@@ -1,10 +1,20 @@
 import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
-import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
 import OrbitDBCommunityInviteMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityInviteMapper';
 import OrbitDBCommunityInviteRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInviteRepository';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+
+const publicStorageGuard = () =>
+  new PrivateCommunityPublicStorageGuard(
+    {
+      findScope: jest.fn().mockResolvedValue(undefined),
+    } as never,
+    new PrivateAuthorizationStorageCoordinator(),
+  );
 
 describe('OrbitDBCommunityInviteRepository', () => {
   const communityId = new CommunityId('community-1');
@@ -45,6 +55,7 @@ describe('OrbitDBCommunityInviteRepository', () => {
     repository = new OrbitDBCommunityInviteRepository(
       registry,
       new OrbitDBCommunityInviteMapper(),
+      publicStorageGuard(),
     );
   });
 

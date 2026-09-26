@@ -1,5 +1,7 @@
 import OrbitDBCommunityReplicaProjection from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaProjection';
 import OrbitDBCommunityReplicaMerger from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaMerger';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import OrbitDBReplicatedHeadCache, {
   OrbitDBReplicatedHeadCacheEntry,
 } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCache';
@@ -220,9 +222,111 @@ function createStores(): {
 }
 
 describe('OrbitDBReplicatedStateRegistry', () => {
+  it('does not publish merged community heads after protection', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const network = createStores();
+    const guard = new PrivateCommunityPublicStorageGuard(
+      { findScope: jest.fn().mockResolvedValue({}) } as never,
+      new PrivateAuthorizationStorageCoordinator(),
+    );
+    new OrbitDBCommunityReplicaProjection(
+      registry,
+      new OrbitDBCommunityReplicaMerger(),
+      guard,
+    ).register();
+    await registry.register('network-1', network.stores);
+    const community = {
+      createdAt: 1,
+      description: 'private',
+      id: 'community-1',
+      memberIds: ['member'],
+      name: 'community',
+      networkId: 'network-1',
+      ownerIdentityId: 'owner',
+      textChannels: [] as unknown[],
+      updatedAt: 2,
+      visibility: 'private',
+    };
+    const key = 'community-member-index:member';
+    registry.cacheHeadLocally(key, {
+      communities: [community],
+      id: key,
+      memberId: 'member',
+      updatedAt: 2,
+    });
+    network.heads.put.mockClear();
+
+    network.heads.emitUpdate({
+      payload: {
+        key,
+        value: {
+          communities: [{ ...community, updatedAt: 1 }],
+          id: key,
+          memberId: 'member',
+          updatedAt: 1,
+        },
+      },
+    });
+    await flushPromises();
+    await flushPromises();
+
+    expect(network.heads.put).not.toHaveBeenCalled();
+  });
+
+  it('does not repair a community head whose key and document identity differ', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const network = createStores();
+    const findScope = jest.fn(async (communityId: { value: string }) =>
+      communityId.value === 'protected-community' ? {} : undefined,
+    );
+    new OrbitDBCommunityReplicaProjection(
+      registry,
+      new OrbitDBCommunityReplicaMerger(),
+      new PrivateCommunityPublicStorageGuard(
+        { findScope } as never,
+        new PrivateAuthorizationStorageCoordinator(),
+      ),
+    ).register();
+    await registry.register('network-1', network.stores);
+    const key = 'community:protected-community';
+    const community = {
+      createdAt: 1,
+      description: 'public',
+      id: 'public-community',
+      memberIds: ['member'],
+      name: 'community',
+      networkId: 'network-1',
+      ownerIdentityId: 'owner',
+      textChannels: [] as unknown[],
+      updatedAt: 2,
+      visibility: 'public',
+    };
+    network.heads.emitUpdate({ payload: { key, value: community } });
+    await flushPromises();
+    network.heads.put.mockClear();
+
+    network.heads.emitUpdate({
+      payload: { key, value: { ...community, updatedAt: 1 } },
+    });
+    await flushPromises();
+    await flushPromises();
+
+    expect(findScope).not.toHaveBeenCalledWith(
+      expect.objectContaining({ value: 'public-community' }),
+    );
+    expect(network.heads.put).not.toHaveBeenCalled();
+  });
+
   it('never persists another private network community through a shared member index', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
-    new OrbitDBCommunityReplicaProjection(registry, new OrbitDBCommunityReplicaMerger()).register();
+    new OrbitDBCommunityReplicaProjection(
+      registry,
+      new OrbitDBCommunityReplicaMerger(),
+      new PrivateCommunityPublicStorageGuard(
+        { findScope: jest.fn().mockResolvedValue(undefined) } as never,
+        new PrivateAuthorizationStorageCoordinator(),
+      ),
+    ).register();
     const first = createStores();
     const second = createStores();
     const key = 'community-member-index:member';

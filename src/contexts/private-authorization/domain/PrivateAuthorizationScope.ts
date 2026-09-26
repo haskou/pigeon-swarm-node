@@ -92,6 +92,9 @@ export class PrivateAuthorizationScope extends AggregateRoot {
       value.byteSize >= 0,
       checkpoint.admittedDeviceKeys.includes(value.authorDeviceKey),
       !checkpoint.revokedDeviceKeys.includes(value.authorDeviceKey),
+      expectedKind !== 'membership.propose' ||
+        value.authorizationRevision > checkpoint.revision ||
+        value.control?.parentHeadHash === checkpoint.headHash,
     ];
 
     if (checks.includes(false)) {

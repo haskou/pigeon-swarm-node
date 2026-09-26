@@ -9,6 +9,8 @@ import { CommunityChannelName } from '@app/contexts/communities/domain/value-obj
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBCommunityMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMapper';
 import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { PrimitiveOf } from '@haskou/value-objects';
@@ -54,6 +56,10 @@ describe('OrbitDBCommunityRepository', () => {
         put: headsPut,
       },
     } as never);
+    const publicStorageGuard = new PrivateCommunityPublicStorageGuard(
+      { findScope: jest.fn().mockResolvedValue(undefined) } as never,
+      new PrivateAuthorizationStorageCoordinator(),
+    );
     repository = new OrbitDBCommunityRepository(
       registry,
       new OrbitDBCommunityMapper(),
@@ -61,7 +67,9 @@ describe('OrbitDBCommunityRepository', () => {
       new OrbitDBCommunityReplicaProjection(
         registry,
         new OrbitDBCommunityReplicaMerger(),
+        publicStorageGuard,
       ),
+      publicStorageGuard,
     );
   });
 
@@ -155,7 +163,7 @@ describe('OrbitDBCommunityRepository', () => {
       }),
     );
     expect(
-      heads.get(`community-member-index:${identityMother.id.valueOf()}`),
+      heads.get(`community-member-index:${identityMother.id.valueOf()}:community-1`),
     ).toEqual(
       expect.objectContaining({
         communities: [expect.objectContaining({ id: 'community-1' })],
@@ -189,7 +197,7 @@ describe('OrbitDBCommunityRepository', () => {
     );
   });
 
-  it('should not wait for member index persistence when saving communities', async () => {
+  it('keeps the save pending until member index persistence finishes', async () => {
     const community = Community.fromPrimitives(communityPrimitives());
     const delayedMemberIndex = deferred<string>();
 
@@ -211,22 +219,22 @@ describe('OrbitDBCommunityRepository', () => {
       new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
     ]);
 
-    expect(result).toBe('saved');
+    expect(result).toBe('blocked');
     expect(heads.get('community:community-1')).toEqual(
       expect.objectContaining({ id: 'community-1' }),
     );
     expect(
-      heads.get(`community-member-index:${identityMother.id.valueOf()}`),
+      heads.get(`community-member-index:${identityMother.id.valueOf()}:community-1`),
     ).toBeUndefined();
     await expect(
       repository.findByMember(identityMother.id),
     ).resolves.toHaveLength(1);
 
     delayedMemberIndex.resolve('ok');
-    await flushBackgroundTasks();
+    await save;
 
     expect(
-      heads.get(`community-member-index:${identityMother.id.valueOf()}`),
+      heads.get(`community-member-index:${identityMother.id.valueOf()}:community-1`),
     ).toEqual(
       expect.objectContaining({
         communities: [expect.objectContaining({ id: 'community-1' })],
@@ -234,24 +242,25 @@ describe('OrbitDBCommunityRepository', () => {
     );
   });
 
-  it('should not wait for replicated document persistence when saving communities', async () => {
+  it('keeps the save pending until document persistence finishes', async () => {
     const community = Community.fromPrimitives(communityPrimitives());
     const delayedWrite = deferred<string>();
 
     communitiesPut.mockImplementationOnce(async () => delayedWrite.promise);
 
+    const save = repository.save(community);
     const result = await Promise.race([
-      repository.save(community).then(() => 'saved'),
+      save.then(() => 'saved'),
       new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
     ]);
 
-    expect(result).toBe('saved');
+    expect(result).toBe('blocked');
     await expect(
       repository.findById(new CommunityId('community-1')),
     ).resolves.toBeDefined();
 
     delayedWrite.resolve('ok');
-    await flushBackgroundTasks();
+    await save;
   });
 
   it('should prefer fresh community heads over stale member indexes', async () => {
@@ -263,9 +272,9 @@ describe('OrbitDBCommunityRepository', () => {
       new CommunityChannelName('updates'),
     );
     await repository.save(freshCommunity);
-    heads.set(`community-member-index:${identityMother.id.valueOf()}`, {
+    heads.set(`community-member-index:${identityMother.id.valueOf()}:community-1`, {
       communities: [stalePrimitives],
-      id: `community-member-index:${identityMother.id.valueOf()}`,
+      id: `community-member-index:${identityMother.id.valueOf()}:community-1`,
       identityId: identityMother.id.valueOf(),
       updatedAt: Date.now() - 1,
     });
@@ -311,14 +320,14 @@ describe('OrbitDBCommunityRepository', () => {
     await repository.save(freshCommunity);
     const freshHead = heads.get('community:community-1');
 
-    heads.set(`community-member-index:${identityMother.id.valueOf()}`, {
+    heads.set(`community-member-index:${identityMother.id.valueOf()}:community-1`, {
       communities: [
         {
           ...stalePrimitives,
           updatedAt: freshHead?.updatedAt,
         },
       ],
-      id: `community-member-index:${identityMother.id.valueOf()}`,
+      id: `community-member-index:${identityMother.id.valueOf()}:community-1`,
       identityId: identityMother.id.valueOf(),
       updatedAt: Date.now(),
     });
@@ -338,10 +347,10 @@ describe('OrbitDBCommunityRepository', () => {
 
     await registry.putHead('community:community-1', primitives, [networkId]);
     await registry.putHead(
-      `community-member-index:${identityMother.id.valueOf()}`,
+      `community-member-index:${identityMother.id.valueOf()}:community-1`,
       {
         communities: [primitives],
-        id: `community-member-index:${identityMother.id.valueOf()}`,
+        id: `community-member-index:${identityMother.id.valueOf()}:community-1`,
         identityId: identityMother.id.valueOf(),
         updatedAt: Date.now(),
       },
@@ -371,7 +380,7 @@ describe('OrbitDBCommunityRepository', () => {
 
   it('should not return deleted communities from stale member indexes', async () => {
     const community = Community.fromPrimitives(communityPrimitives());
-    const indexKey = `community-member-index:${identityMother.id.valueOf()}`;
+    const indexKey = `community-member-index:${identityMother.id.valueOf()}:community-1`;
 
     await repository.save(community);
     await flushBackgroundTasks();

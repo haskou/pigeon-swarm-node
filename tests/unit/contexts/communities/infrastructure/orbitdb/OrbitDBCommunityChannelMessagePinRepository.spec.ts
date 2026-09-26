@@ -2,6 +2,8 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBCommunityChannelMessagePinRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessagePinRepository';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
@@ -75,6 +77,14 @@ function createStore(): {
   return store;
 }
 
+const publicStorageGuard = () =>
+  new PrivateCommunityPublicStorageGuard(
+    {
+      findScope: jest.fn().mockResolvedValue(undefined),
+    } as never,
+    new PrivateAuthorizationStorageCoordinator(),
+  );
+
 describe('OrbitDBCommunityChannelMessagePinRepository', () => {
   const communityId = new CommunityId('community-1');
   const channelId = new CommunityChannelId('channel-1');
@@ -95,7 +105,10 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
       heads,
       pins,
     } as never);
-    repository = new OrbitDBCommunityChannelMessagePinRepository(registry);
+    repository = new OrbitDBCommunityChannelMessagePinRepository(
+      registry,
+      publicStorageGuard(),
+    );
   });
 
   afterEach(() => {
@@ -138,28 +151,32 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
     expect(pins.query).not.toHaveBeenCalled();
   });
 
-  it('does not wait for pin index head persistence when pinning', async () => {
+  it('keeps pinning pending until index persistence finishes', async () => {
     heads.stopWrites();
 
+    const pin = repository.pin(
+      communityId,
+      channelId,
+      messageId,
+      identityId,
+      new Timestamp(1780000000000),
+    );
     await expect(
-      repository.pin(
-        communityId,
-        channelId,
-        messageId,
-        identityId,
-        new Timestamp(1780000000000),
-      ),
-    ).resolves.toBeUndefined();
+      Promise.race([
+        pin.then(() => 'saved'),
+        new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+      ]),
+    ).resolves.toBe('blocked');
 
     await expect(
       repository.findByChannel(communityId, channelId),
     ).resolves.toHaveLength(1);
 
     heads.releaseWrites();
-    await flushBackgroundTasks();
+    await pin;
   });
 
-  it('does not wait for pin index head persistence when unpinning', async () => {
+  it('keeps unpinning pending until index persistence finishes', async () => {
     await repository.pin(
       communityId,
       channelId,
@@ -170,16 +187,20 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
     await flushBackgroundTasks();
     heads.stopWrites();
 
+    const unpin = repository.unpin(communityId, channelId, messageId);
     await expect(
-      repository.unpin(communityId, channelId, messageId),
-    ).resolves.toBeUndefined();
+      Promise.race([
+        unpin.then(() => 'saved'),
+        new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+      ]),
+    ).resolves.toBe('blocked');
 
     await expect(
       repository.findByChannel(communityId, channelId),
     ).resolves.toEqual([]);
 
     heads.releaseWrites();
-    await flushBackgroundTasks();
+    await unpin;
   });
 });
 

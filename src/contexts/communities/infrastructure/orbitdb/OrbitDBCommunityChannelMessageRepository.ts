@@ -6,6 +6,7 @@ import { CommunityChannelMessageId } from '@app/contexts/communities/domain/valu
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
+import PrivateCommunityPublicStorageGuard from '../PrivateCommunityPublicStorageGuard';
 import { OrbitDBCommunityChannelMessageDocument } from './documents/OrbitDBCommunityChannelMessageDocument';
 import OrbitDBCommunityChannelMessageMapper from './mappers/OrbitDBCommunityChannelMessageMapper';
 import OrbitDBCommunityChannelMessageIndex from './OrbitDBCommunityChannelMessageIndex';
@@ -20,6 +21,7 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBCommunityChannelMessageMapper,
+    private readonly publicStorageGuard: PrivateCommunityPublicStorageGuard,
   ) {
     super();
     this.messageIndex = new OrbitDBCommunityChannelMessageIndex(this.registry);
@@ -76,7 +78,7 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
       ),
     );
 
-    this.threadSummaryIndex.refreshForDocumentsInBackground(documents);
+    await this.threadSummaryIndex.refreshForDocuments(documents);
   }
 
   public async findById(
@@ -84,6 +86,7 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     channelId: CommunityChannelId,
     messageId: CommunityChannelMessageId,
   ): Promise<CommunityChannelMessage | undefined> {
+    await this.publicStorageGuard.assertPublic(communityId);
     const document = (
       await this.findMessageDocumentsByChannel(communityId, channelId)
     ).find((candidate) =>
@@ -101,6 +104,7 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     limit: number,
     beforeMessageId?: CommunityChannelMessageId,
   ): Promise<CommunityChannelMessage[]> {
+    await this.publicStorageGuard.assertPublic(communityId);
     const documents = await this.findMessageDocumentsByChannel(
       communityId,
       channelId,
@@ -128,6 +132,7 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     communityId: CommunityId,
     limit: number,
   ): Promise<CommunityChannelMessage[]> {
+    await this.publicStorageGuard.assertPublic(communityId);
     const documents = await this.messageIndex.allByCommunity(communityId);
 
     return this.toDomain(
@@ -139,6 +144,7 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     communityId: CommunityId,
     limit: number,
   ): Promise<CommunityChannelMessage[]> {
+    await this.publicStorageGuard.assertPublic(communityId);
     const documents = (
       await this.messageIndex.allByCommunity(communityId)
     ).filter((document) => !document.plaintextPayload);
@@ -154,6 +160,7 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     rootMessageId: CommunityChannelMessageId,
     limit: number,
   ): Promise<CommunityChannelMessage[]> {
+    await this.publicStorageGuard.assertPublic(communityId);
     const documents = (
       await this.findMessageDocumentsByChannel(communityId, channelId)
     ).filter(
@@ -168,6 +175,8 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     channelIds: CommunityChannelId[],
     limitPerChannel: number,
   ): Promise<Map<string, CommunityChannelThreadSummary[]>> {
+    await this.publicStorageGuard.assertPublic(communityId);
+
     return this.threadSummaryIndex.findByChannel(
       communityId,
       channelIds,
@@ -181,6 +190,8 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     query: string,
     limit: number,
   ): Promise<CommunityChannelMessage[]> {
+    await this.publicStorageGuard.assertPublic(communityId);
+
     return this.searchPublicByChannels(communityId, [channelId], query, limit);
   }
 
@@ -190,6 +201,7 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     query: string,
     limit: number,
   ): Promise<CommunityChannelMessage[]> {
+    await this.publicStorageGuard.assertPublic(communityId);
     const trimmedQuery = query.trim();
 
     if (!trimmedQuery || channelIds.length === 0) {
@@ -216,15 +228,18 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
 
   public async save(message: CommunityChannelMessage): Promise<void> {
     const document = this.mapper.toDocument(message);
+    const communityId = new CommunityId(document.communityId);
 
-    await this.registry.putDocument('messages', document);
+    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      await this.registry.putDocument('messages', document);
 
-    if (document.replyToMessageId) {
-      this.threadSummaryIndex.refreshForChannelInBackground(
-        new CommunityId(document.communityId),
-        new CommunityChannelId(document.channelId),
-      );
-    }
+      if (document.replyToMessageId) {
+        await this.threadSummaryIndex.refreshForChannel(
+          communityId,
+          new CommunityChannelId(document.channelId),
+        );
+      }
+    });
   }
 
   public async delete(
@@ -232,12 +247,15 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     channelId: CommunityChannelId,
     messageId: CommunityChannelMessageId,
   ): Promise<void> {
-    await this.tombstone(
-      (await this.findMessageDocumentsByChannel(communityId, channelId)).filter(
-        (document) =>
+    await this.publicStorageGuard.runWhilePublic(communityId, async () =>
+      this.tombstone(
+        (
+          await this.findMessageDocumentsByChannel(communityId, channelId)
+        ).filter((document) =>
           new CommunityChannelMessageId(
             this.messageIndex.getMessageId(document),
           ).isEqual(messageId),
+        ),
       ),
     );
   }
@@ -246,12 +264,16 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<void> {
-    await this.tombstone(
-      await this.findMessageDocumentsByChannel(communityId, channelId),
+    await this.publicStorageGuard.runWhilePublic(communityId, async () =>
+      this.tombstone(
+        await this.findMessageDocumentsByChannel(communityId, channelId),
+      ),
     );
   }
 
   public async deleteByCommunity(communityId: CommunityId): Promise<void> {
-    await this.tombstone(await this.messageIndex.allByCommunity(communityId));
+    await this.publicStorageGuard.runWhilePublic(communityId, async () =>
+      this.tombstone(await this.messageIndex.allByCommunity(communityId)),
+    );
   }
 }

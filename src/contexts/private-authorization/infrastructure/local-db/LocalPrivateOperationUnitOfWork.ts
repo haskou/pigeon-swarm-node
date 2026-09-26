@@ -1,6 +1,9 @@
 import { PrivateExpectedCheckpoint } from '@app/contexts/private-authorization/application/PrivateExpectedCheckpoint';
 import { PrivateOperationAcceptance } from '@app/contexts/private-authorization/application/PrivateOperationAcceptance';
 import { PrivateOperationUnitOfWork } from '@app/contexts/private-authorization/application/PrivateOperationUnitOfWork';
+import { PrivateAuthorizationConflictError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationConflictError';
+import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
+import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
 import EmbeddedLocalDatabase, {
   EmbeddedLocalDatabaseOperation,
 } from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
@@ -168,17 +171,48 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       return 'stale';
     }
 
-    const acceptedScopeId = acceptance.scope.toPrimitives().checkpoint.scopeId;
+    if (!currentScope) return 'stale';
+    const rebasedAcceptance = this.rebaseAcceptance(currentScope, acceptance);
+    const acceptedScopeId =
+      rebasedAcceptance.scope.toPrimitives().checkpoint.scopeId;
 
     if ([acceptedScopeId, receipt.scopeId].some((id) => id !== scopeId)) {
       throw new Error('Invalid private authorization');
     }
 
-    if (!(await this.reservationMatches(scopeId, acceptance))) return 'stale';
+    if (!(await this.reservationMatches(scopeId, rebasedAcceptance))) {
+      return 'stale';
+    }
 
-    await this.database.commit(this.acceptanceOperations(scopeId, acceptance));
+    await this.database.commit(
+      this.acceptanceOperations(scopeId, rebasedAcceptance),
+    );
 
     return 'committed';
+  }
+
+  private rebaseAcceptance(
+    currentScope: NonNullable<
+      Awaited<ReturnType<LocalPrivateAuthorizationRepository['findScope']>>
+    >,
+    acceptance: PrivateOperationAcceptance,
+  ): PrivateOperationAcceptance {
+    const operation = acceptance.receipt.toPrimitives();
+    const candidate = PrivateAuthorizationCheckpoint.fromPrimitives(
+      acceptance.scope.toPrimitives().checkpoint,
+    );
+    const result =
+      operation.kind === 'membership.propose'
+        ? currentScope.acceptProposal(acceptance.receipt)
+        : operation.kind === 'membership.commit'
+          ? currentScope.commitTransition(acceptance.receipt, candidate)
+          : currentScope.revokeDevice(acceptance.receipt, candidate);
+
+    if (result !== 'accepted' && result !== 'duplicate') {
+      throw new Error('Invalid private authorization');
+    }
+
+    return { ...acceptance, scope: currentScope };
   }
 
   private async isCommitted(
@@ -191,7 +225,14 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     if (!existing) return false;
 
     if (existing.digest !== digest) {
-      throw new Error('Private authorization conflict');
+      const scope = await this.repository.findScope(scopeId);
+
+      if (scope) {
+        scope.quarantine();
+        await this.repository.saveScope(scope);
+      }
+
+      throw new PrivateAuthorizationConflictError();
     }
 
     return true;
@@ -226,6 +267,48 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     );
   }
 
+  private checkpointMatches(
+    scope: NonNullable<
+      Awaited<ReturnType<LocalPrivateAuthorizationRepository['findScope']>>
+    >,
+    expected: PrivateExpectedCheckpoint,
+  ): boolean {
+    const checkpoint = scope.toPrimitives().checkpoint;
+
+    return (
+      checkpoint.headHash === expected.headHash &&
+      checkpoint.revision === expected.revision
+    );
+  }
+
+  private async commitPendingExclusively(
+    scopeId: string,
+    expectedCheckpoint: PrivateExpectedCheckpoint,
+    operation: PrivateControlOperation,
+  ): Promise<'committed' | 'stale'> {
+    const scope = await this.repository.findScope(scopeId);
+
+    if (!scope || !this.checkpointMatches(scope, expectedCheckpoint)) {
+      return 'stale';
+    }
+    let assessment: ReturnType<typeof scope.assess>;
+
+    try {
+      assessment = scope.assess(operation);
+    } catch (error) {
+      if (error instanceof PrivateAuthorizationConflictError) {
+        await this.repository.saveScope(scope);
+      }
+
+      throw error;
+    }
+
+    if (assessment === 'ready') return 'stale';
+    await this.repository.saveScope(scope);
+
+    return 'committed';
+  }
+
   public async commitAcceptance(
     scopeId: string,
     expectedCheckpoint: PrivateExpectedCheckpoint,
@@ -234,6 +317,26 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     return this.exclusively(scopeId, () =>
       this.commitExclusively(scopeId, expectedCheckpoint, acceptance),
     );
+  }
+
+  public async commitPending(
+    scopeId: string,
+    expectedCheckpoint: PrivateExpectedCheckpoint,
+    operation: PrivateControlOperation,
+  ): Promise<'committed' | 'stale'> {
+    return this.exclusively(scopeId, () =>
+      this.commitPendingExclusively(scopeId, expectedCheckpoint, operation),
+    );
+  }
+
+  public async quarantine(scopeId: string): Promise<void> {
+    return this.exclusively(scopeId, async () => {
+      const scope = await this.repository.findScope(scopeId);
+
+      if (!scope) throw new PrivateAuthorizationConflictError();
+      scope.quarantine();
+      await this.repository.saveScope(scope);
+    });
   }
 
   public async reserveChild(

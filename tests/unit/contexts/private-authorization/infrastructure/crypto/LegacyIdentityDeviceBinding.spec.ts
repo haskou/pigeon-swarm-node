@@ -32,7 +32,9 @@ describe('LegacyIdentityDeviceBinding', () => {
     try {
       binding.bind(spki);
     } catch (error) {
-      expect(String(error)).toBe('InvalidPrivateAuthorizationError: Invalid private authorization');
+      expect(String(error)).toBe(
+        '[InvalidPrivateAuthorizationError]: Invalid private authorization',
+      );
       expect(String(error)).not.toContain(spki);
     }
   });

@@ -1,7 +1,14 @@
+import { PrivateControlOperation } from '../domain/PrivateControlOperation';
 import { PrivateExpectedCheckpoint } from './PrivateExpectedCheckpoint';
 import { PrivateOperationAcceptance } from './PrivateOperationAcceptance';
 
 export abstract class PrivateOperationUnitOfWork {
+  public abstract commitPending(
+    scopeId: string,
+    expectedCheckpoint: PrivateExpectedCheckpoint,
+    operation: PrivateControlOperation,
+  ): Promise<'committed' | 'stale'>;
+
   public abstract commitAcceptance(
     scopeId: string,
     expectedCheckpoint: PrivateExpectedCheckpoint,
@@ -13,4 +20,6 @@ export abstract class PrivateOperationUnitOfWork {
     parentHeadHash: string,
     childHeadHash: string,
   ): Promise<'reserved' | 'same' | 'conflict'>;
+
+  public abstract quarantine(scopeId: string): Promise<void>;
 }

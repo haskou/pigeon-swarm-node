@@ -72,7 +72,6 @@ export default class PrivateOperationAcceptor {
   }
 
   private async duplicate(
-    scope: PrivateAuthorizationScope,
     operation: PrivateControlOperation,
   ): Promise<boolean> {
     const value = operation.toPrimitives();
@@ -81,8 +80,7 @@ export default class PrivateOperationAcceptor {
     if (!receipt) return false;
 
     if (receipt.digest === value.digest) return true;
-    scope.quarantine();
-    await this.repository.saveScope(scope);
+    await this.unitOfWork.quarantine(value.scopeId);
     throw new PrivateAuthorizationConflictError();
   }
 
@@ -174,7 +172,7 @@ export default class PrivateOperationAcceptor {
     const { operation, scope } = await this.verifiedOperation(message);
     const value = operation.toPrimitives();
 
-    if (await this.duplicate(scope, operation)) return { status: 'duplicate' };
+    if (await this.duplicate(operation)) return { status: 'duplicate' };
     const checkpoint = PrivateAuthorizationCheckpoint.fromPrimitives(
       scope.toPrimitives().checkpoint,
     );
@@ -189,7 +187,7 @@ export default class PrivateOperationAcceptor {
       assessment = scope.assess(operation);
     } catch (error) {
       if (error instanceof PrivateAuthorizationConflictError) {
-        await this.repository.saveScope(scope);
+        await this.unitOfWork.quarantine(value.scopeId);
       }
 
       throw error;
@@ -198,7 +196,15 @@ export default class PrivateOperationAcceptor {
     if (assessment === 'duplicate') return { status: 'duplicate' };
 
     if (assessment === 'pending') {
-      await this.repository.saveScope(scope);
+      const committed = await this.unitOfWork.commitPending(
+        value.scopeId,
+        this.expectedCheckpoint(checkpoint),
+        operation,
+      );
+
+      if (committed !== 'committed') {
+        throw new InvalidPrivateAuthorizationError();
+      }
 
       return { status: 'pending' };
     }

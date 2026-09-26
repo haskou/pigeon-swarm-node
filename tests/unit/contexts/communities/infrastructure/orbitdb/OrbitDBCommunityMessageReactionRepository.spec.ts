@@ -5,9 +5,19 @@ import { CommunityChannelMessageReactionEmoji } from '@app/contexts/communities/
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBCommunityChannelMessageReactionMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityChannelMessageReactionMapper';
 import OrbitDBCommunityMessageReactionRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityMessageReactionRepository';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
+
+const publicStorageGuard = () =>
+  new PrivateCommunityPublicStorageGuard(
+    {
+      findScope: jest.fn().mockResolvedValue(undefined),
+    } as never,
+    new PrivateAuthorizationStorageCoordinator(),
+  );
 
 describe('OrbitDBCommunityMessageReactionRepository', () => {
   const communityId = new CommunityId('community-1');
@@ -68,6 +78,7 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     repository = new OrbitDBCommunityMessageReactionRepository(
       registry,
       new OrbitDBCommunityChannelMessageReactionMapper(),
+      publicStorageGuard(),
     );
   });
 
@@ -113,7 +124,69 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it('should not wait for reaction index head persistence when saving', async () => {
+  it('does not tombstone a reaction bound to another community through a poisoned index', async () => {
+    const otherCommunityId = new CommunityId('community-2');
+    const reaction = CommunityChannelMessageReaction.create(
+      otherCommunityId,
+      channelId,
+      messageId,
+      authorIdentityId,
+      new CommunityChannelMessageReactionEmoji('👍'),
+      new Timestamp(1780000000000),
+    );
+    await repository.save(reaction);
+    const stored = [...documents.values()][0];
+    headRecords.set(`community-reaction-index:${communityId.valueOf()}`, {
+      communityId: communityId.valueOf(),
+      id: `community-reaction-index:${communityId.valueOf()}`,
+      reactions: [stored],
+      updatedAt: 1,
+    });
+
+    await repository.deleteByCommunity(communityId);
+
+    expect(documents.get(String(stored.id))).toEqual(stored);
+  });
+
+  it('removes cross-community records when refreshing a community index', async () => {
+    const otherCommunityId = new CommunityId('community-2');
+    const otherReaction = CommunityChannelMessageReaction.create(
+      otherCommunityId,
+      channelId,
+      messageId,
+      authorIdentityId,
+      new CommunityChannelMessageReactionEmoji('👍'),
+      new Timestamp(1780000000000),
+    );
+    await repository.save(otherReaction);
+    const poisoned = [...documents.values()][0];
+    const indexKey = `community-reaction-index:${communityId.valueOf()}`;
+    headRecords.set(indexKey, {
+      communityId: communityId.valueOf(),
+      id: indexKey,
+      reactions: [poisoned],
+      updatedAt: 1,
+    });
+    const ownReaction = CommunityChannelMessageReaction.create(
+      communityId,
+      channelId,
+      messageId,
+      authorIdentityId,
+      new CommunityChannelMessageReactionEmoji('👍'),
+      new Timestamp(1780000000001),
+    );
+
+    await repository.save(ownReaction);
+
+    const storedIndex = headRecords.get(indexKey);
+    expect(
+      (storedIndex?.reactions as Array<{ communityId: string }>).map(
+        (reaction) => reaction.communityId,
+      ),
+    ).toEqual([communityId.valueOf()]);
+  });
+
+  it('keeps saving pending until reaction index persistence finishes', async () => {
     const reaction = CommunityChannelMessageReaction.create(
       communityId,
       channelId,
@@ -124,7 +197,13 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     );
     blockHeadPersistence = true;
 
-    await expect(repository.save(reaction)).resolves.toBeUndefined();
+    const save = repository.save(reaction);
+    await expect(
+      Promise.race([
+        save.then(() => 'saved'),
+        new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+      ]),
+    ).resolves.toBe('blocked');
 
     const byMessage = await repository.findByMessageIds(
       communityId,
@@ -137,10 +216,10 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     ]);
 
     releaseHeadPersistence();
-    await flushBackgroundTasks();
+    await save;
   });
 
-  it('should not wait for reaction index head persistence when deleting', async () => {
+  it('keeps deleting pending until reaction index persistence finishes', async () => {
     const reaction = CommunityChannelMessageReaction.create(
       communityId,
       channelId,
@@ -154,14 +233,20 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     await flushBackgroundTasks();
     blockHeadPersistence = true;
 
-    await expect(repository.delete(reaction)).resolves.toBeUndefined();
+    const deletion = repository.delete(reaction);
+    await expect(
+      Promise.race([
+        deletion.then(() => 'saved'),
+        new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+      ]),
+    ).resolves.toBe('blocked');
 
     await expect(
       repository.findByMessageIds(communityId, channelId, [messageId]),
     ).resolves.toEqual([]);
 
     releaseHeadPersistence();
-    await flushBackgroundTasks();
+    await deletion;
   });
 
   function releaseHeadPersistence(): void {

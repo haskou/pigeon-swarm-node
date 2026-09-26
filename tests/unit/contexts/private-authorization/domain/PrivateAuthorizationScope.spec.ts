@@ -30,6 +30,7 @@ describe('PrivateAuthorizationScope', () => {
       authorDeviceKey: ownerKey,
       authorizationRevision: 0,
       byteSize: 512,
+      control: { parentHeadHash: 'head-0' },
       digest: 'digest-proposal',
       id: 'proposal',
       kind: 'membership.propose',
@@ -106,6 +107,7 @@ describe('PrivateAuthorizationScope', () => {
     ['old revision', { authorizationRevision: -1 }],
     ['unknown author', { authorDeviceKey: 'unknown-key' }],
     ['unsupported kind', { kind: 'message.create' }],
+    ['wrong parent head', { control: { parentHeadHash: 'other-head' } }],
   ])('rejects %s without changing accepted state', (_label, change) => {
     const scope = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
 

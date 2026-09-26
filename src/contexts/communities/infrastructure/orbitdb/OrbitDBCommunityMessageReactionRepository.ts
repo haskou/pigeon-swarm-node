@@ -6,6 +6,7 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
+import PrivateCommunityPublicStorageGuard from '../PrivateCommunityPublicStorageGuard';
 import { OrbitDBCommunityChannelMessageReactionDocument } from './documents/OrbitDBCommunityChannelMessageReactionDocument';
 import OrbitDBCommunityChannelMessageReactionMapper from './mappers/OrbitDBCommunityChannelMessageReactionMapper';
 
@@ -15,6 +16,7 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBCommunityChannelMessageReactionMapper,
+    private readonly publicStorageGuard: PrivateCommunityPublicStorageGuard,
   ) {
     super();
     this.reactionIndex = new OrbitDBHeadIndex(this.registry, {
@@ -80,16 +82,21 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
   private putIndexDocument(
     communityId: CommunityId,
     document: Record<string, unknown>,
-  ): void {
+  ): Promise<void> {
     const key = this.indexHeadKey(communityId);
 
-    void this.reactionIndex.replicateRecordInBackground(
+    return this.reactionIndex.putRecord(
       key,
       {
         communityId: communityId.valueOf(),
         id: key,
       },
       document,
+      [],
+      {
+        recordFilter: (record) => record.communityId === communityId.valueOf(),
+        replace: true,
+      },
     );
   }
 
@@ -98,9 +105,13 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
       reaction,
       this.documentId(reaction),
     );
-
-    await this.registry.putDocument('reactions', document);
-    this.putIndexDocument(new CommunityId(document.communityId), document);
+    const communityId = new CommunityId(document.communityId);
+    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      await Promise.all([
+        this.registry.putDocument('reactions', document),
+        this.putIndexDocument(communityId, document),
+      ]);
+    });
   }
 
   public async delete(
@@ -111,9 +122,13 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
       removed: true,
       updatedAt: Date.now(),
     };
-
-    await this.registry.putDocument('reactions', document);
-    this.putIndexDocument(new CommunityId(document.communityId), document);
+    const communityId = new CommunityId(document.communityId);
+    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      await Promise.all([
+        this.registry.putDocument('reactions', document),
+        this.putIndexDocument(communityId, document),
+      ]);
+    });
   }
 
   public async findByMessageIds(
@@ -121,6 +136,8 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     channelId: CommunityChannelId,
     messageIds: CommunityChannelMessageId[],
   ): Promise<CommunityChannelMessageReaction[]> {
+    await this.publicStorageGuard.assertPublic(communityId);
+
     return this.findByMessageIdsInChannels(
       communityId,
       [channelId],
@@ -133,6 +150,8 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     channelIds: CommunityChannelId[],
     messageIds: CommunityChannelMessageId[],
   ): Promise<CommunityChannelMessageReaction[]> {
+    await this.publicStorageGuard.assertPublic(communityId);
+
     if (messageIds.length === 0 || channelIds.length === 0) {
       return [];
     }
@@ -157,6 +176,7 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
       )
       .filter(
         (document) =>
+          document.communityId === communityId.valueOf() &&
           channelIdValues.has(document.channelId) &&
           messageIdValues.has(document.messageId),
       )
@@ -168,6 +188,7 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     communityId: CommunityId,
     limit: number,
   ): Promise<CommunityChannelMessageReaction[]> {
+    await this.publicStorageGuard.assertPublic(communityId);
     const indexedDocuments = await this.reactionIndex.find(
       this.indexHeadKey(communityId),
     );
@@ -178,7 +199,8 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
         (
           document,
         ): document is OrbitDBCommunityChannelMessageReactionDocument =>
-          this.isDocument(document),
+          this.isDocument(document) &&
+          document.communityId === communityId.valueOf(),
       )
       .sort((left, right) => left.createdAt - right.createdAt)
       .slice(-limit)
@@ -189,42 +211,19 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<void> {
-    const documents =
-      (await this.reactionIndex.find(this.indexHeadKey(communityId)))?.filter(
-        (
-          document,
-        ): document is OrbitDBCommunityChannelMessageReactionDocument =>
-          this.isDocument(document) &&
-          new CommunityChannelId(document.channelId).isEqual(channelId),
-      ) ?? [];
-
-    await Promise.all(
-      documents.map(async (document) => {
-        const tombstone = {
-          ...document,
-          removed: true,
-          updatedAt: Date.now(),
-        };
-
-        await this.registry.putDocument('reactions', tombstone);
-        this.putIndexDocument(communityId, tombstone);
-      }),
-    );
-  }
-
-  public async deleteByCommunity(communityId: CommunityId): Promise<void> {
-    const documents =
-      (await this.reactionIndex.find(this.indexHeadKey(communityId))) ?? [];
-
-    await Promise.all(
-      documents
-        .filter(
+    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const documents =
+        (await this.reactionIndex.find(this.indexHeadKey(communityId)))?.filter(
           (
             document,
           ): document is OrbitDBCommunityChannelMessageReactionDocument =>
-            this.isDocument(document),
-        )
-        .map(async (document) => {
+            this.isDocument(document) &&
+            document.communityId === communityId.valueOf() &&
+            new CommunityChannelId(document.channelId).isEqual(channelId),
+        ) ?? [];
+
+      await Promise.all(
+        documents.map(async (document) => {
           const tombstone = {
             ...document,
             removed: true,
@@ -232,8 +231,37 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
           };
 
           await this.registry.putDocument('reactions', tombstone);
-          this.putIndexDocument(communityId, tombstone);
+          await this.putIndexDocument(communityId, tombstone);
         }),
-    );
+      );
+    });
+  }
+
+  public async deleteByCommunity(communityId: CommunityId): Promise<void> {
+    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const documents =
+        (await this.reactionIndex.find(this.indexHeadKey(communityId))) ?? [];
+
+      await Promise.all(
+        documents
+          .filter(
+            (
+              document,
+            ): document is OrbitDBCommunityChannelMessageReactionDocument =>
+              this.isDocument(document) &&
+              document.communityId === communityId.valueOf(),
+          )
+          .map(async (document) => {
+            const tombstone = {
+              ...document,
+              removed: true,
+              updatedAt: Date.now(),
+            };
+
+            await this.registry.putDocument('reactions', tombstone);
+            await this.putIndexDocument(communityId, tombstone);
+          }),
+      );
+    });
   }
 }

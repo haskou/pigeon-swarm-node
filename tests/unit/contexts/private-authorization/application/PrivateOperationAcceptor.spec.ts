@@ -81,7 +81,9 @@ describe('PrivateOperationAcceptor', () => {
       saveScope: jest.fn(),
     };
     unitOfWork = {
+      commitPending: jest.fn().mockResolvedValue('committed'),
       commitAcceptance: jest.fn().mockResolvedValue('committed'),
+      quarantine: jest.fn(),
       reserveChild: jest.fn(),
     };
     verifier = {
@@ -156,7 +158,7 @@ describe('PrivateOperationAcceptor', () => {
       ),
     ).resolves.toEqual({ status: 'pending' });
 
-    expect(repository.saveScope).toHaveBeenCalled();
+    expect(unitOfWork.commitPending).toHaveBeenCalled();
     expect(mutations.apply).not.toHaveBeenCalled();
     expect(unitOfWork.commitAcceptance).not.toHaveBeenCalled();
   });
@@ -243,12 +245,7 @@ describe('PrivateOperationAcceptor', () => {
         ),
       ),
     ).rejects.toThrow('Private authorization conflict');
-    expect(repository.saveScope).toHaveBeenCalledWith(
-      expect.objectContaining({ toPrimitives: expect.any(Function) }),
-    );
-    expect(
-      repository.saveScope.mock.calls[0][0].toPrimitives().status,
-    ).toBe('frozen');
+    expect(unitOfWork.quarantine).toHaveBeenCalledWith(scopeId);
   });
 
   it('maps malformed, unsupported and forged inputs to one redacted error', async () => {

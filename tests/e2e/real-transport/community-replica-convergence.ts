@@ -6,6 +6,8 @@ import { CommunityRole } from '@app/contexts/communities/domain/entities/members
 import { CommunityName } from '@app/contexts/communities/domain/value-objects/CommunityName';
 import { CommunityDescription } from '@app/contexts/communities/domain/value-objects/CommunityDescription';
 import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import OrbitDBCommunityMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMapper';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { HeliaIPFS } from '@app/contexts/shared/infrastructure/ipfs/helia/HeliaIPFS';
@@ -41,6 +43,11 @@ const mapper = new OrbitDBCommunityMapper();
 const nodes: Replica[] = [];
 const pause = (milliseconds: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
+const publicStorageGuard = () =>
+  new PrivateCommunityPublicStorageGuard(
+    { findScope: async (): Promise<undefined> => undefined } as never,
+    new PrivateAuthorizationStorageCoordinator(),
+  );
 let stage = 'setup';
 let root: string;
 
@@ -103,6 +110,7 @@ async function open(
   for (const store of Object.values(replica.stores))
     store.events.on('error', () => undefined);
   replica.registry = registry;
+  const guard = publicStorageGuard();
   replica.repository = new OrbitDBCommunityRepository(
     replica.registry,
     mapper,
@@ -110,7 +118,9 @@ async function open(
     new OrbitDBCommunityReplicaProjection(
       replica.registry,
       new OrbitDBCommunityReplicaMerger(),
+      guard,
     ),
+    guard,
   );
   await replica.registry.register(
     scopedNetworkId,
@@ -445,7 +455,6 @@ async function main(): Promise<void> {
     description: 'Only members of the second network may receive this profile',
   });
   await save(fourth, separate);
-  const indexKey = `community-member-index:${owner.valueOf()}`;
   const scopedStores = [
     ...nodes.slice(0, 3).map((node) => ({
       store: node.stores!.heads,
@@ -456,6 +465,7 @@ async function main(): Promise<void> {
   ];
   const assertPersistedIsolation = async (): Promise<void> => {
     for (const scoped of scopedStores) {
+      const indexKey = `community-member-index:${owner.valueOf()}:${scoped.expected.getId().valueOf()}`;
       await until('actual scoped member index persisted', async () => {
         const record = (await scoped.store.get!(indexKey)) as
           { communities?: Array<{ id: string }> } | undefined;
@@ -544,6 +554,7 @@ async function main(): Promise<void> {
   await assertPersistedIsolation();
   stage = 'reconstructing two network indexes from actual persisted stores';
   const reconstructedRegistry = new OrbitDBReplicatedStateRegistry();
+  const reconstructedGuard = publicStorageGuard();
   const reconstructedRepository = new OrbitDBCommunityRepository(
     reconstructedRegistry,
     mapper,
@@ -551,7 +562,9 @@ async function main(): Promise<void> {
     new OrbitDBCommunityReplicaProjection(
       reconstructedRegistry,
       new OrbitDBCommunityReplicaMerger(),
+      reconstructedGuard,
     ),
+    reconstructedGuard,
   );
   try {
     await reconstructedRegistry.register(

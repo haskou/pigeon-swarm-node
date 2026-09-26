@@ -111,7 +111,9 @@ describe('private authorization cryptography adapters', () => {
     try {
       invoke();
     } catch (error) {
-      expect(String(error)).toBe('InvalidPrivateAuthorizationError: Invalid private authorization');
+      expect(String(error)).toBe(
+        '[InvalidPrivateAuthorizationError]: Invalid private authorization',
+      );
     }
   });
 });

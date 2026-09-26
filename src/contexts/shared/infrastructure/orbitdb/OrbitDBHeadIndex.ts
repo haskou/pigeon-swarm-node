@@ -180,10 +180,10 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     head: Record<string, unknown> | undefined,
     record: Record<string, unknown>,
     networkIds: string[],
-  ): void {
+  ): Promise<void> {
     const records = this.mergeRecords(this.recordsFromHead(head), record);
 
-    this.registry.replicateHeadInBackground(
+    return this.registry.putHead(
       key,
       this.recordsHead(metadata, records, this.nextHeadUpdatedAt(head)),
       networkIds,
@@ -202,7 +202,7 @@ export class OrbitDBHeadIndex<TDocument extends object> {
       : undefined;
     const cachedHead = this.registry.findCachedHead(key);
 
-    this.replicateRecordHead(
+    await this.replicateRecordHead(
       key,
       metadata,
       preferPersistedHead
@@ -371,11 +371,13 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     documents: TDocument[],
     options: OrbitDBHeadIndexPutOptions<TDocument> = {},
   ): Promise<void> {
-    await this.registry.putHead(
-      key,
-      this.documentsHead(metadata, documents, options),
-      options.networkIds ?? [],
-    );
+    const head = this.documentsHead(metadata, documents, options);
+
+    if (options.replace) {
+      await this.registry.putHeadExactly(key, head, options.networkIds ?? []);
+    } else {
+      await this.registry.putHead(key, head, options.networkIds ?? []);
+    }
   }
 
   public replicateDocumentsInBackground(
@@ -396,20 +398,50 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     metadata: Record<string, unknown>,
     record: Record<string, unknown>,
     networkIds: string[] = [],
+    options: OrbitDBHeadIndexPutOptions<TDocument> = {},
   ): Promise<void> {
+    if (options.replace) {
+      const previous = this.recordMergeQueues.get(key) ?? Promise.resolve();
+      const next = previous
+        .catch((): void => undefined)
+        .then(async () => {
+          const cachedHead = this.registry.findCachedHead(key);
+          const records = this.mergeRecords(
+            this.recordsFromHead(
+              cachedHead ?? (await this.registry.findPersistedHead(key)),
+            ),
+            record,
+          ).filter(options.recordFilter ?? (() => true));
+
+          await this.registry.putHeadExactly(
+            key,
+            this.recordsHead(metadata, records),
+            networkIds,
+          );
+        });
+      this.recordMergeQueues.set(key, next);
+
+      try {
+        await next;
+      } finally {
+        if (this.recordMergeQueues.get(key) === next) {
+          this.recordMergeQueues.delete(key);
+        }
+      }
+
+      return;
+    }
     const cachedHead = this.registry.findCachedHead(key);
     const records = this.mergeRecords(
       this.recordsFromHead(
         cachedHead ?? (await this.registry.findPersistedHead(key)),
       ),
       record,
-    );
+    ).filter(options.recordFilter ?? (() => true));
 
-    await this.registry.putHead(
-      key,
-      this.recordsHead(metadata, records),
-      networkIds,
-    );
+    const head = this.recordsHead(metadata, records);
+
+    await this.registry.putHead(key, head, networkIds);
   }
 
   public replicateRecordInBackground(
@@ -445,8 +477,12 @@ export class OrbitDBHeadIndex<TDocument extends object> {
       );
     }
 
-    this.replicateRecordHead(key, metadata, cachedHead, record, networkIds);
-
-    return Promise.resolve();
+    return this.replicateRecordHead(
+      key,
+      metadata,
+      cachedHead,
+      record,
+      networkIds,
+    );
   }
 }

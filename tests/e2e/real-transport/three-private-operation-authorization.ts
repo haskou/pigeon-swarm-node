@@ -13,6 +13,7 @@ import PrivateOperationVerifier from '@app/contexts/private-authorization/infras
 import VerifiedPrivateControlTransitionProcessor from '@app/contexts/private-authorization/infrastructure/crypto/VerifiedPrivateControlTransitionProcessor';
 import InMemoryPrivateFreshnessGate from '@app/contexts/private-authorization/infrastructure/freshness/InMemoryPrivateFreshnessGate';
 import LocalPrivateAuthorizationRepository from '@app/contexts/private-authorization/infrastructure/local-db/LocalPrivateAuthorizationRepository';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import LocalPrivateOperationUnitOfWork from '@app/contexts/private-authorization/infrastructure/local-db/LocalPrivateOperationUnitOfWork';
 import { PrivateAuthorizationLocalNamespaces } from '@app/contexts/private-authorization/infrastructure/local-db/PrivateAuthorizationLocalNamespaces';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
@@ -52,7 +53,10 @@ class AuthorizationNode {
   public constructor(public readonly databasePath: string) {
     process.env.PIGEON_LOCAL_DB_PATH = databasePath;
     this.database = new EmbeddedLocalDatabase();
-    this.repository = new LocalPrivateAuthorizationRepository(this.database);
+    this.repository = new LocalPrivateAuthorizationRepository(
+      this.database,
+      new PrivateAuthorizationStorageCoordinator(),
+    );
     const binding = new LegacyIdentityDeviceBinding();
     this.acceptor = new PrivateOperationAcceptor(
       this.repository,

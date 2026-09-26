@@ -1,6 +1,7 @@
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
@@ -39,7 +40,23 @@ export default class OrbitDBCallProjection {
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly merger: OrbitDBCallDocumentMerger,
     private readonly replicator: OrbitDBCallDocumentReplicator,
+    private readonly publicStorageGuard: PrivateCommunityPublicStorageGuard,
   ) {}
+
+  private replicateRepair(document: OrbitDBCallDocument): void {
+    const communityId = document.scope.communityId;
+
+    if (document.scope.type === 'community_channel' && communityId) {
+      this.publicStorageGuard.runInBackgroundWhilePublic(
+        new CommunityId(communityId),
+        () => this.replicator.replicate(document),
+      );
+
+      return;
+    }
+
+    void this.replicator.replicate(document);
+  }
 
   private hasCallIdentityFields(document: Record<string, unknown>): boolean {
     return (
@@ -59,12 +76,26 @@ export default class OrbitDBCallProjection {
     );
   }
 
+  private hasValidScope(document: Record<string, unknown>): boolean {
+    const scope = document.scope as Record<string, unknown>;
+
+    return scope.type === 'community_channel'
+      ? typeof scope.communityId === 'string' &&
+          typeof scope.channelId === 'string' &&
+          scope.conversationId === undefined
+      : scope.type === 'conversation' &&
+          typeof scope.conversationId === 'string' &&
+          scope.communityId === undefined &&
+          scope.channelId === undefined;
+  }
+
   private isDocument(
     document: Record<string, unknown>,
   ): document is OrbitDBCallDocument {
     return (
       this.hasCallIdentityFields(document) &&
       this.hasCallStateFields(document) &&
+      this.hasValidScope(document) &&
       ((document.scope as OrbitDBCallDocument['scope']).type ===
         'community_channel' ||
         typeof document.creatorIdentityId === 'string')
@@ -247,7 +278,7 @@ export default class OrbitDBCallProjection {
         this.bootstrapRepairs.set(incoming.id, merged);
       }
     } else if (!isDeepStrictEqual(merged, incoming)) {
-      this.replicator.replicate(merged);
+      this.replicateRepair(merged);
     }
   }
 
@@ -261,7 +292,7 @@ export default class OrbitDBCallProjection {
     if (!this.ready || this.historyReplays.size > 0) return;
 
     for (const document of this.bootstrapRepairs.values()) {
-      this.replicator.replicate(document);
+      this.replicateRepair(document);
     }
 
     this.bootstrapRepairs.clear();

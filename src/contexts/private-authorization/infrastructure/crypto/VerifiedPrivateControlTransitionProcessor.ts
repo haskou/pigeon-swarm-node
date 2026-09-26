@@ -143,6 +143,13 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
     const devices = this.trustedPolicyDevices(current);
 
     if (mutation.type === 'member.admit') {
+      if (
+        this.identityBinding.bind(mutation.identityId as string) !==
+        mutation.deviceKey
+      ) {
+        throw new InvalidPrivateAuthorizationError();
+      }
+
       return [
         ...devices,
         {

@@ -315,9 +315,17 @@ Once a community is marked as a protected private scope:
 
 - reads come from the local private projection;
 - writes require a verified version 1 operation;
+- community snapshots, messages, reactions, pins, invitations, membership
+  requests, moderation records, community polls and community calls are rejected
+  by their public OrbitDB adapters;
 - private OrbitDB documents, member indexes and heads are ignored and never
   published; and
 - an unavailable new path fails closed.
+
+Until the participant-specific mailbox transport stores and delivers ordinary
+private content, those ordinary content operations are unavailable for protected
+scopes. They never fall back to a public repository merely to preserve an older
+API behavior.
 
 Explicitly public community publications remain a separate feature and may use a
 public replication adapter. Public state can never be imported as the authority

@@ -1,3 +1,4 @@
+import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
 import { PrivateAuthorizationScopePrimitives } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScopePrimitives';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
@@ -7,13 +8,17 @@ import EmbeddedLocalDatabase, {
   EmbeddedLocalDatabaseOperation,
 } from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 
+import PrivateAuthorizationStorageCoordinator from '../PrivateAuthorizationStorageCoordinator';
 import {
   privateAuthorizationLocalId,
   PrivateAuthorizationLocalNamespaces,
 } from './PrivateAuthorizationLocalNamespaces';
 
 export default class LocalPrivateAuthorizationRepository extends PrivateAuthorizationRepository {
-  public constructor(private readonly database: EmbeddedLocalDatabase) {
+  public constructor(
+    private readonly database: EmbeddedLocalDatabase,
+    private readonly storageCoordinator: PrivateAuthorizationStorageCoordinator,
+  ) {
     super();
   }
 
@@ -170,7 +175,7 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
         pendingOperations,
       });
     } catch {
-      return undefined;
+      throw new InvalidPrivateAuthorizationError();
     }
   }
 
@@ -267,23 +272,26 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
 
   public async saveScope(scope: PrivateAuthorizationScope): Promise<void> {
     const scopeId = scope.toPrimitives().checkpoint.scopeId;
-    const storedPendingIds = (await this.findPending(scopeId)).map(
-      (pending) => pending.toPrimitives().id,
-    );
-    const pendingIds = new Set(
-      scope.toPrimitives().pendingOperations.map((pending) => pending.id),
-    );
 
-    await this.database.commit([
-      this.scopeOperation(scope),
-      ...this.pendingOperations(scope),
-      ...storedPendingIds
-        .filter((id) => !pendingIds.has(id))
-        .map((id) => ({
-          id: privateAuthorizationLocalId(scopeId, id),
-          namespace: PrivateAuthorizationLocalNamespaces.pending,
-          type: 'del' as const,
-        })),
-    ]);
+    await this.storageCoordinator.exclusively(scopeId, async () => {
+      const storedPendingIds = (await this.findPending(scopeId)).map(
+        (pending) => pending.toPrimitives().id,
+      );
+      const pendingIds = new Set(
+        scope.toPrimitives().pendingOperations.map((pending) => pending.id),
+      );
+
+      await this.database.commit([
+        this.scopeOperation(scope),
+        ...this.pendingOperations(scope),
+        ...storedPendingIds
+          .filter((id) => !pendingIds.has(id))
+          .map((id) => ({
+            id: privateAuthorizationLocalId(scopeId, id),
+            namespace: PrivateAuthorizationLocalNamespaces.pending,
+            type: 'del' as const,
+          })),
+      ]);
+    });
   }
 }

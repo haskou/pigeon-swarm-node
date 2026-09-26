@@ -209,4 +209,40 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
       ),
     ).rejects.toThrow('Invalid private authorization');
   });
+
+  it('rejects admission when the identity does not own the admitted device key', () => {
+    const binding = new LegacyIdentityDeviceBinding();
+    const processor = new VerifiedPrivateControlTransitionProcessor(
+      new PrivateControlTransitionVerifier(),
+      new PrivateMlsPolicyVerifier(),
+      binding,
+    );
+    const operation = PrivateControlOperation.fromPrimitives({
+      authorDeviceKey: ownerKey,
+      authorizationRevision: 0,
+      byteSize: 1,
+      digest: encoded(9),
+      id: Buffer.alloc(16, 1).toString('base64url'),
+      kind: 'membership.commit',
+      mutation: {
+        deviceKey: targetKey,
+        identityId: binding.identityIdFor(encoded(20)),
+        mlsCredentialHash: encoded(21),
+        type: 'member.admit',
+      },
+      previousOperationIds: [],
+      scopeId,
+    });
+
+    expect(() =>
+      (
+        processor as unknown as {
+          expectedPolicyDevices(
+            current: PrivateAuthorizationCheckpoint,
+            candidate: PrivateControlOperation,
+          ): unknown;
+        }
+      ).expectedPolicyDevices(checkpoint, operation),
+    ).toThrow('Invalid private authorization');
+  });
 });

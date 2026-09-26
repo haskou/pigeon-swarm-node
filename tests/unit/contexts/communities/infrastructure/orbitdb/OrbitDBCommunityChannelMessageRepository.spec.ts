@@ -4,11 +4,21 @@ import { CommunityChannelMessageId } from '@app/contexts/communities/domain/valu
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBCommunityChannelMessageMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityChannelMessageMapper';
 import OrbitDBCommunityChannelMessageRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessageRepository';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 const identityMother = new IdentityMother();
+
+const publicStorageGuard = () =>
+  new PrivateCommunityPublicStorageGuard(
+    {
+      findScope: jest.fn().mockResolvedValue(undefined),
+    } as never,
+    new PrivateAuthorizationStorageCoordinator(),
+  );
 
 describe('OrbitDBCommunityChannelMessageRepository', () => {
   const documents: Record<string, unknown>[] = [];
@@ -54,6 +64,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
     repository = new OrbitDBCommunityChannelMessageRepository(
       registry,
       new OrbitDBCommunityChannelMessageMapper(),
+      publicStorageGuard(),
     );
   });
 
@@ -109,6 +120,35 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
         id: 'encrypted-message-b',
       }),
     ]);
+  });
+
+  it('never reads or publishes protected community messages through OrbitDB', async () => {
+    const protectedRepository = new OrbitDBCommunityChannelMessageRepository(
+      registry,
+      new OrbitDBCommunityChannelMessageMapper(),
+      new PrivateCommunityPublicStorageGuard(
+        {
+          findScope: jest.fn().mockResolvedValue({}),
+        } as never,
+        new PrivateAuthorizationStorageCoordinator(),
+      ),
+    );
+    const message = CommunityChannelMessage.fromPrimitives(
+      document({}) as never,
+    );
+
+    await expect(protectedRepository.save(message)).rejects.toThrow(
+      'Invalid private authorization',
+    );
+    await expect(
+      protectedRepository.findByChannel(
+        new CommunityId('community-1'),
+        new CommunityChannelId('channel-1'),
+        50,
+      ),
+    ).rejects.toThrow('Invalid private authorization');
+    expect(messagesPut).not.toHaveBeenCalled();
+    expect(query).not.toHaveBeenCalled();
   });
 
   it('should search only public channel messages', async () => {
@@ -341,14 +381,17 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
     const senderRepository = new OrbitDBCommunityChannelMessageRepository(
       registry,
       mapper,
+      publicStorageGuard(),
     );
     const deleterRepository = new OrbitDBCommunityChannelMessageRepository(
       registry,
       mapper,
+      publicStorageGuard(),
     );
     const finderRepository = new OrbitDBCommunityChannelMessageRepository(
       registry,
       mapper,
+      publicStorageGuard(),
     );
 
     await senderRepository.save(

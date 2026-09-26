@@ -63,8 +63,27 @@ describe('OrbitDBCallDocumentReplicator', () => {
       ['network-1'],
     );
     expect(logger.warn).toHaveBeenCalledWith(
-      'Call document replication failed: callId=call-1 error=Error: unavailable',
+      'Call document replication failed',
     );
+  });
+
+  it('resolves after the replicated document is stored', async () => {
+    let releaseWrite!: () => void;
+    const write = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    registry.putDocument.mockReturnValue(write);
+
+    let completed = false;
+    const replication = replicator.replicate(callDocument('active')).then(() => {
+      completed = true;
+    });
+    await flushBackgroundTasks();
+
+    expect(completed).toBe(false);
+    releaseWrite();
+    await replication;
+    expect(completed).toBe(true);
   });
 });
 

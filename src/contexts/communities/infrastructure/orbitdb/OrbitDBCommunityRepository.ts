@@ -5,6 +5,7 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 import { Community } from '../../domain/Community';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
+import PrivateCommunityPublicStorageGuard from '../PrivateCommunityPublicStorageGuard';
 import { OrbitDBCommunityDocument } from './documents/OrbitDBCommunityDocument';
 import OrbitDBCommunityMapper from './mappers/OrbitDBCommunityMapper';
 import OrbitDBCommunityReplicaMerger from './OrbitDBCommunityReplicaMerger';
@@ -24,6 +25,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     private readonly mapper: OrbitDBCommunityMapper,
     private readonly replicaMerger: OrbitDBCommunityReplicaMerger,
     private readonly projection: OrbitDBCommunityReplicaProjection,
+    private readonly publicStorageGuard: PrivateCommunityPublicStorageGuard,
   ) {
     super();
     this.projection.register();
@@ -88,8 +90,10 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     return `community:${communityId}`;
   }
 
-  private memberIndexHeadKey(identityId: string): string {
-    return `community-member-index:${identityId}`;
+  private memberIndexHeadKey(identityId: string, communityId?: string): string {
+    const prefix = `community-member-index:${identityId}`;
+
+    return communityId ? `${prefix}:${communityId}` : `${prefix}:`;
   }
 
   private freshestDocumentsFirst(
@@ -145,45 +149,59 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       );
   }
 
-  private replicateMemberIndexInBackground(
-    identityId: string,
-    community: OrbitDBCommunityDocument,
-  ): void {
-    const key = this.memberIndexHeadKey(identityId);
+  private putMemberIndex(
+    memberId: string,
+    document: OrbitDBCommunityDocument,
+  ): Promise<void> {
+    const key = this.memberIndexHeadKey(memberId, document.id);
 
-    void this.communityIndex.replicateRecordInBackground(
+    return this.communityIndex.putRecord(
       key,
       {
         id: key,
-        identityId,
-        memberId: identityId,
-        networkId: community.networkId,
+        identityId: memberId,
+        memberId,
+        networkId: document.networkId,
       },
-      community,
-      [community.networkId],
+      document,
+      [document.networkId],
+      {
+        recordFilter: (candidate) =>
+          candidate.id === document.id &&
+          Array.isArray(candidate.memberIds) &&
+          candidate.memberIds.includes(memberId),
+        replace: true,
+      },
     );
   }
 
-  private replicateCommunityHeadInBackground(
-    document: OrbitDBCommunityDocument,
-  ): void {
+  private putCommunityHead(document: OrbitDBCommunityDocument): Promise<void> {
     const key = this.communityHeadKey(document.id);
     this.registry.cacheHeadLocally(key, { ...document });
-    this.registry.replicateHeadInBackground(
+
+    return this.registry.putHeadExactly(
       key,
       {
         ...document,
       },
       [document.networkId],
-      true,
     );
   }
 
-  private replicateMemberIndexesInBackground(
-    document: OrbitDBCommunityDocument,
-  ): void {
-    document.memberIds.forEach((memberId) =>
-      this.replicateMemberIndexInBackground(memberId, document),
+  private async persist(document: OrbitDBCommunityDocument): Promise<void> {
+    await this.publicStorageGuard.runWhilePublic(
+      new CommunityId(document.id),
+      async () => {
+        await Promise.all([
+          this.putCommunityHead(document),
+          this.registry.putDocument('communities', document, [
+            document.networkId,
+          ]),
+          ...document.memberIds.map((memberId) =>
+            this.putMemberIndex(memberId, document),
+          ),
+        ]);
+      },
     );
   }
 
@@ -227,13 +245,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       Date.now(),
     );
 
-    await this.registry.replicateDocumentInBackground(
-      'communities',
-      deletedDocument,
-      [deletedDocument.networkId],
-    );
-    this.replicateCommunityHeadInBackground(deletedDocument);
-    this.replicateMemberIndexesInBackground(deletedDocument);
+    await this.persist(deletedDocument);
   }
 
   public async findById(id: CommunityId): Promise<Community | undefined> {
@@ -269,23 +281,24 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     );
   }
 
-  public async findByMember(identityId: IdentityId): Promise<Community[]> {
-    const indexedDocuments =
-      (await this.communityIndex.find(
-        this.memberIndexHeadKey(identityId.valueOf()),
-      )) || [];
+  public findByMember(identityId: IdentityId): Promise<Community[]> {
+    const indexedDocuments = this.communityIndex.cachedByPrefix(
+      this.memberIndexHeadKey(identityId.valueOf()),
+    );
     const documents = [
       ...indexedDocuments,
       ...this.cachedStoredCommunityDocuments(),
     ];
 
-    return this.freshestDocumentsFirst(documents)
-      .filter(
-        (document) =>
-          this.isDocument(document) &&
-          document.memberIds.includes(identityId.valueOf()),
-      )
-      .map((document) => this.toDomain(document));
+    return Promise.resolve(
+      this.freshestDocumentsFirst(documents)
+        .filter(
+          (document) =>
+            this.isDocument(document) &&
+            document.memberIds.includes(identityId.valueOf()),
+        )
+        .map((document) => this.toDomain(document)),
+    );
   }
 
   public async findSyncable(): Promise<Community[]> {
@@ -298,14 +311,6 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
 
   public async save(community: Community): Promise<void> {
     const document = this.toFreshDocument(community);
-    this.registry.cacheHeadLocally(
-      this.communityHeadKey(document.id),
-      document,
-    );
-    await this.registry.replicateDocumentInBackground('communities', document, [
-      document.networkId,
-    ]);
-    this.replicateCommunityHeadInBackground(document);
-    this.replicateMemberIndexesInBackground(document);
+    await this.persist(document);
   }
 }

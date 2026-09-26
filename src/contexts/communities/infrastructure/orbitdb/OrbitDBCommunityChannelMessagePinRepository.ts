@@ -8,12 +8,16 @@ import CommunityChannelMessagePinRepository from '../../domain/repositories/Comm
 import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../../domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
+import PrivateCommunityPublicStorageGuard from '../PrivateCommunityPublicStorageGuard';
 import { OrbitDBCommunityChannelMessagePinDocument } from './documents/OrbitDBCommunityChannelMessagePinDocument';
 
 export default class OrbitDBCommunityChannelMessagePinRepository extends CommunityChannelMessagePinRepository {
   private readonly pinIndex: OrbitDBHeadIndex<OrbitDBCommunityChannelMessagePinDocument>;
 
-  constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
+  constructor(
+    private readonly registry: OrbitDBReplicatedStateRegistry,
+    private readonly publicStorageGuard: PrivateCommunityPublicStorageGuard,
+  ) {
     super();
     this.pinIndex = new OrbitDBHeadIndex(this.registry, {
       collectionName: 'pins',
@@ -66,10 +70,10 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
     communityId: CommunityId,
     channelId: CommunityChannelId,
     document: Record<string, unknown>,
-  ): void {
+  ): Promise<void> {
     const key = this.indexHeadKey(communityId, channelId);
 
-    void this.pinIndex.replicateRecordInBackground(
+    return this.pinIndex.putRecord(
       key,
       {
         channelId: channelId.valueOf(),
@@ -77,6 +81,13 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
         id: key,
       },
       document,
+      [],
+      {
+        recordFilter: (record) =>
+          record.communityId === communityId.valueOf() &&
+          record.channelId === channelId.valueOf(),
+        replace: true,
+      },
     );
   }
 
@@ -107,8 +118,12 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
       scopeType: 'community_channel',
     };
 
-    await this.registry.putDocument('pins', document);
-    this.putIndexDocument(communityId, channelId, document);
+    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      await Promise.all([
+        this.registry.putDocument('pins', document),
+        this.putIndexDocument(communityId, channelId, document),
+      ]);
+    });
   }
 
   public async unpin(
@@ -126,14 +141,19 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
       updatedAt: Date.now(),
     };
 
-    await this.registry.putDocument('pins', document);
-    this.putIndexDocument(communityId, channelId, document);
+    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      await Promise.all([
+        this.registry.putDocument('pins', document),
+        this.putIndexDocument(communityId, channelId, document),
+      ]);
+    });
   }
 
   public async findByChannel(
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<CommunityChannelMessagePin[]> {
+    await this.publicStorageGuard.assertPublic(communityId);
     const indexedDocuments = await this.pinIndex.find(
       this.indexHeadKey(communityId, channelId),
     );

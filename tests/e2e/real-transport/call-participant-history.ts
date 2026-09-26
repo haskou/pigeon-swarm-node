@@ -5,6 +5,8 @@ import { OrbitDBCallDocument } from '@app/contexts/calls/infrastructure/orbitdb/
 import OrbitDBCallDocumentMerger from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentMerger';
 import OrbitDBCallDocumentReplicator from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentReplicator';
 import OrbitDBCallProjection from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallProjection';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
@@ -94,6 +96,10 @@ async function project(
     registry,
     new OrbitDBCallDocumentMerger(),
     new OrbitDBCallDocumentReplicator(registry),
+    new PrivateCommunityPublicStorageGuard(
+      { findScope: () => Promise.resolve(undefined) } as never,
+      new PrivateAuthorizationStorageCoordinator(),
+    ),
   );
   await projection.start();
 

@@ -2,8 +2,18 @@ import { CommunityMembershipRequest } from '@app/contexts/communities/domain/ent
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBCommunityMembershipRequestMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMembershipRequestMapper';
 import OrbitDBCommunityMembershipRequestRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityMembershipRequestRepository';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+
+const publicStorageGuard = () =>
+  new PrivateCommunityPublicStorageGuard(
+    {
+      findScope: jest.fn().mockResolvedValue(undefined),
+    } as never,
+    new PrivateAuthorizationStorageCoordinator(),
+  );
 
 describe('OrbitDBCommunityMembershipRequestRepository', () => {
   const communityId = new CommunityId('community-1');
@@ -71,6 +81,7 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     store = new OrbitDBCommunityMembershipRequestRepository(
       registry,
       new OrbitDBCommunityMembershipRequestMapper(),
+      publicStorageGuard(),
     );
   });
 
@@ -190,6 +201,7 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     const replicatedStore = new OrbitDBCommunityMembershipRequestRepository(
       registry,
       new OrbitDBCommunityMembershipRequestMapper(),
+      publicStorageGuard(),
     );
 
     const byIdentity = await replicatedStore.findByIdentity(invitedIdentityId);
