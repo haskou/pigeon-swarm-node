@@ -3,6 +3,19 @@ import Kernel from '@haskou/ddd-kernel';
 import { Level } from 'level';
 import path from 'path';
 
+export type EmbeddedLocalDatabaseOperation =
+  | {
+      type: 'put';
+      namespace: string;
+      id: string;
+      document: Record<string, unknown>;
+    }
+  | {
+      type: 'del';
+      namespace: string;
+      id: string;
+    };
+
 export default class EmbeddedLocalDatabase {
   private static readonly databases = new Map<
     string,
@@ -70,6 +83,31 @@ export default class EmbeddedLocalDatabase {
   public async clear(): Promise<void> {
     await this.ensureOpen();
     await this.database.clear();
+  }
+
+  public async commit(
+    operations: EmbeddedLocalDatabaseOperation[],
+  ): Promise<void> {
+    await this.ensureOpen();
+    const keys = operations.map((operation) =>
+      this.key(operation.namespace, operation.id),
+    );
+
+    if (new Set(keys).size !== keys.length) {
+      throw new Error('Duplicate local database batch key');
+    }
+
+    await this.database.batch(
+      operations.map((operation, index) =>
+        operation.type === 'put'
+          ? {
+              key: keys[index],
+              type: 'put' as const,
+              value: { ...operation.document, _id: operation.id },
+            }
+          : { key: keys[index], type: 'del' as const },
+      ),
+    );
   }
 
   public async close(): Promise<void> {
