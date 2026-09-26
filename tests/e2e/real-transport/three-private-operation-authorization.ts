@@ -15,9 +15,9 @@ import PrivateOperationVerifier from '@app/contexts/private-authorization/infras
 import VerifiedPrivateControlTransitionProcessor from '@app/contexts/private-authorization/infrastructure/crypto/VerifiedPrivateControlTransitionProcessor';
 import InMemoryPrivateFreshnessGate from '@app/contexts/private-authorization/infrastructure/freshness/InMemoryPrivateFreshnessGate';
 import LocalPrivateAuthorizationRepository from '@app/contexts/private-authorization/infrastructure/local-db/LocalPrivateAuthorizationRepository';
-import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import LocalPrivateOperationUnitOfWork from '@app/contexts/private-authorization/infrastructure/local-db/LocalPrivateOperationUnitOfWork';
-import { PrivateAuthorizationLocalNamespaces } from '@app/contexts/private-authorization/infrastructure/local-db/PrivateAuthorizationLocalNamespaces';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import {
   PrivateFreshnessProof,
@@ -49,6 +49,7 @@ interface ControlPolicy {
 
 class AuthorizationNode {
   private readonly identityBinding = new LegacyIdentityDeviceBinding();
+  private readonly unitOfWork: LocalPrivateOperationUnitOfWork;
   public readonly acceptor: PrivateOperationAcceptor;
   public readonly database: EmbeddedLocalDatabase;
   public readonly repository: LocalPrivateAuthorizationRepository;
@@ -61,13 +62,14 @@ class AuthorizationNode {
       this.database,
       storageCoordinator,
     );
+    this.unitOfWork = new LocalPrivateOperationUnitOfWork(
+      this.database,
+      this.repository,
+      storageCoordinator,
+    );
     this.acceptor = new PrivateOperationAcceptor(
       this.repository,
-      new LocalPrivateOperationUnitOfWork(
-        this.database,
-        this.repository,
-        storageCoordinator,
-      ),
+      this.unitOfWork,
       new PrivateOperationAuthorizer(
         this.repository,
         new PrivateOperationVerifier(),
@@ -89,16 +91,20 @@ class AuthorizationNode {
     projection: Record<string, unknown>,
     protectedState: string,
   ): Promise<void> {
-    const scopeId = checkpoint.toPrimitives().scopeId;
-    await this.repository.saveScope(
-      PrivateAuthorizationScope.pin(checkpoint, hash(checkpoint.toPrimitives())),
-    );
-    await this.repository.saveProjection(scopeId, projection);
-    await this.database.save(
-      PrivateAuthorizationLocalNamespaces.mls,
-      scopeId,
-      { state: protectedState },
-    );
+    const ownerDeviceKey = checkpoint.getFreshnessAuthorityKey();
+
+    await this.unitOfWork.commitGenesis({
+      ownerIdentityId: new IdentityId(
+        this.identityBinding.identityIdFor(ownerDeviceKey.valueOf()),
+      ),
+      projection,
+      protectedMlsState: protectedState,
+      scope: PrivateAuthorizationScope.pin(
+        checkpoint,
+        hash(checkpoint.toPrimitives()),
+        ownerDeviceKey,
+      ),
+    });
   }
 
   public async accept(

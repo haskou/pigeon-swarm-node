@@ -1,4 +1,5 @@
 import { PrivateOperationAcceptance } from '@app/contexts/private-authorization/application/PrivateOperationAcceptance';
+import { PrivateAuthorizationStorageCapacityExceededError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationStorageCapacityExceededError';
 import { PrivateAuthorizationConflictError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationConflictError';
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
@@ -14,6 +15,7 @@ import {
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { Buffer } from 'buffer';
 import { generateKeyPairSync } from 'crypto';
 import * as fs from 'fs/promises';
 import os from 'os';
@@ -140,6 +142,11 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     await repository.saveScope(
       PrivateAuthorizationScope.pin(checkpoint(), 'genesis'),
     );
+    await database.save(
+      PrivateAuthorizationLocalNamespaces.provisioning,
+      'scope',
+      { ownerIdentityId: ownerIdentityId.valueOf(), provisionedBytes: 1 },
+    );
     await repository.savePending('scope', operation());
   });
 
@@ -177,6 +184,78 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       true,
     );
     await expect(repository.findOutbox('scope')).resolves.toHaveLength(1);
+  });
+
+  it('atomically updates the scope storage reservation after acceptance', async () => {
+    const before = await database.findOne(
+      PrivateAuthorizationLocalNamespaces.provisioning,
+      'scope',
+    );
+    const expanded = acceptance();
+    expanded.projection = { members: ['member'], padding: 'x'.repeat(2048) };
+
+    await expect(
+      unitOfWork.commitAcceptance(
+        'scope',
+        { headHash: 'head-0', revision: 0 },
+        expanded,
+      ),
+    ).resolves.toBe('committed');
+
+    const after = await database.findOne(
+      PrivateAuthorizationLocalNamespaces.provisioning,
+      'scope',
+    );
+    const storedScope = await repository.findScope('scope');
+    expect(after?.provisionedBytes).toBe(
+      Buffer.byteLength(
+        JSON.stringify({
+          projection: expanded.projection,
+          protectedMlsState: expanded.protectedMlsState,
+          scope: storedScope?.toPrimitives(),
+        }),
+      ),
+    );
+    expect(Number(after?.provisionedBytes)).toBeGreaterThan(
+      Number(before?.provisionedBytes),
+    );
+  });
+
+  it('rejects projection growth that exceeds the owner storage quota', async () => {
+    const reservation = await database.findOne(
+      PrivateAuthorizationLocalNamespaces.provisioning,
+      'scope',
+    );
+    const provisionedBytes = Number(reservation?.provisionedBytes);
+    await database.save(
+      PrivateAuthorizationLocalNamespaces.provisioning,
+      'other-scope',
+      {
+        ownerIdentityId: ownerIdentityId.valueOf(),
+        provisionedBytes: 32 * 1024 * 1024 - provisionedBytes - 1,
+      },
+    );
+    const expanded = acceptance();
+    expanded.projection = { members: ['member'], padding: 'x'.repeat(2048) };
+
+    await expect(
+      unitOfWork.commitAcceptance(
+        'scope',
+        { headHash: 'head-0', revision: 0 },
+        expanded,
+      ),
+    ).rejects.toThrow(PrivateAuthorizationStorageCapacityExceededError);
+
+    await expect(repository.findProjection('scope')).resolves.toBeUndefined();
+    await expect(
+      repository.findReceipt('scope', 'operation'),
+    ).resolves.toBeUndefined();
+    await expect(
+      database.findOne(
+        PrivateAuthorizationLocalNamespaces.provisioning,
+        'scope',
+      ),
+    ).resolves.toEqual(reservation);
   });
 
   it('atomically provisions a private authorization genesis', async () => {

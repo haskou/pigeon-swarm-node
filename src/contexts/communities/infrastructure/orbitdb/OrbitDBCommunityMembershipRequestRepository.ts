@@ -224,9 +224,9 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
               deletedAt: Date.now(),
             };
 
-            this.replicateHeadsInBackground(communityId, tombstone);
-            this.cacheRequestDocument(tombstone);
             await this.registry.putDocument('requests', tombstone);
+            this.cacheRequestDocument(tombstone);
+            this.replicateHeadsInBackground(communityId, tombstone);
           }),
       );
     });
@@ -354,12 +354,12 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
     await this.publicStorageGuard.runWhilePublic(
       new CommunityId(document.communityId),
       async () => {
+        await this.registry.putDocument('requests', document);
+        this.cacheRequestDocument(document);
         this.replicateHeadsInBackground(
           new CommunityId(document.communityId),
           document,
         );
-        this.cacheRequestDocument(document);
-        await this.registry.putDocument('requests', document);
       },
     );
   }
