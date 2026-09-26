@@ -69,6 +69,7 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
       projection,
     );
     expect(unitOfWork.commitGenesis).toHaveBeenCalledWith({
+      ownerIdentityId: new IdentityId(ownerIdentityId),
       projection,
       protectedMlsState: 'protected-state',
       scope: expect.objectContaining({}),

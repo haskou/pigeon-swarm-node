@@ -62,6 +62,7 @@ describe('PrivateAuthorizationScope', () => {
 
     expect(scope.toPrimitives()).toMatchObject({
       genesisHash: 'genesis-hash',
+      ownerDeviceKey: ownerKey,
       status: 'active',
       checkpoint: { headHash: 'head-0', revision: 0, scopeId },
     });
@@ -265,6 +266,7 @@ describe('PrivateAuthorizationScope', () => {
       acceptedOperations: [],
       checkpoint: genesis().toPrimitives(),
       genesisHash: 'genesis-hash',
+      ownerDeviceKey: ownerKey,
       pendingOperations: Array.from({ length: 128 }, (_value, index) =>
         operation({
           authorizationRevision: -1,
@@ -426,6 +428,7 @@ describe('PrivateAuthorizationScope', () => {
       ),
       checkpoint: genesis().toPrimitives(),
       genesisHash: 'genesis-hash',
+      ownerDeviceKey: ownerKey,
       pendingOperations: [],
       status: 'active',
     });

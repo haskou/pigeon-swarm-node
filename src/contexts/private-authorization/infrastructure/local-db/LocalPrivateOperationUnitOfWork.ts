@@ -2,12 +2,18 @@ import { PrivateAuthorizationGenesisCommit } from '@app/contexts/private-authori
 import { PrivateExpectedCheckpoint } from '@app/contexts/private-authorization/application/PrivateExpectedCheckpoint';
 import { PrivateOperationAcceptance } from '@app/contexts/private-authorization/application/PrivateOperationAcceptance';
 import { PrivateOperationUnitOfWork } from '@app/contexts/private-authorization/application/PrivateOperationUnitOfWork';
+import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationConflictError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationConflictError';
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
+import { PrivateAuthorizationProvisioningQuota } from '@app/contexts/private-authorization/domain/PrivateAuthorizationProvisioningQuota';
+import { PrivateAuthorizationStorageReservationPrimitives } from '@app/contexts/private-authorization/domain/PrivateAuthorizationStorageReservationPrimitives';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
+import { PrivateAuthorizationDeviceKey } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationDeviceKey';
 import EmbeddedLocalDatabase, {
   EmbeddedLocalDatabaseOperation,
 } from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import { assert, Integer } from '@haskou/value-objects';
+import { Buffer } from 'buffer';
 
 import PrivateAuthorizationStorageCoordinator from '../PrivateAuthorizationStorageCoordinator';
 import LocalPrivateAuthorizationRepository from './LocalPrivateAuthorizationRepository';
@@ -20,6 +26,11 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   private static readonly scopeQueuesByDatabase = new WeakMap<
     EmbeddedLocalDatabase,
     Map<string, Promise<void>>
+  >();
+
+  private static readonly provisioningQueuesByDatabase = new WeakMap<
+    EmbeddedLocalDatabase,
+    Promise<void>
   >();
 
   public constructor(
@@ -70,13 +81,49 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     }
   }
 
+  private async exclusivelyProvisioning<T>(
+    action: () => Promise<T>,
+  ): Promise<T> {
+    const previous =
+      LocalPrivateOperationUnitOfWork.provisioningQueuesByDatabase.get(
+        this.database,
+      ) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = previous.then(() => gate);
+    LocalPrivateOperationUnitOfWork.provisioningQueuesByDatabase.set(
+      this.database,
+      tail,
+    );
+    await previous;
+
+    try {
+      return await action();
+    } finally {
+      release();
+
+      if (
+        LocalPrivateOperationUnitOfWork.provisioningQueuesByDatabase.get(
+          this.database,
+        ) === tail
+      ) {
+        LocalPrivateOperationUnitOfWork.provisioningQueuesByDatabase.delete(
+          this.database,
+        );
+      }
+    }
+  }
+
   private genesisOperations(
     genesis: PrivateAuthorizationGenesisCommit,
+    reservation?: PrivateAuthorizationStorageReservationPrimitives,
   ): EmbeddedLocalDatabaseOperation[] {
     const scope = genesis.scope.toPrimitives();
     const scopeId = scope.checkpoint.scopeId;
 
-    return [
+    const operations: EmbeddedLocalDatabaseOperation[] = [
       {
         document: { ...scope, pendingOperations: [] },
         id: scopeId,
@@ -96,6 +143,43 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
         type: 'put',
       },
     ];
+
+    if (reservation) {
+      operations.push({
+        document: { ...reservation },
+        id: scopeId,
+        namespace: PrivateAuthorizationLocalNamespaces.provisioning,
+        type: 'put',
+      });
+    }
+
+    return operations;
+  }
+
+  private provisionedBytes(genesis: PrivateAuthorizationGenesisCommit): number {
+    return Buffer.byteLength(
+      JSON.stringify({
+        projection: genesis.projection,
+        protectedMlsState: genesis.protectedMlsState,
+        scope: genesis.scope.toPrimitives(),
+      }),
+    );
+  }
+
+  private async provisioningQuota(): Promise<PrivateAuthorizationProvisioningQuota> {
+    const documents = await this.database.find(
+      PrivateAuthorizationLocalNamespaces.provisioning,
+    );
+    const reservations: PrivateAuthorizationStorageReservationPrimitives[] = [];
+
+    for (const document of documents) {
+      reservations.push({
+        ownerIdentityId: String(document.ownerIdentityId),
+        provisionedBytes: Number(document.provisionedBytes),
+      });
+    }
+
+    return new PrivateAuthorizationProvisioningQuota(reservations);
   }
 
   private equal(left: unknown, right: unknown): boolean {
@@ -110,10 +194,22 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     const current = await this.repository.findScope(scopeId);
 
     if (!current) {
-      await this.database.commit(this.genesisOperations(genesis));
+      const quota = await this.provisioningQuota();
+      const reservation = quota.reserve(
+        genesis.ownerIdentityId,
+        new Integer(this.provisionedBytes(genesis)),
+      );
+      await this.database.commit(this.genesisOperations(genesis, reservation));
 
       return 'committed';
     }
+
+    assert(
+      current.isOwnedBy(
+        new PrivateAuthorizationDeviceKey(candidate.ownerDeviceKey),
+      ),
+      new InvalidPrivateAuthorizationError(),
+    );
 
     try {
       if (current.toPrimitives().status === 'frozen') {
@@ -558,6 +654,15 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     return 'committed';
   }
 
+  private async commitGenesisWithStorageLock(
+    scopeId: string,
+    genesis: PrivateAuthorizationGenesisCommit,
+  ): Promise<'committed' | 'duplicate'> {
+    return this.storageCoordinator.exclusively(scopeId, () =>
+      this.commitGenesisExclusively(genesis),
+    );
+  }
+
   public async commitAcceptance(
     scopeId: string,
     expectedCheckpoint: PrivateExpectedCheckpoint,
@@ -573,9 +678,9 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   ): Promise<'committed' | 'duplicate'> {
     const scopeId = genesis.scope.toPrimitives().checkpoint.scopeId;
 
-    return this.exclusively(scopeId, () =>
-      this.storageCoordinator.exclusively(scopeId, () =>
-        this.commitGenesisExclusively(genesis),
+    return this.exclusivelyProvisioning(() =>
+      this.exclusively(scopeId, () =>
+        this.commitGenesisWithStorageLock(scopeId, genesis),
       ),
     );
   }

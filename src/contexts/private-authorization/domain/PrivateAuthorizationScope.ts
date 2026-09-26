@@ -11,6 +11,7 @@ import { PrivateControlOperationWasAcceptedEvent } from './events/PrivateControl
 import { PrivateAuthorizationCheckpoint } from './PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScopePrimitives } from './PrivateAuthorizationScopePrimitives';
 import { PrivateControlOperation } from './PrivateControlOperation';
+import { PrivateAuthorizationDeviceKey } from './value-objects/PrivateAuthorizationDeviceKey';
 
 export class PrivateAuthorizationScope extends AggregateRoot {
   private static readonly MAX_ACCEPTED_BYTES = 4 * 1024 * 1024;
@@ -28,10 +29,16 @@ export class PrivateAuthorizationScope extends AggregateRoot {
   public static pin(
     checkpoint: PrivateAuthorizationCheckpoint,
     genesisHash: string,
+    ownerDeviceKey: PrivateAuthorizationDeviceKey = checkpoint.getFreshnessAuthorityKey(),
   ): PrivateAuthorizationScope {
+    assert(
+      checkpoint.authorizes(ownerDeviceKey),
+      new InvalidPrivateAuthorizationError(),
+    );
     const scope = new PrivateAuthorizationScope(
       checkpoint,
       genesisHash,
+      ownerDeviceKey,
       'active',
       [],
       [],
@@ -51,6 +58,7 @@ export class PrivateAuthorizationScope extends AggregateRoot {
     return new PrivateAuthorizationScope(
       PrivateAuthorizationCheckpoint.fromPrimitives(primitives.checkpoint),
       primitives.genesisHash,
+      new PrivateAuthorizationDeviceKey(primitives.ownerDeviceKey),
       primitives.status,
       primitives.acceptedOperations.map((operation) =>
         PrivateControlOperation.fromPrimitives(operation),
@@ -64,6 +72,7 @@ export class PrivateAuthorizationScope extends AggregateRoot {
   private constructor(
     private checkpoint: PrivateAuthorizationCheckpoint,
     private readonly genesisHash: string,
+    private readonly ownerDeviceKey: PrivateAuthorizationDeviceKey,
     private status: 'active' | 'frozen',
     private readonly acceptedOperations: PrivateControlOperation[],
     private readonly pendingOperations: PrivateControlOperation[],
@@ -567,10 +576,15 @@ export class PrivateAuthorizationScope extends AggregateRoot {
       ),
       checkpoint: this.checkpoint.toPrimitives(),
       genesisHash: this.genesisHash,
+      ownerDeviceKey: this.ownerDeviceKey.valueOf(),
       pendingOperations: this.pendingOperations.map((operation) =>
         operation.toPrimitives(),
       ),
       status: this.status,
     };
+  }
+
+  public isOwnedBy(deviceKey: PrivateAuthorizationDeviceKey): boolean {
+    return this.ownerDeviceKey.isEqual(deviceKey);
   }
 }

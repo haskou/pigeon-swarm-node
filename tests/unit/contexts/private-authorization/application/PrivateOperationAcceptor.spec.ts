@@ -335,7 +335,10 @@ describe('PrivateOperationAcceptor', () => {
     const receipt = new PrivateControlOperationContract()
       .decode(signed())
       .toPrimitives();
-    repository.findReceipt.mockResolvedValue({ ...receipt, digest: encoded(32, 8) });
+    repository.findReceipt.mockResolvedValue({
+      ...receipt,
+      digest: encoded(32, 8),
+    });
 
     await expect(
       acceptor.accept(new PrivateOperationAcceptMessage(signed(), 'proof')),
@@ -350,6 +353,7 @@ describe('PrivateOperationAcceptor', () => {
         acceptedOperations: [],
         checkpoint: checkpoint().toPrimitives(),
         genesisHash: 'genesis',
+        ownerDeviceKey: 'owner',
         pendingOperations: [pending.toPrimitives()],
         status: 'active',
       }),
@@ -359,10 +363,7 @@ describe('PrivateOperationAcceptor', () => {
 
     await expect(
       acceptor.accept(
-        new PrivateOperationAcceptMessage(
-          JSON.stringify(conflicting),
-          'proof',
-        ),
+        new PrivateOperationAcceptMessage(JSON.stringify(conflicting), 'proof'),
       ),
     ).rejects.toThrow('Private authorization conflict');
     expect(unitOfWork.quarantine).toHaveBeenCalledWith(scopeId);
@@ -377,7 +378,9 @@ describe('PrivateOperationAcceptor', () => {
       acceptor.accept(new PrivateOperationAcceptMessage(signed(), 'proof')),
     ).rejects.toThrow(InvalidPrivateAuthorizationError);
     await expect(
-      acceptor.accept(new PrivateOperationAcceptMessage('{"version":2}', 'proof')),
+      acceptor.accept(
+        new PrivateOperationAcceptMessage('{"version":2}', 'proof'),
+      ),
     ).rejects.toThrow(InvalidPrivateAuthorizationError);
   });
 });

@@ -3,6 +3,8 @@ import { PrivateAuthorizationConflictError } from '@app/contexts/private-authori
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
+import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
+import { PrivateAuthorizationDeviceKey } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationDeviceKey';
 import LocalPrivateAuthorizationRepository from '@app/contexts/private-authorization/infrastructure/local-db/LocalPrivateAuthorizationRepository';
 import LocalPrivateOperationUnitOfWork from '@app/contexts/private-authorization/infrastructure/local-db/LocalPrivateOperationUnitOfWork';
 import {
@@ -11,11 +13,29 @@ import {
 } from '@app/contexts/private-authorization/infrastructure/local-db/PrivateAuthorizationLocalNamespaces';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { generateKeyPairSync } from 'crypto';
 import * as fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 
 describe('LocalPrivateOperationUnitOfWork', () => {
+  const ownerIdentityId = new IdentityId(
+    generateKeyPairSync('ed25519')
+      .publicKey.export({
+        format: 'der',
+        type: 'spki',
+      })
+      .toString('base64'),
+  );
+  const attackerIdentityId = new IdentityId(
+    generateKeyPairSync('ed25519')
+      .publicKey.export({
+        format: 'der',
+        type: 'spki',
+      })
+      .toString('base64'),
+  );
   let databasePath: string;
   let database: EmbeddedLocalDatabase;
   let repository: LocalPrivateAuthorizationRepository;
@@ -71,6 +91,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
         revokedDeviceKeys: ['device'],
       },
       genesisHash: 'genesis',
+      ownerDeviceKey: 'owner',
       pendingOperations: [],
       status: 'active',
     }),
@@ -80,15 +101,22 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     genesisHash = 'new-genesis',
     projection: Record<string, unknown> = { id: scopeId },
     protectedMlsState = 'protected-genesis-state',
+    ownerDeviceKey = 'owner',
+    identityId = ownerIdentityId,
   ) => ({
+    ownerIdentityId: identityId,
     projection,
     protectedMlsState,
     scope: PrivateAuthorizationScope.pin(
       PrivateAuthorizationCheckpoint.fromPrimitives({
         ...checkpoint().toPrimitives(),
+        admittedDeviceKeys: [ownerDeviceKey],
+        authorityKeys: [ownerDeviceKey],
+        freshnessAuthorityKey: ownerDeviceKey,
         scopeId,
       }),
       genesisHash,
+      new PrivateAuthorizationDeviceKey(ownerDeviceKey),
     ),
   });
 
@@ -166,9 +194,18 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     await expect(repository.findProjection('new-scope')).resolves.toEqual({
       id: 'new-scope',
     });
+    await expect(repository.findProtectedMlsState('new-scope')).resolves.toBe(
+      'protected-genesis-state',
+    );
     await expect(
-      repository.findProtectedMlsState('new-scope'),
-    ).resolves.toBe('protected-genesis-state');
+      database.findOne(
+        PrivateAuthorizationLocalNamespaces.provisioning,
+        'new-scope',
+      ),
+    ).resolves.toMatchObject({
+      ownerIdentityId: ownerIdentityId.valueOf(),
+      provisionedBytes: expect.any(Number),
+    });
   });
 
   it('does not share scope queues between independent node databases', async () => {
@@ -197,11 +234,13 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     const firstStarted = new Promise<void>((resolve) => {
       firstEntered = resolve;
     });
-    jest.spyOn(database, 'commit').mockImplementationOnce(async (operations) => {
-      firstEntered();
-      await firstReleased;
-      await originalCommit(operations);
-    });
+    jest
+      .spyOn(database, 'commit')
+      .mockImplementationOnce(async (operations) => {
+        firstEntered();
+        await firstReleased;
+        await originalCommit(operations);
+      });
 
     const first = unitOfWork.commitGenesis(genesis('shared-scope'));
     await firstStarted;
@@ -265,8 +304,31 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     expect(
       (await repository.findScope('conflicting-scope'))?.toPrimitives().status,
     ).toBe('frozen');
-    await expect(repository.findProjection('conflicting-scope')).resolves.toEqual(
-      { id: 'conflicting-scope' },
+    await expect(
+      repository.findProjection('conflicting-scope'),
+    ).resolves.toEqual({ id: 'conflicting-scope' });
+  });
+
+  it('rejects conflicting genesis from another owner without freezing the scope', async () => {
+    await unitOfWork.commitGenesis(genesis('protected-scope'));
+
+    await expect(
+      unitOfWork.commitGenesis(
+        genesis(
+          'protected-scope',
+          'attacker-genesis',
+          { id: 'protected-scope' },
+          'attacker-state',
+          'attacker-device',
+          attackerIdentityId,
+        ),
+      ),
+    ).rejects.toThrow(InvalidPrivateAuthorizationError);
+    expect(
+      (await repository.findScope('protected-scope'))?.toPrimitives().status,
+    ).toBe('active');
+    await expect(repository.findProjection('protected-scope')).resolves.toEqual(
+      { id: 'protected-scope' },
     );
   });
 
@@ -336,6 +398,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
         ),
         checkpoint: checkpoint().toPrimitives(),
         genesisHash: 'genesis',
+        ownerDeviceKey: 'owner',
         pendingOperations: [],
         status: 'active',
       }),
@@ -366,6 +429,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       acceptedOperations: proposals.map((proposal) => proposal.toPrimitives()),
       checkpoint: checkpoint().toPrimitives(),
       genesisHash: 'genesis',
+      ownerDeviceKey: 'owner',
       pendingOperations: [],
       status: 'active',
     });
@@ -418,6 +482,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       acceptedOperations: [proposal.toPrimitives()],
       checkpoint: checkpoint().toPrimitives(),
       genesisHash: 'genesis',
+      ownerDeviceKey: 'owner',
       pendingOperations: [],
       status: 'active',
     });
@@ -455,6 +520,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
           acceptedOperations: [proposal.toPrimitives()],
           checkpoint: checkpoint().toPrimitives(),
           genesisHash: 'genesis',
+          ownerDeviceKey: 'owner',
           pendingOperations: [],
           status: 'active',
         }),
@@ -502,6 +568,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
         acceptedOperations: [proposal.toPrimitives()],
         checkpoint: checkpoint().toPrimitives(),
         genesisHash: 'genesis',
+        ownerDeviceKey: 'owner',
         pendingOperations: [],
         status: 'active',
       }),
@@ -524,6 +591,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
           revokedDeviceKeys: ['device'],
         },
         genesisHash: 'genesis',
+        ownerDeviceKey: 'owner',
         pendingOperations: [],
         status: 'active',
       }),
@@ -600,6 +668,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
         acceptedOperations: [proposal.toPrimitives()],
         checkpoint: checkpoint().toPrimitives(),
         genesisHash: 'genesis',
+        ownerDeviceKey: 'owner',
         pendingOperations: [],
         status: 'active',
       }),

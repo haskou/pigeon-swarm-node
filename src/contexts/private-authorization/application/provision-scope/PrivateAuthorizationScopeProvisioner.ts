@@ -1,5 +1,6 @@
 import { PrivateAuthorizationScope } from '../../domain/PrivateAuthorizationScope';
 import { PrivateIdentityBinding } from '../../domain/services/PrivateIdentityBinding';
+import { PrivateAuthorizationDeviceKey } from '../../domain/value-objects/PrivateAuthorizationDeviceKey';
 import { PrivateOperationUnitOfWork } from '../PrivateOperationUnitOfWork';
 import { PrivateAuthorizationScopeProvisionMessage } from './messages/PrivateAuthorizationScopeProvisionMessage';
 import { PrivateAuthorizationScopeProvisionStatus } from './PrivateAuthorizationScopeProvisionStatus';
@@ -31,11 +32,13 @@ export default class PrivateAuthorizationScopeProvisioner {
       message.projection,
     );
     const result = await this.unitOfWork.commitGenesis({
+      ownerIdentityId: message.authenticatedIdentityId,
       projection,
       protectedMlsState: message.protectedMlsState,
       scope: PrivateAuthorizationScope.pin(
         genesis.checkpoint,
         genesis.genesisHash,
+        new PrivateAuthorizationDeviceKey(ownerDeviceKey),
       ),
     });
 

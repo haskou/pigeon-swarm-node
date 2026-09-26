@@ -1,5 +1,6 @@
 import { InvalidPrivateAuthorizationError } from './errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationCheckpointPrimitives } from './PrivateAuthorizationCheckpointPrimitives';
+import { PrivateAuthorizationDeviceKey } from './value-objects/PrivateAuthorizationDeviceKey';
 import { PrivateAuthorizationScopeId } from './value-objects/PrivateAuthorizationScopeId';
 
 export class PrivateAuthorizationCheckpoint {
@@ -106,6 +107,16 @@ export class PrivateAuthorizationCheckpoint {
 
   public getScopeId(): PrivateAuthorizationScopeId {
     return new PrivateAuthorizationScopeId(this.primitives.scopeId);
+  }
+
+  public getFreshnessAuthorityKey(): PrivateAuthorizationDeviceKey {
+    return new PrivateAuthorizationDeviceKey(
+      this.primitives.freshnessAuthorityKey,
+    );
+  }
+
+  public authorizes(deviceKey: PrivateAuthorizationDeviceKey): boolean {
+    return this.primitives.authorityKeys.includes(deviceKey.valueOf());
   }
 
   public toPrimitives(): PrivateAuthorizationCheckpointPrimitives {
