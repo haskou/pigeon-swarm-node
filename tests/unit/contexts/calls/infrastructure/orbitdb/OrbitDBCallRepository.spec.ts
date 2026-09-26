@@ -236,6 +236,39 @@ describe('OrbitDBCallRepository', () => {
     expect(calls.put).not.toHaveBeenCalled();
   });
 
+  it('filters protected calls before hydrating aggregate results', async () => {
+    await repository.save(communityCall());
+    const leaseLookup = jest.spyOn(leases, 'findByCallIds');
+    const protectedRepository = new OrbitDBCallRepository(
+      new OrbitDBCallMapper(),
+      new OrbitDBCallDocumentReplicator(registry),
+      projection,
+      leases,
+      new PrivateCommunityPublicStorageGuard(
+        {
+          findScope: jest.fn().mockImplementation((scopeId: string) =>
+            Promise.resolve(
+              scopeId === communityId.valueOf() ? ({} as never) : undefined,
+            ),
+          ),
+        } as never,
+        new PrivateAuthorizationStorageCoordinator(),
+      ),
+    );
+
+    await expect(
+      protectedRepository.findActiveByParticipant(
+        new IdentityId(participantIdentityId),
+      ),
+    ).resolves.toEqual([]);
+    await expect(
+      protectedRepository.findTimedOutRingingCalls(
+        new Timestamp(1_780_000_010_000),
+      ),
+    ).resolves.toEqual([]);
+    expect(leaseLookup).not.toHaveBeenCalled();
+  });
+
   it('keeps scope protection behind an admitted call publication', async () => {
     const coordinator = new PrivateAuthorizationStorageCoordinator();
     let protectedScope = false;

@@ -72,6 +72,28 @@ export default class OrbitDBCallRepository extends CallRepository {
     return Promise.all(documents.map((document) => this.hydrate(document)));
   }
 
+  private async filterPublicCommunityDocuments(
+    documents: OrbitDBCallDocument[],
+  ): Promise<OrbitDBCallDocument[]> {
+    const communityDocuments = documents.filter(
+      (document) =>
+        document.scope.type === 'community_channel' &&
+        typeof document.scope.communityId === 'string',
+    );
+    const publicCommunityDocuments = new Set(
+      await this.publicStorageGuard.filterPublic(
+        communityDocuments,
+        (document) => new CommunityId(document.scope.communityId!),
+      ),
+    );
+
+    return documents.filter(
+      (document) =>
+        document.scope.type !== 'community_channel' ||
+        publicCommunityDocuments.has(document),
+    );
+  }
+
   public async findById(id: CallId): Promise<Call | undefined> {
     const document = await this.callProjection.findById(id);
 
@@ -85,14 +107,20 @@ export default class OrbitDBCallRepository extends CallRepository {
       this.callProjection.findActiveByParticipant(participantId),
       this.callProjection.findActiveCommunityCalls(),
     ]);
-    const calls = await this.hydrateList([...conversations, ...communities]);
+    const documents = await this.filterPublicCommunityDocuments([
+      ...conversations,
+      ...communities,
+    ]);
+    const calls = await this.hydrateList(documents);
 
     return calls.filter((call) => call.hasParticipant(participantId));
   }
 
   public async findByParticipant(participantId: IdentityId): Promise<Call[]> {
     return this.hydrateList(
-      await this.callProjection.findByParticipant(participantId),
+      await this.filterPublicCommunityDocuments(
+        await this.callProjection.findByParticipant(participantId),
+      ),
     );
   }
 
@@ -142,7 +170,9 @@ export default class OrbitDBCallRepository extends CallRepository {
     timeoutThreshold: Timestamp,
   ): Promise<Call[]> {
     return this.hydrateList(
-      await this.callProjection.findTimedOutRingingCalls(timeoutThreshold),
+      await this.filterPublicCommunityDocuments(
+        await this.callProjection.findTimedOutRingingCalls(timeoutThreshold),
+      ),
     );
   }
 
