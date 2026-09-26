@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pigeon.futoineko.com/contracts/private-authorization/private-control-operation-v1.schema.json",
+  "title": "Private control operation v1",
+  "oneOf": [
+    { "$ref": "#/$defs/proposal" },
+    { "$ref": "#/$defs/commit" },
+    { "$ref": "#/$defs/revocation" }
+  ],
+  "$defs": {
+    "base64url16": { "type": "string", "pattern": "^[A-Za-z0-9_-]{22}$" },
+    "base64url32": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
+    "base64url64": { "type": "string", "pattern": "^[A-Za-z0-9_-]{86}$" },
+    "memberTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "targetIdentityId"],
+      "properties": {
+        "type": { "enum": ["member.ban", "member.remove"] },
+        "targetIdentityId": { "type": "string", "minLength": 1, "maxLength": 1024 }
+      }
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "identityId", "deviceKey", "mlsCredentialHash"],
+      "properties": {
+        "type": { "const": "member.admit" },
+        "identityId": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "deviceKey": { "$ref": "#/$defs/base64url32" },
+        "mlsCredentialHash": { "$ref": "#/$defs/base64url32" }
+      }
+    },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "targetIdentityId", "roleIds"],
+      "properties": {
+        "type": { "const": "member.roles.set" },
+        "targetIdentityId": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "roleIds": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "change": {
+      "oneOf": [
+        { "$ref": "#/$defs/memberTarget" },
+        { "$ref": "#/$defs/admission" },
+        { "$ref": "#/$defs/roles" }
+      ]
+    },
+    "envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "operationId",
+        "scopeId",
+        "authorizationRevision",
+        "authorDeviceKey",
+        "kind",
+        "previousOperationIds",
+        "payload",
+        "signature"
+      ],
+      "properties": {
+        "version": { "const": 1 },
+        "operationId": { "$ref": "#/$defs/base64url16" },
+        "scopeId": { "$ref": "#/$defs/base64url32" },
+        "authorizationRevision": { "type": "integer", "minimum": 0 },
+        "authorDeviceKey": { "$ref": "#/$defs/base64url32" },
+        "kind": { "type": "string" },
+        "payload": { "type": "object" },
+        "previousOperationIds": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/base64url16" }
+        },
+        "signature": { "$ref": "#/$defs/base64url64" }
+      }
+    },
+    "proposal": {
+      "allOf": [
+        { "$ref": "#/$defs/envelope" },
+        {
+          "properties": {
+            "kind": { "const": "membership.propose" },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["proposalId", "parentHeadHash", "change"],
+              "properties": {
+                "proposalId": { "$ref": "#/$defs/base64url16" },
+                "parentHeadHash": { "$ref": "#/$defs/base64url32" },
+                "change": { "$ref": "#/$defs/change" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "commit": {
+      "allOf": [
+        { "$ref": "#/$defs/envelope" },
+        {
+          "properties": {
+            "kind": { "const": "membership.commit" },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["proposalOperationId", "resultingHeadHash", "mlsMessageHash", "change"],
+              "properties": {
+                "proposalOperationId": { "$ref": "#/$defs/base64url16" },
+                "resultingHeadHash": { "$ref": "#/$defs/base64url32" },
+                "mlsMessageHash": { "$ref": "#/$defs/base64url32" },
+                "change": { "$ref": "#/$defs/change" }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "revocation": {
+      "allOf": [
+        { "$ref": "#/$defs/envelope" },
+        {
+          "properties": {
+            "kind": { "const": "device.revoke" },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["deviceKey", "resultingHeadHash"],
+              "properties": {
+                "deviceKey": { "$ref": "#/$defs/base64url32" },
+                "resultingHeadHash": { "$ref": "#/$defs/base64url32" }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

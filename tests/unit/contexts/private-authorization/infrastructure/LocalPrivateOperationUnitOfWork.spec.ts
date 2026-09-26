@@ -26,14 +26,14 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       revokedDeviceKeys: [],
       scopeId: 'scope',
     });
-  const operation = () =>
+  const operation = (kind = 'membership.commit') =>
     PrivateControlOperation.fromPrimitives({
       authorDeviceKey: 'owner',
       authorizationRevision: 0,
       byteSize: 10,
       digest: 'digest-operation',
       id: 'operation',
-      kind: 'membership.propose',
+      kind,
       mutation: { targetIdentityId: 'member', type: 'member.ban' },
       previousOperationIds: [],
       scopeId: 'scope',
@@ -107,6 +107,28 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       true,
     );
     await expect(repository.findOutbox('scope')).resolves.toHaveLength(1);
+  });
+
+  it('commits a proposal without advancing the authorization checkpoint', async () => {
+    const proposal = operation('membership.propose');
+    const accepted = acceptance();
+    accepted.receipt = proposal;
+    accepted.scope = PrivateAuthorizationScope.fromPrimitives({
+      acceptedOperations: [proposal.toPrimitives()],
+      checkpoint: checkpoint().toPrimitives(),
+      genesisHash: 'genesis',
+      pendingOperations: [],
+      status: 'active',
+    });
+    delete accepted.reservation;
+
+    await expect(
+      unitOfWork.commitAcceptance(
+        'scope',
+        { headHash: 'head-0', revision: 0 },
+        accepted,
+      ),
+    ).resolves.toBe('committed');
   });
 
   it('rejects stale checkpoints and a different child reservation', async () => {

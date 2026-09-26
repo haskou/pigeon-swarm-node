@@ -64,17 +64,9 @@ export class PrivateAuthorizationScope extends AggregateRoot {
     operation: PrivateControlOperation,
     expectedKind: string,
   ): 'accepted' | 'duplicate' | 'pending' {
-    const duplicate = this.duplicateResult(operation);
+    const assessment = this.assess(operation, expectedKind);
 
-    if (duplicate) return duplicate;
-    this.assertActive();
-    this.assertOperation(operation, expectedKind);
-
-    if (this.isPending(operation)) {
-      this.enqueue(operation);
-
-      return 'pending';
-    }
+    if (assessment !== 'ready') return assessment;
 
     this.acceptNow(operation);
 
@@ -238,11 +230,9 @@ export class PrivateAuthorizationScope extends AggregateRoot {
     operation: PrivateControlOperation,
     candidate: PrivateAuthorizationCheckpoint,
   ): 'accepted' | 'duplicate' | 'pending' {
-    const duplicate = this.duplicateResult(operation);
+    const assessment = this.assess(operation, 'membership.commit');
 
-    if (duplicate) return duplicate;
-    this.assertActive();
-    this.assertOperation(operation, 'membership.commit');
+    if (assessment !== 'ready') return assessment;
     const operationPrimitives = operation.toPrimitives();
     const proposal = this.acceptedOperations.find(
       (accepted) =>
@@ -275,11 +265,9 @@ export class PrivateAuthorizationScope extends AggregateRoot {
     operation: PrivateControlOperation,
     candidate: PrivateAuthorizationCheckpoint,
   ): 'accepted' | 'duplicate' | 'pending' {
-    const duplicate = this.duplicateResult(operation);
+    const assessment = this.assess(operation, 'device.revoke');
 
-    if (duplicate) return duplicate;
-    this.assertActive();
-    this.assertOperation(operation, 'device.revoke');
+    if (assessment !== 'ready') return assessment;
     const mutation = operation.toPrimitives().mutation;
     const deviceKey =
       mutation.type === 'device.revoke' && 'deviceKey' in mutation
@@ -302,6 +290,35 @@ export class PrivateAuthorizationScope extends AggregateRoot {
     this.checkpoint = candidate;
 
     return 'accepted';
+  }
+
+  public assess(
+    operation: PrivateControlOperation,
+    expectedKind: string = operation.toPrimitives().kind,
+  ): 'duplicate' | 'pending' | 'ready' {
+    const duplicate = this.duplicateResult(operation);
+
+    if (duplicate) return duplicate === 'accepted' ? 'duplicate' : duplicate;
+    this.assertActive();
+    this.assertOperation(operation, expectedKind);
+
+    if (this.isPending(operation)) {
+      this.enqueue(operation);
+
+      return 'pending';
+    }
+
+    return 'ready';
+  }
+
+  public quarantine(): void {
+    if (this.status === 'frozen') return;
+    this.status = 'frozen';
+    this.record(
+      new PrivateAuthorizationScopeWasFrozenEvent(
+        this.checkpoint.toPrimitives().scopeId,
+      ),
+    );
   }
 
   public retryable(): PrivateControlOperation[] {

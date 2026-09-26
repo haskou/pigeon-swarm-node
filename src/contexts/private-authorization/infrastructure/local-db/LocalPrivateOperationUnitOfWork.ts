@@ -53,6 +53,15 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   ): boolean {
     const checkpoint = acceptance.scope.toPrimitives().checkpoint;
 
+    const operation = acceptance.receipt.toPrimitives();
+
+    if (operation.kind === 'membership.propose') {
+      return (
+        checkpoint.revision === expected.revision &&
+        checkpoint.headHash === expected.headHash
+      );
+    }
+
     return (
       checkpoint.revision === expected.revision + 1 &&
       checkpoint.parentHeadHash === expected.headHash

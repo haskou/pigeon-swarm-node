@@ -14,6 +14,9 @@ export class PrivateControlOperation {
   public toPrimitives(): PrivateControlOperationPrimitives {
     return {
       ...this.primitives,
+      control: this.primitives.control
+        ? { ...this.primitives.control }
+        : undefined,
       mutation: { ...this.primitives.mutation },
       previousOperationIds: [...this.primitives.previousOperationIds],
     };
