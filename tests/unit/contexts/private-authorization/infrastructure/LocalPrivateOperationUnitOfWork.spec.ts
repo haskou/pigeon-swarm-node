@@ -345,6 +345,43 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     );
   });
 
+  it('persists quarantine when a rebase finds a conflicting pending operation', async () => {
+    const proposal = PrivateControlOperation.fromPrimitives({
+      ...operation('membership.propose').toPrimitives(),
+      digest: 'accepted-digest',
+      id: 'conflicting-proposal',
+    });
+    const conflictingPending = PrivateControlOperation.fromPrimitives({
+      ...proposal.toPrimitives(),
+      digest: 'pending-digest',
+    });
+    const accepted: PrivateOperationAcceptance = {
+      ...acceptance(),
+      clearPendingOperationIds: [proposal.toPrimitives().id],
+      receipt: proposal,
+      reservation: undefined,
+      scope: PrivateAuthorizationScope.fromPrimitives({
+        acceptedOperations: [proposal.toPrimitives()],
+        checkpoint: checkpoint().toPrimitives(),
+        genesisHash: 'genesis',
+        pendingOperations: [],
+        status: 'active',
+      }),
+    };
+    await repository.savePending('scope', conflictingPending);
+
+    await expect(
+      unitOfWork.commitAcceptance(
+        'scope',
+        { headHash: 'head-0', revision: 0 },
+        accepted,
+      ),
+    ).rejects.toThrow(PrivateAuthorizationConflictError);
+    expect((await repository.findScope('scope'))?.toPrimitives().status).toBe(
+      'frozen',
+    );
+  });
+
   it('does not save pending work over a newer checkpoint', async () => {
     await unitOfWork.commitAcceptance(
       'scope',

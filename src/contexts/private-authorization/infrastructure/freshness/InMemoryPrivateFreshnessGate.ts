@@ -19,7 +19,7 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
   private static readonly MAX_AGE_MILLISECONDS = 10_000;
   private static readonly MAX_OUTSTANDING_CHALLENGES_PER_PRINCIPAL = 64;
   private static readonly MAX_OUTSTANDING_CHALLENGES_PER_SCOPE = 1024;
-  private static readonly challenges = new Map<
+  private readonly challenges = new Map<
     string,
     Map<string, Map<string, OutstandingChallenge>>
   >();
@@ -43,7 +43,7 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
   }
 
   private removeExpired(now: number): void {
-    for (const [scopeId, scope] of InMemoryPrivateFreshnessGate.challenges) {
+    for (const [scopeId, scope] of this.challenges) {
       for (const [authorDeviceKey, challenges] of scope) {
         this.removeExpiredChallenges(challenges, now);
 
@@ -53,7 +53,7 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
       }
 
       if (scope.size === 0) {
-        InMemoryPrivateFreshnessGate.challenges.delete(scopeId);
+        this.challenges.delete(scopeId);
       }
     }
   }
@@ -102,7 +102,7 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
     authorDeviceKey: string,
     digest: string,
   ): OutstandingChallenge | undefined {
-    const scope = InMemoryPrivateFreshnessGate.challenges.get(scopeId);
+    const scope = this.challenges.get(scopeId);
     const challenges = scope?.get(authorDeviceKey);
     const challenge = challenges?.get(digest);
     challenges?.delete(digest);
@@ -120,7 +120,7 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
     if (challenges?.size === 0) scope?.delete(authorDeviceKey);
 
     if (scope?.size === 0) {
-      InMemoryPrivateFreshnessGate.challenges.delete(scopeId);
+      this.challenges.delete(scopeId);
     }
   }
 
@@ -178,12 +178,12 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
     scopeId: string,
     authorDeviceKey: string,
   ): Map<string, OutstandingChallenge> {
-    let scope = InMemoryPrivateFreshnessGate.challenges.get(scopeId);
+    let scope = this.challenges.get(scopeId);
     scope ??= new Map<string, Map<string, OutstandingChallenge>>();
     let challenges = scope.get(authorDeviceKey);
     challenges ??= new Map<string, OutstandingChallenge>();
     scope.set(authorDeviceKey, challenges);
-    InMemoryPrivateFreshnessGate.challenges.set(scopeId, scope);
+    this.challenges.set(scopeId, scope);
 
     return challenges;
   }
@@ -198,7 +198,7 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
     this.assertAdmitted(trusted, candidate);
     const now = this.now();
     this.removeExpired(now);
-    const scope = InMemoryPrivateFreshnessGate.challenges.get(trusted.scopeId);
+    const scope = this.challenges.get(trusted.scopeId);
     let challenges = scope?.get(candidate.authorDeviceKey);
     const existing = challenges?.get(candidate.digest);
 

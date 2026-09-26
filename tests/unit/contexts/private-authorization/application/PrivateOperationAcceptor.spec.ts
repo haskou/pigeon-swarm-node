@@ -212,6 +212,30 @@ describe('PrivateOperationAcceptor', () => {
     expect(mutations.apply).not.toHaveBeenCalled();
   });
 
+  it('acknowledges an identical receipt after its author is revoked', async () => {
+    const decoded = new PrivateControlOperationContract()
+      .decode(signed())
+      .toPrimitives();
+    const activeKey = encoded(32, 10);
+    const revokedCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
+      ...checkpoint().toPrimitives(),
+      admittedDeviceKeys: [activeKey],
+      authorityKeys: [activeKey],
+      freshnessAuthorityKey: activeKey,
+      revokedDeviceKeys: [authorKey],
+    });
+    repository.findScope.mockResolvedValue(
+      PrivateAuthorizationScope.pin(revokedCheckpoint, 'genesis'),
+    );
+    repository.findReceipt.mockResolvedValue(decoded);
+
+    await expect(
+      acceptor.accept(new PrivateOperationAcceptMessage(signed(), 'proof')),
+    ).resolves.toEqual({ status: 'duplicate' });
+    expect(verifier.verify).not.toHaveBeenCalled();
+    expect(freshness.verify).not.toHaveBeenCalled();
+  });
+
   it('rejects a replay identifier carrying a different signed digest', async () => {
     const receipt = new PrivateControlOperationContract()
       .decode(signed())

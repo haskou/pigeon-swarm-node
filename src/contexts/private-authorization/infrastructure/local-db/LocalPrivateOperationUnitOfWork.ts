@@ -181,13 +181,33 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     }
 
     if (!currentScope) return 'stale';
-    const rebasedAcceptance = this.rebaseAcceptance(currentScope, acceptance);
+    const rebasedAcceptance = await this.rebasePersistingQuarantine(
+      currentScope,
+      acceptance,
+    );
 
     await this.database.commit(
       this.acceptanceOperations(scopeId, rebasedAcceptance),
     );
 
     return 'committed';
+  }
+
+  private async rebasePersistingQuarantine(
+    currentScope: NonNullable<
+      Awaited<ReturnType<LocalPrivateAuthorizationRepository['findScope']>>
+    >,
+    acceptance: PrivateOperationAcceptance,
+  ): Promise<PrivateOperationAcceptance> {
+    try {
+      return this.rebaseAcceptance(currentScope, acceptance);
+    } catch (error) {
+      if (error instanceof PrivateAuthorizationConflictError) {
+        await this.repository.saveScope(currentScope);
+      }
+
+      throw error;
+    }
   }
 
   private rebaseAcceptance(

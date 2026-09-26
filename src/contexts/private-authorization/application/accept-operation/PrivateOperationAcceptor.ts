@@ -33,11 +33,13 @@ export default class PrivateOperationAcceptor {
 
   private async verifiedOperation(
     message: PrivateOperationAcceptMessage,
+    routed: PrivateControlOperation = this.contract.decode(
+      message.signedOperationJson,
+    ),
   ): Promise<{
     operation: PrivateControlOperation;
     scope: PrivateAuthorizationScope;
   }> {
-    const routed = this.contract.decode(message.signedOperationJson);
     const routedValue = routed.toPrimitives();
     const scope = await this.repository.findScope(routedValue.scopeId);
 
@@ -82,6 +84,15 @@ export default class PrivateOperationAcceptor {
     if (receipt.digest === value.digest) return true;
     await this.unitOfWork.quarantine(value.scopeId);
     throw new PrivateAuthorizationConflictError();
+  }
+
+  private async hasIdenticalReceipt(
+    operation: PrivateControlOperation,
+  ): Promise<boolean> {
+    const value = operation.toPrimitives();
+    const receipt = await this.repository.findReceipt(value.scopeId, value.id);
+
+    return receipt?.digest === value.digest;
   }
 
   private async transition(
@@ -166,10 +177,11 @@ export default class PrivateOperationAcceptor {
     };
   }
 
-  public async accept(
+  private async acceptNewOperation(
     message: PrivateOperationAcceptMessage,
+    routed: PrivateControlOperation,
   ): Promise<PrivateOperationAcceptanceResult> {
-    const { operation, scope } = await this.verifiedOperation(message);
+    const { operation, scope } = await this.verifiedOperation(message, routed);
     const value = operation.toPrimitives();
 
     if (await this.duplicate(operation)) return { status: 'duplicate' };
@@ -226,6 +238,16 @@ export default class PrivateOperationAcceptor {
     }
 
     return { status: 'accepted' };
+  }
+
+  public async accept(
+    message: PrivateOperationAcceptMessage,
+  ): Promise<PrivateOperationAcceptanceResult> {
+    const routed = this.contract.decode(message.signedOperationJson);
+
+    return (await this.hasIdenticalReceipt(routed))
+      ? { status: 'duplicate' }
+      : this.acceptNewOperation(message, routed);
   }
 
   public async challenge(signedOperationJson: string): Promise<string> {

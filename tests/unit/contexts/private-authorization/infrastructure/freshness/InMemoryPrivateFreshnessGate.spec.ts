@@ -163,6 +163,31 @@ describe('InMemoryPrivateFreshnessGate', () => {
     );
   });
 
+  it('isolates challenges between gate instances in one process', async () => {
+    const firstNonce = Buffer.alloc(32, 11).toString('base64url');
+    const secondNonce = Buffer.alloc(32, 12).toString('base64url');
+    const first = new InMemoryPrivateFreshnessGate(
+      new PrivateFreshnessVerifier(),
+      () => now,
+      () => firstNonce,
+    );
+    const second = new InMemoryPrivateFreshnessGate(
+      new PrivateFreshnessVerifier(),
+      () => now,
+      () => secondNonce,
+    );
+    const firstRequest = first.issue(checkpoint, operation);
+    const secondRequest = second.issue(checkpoint, operation);
+
+    expect(firstRequest).not.toBe(secondRequest);
+    await expect(
+      first.verify(checkpoint, operation, signedProof(firstRequest)),
+    ).resolves.toEqual({ replayMarkerId: firstNonce });
+    await expect(
+      second.verify(checkpoint, operation, signedProof(secondRequest)),
+    ).resolves.toEqual({ replayMarkerId: secondNonce });
+  });
+
   it('bounds outstanding challenges per scope and author', () => {
     for (let index = 0; index < 64; index++) {
       gate.issue(
