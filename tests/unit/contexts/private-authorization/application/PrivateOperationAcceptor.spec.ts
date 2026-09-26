@@ -2,13 +2,17 @@ import { PrivateControlMutationAuthorizer } from '@app/contexts/private-authoriz
 import { PrivateControlTransitionProcessor } from '@app/contexts/private-authorization/application/accept-operation/PrivateControlTransitionProcessor';
 import { PrivateFreshnessGate } from '@app/contexts/private-authorization/application/accept-operation/PrivateFreshnessGate';
 import { PrivateOperationAcceptMessage } from '@app/contexts/private-authorization/application/accept-operation/messages/PrivateOperationAcceptMessage';
+import { PrivateOperationChallengeMessage } from '@app/contexts/private-authorization/application/accept-operation/messages/PrivateOperationChallengeMessage';
 import PrivateOperationAcceptor from '@app/contexts/private-authorization/application/accept-operation/PrivateOperationAcceptor';
+import PrivateOperationAuthorizer from '@app/contexts/private-authorization/application/accept-operation/PrivateOperationAuthorizer';
 import { PrivateOperationUnitOfWork } from '@app/contexts/private-authorization/application/PrivateOperationUnitOfWork';
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
+import { PrivateIdentityBinding } from '@app/contexts/private-authorization/domain/services/PrivateIdentityBinding';
 import PrivateControlOperationContract from '@app/contexts/private-authorization/infrastructure/contracts/PrivateControlOperationContract';
+import LegacyIdentityDeviceBinding from '@app/contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
 import PrivateOperationVerifier from '@app/contexts/private-authorization/infrastructure/crypto/PrivateOperationVerifier';
 
 describe('PrivateOperationAcceptor', () => {
@@ -16,6 +20,9 @@ describe('PrivateOperationAcceptor', () => {
     Buffer.alloc(bytes, value).toString('base64url');
   const scopeId = encoded(32, 1);
   const authorKey = encoded(32, 2);
+  const authorIdentityId = new LegacyIdentityDeviceBinding().identityIdFor(
+    authorKey,
+  );
   const headHash = encoded(32, 3);
   const operationId = encoded(16, 4);
   const proposalId = encoded(16, 5);
@@ -62,6 +69,7 @@ describe('PrivateOperationAcceptor', () => {
   let freshness: jest.Mocked<PrivateFreshnessGate>;
   let transitions: jest.Mocked<PrivateControlTransitionProcessor>;
   let mutations: jest.Mocked<PrivateControlMutationAuthorizer>;
+  let identityBinding: jest.Mocked<PrivateIdentityBinding>;
   let acceptor: PrivateOperationAcceptor;
 
   beforeEach(() => {
@@ -99,11 +107,19 @@ describe('PrivateOperationAcceptor', () => {
     mutations = {
       apply: jest.fn().mockResolvedValue({ members: ['member'] }),
     };
+    identityBinding = {
+      bind: jest.fn().mockReturnValue(authorKey),
+      identityIdFor: jest.fn(),
+    };
     acceptor = new PrivateOperationAcceptor(
       repository,
       unitOfWork,
-      verifier,
-      new PrivateControlOperationContract(),
+      new PrivateOperationAuthorizer(
+        repository,
+        verifier,
+        new PrivateControlOperationContract(),
+        identityBinding,
+      ),
       freshness,
       transitions,
       mutations,
@@ -111,11 +127,25 @@ describe('PrivateOperationAcceptor', () => {
   });
 
   it('issues freshness only after verifying the signed operation against local policy', async () => {
-    await expect(acceptor.challenge(signed())).resolves.toBe(
-      'challenge-request',
+    const message = new PrivateOperationChallengeMessage(
+      authorIdentityId,
+      signed(),
     );
+
+    await expect(acceptor.challenge(message)).resolves.toBe('challenge-request');
     expect(verifier.verify).toHaveBeenCalledWith(signed(), authorKey);
     expect(freshness.issue).toHaveBeenCalled();
+  });
+
+  it('rejects freshness requested by an identity other than the operation author', async () => {
+    identityBinding.bind.mockReturnValue(encoded(32, 9));
+
+    await expect(
+      acceptor.challenge(
+        new PrivateOperationChallengeMessage(authorIdentityId, signed()),
+      ),
+    ).rejects.toThrow(InvalidPrivateAuthorizationError);
+    expect(freshness.issue).not.toHaveBeenCalled();
   });
 
   it('verifies and atomically accepts an authorized proposal', async () => {
@@ -299,7 +329,7 @@ describe('PrivateOperationAcceptor', () => {
     expect(unitOfWork.quarantine).not.toHaveBeenCalled();
   });
 
-  it('freezes a valid historical sibling reserved to another child', async () => {
+  it('rejects a historical sibling without trusting it to freeze the scope', async () => {
     const activeKey = encoded(32, 10);
     const currentCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
       ...checkpoint().toPrimitives(),
@@ -327,7 +357,7 @@ describe('PrivateOperationAcceptor', () => {
     ).rejects.toThrow('Private authorization conflict');
     expect(verifier.verify).toHaveBeenCalledWith(sibling, authorKey);
     expect(repository.findReservation).toHaveBeenCalledWith(scopeId, headHash);
-    expect(unitOfWork.quarantine).toHaveBeenCalledWith(scopeId);
+    expect(unitOfWork.quarantine).not.toHaveBeenCalled();
     expect(freshness.verify).not.toHaveBeenCalled();
   });
 

@@ -7,19 +7,18 @@ import { PrivateAuthorizationRepository } from '../../domain/repositories/Privat
 import { PrivateOperationAcceptance } from '../PrivateOperationAcceptance';
 import { PrivateOperationUnitOfWork } from '../PrivateOperationUnitOfWork';
 import { PrivateOperationAcceptMessage } from './messages/PrivateOperationAcceptMessage';
+import { PrivateOperationChallengeMessage } from './messages/PrivateOperationChallengeMessage';
 import { PrivateControlMutationAuthorizer } from './PrivateControlMutationAuthorizer';
 import { PrivateControlTransitionProcessor } from './PrivateControlTransitionProcessor';
 import { PrivateFreshnessGate } from './PrivateFreshnessGate';
 import { PrivateOperationAcceptanceResult } from './PrivateOperationAcceptanceResult';
-import { PrivateOperationAuthenticator } from './PrivateOperationAuthenticator';
-import { PrivateOperationDecoder } from './PrivateOperationDecoder';
+import PrivateOperationAuthorizer from './PrivateOperationAuthorizer';
 
 export default class PrivateOperationAcceptor {
   public constructor(
     private readonly repository: PrivateAuthorizationRepository,
     private readonly unitOfWork: PrivateOperationUnitOfWork,
-    private readonly operationVerifier: PrivateOperationAuthenticator,
-    private readonly contract: PrivateOperationDecoder,
+    private readonly authorizer: PrivateOperationAuthorizer,
     private readonly freshness: PrivateFreshnessGate,
     private readonly transitions: PrivateControlTransitionProcessor,
     private readonly mutations: PrivateControlMutationAuthorizer,
@@ -29,50 +28,6 @@ export default class PrivateOperationAcceptor {
     const value = checkpoint.toPrimitives();
 
     return { headHash: value.headHash, revision: value.revision };
-  }
-
-  private async verifiedOperation(
-    message: PrivateOperationAcceptMessage,
-    routed: PrivateControlOperation = this.contract.decode(
-      message.signedOperationJson,
-    ),
-    admission: 'active' | 'historical' = 'active',
-  ): Promise<{
-    operation: PrivateControlOperation;
-    scope: PrivateAuthorizationScope;
-  }> {
-    const routedValue = routed.toPrimitives();
-    const scope = await this.repository.findScope(routedValue.scopeId);
-
-    if (!scope) throw new InvalidPrivateAuthorizationError();
-    const checkpoint = scope.toPrimitives().checkpoint;
-    const eligibleDeviceKeys =
-      admission === 'historical'
-        ? [...checkpoint.admittedDeviceKeys, ...checkpoint.revokedDeviceKeys]
-        : checkpoint.admittedDeviceKeys;
-    const expectedAuthor = eligibleDeviceKeys.find(
-      (key) => key === routedValue.authorDeviceKey,
-    );
-
-    if (!expectedAuthor) {
-      throw new InvalidPrivateAuthorizationError();
-    }
-
-    try {
-      const canonical = this.operationVerifier.verify(
-        message.signedOperationJson,
-        expectedAuthor,
-      );
-      const operation = this.contract.decode(canonical);
-
-      if (operation.toPrimitives().scopeId !== checkpoint.scopeId) {
-        throw new InvalidPrivateAuthorizationError();
-      }
-
-      return { operation, scope };
-    } catch {
-      throw new InvalidPrivateAuthorizationError();
-    }
   }
 
   private async duplicate(
@@ -99,7 +54,10 @@ export default class PrivateOperationAcceptor {
 
     if (receipt.digest === value.digest) return true;
 
-    await this.verifiedOperation(message, routed, 'historical');
+    await this.authorizer.authorizeHistorical(
+      message.signedOperationJson,
+      routed,
+    );
     await this.unitOfWork.quarantine(value.scopeId);
     throw new PrivateAuthorizationConflictError();
   }
@@ -146,8 +104,10 @@ export default class PrivateOperationAcceptor {
     const candidateHead = value.control?.resultingHeadHash;
 
     if (!this.isConflictingReservation(reservedChild, candidateHead)) return;
-    await this.verifiedOperation(message, routed, 'historical');
-    await this.unitOfWork.quarantine(value.scopeId);
+    await this.authorizer.authorizeHistorical(
+      message.signedOperationJson,
+      routed,
+    );
     throw new PrivateAuthorizationConflictError();
   }
 
@@ -243,7 +203,10 @@ export default class PrivateOperationAcceptor {
     message: PrivateOperationAcceptMessage,
     routed: PrivateControlOperation,
   ): Promise<PrivateOperationAcceptanceResult> {
-    const { operation, scope } = await this.verifiedOperation(message, routed);
+    const { operation, scope } = await this.authorizer.authorize(
+      message.signedOperationJson,
+      routed,
+    );
     const value = operation.toPrimitives();
 
     if (await this.duplicate(operation)) return { status: 'duplicate' };
@@ -305,7 +268,7 @@ export default class PrivateOperationAcceptor {
   public async accept(
     message: PrivateOperationAcceptMessage,
   ): Promise<PrivateOperationAcceptanceResult> {
-    const routed = this.contract.decode(message.signedOperationJson);
+    const routed = this.authorizer.decode(message.signedOperationJson);
 
     if (await this.hasReceipt(message, routed)) return { status: 'duplicate' };
     await this.rejectReservedSibling(message, routed);
@@ -313,9 +276,15 @@ export default class PrivateOperationAcceptor {
     return this.acceptNewOperation(message, routed);
   }
 
-  public async challenge(signedOperationJson: string): Promise<string> {
-    const { operation, scope } = await this.verifiedOperation(
-      new PrivateOperationAcceptMessage(signedOperationJson, ''),
+  public async challenge(
+    message: PrivateOperationChallengeMessage,
+  ): Promise<string> {
+    const { operation, scope } = await this.authorizer.authorize(
+      message.signedOperationJson,
+    );
+    this.authorizer.assertAuthoredBy(
+      operation,
+      message.authenticatedIdentityId,
     );
     const checkpoint = PrivateAuthorizationCheckpoint.fromPrimitives(
       scope.toPrimitives().checkpoint,

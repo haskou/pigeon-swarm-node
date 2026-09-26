@@ -1,7 +1,9 @@
 import PrivateCommunityControlApplier from '@app/contexts/communities/application/apply-private-control/PrivateCommunityControlApplier';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { PrivateOperationAcceptMessage } from '@app/contexts/private-authorization/application/accept-operation/messages/PrivateOperationAcceptMessage';
+import { PrivateOperationChallengeMessage } from '@app/contexts/private-authorization/application/accept-operation/messages/PrivateOperationChallengeMessage';
 import PrivateOperationAcceptor from '@app/contexts/private-authorization/application/accept-operation/PrivateOperationAcceptor';
+import PrivateOperationAuthorizer from '@app/contexts/private-authorization/application/accept-operation/PrivateOperationAuthorizer';
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
 import PrivateControlOperationContract from '@app/contexts/private-authorization/infrastructure/contracts/PrivateControlOperationContract';
@@ -46,6 +48,7 @@ interface ControlPolicy {
 }
 
 class AuthorizationNode {
+  private readonly identityBinding = new LegacyIdentityDeviceBinding();
   public readonly acceptor: PrivateOperationAcceptor;
   public readonly database: EmbeddedLocalDatabase;
   public readonly repository: LocalPrivateAuthorizationRepository;
@@ -58,7 +61,6 @@ class AuthorizationNode {
       this.database,
       storageCoordinator,
     );
-    const binding = new LegacyIdentityDeviceBinding();
     this.acceptor = new PrivateOperationAcceptor(
       this.repository,
       new LocalPrivateOperationUnitOfWork(
@@ -66,15 +68,19 @@ class AuthorizationNode {
         this.repository,
         storageCoordinator,
       ),
-      new PrivateOperationVerifier(),
-      new PrivateControlOperationContract(),
+      new PrivateOperationAuthorizer(
+        this.repository,
+        new PrivateOperationVerifier(),
+        new PrivateControlOperationContract(),
+        this.identityBinding,
+      ),
       new InMemoryPrivateFreshnessGate(new PrivateFreshnessVerifier()),
       new VerifiedPrivateControlTransitionProcessor(
         new PrivateControlTransitionVerifier(),
         new PrivateMlsPolicyVerifier(),
-        binding,
+        this.identityBinding,
       ),
-      new PrivateCommunityControlApplier(binding),
+      new PrivateCommunityControlApplier(this.identityBinding),
     );
   }
 
@@ -104,7 +110,12 @@ class AuthorizationNode {
       signedTransitionJson: string;
     },
   ): Promise<'accepted' | 'duplicate' | 'pending'> {
-    const requestJson = await this.acceptor.challenge(signedOperationJson);
+    const requestJson = await this.acceptor.challenge(
+      new PrivateOperationChallengeMessage(
+        this.identityBinding.identityIdFor(rawDeviceKey(signer)),
+        signedOperationJson,
+      ),
+    );
     const request = JSON.parse(requestJson) as Record<string, unknown>;
     const signerKey = rawDeviceKey(signer);
     const proof = PrivateFreshnessProof.sign(

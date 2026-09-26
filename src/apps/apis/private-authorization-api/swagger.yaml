@@ -8,6 +8,10 @@ paths:
       tags: [private-authorization]
       summary: Provision a private authorization scope
       description: Verifies the owner-signed genesis and its protected MLS state, validates the owner-only private community projection, and commits all initial local state atomically. The signed HTTP identity must match the genesis owner key.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
       requestBody:
         required: true
         content:
@@ -33,11 +37,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PrivateAuthorizationError'
+        '401':
+          description: Invalid signed request
   /private-authorization/challenges:
     post:
       tags: [private-authorization]
       summary: Issue a one-use freshness challenge for a verified operation
       description: The returned canonical JSON must be signed exactly as supplied and used once within ten seconds.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
       requestBody:
         required: true
         content:
@@ -57,11 +67,17 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PrivateAuthorizationError'
+        '401':
+          description: Invalid signed request
   /private-authorization/operations:
     post:
       tags: [private-authorization]
       summary: Accept a signed private control operation
       description: A control frame is required for membership commits and device revocations. Its byte fields use canonical unpadded base64url.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
       requestBody:
         required: true
         content:
@@ -97,7 +113,28 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PrivateAuthorizationError'
+        '401':
+          description: Invalid signed request
 components:
+  parameters:
+    XIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      in: header
+      name: X-Timestamp
+      required: true
+      schema:
+        type: string
+    XSignature:
+      in: header
+      name: X-Signature
+      required: true
+      schema:
+        type: string
   schemas:
     PostPrivateAuthorizationScopeBody:
       type: object

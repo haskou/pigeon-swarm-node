@@ -1,3 +1,4 @@
+import { NodeOwnerRouteSupport } from '@app/apps/apis/nodes-api/routes/NodeOwnerRouteSupport';
 import { PrivateAuthorizationScopeProvisionMessage } from '@app/contexts/private-authorization/application/provision-scope/messages/PrivateAuthorizationScopeProvisionMessage';
 import PrivateAuthorizationScopeProvisioner from '@app/contexts/private-authorization/application/provision-scope/PrivateAuthorizationScopeProvisioner';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
@@ -5,10 +6,9 @@ import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 
 import { PostPrivateAuthorizationScopeBody } from '../bodies/PostPrivateAuthorizationScopeBody';
-import { PrivateAuthorizationRouteSupport } from './PrivateAuthorizationRouteSupport';
 
 @JsonController('/private-authorization')
-export class PostPrivateAuthorizationScopeRoute extends PrivateAuthorizationRouteSupport {
+export class PostPrivateAuthorizationScopeRoute extends NodeOwnerRouteSupport {
   private readonly provisioner = this.get<PrivateAuthorizationScopeProvisioner>(
     PrivateAuthorizationScopeProvisioner,
   );
@@ -20,7 +20,7 @@ export class PostPrivateAuthorizationScopeRoute extends PrivateAuthorizationRout
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const identityId = this.authenticate(request);
+    const identityId = await this.authenticateNodeOwner(request);
     const result = await this.provisioner.provision(
       new PrivateAuthorizationScopeProvisionMessage(
         identityId.valueOf(),

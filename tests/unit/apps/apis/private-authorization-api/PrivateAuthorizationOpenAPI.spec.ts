@@ -42,6 +42,23 @@ describe('private authorization OpenAPI contract', () => {
     });
   });
 
+  it('documents signed request authentication for every operation', () => {
+    const expectedParameters = [
+      { $ref: '#/components/parameters/XIdentityId' },
+      { $ref: '#/components/parameters/XTimestamp' },
+      { $ref: '#/components/parameters/XSignature' },
+    ];
+
+    for (const path of Object.values(specification.paths) as Array<{
+      post: { parameters: unknown; responses: Record<string, unknown> };
+    }>) {
+      expect(path.post.parameters).toEqual(expectedParameters);
+      expect(path.post.responses['401']).toEqual({
+        description: 'Invalid signed request',
+      });
+    }
+  });
+
   it('matches the validated DTO field limits', () => {
     const schemas = specification.components.schemas;
 

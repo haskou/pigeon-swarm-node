@@ -6,6 +6,8 @@ import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projec
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
+import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
+import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import LegacyIdentityDeviceBinding from '@app/contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
@@ -543,6 +545,30 @@ export default class Definitions {
   @given('I sign the current private authorization scope request')
   public async iSignTheCurrentPrivateAuthorizationScopeRequest(): Promise<void> {
     await this.signCurrentRequest('POST', '/private-authorization/scopes');
+  }
+
+  @given('another identity signs the current private authorization scope request')
+  public async anotherIdentitySignsTheCurrentPrivateAuthorizationScopeRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      'POST',
+      '/private-authorization/scopes',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('the current identity owns the node')
+  public async theCurrentIdentityOwnsTheNode(): Promise<void> {
+    await this.ensureIdentityKeyPair();
+    const identityId = this.ownerIdentityId as IdentityId;
+    const assigner = Kernel.di.getService<NodeOwnerAssigner>(NodeOwnerAssigner);
+
+    await assigner.assignOwner(
+      new NodeOwnerAssignerMessage(identityId.valueOf(), identityId.valueOf()),
+    );
   }
 
   @then('the private authorization scope is durably provisioned')

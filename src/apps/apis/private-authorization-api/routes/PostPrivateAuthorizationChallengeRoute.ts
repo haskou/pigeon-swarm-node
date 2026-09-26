@@ -1,3 +1,4 @@
+import { PrivateOperationChallengeMessage } from '@app/contexts/private-authorization/application/accept-operation/messages/PrivateOperationChallengeMessage';
 import PrivateOperationAcceptor from '@app/contexts/private-authorization/application/accept-operation/PrivateOperationAcceptor';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
@@ -19,8 +20,13 @@ export class PostPrivateAuthorizationChallengeRoute extends PrivateAuthorization
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    this.authenticate(request);
-    const challenge = await this.acceptor.challenge(body.signedOperationJson);
+    const identityId = this.authenticate(request);
+    const challenge = await this.acceptor.challenge(
+      new PrivateOperationChallengeMessage(
+        identityId.valueOf(),
+        body.signedOperationJson,
+      ),
+    );
 
     return response.status(HttpRouteStatusEnum.OK).send({ challenge });
   }

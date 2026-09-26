@@ -1,4 +1,5 @@
 import { PrivateControlOperationPrimitives } from './PrivateControlOperationPrimitives';
+import { PrivateAuthorizationDeviceKey } from './value-objects/PrivateAuthorizationDeviceKey';
 
 export class PrivateControlOperation {
   public static fromPrimitives(
@@ -10,6 +11,14 @@ export class PrivateControlOperation {
   private constructor(
     private readonly primitives: PrivateControlOperationPrimitives,
   ) {}
+
+  public isAuthoredBy(deviceKey: PrivateAuthorizationDeviceKey): boolean {
+    return this.primitives.authorDeviceKey === deviceKey.valueOf();
+  }
+
+  public getAuthorDeviceKey(): PrivateAuthorizationDeviceKey {
+    return new PrivateAuthorizationDeviceKey(this.primitives.authorDeviceKey);
+  }
 
   public toPrimitives(): PrivateControlOperationPrimitives {
     return {

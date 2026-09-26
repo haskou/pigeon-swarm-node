@@ -569,6 +569,10 @@ export class PrivateAuthorizationScope extends AggregateRoot {
       );
   }
 
+  public getCheckpoint(): PrivateAuthorizationCheckpoint {
+    return this.checkpoint;
+  }
+
   public toPrimitives(): PrivateAuthorizationScopePrimitives {
     return {
       acceptedOperations: this.acceptedOperations.map((operation) =>

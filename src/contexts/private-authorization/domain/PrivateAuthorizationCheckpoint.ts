@@ -119,6 +119,17 @@ export class PrivateAuthorizationCheckpoint {
     return this.primitives.authorityKeys.includes(deviceKey.valueOf());
   }
 
+  public admits(deviceKey: PrivateAuthorizationDeviceKey): boolean {
+    return this.primitives.admittedDeviceKeys.includes(deviceKey.valueOf());
+  }
+
+  public recognizes(deviceKey: PrivateAuthorizationDeviceKey): boolean {
+    return (
+      this.admits(deviceKey) ||
+      this.primitives.revokedDeviceKeys.includes(deviceKey.valueOf())
+    );
+  }
+
   public toPrimitives(): PrivateAuthorizationCheckpointPrimitives {
     return {
       ...this.primitives,
