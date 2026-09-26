@@ -22,7 +22,11 @@ export default class NotificationScopeSettingsUpdater {
     settings.update(message.getPreferences());
 
     await this.repository.save(settings);
-    await this.messageBus.publish(settings.pullDomainEvents());
+    const events = settings.pullDomainEvents();
+
+    if (!(await this.repository.isPrivateScope(scope))) {
+      await this.messageBus.publish(events);
+    }
 
     return settings;
   }

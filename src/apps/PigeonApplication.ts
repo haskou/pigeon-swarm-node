@@ -19,6 +19,8 @@ import CommunityRepository from '../contexts/communities/domain/repositories/Com
 import CommunityRepositoryRouter from '../contexts/communities/infrastructure/CommunityRepositoryRouter';
 import NodeNetworkSynchronizationMonitor from '../contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
+import NotificationScopeSettingsRepository from '../contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
+import NotificationScopeSettingsRepositoryRouter from '../contexts/notification-settings/infrastructure/NotificationScopeSettingsRepositoryRouter';
 import IdentityPresenceRepository from '../contexts/presence/domain/repositories/IdentityPresenceRepository';
 import InMemoryIdentityPresenceRepository from '../contexts/presence/infrastructure/memory/InMemoryIdentityPresenceRepository';
 import { PrivateControlMutationAuthorizer } from '../contexts/private-authorization/application/accept-operation/PrivateControlMutationAuthorizer';
@@ -217,6 +219,10 @@ export default class PigeonApplication {
         {
           token: CommunityRepository,
           useClass: CommunityRepositoryRouter,
+        },
+        {
+          token: NotificationScopeSettingsRepository,
+          useClass: NotificationScopeSettingsRepositoryRouter,
         },
       ],
     });

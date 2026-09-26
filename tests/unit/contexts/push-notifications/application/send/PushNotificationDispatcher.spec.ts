@@ -350,6 +350,7 @@ function emptySettingsRepository(): NotificationScopeSettingsRepository {
         _scope: NotificationSettingScope,
       ): Promise<NotificationScopeSettings | undefined> => undefined,
     ),
+    isPrivateScope: jest.fn(async (): Promise<boolean> => false),
     save: jest.fn(),
   };
 }

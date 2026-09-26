@@ -22,6 +22,10 @@ export default class NotificationScopeSettingsResetter {
 
     settings.recordReset();
     await this.repository.delete(identityId, scope);
-    await this.messageBus.publish(settings.pullDomainEvents());
+    const events = settings.pullDomainEvents();
+
+    if (!(await this.repository.isPrivateScope(scope))) {
+      await this.messageBus.publish(events);
+    }
   }
 }

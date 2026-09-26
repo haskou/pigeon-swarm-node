@@ -190,6 +190,10 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
       : undefined;
   }
 
+  public isPrivateScope(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+
   public async save(settings: NotificationScopeSettings): Promise<void> {
     const document = this.toDocument(settings);
 

@@ -54,4 +54,35 @@ describe('private authorization container wiring', () => {
     expect(communityRepository.arguments).toContain(`@${guardId}`);
     expect(communityProjection.arguments).toContain(`@${guardId}`);
   });
+
+  it('routes protected notification settings to local storage', () => {
+    const document = YAML.parse(
+      fs.readFileSync(
+        path.resolve(process.cwd(), 'config/container/services.yaml'),
+        'utf8',
+      ),
+    ) as { services: Record<string, ServiceDefinition> };
+    const entries = Object.entries(document.services);
+    const service = (className: string) => {
+      const entry = entries.find(([, definition]) =>
+        definition.class?.endsWith(`/${className}`),
+      );
+
+      expect(entry).toBeDefined();
+
+      return entry!;
+    };
+    const [guardId] = service(
+      'communities/infrastructure/PrivateCommunityPublicStorageGuard',
+    );
+    const [localRepositoryId] = service(
+      'notification-settings/infrastructure/local-db/LocalNotificationScopeSettingsRepository',
+    );
+    const [, router] = service(
+      'notification-settings/infrastructure/NotificationScopeSettingsRepositoryRouter',
+    );
+
+    expect(router.arguments).toContain(`@${guardId}`);
+    expect(router.arguments).toContain(`@${localRepositoryId}`);
+  });
 });
