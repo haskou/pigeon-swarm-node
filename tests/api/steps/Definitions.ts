@@ -7,15 +7,27 @@ import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/Or
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
+import LegacyIdentityDeviceBinding from '@app/contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { Kernel } from '@haskou/ddd-kernel';
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  KeyPair,
+  PrivateGenesisSignature,
+  PrivateKey,
+} from '@haskou/pigeon-swarm-crypto';
+import canonicalize from 'canonicalize';
 import { expect } from 'chai';
 import * as chai from 'chai';
 import chaiSubset from 'chai-subset';
-import { generateKeyPairSync, randomUUID } from 'crypto';
+import {
+  createHash,
+  generateKeyPairSync,
+  randomBytes,
+  randomUUID,
+} from 'crypto';
 import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import FormData from 'form-data';
 
@@ -52,6 +64,7 @@ export default class Definitions {
   private keychainExternalIdentifier: string | undefined;
   private messageId: string | undefined;
   private notificationId: string | undefined;
+  private privateAuthorizationScopeId: string | undefined;
   private otherIdentityId: IdentityId | undefined;
   private otherIdentityKeyPair: KeyPair | undefined;
 
@@ -450,6 +463,101 @@ export default class Definitions {
     await this.signCurrentRequest(
       'POST',
       '/private-authorization/challenges',
+    );
+  }
+
+  @given('I set a valid private authorization genesis body')
+  public async iSetAValidPrivateAuthorizationGenesisBody(): Promise<void> {
+    const keyPair = await this.ensureIdentityKeyPair();
+    const identityId = this.ownerIdentityId as IdentityId;
+    const ownerDeviceKey = new LegacyIdentityDeviceBinding().bind(
+      identityId.valueOf(),
+    );
+    const scopeId = randomBytes(32).toString('base64url');
+    const protectedState = Buffer.from('private-genesis-state');
+    const mlsContextHash = createHash('sha256')
+      .update(protectedState)
+      .digest('base64url');
+    const hash = (value: unknown) =>
+      createHash('sha256')
+        .update(canonicalize(value)!)
+        .digest('base64url');
+    const policy = {
+      authorityKeys: [ownerDeviceKey],
+      devices: [
+        {
+          deviceKey: ownerDeviceKey,
+          mlsCredentialHash: randomBytes(32).toString('base64url'),
+        },
+      ],
+      freshnessAuthorityKey: ownerDeviceKey,
+      leaseRevocationHpkeKey: randomBytes(32).toString('base64url'),
+      leaseRevocationKey: ownerDeviceKey,
+      sequencerKey: ownerDeviceKey,
+      threshold: 1,
+      version: 1,
+    };
+    const head = {
+      mlsContextHash,
+      mlsEpoch: 0,
+      parentHeadHash: null as string | null,
+      policyHash: hash(policy),
+      revision: 0,
+      scopeId,
+    };
+    const unsignedGenesis = {
+      ...head,
+      headHash: hash(head),
+      policy,
+      version: 1,
+    };
+    const signedGenesisJson = PrivateGenesisSignature.sign(
+      canonicalize(unsignedGenesis)!,
+      new PrivateKey(keyPair.toPrimitives().privateKey),
+    );
+
+    this.privateAuthorizationScopeId = scopeId;
+    this.body = JSON.stringify({
+      projection: {
+        autoJoinEnabled: false,
+        bannedMemberIds: [],
+        createdAt: 1,
+        description: 'Protected API community',
+        discoverable: false,
+        id: scopeId,
+        memberIds: [identityId.valueOf()],
+        memberRoles: [],
+        name: 'Protected API community',
+        networkId: '550e8400-e29b-41d4-a716-446655440000',
+        ownerIdentityId: identityId.valueOf(),
+        roles: [],
+        textChannels: [],
+        visibility: 'private',
+        voiceChannels: [],
+      },
+      protectedMlsState: protectedState.toString('base64url'),
+      signedGenesisJson,
+    });
+  }
+
+  @given('I sign the current private authorization scope request')
+  public async iSignTheCurrentPrivateAuthorizationScopeRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/private-authorization/scopes');
+  }
+
+  @then('the private authorization scope is durably provisioned')
+  public async thePrivateAuthorizationScopeIsDurablyProvisioned(): Promise<void> {
+    const scopeId = this.privateAuthorizationScopeId as string;
+    const repository = Kernel.di.getService<PrivateAuthorizationRepository>(
+      PrivateAuthorizationRepository,
+    );
+
+    expect(await repository.findScope(scopeId)).not.to.equal(undefined);
+    expect(await repository.findProjection(scopeId)).to.containSubset({
+      id: scopeId,
+    });
+    expect(await repository.findProtectedMlsState(scopeId)).to.equal(
+      Buffer.from('private-genesis-state').toString('base64url'),
     );
   }
 

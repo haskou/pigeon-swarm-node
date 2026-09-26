@@ -3,6 +3,36 @@ info:
   title: Private authorization API
   version: 1.0.0
 paths:
+  /private-authorization/scopes:
+    post:
+      tags: [private-authorization]
+      summary: Provision a private authorization scope
+      description: Verifies the owner-signed genesis and its protected MLS state, validates the owner-only private community projection, and commits all initial local state atomically. The signed HTTP identity must match the genesis owner key.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostPrivateAuthorizationScopeBody'
+      responses:
+        '201':
+          description: Scope provisioned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateAuthorizationProvisionResource'
+        '200':
+          description: Exact genesis already provisioned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateAuthorizationProvisionResource'
+        '409':
+          description: Invalid or conflicting private authorization genesis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateAuthorizationError'
   /private-authorization/challenges:
     post:
       tags: [private-authorization]
@@ -69,6 +99,26 @@ paths:
                 $ref: '#/components/schemas/PrivateAuthorizationError'
 components:
   schemas:
+    PostPrivateAuthorizationScopeBody:
+      type: object
+      required: [projection, protectedMlsState, signedGenesisJson]
+      properties:
+        projection:
+          type: object
+          additionalProperties: true
+        protectedMlsState:
+          type: string
+          maxLength: 1398102
+        signedGenesisJson:
+          type: string
+          maxLength: 262144
+    PrivateAuthorizationProvisionResource:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [accepted, duplicate]
     PostPrivateAuthorizationChallengeBody:
       type: object
       required: [signedOperationJson]

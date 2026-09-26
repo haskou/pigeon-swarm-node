@@ -9,6 +9,7 @@ import {
   PrivateGenesisSignature,
   PrivateOperationSignature,
 } from '@haskou/pigeon-swarm-crypto';
+import { createHash } from 'crypto';
 
 describe('private authorization cryptography adapters', () => {
   afterEach(() => jest.restoreAllMocks());
@@ -25,18 +26,42 @@ describe('private authorization cryptography adapters', () => {
   });
 
   it('pins genesis to the expected owner, scope and MLS context', () => {
+    const protectedState = Buffer.from('protected-state');
+    const mlsContextHash = createHash('sha256')
+      .update(protectedState)
+      .digest('base64url');
+    const canonicalGenesis = JSON.stringify({
+      headHash: 'head',
+      mlsContextHash,
+      mlsEpoch: 0,
+      policy: {
+        authorityKeys: ['owner'],
+        devices: [{ deviceKey: 'owner', mlsCredentialHash: 'credential' }],
+        freshnessAuthorityKey: 'owner',
+      },
+      revision: 0,
+      scopeId: 'scope',
+    });
     const verify = jest
       .spyOn(PrivateGenesisSignature, 'verify')
-      .mockReturnValue('canonical-genesis');
+      .mockReturnValue(canonicalGenesis);
 
     expect(
-      new PrivateGenesisVerifier().verify('signed', {
-        mlsContextHash: 'context',
-        ownerDeviceKey: 'owner',
-        scopeId: 'scope',
-      }),
-    ).toBe('canonical-genesis');
-    expect(verify).toHaveBeenCalledWith('signed', 'owner', 'scope', 'context');
+      new PrivateGenesisVerifier().verify(
+        JSON.stringify({ mlsContextHash, scopeId: 'scope' }),
+        'owner',
+        protectedState.toString('base64url'),
+      ),
+    ).toMatchObject({
+      checkpoint: expect.any(Object),
+      genesisHash: expect.any(String),
+    });
+    expect(verify).toHaveBeenCalledWith(
+      JSON.stringify({ mlsContextHash, scopeId: 'scope' }),
+      'owner',
+      'scope',
+      mlsContextHash,
+    );
   });
 
   it('authenticates control bytes before MLS and verifies the resulting context', () => {
@@ -96,11 +121,11 @@ describe('private authorization cryptography adapters', () => {
     [
       PrivateGenesisSignature,
       () =>
-        new PrivateGenesisVerifier().verify('secret', {
-          mlsContextHash: 'context',
-          ownerDeviceKey: 'owner',
-          scopeId: 'scope',
-        }),
+        new PrivateGenesisVerifier().verify(
+          JSON.stringify({ mlsContextHash: 'context', scopeId: 'scope' }),
+          'owner',
+          Buffer.from('state').toString('base64url'),
+        ),
     ],
   ])('redacts underlying cryptographic failures', (target, invoke) => {
     jest.spyOn(target, 'verify').mockImplementation(() => {

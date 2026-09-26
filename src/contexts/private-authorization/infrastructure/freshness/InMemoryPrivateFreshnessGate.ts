@@ -97,6 +97,14 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
     }
   }
 
+  private findChallenge(
+    scopeId: string,
+    authorDeviceKey: string,
+    digest: string,
+  ): OutstandingChallenge | undefined {
+    return this.challenges.get(scopeId)?.get(authorDeviceKey)?.get(digest);
+  }
+
   private takeChallenge(
     scopeId: string,
     authorDeviceKey: string,
@@ -104,7 +112,7 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
   ): OutstandingChallenge | undefined {
     const scope = this.challenges.get(scopeId);
     const challenges = scope?.get(authorDeviceKey);
-    const challenge = challenges?.get(digest);
+    const challenge = this.findChallenge(scopeId, authorDeviceKey, digest);
     challenges?.delete(digest);
     this.removeEmptyStores(scopeId, authorDeviceKey, scope, challenges);
 
@@ -144,7 +152,7 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
   ): { replayMarkerId: string } {
     const trusted = checkpoint.toPrimitives();
     const candidate = operation.toPrimitives();
-    const challenge = this.takeChallenge(
+    const challenge = this.findChallenge(
       trusted.scopeId,
       candidate.authorDeviceKey,
       candidate.digest,
@@ -156,6 +164,13 @@ export default class InMemoryPrivateFreshnessGate extends PrivateFreshnessGate {
       trusted.freshnessAuthorityKey,
       challenge.requestJson,
     );
+    const consumed = this.takeChallenge(
+      trusted.scopeId,
+      candidate.authorDeviceKey,
+      candidate.digest,
+    );
+
+    if (consumed !== challenge) throw new InvalidPrivateAuthorizationError();
 
     return { replayMarkerId: challenge.nonce };
   }

@@ -49,6 +49,21 @@ package "private-authorization/domain" {
   PrivateAuthorizationScope ..> PrivateControlOperationWasAcceptedEvent
 }
 
+package "private-authorization/application" {
+  class PrivateAuthorizationScopeProvisioner {
+    +provision(message): ProvisionResult
+  }
+
+  interface PrivateGenesisAuthenticator
+  interface PrivateGenesisProjectionAuthorizer
+  interface PrivateOperationUnitOfWork
+
+  PrivateAuthorizationScopeProvisioner --> PrivateGenesisAuthenticator
+  PrivateAuthorizationScopeProvisioner --> PrivateGenesisProjectionAuthorizer
+  PrivateAuthorizationScopeProvisioner --> PrivateOperationUnitOfWork
+  PrivateAuthorizationScopeProvisioner ..> PrivateAuthorizationScope
+}
+
 note right of PrivateAuthorizationScope
   A pinned local checkpoint is authoritative.
   Conflicting genesis or operation digests

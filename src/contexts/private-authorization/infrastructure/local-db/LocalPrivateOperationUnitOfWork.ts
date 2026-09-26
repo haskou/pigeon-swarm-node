@@ -1,3 +1,4 @@
+import { PrivateAuthorizationGenesisCommit } from '@app/contexts/private-authorization/application/PrivateAuthorizationGenesisCommit';
 import { PrivateExpectedCheckpoint } from '@app/contexts/private-authorization/application/PrivateExpectedCheckpoint';
 import { PrivateOperationAcceptance } from '@app/contexts/private-authorization/application/PrivateOperationAcceptance';
 import { PrivateOperationUnitOfWork } from '@app/contexts/private-authorization/application/PrivateOperationUnitOfWork';
@@ -47,6 +48,83 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       if (LocalPrivateOperationUnitOfWork.scopeQueues.get(scopeId) === tail) {
         LocalPrivateOperationUnitOfWork.scopeQueues.delete(scopeId);
       }
+    }
+  }
+
+  private genesisOperations(
+    genesis: PrivateAuthorizationGenesisCommit,
+  ): EmbeddedLocalDatabaseOperation[] {
+    const scope = genesis.scope.toPrimitives();
+    const scopeId = scope.checkpoint.scopeId;
+
+    return [
+      {
+        document: { ...scope, pendingOperations: [] },
+        id: scopeId,
+        namespace: PrivateAuthorizationLocalNamespaces.scopes,
+        type: 'put',
+      },
+      {
+        document: genesis.projection,
+        id: scopeId,
+        namespace: PrivateAuthorizationLocalNamespaces.projections,
+        type: 'put',
+      },
+      {
+        document: { state: genesis.protectedMlsState },
+        id: scopeId,
+        namespace: PrivateAuthorizationLocalNamespaces.mls,
+        type: 'put',
+      },
+    ];
+  }
+
+  private equal(left: unknown, right: unknown): boolean {
+    return JSON.stringify(left) === JSON.stringify(right);
+  }
+
+  private async commitGenesisExclusively(
+    genesis: PrivateAuthorizationGenesisCommit,
+  ): Promise<'committed' | 'duplicate'> {
+    const candidate = genesis.scope.toPrimitives();
+    const scopeId = candidate.checkpoint.scopeId;
+    const current = await this.repository.findScope(scopeId);
+
+    if (!current) {
+      await this.database.commit(this.genesisOperations(genesis));
+
+      return 'committed';
+    }
+
+    try {
+      if (current.toPrimitives().status === 'frozen') {
+        throw new PrivateAuthorizationConflictError();
+      }
+      current.pinGenesis(
+        PrivateAuthorizationCheckpoint.fromPrimitives(candidate.checkpoint),
+        candidate.genesisHash,
+      );
+      const [projection, protectedMlsState] = await Promise.all([
+        this.repository.findProjection(scopeId),
+        this.repository.findProtectedMlsState(scopeId),
+      ]);
+
+      if (
+        !this.equal(projection, genesis.projection) ||
+        protectedMlsState !== genesis.protectedMlsState
+      ) {
+        current.quarantine();
+        throw new PrivateAuthorizationConflictError();
+      }
+
+      return 'duplicate';
+    } catch (error) {
+      if (!(error instanceof PrivateAuthorizationConflictError)) throw error;
+
+      await this.database.commit([
+        this.genesisOperations({ ...genesis, scope: current })[0],
+      ]);
+      throw error;
     }
   }
 
@@ -468,6 +546,16 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   ): Promise<'committed' | 'stale'> {
     return this.exclusively(scopeId, () =>
       this.commitExclusively(scopeId, expectedCheckpoint, acceptance),
+    );
+  }
+
+  public async commitGenesis(
+    genesis: PrivateAuthorizationGenesisCommit,
+  ): Promise<'committed' | 'duplicate'> {
+    const scopeId = genesis.scope.toPrimitives().checkpoint.scopeId;
+
+    return this.exclusively(scopeId, () =>
+      this.commitGenesisExclusively(genesis),
     );
   }
 

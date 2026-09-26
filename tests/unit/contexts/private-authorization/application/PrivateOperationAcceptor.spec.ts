@@ -82,6 +82,7 @@ describe('PrivateOperationAcceptor', () => {
       saveScope: jest.fn(),
     };
     unitOfWork = {
+      commitGenesis: jest.fn().mockResolvedValue('committed'),
       commitPending: jest.fn().mockResolvedValue('committed'),
       commitAcceptance: jest.fn().mockResolvedValue('committed'),
       quarantine: jest.fn(),

@@ -81,7 +81,7 @@ describe('InMemoryPrivateFreshnessGate', () => {
     ).rejects.toThrow('Invalid private authorization');
   });
 
-  it('rejects and consumes an expired challenge', async () => {
+  it('rejects an expired challenge', async () => {
     const request = gate.issue(checkpoint, operation);
     now += 10_001;
 
@@ -136,7 +136,7 @@ describe('InMemoryPrivateFreshnessGate', () => {
     );
   });
 
-  it('consumes a challenge after an invalid proof attempt', async () => {
+  it('keeps a challenge available after an invalid proof attempt', async () => {
     const request = gate.issue(checkpoint, operation);
 
     await expect(
@@ -144,7 +144,7 @@ describe('InMemoryPrivateFreshnessGate', () => {
     ).rejects.toThrow();
     await expect(
       gate.verify(checkpoint, operation, signedProof(request)),
-    ).rejects.toThrow('Invalid private authorization');
+    ).resolves.toEqual({ replayMarkerId: nonce });
   });
 
   it('allows only one concurrent verification of a challenge', async () => {

@@ -146,6 +146,22 @@ Independent per-device credentials will replace this binding through an admitted
 scope-private credential record; the signed operation envelope and authorization
 pipeline remain unchanged.
 
+## Genesis provisioning
+
+An attached client provisions a new protected scope through the authenticated
+`POST /private-authorization/scopes` endpoint. The signed HTTP identity is
+converted to the expected owner device key before the owner-signed genesis is
+verified. The verifier binds the signature to the scope identifier and MLS
+context hash, and the supplied protected MLS state must hash to that context.
+
+Version 1 genesis contains one owner credential. Its community projection must
+use the same scope and owner, contain only that owner as a member, and disable
+public visibility, discovery and automatic joins. The scope, normalized
+projection and protected MLS state are written in one local database batch.
+Repeating the exact request is idempotent; a different genesis, projection or MLS
+state for an existing scope freezes the scope and reports a conflict. Challenge
+and operation ingress remains unavailable until this record exists locally.
+
 ## Validation pipeline
 
 The accept use case performs the following steps in order. A failure stops before

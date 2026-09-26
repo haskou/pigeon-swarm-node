@@ -1,8 +1,13 @@
 import { PrivateControlOperation } from '../domain/PrivateControlOperation';
+import { PrivateAuthorizationGenesisCommit } from './PrivateAuthorizationGenesisCommit';
 import { PrivateExpectedCheckpoint } from './PrivateExpectedCheckpoint';
 import { PrivateOperationAcceptance } from './PrivateOperationAcceptance';
 
 export abstract class PrivateOperationUnitOfWork {
+  public abstract commitGenesis(
+    genesis: PrivateAuthorizationGenesisCommit,
+  ): Promise<'committed' | 'duplicate'>;
+
   public abstract commitPending(
     scopeId: string,
     expectedCheckpoint: PrivateExpectedCheckpoint,

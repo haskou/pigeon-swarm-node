@@ -74,6 +74,22 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       status: 'active',
     }),
   });
+  const genesis = (
+    scopeId: string,
+    genesisHash = 'new-genesis',
+    projection: Record<string, unknown> = { id: scopeId },
+    protectedMlsState = 'protected-genesis-state',
+  ) => ({
+    projection,
+    protectedMlsState,
+    scope: PrivateAuthorizationScope.pin(
+      PrivateAuthorizationCheckpoint.fromPrimitives({
+        ...checkpoint().toPrimitives(),
+        scopeId,
+      }),
+      genesisHash,
+    ),
+  });
 
   beforeEach(async () => {
     previousDatabasePath = process.env.PIGEON_LOCAL_DB_PATH;
@@ -127,6 +143,42 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       true,
     );
     await expect(repository.findOutbox('scope')).resolves.toHaveLength(1);
+  });
+
+  it('atomically provisions a private authorization genesis', async () => {
+    const commit = genesis('new-scope');
+    const databaseCommit = jest.spyOn(database, 'commit');
+
+    await expect(
+      Promise.all([
+        unitOfWork.commitGenesis(commit),
+        unitOfWork.commitGenesis(commit),
+      ]),
+    ).resolves.toEqual(['committed', 'duplicate']);
+    expect(databaseCommit).toHaveBeenCalledTimes(1);
+    await expect(repository.findScope('new-scope')).resolves.toBeDefined();
+    await expect(repository.findProjection('new-scope')).resolves.toEqual({
+      id: 'new-scope',
+    });
+    await expect(
+      repository.findProtectedMlsState('new-scope'),
+    ).resolves.toBe('protected-genesis-state');
+  });
+
+  it('freezes a scope when genesis provisioning conflicts', async () => {
+    await unitOfWork.commitGenesis(genesis('conflicting-scope'));
+
+    await expect(
+      unitOfWork.commitGenesis(
+        genesis('conflicting-scope', 'other-genesis', { id: 'other' }),
+      ),
+    ).rejects.toThrow(PrivateAuthorizationConflictError);
+    expect(
+      (await repository.findScope('conflicting-scope'))?.toPrimitives().status,
+    ).toBe('frozen');
+    await expect(repository.findProjection('conflicting-scope')).resolves.toEqual(
+      { id: 'conflicting-scope' },
+    );
   });
 
   it('atomically removes pending operations invalidated by a checkpoint', async () => {
