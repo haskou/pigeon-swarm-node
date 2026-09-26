@@ -9,6 +9,7 @@ import EmbeddedLocalDatabase, {
   EmbeddedLocalDatabaseOperation,
 } from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 
+import PrivateAuthorizationStorageCoordinator from '../PrivateAuthorizationStorageCoordinator';
 import LocalPrivateAuthorizationRepository from './LocalPrivateAuthorizationRepository';
 import {
   privateAuthorizationLocalId,
@@ -21,6 +22,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   public constructor(
     private readonly database: EmbeddedLocalDatabase,
     private readonly repository: LocalPrivateAuthorizationRepository,
+    private readonly storageCoordinator: PrivateAuthorizationStorageCoordinator,
   ) {
     super();
   }
@@ -554,8 +556,8 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   ): Promise<'committed' | 'duplicate'> {
     const scopeId = genesis.scope.toPrimitives().checkpoint.scopeId;
 
-    return this.exclusively(scopeId, () =>
-      this.commitGenesisExclusively(genesis),
+    return this.storageCoordinator.exclusively(scopeId, () =>
+      this.exclusively(scopeId, () => this.commitGenesisExclusively(genesis)),
     );
   }
 

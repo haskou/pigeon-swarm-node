@@ -53,14 +53,19 @@ class AuthorizationNode {
   public constructor(public readonly databasePath: string) {
     process.env.PIGEON_LOCAL_DB_PATH = databasePath;
     this.database = new EmbeddedLocalDatabase();
+    const storageCoordinator = new PrivateAuthorizationStorageCoordinator();
     this.repository = new LocalPrivateAuthorizationRepository(
       this.database,
-      new PrivateAuthorizationStorageCoordinator(),
+      storageCoordinator,
     );
     const binding = new LegacyIdentityDeviceBinding();
     this.acceptor = new PrivateOperationAcceptor(
       this.repository,
-      new LocalPrivateOperationUnitOfWork(this.database, this.repository),
+      new LocalPrivateOperationUnitOfWork(
+        this.database,
+        this.repository,
+        storageCoordinator,
+      ),
       new PrivateOperationVerifier(),
       new PrivateControlOperationContract(),
       new InMemoryPrivateFreshnessGate(new PrivateFreshnessVerifier()),

@@ -19,6 +19,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
   let databasePath: string;
   let database: EmbeddedLocalDatabase;
   let repository: LocalPrivateAuthorizationRepository;
+  let storageCoordinator: PrivateAuthorizationStorageCoordinator;
   let unitOfWork: LocalPrivateOperationUnitOfWork;
   let previousDatabasePath: string | undefined;
 
@@ -98,11 +99,16 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     );
     process.env.PIGEON_LOCAL_DB_PATH = databasePath;
     database = new EmbeddedLocalDatabase();
+    storageCoordinator = new PrivateAuthorizationStorageCoordinator();
     repository = new LocalPrivateAuthorizationRepository(
       database,
-      new PrivateAuthorizationStorageCoordinator(),
+      storageCoordinator,
     );
-    unitOfWork = new LocalPrivateOperationUnitOfWork(database, repository);
+    unitOfWork = new LocalPrivateOperationUnitOfWork(
+      database,
+      repository,
+      storageCoordinator,
+    );
     await repository.saveScope(
       PrivateAuthorizationScope.pin(checkpoint(), 'genesis'),
     );
@@ -163,6 +169,46 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     await expect(
       repository.findProtectedMlsState('new-scope'),
     ).resolves.toBe('protected-genesis-state');
+  });
+
+  it('waits for an in-flight public write before protecting its scope', async () => {
+    const findScope = jest.spyOn(repository, 'findScope');
+    let releasePublicWrite!: () => void;
+    let publicWriteStarted!: () => void;
+    const publicWriteReleased = new Promise<void>((resolve) => {
+      releasePublicWrite = resolve;
+    });
+    const publicWriteEntered = new Promise<void>((resolve) => {
+      publicWriteStarted = resolve;
+    });
+    const publicWrite = storageCoordinator.exclusively(
+      'racing-scope',
+      async () => {
+        await expect(
+          repository.findScope('racing-scope'),
+        ).resolves.toBeUndefined();
+        publicWriteStarted();
+        await publicWriteReleased;
+      },
+    );
+
+    await publicWriteEntered;
+    let provisioned = false;
+    const provisioning = unitOfWork
+      .commitGenesis(genesis('racing-scope'))
+      .then((result) => {
+        provisioned = true;
+
+        return result;
+      });
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(provisioned).toBe(false);
+    expect(findScope).toHaveBeenCalledTimes(1);
+    await expect(repository.findScope('racing-scope')).resolves.toBeUndefined();
+    releasePublicWrite();
+    await publicWrite;
+    await expect(provisioning).resolves.toBe('committed');
   });
 
   it('freezes a scope when genesis provisioning conflicts', async () => {
@@ -637,7 +683,11 @@ describe('LocalPrivateOperationUnitOfWork', () => {
   });
 
   it('durably reserves only one child per parent across unit-of-work instances', async () => {
-    const another = new LocalPrivateOperationUnitOfWork(database, repository);
+    const another = new LocalPrivateOperationUnitOfWork(
+      database,
+      repository,
+      storageCoordinator,
+    );
 
     await expect(
       Promise.all([
