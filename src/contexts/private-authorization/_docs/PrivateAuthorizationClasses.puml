@@ -55,8 +55,11 @@ note right of PrivateAuthorizationScope
   freeze the scope instead of merging.
   Current and causally required accepted
   operations are bounded by count and bytes.
+  Per-author quotas reserve capacity for an
+  authorized checkpoint advance.
   Checkpoint advances retain a small recent
   history and retire linked durable records.
+  Revoked-key history is also bounded.
 end note
 
 @enduml

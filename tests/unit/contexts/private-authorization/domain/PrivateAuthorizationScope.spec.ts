@@ -352,13 +352,14 @@ describe('PrivateAuthorizationScope', () => {
     expect(scope.toPrimitives().pendingOperations).toEqual([]);
   });
 
-  it('bounds accepted operations at one authorization checkpoint', () => {
+  it('reserves accepted operation capacity for checkpoint progress', () => {
     const scope = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
 
-    for (let index = 0; index < 128; index++) {
+    for (let index = 0; index < 8; index++) {
       expect(
         scope.acceptProposal(
           operation({
+            authorDeviceKey: memberKey,
             byteSize: 1,
             digest: `accepted-${index}`,
             id: `accepted-${index}`,
@@ -370,32 +371,42 @@ describe('PrivateAuthorizationScope', () => {
     expect(() =>
       scope.acceptProposal(
         operation({
+          authorDeviceKey: memberKey,
           byteSize: 1,
           digest: 'accepted-overflow',
           id: 'accepted-overflow',
         }),
       ),
     ).toThrow(PrivateAcceptedCapacityExceededError);
+    expect(
+      scope.acceptProposal(
+        operation({
+          byteSize: 1,
+          digest: 'authority-progress',
+          id: 'authority-progress',
+        }),
+      ),
+    ).toBe('accepted');
   });
 
-  it('bounds accepted operation bytes at one authorization checkpoint', () => {
+  it('bounds accepted operation bytes per author', () => {
     const scope = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
 
-    for (let index = 0; index < 8; index++) {
-      expect(
-        scope.acceptProposal(
-          operation({
-            byteSize: 512 * 1024,
-            digest: `accepted-${index}`,
-            id: `accepted-${index}`,
-          }),
-        ),
-      ).toBe('accepted');
-    }
+    expect(
+      scope.acceptProposal(
+        operation({
+          authorDeviceKey: memberKey,
+          byteSize: 512 * 1024,
+          digest: 'accepted-at-limit',
+          id: 'accepted-at-limit',
+        }),
+      ),
+    ).toBe('accepted');
 
     expect(() =>
       scope.acceptProposal(
         operation({
+          authorDeviceKey: memberKey,
           byteSize: 1,
           digest: 'accepted-overflow',
           id: 'accepted-overflow',
@@ -405,17 +416,19 @@ describe('PrivateAuthorizationScope', () => {
   });
 
   it('compacts old accepted history after advancing the checkpoint', () => {
-    const scope = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
-
-    for (let index = 0; index < 128; index++) {
-      scope.acceptProposal(
+    const scope = PrivateAuthorizationScope.fromPrimitives({
+      acceptedOperations: Array.from({ length: 128 }, (_value, index) =>
         operation({
           byteSize: 1,
           digest: `accepted-${index}`,
           id: `accepted-${index}`,
-        }),
-      );
-    }
+        }).toPrimitives(),
+      ),
+      checkpoint: genesis().toPrimitives(),
+      genesisHash: 'genesis-hash',
+      pendingOperations: [],
+      status: 'active',
+    });
 
     expect(
       scope.revokeDevice(

@@ -154,6 +154,9 @@ export default class PigeonApplication {
         routingControllersOptions: {
           cors: true,
           defaultErrorHandler: false,
+          validation: {
+            validationError: { target: false, value: false },
+          },
         },
       });
       this.logger.attach(this.server);

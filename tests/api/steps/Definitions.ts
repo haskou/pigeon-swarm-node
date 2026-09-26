@@ -454,6 +454,17 @@ export default class Definitions {
   }
 
   @given(
+    'I set a non-string private authorization challenge body containing {string}',
+  )
+  public iSetANonStringPrivateAuthorizationChallengeBodyContaining(
+    sensitiveValue: string,
+  ): void {
+    this.body = JSON.stringify({
+      signedOperationJson: { sensitiveValue },
+    });
+  }
+
+  @given(
     'I set a client-signed identity body with name {string} and handle {string}',
   )
   public async iSetAClientSignedIdentityBody(

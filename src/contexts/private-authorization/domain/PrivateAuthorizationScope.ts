@@ -13,7 +13,11 @@ import { PrivateControlOperation } from './PrivateControlOperation';
 
 export class PrivateAuthorizationScope extends AggregateRoot {
   private static readonly MAX_ACCEPTED_BYTES = 4 * 1024 * 1024;
+  private static readonly MAX_ACCEPTED_BYTES_PER_AUTHOR = 512 * 1024;
   private static readonly MAX_ACCEPTED_OPERATIONS = 128;
+  private static readonly MAX_ACCEPTED_OPERATIONS_PER_AUTHOR = 8;
+  private static readonly MAX_NON_AUTHORITY_ACCEPTED_BYTES = 3 * 1024 * 1024;
+  private static readonly MAX_NON_AUTHORITY_ACCEPTED_OPERATIONS = 96;
   private static readonly MAX_HISTORICAL_OPERATIONS = 32;
   private static readonly MAX_PENDING_BYTES = 1024 * 1024;
   private static readonly MAX_PENDING_OPERATIONS = 128;
@@ -162,12 +166,53 @@ export class PrivateAuthorizationScope extends AggregateRoot {
     operation: PrivateControlOperation,
     checkpoint: PrivateAuthorizationCheckpoint = this.checkpoint,
   ): void {
-    const operationId = operation.toPrimitives().id;
+    const value = operation.toPrimitives();
+    const operationId = value.id;
     const pending = this.pendingOperations.filter(
       (candidate) =>
         candidate.toPrimitives().id !== operationId &&
         !this.isPermanentlyInvalidPending(candidate, checkpoint),
     );
+
+    if (value.authorizationRevision === checkpoint.toPrimitives().revision) {
+      const current = this.acceptedOperations.filter(
+        (accepted) =>
+          accepted.toPrimitives().authorizationRevision ===
+          checkpoint.toPrimitives().revision,
+      );
+      const byAuthor = current.filter(
+        (accepted) =>
+          accepted.toPrimitives().authorDeviceKey === value.authorDeviceKey,
+      );
+
+      if (
+        byAuthor.length >=
+          PrivateAuthorizationScope.MAX_ACCEPTED_OPERATIONS_PER_AUTHOR ||
+        this.acceptedBytes(byAuthor) + value.byteSize >
+          PrivateAuthorizationScope.MAX_ACCEPTED_BYTES_PER_AUTHOR
+      ) {
+        throw new PrivateAcceptedCapacityExceededError();
+      }
+
+      if (
+        !checkpoint.toPrimitives().authorityKeys.includes(value.authorDeviceKey)
+      ) {
+        const authorityKeys = new Set(checkpoint.toPrimitives().authorityKeys);
+        const nonAuthority = current.filter(
+          (accepted) =>
+            !authorityKeys.has(accepted.toPrimitives().authorDeviceKey),
+        );
+
+        if (
+          nonAuthority.length >=
+            PrivateAuthorizationScope.MAX_NON_AUTHORITY_ACCEPTED_OPERATIONS ||
+          this.acceptedBytes(nonAuthority) + value.byteSize >
+            PrivateAuthorizationScope.MAX_NON_AUTHORITY_ACCEPTED_BYTES
+        ) {
+          throw new PrivateAcceptedCapacityExceededError();
+        }
+      }
+    }
 
     this.retainedAccepted(
       [...this.acceptedOperations, operation],

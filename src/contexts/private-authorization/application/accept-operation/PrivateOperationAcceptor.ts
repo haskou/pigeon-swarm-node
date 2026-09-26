@@ -104,6 +104,53 @@ export default class PrivateOperationAcceptor {
     throw new PrivateAuthorizationConflictError();
   }
 
+  private historicalParent(
+    operation: PrivateControlOperation,
+    checkpoint: ReturnType<PrivateAuthorizationCheckpoint['toPrimitives']>,
+  ): string | null {
+    return operation.toPrimitives().authorizationRevision ===
+      checkpoint.revision - 1
+      ? checkpoint.parentHeadHash
+      : null;
+  }
+
+  private isConflictingReservation(
+    reservedChild: string | null,
+    candidateHead: unknown,
+  ): candidateHead is string {
+    return (
+      typeof candidateHead === 'string' &&
+      reservedChild !== null &&
+      reservedChild !== candidateHead
+    );
+  }
+
+  private async rejectReservedSibling(
+    message: PrivateOperationAcceptMessage,
+    routed: PrivateControlOperation,
+  ): Promise<void> {
+    const value = routed.toPrimitives();
+
+    if (value.kind === 'membership.propose') return;
+    const scope = await this.repository.findScope(value.scopeId);
+
+    if (!scope) return;
+    const checkpoint = scope.toPrimitives().checkpoint;
+    const parentHead = this.historicalParent(routed, checkpoint);
+
+    if (!parentHead) return;
+    const reservedChild = await this.repository.findReservation(
+      value.scopeId,
+      parentHead,
+    );
+    const candidateHead = value.control?.resultingHeadHash;
+
+    if (!this.isConflictingReservation(reservedChild, candidateHead)) return;
+    await this.verifiedOperation(message, routed, 'historical');
+    await this.unitOfWork.quarantine(value.scopeId);
+    throw new PrivateAuthorizationConflictError();
+  }
+
   private async transition(
     message: PrivateOperationAcceptMessage,
     checkpoint: PrivateAuthorizationCheckpoint,
@@ -160,11 +207,17 @@ export default class PrivateOperationAcceptor {
     if (result !== 'accepted') throw new InvalidPrivateAuthorizationError();
     const currentProjection =
       (await this.repository.findProjection(value.scopeId)) ?? {};
-    const candidateProjection = await this.mutations.apply(
-      currentCheckpoint,
-      operation,
-      currentProjection,
-    );
+    let candidateProjection: Record<string, unknown>;
+
+    try {
+      candidateProjection = await this.mutations.apply(
+        currentCheckpoint,
+        operation,
+        currentProjection,
+      );
+    } catch {
+      throw new InvalidPrivateAuthorizationError();
+    }
     const projection =
       value.kind === 'membership.propose'
         ? currentProjection
@@ -254,9 +307,10 @@ export default class PrivateOperationAcceptor {
   ): Promise<PrivateOperationAcceptanceResult> {
     const routed = this.contract.decode(message.signedOperationJson);
 
-    return (await this.hasReceipt(message, routed))
-      ? { status: 'duplicate' }
-      : this.acceptNewOperation(message, routed);
+    if (await this.hasReceipt(message, routed)) return { status: 'duplicate' };
+    await this.rejectReservedSibling(message, routed);
+
+    return this.acceptNewOperation(message, routed);
   }
 
   public async challenge(signedOperationJson: string): Promise<string> {

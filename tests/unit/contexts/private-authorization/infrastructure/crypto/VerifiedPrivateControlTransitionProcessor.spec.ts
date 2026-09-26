@@ -66,6 +66,13 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
   });
 
   it('verifies a prior-authority-signed revocation against exact message and state bytes', async () => {
+    const historicalRevokedKeys = Array.from({ length: 128 }, (_value, index) =>
+      Buffer.alloc(32, index + 30).toString('base64url'),
+    );
+    const checkpointWithHistory = PrivateAuthorizationCheckpoint.fromPrimitives({
+      ...checkpoint.toPrimitives(),
+      revokedDeviceKeys: historicalRevokedKeys,
+    });
     const message = Buffer.from('control-message');
     const state = Buffer.from('protected-state');
     const policy = {
@@ -121,7 +128,7 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
     );
 
     const result = await processor.verify(
-      checkpoint,
+      checkpointWithHistory,
       operation,
       {
         encryptedMlsState: state.toString('base64url'),
@@ -134,9 +141,15 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
     expect(result.checkpoint.toPrimitives()).toMatchObject({
       admittedDeviceKeys: [ownerKey],
       headHash: unsigned.headHash,
-      revokedDeviceKeys: [targetKey],
       revision: 1,
     });
+    expect(result.checkpoint.toPrimitives().revokedDeviceKeys).toHaveLength(128);
+    expect(result.checkpoint.toPrimitives().revokedDeviceKeys).toContain(
+      targetKey,
+    );
+    expect(result.checkpoint.toPrimitives().revokedDeviceKeys).not.toContain(
+      historicalRevokedKeys[0],
+    );
     expect(result.protectedMlsState).toBe(state.toString('base64url'));
   });
 

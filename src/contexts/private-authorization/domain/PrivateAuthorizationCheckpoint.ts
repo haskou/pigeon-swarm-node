@@ -2,6 +2,7 @@ import { InvalidPrivateAuthorizationError } from './errors/InvalidPrivateAuthori
 import { PrivateAuthorizationCheckpointPrimitives } from './PrivateAuthorizationCheckpointPrimitives';
 
 export class PrivateAuthorizationCheckpoint {
+  private static readonly MAX_REVOKED_DEVICE_KEYS = 128;
   public static genesis(
     primitives: Omit<
       PrivateAuthorizationCheckpointPrimitives,
@@ -94,7 +95,11 @@ export class PrivateAuthorizationCheckpoint {
     );
 
     return (
-      duplicateKey || invalidAuthority || invalidRevocation || revoked.has('')
+      duplicateKey ||
+      invalidAuthority ||
+      invalidRevocation ||
+      revoked.size > PrivateAuthorizationCheckpoint.MAX_REVOKED_DEVICE_KEYS ||
+      revoked.has('')
     );
   }
 

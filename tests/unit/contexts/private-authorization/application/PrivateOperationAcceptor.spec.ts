@@ -199,6 +199,17 @@ describe('PrivateOperationAcceptor', () => {
     expect(mutations.apply).not.toHaveBeenCalled();
   });
 
+  it('redacts community mutation failures as authorization errors', async () => {
+    mutations.apply.mockRejectedValue(
+      new Error('Secret community member and role details'),
+    );
+
+    await expect(
+      acceptor.accept(new PrivateOperationAcceptMessage(signed(), 'proof')),
+    ).rejects.toMatchObject({ message: 'Invalid private authorization' });
+    expect(unitOfWork.commitAcceptance).not.toHaveBeenCalled();
+  });
+
   it('returns a verified identical receipt as a duplicate without reapplying it', async () => {
     const decoded = new PrivateControlOperationContract()
       .decode(signed())
@@ -285,6 +296,38 @@ describe('PrivateOperationAcceptor', () => {
     ).rejects.toThrow(InvalidPrivateAuthorizationError);
     expect(verifier.verify).not.toHaveBeenCalled();
     expect(unitOfWork.quarantine).not.toHaveBeenCalled();
+  });
+
+  it('freezes a valid historical sibling reserved to another child', async () => {
+    const activeKey = encoded(32, 10);
+    const currentCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
+      ...checkpoint().toPrimitives(),
+      admittedDeviceKeys: [activeKey],
+      authorityKeys: [activeKey],
+      freshnessAuthorityKey: activeKey,
+      headHash: encoded(32, 11),
+      parentHeadHash: headHash,
+      revision: 1,
+      revokedDeviceKeys: [authorKey],
+    });
+    const sibling = revocation({
+      payload: {
+        deviceKey: authorKey,
+        resultingHeadHash: encoded(32, 12),
+      },
+    });
+    repository.findScope.mockResolvedValue(
+      PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
+    );
+    repository.findReservation.mockResolvedValue(encoded(32, 11));
+
+    await expect(
+      acceptor.accept(new PrivateOperationAcceptMessage(sibling, 'proof')),
+    ).rejects.toThrow('Private authorization conflict');
+    expect(verifier.verify).toHaveBeenCalledWith(sibling, authorKey);
+    expect(repository.findReservation).toHaveBeenCalledWith(scopeId, headHash);
+    expect(unitOfWork.quarantine).toHaveBeenCalledWith(scopeId);
+    expect(freshness.verify).not.toHaveBeenCalled();
   });
 
   it('rejects a replay identifier carrying a different signed digest', async () => {

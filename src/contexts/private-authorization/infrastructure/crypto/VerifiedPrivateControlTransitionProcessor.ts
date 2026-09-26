@@ -14,6 +14,7 @@ import PrivateMlsPolicyVerifier from './PrivateMlsPolicyVerifier';
 import { VerifiedTransition } from './VerifiedPrivateControlTransitionContract';
 
 export default class VerifiedPrivateControlTransitionProcessor extends PrivateControlTransitionProcessor {
+  private static readonly MAX_REVOKED_DEVICE_KEYS = 128;
   public constructor(
     private readonly verifier: PrivateControlTransitionVerifier,
     private readonly policyVerifier: PrivateMlsPolicyVerifier,
@@ -230,11 +231,13 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
       (device) => device.deviceKey,
     );
     const revokedDeviceKeys = [
-      ...trusted.revokedDeviceKeys,
-      ...trusted.admittedDeviceKeys.filter(
-        (deviceKey) => !admittedDeviceKeys.includes(deviceKey),
-      ),
-    ];
+      ...new Set([
+        ...trusted.revokedDeviceKeys,
+        ...trusted.admittedDeviceKeys.filter(
+          (deviceKey) => !admittedDeviceKeys.includes(deviceKey),
+        ),
+      ]),
+    ].slice(-VerifiedPrivateControlTransitionProcessor.MAX_REVOKED_DEVICE_KEYS);
 
     return {
       checkpoint: PrivateAuthorizationCheckpoint.fromPrimitives({
@@ -245,7 +248,7 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
         headHash: candidate.headHash,
         parentHeadHash: candidate.parentHeadHash,
         revision: candidate.revision,
-        revokedDeviceKeys: [...new Set(revokedDeviceKeys)],
+        revokedDeviceKeys,
         scopeId: candidate.scopeId,
       }),
       protectedMlsState: frame.encryptedMlsState,

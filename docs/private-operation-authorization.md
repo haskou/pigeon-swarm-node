@@ -261,13 +261,16 @@ pending operation and removes it atomically when acceptance commits.
 Accepted control history is also bounded per scope. The aggregate retains at
 most 128 operations or 4 MiB, including every operation from the current
 authorization revision and every accepted predecessor still required by pending
-work. After a checkpoint advances, it additionally keeps up to 32 of the most
-recent historical operations while capacity permits. An acceptance that would
-make required history exceed either bound fails closed. Compaction deletes the
-corresponding receipts, replay markers, sequencer reservations and outbox records
-in the same local database batch, so restart does not restore unbounded records.
-Frames outside the retained history are stale under the current checkpoint and
-must be resynchronized instead of being replayed as current operations.
+work. One author may consume at most eight operations or 512 KiB in a revision.
+Non-authority authors share at most 96 operations or 3 MiB, leaving capacity for
+an authorized checkpoint advance. After a checkpoint advances, the aggregate
+additionally keeps up to 32 of the most recent historical operations while
+capacity permits. An acceptance that would make required history exceed any
+bound fails closed. Compaction deletes the corresponding receipts, replay
+markers, sequencer reservations and outbox records in the same local database
+batch, so restart does not restore unbounded records. Frames outside the retained
+history are stale under the current checkpoint and must be resynchronized
+instead of being replayed as current operations.
 
 `retryable()` exposes currently satisfiable pending operations in deterministic
 operation-ID order. Transport retention and rejoin deadlines belong to the opaque
@@ -278,6 +281,11 @@ genesis records freeze the scope and surface a conflict. Automatic last-write-wi
 wall-clock arbitration and leader election are forbidden.
 
 ## Revocation under partitions
+
+The checkpoint retains at most the 128 most recent revoked device keys. Dropping
+an older key from that audit window does not admit it again: only the current
+admitted key set authorizes operations, and re-admission requires another
+authorized control transition.
 
 A removal or device revocation becomes effective when its verified control head
 is committed locally. From that point, operations signed by the removed credential
