@@ -1,6 +1,7 @@
-export class PrivatePendingCapacityExceededError extends Error {
+import { DomainError } from '@haskou/value-objects';
+
+export class PrivatePendingCapacityExceededError extends DomainError {
   public constructor() {
     super('Private pending capacity exceeded');
-    this.name = PrivatePendingCapacityExceededError.name;
   }
 }

@@ -23,6 +23,8 @@ describe('PrivateOperationAcceptor', () => {
     PrivateAuthorizationCheckpoint.genesis({
       admittedDeviceKeys: [authorKey],
       authorityKeys: [authorKey],
+      controlCheckpointJson: '{}',
+      freshnessAuthorityKey: authorKey,
       headHash,
       scopeId,
     });
@@ -86,6 +88,7 @@ describe('PrivateOperationAcceptor', () => {
       verify: jest.fn((value) => value),
     } as unknown as jest.Mocked<PrivateOperationVerifier>;
     freshness = {
+      issue: jest.fn().mockReturnValue('challenge-request'),
       verify: jest.fn().mockResolvedValue({ replayMarkerId: 'challenge' }),
     };
     transitions = { verify: jest.fn() };
@@ -101,6 +104,14 @@ describe('PrivateOperationAcceptor', () => {
       transitions,
       mutations,
     );
+  });
+
+  it('issues freshness only after verifying the signed operation against local policy', async () => {
+    await expect(acceptor.challenge(signed())).resolves.toBe(
+      'challenge-request',
+    );
+    expect(verifier.verify).toHaveBeenCalledWith(signed(), authorKey);
+    expect(freshness.issue).toHaveBeenCalled();
   });
 
   it('verifies and atomically accepts an authorized proposal', async () => {
@@ -119,7 +130,7 @@ describe('PrivateOperationAcceptor', () => {
       scopeId,
       { headHash, revision: 0 },
       expect.objectContaining({
-        projection: { members: ['member'] },
+        projection: { members: [] },
         replayMarkerId: 'challenge',
       }),
     );
@@ -208,6 +219,36 @@ describe('PrivateOperationAcceptor', () => {
       acceptor.accept(new PrivateOperationAcceptMessage(signed(), 'proof')),
     ).rejects.toThrow('Private authorization conflict');
     expect(mutations.apply).not.toHaveBeenCalled();
+  });
+
+  it('durably freezes a conflicting queued operation identifier', async () => {
+    const pending = new PrivateControlOperationContract().decode(signed());
+    repository.findScope.mockResolvedValue(
+      PrivateAuthorizationScope.fromPrimitives({
+        acceptedOperations: [],
+        checkpoint: checkpoint().toPrimitives(),
+        genesisHash: 'genesis',
+        pendingOperations: [pending.toPrimitives()],
+        status: 'active',
+      }),
+    );
+    const conflicting = JSON.parse(signed());
+    conflicting.payload.change.targetIdentityId = 'different-member';
+
+    await expect(
+      acceptor.accept(
+        new PrivateOperationAcceptMessage(
+          JSON.stringify(conflicting),
+          'proof',
+        ),
+      ),
+    ).rejects.toThrow('Private authorization conflict');
+    expect(repository.saveScope).toHaveBeenCalledWith(
+      expect.objectContaining({ toPrimitives: expect.any(Function) }),
+    );
+    expect(
+      repository.saveScope.mock.calls[0][0].toPrimitives().status,
+    ).toBe('frozen');
   });
 
   it('maps malformed, unsupported and forged inputs to one redacted error', async () => {

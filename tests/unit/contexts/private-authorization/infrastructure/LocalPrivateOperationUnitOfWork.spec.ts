@@ -20,6 +20,8 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     PrivateAuthorizationCheckpoint.fromPrimitives({
       admittedDeviceKeys: ['owner'],
       authorityKeys: ['owner'],
+      controlCheckpointJson: '{}',
+      freshnessAuthorityKey: 'owner',
       headHash,
       parentHeadHash: revision === 0 ? null : 'head-0',
       revision,

@@ -1,6 +1,7 @@
-export class InvalidPrivateAuthorizationError extends Error {
+import { DomainError } from '@haskou/value-objects';
+
+export class InvalidPrivateAuthorizationError extends DomainError {
   public constructor() {
     super('Invalid private authorization');
-    this.name = InvalidPrivateAuthorizationError.name;
   }
 }

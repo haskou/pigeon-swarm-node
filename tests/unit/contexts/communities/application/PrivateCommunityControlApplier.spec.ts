@@ -42,6 +42,8 @@ describe('PrivateCommunityControlApplier', () => {
     checkpoint = PrivateAuthorizationCheckpoint.genesis({
       admittedDeviceKeys: [ownerDeviceKey],
       authorityKeys: [ownerDeviceKey],
+      controlCheckpointJson: '{}',
+      freshnessAuthorityKey: ownerDeviceKey,
       headHash: Buffer.alloc(32, 2).toString('base64url'),
       scopeId,
     });
@@ -131,6 +133,8 @@ describe('PrivateCommunityControlApplier', () => {
     const memberCheckpoint = PrivateAuthorizationCheckpoint.genesis({
       admittedDeviceKeys: [memberDeviceKey],
       authorityKeys: [memberDeviceKey],
+      controlCheckpointJson: '{}',
+      freshnessAuthorityKey: memberDeviceKey,
       headHash: Buffer.alloc(32, 2).toString('base64url'),
       scopeId,
     });

@@ -1,0 +1,25 @@
+openapi: 3.0.3
+info:
+  title: Private authorization API
+  version: 1.0.0
+paths:
+  /private-authorization/challenges:
+    post:
+      tags: [private-authorization]
+      summary: Issue a one-use freshness challenge for a verified operation
+      responses:
+        '200':
+          description: Exact canonical challenge request to sign
+        '409':
+          description: Invalid private authorization
+  /private-authorization/operations:
+    post:
+      tags: [private-authorization]
+      summary: Accept a signed private control operation
+      responses:
+        '200':
+          description: Operation accepted or already committed
+        '202':
+          description: Valid operation retained pending causal dependencies
+        '409':
+          description: Invalid private authorization

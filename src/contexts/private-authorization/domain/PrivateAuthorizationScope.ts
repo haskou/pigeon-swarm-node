@@ -171,7 +171,7 @@ export class PrivateAuthorizationScope extends AggregateRoot {
 
   private duplicateResult(
     operation: PrivateControlOperation,
-  ): 'accepted' | 'duplicate' | 'pending' | undefined {
+  ): 'duplicate' | 'pending' | undefined {
     const candidate = operation.toPrimitives();
     const existing = [
       ...this.acceptedOperations,
@@ -298,9 +298,19 @@ export class PrivateAuthorizationScope extends AggregateRoot {
   ): 'duplicate' | 'pending' | 'ready' {
     const duplicate = this.duplicateResult(operation);
 
-    if (duplicate) return duplicate === 'accepted' ? 'duplicate' : duplicate;
+    if (duplicate === 'duplicate') return duplicate;
     this.assertActive();
     this.assertOperation(operation, expectedKind);
+
+    if (duplicate === 'pending' && !this.isPending(operation)) {
+      const operationId = operation.toPrimitives().id;
+      const pendingIndex = this.pendingOperations.findIndex(
+        (pending) => pending.toPrimitives().id === operationId,
+      );
+      this.pendingOperations.splice(pendingIndex, 1);
+    } else if (duplicate === 'pending') {
+      return duplicate;
+    }
 
     if (this.isPending(operation)) {
       this.enqueue(operation);

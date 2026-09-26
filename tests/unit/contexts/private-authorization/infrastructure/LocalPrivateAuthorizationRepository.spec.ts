@@ -16,6 +16,8 @@ describe('LocalPrivateAuthorizationRepository', () => {
     PrivateAuthorizationCheckpoint.genesis({
       admittedDeviceKeys: ['owner'],
       authorityKeys: ['owner'],
+      controlCheckpointJson: '{}',
+      freshnessAuthorityKey: 'owner',
       headHash: 'head-0',
       scopeId: 'scope',
     });

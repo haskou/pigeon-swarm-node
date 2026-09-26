@@ -4429,6 +4429,29 @@ POST /polls/{pollId}/close
 Requires signed HTTP headers and access to the poll scope. Closed or expired
 polls reject new votes.
 
+## Private operation authorization
+
+Protected communities reject the legacy mutation routes. A signed client first
+submits the complete signed operation to
+`POST /private-authorization/challenges`. The node verifies the operation
+signature against its local checkpoint before returning the exact one-use
+freshness request. The request expires after ten seconds of local monotonic
+time and is invalidated by every verification attempt.
+
+Submit the signed operation, signed freshness proof and, for commits or device
+revocation, the participant-encrypted control frame to
+`POST /private-authorization/operations`. The response status is `accepted`,
+`duplicate` or `pending`. Pending means the signature and freshness proof were
+valid but a causal dependency or newer authorization checkpoint is missing.
+Clients retain the encrypted frame and retry it with a new challenge; the node
+does not acknowledge remote delivery until the result is accepted or duplicate.
+
+Both endpoints require the normal signed HTTP request. That request controls
+access to the attached node; operation authorship and permissions come only
+from the private operation signature, local checkpoint and community aggregate.
+Errors are fixed and never include the submitted scope, identity, key, payload
+or nested cryptographic error.
+
 ## Planned API
 
 The following API shapes are not implemented yet. They are kept here as design

@@ -14,14 +14,28 @@ import CallParticipantLeaseRepository from '../contexts/calls/domain/repositorie
 import CallSignalDeliveryRepository from '../contexts/calls/domain/repositories/CallSignalDeliveryRepository';
 import InMemoryCallParticipantLeaseRepository from '../contexts/calls/infrastructure/memory/InMemoryCallParticipantLeaseRepository';
 import InMemoryCallSignalDeliveryRepository from '../contexts/calls/infrastructure/memory/InMemoryCallSignalDeliveryRepository';
+import PrivateCommunityControlApplier from '../contexts/communities/application/apply-private-control/PrivateCommunityControlApplier';
 import CommunityRepository from '../contexts/communities/domain/repositories/CommunityRepository';
 import CommunityRepositoryRouter from '../contexts/communities/infrastructure/CommunityRepositoryRouter';
 import NodeNetworkSynchronizationMonitor from '../contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
 import IdentityPresenceRepository from '../contexts/presence/domain/repositories/IdentityPresenceRepository';
 import InMemoryIdentityPresenceRepository from '../contexts/presence/infrastructure/memory/InMemoryIdentityPresenceRepository';
+import { PrivateControlMutationAuthorizer } from '../contexts/private-authorization/application/accept-operation/PrivateControlMutationAuthorizer';
+import { PrivateControlTransitionProcessor } from '../contexts/private-authorization/application/accept-operation/PrivateControlTransitionProcessor';
+import { PrivateFreshnessGate } from '../contexts/private-authorization/application/accept-operation/PrivateFreshnessGate';
+import { PrivateOperationAuthenticator } from '../contexts/private-authorization/application/accept-operation/PrivateOperationAuthenticator';
+import { PrivateOperationDecoder } from '../contexts/private-authorization/application/accept-operation/PrivateOperationDecoder';
+import { PrivateOperationUnitOfWork } from '../contexts/private-authorization/application/PrivateOperationUnitOfWork';
 import { PrivateAuthorizationRepository } from '../contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
+import { PrivateIdentityBinding } from '../contexts/private-authorization/domain/services/PrivateIdentityBinding';
+import PrivateControlOperationContract from '../contexts/private-authorization/infrastructure/contracts/PrivateControlOperationContract';
+import LegacyIdentityDeviceBinding from '../contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
+import PrivateOperationVerifier from '../contexts/private-authorization/infrastructure/crypto/PrivateOperationVerifier';
+import VerifiedPrivateControlTransitionProcessor from '../contexts/private-authorization/infrastructure/crypto/VerifiedPrivateControlTransitionProcessor';
+import InMemoryPrivateFreshnessGate from '../contexts/private-authorization/infrastructure/freshness/InMemoryPrivateFreshnessGate';
 import LocalPrivateAuthorizationRepository from '../contexts/private-authorization/infrastructure/local-db/LocalPrivateAuthorizationRepository';
+import LocalPrivateOperationUnitOfWork from '../contexts/private-authorization/infrastructure/local-db/LocalPrivateOperationUnitOfWork';
 import { pigeonEnvironmentSchema } from '../shared/infrastructure/environment/PigeonEnvironment';
 import HttpRequestContext from '../shared/infrastructure/express/HttpRequestContext';
 import {
@@ -171,6 +185,34 @@ export default class PigeonApplication {
         {
           token: PrivateAuthorizationRepository,
           useClass: LocalPrivateAuthorizationRepository,
+        },
+        {
+          token: PrivateOperationUnitOfWork,
+          useClass: LocalPrivateOperationUnitOfWork,
+        },
+        {
+          token: PrivateOperationAuthenticator,
+          useClass: PrivateOperationVerifier,
+        },
+        {
+          token: PrivateOperationDecoder,
+          useClass: PrivateControlOperationContract,
+        },
+        {
+          token: PrivateFreshnessGate,
+          useClass: InMemoryPrivateFreshnessGate,
+        },
+        {
+          token: PrivateControlTransitionProcessor,
+          useClass: VerifiedPrivateControlTransitionProcessor,
+        },
+        {
+          token: PrivateIdentityBinding,
+          useClass: LegacyIdentityDeviceBinding,
+        },
+        {
+          token: PrivateControlMutationAuthorizer,
+          useClass: PrivateCommunityControlApplier,
         },
         {
           token: CommunityRepository,

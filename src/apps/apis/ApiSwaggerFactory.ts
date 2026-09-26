@@ -16,6 +16,7 @@ const swaggerFileByApi: Record<string, string> = {
   'notifications-api': 'notifications-api/swagger.yaml',
   'polls-api': 'polls-api/swagger.yaml',
   'presence-api': 'presence-api/swagger.yaml',
+  'private-authorization-api': 'private-authorization-api/swagger.yaml',
   'push-api': 'push-api/swagger.yaml',
   'stickers-api': 'stickers-api/swagger.yaml',
 };

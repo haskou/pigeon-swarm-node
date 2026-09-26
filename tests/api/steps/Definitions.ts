@@ -445,6 +445,14 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/keychains/');
   }
 
+  @given('I sign the current private authorization challenge request')
+  public async iSignTheCurrentPrivateAuthorizationChallengeRequest(): Promise<void> {
+    await this.signCurrentRequest(
+      'POST',
+      '/private-authorization/challenges',
+    );
+  }
+
   @given(
     'I set a client-signed identity body with name {string} and handle {string}',
   )

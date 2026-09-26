@@ -142,11 +142,15 @@ export default class PrivateOperationAcceptor {
     if (result !== 'accepted') throw new InvalidPrivateAuthorizationError();
     const currentProjection =
       (await this.repository.findProjection(value.scopeId)) ?? {};
-    const projection = await this.mutations.apply(
+    const candidateProjection = await this.mutations.apply(
       currentCheckpoint,
       operation,
       currentProjection,
     );
+    const projection =
+      value.kind === 'membership.propose'
+        ? currentProjection
+        : candidateProjection;
 
     return {
       clearPendingOperationIds: [value.id],
@@ -179,7 +183,17 @@ export default class PrivateOperationAcceptor {
       operation,
       message.signedFreshnessProofJson,
     );
-    const assessment = scope.assess(operation);
+    let assessment: ReturnType<PrivateAuthorizationScope['assess']>;
+
+    try {
+      assessment = scope.assess(operation);
+    } catch (error) {
+      if (error instanceof PrivateAuthorizationConflictError) {
+        await this.repository.saveScope(scope);
+      }
+
+      throw error;
+    }
 
     if (assessment === 'duplicate') return { status: 'duplicate' };
 
@@ -206,5 +220,16 @@ export default class PrivateOperationAcceptor {
     }
 
     return { status: 'accepted' };
+  }
+
+  public async challenge(signedOperationJson: string): Promise<string> {
+    const { operation, scope } = await this.verifiedOperation(
+      new PrivateOperationAcceptMessage(signedOperationJson, ''),
+    );
+    const checkpoint = PrivateAuthorizationCheckpoint.fromPrimitives(
+      scope.toPrimitives().checkpoint,
+    );
+
+    return this.freshness.issue(checkpoint, operation);
   }
 }

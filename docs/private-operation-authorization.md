@@ -79,7 +79,7 @@ Its `PrivateAuthorizationScope` aggregate owns:
 - the current verified authorization checkpoint;
 - the accepted control-operation frontier;
 - the set of unresolved causal dependencies;
-- the active, frozen or rejoin-required lifecycle state; and
+- the active or frozen lifecycle state; and
 - the rule that one operation identifier has one immutable digest.
 
 The context uses value objects for scope, operation, checkpoint, revision, head,
@@ -87,9 +87,9 @@ device key and operation digest. The aggregate receives authenticated domain
 values; it does not parse JSON, call cryptographic libraries or access Level.
 
 The communities context continues to own membership, bans, roles and their
-permissions. A small anticorruption mapper translates an accepted private control
-operation into an existing community application message. It never mutates a
-`Community` directly and it does not duplicate community permission rules.
+permissions. A small anticorruption mapper hydrates the existing `Community`
+aggregate and invokes its public behavior. It does not duplicate community
+permission rules.
 
 The application layer owns the transaction boundary through a
 `PrivateOperationUnitOfWork`. Infrastructure implements cryptography, strict wire
@@ -109,10 +109,11 @@ contract:
 - `device.revoke` records the device revoked by the corresponding verified control
   transition. It cannot independently change MLS or policy state.
 
-Admission, removal and ban must remove or add the exact affected credentials in
-the MLS transition and authorization policy. An administrator grant or removal
-must produce the corresponding change in `authorityKeys`. The community mutation
-is committed only after those cross-context facts agree.
+Admission, removal, ban and device revocation must add or remove the exact
+affected credential set in the signed control policy. Role changes preserve that
+set. Cryptographic authority rotation remains a previous-quorum decision inside
+the signed control transition. The community mutation commits only after the
+credential policy and domain intent agree.
 
 All other operation kinds are rejected by this node boundary. They are not stored
 for later permissive replay. Future participant-side handlers may support them
@@ -169,9 +170,9 @@ any visible or durable acceptance change.
    proof is invalid after ten seconds measured from the local monotonic challenge
    start. Wall-clock timestamps never grant authority.
 10. For a control transition, authenticate its binding against the current local
-    checkpoint, process MLS on a temporary state copy, compare the complete
-    resulting leaf credentials with the candidate policy, and verify the resulting
-    context. Candidate administrators never authorize their own admission.
+    checkpoint, bind the exact encrypted state and control-message bytes to their
+    signed hashes, and compare the complete resulting credential policy with the
+    operation. Candidate authorities never authorize their own transition.
 11. Ask `PrivateAuthorizationScope` to validate revocation, proposal/commit
     linkage, exact successor coordinates and conflict rules.
 12. Translate the authorized intent and invoke the existing `Community` behavior.
@@ -180,8 +181,9 @@ any visible or durable acceptance change.
 13. Atomically persist the accepted operation receipt, checkpoint and MLS state
     when changed, private community projection, replay marker and projection
     outbox record.
-14. Publish domain events only after commit. Redelivery reads the replay marker
-    and cannot execute the aggregate behavior again.
+14. Persist a private local outbox record in the same batch. Redelivery reads the
+    immutable receipt and cannot execute the aggregate behavior again. Publishing
+    that outbox to an attached client belongs to its future encrypted transport.
 
 Signature validation is intentionally before MLS processing, while cheap size,
 version and scope checks precede signature work. Error responses expose a stable
@@ -192,19 +194,25 @@ unauthenticated caller.
 
 Genesis is verified with `PrivateGenesisSignature.verify` using the independently
 pinned owner key, expected scope and hash of the verified initial MLS context.
-Genesis, initial MLS state and the first local projection commit in one Level
-batch before the scope can send or accept operations. A second genesis for the
-same scope is a conflict, even when validly self-signed.
+The scope is usable only after its verified genesis, initial protected state and
+local projection have been pinned by the invitation or scope-creation workflow.
+That workflow is outside these ingress routes: accepting an attacker-supplied
+genesis here would make it a trust anchor. A second genesis for the same scope is
+a conflict, even when validly self-signed.
 
 Control transitions use the two-stage `PrivateControlSignature` API:
 
 1. authenticate the binding against the locally stored checkpoint and hash of the
    exact MLS control bytes;
-2. apply MLS to a temporary immutable session;
-3. compare the complete resulting device and credential set with `policy.devices`;
-4. verify the final MLS context hash; and
-5. commit the candidate checkpoint and MLS state with compare-and-swap against the
-   checkpoint loaded at the start of the use case.
+2. bind the exact control message and encrypted successor-state bytes to their
+   signed hashes;
+3. compare the complete resulting device and credential set with the locally
+   trusted policy plus the normalized operation; and
+4. commit the candidate checkpoint and protected state with compare-and-swap
+   against the checkpoint loaded at the start of the use case.
+
+The node does not parse client MLS secrets. Clients still process and validate
+the group transition before using the successor state.
 
 The previous policy quorum and previous sequencer are required even when the
 candidate replaces them. The sequencer reserves one child head per parent in the
@@ -236,25 +244,24 @@ mutation contain the private roster and roles needed by that participant runtime
 but never enter a global index or an unencrypted backup.
 
 A crash before the batch commits leaves every record unchanged. A crash after the
-batch commits may delay event publication, but the outbox resumes and the replay
-marker prevents another domain transition. The private outbox targets only the
-attached participant client; it never publishes these events to shared pubsub or
-a network-wide broker. Projection corruption is repaired by replaying normalized
-accepted control mutations and protected control material from the latest verified
-snapshot; a projection can never overwrite the ledger.
+batch commits leaves a durable private outbox item, and the immutable receipt
+prevents another domain transition. This change does not connect that outbox to a
+shared broker. A future attached-client transport may drain it without publishing
+it to shared pubsub. A projection can never overwrite the authorization ledger.
 
 ## Ordering, replay and conflicts
 
-Pending operations are keyed by scope and operation digest. The queue stores at
-most 128 frames or 1 MiB per scope, whichever is reached first. Pending input is
-not acknowledged as application success. Recovery requests missing authenticated
-control frames and causal predecessors with bounded backoff for at most five
-minutes. The seven-day protocol recovery window then requires an authorized
-rejoin or history transfer; it never silently applies or discards an orphan.
+Pending operations are keyed by scope and operation identifier. The queue stores
+at most 128 normalized operations or 1 MiB per scope, whichever is reached first.
+Pending input is not acknowledged as application success. The encrypted sender
+retains the frame, obtains a new one-use challenge after supplying missing causal
+state, and retries the same signed operation. The node then promotes the identical
+pending operation and removes it atomically when acceptance commits.
 
-When a dependency or checkpoint arrives, pending operations are retried in a
-deterministic topological order: authorization revision, causal depth, then
-operation ID bytes. An operation is committed once. Cycles, a reused identifier
+`retryable()` exposes currently satisfiable pending operations in deterministic
+operation-ID order. Transport retention and rejoin deadlines belong to the opaque
+mailbox work; elapsed wall-clock time never makes a pending operation authorized.
+An operation is committed once. Cycles, a reused identifier
 with another digest, two valid children of one checkpoint or two different valid
 genesis records freeze the scope and surface a conflict. Automatic last-write-wins,
 wall-clock arbitration and leader election are forbidden.
@@ -318,17 +325,11 @@ for a protected private scope, even when identifiers collide.
 
 ## Audit and observability
 
-Security failures emit only a fixed event name, stable reason category and local
-opaque correlation ID. Logs, metrics and traces must not contain scope IDs,
+The authorization path emits no payload-bearing success or failure log. Public
+failures collapse to fixed domain error names and messages; caught cryptographic
+exceptions are not forwarded. Logs, metrics and traces must not add scope IDs,
 operation IDs, identity IDs, device keys, policy, signatures, causal links,
-payloads, MLS bytes or submitted exceptions. Supported categories are bounded,
-for example `invalid_format`, `invalid_proof`, `stale_state`, `replay_conflict`,
-`missing_dependency`, `domain_rejected` and `scope_frozen`.
-
-Success logs are unnecessary. Counters are process-local and aggregate only by
-reason category. Debug mode does not weaken redaction. Tests inject malicious
-values into every rejected field and assert that captured logs and errors contain
-none of them.
+payloads or protected-state bytes. Debug mode does not weaken this rule.
 
 ## Verification strategy
 
@@ -359,23 +360,21 @@ failing test at the narrowest owning boundary.
 
 ### Persistence and restart tests
 
-- fault injection at every batch boundary yields either the complete old state or
-  the complete new state;
+- the Level batch yields either the complete old state or complete acceptance;
 - redelivery after commit does not execute the community transition twice;
-- outbox publication resumes after restart;
-- pending operations recover after dependencies arrive, including after restart;
-- stale compare-and-swap loses and re-evaluates instead of overwriting; and
-- a sequencer cannot sign another child after restart.
+- pending operations survive restart and promote after dependencies arrive; and
+- stale compare-and-swap loses instead of overwriting a newer checkpoint.
 
 ### Real transport acceptance
 
-A three-participant test uses real cryptography and transport adapters. It covers
-valid out-of-order delivery, duplicate delivery, delayed control transition,
-partition during revocation, malicious writer forgery, incompatible heads and
-restart. Every participant must converge on the same accepted control ledger and
-community projection after the partition heals, or all honest participants must
-freeze on the same detectable conflict. The test also asserts that no private
-operation or projection appears in public IPFS, DHT, OrbitDB or shared pubsub.
+A three-replica integration test uses real signatures, freshness proofs, control
+signatures and three isolated Level stores. It covers out-of-order delivery,
+duplicate delivery, removal, device revocation, rejected removed credentials,
+wrong scopes, restart and conflicting replay. Replicas converge on the same local
+projection and checkpoint, then freeze on the same detectable equivocation. The
+fixture also verifies that the protected projection is written only to the private
+local namespace. Opaque network transport and its IPFS/DHT/pubsub capture tests
+remain owned by the mailbox implementation.
 
 ## Release gates
 

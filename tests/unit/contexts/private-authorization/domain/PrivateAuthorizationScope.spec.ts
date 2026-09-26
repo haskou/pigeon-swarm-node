@@ -16,6 +16,8 @@ describe('PrivateAuthorizationScope', () => {
     PrivateAuthorizationCheckpoint.genesis({
       admittedDeviceKeys: [ownerKey, memberKey],
       authorityKeys: [ownerKey],
+      controlCheckpointJson: '{}',
+      freshnessAuthorityKey: ownerKey,
       headHash: 'head-0',
       scopeId,
     });
@@ -45,6 +47,8 @@ describe('PrivateAuthorizationScope', () => {
     PrivateAuthorizationCheckpoint.fromPrimitives({
       admittedDeviceKeys: [ownerKey],
       authorityKeys: [ownerKey],
+      controlCheckpointJson: '{}',
+      freshnessAuthorityKey: ownerKey,
       headHash: 'head-1',
       parentHeadHash: 'head-0',
       revision: 1,
@@ -255,6 +259,24 @@ describe('PrivateAuthorizationScope', () => {
     expect(
       scope.retryable().map((pending) => pending.toPrimitives().id),
     ).toEqual(['a', 'z']);
+  });
+
+  it('promotes an identical pending operation once its predecessors are accepted', () => {
+    const scope = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
+    const dependent = operation({
+      digest: 'dependent-digest',
+      id: 'dependent',
+      previousOperationIds: ['dependency'],
+    });
+
+    expect(scope.acceptProposal(dependent)).toBe('pending');
+    expect(
+      scope.acceptProposal(
+        operation({ digest: 'dependency-digest', id: 'dependency' }),
+      ),
+    ).toBe('accepted');
+    expect(scope.acceptProposal(dependent)).toBe('accepted');
+    expect(scope.toPrimitives().pendingOperations).toEqual([]);
   });
 
   it('enforces both pending queue bounds without acknowledging overflow', () => {

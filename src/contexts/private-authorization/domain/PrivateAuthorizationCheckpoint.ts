@@ -33,6 +33,8 @@ export class PrivateAuthorizationCheckpoint {
     const {
       admittedDeviceKeys,
       authorityKeys,
+      controlCheckpointJson,
+      freshnessAuthorityKey,
       headHash,
       parentHeadHash,
       revision,
@@ -44,7 +46,8 @@ export class PrivateAuthorizationCheckpoint {
     const unique = (values: string[]): boolean =>
       values.length === new Set(values).size;
 
-    const invalidIdentity = !scopeId || !headHash;
+    const invalidIdentity =
+      !scopeId || !headHash || !controlCheckpointJson || !freshnessAuthorityKey;
     const invalidRevision = this.invalidRevision(revision, parentHeadHash);
     const invalidKeys = this.invalidKeys(
       admittedDeviceKeys,
@@ -53,6 +56,7 @@ export class PrivateAuthorizationCheckpoint {
       admitted,
       revoked,
       unique,
+      freshnessAuthorityKey,
     );
 
     if (invalidIdentity || invalidRevision || invalidKeys) {
@@ -76,12 +80,15 @@ export class PrivateAuthorizationCheckpoint {
     admitted: Set<string>,
     revoked: Set<string>,
     unique: (values: string[]) => boolean,
+    freshnessAuthorityKey: string,
   ): boolean {
     const duplicateKey =
       !unique(admittedDeviceKeys) ||
       !unique(authorityKeys) ||
       !unique(revokedDeviceKeys);
-    const invalidAuthority = authorityKeys.some((key) => !admitted.has(key));
+    const invalidAuthority =
+      authorityKeys.some((key) => !admitted.has(key)) ||
+      !admitted.has(freshnessAuthorityKey);
     const invalidRevocation = revokedDeviceKeys.some(
       (key) => admitted.has(key) || !key,
     );

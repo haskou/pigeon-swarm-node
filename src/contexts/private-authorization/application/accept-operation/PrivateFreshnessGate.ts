@@ -2,6 +2,11 @@ import { PrivateAuthorizationCheckpoint } from '../../domain/PrivateAuthorizatio
 import { PrivateControlOperation } from '../../domain/PrivateControlOperation';
 
 export abstract class PrivateFreshnessGate {
+  public abstract issue(
+    checkpoint: PrivateAuthorizationCheckpoint,
+    operation: PrivateControlOperation,
+  ): string;
+
   public abstract verify(
     checkpoint: PrivateAuthorizationCheckpoint,
     operation: PrivateControlOperation,
