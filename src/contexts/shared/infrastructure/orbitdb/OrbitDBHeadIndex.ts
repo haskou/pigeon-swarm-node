@@ -73,7 +73,7 @@ export class OrbitDBHeadIndex<TDocument extends object> {
       const initialRevision = this.canonicalProjectionRevision;
       this.canonicalProjection = this.registry
         .onDocumentUpdated?.(storeName, (document) =>
-          this.projectCanonicalRecord(document),
+          this.projectReplicatedCanonicalRecord(document),
         )
         .then(() => {
           if (initialRevision === this.registryProjectionRevision()) {
@@ -91,22 +91,33 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     return record.removed === true || record.deleted === true;
   }
 
+  private freshestCanonicalRecord(
+    current: Record<string, unknown> | undefined,
+    candidate: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (!current || this.shouldReplaceRecord(current, candidate)) {
+      return candidate;
+    }
+
+    return current;
+  }
+
   private canonicalRecord(
     current: Record<string, unknown> | undefined,
     candidate: Record<string, unknown>,
+    acceptRemoval: boolean,
   ): Record<string, unknown> | undefined {
-    if (!current) return candidate;
+    if (this.isCanonicalRemoval(candidate)) {
+      return acceptRemoval
+        ? this.freshestCanonicalRecord(current, candidate)
+        : current;
+    }
     const candidateDocument = this.options.documentFromRecord(candidate);
 
-    if (!candidateDocument && !this.isCanonicalRemoval(candidate)) {
-      return current;
-    }
+    if (!candidateDocument) return current;
 
-    if (
-      this.isCanonicalRemoval(current) ||
-      this.isCanonicalRemoval(candidate)
-    ) {
-      return this.shouldReplaceRecord(current, candidate) ? candidate : current;
+    if (current && this.isCanonicalRemoval(current)) {
+      return this.freshestCanonicalRecord(current, candidate);
     }
 
     return this.mergeRecord(current, candidate);
@@ -126,16 +137,31 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     this.canonicalRecordsByKey.set(key, records);
   }
 
-  private projectCanonicalRecord(record: Record<string, unknown>): void {
+  private projectCanonicalRecord(
+    record: Record<string, unknown>,
+    acceptRemoval: boolean,
+  ): void {
     const recordId = this.options.recordId(record);
     const indexKeys = this.options.canonicalIndexKeys;
 
     if (!recordId || !indexKeys) return;
     const current = this.canonicalRecordsById.get(recordId);
-    const canonical = this.canonicalRecord(current, record);
+    const canonical = this.canonicalRecord(current, record, acceptRemoval);
 
     if (!canonical || canonical === current) return;
     this.updateCanonicalProjection(recordId, canonical);
+  }
+
+  private projectReplicatedCanonicalRecord(
+    record: Record<string, unknown>,
+  ): void {
+    this.projectCanonicalRecord(record, false);
+  }
+
+  private projectAuthorizedCanonicalRecord(
+    record: Record<string, unknown>,
+  ): void {
+    this.projectCanonicalRecord(record, true);
   }
 
   private updateCanonicalProjection(
@@ -207,7 +233,7 @@ export class OrbitDBHeadIndex<TDocument extends object> {
       if (revision !== this.registryProjectionRevision()) return;
 
       for (const document of documents) {
-        this.projectCanonicalRecord(document);
+        this.projectReplicatedCanonicalRecord(document);
       }
 
       this.canonicalProjectionKeys.add(key);
@@ -693,7 +719,9 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     options: OrbitDBHeadIndexPutOptions<TDocument> = {},
   ): Promise<void> {
     documents.forEach((document) =>
-      this.projectCanonicalRecord(Object.fromEntries(Object.entries(document))),
+      this.projectAuthorizedCanonicalRecord(
+        Object.fromEntries(Object.entries(document)),
+      ),
     );
     const head = this.documentsHead(metadata, documents, options);
 
@@ -713,7 +741,9 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     options: OrbitDBHeadIndexPutOptions<TDocument> = {},
   ): void {
     documents.forEach((document) =>
-      this.projectCanonicalRecord(Object.fromEntries(Object.entries(document))),
+      this.projectAuthorizedCanonicalRecord(
+        Object.fromEntries(Object.entries(document)),
+      ),
     );
     this.registry.replicateHeadInBackground(
       key,
@@ -729,7 +759,7 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     networkIds: string[] = [],
     options: OrbitDBHeadIndexPutOptions<TDocument> = {},
   ): Promise<void> {
-    this.projectCanonicalRecord(record);
+    this.projectAuthorizedCanonicalRecord(record);
 
     if (this.isRemoval(record)) {
       await this.removeRecord(key, metadata, record, networkIds);
@@ -758,7 +788,7 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     record: Record<string, unknown>,
     networkIds: string[] = [],
   ): Promise<void> {
-    this.projectCanonicalRecord(record);
+    this.projectAuthorizedCanonicalRecord(record);
 
     if (this.isRemoval(record)) {
       return this.removeRecord(key, metadata, record, networkIds);

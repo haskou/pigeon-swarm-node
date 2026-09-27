@@ -230,7 +230,7 @@ describe('OrbitDBHeadIndex', () => {
     ).toEqual([stored]);
   });
 
-  it('derives removals from the canonical store on receiving replicas', async () => {
+  it('rejects replicated canonical removals and accepts local removals', async () => {
     jest
       .spyOn(registry, 'onDocumentUpdated')
       .mockImplementation(async (_storeName, listener) => {
@@ -242,6 +242,7 @@ describe('OrbitDBHeadIndex', () => {
           ...document('removed', 2),
           removed: true,
           scopeId: 'scope-1',
+          updatedAt: Number.MAX_SAFE_INTEGER,
         });
       });
     const canonicalIndex = new OrbitDBHeadIndex(registry, {
@@ -267,7 +268,20 @@ describe('OrbitDBHeadIndex', () => {
     });
     const queryDocuments = jest.spyOn(registry, 'queryDocuments');
 
-    await expect(canonicalIndex.find('index:scope-1')).resolves.toEqual([]);
+    const stored = { ...document('removed', 1), scopeId: 'scope-1' };
+
+    await expect(canonicalIndex.find('index:scope-1')).resolves.toEqual([
+      stored,
+    ]);
+    await canonicalIndex.putRecord(
+      'index:scope-1',
+      { id: 'index:scope-1' },
+      {
+        ...stored,
+        removed: true,
+        updatedAt: 2,
+      },
+    );
     await expect(canonicalIndex.find('index:scope-1')).resolves.toEqual([]);
     expect(queryDocuments).not.toHaveBeenCalled();
   });
