@@ -114,6 +114,7 @@ describe('LocalPrivateAuthorizationRepository', () => {
       'head-1',
       'accepted',
       'owner',
+      checkpoint(),
     );
     await repository.saveProjection('scope', { members: ['member'] });
 
@@ -126,6 +127,7 @@ describe('LocalPrivateAuthorizationRepository', () => {
       authorDeviceKey: 'owner',
       childHeadHash: 'head-1',
       operationId: 'accepted',
+      parentCheckpoint: checkpoint().toPrimitives(),
     });
     await expect(repository.findProjection('scope')).resolves.toEqual({
       members: ['member'],

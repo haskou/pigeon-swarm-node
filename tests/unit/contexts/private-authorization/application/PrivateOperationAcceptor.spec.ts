@@ -12,6 +12,7 @@ import { PrivateControlTransitionReservation } from '@app/contexts/private-autho
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import { PrivateIdentityBinding } from '@app/contexts/private-authorization/domain/services/PrivateIdentityBinding';
+import { AuthenticatedPrivateOperationJson } from '@app/contexts/private-authorization/domain/value-objects/AuthenticatedPrivateOperationJson';
 import PrivateControlOperationContract from '@app/contexts/private-authorization/infrastructure/contracts/PrivateControlOperationContract';
 import LegacyIdentityDeviceBinding from '@app/contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
 import PrivateOperationVerifier from '@app/contexts/private-authorization/infrastructure/crypto/PrivateOperationVerifier';
@@ -63,6 +64,11 @@ describe('PrivateOperationAcceptor', () => {
       },
       ...changes,
     });
+  const controlFrame = {
+    encryptedMlsState: encoded(32, 15),
+    mlsMessage: encoded(32, 16),
+    signedTransitionJson: 'transition',
+  };
 
   let repository: jest.Mocked<PrivateAuthorizationRepository>;
   let unitOfWork: jest.Mocked<PrivateOperationUnitOfWork>;
@@ -98,7 +104,9 @@ describe('PrivateOperationAcceptor', () => {
       reserveChild: jest.fn(),
     };
     verifier = {
-      verify: jest.fn((value) => value),
+      verify: jest.fn(
+        (value) => new AuthenticatedPrivateOperationJson(value),
+      ),
     } as unknown as jest.Mocked<PrivateOperationVerifier>;
     freshness = {
       issue: jest.fn().mockReturnValue('challenge-request'),
@@ -442,7 +450,7 @@ describe('PrivateOperationAcceptor', () => {
     expect(unitOfWork.quarantine).not.toHaveBeenCalled();
   });
 
-  it('rejects a historical sibling without trusting it to freeze the scope', async () => {
+  it('quarantines an authenticated historical child fork', async () => {
     const activeKey = encoded(32, 10);
     const currentCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
       ...checkpoint().toPrimitives(),
@@ -468,19 +476,28 @@ describe('PrivateOperationAcceptor', () => {
         authorDeviceKey: authorKey,
         childHeadHash: encoded(32, 11),
         operationId,
+        parentCheckpoint: checkpoint().toPrimitives(),
       }),
     );
 
     await expect(
-      acceptor.accept(new PrivateOperationAcceptMessage(sibling, 'proof')),
+      acceptor.accept(
+        new PrivateOperationAcceptMessage(sibling, 'proof', controlFrame),
+      ),
     ).rejects.toThrow('Private authorization conflict');
     expect(verifier.verify).toHaveBeenCalledWith(sibling, authorKey);
     expect(repository.findReservation).toHaveBeenCalledWith(scopeId, headHash);
-    expect(unitOfWork.quarantine).not.toHaveBeenCalled();
+    expect(transitions.verify).toHaveBeenCalledWith(
+      expect.any(PrivateAuthorizationCheckpoint),
+      expect.anything(),
+      expect.any(AuthenticatedPrivateOperationJson),
+      controlFrame,
+    );
+    expect(unitOfWork.quarantine).toHaveBeenCalledWith(scopeId);
     expect(freshness.verify).not.toHaveBeenCalled();
   });
 
-  it('freezes a historical operation that reuses another operation transition', async () => {
+  it('rejects reuse of another operation transition without freezing', async () => {
     const activeKey = encoded(32, 10);
     const currentCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
       ...checkpoint().toPrimitives(),
@@ -506,19 +523,27 @@ describe('PrivateOperationAcceptor', () => {
         authorDeviceKey: authorKey,
         childHeadHash: encoded(32, 11),
         operationId: encoded(16, 12),
+        parentCheckpoint: checkpoint().toPrimitives(),
       }),
+    );
+    transitions.verify.mockRejectedValueOnce(
+      new InvalidPrivateAuthorizationError(),
     );
 
     await expect(
       acceptor.accept(
-        new PrivateOperationAcceptMessage(reusedTransition, 'proof'),
+        new PrivateOperationAcceptMessage(
+          reusedTransition,
+          'proof',
+          controlFrame,
+        ),
       ),
-    ).rejects.toThrow('Private authorization conflict');
+    ).rejects.toBeInstanceOf(InvalidPrivateAuthorizationError);
     expect(verifier.verify).toHaveBeenCalledWith(
       reusedTransition,
       authorKey,
     );
-    expect(unitOfWork.quarantine).toHaveBeenCalledWith(scopeId);
+    expect(unitOfWork.quarantine).not.toHaveBeenCalled();
     expect(freshness.verify).not.toHaveBeenCalled();
   });
 
@@ -550,12 +575,20 @@ describe('PrivateOperationAcceptor', () => {
         authorDeviceKey: authorKey,
         childHeadHash: encoded(32, 11),
         operationId: encoded(16, 12),
+        parentCheckpoint: checkpoint().toPrimitives(),
       }),
+    );
+    transitions.verify.mockRejectedValueOnce(
+      new InvalidPrivateAuthorizationError(),
     );
 
     await expect(
       acceptor.accept(
-        new PrivateOperationAcceptMessage(claimedTransition, 'proof'),
+        new PrivateOperationAcceptMessage(
+          claimedTransition,
+          'proof',
+          controlFrame,
+        ),
       ),
     ).rejects.toBeInstanceOf(InvalidPrivateAuthorizationError);
     expect(verifier.verify).toHaveBeenCalledWith(

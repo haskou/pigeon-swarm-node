@@ -1,8 +1,8 @@
 import { assert } from '@haskou/value-objects';
 
 import { InvalidPrivateAuthorizationError } from './errors/InvalidPrivateAuthorizationError';
+import { PrivateAuthorizationCheckpoint } from './PrivateAuthorizationCheckpoint';
 import { PrivateControlTransitionReservationPrimitives } from './PrivateControlTransitionReservationPrimitives';
-import { PrivateAuthorizationDeviceKey } from './value-objects/PrivateAuthorizationDeviceKey';
 
 export class PrivateControlTransitionReservation {
   public static fromPrimitives(
@@ -14,6 +14,7 @@ export class PrivateControlTransitionReservation {
         primitives.operationId.length > 0,
       new InvalidPrivateAuthorizationError(),
     );
+    PrivateAuthorizationCheckpoint.fromPrimitives(primitives.parentCheckpoint);
 
     return new PrivateControlTransitionReservation(primitives);
   }
@@ -50,11 +51,25 @@ export class PrivateControlTransitionReservation {
     );
   }
 
-  public isAuthoredBy(author: PrivateAuthorizationDeviceKey): boolean {
-    return this.primitives.authorDeviceKey === author.valueOf();
+  public getParentCheckpoint(): PrivateAuthorizationCheckpoint {
+    return PrivateAuthorizationCheckpoint.fromPrimitives(
+      this.primitives.parentCheckpoint,
+    );
   }
 
   public toPrimitives(): PrivateControlTransitionReservationPrimitives {
-    return { ...this.primitives };
+    return {
+      ...this.primitives,
+      parentCheckpoint: {
+        ...this.primitives.parentCheckpoint,
+        admittedDeviceKeys: [
+          ...this.primitives.parentCheckpoint.admittedDeviceKeys,
+        ],
+        authorityKeys: [...this.primitives.parentCheckpoint.authorityKeys],
+        revokedDeviceKeys: [
+          ...this.primitives.parentCheckpoint.revokedDeviceKeys,
+        ],
+      },
+    };
   }
 }

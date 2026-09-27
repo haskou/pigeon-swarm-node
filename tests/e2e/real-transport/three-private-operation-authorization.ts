@@ -47,6 +47,17 @@ interface ControlPolicy {
   version: number;
 }
 
+interface UnsignedPrivateOperation {
+  authorDeviceKey: string;
+  authorizationRevision: number;
+  kind: string;
+  operationId: string;
+  payload: Record<string, unknown>;
+  previousOperationIds: string[];
+  scopeId: string;
+  version: number;
+}
+
 class AuthorizationNode {
   private readonly identityBinding = new LegacyIdentityDeviceBinding();
   private readonly unitOfWork: LocalPrivateOperationUnitOfWork;
@@ -194,6 +205,7 @@ const signedControlTransition = (
   current: { headHash: string; mlsEpoch: number; revision: number },
   scopeId: string,
   policy: ControlPolicy,
+  operation: UnsignedPrivateOperation,
   mlsMessage: Buffer,
   protectedState: Buffer,
 ) => {
@@ -202,6 +214,9 @@ const signedControlTransition = (
       .update(protectedState)
       .digest('base64url'),
     mlsEpoch: current.mlsEpoch + 1,
+    operationBindingHash: PrivateOperationSignature.bindingHash(
+      JSON.stringify(operation),
+    ),
     parentHeadHash: current.headHash,
     policyHash: hash(policy),
     revision: current.revision + 1,
@@ -219,14 +234,13 @@ const signedControlTransition = (
 
   return {
     headHash: unsigned.headHash,
-    mlsMessageHash: unsigned.mlsMessageHash,
     signedJson: JSON.stringify({
       ...unsigned,
       signatures: {
         [ownerKey]: sign(
           null,
           Buffer.from(
-            `pigeon.private-control.v1\0${canonicalize(unsigned)}`,
+            `pigeon.private-control.v2\0${canonicalize(unsigned)}`,
           ),
           nodePrivateKey(ownerFill),
         ).toString('base64url'),
@@ -340,28 +354,37 @@ async function main(): Promise<void> {
         (device) => device.deviceKey !== targetDeviceKey,
       ),
     };
-    const transition = signedControlTransition(
-      1,
-      initialControl,
-      scopeId,
-      nextPolicy,
-      message,
-      nextState,
-    );
-    const commit = signedOperation(owner, {
+    const commitWithoutHead: UnsignedPrivateOperation = {
       authorDeviceKey: ownerDeviceKey,
       authorizationRevision: 0,
       kind: 'membership.commit',
       operationId: encoded(16, 21),
       payload: {
         change: mutation,
-        mlsMessageHash: transition.mlsMessageHash,
+        mlsMessageHash: createHash('sha256')
+          .update(message)
+          .digest('base64url'),
         proposalOperationId: proposalId,
-        resultingHeadHash: transition.headHash,
       },
       previousOperationIds: [proposalId],
       scopeId,
       version: 1,
+    };
+    const transition = signedControlTransition(
+      1,
+      initialControl,
+      scopeId,
+      nextPolicy,
+      commitWithoutHead,
+      message,
+      nextState,
+    );
+    const commit = signedOperation(owner, {
+      ...commitWithoutHead,
+      payload: {
+        ...commitWithoutHead.payload,
+        resultingHeadHash: transition.headHash,
+      },
     });
     const frame = {
       encryptedMlsState: nextState.toString('base64url'),
@@ -385,27 +408,32 @@ async function main(): Promise<void> {
         (device) => device.deviceKey !== spareDeviceKey,
       ),
     };
+    const revocationId = encoded(16, 24);
+    const revocationWithoutHead: UnsignedPrivateOperation = {
+      authorDeviceKey: ownerDeviceKey,
+      authorizationRevision: 1,
+      kind: 'device.revoke',
+      operationId: revocationId,
+      payload: { deviceKey: spareDeviceKey },
+      previousOperationIds: [],
+      scopeId,
+      version: 1,
+    };
     const revocationTransition = signedControlTransition(
       1,
       { headHash: transition.headHash, mlsEpoch: 1, revision: 1 },
       scopeId,
       revocationPolicy,
+      revocationWithoutHead,
       revocationMessage,
       revokedState,
     );
-    const revocationId = encoded(16, 24);
     const revocation = signedOperation(owner, {
-      authorDeviceKey: ownerDeviceKey,
-      authorizationRevision: 1,
-      kind: 'device.revoke',
-      operationId: revocationId,
+      ...revocationWithoutHead,
       payload: {
-        deviceKey: spareDeviceKey,
+        ...revocationWithoutHead.payload,
         resultingHeadHash: revocationTransition.headHash,
       },
-      previousOperationIds: [],
-      scopeId,
-      version: 1,
     });
     const revocationFrame = {
       encryptedMlsState: revokedState.toString('base64url'),

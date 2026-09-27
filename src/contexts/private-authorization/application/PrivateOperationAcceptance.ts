@@ -1,3 +1,4 @@
+import { PrivateAuthorizationCheckpointPrimitives } from '../domain/PrivateAuthorizationCheckpointPrimitives';
 import { PrivateAuthorizationScope } from '../domain/PrivateAuthorizationScope';
 import { PrivateControlOperation } from '../domain/PrivateControlOperation';
 
@@ -16,6 +17,7 @@ export interface PrivateOperationAcceptance {
     authorDeviceKey: string;
     childHeadHash: string;
     operationId: string;
+    parentCheckpoint: PrivateAuthorizationCheckpointPrimitives;
     parentHeadHash: string;
   };
   scope: PrivateAuthorizationScope;

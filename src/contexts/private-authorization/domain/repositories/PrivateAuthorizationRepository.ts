@@ -1,3 +1,4 @@
+import { PrivateAuthorizationCheckpoint } from '../PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '../PrivateAuthorizationScope';
 import { PrivateControlOperation } from '../PrivateControlOperation';
 import { PrivateControlOperationPrimitives } from '../PrivateControlOperationPrimitives';
@@ -62,6 +63,7 @@ export abstract class PrivateAuthorizationRepository {
     childHeadHash: string,
     operationId: string,
     authorDeviceKey: string,
+    parentCheckpoint: PrivateAuthorizationCheckpoint,
   ): Promise<void>;
 
   public abstract saveScope(scope: PrivateAuthorizationScope): Promise<void>;

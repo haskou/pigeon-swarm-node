@@ -558,6 +558,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
           authorDeviceKey: acceptance.reservation.authorDeviceKey,
           childHeadHash: acceptance.reservation.childHeadHash,
           operationId: acceptance.reservation.operationId,
+          parentCheckpoint: acceptance.reservation.parentCheckpoint,
         },
         id: privateAuthorizationLocalId(
           scopeId,
@@ -740,6 +741,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       authorDeviceKey: acceptance.reservation.authorDeviceKey,
       childHeadHash: acceptance.reservation.childHeadHash,
       operationId: acceptance.reservation.operationId,
+      parentCheckpoint: acceptance.reservation.parentCheckpoint,
     });
 
     if (!reservedChild || reservedChild.matches(candidate)) {
@@ -913,6 +915,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     childHeadHash: string,
     operationId: string,
     authorDeviceKey: string,
+    parentCheckpoint: PrivateAuthorizationCheckpoint,
   ): Promise<'reserved' | 'same' | 'conflict'> {
     return this.exclusivelyProvisioning(() =>
       this.exclusively(scopeId, async () => {
@@ -924,6 +927,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
           authorDeviceKey,
           childHeadHash,
           operationId,
+          parentCheckpoint: parentCheckpoint.toPrimitives(),
         });
 
         if (existing) {

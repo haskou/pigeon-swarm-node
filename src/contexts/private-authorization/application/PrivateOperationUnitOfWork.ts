@@ -1,3 +1,4 @@
+import { PrivateAuthorizationCheckpoint } from '../domain/PrivateAuthorizationCheckpoint';
 import { PrivateControlOperation } from '../domain/PrivateControlOperation';
 import { PrivateAuthorizationGenesisCommit } from './PrivateAuthorizationGenesisCommit';
 import { PrivateExpectedCheckpoint } from './PrivateExpectedCheckpoint';
@@ -26,6 +27,7 @@ export abstract class PrivateOperationUnitOfWork {
     childHeadHash: string,
     operationId: string,
     authorDeviceKey: string,
+    parentCheckpoint: PrivateAuthorizationCheckpoint,
   ): Promise<'reserved' | 'same' | 'conflict'>;
 
   public abstract quarantine(scopeId: string): Promise<void>;

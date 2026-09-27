@@ -1,10 +1,12 @@
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
+import { AuthenticatedPrivateOperationJson } from '@app/contexts/private-authorization/domain/value-objects/AuthenticatedPrivateOperationJson';
 import LegacyIdentityDeviceBinding from '@app/contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
 import PrivateControlTransitionVerifier from '@app/contexts/private-authorization/infrastructure/crypto/PrivateControlTransitionVerifier';
 import PrivateMlsPolicyVerifier from '@app/contexts/private-authorization/infrastructure/crypto/PrivateMlsPolicyVerifier';
 import VerifiedPrivateControlTransitionProcessor from '@app/contexts/private-authorization/infrastructure/crypto/VerifiedPrivateControlTransitionProcessor';
 import canonicalize from 'canonicalize';
+import { PrivateOperationSignature } from '@haskou/pigeon-swarm-crypto';
 import {
   createHash,
   createPrivateKey,
@@ -36,6 +38,31 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
   const digest = (value: unknown) =>
     createHash('sha256').update(canonicalize(value)!).digest('base64url');
   const scopeId = encoded(3);
+  const authenticatedOperation = (
+    kind: string,
+    payload: Record<string, unknown>,
+    resultingHeadHash: string,
+  ) =>
+    new AuthenticatedPrivateOperationJson(
+      JSON.stringify({
+        authorDeviceKey: ownerKey,
+        authorizationRevision: 0,
+        kind,
+        operationId: Buffer.alloc(16, 1).toString('base64url'),
+        payload: { ...payload, resultingHeadHash },
+        previousOperationIds: [],
+        scopeId,
+        signature: Buffer.alloc(64, 1).toString('base64url'),
+        version: 1,
+      }),
+    );
+  const operationBindingHash = (
+    kind: string,
+    payload: Record<string, unknown>,
+  ) =>
+    PrivateOperationSignature.bindingHash(
+      authenticatedOperation(kind, payload, encoded(0)).valueOf(),
+    );
   const currentPolicy = {
     authorityKeys: [ownerKey],
     devices: [ownerKey, targetKey].map((deviceKey, index) => ({
@@ -81,9 +108,14 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
         (device) => device.deviceKey !== targetKey,
       ),
     };
+    const operationPayload = { deviceKey: targetKey };
     const head = {
       mlsContextHash: createHash('sha256').update(state).digest('base64url'),
       mlsEpoch: 1,
+      operationBindingHash: operationBindingHash(
+        'device.revoke',
+        operationPayload,
+      ),
       parentHeadHash: currentControl.headHash,
       policyHash: digest(policy),
       revision: 1,
@@ -103,7 +135,7 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
         [ownerKey]: sign(
           null,
           Buffer.from(
-            `pigeon.private-control.v1\0${canonicalize(unsigned)}`,
+            `pigeon.private-control.v2\0${canonicalize(unsigned)}`,
           ),
           ownerPrivateKey,
         ).toString('base64url'),
@@ -130,12 +162,16 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
     const result = await processor.verify(
       checkpointWithHistory,
       operation,
+      authenticatedOperation(
+        'device.revoke',
+        operationPayload,
+        unsigned.headHash,
+      ),
       {
         encryptedMlsState: state.toString('base64url'),
         mlsMessage: message.toString('base64url'),
         signedTransitionJson,
       },
-      Buffer.from('previous-state').toString('base64url'),
     );
 
     expect(result.checkpoint.toPrimitives()).toMatchObject({
@@ -163,9 +199,14 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
         { deviceKey: encoded(20), mlsCredentialHash: encoded(21) },
       ],
     };
+    const operationPayload = { deviceKey: targetKey };
     const head = {
       mlsContextHash: createHash('sha256').update(state).digest('base64url'),
       mlsEpoch: 1,
+      operationBindingHash: operationBindingHash(
+        'device.revoke',
+        operationPayload,
+      ),
       parentHeadHash: currentControl.headHash,
       policyHash: digest(policy),
       revision: 1,
@@ -185,7 +226,7 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
         [ownerKey]: sign(
           null,
           Buffer.from(
-            `pigeon.private-control.v1\0${canonicalize(unsigned)}`,
+            `pigeon.private-control.v2\0${canonicalize(unsigned)}`,
           ),
           ownerPrivateKey,
         ).toString('base64url'),
@@ -213,12 +254,16 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
       processor.verify(
         checkpoint,
         operation,
+        authenticatedOperation(
+          'device.revoke',
+          operationPayload,
+          unsigned.headHash,
+        ),
         {
           encryptedMlsState: state.toString('base64url'),
           mlsMessage: message.toString('base64url'),
           signedTransitionJson,
         },
-        Buffer.from('previous-state').toString('base64url'),
       ),
     ).rejects.toThrow('Invalid private authorization');
   });
@@ -277,9 +322,18 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
     });
     const message = Buffer.from('re-admission-message');
     const state = Buffer.from('re-admitted-state');
+    const operationPayload = {
+      deviceKey: targetKey,
+      identityId: binding.identityIdFor(targetKey),
+      mlsCredentialHash: currentPolicy.devices[1].mlsCredentialHash,
+    };
     const head = {
       mlsContextHash: createHash('sha256').update(state).digest('base64url'),
       mlsEpoch: 1,
+      operationBindingHash: operationBindingHash(
+        'membership.commit',
+        operationPayload,
+      ),
       parentHeadHash: currentControl.headHash,
       policyHash: digest(currentPolicy),
       revision: 1,
@@ -299,7 +353,7 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
         [ownerKey]: sign(
           null,
           Buffer.from(
-            `pigeon.private-control.v1\0${canonicalize(unsigned)}`,
+            `pigeon.private-control.v2\0${canonicalize(unsigned)}`,
           ),
           ownerPrivateKey,
         ).toString('base64url'),
@@ -331,12 +385,16 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
     const result = await processor.verify(
       previousCheckpoint,
       operation,
+      authenticatedOperation(
+        'membership.commit',
+        operationPayload,
+        unsigned.headHash,
+      ),
       {
         encryptedMlsState: state.toString('base64url'),
         mlsMessage: message.toString('base64url'),
         signedTransitionJson,
       },
-      Buffer.from('previous-state').toString('base64url'),
     );
 
     expect(result.checkpoint.toPrimitives()).toMatchObject({

@@ -1,4 +1,6 @@
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
+import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
+import { PrivateAuthorizationCheckpointPrimitives } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpointPrimitives';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
 import { PrivateAuthorizationScopePrimitives } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScopePrimitives';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
@@ -160,7 +162,9 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
     if (
       typeof document?.authorDeviceKey !== 'string' ||
       typeof document?.childHeadHash !== 'string' ||
-      typeof document.operationId !== 'string'
+      typeof document.operationId !== 'string' ||
+      !document.parentCheckpoint ||
+      typeof document.parentCheckpoint !== 'object'
     ) {
       return undefined;
     }
@@ -169,6 +173,8 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
       authorDeviceKey: document.authorDeviceKey,
       childHeadHash: document.childHeadHash,
       operationId: document.operationId,
+      parentCheckpoint:
+        document.parentCheckpoint as unknown as PrivateAuthorizationCheckpointPrimitives,
     });
   }
 
@@ -284,12 +290,14 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
     childHeadHash: string,
     operationId: string,
     authorDeviceKey: string,
+    parentCheckpoint: PrivateAuthorizationCheckpoint,
   ): Promise<void> {
     const existing = await this.findReservation(scopeId, parentHeadHash);
     const candidate = PrivateControlTransitionReservation.fromPrimitives({
       authorDeviceKey,
       childHeadHash,
       operationId,
+      parentCheckpoint: parentCheckpoint.toPrimitives(),
     });
 
     if (existing && !existing.matches(candidate)) {

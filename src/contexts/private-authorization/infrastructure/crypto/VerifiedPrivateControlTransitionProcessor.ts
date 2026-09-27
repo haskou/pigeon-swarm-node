@@ -6,6 +6,7 @@ import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorizat
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
 import { PrivateMlsPolicyDevice } from '@app/contexts/private-authorization/domain/PrivateMlsPolicyDevice';
 import { PrivateIdentityBinding } from '@app/contexts/private-authorization/domain/services/PrivateIdentityBinding';
+import { AuthenticatedPrivateOperationJson } from '@app/contexts/private-authorization/domain/value-objects/AuthenticatedPrivateOperationJson';
 import { PrivateAuthorizationDeviceKey } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationDeviceKey';
 import { Buffer } from 'buffer';
 import { createHash } from 'crypto';
@@ -192,10 +193,9 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
   private verifyNow(
     checkpoint: PrivateAuthorizationCheckpoint,
     operation: PrivateControlOperation,
+    authenticatedOperation: AuthenticatedPrivateOperationJson,
     frame: PrivateControlFrame,
-    currentProtectedMlsState: string,
   ): PrivateVerifiedControlTransition {
-    this.bytes(currentProtectedMlsState, 1024 * 1024);
     const mlsMessageHash = this.hash(this.bytes(frame.mlsMessage, 256 * 1024));
     const protectedState = this.bytes(frame.encryptedMlsState, 1024 * 1024);
     const operationControl = operation.toPrimitives().control;
@@ -210,11 +210,13 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
     const authenticated = this.verifier.authenticate(
       frame.signedTransitionJson,
       trusted.controlCheckpointJson,
+      authenticatedOperation.valueOf(),
       mlsMessageHash,
     );
     const verified = this.verifier.verify(
       authenticated,
       trusted.controlCheckpointJson,
+      authenticatedOperation.valueOf(),
       mlsMessageHash,
       this.hash(protectedState),
     );
@@ -255,11 +257,11 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
   public verify(
     checkpoint: PrivateAuthorizationCheckpoint,
     operation: PrivateControlOperation,
+    authenticatedOperation: AuthenticatedPrivateOperationJson,
     frame: PrivateControlFrame,
-    currentProtectedMlsState: string,
   ): Promise<PrivateVerifiedControlTransition> {
     return Promise.resolve().then(() =>
-      this.verifyNow(checkpoint, operation, frame, currentProtectedMlsState),
+      this.verifyNow(checkpoint, operation, authenticatedOperation, frame),
     );
   }
 }

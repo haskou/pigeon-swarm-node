@@ -88,6 +88,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       authorDeviceKey: 'owner',
       childHeadHash: 'head-1',
       operationId: 'operation',
+      parentCheckpoint: checkpoint().toPrimitives(),
       parentHeadHash: 'head-0',
     },
     scope: PrivateAuthorizationScope.fromPrimitives({
@@ -605,6 +606,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       'retired-child',
       oldest.id,
       'owner',
+      checkpoint(),
     );
     await database.save(
       PrivateAuthorizationLocalNamespaces.replay,
@@ -946,6 +948,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       'other-head',
       'other-operation',
       'owner',
+      checkpoint(),
     );
 
     await expect(
@@ -970,6 +973,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       'head-1',
       'other-operation',
       'owner',
+      checkpoint(),
     );
 
     await expect(
@@ -994,6 +998,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       'head-1',
       'owner-operation',
       'owner',
+      checkpoint(),
     );
     const claimed = acceptance();
     claimed.receipt = PrivateControlOperation.fromPrimitives({
@@ -1006,6 +1011,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       authorDeviceKey: 'device',
       childHeadHash: 'head-1',
       operationId: 'device-operation',
+      parentCheckpoint: checkpoint().toPrimitives(),
       parentHeadHash: 'head-0',
     };
 
@@ -1048,6 +1054,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       authorDeviceKey: 'owner',
       childHeadHash: 'head-2',
       operationId: 'sibling',
+      parentCheckpoint: checkpoint().toPrimitives(),
       parentHeadHash: 'head-0',
     };
 
@@ -1106,6 +1113,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
           'head-1',
           'operation-1',
           'owner',
+          checkpoint(),
         ),
         another.reserveChild(
           'scope',
@@ -1113,6 +1121,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
           'head-2',
           'operation-2',
           'owner',
+          checkpoint(),
         ),
       ]),
     ).resolves.toEqual(['reserved', 'conflict']);
@@ -1123,6 +1132,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
         'head-1',
         'operation-1',
         'owner',
+        checkpoint(),
       ),
     ).resolves.toBe('same');
     const storageReservation = await database.findOne(

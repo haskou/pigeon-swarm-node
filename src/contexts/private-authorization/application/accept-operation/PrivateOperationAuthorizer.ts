@@ -6,6 +6,7 @@ import { PrivateAuthorizationScope } from '../../domain/PrivateAuthorizationScop
 import { PrivateControlOperation } from '../../domain/PrivateControlOperation';
 import { PrivateAuthorizationRepository } from '../../domain/repositories/PrivateAuthorizationRepository';
 import { PrivateIdentityBinding } from '../../domain/services/PrivateIdentityBinding';
+import { AuthenticatedPrivateOperationJson } from '../../domain/value-objects/AuthenticatedPrivateOperationJson';
 import { PrivateAuthorizationDeviceKey } from '../../domain/value-objects/PrivateAuthorizationDeviceKey';
 import { PrivateOperationAuthenticator } from './PrivateOperationAuthenticator';
 import { PrivateOperationDecoder } from './PrivateOperationDecoder';
@@ -36,15 +37,16 @@ export default class PrivateOperationAuthorizer {
     scope: PrivateAuthorizationScope,
     expectedAuthor: PrivateAuthorizationDeviceKey,
   ): {
+    authenticatedOperation: AuthenticatedPrivateOperationJson;
     operation: PrivateControlOperation;
     scope: PrivateAuthorizationScope;
   } {
     try {
-      const canonical = this.operationVerifier.verify(
+      const authenticatedOperation = this.operationVerifier.verify(
         signedOperationJson,
         expectedAuthor.valueOf(),
       );
-      const operation = this.contract.decode(canonical);
+      const operation = this.contract.decode(authenticatedOperation.valueOf());
 
       assert(
         operation.isAuthoredBy(expectedAuthor) &&
@@ -53,7 +55,11 @@ export default class PrivateOperationAuthorizer {
         new InvalidPrivateAuthorizationError(),
       );
 
-      return { operation, scope };
+      return {
+        authenticatedOperation,
+        operation,
+        scope,
+      };
     } catch {
       throw new InvalidPrivateAuthorizationError();
     }
@@ -67,6 +73,7 @@ export default class PrivateOperationAuthorizer {
     signedOperationJson: string,
     routed: PrivateControlOperation = this.decode(signedOperationJson),
   ): Promise<{
+    authenticatedOperation: AuthenticatedPrivateOperationJson;
     operation: PrivateControlOperation;
     scope: PrivateAuthorizationScope;
   }> {
@@ -90,6 +97,7 @@ export default class PrivateOperationAuthorizer {
     signedOperationJson: string,
     routed: PrivateControlOperation = this.decode(signedOperationJson),
   ): Promise<{
+    authenticatedOperation: AuthenticatedPrivateOperationJson;
     operation: PrivateControlOperation;
     scope: PrivateAuthorizationScope;
   }> {

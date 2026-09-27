@@ -19,9 +19,11 @@ describe('private authorization cryptography adapters', () => {
       .spyOn(PrivateOperationSignature, 'verify')
       .mockReturnValue('canonical-operation');
 
-    expect(new PrivateOperationVerifier().verify('signed', 'expected-key')).toBe(
-      'canonical-operation',
-    );
+    expect(
+      new PrivateOperationVerifier()
+        .verify('signed', 'expected-key')
+        .hasValue('canonical-operation'),
+    ).toBe(true);
     expect(verify).toHaveBeenCalledWith('signed', 'expected-key');
   });
 
@@ -73,13 +75,19 @@ describe('private authorization cryptography adapters', () => {
       .mockReturnValue('verified');
     const adapter = new PrivateControlTransitionVerifier();
 
-    expect(adapter.authenticate('binding', 'checkpoint', 'message-hash')).toBe(
-      'authenticated',
-    );
+    expect(
+      adapter.authenticate(
+        'binding',
+        'checkpoint',
+        'authenticated-operation',
+        'message-hash',
+      ),
+    ).toBe('authenticated');
     expect(
       adapter.verify(
         'authenticated',
         'checkpoint',
+        'authenticated-operation',
         'message-hash',
         'context-hash',
       ),
@@ -87,11 +95,13 @@ describe('private authorization cryptography adapters', () => {
     expect(authenticate).toHaveBeenCalledWith(
       'binding',
       'checkpoint',
+      'authenticated-operation',
       'message-hash',
     );
     expect(verify).toHaveBeenCalledWith(
       'authenticated',
       'checkpoint',
+      'authenticated-operation',
       'message-hash',
       'context-hash',
     );

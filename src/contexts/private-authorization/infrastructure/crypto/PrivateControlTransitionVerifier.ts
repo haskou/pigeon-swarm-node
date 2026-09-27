@@ -5,12 +5,14 @@ export default class PrivateControlTransitionVerifier {
   public authenticate(
     signedJson: string,
     trustedCheckpointJson: string,
+    authenticatedOperationJson: string,
     expectedMlsMessageHash: string,
   ): string {
     try {
       return PrivateControlSignature.authenticate(
         signedJson,
         trustedCheckpointJson,
+        authenticatedOperationJson,
         expectedMlsMessageHash,
       );
     } catch {
@@ -21,6 +23,7 @@ export default class PrivateControlTransitionVerifier {
   public verify(
     signedJson: string,
     trustedCheckpointJson: string,
+    authenticatedOperationJson: string,
     expectedMlsMessageHash: string,
     expectedMlsContextHash: string,
   ): string {
@@ -28,6 +31,7 @@ export default class PrivateControlTransitionVerifier {
       return PrivateControlSignature.verify(
         signedJson,
         trustedCheckpointJson,
+        authenticatedOperationJson,
         expectedMlsMessageHash,
         expectedMlsContextHash,
       );
