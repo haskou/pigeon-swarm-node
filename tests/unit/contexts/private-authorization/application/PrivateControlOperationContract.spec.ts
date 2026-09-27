@@ -61,6 +61,20 @@ describe('PrivateControlOperationContract', () => {
     });
   });
 
+  it('uses the canonical signed envelope for the operation digest', () => {
+    const compact = envelope('membership.propose', {
+      change,
+      parentHeadHash: encoded(32, 5),
+      proposalId: encoded(16, 6),
+    });
+    const formatted = JSON.stringify(JSON.parse(compact), null, 2);
+    const contract = new PrivateControlOperationContract();
+
+    expect(contract.decode(formatted).toPrimitives().digest).toBe(
+      contract.decode(compact).toPrimitives().digest,
+    );
+  });
+
   it.each([
     ['unknown envelope field', { extra: true }],
     ['unsupported version', { version: 2 }],

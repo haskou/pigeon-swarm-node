@@ -254,6 +254,22 @@ describe('PrivateOperationAcceptor', () => {
     expect(mutations.apply).not.toHaveBeenCalled();
   });
 
+  it('treats a reformatted accepted operation as the same receipt', async () => {
+    const compact = signed();
+    const receipt = new PrivateControlOperationContract()
+      .decode(compact)
+      .toPrimitives();
+    const formatted = JSON.stringify(JSON.parse(compact), null, 2);
+    repository.findReceipt.mockResolvedValue(receipt);
+
+    await expect(
+      acceptor.accept(new PrivateOperationAcceptMessage(formatted, 'proof')),
+    ).resolves.toEqual({ status: 'duplicate' });
+    expect(unitOfWork.quarantine).not.toHaveBeenCalled();
+    expect(verifier.verify).not.toHaveBeenCalled();
+    expect(freshness.verify).not.toHaveBeenCalled();
+  });
+
   it('acknowledges an identical receipt after its author is revoked', async () => {
     const decoded = new PrivateControlOperationContract()
       .decode(signed())

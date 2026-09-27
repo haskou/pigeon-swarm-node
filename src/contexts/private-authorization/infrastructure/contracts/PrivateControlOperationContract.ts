@@ -2,7 +2,9 @@ import { PrivateOperationDecoder } from '@app/contexts/private-authorization/app
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
 import { PrivateControlOperationPrimitives } from '@app/contexts/private-authorization/domain/PrivateControlOperationPrimitives';
+import { assert } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
+import canonicalize from 'canonicalize';
 import { createHash } from 'crypto';
 
 export default class PrivateControlOperationContract extends PrivateOperationDecoder {
@@ -204,9 +206,9 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
       : undefined;
   }
 
-  public decode(canonicalSignedJson: string): PrivateControlOperation {
+  public decode(signedJson: string): PrivateControlOperation {
     try {
-      const value = this.exact(JSON.parse(canonicalSignedJson), [
+      const value = this.exact(JSON.parse(signedJson), [
         'version',
         'operationId',
         'scopeId',
@@ -221,14 +223,16 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
       if (value.version !== 1) {
         throw new InvalidPrivateAuthorizationError();
       }
+      const canonical = canonicalize(value);
+      assert(canonical, new InvalidPrivateAuthorizationError());
       const mapped = this.controlPayload(value.kind, value.payload);
       const primitives: PrivateControlOperationPrimitives = {
         authorDeviceKey: this.encoded(value.authorDeviceKey, 32),
         authorizationRevision: this.revision(value.authorizationRevision),
-        byteSize: Buffer.byteLength(canonicalSignedJson, 'utf8'),
+        byteSize: Buffer.byteLength(signedJson, 'utf8'),
         control: mapped.control,
         digest: createHash('sha256')
-          .update(canonicalSignedJson, 'utf8')
+          .update(canonical, 'utf8')
           .digest('base64url'),
         id: this.encoded(value.operationId, 16),
         kind: value.kind as string,
