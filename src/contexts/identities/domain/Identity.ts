@@ -102,6 +102,18 @@ export class Identity extends AggregateRoot {
     return this.publication.isFirstVersion();
   }
 
+  public hasInitialAuthorizationRevision(): boolean {
+    return this.authorizationRevision.isEqual(
+      IdentityAuthorizationRevision.initial(),
+    );
+  }
+
+  public doesNotRollbackAuthorizationFrom(previous: Identity): boolean {
+    return this.authorizationRevision.isGreaterOrEqualThan(
+      previous.authorizationRevision,
+    );
+  }
+
   public isIdentifiedBy(id: IdentityId): boolean {
     return this.id.isEqual(id);
   }

@@ -11,6 +11,7 @@ export default class IdentityCandidateValidationDomainService {
     return (
       candidate.isNextVersionAfter(previousIdentity) &&
       candidate.usesSameGenesisAuthorizationAs(previousIdentity) &&
+      candidate.doesNotRollbackAuthorizationFrom(previousIdentity) &&
       candidate.keepsNetworksFrom(previousIdentity)
     );
   }
@@ -32,7 +33,10 @@ export default class IdentityCandidateValidationDomainService {
     }
 
     if (candidate.isFirstVersion()) {
-      return candidate.hasNoPreviousReference();
+      return (
+        candidate.hasNoPreviousReference() &&
+        candidate.hasInitialAuthorizationRevision()
+      );
     }
 
     const previousReference = candidate.getPreviousReference();

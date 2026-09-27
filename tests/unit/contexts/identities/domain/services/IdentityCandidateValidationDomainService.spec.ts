@@ -60,4 +60,39 @@ describe('IdentityCandidateValidationDomainService', () => {
 
     expect(result).toBe(false);
   });
+
+  it('rejects a genesis publication above authorization revision zero', async () => {
+    const candidate = await mother.buildNext({
+      authorizationRevision: 1,
+      previousIdentityExternalIdentifier: undefined,
+      version: 1,
+    });
+
+    const result = await service.isValidChainFor(
+      mother.id,
+      candidate,
+      () => Promise.resolve(undefined),
+    );
+
+    expect(result).toBe(false);
+  });
+
+  it('rejects an authorization revision rollback', async () => {
+    const previousIdentity = await mother.buildNext({
+      authorizationRevision: 5,
+      previousIdentityExternalIdentifier: undefined,
+      version: 1,
+    });
+    const candidate = await mother.buildNext({
+      authorizationRevision: 4,
+      previousIdentityExternalIdentifier: 'bafypreviousidentity',
+      version: 2,
+    });
+
+    const result = await service.isValidChainFor(mother.id, candidate, () =>
+      Promise.resolve(previousIdentity),
+    );
+
+    expect(result).toBe(false);
+  });
 });

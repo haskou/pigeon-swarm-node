@@ -1429,12 +1429,9 @@ Response:
   "identityExternalIdentifier": "<currentIdentityCid>",
   "networks": ["<networkId>"],
   "profile": {
-    "name": "Alice",
     "handle": "alice",
-    "picture": "<publicImageCid>",
-    "banner": "<publicBannerCid>"
+    "name": "Alice"
   },
-  "previousIdentityExternalIdentifier": null,
   "timestamp": 1773848829055,
   "signature": "<identitySignature>",
   "version": 1
@@ -1483,11 +1480,7 @@ The signature covers this canonical property order:
   "deviceCredentialCommitment": "<commitment>",
   "id": "<identityId>",
   "networks": ["<networkId>"],
-  "previousIdentityExternalIdentifier": null,
   "profile": {
-    "picture": null,
-    "banner": null,
-    "biography": null,
     "handle": "alice",
     "name": "Alice"
   },
