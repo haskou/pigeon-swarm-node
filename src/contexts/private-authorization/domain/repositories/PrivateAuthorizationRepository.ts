@@ -61,6 +61,7 @@ export abstract class PrivateAuthorizationRepository {
     parentHeadHash: string,
     childHeadHash: string,
     operationId: string,
+    authorDeviceKey: string,
   ): Promise<void>;
 
   public abstract saveScope(scope: PrivateAuthorizationScope): Promise<void>;

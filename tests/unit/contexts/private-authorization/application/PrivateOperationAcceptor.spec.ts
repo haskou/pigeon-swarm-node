@@ -465,6 +465,7 @@ describe('PrivateOperationAcceptor', () => {
     );
     repository.findReservation.mockResolvedValue(
       PrivateControlTransitionReservation.fromPrimitives({
+        authorDeviceKey: authorKey,
         childHeadHash: encoded(32, 11),
         operationId,
       }),
@@ -502,6 +503,7 @@ describe('PrivateOperationAcceptor', () => {
     );
     repository.findReservation.mockResolvedValue(
       PrivateControlTransitionReservation.fromPrimitives({
+        authorDeviceKey: authorKey,
         childHeadHash: encoded(32, 11),
         operationId: encoded(16, 12),
       }),
@@ -517,6 +519,50 @@ describe('PrivateOperationAcceptor', () => {
       authorKey,
     );
     expect(unitOfWork.quarantine).toHaveBeenCalledWith(scopeId);
+    expect(freshness.verify).not.toHaveBeenCalled();
+  });
+
+  it('rejects a cross-author claim on a reserved transition without freezing', async () => {
+    const activeKey = encoded(32, 10);
+    const historicalKey = encoded(32, 13);
+    const currentCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
+      ...checkpoint().toPrimitives(),
+      admittedDeviceKeys: [activeKey],
+      authorityKeys: [activeKey],
+      freshnessAuthorityKey: activeKey,
+      headHash: encoded(32, 11),
+      parentHeadHash: headHash,
+      revision: 1,
+      revokedDeviceKeys: [authorKey, historicalKey],
+    });
+    const claimedTransition = revocation({
+      authorDeviceKey: historicalKey,
+      payload: {
+        deviceKey: historicalKey,
+        resultingHeadHash: encoded(32, 11),
+      },
+    });
+    repository.findScope.mockResolvedValue(
+      PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
+    );
+    repository.findReservation.mockResolvedValue(
+      PrivateControlTransitionReservation.fromPrimitives({
+        authorDeviceKey: authorKey,
+        childHeadHash: encoded(32, 11),
+        operationId: encoded(16, 12),
+      }),
+    );
+
+    await expect(
+      acceptor.accept(
+        new PrivateOperationAcceptMessage(claimedTransition, 'proof'),
+      ),
+    ).rejects.toBeInstanceOf(InvalidPrivateAuthorizationError);
+    expect(verifier.verify).toHaveBeenCalledWith(
+      claimedTransition,
+      historicalKey,
+    );
+    expect(unitOfWork.quarantine).not.toHaveBeenCalled();
     expect(freshness.verify).not.toHaveBeenCalled();
   });
 

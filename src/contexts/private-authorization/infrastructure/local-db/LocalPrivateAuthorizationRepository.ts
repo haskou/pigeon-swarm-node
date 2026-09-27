@@ -158,6 +158,7 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
     );
 
     if (
+      typeof document?.authorDeviceKey !== 'string' ||
       typeof document?.childHeadHash !== 'string' ||
       typeof document.operationId !== 'string'
     ) {
@@ -165,6 +166,7 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
     }
 
     return PrivateControlTransitionReservation.fromPrimitives({
+      authorDeviceKey: document.authorDeviceKey,
       childHeadHash: document.childHeadHash,
       operationId: document.operationId,
     });
@@ -281,9 +283,11 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
     parentHeadHash: string,
     childHeadHash: string,
     operationId: string,
+    authorDeviceKey: string,
   ): Promise<void> {
     const existing = await this.findReservation(scopeId, parentHeadHash);
     const candidate = PrivateControlTransitionReservation.fromPrimitives({
+      authorDeviceKey,
       childHeadHash,
       operationId,
     });

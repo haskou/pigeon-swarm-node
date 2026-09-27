@@ -88,15 +88,33 @@ export default class PrivateOperationAcceptor {
     reservation: PrivateControlTransitionReservation | undefined,
     candidateHead: unknown,
     operationId: string,
+    authorDeviceKey: string,
   ): 'head' | 'none' | 'operation' {
     if (!reservation || typeof candidateHead !== 'string') return 'none';
 
     return reservation.conflictWith(
       PrivateControlTransitionReservation.fromPrimitives({
+        authorDeviceKey,
         childHeadHash: candidateHead,
         operationId,
       }),
     );
+  }
+
+  private async rejectHistoricalReservationConflict(
+    conflict: 'head' | 'operation',
+    reservation: PrivateControlTransitionReservation | undefined,
+    operation: PrivateControlOperation,
+  ): Promise<never> {
+    if (conflict === 'operation') {
+      assert(
+        reservation?.isAuthoredBy(operation.getAuthorDeviceKey()),
+        new InvalidPrivateAuthorizationError(),
+      );
+      await this.unitOfWork.quarantine(operation.toPrimitives().scopeId);
+    }
+
+    throw new PrivateAuthorizationConflictError();
   }
 
   private async rejectReservedSibling(
@@ -122,6 +140,7 @@ export default class PrivateOperationAcceptor {
       reservedChild,
       candidateHead,
       value.id,
+      value.authorDeviceKey,
     );
 
     if (conflict === 'none') return;
@@ -129,12 +148,11 @@ export default class PrivateOperationAcceptor {
       message.signedOperationJson,
       routed,
     );
-
-    if (conflict === 'operation') {
-      await this.unitOfWork.quarantine(value.scopeId);
-    }
-
-    throw new PrivateAuthorizationConflictError();
+    await this.rejectHistoricalReservationConflict(
+      conflict,
+      reservedChild,
+      routed,
+    );
   }
 
   private async transition(
@@ -181,6 +199,7 @@ export default class PrivateOperationAcceptor {
       protectedMlsState = verified.protectedMlsState;
       const candidate = verified.checkpoint.toPrimitives();
       reservation = {
+        authorDeviceKey: value.authorDeviceKey,
         childHeadHash: candidate.headHash,
         operationId: value.id,
         parentHeadHash: currentCheckpoint.toPrimitives().headHash,

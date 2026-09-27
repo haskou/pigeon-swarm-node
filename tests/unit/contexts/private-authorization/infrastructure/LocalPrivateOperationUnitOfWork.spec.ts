@@ -85,6 +85,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     receipt: operation(),
     replayMarkerId: 'request',
     reservation: {
+      authorDeviceKey: 'owner',
       childHeadHash: 'head-1',
       operationId: 'operation',
       parentHeadHash: 'head-0',
@@ -603,6 +604,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       'retired-parent',
       'retired-child',
       oldest.id,
+      'owner',
     );
     await database.save(
       PrivateAuthorizationLocalNamespaces.replay,
@@ -943,6 +945,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       'head-0',
       'other-head',
       'other-operation',
+      'owner',
     );
 
     await expect(
@@ -966,6 +969,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       'head-0',
       'head-1',
       'other-operation',
+      'owner',
     );
 
     await expect(
@@ -1004,6 +1008,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       },
     });
     sibling.reservation = {
+      authorDeviceKey: 'owner',
       childHeadHash: 'head-2',
       operationId: 'sibling',
       parentHeadHash: 'head-0',
@@ -1058,12 +1063,30 @@ describe('LocalPrivateOperationUnitOfWork', () => {
 
     await expect(
       Promise.all([
-        unitOfWork.reserveChild('scope', 'head-0', 'head-1', 'operation-1'),
-        another.reserveChild('scope', 'head-0', 'head-2', 'operation-2'),
+        unitOfWork.reserveChild(
+          'scope',
+          'head-0',
+          'head-1',
+          'operation-1',
+          'owner',
+        ),
+        another.reserveChild(
+          'scope',
+          'head-0',
+          'head-2',
+          'operation-2',
+          'owner',
+        ),
       ]),
     ).resolves.toEqual(['reserved', 'conflict']);
     await expect(
-      another.reserveChild('scope', 'head-0', 'head-1', 'operation-1'),
+      another.reserveChild(
+        'scope',
+        'head-0',
+        'head-1',
+        'operation-1',
+        'owner',
+      ),
     ).resolves.toBe('same');
     const storageReservation = await database.findOne(
       PrivateAuthorizationLocalNamespaces.provisioning,

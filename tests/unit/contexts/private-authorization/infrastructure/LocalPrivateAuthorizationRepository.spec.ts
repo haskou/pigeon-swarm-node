@@ -113,6 +113,7 @@ describe('LocalPrivateAuthorizationRepository', () => {
       'head-0',
       'head-1',
       'accepted',
+      'owner',
     );
     await repository.saveProjection('scope', { members: ['member'] });
 
@@ -122,6 +123,7 @@ describe('LocalPrivateAuthorizationRepository', () => {
     const reservation = await repository.findReservation('scope', 'head-0');
 
     expect(reservation?.toPrimitives()).toEqual({
+      authorDeviceKey: 'owner',
       childHeadHash: 'head-1',
       operationId: 'accepted',
     });

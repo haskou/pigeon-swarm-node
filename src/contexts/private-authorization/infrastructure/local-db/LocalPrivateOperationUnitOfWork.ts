@@ -555,6 +555,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     if (acceptance.reservation) {
       operations.push({
         document: {
+          authorDeviceKey: acceptance.reservation.authorDeviceKey,
           childHeadHash: acceptance.reservation.childHeadHash,
           operationId: acceptance.reservation.operationId,
         },
@@ -736,6 +737,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       acceptance.reservation.parentHeadHash,
     );
     const candidate = PrivateControlTransitionReservation.fromPrimitives({
+      authorDeviceKey: acceptance.reservation.authorDeviceKey,
       childHeadHash: acceptance.reservation.childHeadHash,
       operationId: acceptance.reservation.operationId,
     });
@@ -905,6 +907,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     parentHeadHash: string,
     childHeadHash: string,
     operationId: string,
+    authorDeviceKey: string,
   ): Promise<'reserved' | 'same' | 'conflict'> {
     return this.exclusivelyProvisioning(() =>
       this.exclusively(scopeId, async () => {
@@ -913,6 +916,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
           parentHeadHash,
         );
         const candidate = PrivateControlTransitionReservation.fromPrimitives({
+          authorDeviceKey,
           childHeadHash,
           operationId,
         });

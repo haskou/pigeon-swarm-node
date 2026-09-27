@@ -2,13 +2,16 @@ import { assert } from '@haskou/value-objects';
 
 import { InvalidPrivateAuthorizationError } from './errors/InvalidPrivateAuthorizationError';
 import { PrivateControlTransitionReservationPrimitives } from './PrivateControlTransitionReservationPrimitives';
+import { PrivateAuthorizationDeviceKey } from './value-objects/PrivateAuthorizationDeviceKey';
 
 export class PrivateControlTransitionReservation {
   public static fromPrimitives(
     primitives: PrivateControlTransitionReservationPrimitives,
   ): PrivateControlTransitionReservation {
     assert(
-      primitives.childHeadHash.length > 0 && primitives.operationId.length > 0,
+      primitives.authorDeviceKey.length > 0 &&
+        primitives.childHeadHash.length > 0 &&
+        primitives.operationId.length > 0,
       new InvalidPrivateAuthorizationError(),
     );
 
@@ -32,7 +35,14 @@ export class PrivateControlTransitionReservation {
   }
 
   public matches(candidate: PrivateControlTransitionReservation): boolean {
-    return this.conflictWith(candidate) === 'none';
+    return (
+      this.conflictWith(candidate) === 'none' &&
+      this.primitives.authorDeviceKey === candidate.primitives.authorDeviceKey
+    );
+  }
+
+  public isAuthoredBy(author: PrivateAuthorizationDeviceKey): boolean {
+    return this.primitives.authorDeviceKey === author.valueOf();
   }
 
   public toPrimitives(): PrivateControlTransitionReservationPrimitives {

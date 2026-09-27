@@ -13,6 +13,7 @@ export interface PrivateOperationAcceptance {
   receipt: PrivateControlOperation;
   replayMarkerId: string;
   reservation?: {
+    authorDeviceKey: string;
     childHeadHash: string;
     operationId: string;
     parentHeadHash: string;

@@ -25,6 +25,7 @@ export abstract class PrivateOperationUnitOfWork {
     parentHeadHash: string,
     childHeadHash: string,
     operationId: string,
+    authorDeviceKey: string,
   ): Promise<'reserved' | 'same' | 'conflict'>;
 
   public abstract quarantine(scopeId: string): Promise<void>;
