@@ -1,8 +1,4 @@
-import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
-
 export type OrbitDBHeadIndexOptions<TDocument extends object> = {
-  canonicalIndexKeys?(document: Record<string, unknown>): string[];
-  canonicalStoreName?: OrbitDBReplicatedDocumentStoreName;
   collectionName: string;
   documentFromRecord(record: Record<string, unknown>): TDocument | undefined;
   documentIds?(document: TDocument): string[];

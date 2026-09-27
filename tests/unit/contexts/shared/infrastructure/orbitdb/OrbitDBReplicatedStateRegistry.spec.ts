@@ -1339,7 +1339,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
   });
 
   it.each(['pins', 'reactions'])(
-    'rejects untrusted replicated %s tombstones and omissions',
+    'merges replicated %s head records without resurrecting stale tombstones',
     async (collectionName) => {
       const registry = new OrbitDBReplicatedStateRegistry();
       const firstNetwork = createStores();
@@ -1352,11 +1352,12 @@ describe('OrbitDBReplicatedStateRegistry', () => {
           id: key,
           [collectionName]: [
             {
-              createdAt: 10,
               id: `${collectionName}-1`,
+              removed: true,
+              updatedAt: 30,
             },
           ],
-          updatedAt: 10,
+          updatedAt: 31,
         },
       );
       firstNetwork.heads.emitUpdate({
@@ -1366,22 +1367,11 @@ describe('OrbitDBReplicatedStateRegistry', () => {
             id: key,
             [collectionName]: [
               {
+                createdAt: 10,
                 id: `${collectionName}-1`,
-                removed: true,
-                updatedAt: Number.MAX_SAFE_INTEGER,
               },
             ],
-            updatedAt: Number.MAX_SAFE_INTEGER,
-          },
-        },
-      });
-      firstNetwork.heads.emitUpdate({
-        payload: {
-          key,
-          value: {
-            id: key,
-            [collectionName]: [],
-            updatedAt: Number.MAX_SAFE_INTEGER,
+            updatedAt: 40,
           },
         },
       });
@@ -1390,11 +1380,12 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         id: key,
         [collectionName]: [
           {
-            createdAt: 10,
             id: `${collectionName}-1`,
+            removed: true,
+            updatedAt: 30,
           },
         ],
-        updatedAt: Number.MAX_SAFE_INTEGER,
+        updatedAt: 40,
       });
     },
   );

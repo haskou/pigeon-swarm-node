@@ -30,13 +30,6 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     super();
     this.projection.register();
     this.communityIndex = new OrbitDBHeadIndex(this.registry, {
-      canonicalIndexKeys: (record) =>
-        this.isStoredDocument(record)
-          ? record.memberIds.map((memberId) =>
-              this.memberIndexHeadKey(memberId, record.id),
-            )
-          : [],
-      canonicalStoreName: 'communities',
       collectionName: 'communities',
       documentFromRecord: (record) =>
         this.isStoredDocument(record) ? record : undefined,

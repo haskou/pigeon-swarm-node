@@ -64,8 +64,6 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private readonly projectedHeads = new Map<string, Record<string, unknown>>();
 
-  private documentProjectionRevision = 0;
-
   private readonly exactProjectedHeadKeys = new Set<string>();
 
   private readonly replicatedHeadsByNetworkId = new Map<
@@ -566,6 +564,7 @@ export default class OrbitDBReplicatedStateRegistry {
         ([key, value]) =>
           OrbitDBReplicatedStateRegistry.INDEX_HEAD_COLLECTION_NAMES.has(key) &&
           Array.isArray(value) &&
+          value.length > 0 &&
           value.every((item) => this.isRecord(item)),
       )
       .map(([key]) => key);
@@ -598,9 +597,7 @@ export default class OrbitDBReplicatedStateRegistry {
     const merged = new Map<string, Record<string, unknown>>();
     const withoutId: Record<string, unknown>[] = [];
 
-    for (const record of [...currentRecords, ...candidateRecords].filter(
-      (candidate) => candidate.removed !== true,
-    )) {
+    for (const record of [...currentRecords, ...candidateRecords]) {
       const id = this.recordId(record);
 
       if (!id) {
@@ -1135,7 +1132,6 @@ export default class OrbitDBReplicatedStateRegistry {
         'deletedAt',
         'editedAt',
         'endedAt',
-        'lastReplyAt',
         'receivedAt',
         'updatedAt',
         'createdAt',
@@ -1597,7 +1593,6 @@ export default class OrbitDBReplicatedStateRegistry {
     networkId: string,
     stores: OrbitDBPrivateNetworkStores,
   ): Promise<void> {
-    this.documentProjectionRevision += 1;
     this.storesByNetworkId.set(networkId, stores);
     this.registerDocumentUpdateListeners(stores);
     this.registerHeadCacheListeners(networkId, stores);
@@ -1649,7 +1644,6 @@ export default class OrbitDBReplicatedStateRegistry {
     this.replicatedHeadsByNetworkId.delete(networkId);
     this.projectedHeads.clear();
     this.exactProjectedHeadKeys.clear();
-    this.documentProjectionRevision += 1;
 
     await stores?.stop();
   }
@@ -1660,11 +1654,6 @@ export default class OrbitDBReplicatedStateRegistry {
     this.replicatedHeadsByNetworkId.clear();
     this.projectedHeads.clear();
     this.exactProjectedHeadKeys.clear();
-    this.documentProjectionRevision += 1;
-  }
-
-  public getDocumentProjectionRevision(): number {
-    return this.documentProjectionRevision;
   }
 
   public async onDocumentUpdated(
@@ -1802,19 +1791,10 @@ export default class OrbitDBReplicatedStateRegistry {
   public findCachedHeadsByPrefix(
     prefix: string,
   ): Array<Record<string, unknown>> {
-    return this.findCachedHeadEntriesByPrefix(prefix).map(({ value }) => value);
-  }
-
-  public findCachedHeadEntriesByPrefix(
-    prefix: string,
-  ): Array<{ key: string; value: Record<string, unknown> }> {
     return [...this.cachedHeadKeys()]
       .filter((key) => key.startsWith(prefix))
-      .flatMap((key) => {
-        const value = this.cachedHead(key);
-
-        return value ? [{ key, value }] : [];
-      });
+      .map((key) => this.cachedHead(key))
+      .filter((head): head is Record<string, unknown> => head !== undefined);
   }
 
   public findCachedHead(key: string): Record<string, unknown> | undefined {

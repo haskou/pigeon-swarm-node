@@ -21,14 +21,7 @@ describe('OrbitDBNotificationScopeSettingsRepository', () => {
       },
     ];
     const registry = {
-      onDocumentUpdated: jest.fn(
-        async (
-          _storeName: string,
-          listener: (document: Record<string, unknown>) => void | Promise<void>,
-        ) => {
-          for (const document of documents) await listener(document);
-        },
-      ),
+      findHead: jest.fn().mockResolvedValue({ settings: documents }),
     } as unknown as OrbitDBReplicatedStateRegistry;
     const repository = new OrbitDBNotificationScopeSettingsRepository(registry);
 

@@ -25,12 +25,6 @@ export default class OrbitDBPollRepository extends PollRepository {
   ) {
     super();
     this.pollIndex = new OrbitDBHeadIndex(this.registry, {
-      canonicalIndexKeys: (record) => {
-        if (!this.isDocument(record)) return [];
-
-        return [this.indexHeadKey(record)];
-      },
-      canonicalStoreName: 'polls',
       collectionName: 'polls',
       documentFromRecord: (record) =>
         this.isDocument(record) ? record : undefined,
@@ -205,19 +199,6 @@ export default class OrbitDBPollRepository extends PollRepository {
       document.scope.type === 'group_conversation' &&
       key ===
         this.groupConversationIndexHeadKey(document.scope.conversationId ?? '')
-    );
-  }
-
-  private indexHeadKey(document: OrbitDBPollDocument): string {
-    if (document.scope.type === 'community_channel') {
-      return this.communityChannelIndexHeadKey(
-        document.scope.communityId ?? '',
-        document.scope.channelId ?? '',
-      );
-    }
-
-    return this.groupConversationIndexHeadKey(
-      document.scope.conversationId ?? '',
     );
   }
 

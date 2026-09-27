@@ -17,11 +17,6 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
   ) {
     super();
     this.logIndex = new OrbitDBHeadIndex(this.registry, {
-      canonicalIndexKeys: (record) =>
-        typeof record.communityId === 'string'
-          ? [this.communityIndexHeadKey(record.communityId)]
-          : [],
-      canonicalStoreName: 'moderationLogs',
       collectionName: 'logs',
       documentFromRecord: (record) =>
         this.isDocument(record) ? record : undefined,
