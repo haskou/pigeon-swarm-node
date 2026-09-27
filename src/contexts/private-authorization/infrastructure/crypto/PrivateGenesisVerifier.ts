@@ -2,6 +2,7 @@ import { PrivateAuthorizationGenesis } from '@app/contexts/private-authorization
 import { PrivateGenesisAuthenticator } from '@app/contexts/private-authorization/application/provision-scope/PrivateGenesisAuthenticator';
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
+import { PrivateProtectedMlsState } from '@app/contexts/private-authorization/domain/value-objects/PrivateProtectedMlsState';
 import { PrivateGenesisSignature } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 import { createHash } from 'crypto';
@@ -35,17 +36,9 @@ export default class PrivateGenesisVerifier extends PrivateGenesisAuthenticator 
   }
 
   private protectedStateHash(protectedMlsState: string): string {
-    const bytes = Buffer.from(protectedMlsState, 'base64url');
-
-    if (
-      bytes.length === 0 ||
-      bytes.length > 1024 * 1024 ||
-      bytes.toString('base64url') !== protectedMlsState
-    ) {
-      throw new InvalidPrivateAuthorizationError();
-    }
-
-    return this.hash(bytes);
+    return this.hash(
+      new PrivateProtectedMlsState(protectedMlsState).toBuffer(),
+    );
   }
 
   public verify(

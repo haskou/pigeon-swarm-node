@@ -57,6 +57,15 @@ export class PrivateControlTransitionReservation {
     );
   }
 
+  public assertParent(scopeId: string, parentHeadHash: string): void {
+    const parent = this.getParentCheckpoint().toPrimitives();
+
+    assert(
+      parent.scopeId === scopeId && parent.headHash === parentHeadHash,
+      new InvalidPrivateAuthorizationError(),
+    );
+  }
+
   public toPrimitives(): PrivateControlTransitionReservationPrimitives {
     return {
       ...this.primitives,

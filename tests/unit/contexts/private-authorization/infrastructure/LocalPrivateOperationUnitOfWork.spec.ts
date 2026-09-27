@@ -606,7 +606,10 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       'retired-child',
       oldest.id,
       'owner',
-      checkpoint(),
+      PrivateAuthorizationCheckpoint.fromPrimitives({
+        ...checkpoint().toPrimitives(),
+        headHash: 'retired-parent',
+      }),
     );
     await database.save(
       PrivateAuthorizationLocalNamespaces.replay,

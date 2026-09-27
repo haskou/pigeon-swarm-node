@@ -743,6 +743,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       operationId: acceptance.reservation.operationId,
       parentCheckpoint: acceptance.reservation.parentCheckpoint,
     });
+    candidate.assertParent(scopeId, acceptance.reservation.parentHeadHash);
 
     if (!reservedChild || reservedChild.matches(candidate)) {
       return;
@@ -929,6 +930,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
           operationId,
           parentCheckpoint: parentCheckpoint.toPrimitives(),
         });
+        candidate.assertParent(scopeId, parentHeadHash);
 
         if (existing) {
           if (existing.matches(candidate)) return 'same';

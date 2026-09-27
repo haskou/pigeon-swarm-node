@@ -8,6 +8,7 @@ import { PrivateMlsPolicyDevice } from '@app/contexts/private-authorization/doma
 import { PrivateIdentityBinding } from '@app/contexts/private-authorization/domain/services/PrivateIdentityBinding';
 import { AuthenticatedPrivateOperationJson } from '@app/contexts/private-authorization/domain/value-objects/AuthenticatedPrivateOperationJson';
 import { PrivateAuthorizationDeviceKey } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationDeviceKey';
+import { PrivateProtectedMlsState } from '@app/contexts/private-authorization/domain/value-objects/PrivateProtectedMlsState';
 import { Buffer } from 'buffer';
 import { createHash } from 'crypto';
 
@@ -197,7 +198,9 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
     frame: PrivateControlFrame,
   ): PrivateVerifiedControlTransition {
     const mlsMessageHash = this.hash(this.bytes(frame.mlsMessage, 256 * 1024));
-    const protectedState = this.bytes(frame.encryptedMlsState, 1024 * 1024);
+    const protectedState = new PrivateProtectedMlsState(
+      frame.encryptedMlsState,
+    );
     const operationControl = operation.toPrimitives().control;
 
     if (
@@ -218,7 +221,7 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
       trusted.controlCheckpointJson,
       authenticatedOperation.valueOf(),
       mlsMessageHash,
-      this.hash(protectedState),
+      this.hash(protectedState.toBuffer()),
     );
     const candidate = this.parse(verified);
 

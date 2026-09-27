@@ -8,6 +8,7 @@ import { PrivateControlOperation } from '../../domain/PrivateControlOperation';
 import { PrivateControlTransitionReservation } from '../../domain/PrivateControlTransitionReservation';
 import { PrivateAuthorizationRepository } from '../../domain/repositories/PrivateAuthorizationRepository';
 import { AuthenticatedPrivateOperationJson } from '../../domain/value-objects/AuthenticatedPrivateOperationJson';
+import { PrivateProtectedMlsState } from '../../domain/value-objects/PrivateProtectedMlsState';
 import { PrivateOperationAcceptance } from '../PrivateOperationAcceptance';
 import { PrivateOperationUnitOfWork } from '../PrivateOperationUnitOfWork';
 import { PrivateOperationAcceptMessage } from './messages/PrivateOperationAcceptMessage';
@@ -174,6 +175,7 @@ export default class PrivateOperationAcceptor {
     const protectedState = await this.repository.findProtectedMlsState(scopeId);
 
     assert(protectedState, new InvalidPrivateAuthorizationError());
+    new PrivateProtectedMlsState(protectedState);
 
     return this.transitions.verify(
       checkpoint,

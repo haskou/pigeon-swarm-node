@@ -222,7 +222,7 @@ describe('PrivateOperationAcceptor', () => {
   });
 
   it('authenticates a control transition before evaluating the community mutation', async () => {
-    repository.findProtectedMlsState.mockResolvedValue('protected-state');
+    repository.findProtectedMlsState.mockResolvedValue(encoded(32, 14));
     transitions.verify.mockRejectedValue(
       new InvalidPrivateAuthorizationError(),
     );
@@ -236,6 +236,18 @@ describe('PrivateOperationAcceptor', () => {
         }),
       ),
     ).rejects.toThrow(InvalidPrivateAuthorizationError);
+    expect(mutations.apply).not.toHaveBeenCalled();
+  });
+
+  it('rejects a corrupt stored protected MLS state before transition verification', async () => {
+    repository.findProtectedMlsState.mockResolvedValue('not canonical base64');
+
+    await expect(
+      acceptor.accept(
+        new PrivateOperationAcceptMessage(revocation(), 'proof', controlFrame),
+      ),
+    ).rejects.toThrow(InvalidPrivateAuthorizationError);
+    expect(transitions.verify).not.toHaveBeenCalled();
     expect(mutations.apply).not.toHaveBeenCalled();
   });
 
@@ -487,12 +499,18 @@ describe('PrivateOperationAcceptor', () => {
     ).rejects.toThrow('Private authorization conflict');
     expect(verifier.verify).toHaveBeenCalledWith(sibling, authorKey);
     expect(repository.findReservation).toHaveBeenCalledWith(scopeId, headHash);
+    const retainedParent = checkpoint();
     expect(transitions.verify).toHaveBeenCalledWith(
-      expect.any(PrivateAuthorizationCheckpoint),
+      expect.objectContaining({
+        toPrimitives: expect.any(Function),
+      }),
       expect.anything(),
       expect.any(AuthenticatedPrivateOperationJson),
       controlFrame,
     );
+    expect(
+      transitions.verify.mock.calls[0][0].toPrimitives(),
+    ).toEqual(retainedParent.toPrimitives());
     expect(unitOfWork.quarantine).toHaveBeenCalledWith(scopeId);
     expect(freshness.verify).not.toHaveBeenCalled();
   });

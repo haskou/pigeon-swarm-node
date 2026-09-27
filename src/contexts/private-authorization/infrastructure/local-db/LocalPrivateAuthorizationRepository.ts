@@ -169,13 +169,16 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
       return undefined;
     }
 
-    return PrivateControlTransitionReservation.fromPrimitives({
+    const reservation = PrivateControlTransitionReservation.fromPrimitives({
       authorDeviceKey: document.authorDeviceKey,
       childHeadHash: document.childHeadHash,
       operationId: document.operationId,
       parentCheckpoint:
         document.parentCheckpoint as unknown as PrivateAuthorizationCheckpointPrimitives,
     });
+    reservation.assertParent(scopeId, parentHeadHash);
+
+    return reservation;
   }
 
   public async findScope(
@@ -299,6 +302,7 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
       operationId,
       parentCheckpoint: parentCheckpoint.toPrimitives(),
     });
+    candidate.assertParent(scopeId, parentHeadHash);
 
     if (existing && !existing.matches(candidate)) {
       throw new Error('Private authorization conflict');

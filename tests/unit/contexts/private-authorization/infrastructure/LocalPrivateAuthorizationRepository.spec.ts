@@ -134,6 +134,54 @@ describe('LocalPrivateAuthorizationRepository', () => {
     });
   });
 
+  it.each([
+    ['another-scope', 'head-0'],
+    ['scope', 'another-head'],
+  ])(
+    'rejects a reservation whose retained checkpoint does not match its key',
+    async (scopeId, parentHeadHash) => {
+      const repository = new LocalPrivateAuthorizationRepository(
+        database,
+        coordinator,
+      );
+
+      await expect(
+        repository.saveReservation(
+          scopeId,
+          parentHeadHash,
+          'head-1',
+          'operation',
+          'owner',
+          checkpoint(),
+        ),
+      ).rejects.toThrow('Invalid private authorization');
+    },
+  );
+
+  it('fails closed when a persisted reservation contains another parent checkpoint', async () => {
+    const repository = new LocalPrivateAuthorizationRepository(
+      database,
+      coordinator,
+    );
+    await database.save(
+      PrivateAuthorizationLocalNamespaces.reservations,
+      'scope:head-0',
+      {
+        authorDeviceKey: 'owner',
+        childHeadHash: 'head-1',
+        operationId: 'operation',
+        parentCheckpoint: {
+          ...checkpoint().toPrimitives(),
+          headHash: 'another-head',
+        },
+      },
+    );
+
+    await expect(
+      repository.findReservation('scope', 'head-0'),
+    ).rejects.toThrow('Invalid private authorization');
+  });
+
   it('fails closed when a persisted protected scope cannot be hydrated', async () => {
     const repository = new LocalPrivateAuthorizationRepository(
       database,
