@@ -460,9 +460,7 @@ export class OrbitDBHeadIndex<TDocument extends object> {
         this.addPendingRecord(key, record);
       }
 
-      return cachedHead
-        ? Promise.resolve()
-        : this.queueRecordHeadReplication(key, metadata, record, networkIds);
+      return this.queueRecordHeadReplication(key, metadata, record, networkIds);
     }
 
     if (!cachedHead) {

@@ -2,6 +2,7 @@ import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/Or
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import HttpRequestContext from '@app/shared/infrastructure/express/HttpRequestContext';
 import { Request } from 'express';
+import assert from 'node:assert/strict';
 
 type Entry = {
   key?: string;
@@ -225,6 +226,58 @@ describe('OrbitDBHeadIndex', () => {
       ]),
     );
     expect(persistedHead?.items).toHaveLength(3);
+  });
+
+  it('persists records received while an earlier background write is pending', async () => {
+    const originalPut = heads.put.getMockImplementation();
+    assert(originalPut);
+    let releaseWrite!: () => void;
+    let notifyWriteStarted!: () => void;
+    const writeReleased = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    const writeStarted = new Promise<void>((resolve) => {
+      notifyWriteStarted = resolve;
+    });
+
+    heads.put.mockImplementationOnce(async (key, value) => {
+      notifyWriteStarted();
+      await writeReleased;
+
+      return originalPut(key, value);
+    });
+
+    const firstReplication = index.replicateRecordInBackground(
+      'index:key',
+      {
+        id: 'index:key',
+        ownerId: 'owner',
+      },
+      document('first', 1),
+      [networkId],
+    );
+
+    await writeStarted;
+
+    const secondReplication = index.replicateRecordInBackground(
+      'index:key',
+      {
+        id: 'index:key',
+        ownerId: 'owner',
+      },
+      document('second', 2),
+      [networkId],
+    );
+
+    releaseWrite();
+    await Promise.all([firstReplication, secondReplication]);
+
+    await expect(heads.get('index:key')).resolves.toEqual({
+      id: 'index:key',
+      items: [document('first', 1), document('second', 2)],
+      ownerId: 'owner',
+      updatedAt: expect.any(Number),
+    });
   });
 
   it('shares local pending record overlays across index instances', async () => {
