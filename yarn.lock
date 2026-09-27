@@ -794,15 +794,18 @@
   dependencies:
     "@haskou/value-objects" "^2.13.1"
 
-"@haskou/pigeon-swarm-crypto@1.0.1":
-  version "1.0.1"
-  resolved "https://registry.yarnpkg.com/@haskou/pigeon-swarm-crypto/-/pigeon-swarm-crypto-1.0.1.tgz#823466c68eeb95f493de3f859a84ff286cb0a488"
-  integrity sha512-JT7ieWADXu+imiVo/gLecZCbDWwNbC2Lou+lYA+ARLWjY8S/AADZ4B0yw0H86buLLJc8Zbew9g03yy5C60PDBg==
+"@haskou/pigeon-swarm-crypto@2.1.0":
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/@haskou/pigeon-swarm-crypto/-/pigeon-swarm-crypto-2.1.0.tgz#012dcf7ce186e692fd355ee92c6f4c7fceef5d6d"
+  integrity sha512-/xAiq/VU5qAFo4OIwrCs+wlNHhu+Fge5mdmnoj0rVpdam51yQLCfFYmhfQYPNzydNvYt8yAAESDwid55t7VDnA==
   dependencies:
-    "@noble/ciphers" "^2.2.0"
-    "@noble/curves" "^2.2.0"
+    "@noble/ciphers" "2.1.1"
+    "@noble/curves" "2.0.1"
     "@noble/hashes" "^2.2.0"
     buffer "^6.0.3"
+    canonicalize "2.1.0"
+    jsonc-parser "3.3.1"
+    ts-mls "1.6.4"
     tslib "^2.8.1"
 
 "@haskou/value-objects@7.0.0":
@@ -1033,6 +1036,18 @@
     p-defer "^4.0.1"
     progress-events "^1.1.0"
     race-signal "^2.0.0"
+
+"@hpke/common@^1.10.0":
+  version "1.10.1"
+  resolved "https://registry.yarnpkg.com/@hpke/common/-/common-1.10.1.tgz#11f205e5ba24d558c1bd4ac671580d95d488af18"
+  integrity sha512-moJwhmtLtuxiUzzNp1jpfBfx8yefKoO9D/RCR9dmwrnc7qjJqId1rEtQz+lSlU5cabX8daToMSx/7HayXOiaFw==
+
+"@hpke/core@1.9.0":
+  version "1.9.0"
+  resolved "https://registry.yarnpkg.com/@hpke/core/-/core-1.9.0.tgz#4eced0597787f51fdb53ad515c3d47a3abc9fe3a"
+  integrity sha512-pFxWl1nNJeQCSUFs7+GAblHvXBCjn9EPN65vdKlYQil2aURaRxfGMO6vBKGqm1YHTKwiAxJQNEI70PbSowMP9Q==
+  dependencies:
+    "@hpke/common" "^1.10.0"
 
 "@humanfs/core@^0.19.2":
   version "0.19.2"
@@ -2476,7 +2491,7 @@
     "@emnapi/runtime" "^1.4.3"
     "@tybys/wasm-util" "^0.10.0"
 
-"@noble/ciphers@^2.0.1":
+"@noble/ciphers@2.1.1", "@noble/ciphers@^2.0.1":
   version "2.1.1"
   resolved "https://registry.yarnpkg.com/@noble/ciphers/-/ciphers-2.1.1.tgz#c8c74fcda8c3d1f88797d0ecda24f9fc8b92b052"
   integrity sha512-bysYuiVfhxNJuldNXlFEitTVdNnYUc+XNJZd7Qm2a5j1vZHgY+fazadNFWFaMK/2vye0JVlxV3gHmC0WDfAOQw==
@@ -2486,19 +2501,19 @@
   resolved "https://registry.yarnpkg.com/@noble/ciphers/-/ciphers-2.2.0.tgz#84fb45ac9332925d643b80f89ceb0ea2f21dba95"
   integrity sha512-Z6pjIZ/8IJcCGzb2S/0Px5J81yij85xASuk1teLNeg75bfT07MV3a/O2Mtn1I2se43k3lkVEcFaR10N4cgQcZA==
 
+"@noble/curves@2.0.1", "@noble/curves@^2.0.1":
+  version "2.0.1"
+  resolved "https://registry.yarnpkg.com/@noble/curves/-/curves-2.0.1.tgz#64ba8bd5e8564a02942655602515646df1cdb3ad"
+  integrity sha512-vs1Az2OOTBiP4q0pwjW5aF0xp9n4MxVrmkFBxc6EKZc6ddYx5gaZiAsZoq0uRRXWbi3AT/sBqn05eRPtn1JCPw==
+  dependencies:
+    "@noble/hashes" "2.0.1"
+
 "@noble/curves@2.3.0":
   version "2.3.0"
   resolved "https://registry.yarnpkg.com/@noble/curves/-/curves-2.3.0.tgz#0ac09b0c0fc3ceffbbe599c2e5685b5f59ab005d"
   integrity sha512-v7cY+4oWYPQszRj6ZFGzTVL7uP2TaLo1xMhWHzYC5wj0ZhOXQ5x+sBre8rF3hi8cAoi0bh1qXoovoOkdFtvqEg==
   dependencies:
     "@noble/hashes" "2.3.0"
-
-"@noble/curves@^2.0.1":
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/@noble/curves/-/curves-2.0.1.tgz#64ba8bd5e8564a02942655602515646df1cdb3ad"
-  integrity sha512-vs1Az2OOTBiP4q0pwjW5aF0xp9n4MxVrmkFBxc6EKZc6ddYx5gaZiAsZoq0uRRXWbi3AT/sBqn05eRPtn1JCPw==
-  dependencies:
-    "@noble/hashes" "2.0.1"
 
 "@noble/curves@^2.2.0":
   version "2.2.0"
@@ -3876,6 +3891,11 @@ caniuse-lite@^1.0.30001759:
   version "1.0.30001777"
   resolved "https://registry.yarnpkg.com/caniuse-lite/-/caniuse-lite-1.0.30001777.tgz#028f21e4b2718d138b55e692583e6810ccf60691"
   integrity sha512-tmN+fJxroPndC74efCdp12j+0rk0RHwV5Jwa1zWaFVyw2ZxAuPeG8ZgWC3Wz7uSjT3qMRQ5XHZ4COgQmsCMJAQ==
+
+canonicalize@2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/canonicalize/-/canonicalize-2.1.0.tgz#92a20ecfb94e96591badf4977dc2fb1bfbc31dc5"
+  integrity sha512-F705O3xrsUtgt98j7leetNhTWPe+5S72rlL5O4jA1pKqBVQ/dT1O1D6PFxmSXvc0SUOinWS57DKx0I3CHrXJHQ==
 
 cborg@^4.0.0, cborg@^4.2.14:
   version "4.5.8"
@@ -6716,6 +6736,11 @@ json5@^2.2.2, json5@^2.2.3:
   resolved "https://registry.yarnpkg.com/json5/-/json5-2.2.3.tgz#78cd6f1a19bdc12b73db5ad0c61efd66c1e29283"
   integrity sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==
 
+jsonc-parser@3.3.1:
+  version "3.3.1"
+  resolved "https://registry.yarnpkg.com/jsonc-parser/-/jsonc-parser-3.3.1.tgz#f2a524b4f7fd11e3d791e559977ad60b98b798b4"
+  integrity sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==
+
 jsonfile@^4.0.0:
   version "4.0.0"
   resolved "https://registry.yarnpkg.com/jsonfile/-/jsonfile-4.0.0.tgz#8771aae0799b64076b76640fca058f9c10e33ecb"
@@ -8892,6 +8917,13 @@ ts-jest@^29.4.11:
     semver "^7.8.0"
     type-fest "^4.41.0"
     yargs-parser "^21.1.1"
+
+ts-mls@1.6.4:
+  version "1.6.4"
+  resolved "https://registry.yarnpkg.com/ts-mls/-/ts-mls-1.6.4.tgz#a2f35de3ed3d57a35dfa7247995e25bd97f828d6"
+  integrity sha512-BFb9qJ3V1+HIuifC+MtnlROEj3oc6NEzA7Ig1/LAmANDRhNay7UCnwkzijzHH9cav5wf1BoJw8KQ2mXiEhPy1Q==
+  dependencies:
+    "@hpke/core" "1.9.0"
 
 ts-node@^10.9.2:
   version "10.9.2"
