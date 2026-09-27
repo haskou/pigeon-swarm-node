@@ -339,6 +339,42 @@ describe('PrivateOperationAcceptor', () => {
     expect(unitOfWork.quarantine).toHaveBeenCalledWith(scopeId);
   });
 
+  it('rejects a concurrent receipt owned by another admitted author without freezing the scope', async () => {
+    const competingAuthorKey = encoded(32, 10);
+    const competingCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
+      ...checkpoint().toPrimitives(),
+      admittedDeviceKeys: [authorKey, competingAuthorKey],
+    });
+    const receipt = new PrivateControlOperationContract()
+      .decode(signed())
+      .toPrimitives();
+    const competingOperation = signed({
+      authorDeviceKey: competingAuthorKey,
+      payload: {
+        change: { targetIdentityId: 'different-member', type: 'member.ban' },
+        parentHeadHash: headHash,
+        proposalId,
+      },
+    });
+    repository.findScope.mockResolvedValue(
+      PrivateAuthorizationScope.pin(competingCheckpoint, 'genesis'),
+    );
+    repository.findReceipt
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(receipt);
+
+    await expect(
+      acceptor.accept(
+        new PrivateOperationAcceptMessage(competingOperation, 'proof'),
+      ),
+    ).rejects.toThrow(InvalidPrivateAuthorizationError);
+    expect(verifier.verify).toHaveBeenCalledWith(
+      competingOperation,
+      competingAuthorKey,
+    );
+    expect(unitOfWork.quarantine).not.toHaveBeenCalled();
+  });
+
   it('verifies a retained receipt conflict after its author leaves key history', async () => {
     const receipt = new PrivateControlOperationContract()
       .decode(signed())

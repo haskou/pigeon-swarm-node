@@ -29,6 +29,10 @@ export class PrivateControlOperation {
     );
   }
 
+  public hasSameDigestAs(operation: PrivateControlOperation): boolean {
+    return this.primitives.digest === operation.primitives.digest;
+  }
+
   public toPrimitives(): PrivateControlOperationPrimitives {
     return {
       ...this.primitives,

@@ -1,3 +1,5 @@
+import { assert } from '@haskou/value-objects';
+
 import { InvalidPrivateAuthorizationError } from '../../domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationConflictError } from '../../domain/errors/PrivateAuthorizationConflictError';
 import { PrivateAuthorizationCheckpoint } from '../../domain/PrivateAuthorizationCheckpoint';
@@ -37,8 +39,14 @@ export default class PrivateOperationAcceptor {
     const receipt = await this.repository.findReceipt(value.scopeId, value.id);
 
     if (!receipt) return false;
+    const committed = PrivateControlOperation.fromPrimitives(receipt);
 
-    if (receipt.digest === value.digest) return true;
+    assert(
+      committed.isAuthoredBy(operation.getAuthorDeviceKey()),
+      new InvalidPrivateAuthorizationError(),
+    );
+
+    if (committed.hasSameDigestAs(operation)) return true;
     await this.unitOfWork.quarantine(value.scopeId);
     throw new PrivateAuthorizationConflictError();
   }
@@ -52,12 +60,14 @@ export default class PrivateOperationAcceptor {
 
     if (!receipt) return false;
 
-    if (receipt.digest === value.digest) return true;
+    const committed = PrivateControlOperation.fromPrimitives(receipt);
+
+    if (committed.hasSameDigestAs(routed)) return true;
 
     await this.authorizer.authorizeReceiptConflict(
       message.signedOperationJson,
       routed,
-      PrivateControlOperation.fromPrimitives(receipt),
+      committed,
     );
     await this.unitOfWork.quarantine(value.scopeId);
     throw new PrivateAuthorizationConflictError();
