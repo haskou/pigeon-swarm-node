@@ -65,6 +65,17 @@ describe('PrivateOperationAcceptor', () => {
       },
       ...changes,
     });
+  const commitment = (changes: Record<string, unknown> = {}) =>
+    signed({
+      kind: 'membership.commit',
+      payload: {
+        change: { targetIdentityId: 'member', type: 'member.ban' },
+        mlsMessageHash: encoded(32, 8),
+        proposalOperationId: proposalId,
+        resultingHeadHash: encoded(32, 7),
+      },
+      ...changes,
+    });
   const controlFrame = {
     encryptedMlsState: encoded(32, 15),
     mlsMessage: encoded(32, 16),
@@ -239,6 +250,34 @@ describe('PrivateOperationAcceptor', () => {
       ),
     ).rejects.toThrow(InvalidPrivateAuthorizationError);
 
+    expect(unitOfWork.reserveChild).not.toHaveBeenCalled();
+    expect(freshness.issue).not.toHaveBeenCalled();
+  });
+
+  it('does not reserve a control child whose domain mutation is unauthorized', async () => {
+    repository.findProtectedMlsState.mockResolvedValue(encoded(32, 14));
+    transitions.verify.mockResolvedValue({
+      checkpoint: PrivateAuthorizationCheckpoint.fromPrimitives({
+        ...checkpoint().toPrimitives(),
+        headHash: encoded(32, 7),
+        parentHeadHash: headHash,
+        revision: 1,
+      }),
+      protectedMlsState: encoded(32, 17),
+    });
+    mutations.apply.mockRejectedValue(new InvalidPrivateAuthorizationError());
+
+    await expect(
+      acceptor.challenge(
+        new PrivateOperationChallengeMessage(
+          authorIdentityId,
+          commitment(),
+          controlFrame,
+        ),
+      ),
+    ).rejects.toThrow(InvalidPrivateAuthorizationError);
+
+    expect(mutations.apply).toHaveBeenCalled();
     expect(unitOfWork.reserveChild).not.toHaveBeenCalled();
     expect(freshness.issue).not.toHaveBeenCalled();
   });

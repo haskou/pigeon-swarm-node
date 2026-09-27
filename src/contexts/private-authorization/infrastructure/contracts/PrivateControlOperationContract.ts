@@ -2,6 +2,7 @@ import { PrivateOperationDecoder } from '@app/contexts/private-authorization/app
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
 import { PrivateControlOperationPrimitives } from '@app/contexts/private-authorization/domain/PrivateControlOperationPrimitives';
+import { PrivateOperationJson } from '@app/contexts/private-authorization/domain/value-objects/PrivateOperationJson';
 import { assert } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
 import canonicalize from 'canonicalize';
@@ -208,7 +209,8 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
 
   public decode(signedJson: string): PrivateControlOperation {
     try {
-      const value = this.exact(JSON.parse(signedJson), [
+      const boundedJson = new PrivateOperationJson(signedJson).valueOf();
+      const value = this.exact(JSON.parse(boundedJson), [
         'version',
         'operationId',
         'scopeId',
@@ -229,7 +231,7 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
       const primitives: PrivateControlOperationPrimitives = {
         authorDeviceKey: this.encoded(value.authorDeviceKey, 32),
         authorizationRevision: this.revision(value.authorizationRevision),
-        byteSize: Buffer.byteLength(signedJson, 'utf8'),
+        byteSize: Buffer.byteLength(boundedJson, 'utf8'),
         control: mapped.control,
         digest: createHash('sha256')
           .update(canonical, 'utf8')

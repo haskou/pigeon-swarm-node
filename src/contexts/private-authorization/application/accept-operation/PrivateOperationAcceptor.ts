@@ -75,6 +75,18 @@ export default class PrivateOperationAcceptor {
     assert(result !== 'conflict', new PrivateAuthorizationConflictError());
   }
 
+  private async applyMutation(
+    checkpoint: PrivateAuthorizationCheckpoint,
+    operation: PrivateControlOperation,
+    projection: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    try {
+      return await this.mutations.apply(checkpoint, operation, projection);
+    } catch {
+      throw new InvalidPrivateAuthorizationError();
+    }
+  }
+
   private async hasReceipt(
     message: PrivateOperationAcceptMessage,
     routed: PrivateControlOperation,
@@ -247,17 +259,11 @@ export default class PrivateOperationAcceptor {
     if (result !== 'accepted') throw new InvalidPrivateAuthorizationError();
     const currentProjection =
       (await this.repository.findProjection(value.scopeId)) ?? {};
-    let candidateProjection: Record<string, unknown>;
-
-    try {
-      candidateProjection = await this.mutations.apply(
-        currentCheckpoint,
-        operation,
-        currentProjection,
-      );
-    } catch {
-      throw new InvalidPrivateAuthorizationError();
-    }
+    const candidateProjection = await this.applyMutation(
+      currentCheckpoint,
+      operation,
+      currentProjection,
+    );
     const projection =
       value.kind === 'membership.propose'
         ? currentProjection
@@ -396,6 +402,13 @@ export default class PrivateOperationAcceptor {
     const checkpoint = PrivateAuthorizationCheckpoint.fromPrimitives(
       scope.toPrimitives().checkpoint,
     );
+
+    const projection =
+      (await this.repository.findProjection(
+        operation.getScopeId().valueOf(),
+      )) ?? {};
+
+    await this.applyMutation(checkpoint, operation, projection);
 
     await this.reserveControlChild(
       checkpoint,

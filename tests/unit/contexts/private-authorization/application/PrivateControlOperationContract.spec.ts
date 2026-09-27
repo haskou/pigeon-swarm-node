@@ -141,4 +141,16 @@ describe('PrivateControlOperationContract', () => {
       ),
     ).toThrow(InvalidPrivateAuthorizationError);
   });
+
+  it('rejects an oversized signed operation before parsing it', () => {
+    const oversized = ' '.repeat(262_145);
+    const parse = jest.spyOn(JSON, 'parse');
+
+    expect(() => new PrivateControlOperationContract().decode(oversized)).toThrow(
+      InvalidPrivateAuthorizationError,
+    );
+    expect(parse).not.toHaveBeenCalled();
+
+    parse.mockRestore();
+  });
 });
