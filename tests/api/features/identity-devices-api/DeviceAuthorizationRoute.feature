@@ -18,3 +18,14 @@ Feature: Device authorization route
     And response body should not contain "authorizedCredentialCommitments"
     When I POST to "/identity-devices/transitions"
     Then response code is equal to 409
+
+  Scenario: Reject an undeclared secret on a device authorization transition
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "strict device owner" and handle "strict-device-owner"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I set a signed device enrollment transition body
+    And I add undeclared identity field "recoverySecret"
+    When I POST to "/identity-devices/transitions"
+    Then response code is equal to 400

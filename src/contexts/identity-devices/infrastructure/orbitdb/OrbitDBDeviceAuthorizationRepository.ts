@@ -81,17 +81,50 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   ): void {
     const identityId = authorization.getIdentityId().valueOf();
     const currentVersion = this.routingVersionByIdentity.get(identityId);
+    const candidateNetworkIds = this.networkIds(authorization);
 
-    if (currentVersion && !identityVersion.isGreaterThan(currentVersion)) {
+    if (
+      currentVersion &&
+      !this.shouldReplaceRoutingNetworks(
+        identityId,
+        currentVersion,
+        identityVersion,
+        candidateNetworkIds,
+      )
+    ) {
       return;
     }
 
-    this.routingNetworkIdsByIdentity.set(
-      identityId,
-      this.networkIds(authorization),
-    );
+    this.routingNetworkIdsByIdentity.set(identityId, candidateNetworkIds);
     this.routingVersionByIdentity.set(identityId, identityVersion);
     this.trustedGenesisByIdentity.set(identityId, authorization);
+  }
+
+  private shouldReplaceRoutingNetworks(
+    identityId: string,
+    currentVersion: IdentityVersion,
+    candidateVersion: IdentityVersion,
+    candidateNetworkIds: string[],
+  ): boolean {
+    if (candidateVersion.isGreaterThan(currentVersion)) {
+      return true;
+    }
+
+    if (currentVersion.isGreaterThan(candidateVersion)) {
+      return false;
+    }
+
+    const currentNetworkIds = this.routingNetworkIdsByIdentity.get(identityId);
+
+    assert(
+      currentNetworkIds !== undefined,
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return (
+      this.canonicalString(candidateNetworkIds) <
+      this.canonicalString(currentNetworkIds)
+    );
   }
 
   private canonicalValue(value: unknown): unknown {
@@ -443,7 +476,8 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   private networkIds(authorization: DeviceAuthorization): string[] {
     return authorization
       .getNetworkIds()
-      .map((networkId) => networkId.valueOf());
+      .map((networkId) => networkId.valueOf())
+      .sort();
   }
 
   private async save(

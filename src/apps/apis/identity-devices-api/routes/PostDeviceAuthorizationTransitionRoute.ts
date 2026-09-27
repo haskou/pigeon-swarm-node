@@ -16,7 +16,10 @@ export class PostDeviceAuthorizationTransitionRoute extends Route {
 
   @Post('/transitions')
   public async apply(
-    @Body({ options: { limit: '32kb' } })
+    @Body({
+      options: { limit: '32kb' },
+      validate: { forbidNonWhitelisted: true, whitelist: true },
+    })
     body: PostDeviceAuthorizationTransitionBody,
     @Res() response: Response,
   ): Promise<Response> {

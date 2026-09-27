@@ -572,4 +572,45 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       ],
     );
   });
+
+  it('selects the same routing networks for equal-version identity forks', async () => {
+    const { genesis, identityId } = await fixture();
+    const preferredNetworkId =
+      '550e8400-e29b-41d4-a716-446655440001';
+    const otherNetworkId = '550e8400-e29b-41d4-a716-446655440002';
+    const preferred = DeviceAuthorization.genesis(
+      identityId,
+      [...genesis.getNetworkIds(), new NetworkId(preferredNetworkId)],
+      genesis.getCredentials()[0],
+      genesis.getRecoveryAuthority(),
+    );
+    const other = DeviceAuthorization.genesis(
+      identityId,
+      [...genesis.getNetworkIds(), new NetworkId(otherNetworkId)],
+      genesis.getCredentials()[0],
+      genesis.getRecoveryAuthority(),
+    );
+    const first = repositoryFixture();
+    const second = repositoryFixture();
+
+    await first.repository.provision(preferred, new IdentityVersion(2));
+    await first.repository.provision(other, new IdentityVersion(2));
+    await second.repository.provision(other, new IdentityVersion(2));
+    await second.repository.provision(preferred, new IdentityVersion(2));
+
+    const expectedNetworks = [
+      '550e8400-e29b-41d4-a716-446655440000',
+      preferredNetworkId,
+    ];
+    expect(first.registry.putHead).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      expectedNetworks,
+    );
+    expect(second.registry.putHead).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      expectedNetworks,
+    );
+  });
 });
