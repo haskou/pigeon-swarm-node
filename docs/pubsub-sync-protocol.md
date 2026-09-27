@@ -10,7 +10,11 @@ its previous-version chain. They must not resolve the event through a DHT
 routing record: OrbitDB metadata is the canonical discovery index.
 
 The remaining attributes describe the published identity metadata:
-`handle`, `networkIds`, `previousExternalIdentifier`, and `version`.
+`deviceCredentialCommitment`, `handle`, `networkIds`,
+`previousExternalIdentifier`, `recoveryAuthority`, and `version`. Consumers use
+the commitment and recovery authority only after validating the exact signed
+identity candidate referenced by `externalIdentifier`; event attributes do not
+replace that signature-chain validation.
 
 Identity and keychain metadata documents are the canonical replicated state.
 They are not duplicated in the optimized `heads` store. Each node projects the

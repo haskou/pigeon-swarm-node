@@ -46,6 +46,10 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     return `${OrbitDBDeviceAuthorizationRepository.HEAD_PREFIX}${identityId.valueOf()}`;
   }
 
+  private documentId(identityId: IdentityId): string {
+    return `device-authorization:${identityId.valueOf()}`;
+  }
+
   private sameGenesis(
     left: OrbitDBDeviceAuthorizationDocument,
     right: OrbitDBDeviceAuthorizationDocument,
@@ -272,7 +276,8 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       authorization: replay.authorization.toPrimitives(),
       genesis: genesis.toPrimitives(),
       history: replay.history,
-      id: replay.authorization.getIdentityId().valueOf(),
+      id: this.documentId(replay.authorization.getIdentityId()),
+      identityId: replay.authorization.getIdentityId().valueOf(),
       kind: 'device_authorization',
     };
   }
@@ -281,6 +286,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     return [
       value.kind === 'device_authorization',
       typeof value.id === 'string',
+      typeof value.identityId === 'string',
       Array.isArray(value.history),
       typeof value.genesis === 'object' && value.genesis !== null,
       typeof value.authorization === 'object' && value.authorization !== null,
@@ -294,7 +300,8 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     const credentials = genesis.getCredentials();
 
     return (
-      document.id === genesis.getIdentityId().valueOf() &&
+      document.id === this.documentId(genesis.getIdentityId()) &&
+      document.identityId === genesis.getIdentityId().valueOf() &&
       genesis.getRevision().isEqual(DeviceAuthorizationRevision.initial()) &&
       credentials.length === 1
     );
@@ -336,7 +343,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   private conflictsWithTrustedGenesis(
     document: OrbitDBDeviceAuthorizationDocument,
   ): boolean {
-    const trusted = this.trustedGenesisByIdentity.get(document.id);
+    const trusted = this.trustedGenesisByIdentity.get(document.identityId);
 
     return Boolean(
       trusted &&
@@ -424,7 +431,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
 
   private async save(
     document: OrbitDBDeviceAuthorizationDocument,
-  ): Promise<void> {
+  ): Promise<OrbitDBDeviceAuthorizationDocument> {
     const authorization = DeviceAuthorization.fromPrimitives(
       document.authorization,
     );
@@ -439,6 +446,16 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       document,
       networkIds,
     );
+    const saved = await this.registry.findHead(
+      this.headKey(authorization.getIdentityId()),
+    );
+
+    assert(
+      saved !== undefined && this.isDocument(saved),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return saved;
   }
 
   public compareAndApply(
@@ -488,9 +505,9 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
         ],
       );
 
-      await this.save(document);
+      const saved = await this.save(document);
 
-      return DeviceAuthorization.fromPrimitives(document.authorization);
+      return DeviceAuthorization.fromPrimitives(saved.authorization);
     });
   }
 

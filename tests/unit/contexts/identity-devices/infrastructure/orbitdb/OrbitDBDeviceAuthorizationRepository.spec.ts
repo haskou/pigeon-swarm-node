@@ -49,7 +49,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     registry.findHead.mockImplementation(() => Promise.resolve(head));
     registry.putDocument.mockResolvedValue();
     registry.putHead.mockImplementation((_key, value) => {
-      head = value;
+      head = head && merger ? merger(head, value) : value;
 
       return Promise.resolve();
     });
@@ -100,7 +100,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
   it('atomically persists an accepted transition and rejects its replay', async () => {
     const { genesis, identityId, owner } = await fixture();
     const target = await KeyPair.generate();
-    const { repository } = repositoryFixture();
+    const { registry, repository } = repositoryFixture();
     const transition = await enrollment(
       identityId,
       owner,
@@ -113,6 +113,14 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const applied = await repository.compareAndApply(transition);
 
     expect(applied.getRevision().valueOf()).toBe(1);
+    expect(registry.putDocument).toHaveBeenLastCalledWith(
+      'identities',
+      expect.objectContaining({
+        id: `device-authorization:${identityId.valueOf()}`,
+        identityId: identityId.valueOf(),
+      }),
+      expect.any(Array),
+    );
     await expect(repository.compareAndApply(transition)).rejects.toThrow();
   });
 
@@ -173,7 +181,8 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       authorization: authorization.toPrimitives(),
       genesis: genesis.toPrimitives(),
       history: [{ transition: transition.toPrimitives() }],
-      id: identityId.valueOf(),
+      id: `device-authorization:${identityId.valueOf()}`,
+      identityId: identityId.valueOf(),
       kind: 'device_authorization',
     }) as { authorization?: { revision?: number } };
 
@@ -364,6 +373,77 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     );
   });
 
+  it('returns the checkpoint produced by a concurrent head merge', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const revoked = await KeyPair.generate();
+    const enrolled = await KeyPair.generate();
+    const local = repositoryFixture();
+    const remote = repositoryFixture();
+    const initialEnrollment = await enrollment(
+      identityId,
+      owner,
+      revoked,
+      '00000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+    );
+    await local.repository.provision(genesis);
+    await local.repository.compareAndApply(initialEnrollment);
+    remote.setHead(local.getHead() ?? {});
+    await remote.repository.provision(genesis);
+    const revocation = DeviceAuthorizationTransition.revocation(
+      identityId,
+      new DeviceAuthorizationOperationId(
+        '00000000-0000-4000-8000-000000000002',
+      ),
+      new DeviceAuthorizationRevision(1),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+      DeviceCredential.fromString(revoked.toPrimitives().publicKey),
+    );
+    await remote.repository.compareAndApply(
+      revocation.authorize(owner.sign(revocation.getSigningPayload())),
+    );
+    const remoteHead = remote.getHead();
+    const unsignedSiblingEnrollment = DeviceAuthorizationTransition.enrollment(
+      identityId,
+      new DeviceAuthorizationOperationId(
+        '00000000-0000-4000-8000-000000000003',
+      ),
+      new DeviceAuthorizationRevision(1),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+      DeviceCredential.fromString(enrolled.toPrimitives().publicKey),
+      new PairingAuthorization(
+        new PairingId('10000000-0000-4000-8000-000000000002'),
+        new PairingExpiration(now.valueOf() + 60_000),
+        now,
+      ),
+    );
+    const provenSiblingEnrollment = unsignedSiblingEnrollment.provePossession(
+      enrolled.sign(unsignedSiblingEnrollment.getProofOfPossessionPayload()),
+    );
+    const siblingEnrollment = provenSiblingEnrollment.authorize(
+      owner.sign(provenSiblingEnrollment.getSigningPayload()),
+    );
+    local.registry.putDocument.mockImplementationOnce(() => {
+      local.setHead(remoteHead ?? {});
+
+      return Promise.resolve();
+    });
+
+    const applied = await local.repository.compareAndApply(siblingEnrollment);
+
+    expect(applied.getRevision().valueOf()).toBe(2);
+    expect(
+      applied.isAuthorized(
+        DeviceCredential.fromString(revoked.toPrimitives().publicKey),
+      ),
+    ).toBe(false);
+    expect(
+      applied.isAuthorized(
+        DeviceCredential.fromString(enrolled.toPrimitives().publicKey),
+      ),
+    ).toBe(false);
+  });
+
   it('rejects replicated documents containing unverified transition history', async () => {
     const { genesis, identityId, owner } = await fixture();
     const target = await KeyPair.generate();
@@ -415,7 +495,8 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       authorization: malicious.toPrimitives(),
       genesis: malicious.toPrimitives(),
       history: [],
-      id: identityId.valueOf(),
+      id: `device-authorization:${identityId.valueOf()}`,
+      identityId: identityId.valueOf(),
       kind: 'device_authorization',
     });
 
