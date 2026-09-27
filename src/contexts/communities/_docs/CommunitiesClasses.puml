@@ -605,6 +605,7 @@ package "communities/infrastructure" {
   CommunityRepositoryRouter --> OrbitDBCommunityRepository : public
   CommunityRepositoryRouter --> LocalPrivateCommunityRepository : protected
   CommunityRepositoryRouter --> PrivateAuthorizationRepository : classify scope
+  CommunityRepositoryRouter --> PrivateAuthorizationStorageCoordinator : serialize classification
   LocalPrivateCommunityRepository --> PrivateAuthorizationRepository : projection
   OrbitDBCommunityRepository --> PrivateCommunityPublicStorageGuard
   PrivateCommunityPublicStorageGuard --> PrivateAuthorizationRepository

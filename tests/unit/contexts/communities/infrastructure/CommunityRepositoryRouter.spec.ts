@@ -5,6 +5,7 @@ import CommunityRepositoryRouter from '@app/contexts/communities/infrastructure/
 import LocalPrivateCommunityRepository from '@app/contexts/communities/infrastructure/local-db/LocalPrivateCommunityRepository';
 import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { generateKeyPairSync } from 'node:crypto';
 
@@ -13,6 +14,7 @@ describe('CommunityRepositoryRouter', () => {
   let publicRepository: jest.Mocked<OrbitDBCommunityRepository>;
   let privateRepository: jest.Mocked<LocalPrivateCommunityRepository>;
   let authorizationRepository: jest.Mocked<PrivateAuthorizationRepository>;
+  let storageCoordinator: PrivateAuthorizationStorageCoordinator;
   let router: CommunityRepositoryRouter;
 
   beforeEach(() => {
@@ -32,10 +34,12 @@ describe('CommunityRepositoryRouter', () => {
       findScope: jest.fn().mockResolvedValue({}),
       findScopeIds: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<PrivateAuthorizationRepository>;
+    storageCoordinator = new PrivateAuthorizationStorageCoordinator();
     router = new CommunityRepositoryRouter(
       publicRepository,
       privateRepository,
       authorizationRepository,
+      storageCoordinator,
     );
   });
 
@@ -53,6 +57,31 @@ describe('CommunityRepositoryRouter', () => {
     publicRepository.findById.mockResolvedValue({} as Community);
 
     await expect(router.findById(id)).resolves.toBeUndefined();
+    expect(publicRepository.findById).not.toHaveBeenCalled();
+  });
+
+  it('serializes lookup with scope protection', async () => {
+    const provisioningStarted = deferred<void>();
+    const releaseProvisioning = deferred<void>();
+    const privateCommunity = {} as Community;
+    authorizationRepository.findScope.mockResolvedValue(undefined);
+    privateRepository.findById.mockResolvedValue(privateCommunity);
+    publicRepository.findById.mockResolvedValue({} as Community);
+    const provisioning = storageCoordinator.exclusively(
+      id.valueOf(),
+      async () => {
+        authorizationRepository.findScope.mockResolvedValue({} as never);
+        provisioningStarted.resolve();
+        await releaseProvisioning.promise;
+      },
+    );
+    await provisioningStarted.promise;
+
+    const lookup = router.findById(id);
+    releaseProvisioning.resolve();
+    await provisioning;
+
+    await expect(lookup).resolves.toBe(privateCommunity);
     expect(publicRepository.findById).not.toHaveBeenCalled();
   });
 
@@ -135,4 +164,16 @@ function validIdentityId(): IdentityId {
       })
       .toString(),
   );
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve(value?: T): void;
+} {
+  let resolve: (value?: T) => void = () => undefined;
+  const promise = new Promise<T>((next) => {
+    resolve = next;
+  });
+
+  return { promise, resolve };
 }

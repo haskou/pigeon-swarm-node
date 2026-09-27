@@ -1,5 +1,6 @@
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Community } from '../domain/Community';
@@ -13,6 +14,7 @@ export default class CommunityRepositoryRouter extends CommunityRepository {
     private readonly publicRepository: OrbitDBCommunityRepository,
     private readonly privateRepository: LocalPrivateCommunityRepository,
     private readonly authorizationRepository: PrivateAuthorizationRepository,
+    private readonly storageCoordinator: PrivateAuthorizationStorageCoordinator,
   ) {
     super();
   }
@@ -53,11 +55,13 @@ export default class CommunityRepositoryRouter extends CommunityRepository {
   }
 
   public async findById(id: CommunityId): Promise<Community | undefined> {
-    if (await this.isProtected(id)) {
-      return this.privateRepository.findById(id);
-    }
+    return this.storageCoordinator.exclusively(id.valueOf(), async () => {
+      if (await this.isProtected(id)) {
+        return this.privateRepository.findById(id);
+      }
 
-    return this.publicRepository.findById(id);
+      return this.publicRepository.findById(id);
+    });
   }
 
   public async findByMember(identityId: IdentityId): Promise<Community[]> {
