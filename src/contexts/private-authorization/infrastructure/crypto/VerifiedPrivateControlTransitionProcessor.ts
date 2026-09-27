@@ -6,6 +6,7 @@ import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorizat
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
 import { PrivateMlsPolicyDevice } from '@app/contexts/private-authorization/domain/PrivateMlsPolicyDevice';
 import { PrivateIdentityBinding } from '@app/contexts/private-authorization/domain/services/PrivateIdentityBinding';
+import { PrivateAuthorizationDeviceKey } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationDeviceKey';
 import { Buffer } from 'buffer';
 import { createHash } from 'crypto';
 
@@ -14,7 +15,6 @@ import PrivateMlsPolicyVerifier from './PrivateMlsPolicyVerifier';
 import { VerifiedTransition } from './VerifiedPrivateControlTransitionContract';
 
 export default class VerifiedPrivateControlTransitionProcessor extends PrivateControlTransitionProcessor {
-  private static readonly MAX_REVOKED_DEVICE_KEYS = 128;
   public constructor(
     private readonly verifier: PrivateControlTransitionVerifier,
     private readonly policyVerifier: PrivateMlsPolicyVerifier,
@@ -230,14 +230,11 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
     const admittedDeviceKeys = candidate.policy.devices.map(
       (device) => device.deviceKey,
     );
-    const revokedDeviceKeys = [
-      ...new Set([
-        ...trusted.revokedDeviceKeys,
-        ...trusted.admittedDeviceKeys.filter(
-          (deviceKey) => !admittedDeviceKeys.includes(deviceKey),
-        ),
-      ]),
-    ].slice(-VerifiedPrivateControlTransitionProcessor.MAX_REVOKED_DEVICE_KEYS);
+    const revokedDeviceKeys = checkpoint
+      .revocationHistoryAfter(
+        admittedDeviceKeys.map((key) => new PrivateAuthorizationDeviceKey(key)),
+      )
+      .map((key) => key.valueOf());
 
     return {
       checkpoint: PrivateAuthorizationCheckpoint.fromPrimitives({

@@ -1,3 +1,5 @@
+import { UniqueObjectArray } from '@haskou/value-objects';
+
 import { InvalidPrivateAuthorizationError } from './errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationCheckpointPrimitives } from './PrivateAuthorizationCheckpointPrimitives';
 import { PrivateAuthorizationDeviceKey } from './value-objects/PrivateAuthorizationDeviceKey';
@@ -128,6 +130,26 @@ export class PrivateAuthorizationCheckpoint {
       this.admits(deviceKey) ||
       this.primitives.revokedDeviceKeys.includes(deviceKey.valueOf())
     );
+  }
+
+  public revocationHistoryAfter(
+    admittedDeviceKeys: PrivateAuthorizationDeviceKey[],
+  ): PrivateAuthorizationDeviceKey[] {
+    const admitted = UniqueObjectArray.fromArray(admittedDeviceKeys);
+    const revoked = UniqueObjectArray.fromArray(
+      this.primitives.revokedDeviceKeys
+        .map((key) => new PrivateAuthorizationDeviceKey(key))
+        .filter((key) => !admitted.includes(key)),
+    );
+
+    this.primitives.admittedDeviceKeys
+      .map((key) => new PrivateAuthorizationDeviceKey(key))
+      .filter((key) => !admitted.includes(key))
+      .forEach((key) => revoked.push(key));
+
+    return revoked
+      .toArray()
+      .slice(-PrivateAuthorizationCheckpoint.MAX_REVOKED_DEVICE_KEYS);
   }
 
   public toPrimitives(): PrivateAuthorizationCheckpointPrimitives {

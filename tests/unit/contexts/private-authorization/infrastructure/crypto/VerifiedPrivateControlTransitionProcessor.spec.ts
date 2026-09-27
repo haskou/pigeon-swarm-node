@@ -258,4 +258,90 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
       ).expectedPolicyDevices(checkpoint, operation),
     ).toThrow('Invalid private authorization');
   });
+
+  it('removes a re-admitted device key from retained revocation history', async () => {
+    const binding = new LegacyIdentityDeviceBinding();
+    const previousPolicy = {
+      ...currentPolicy,
+      devices: [currentPolicy.devices[0]],
+    };
+    const previousControl = {
+      ...currentControl,
+      policy: previousPolicy,
+    };
+    const previousCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
+      ...checkpoint.toPrimitives(),
+      admittedDeviceKeys: [ownerKey],
+      controlCheckpointJson: JSON.stringify(previousControl),
+      revokedDeviceKeys: [targetKey],
+    });
+    const message = Buffer.from('re-admission-message');
+    const state = Buffer.from('re-admitted-state');
+    const head = {
+      mlsContextHash: createHash('sha256').update(state).digest('base64url'),
+      mlsEpoch: 1,
+      parentHeadHash: currentControl.headHash,
+      policyHash: digest(currentPolicy),
+      revision: 1,
+      scopeId,
+    };
+    const unsigned = {
+      ...head,
+      headHash: digest(head),
+      mlsMessageHash: createHash('sha256')
+        .update(message)
+        .digest('base64url'),
+      policy: currentPolicy,
+    };
+    const signedTransitionJson = JSON.stringify({
+      ...unsigned,
+      signatures: {
+        [ownerKey]: sign(
+          null,
+          Buffer.from(
+            `pigeon.private-control.v1\0${canonicalize(unsigned)}`,
+          ),
+          ownerPrivateKey,
+        ).toString('base64url'),
+      },
+    });
+    const operation = PrivateControlOperation.fromPrimitives({
+      authorDeviceKey: ownerKey,
+      authorizationRevision: 0,
+      byteSize: 1,
+      control: { resultingHeadHash: unsigned.headHash },
+      digest: encoded(9),
+      id: Buffer.alloc(16, 1).toString('base64url'),
+      kind: 'membership.commit',
+      mutation: {
+        deviceKey: targetKey,
+        identityId: binding.identityIdFor(targetKey),
+        mlsCredentialHash: currentPolicy.devices[1].mlsCredentialHash,
+        type: 'member.admit',
+      },
+      previousOperationIds: [],
+      scopeId,
+    });
+    const processor = new VerifiedPrivateControlTransitionProcessor(
+      new PrivateControlTransitionVerifier(),
+      new PrivateMlsPolicyVerifier(),
+      binding,
+    );
+
+    const result = await processor.verify(
+      previousCheckpoint,
+      operation,
+      {
+        encryptedMlsState: state.toString('base64url'),
+        mlsMessage: message.toString('base64url'),
+        signedTransitionJson,
+      },
+      Buffer.from('previous-state').toString('base64url'),
+    );
+
+    expect(result.checkpoint.toPrimitives()).toMatchObject({
+      admittedDeviceKeys: [ownerKey, targetKey],
+      revokedDeviceKeys: [],
+    });
+  });
 });
