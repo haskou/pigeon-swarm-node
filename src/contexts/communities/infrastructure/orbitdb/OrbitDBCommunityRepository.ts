@@ -216,15 +216,14 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     await this.publicStorageGuard.runWhilePublic(
       new CommunityId(document.id),
       async () => {
-        await Promise.all([
-          this.putCommunityHead(document),
-          this.registry.putDocument('communities', document, [
-            document.networkId,
-          ]),
-          ...[...memberIds].map((memberId) =>
-            this.putMemberIndex(memberId, document),
-          ),
+        await this.registry.putDocument('communities', document, [
+          document.networkId,
         ]);
+        await this.putCommunityHead(document);
+
+        for (const memberId of memberIds) {
+          await this.putMemberIndex(memberId, document);
+        }
       },
     );
   }

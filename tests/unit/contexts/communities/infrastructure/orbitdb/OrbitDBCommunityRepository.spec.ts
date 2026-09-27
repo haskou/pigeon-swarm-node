@@ -257,10 +257,30 @@ describe('OrbitDBCommunityRepository', () => {
     expect(result).toBe('blocked');
     await expect(
       repository.findById(new CommunityId('community-1')),
-    ).resolves.toBeDefined();
+    ).resolves.toBeUndefined();
 
     delayedWrite.resolve('ok');
     await save;
+    await expect(
+      repository.findById(new CommunityId('community-1')),
+    ).resolves.toBeDefined();
+  });
+
+  it('does not publish community indexes when canonical persistence fails', async () => {
+    const community = Community.fromPrimitives(communityPrimitives());
+
+    communitiesPut.mockRejectedValueOnce(new Error('canonical write failed'));
+
+    await expect(repository.save(community)).rejects.toThrow(
+      'canonical write failed',
+    );
+    expect(headsPut).not.toHaveBeenCalled();
+    await expect(
+      repository.findById(new CommunityId('community-1')),
+    ).resolves.toBeUndefined();
+    await expect(repository.findByMember(identityMother.id)).resolves.toEqual(
+      [],
+    );
   });
 
   it('should prefer fresh community heads over stale member indexes', async () => {
