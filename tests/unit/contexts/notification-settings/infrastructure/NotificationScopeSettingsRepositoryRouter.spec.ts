@@ -1,7 +1,9 @@
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
 import { NotificationScopeSettingsPreferences } from '@app/contexts/notification-settings/domain/NotificationScopeSettingsPreferences';
+import NotificationScopeAccessAuthorizer from '@app/contexts/notification-settings/domain/services/NotificationScopeAccessAuthorizer';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import NotificationScopeSettingsRepositoryRouter from '@app/contexts/notification-settings/infrastructure/NotificationScopeSettingsRepositoryRouter';
 import LocalNotificationScopeSettingsRepository from '@app/contexts/notification-settings/infrastructure/local-db/LocalNotificationScopeSettingsRepository';
@@ -17,9 +19,14 @@ describe('NotificationScopeSettingsRepositoryRouter', () => {
   const publicScope = NotificationSettingScope.community(
     new CommunityId('public-community'),
   );
+  const privateChannelScope = NotificationSettingScope.communityChannel(
+    new CommunityId('private-community'),
+    new CommunityChannelId('private-channel'),
+  );
   let publicRepository: jest.Mocked<OrbitDBNotificationScopeSettingsRepository>;
   let privateRepository: jest.Mocked<LocalNotificationScopeSettingsRepository>;
   let guard: jest.Mocked<PrivateCommunityPublicStorageGuard>;
+  let privateScopeAccess: jest.Mocked<NotificationScopeAccessAuthorizer>;
   let repository: NotificationScopeSettingsRepositoryRouter;
 
   beforeEach(() => {
@@ -49,10 +56,14 @@ describe('NotificationScopeSettingsRepositoryRouter', () => {
             action(),
         ),
     } as unknown as jest.Mocked<PrivateCommunityPublicStorageGuard>;
+    privateScopeAccess = {
+      authorize: jest.fn(),
+    } as jest.Mocked<NotificationScopeAccessAuthorizer>;
     repository = new NotificationScopeSettingsRepositoryRouter(
       publicRepository,
       privateRepository,
       guard,
+      privateScopeAccess,
     );
   });
 
@@ -65,8 +76,40 @@ describe('NotificationScopeSettingsRepositoryRouter', () => {
 
     await repository.save(settings);
 
+    expect(privateScopeAccess.authorize).toHaveBeenCalledWith(
+      identityId,
+      privateScope,
+    );
     expect(privateRepository.save).toHaveBeenCalledWith(settings);
     expect(publicRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('validates protected channel access before storing settings', async () => {
+    const settings = NotificationScopeSettings.create(
+      identityId,
+      privateChannelScope,
+      NotificationScopeSettingsPreferences.defaults(),
+    );
+
+    await repository.save(settings);
+
+    expect(privateScopeAccess.authorize).toHaveBeenCalledWith(
+      identityId,
+      privateChannelScope,
+    );
+    expect(privateRepository.save).toHaveBeenCalledWith(settings);
+  });
+
+  it('rejects protected settings when the local community projection is absent', async () => {
+    privateScopeAccess.authorize.mockRejectedValue(new Error('denied'));
+    const settings = NotificationScopeSettings.create(
+      identityId,
+      privateScope,
+      NotificationScopeSettingsPreferences.defaults(),
+    );
+
+    await expect(repository.save(settings)).rejects.toThrow();
+    expect(privateRepository.save).not.toHaveBeenCalled();
   });
 
   it('guards public community writes against concurrent protection', async () => {

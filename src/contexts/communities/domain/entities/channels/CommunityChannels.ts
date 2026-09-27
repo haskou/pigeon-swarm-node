@@ -80,6 +80,12 @@ export class CommunityChannels {
     );
   }
 
+  public permissions(
+    channelId: CommunityChannelId,
+  ): CommunityChannelPermissions {
+    return this.findExisting(channelId).getPermissions();
+  }
+
   public textChannelPermissions(
     channelId: CommunityChannelId,
   ): CommunityChannelPermissions {

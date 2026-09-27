@@ -1,9 +1,9 @@
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { NotificationScopeSettings } from '../domain/NotificationScopeSettings';
 import NotificationScopeSettingsRepository from '../domain/repositories/NotificationScopeSettingsRepository';
+import NotificationScopeAccessAuthorizer from '../domain/services/NotificationScopeAccessAuthorizer';
 import { NotificationSettingScope } from '../domain/value-objects/NotificationSettingScope';
 import LocalNotificationScopeSettingsRepository from './local-db/LocalNotificationScopeSettingsRepository';
 import OrbitDBNotificationScopeSettingsRepository from './orbitdb/OrbitDBNotificationScopeSettingsRepository';
@@ -13,16 +13,9 @@ export default class NotificationScopeSettingsRepositoryRouter extends Notificat
     private readonly publicRepository: OrbitDBNotificationScopeSettingsRepository,
     private readonly privateRepository: LocalNotificationScopeSettingsRepository,
     private readonly publicStorageGuard: PrivateCommunityPublicStorageGuard,
+    private readonly privateScopeAccess: NotificationScopeAccessAuthorizer,
   ) {
     super();
-  }
-
-  private communityId(
-    scope: NotificationSettingScope,
-  ): CommunityId | undefined {
-    const communityId = scope.toPrimitives().communityId;
-
-    return communityId ? new CommunityId(communityId) : undefined;
   }
 
   private async publicSettings(
@@ -49,7 +42,7 @@ export default class NotificationScopeSettingsRepositoryRouter extends Notificat
     scope: NotificationSettingScope,
     action: () => Promise<T>,
   ): Promise<T> {
-    const communityId = this.communityId(scope);
+    const communityId = scope.getCommunityId();
 
     return communityId
       ? this.publicStorageGuard.runWhilePublic(communityId, action)
@@ -109,7 +102,7 @@ export default class NotificationScopeSettingsRepositoryRouter extends Notificat
   public async isPrivateScope(
     scope: NotificationSettingScope,
   ): Promise<boolean> {
-    const communityId = this.communityId(scope);
+    const communityId = scope.getCommunityId();
 
     return communityId
       ? this.publicStorageGuard.isProtected(communityId)
@@ -120,6 +113,7 @@ export default class NotificationScopeSettingsRepositoryRouter extends Notificat
     const scope = settings.getScope();
 
     if (await this.isPrivateScope(scope)) {
+      await this.privateScopeAccess.authorize(settings.getIdentityId(), scope);
       await this.privateRepository.save(settings);
 
       return;

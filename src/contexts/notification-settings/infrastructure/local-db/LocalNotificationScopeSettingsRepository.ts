@@ -1,12 +1,44 @@
 import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
+import { NotificationSettingsStorageQuota } from '@app/contexts/notification-settings/domain/NotificationSettingsStorageQuota';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import { Integer } from '@haskou/value-objects';
 
 export default class LocalNotificationScopeSettingsRepository {
   private static readonly NAMESPACE = 'private_notification_scope_settings';
+  private static readonly queues = new WeakMap<
+    EmbeddedLocalDatabase,
+    Promise<void>
+  >();
 
   public constructor(private readonly database: EmbeddedLocalDatabase) {}
+
+  private async exclusively<T>(action: () => Promise<T>): Promise<T> {
+    const previous =
+      LocalNotificationScopeSettingsRepository.queues.get(this.database) ??
+      Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = previous.then(() => gate);
+    LocalNotificationScopeSettingsRepository.queues.set(this.database, tail);
+    await previous;
+
+    try {
+      return await action();
+    } finally {
+      release();
+
+      if (
+        LocalNotificationScopeSettingsRepository.queues.get(this.database) ===
+        tail
+      ) {
+        LocalNotificationScopeSettingsRepository.queues.delete(this.database);
+      }
+    }
+  }
 
   private documentId(
     identityId: IdentityId,
@@ -118,11 +150,34 @@ export default class LocalNotificationScopeSettingsRepository {
 
   public async save(settings: NotificationScopeSettings): Promise<void> {
     const primitives = settings.toPrimitives();
+    const id = this.documentId(settings.getIdentityId(), settings.getScope());
 
-    await this.database.save(
-      LocalNotificationScopeSettingsRepository.NAMESPACE,
-      this.documentId(settings.getIdentityId(), settings.getScope()),
-      { ...primitives },
-    );
+    await this.exclusively(async () => {
+      const existing = await this.database.findOne(
+        LocalNotificationScopeSettingsRepository.NAMESPACE,
+        id,
+      );
+
+      if (!existing) {
+        const documents = await this.database.find(
+          LocalNotificationScopeSettingsRepository.NAMESPACE,
+        );
+        const identitySettings = documents.filter(
+          (document) =>
+            document.identityId === settings.getIdentityId().valueOf(),
+        );
+        const quota = new NotificationSettingsStorageQuota(
+          new Integer(documents.length),
+          new Integer(identitySettings.length),
+        );
+        quota.reserve();
+      }
+
+      await this.database.save(
+        LocalNotificationScopeSettingsRepository.NAMESPACE,
+        id,
+        { ...primitives },
+      );
+    });
   }
 }

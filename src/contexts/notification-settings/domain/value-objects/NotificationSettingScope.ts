@@ -132,6 +132,14 @@ export class NotificationSettingScope {
     return NotificationSettingScope.community(this.communityId);
   }
 
+  public getCommunityId(): CommunityId | undefined {
+    return this.communityId;
+  }
+
+  public getChannelId(): CommunityChannelId | undefined {
+    return this.channelId;
+  }
+
   public isEqual(other: NotificationSettingScope): boolean {
     return this.key() === other.key();
   }

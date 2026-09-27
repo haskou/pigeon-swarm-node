@@ -10,6 +10,7 @@ import { CommunityWasCreatedEvent } from '@app/contexts/communities/domain/event
 import { CommunityWasUpdatedEvent } from '@app/contexts/communities/domain/events/CommunityWasUpdatedEvent';
 import { CommunityAvatar } from '@app/contexts/communities/domain/value-objects/CommunityAvatar';
 import { CommunityBanner } from '@app/contexts/communities/domain/value-objects/CommunityBanner';
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelName } from '@app/contexts/communities/domain/value-objects/CommunityChannelName';
 import { CommunityDescription } from '@app/contexts/communities/domain/value-objects/CommunityDescription';
 import { CommunityName } from '@app/contexts/communities/domain/value-objects/CommunityName';
@@ -105,6 +106,28 @@ describe('Community', () => {
         type: 'voice',
       },
     });
+  });
+
+  it('authorizes notification access only for members of existing channels', () => {
+    const community = createCommunity();
+    const channel = community.addVoiceChannel(
+      owner,
+      new CommunityChannelName('voice'),
+    );
+    community.addMember(owner, member);
+
+    expect(() => community.viewChannel(member, channel.getId())).not.toThrow();
+    expect(() =>
+      community.viewChannel(
+        new IdentityId(
+          'MCowBQYDK2VwAyEA5EcAUsSpRM+8ucjvEJ3jUxjBPPscqOTuVYHe0m+FOIA=',
+        ),
+        channel.getId(),
+      ),
+    ).toThrow('Identity is not a community member');
+    expect(() =>
+      community.viewChannel(member, new CommunityChannelId('missing')),
+    ).toThrow('Community channel not found');
   });
 
   it('records member and profile metadata events', () => {

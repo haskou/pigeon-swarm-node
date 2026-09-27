@@ -119,10 +119,8 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
     };
 
     await this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      await Promise.all([
-        this.registry.putDocument('pins', document),
-        this.putIndexDocument(communityId, channelId, document),
-      ]);
+      await this.registry.putDocument('pins', document);
+      await this.putIndexDocument(communityId, channelId, document);
     });
   }
 
@@ -142,10 +140,8 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
     };
 
     await this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      await Promise.all([
-        this.registry.putDocument('pins', document),
-        this.putIndexDocument(communityId, channelId, document),
-      ]);
+      await this.registry.putDocument('pins', document);
+      await this.putIndexDocument(communityId, channelId, document);
     });
   }
 

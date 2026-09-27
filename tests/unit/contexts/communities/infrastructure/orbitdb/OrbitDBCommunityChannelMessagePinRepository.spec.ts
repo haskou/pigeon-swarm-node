@@ -202,6 +202,44 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
     heads.releaseWrites();
     await unpin;
   });
+
+  it('does not publish a pin index when document persistence fails', async () => {
+    pins.put.mockRejectedValueOnce(new Error('document write failed'));
+
+    await expect(
+      repository.pin(
+        communityId,
+        channelId,
+        messageId,
+        identityId,
+        new Timestamp(1780000000000),
+      ),
+    ).rejects.toThrow('document write failed');
+    expect(heads.put).not.toHaveBeenCalled();
+    await expect(
+      repository.findByChannel(communityId, channelId),
+    ).resolves.toEqual([]);
+  });
+
+  it('does not publish an unpin index when document persistence fails', async () => {
+    await repository.pin(
+      communityId,
+      channelId,
+      messageId,
+      identityId,
+      new Timestamp(1780000000000),
+    );
+    heads.put.mockClear();
+    pins.put.mockRejectedValueOnce(new Error('document write failed'));
+
+    await expect(
+      repository.unpin(communityId, channelId, messageId),
+    ).rejects.toThrow('document write failed');
+    expect(heads.put).not.toHaveBeenCalled();
+    await expect(
+      repository.findByChannel(communityId, channelId),
+    ).resolves.toHaveLength(1);
+  });
 });
 
 function flushBackgroundTasks(): Promise<void> {

@@ -427,6 +427,13 @@ export class Community extends AggregateRoot {
     );
   }
 
+  public viewChannel(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.createAccessValidator().assertCanViewChannel(identityId, channelId);
+  }
+
   public manageChannelMessages(
     identityId: IdentityId,
     channelId: CommunityChannelId,

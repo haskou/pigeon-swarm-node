@@ -11,8 +11,11 @@ package "notification-settings/domain" {
   class NotificationMuteUntil <<ValueObject>>
   class NotificationSettingScope <<ValueObject>>
   class NotificationSettingScopeType <<ValueObject>>
+  class NotificationSettingsStorageQuota
+  class NotificationSettingsStorageCapacityExceededError
 
   abstract class NotificationScopeSettingsRepository
+  abstract class NotificationScopeAccessAuthorizer
 
   class NotificationSettingsWereUpdatedEvent <<DomainEvent>>
   class NotificationSettingsWereResetEvent <<DomainEvent>>
@@ -29,12 +32,18 @@ package "notification-settings/application" {
 
 package "notification-settings/infrastructure" {
   class NotificationScopeSettingsRepositoryRouter
+  class CommunityNotificationScopeAccessAuthorizer
   class LocalNotificationScopeSettingsRepository
   class OrbitDBNotificationScopeSettingsRepository
 }
 
 package "communities/infrastructure" {
   class PrivateCommunityPublicStorageGuard
+}
+
+package "communities/domain" {
+  class Community
+  abstract class CommunityRepository
 }
 
 package "private-authorization/domain" {
@@ -46,6 +55,7 @@ NotificationScopeSettings *-- NotificationSettingScope
 NotificationScopeSettingsPreferences *-- NotificationLevel
 NotificationScopeSettingsPreferences *-- NotificationMuteUntil
 NotificationSettingScope *-- NotificationSettingScopeType
+NotificationSettingsStorageQuota ..> NotificationSettingsStorageCapacityExceededError
 
 NotificationScopeSettings ..> NotificationSettingsWereUpdatedEvent
 NotificationScopeSettings ..> NotificationSettingsWereResetEvent
@@ -60,7 +70,11 @@ NotificationScopeSettingsRepositoryRouter ..|> NotificationScopeSettingsReposito
 NotificationScopeSettingsRepositoryRouter --> OrbitDBNotificationScopeSettingsRepository : public
 NotificationScopeSettingsRepositoryRouter --> LocalNotificationScopeSettingsRepository : protected
 NotificationScopeSettingsRepositoryRouter --> PrivateCommunityPublicStorageGuard : classify scope
+NotificationScopeSettingsRepositoryRouter --> NotificationScopeAccessAuthorizer : authorize protected scope
+CommunityNotificationScopeAccessAuthorizer ..|> NotificationScopeAccessAuthorizer
+CommunityNotificationScopeAccessAuthorizer --> CommunityRepository
 LocalNotificationScopeSettingsRepository --> NotificationScopeSettings
+LocalNotificationScopeSettingsRepository --> NotificationSettingsStorageQuota
 OrbitDBNotificationScopeSettingsRepository ..> NotificationScopeSettings
 PrivateCommunityPublicStorageGuard --> PrivateAuthorizationRepository
 

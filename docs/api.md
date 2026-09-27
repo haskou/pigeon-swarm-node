@@ -3911,6 +3911,11 @@ Set a community channel to mentions only:
 
 Response is the updated scope resource.
 
+For protected communities, the node accepts the setting only while its local
+projection confirms that the authenticated identity is a member and can view
+the requested channel. Protected settings stay in the node-local database and
+are limited to 256 scopes per identity and 4,096 scopes per node.
+
 ### Reset scope notification settings
 
 ```http

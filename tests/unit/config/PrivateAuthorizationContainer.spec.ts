@@ -5,6 +5,7 @@ import YAML from 'yaml';
 type ServiceDefinition = {
   arguments?: string[];
   class?: string;
+  parent?: string;
 };
 
 describe('private authorization container wiring', () => {
@@ -78,11 +79,16 @@ describe('private authorization container wiring', () => {
     const [localRepositoryId] = service(
       'notification-settings/infrastructure/local-db/LocalNotificationScopeSettingsRepository',
     );
+    const [, scopeAccessAuthorizer] = service(
+      'notification-settings/infrastructure/CommunityNotificationScopeAccessAuthorizer',
+    );
     const [, router] = service(
       'notification-settings/infrastructure/NotificationScopeSettingsRepositoryRouter',
     );
 
     expect(router.arguments).toContain(`@${guardId}`);
     expect(router.arguments).toContain(`@${localRepositoryId}`);
+    expect(scopeAccessAuthorizer.parent).toBeDefined();
+    expect(router.arguments).toContain(`@${scopeAccessAuthorizer.parent}`);
   });
 });

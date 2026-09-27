@@ -111,6 +111,19 @@ export class CommunityAccessValidator {
     );
   }
 
+  public assertCanViewChannel(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.assertIsMember(identityId);
+    CommunityPermissionValidator.assertCanAccessChannel(
+      this.ownerIdentityId,
+      this.membership,
+      identityId,
+      this.channels.permissions(channelId),
+    );
+  }
+
   public assertCanReactWithSticker(
     identityId: IdentityId,
     channelId: CommunityChannelId,
