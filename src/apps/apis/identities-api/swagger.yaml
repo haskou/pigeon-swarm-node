@@ -155,10 +155,6 @@ components:
           type: string
         version:
           type: integer
-        identityExternalIdentifier:
-          type: string
-          nullable: true
-          description: Current published identity CID. Use it as previousIdentityExternalIdentifier in the next signed identity update.
         previousIdentityExternalIdentifier:
           type: string
           nullable: true

@@ -29,7 +29,7 @@ import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/or
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { Kernel } from '@haskou/ddd-kernel';
-import { Timestamp } from '@haskou/value-objects';
+import { Timestamp, assert } from '@haskou/value-objects';
 import {
   KeyPair,
   PrivateGenesisSignature,
@@ -777,6 +777,20 @@ export default class Definitions {
     const body = JSON.parse(this.body ?? '{}') as Record<string, unknown>;
 
     body[field] = 'must-not-be-accepted';
+    this.body = JSON.stringify(body);
+  }
+
+  @given('I add undeclared identity profile field {string}')
+  public iAddUndeclaredIdentityProfileField(field: string): void {
+    const body = JSON.parse(this.body ?? '{}') as {
+      profile?: Record<string, unknown>;
+    };
+
+    assert(
+      body.profile !== undefined,
+      new Error('Identity profile must be configured first.'),
+    );
+    body.profile[field] = 'must-not-be-accepted';
     this.body = JSON.stringify(body);
   }
 

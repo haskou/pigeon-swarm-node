@@ -1,14 +1,17 @@
+import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
   IsInt,
   IsEmpty,
   IsNumber,
-  IsObject,
   IsOptional,
   IsString,
   Min,
+  ValidateNested,
 } from 'class-validator';
+
+import { IdentityProfileBody } from './IdentityProfileBody';
 
 export class PostIdentityBody {
   @IsEmpty()
@@ -44,14 +47,9 @@ export class PostIdentityBody {
   @ArrayMinSize(1)
   public readonly networks: string[];
 
-  @IsObject()
-  public readonly profile: {
-    banner?: string;
-    biography?: string;
-    handle?: string;
-    name: string;
-    picture?: string;
-  };
+  @ValidateNested()
+  @Type(() => IdentityProfileBody)
+  public readonly profile: IdentityProfileBody;
 
   @IsNumber()
   public readonly timestamp: number;
