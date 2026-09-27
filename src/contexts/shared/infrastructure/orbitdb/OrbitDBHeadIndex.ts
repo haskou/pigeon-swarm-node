@@ -6,7 +6,7 @@ import { OrbitDBHeadIndexPutOptions } from './OrbitDBHeadIndexPutOptions';
 import OrbitDBReplicatedStateRegistry from './OrbitDBReplicatedStateRegistry';
 
 export class OrbitDBHeadIndex<TDocument extends object> {
-  private static readonly exactRecordIdsByRegistry = new WeakMap<
+  private static readonly excludedRecordIdsByRegistry = new WeakMap<
     OrbitDBReplicatedStateRegistry,
     Map<string, Set<string>>
   >();
@@ -20,20 +20,20 @@ export class OrbitDBHeadIndex<TDocument extends object> {
 
   private readonly recordMergeQueues = new Map<string, Promise<void>>();
 
-  private get exactRecordIds(): Map<string, Set<string>> {
-    let exactRecordIds = OrbitDBHeadIndex.exactRecordIdsByRegistry.get(
+  private get excludedRecordIds(): Map<string, Set<string>> {
+    let excludedRecordIds = OrbitDBHeadIndex.excludedRecordIdsByRegistry.get(
       this.registry,
     );
 
-    if (!exactRecordIds) {
-      exactRecordIds = new Map<string, Set<string>>();
-      OrbitDBHeadIndex.exactRecordIdsByRegistry.set(
+    if (!excludedRecordIds) {
+      excludedRecordIds = new Map<string, Set<string>>();
+      OrbitDBHeadIndex.excludedRecordIdsByRegistry.set(
         this.registry,
-        exactRecordIds,
+        excludedRecordIds,
       );
     }
 
-    return exactRecordIds;
+    return excludedRecordIds;
   }
 
   private get pendingRecords(): Map<string, Record<string, unknown>[]> {
@@ -97,23 +97,58 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     };
   }
 
-  private replacementRecords(
+  private recordIds(records: Record<string, unknown>[]): Set<string> {
+    return new Set(
+      records
+        .map((record) => this.options.recordId(record))
+        .filter((id): id is string => id !== undefined),
+    );
+  }
+
+  private replacementProjection(
     key: string,
+    currentRecords: Record<string, unknown>[],
     candidateRecords: Record<string, unknown>[],
-  ): Record<string, unknown>[] {
+  ): {
+    excludedRecordIds: Set<string>;
+    records: Record<string, unknown>[];
+  } {
     const records = candidateRecords.filter(
       (record) => this.options.documentFromRecord(record) !== undefined,
     );
-    this.exactRecordIds.set(
-      key,
-      new Set(
-        records
-          .map((record) => this.options.recordId(record))
-          .filter((id): id is string => id !== undefined),
-      ),
-    );
+    const candidateIds = this.recordIds(records);
+    const excludedRecordIds = new Set(this.excludedRecordIds.get(key));
 
-    return records;
+    candidateIds.forEach((id) => excludedRecordIds.delete(id));
+    this.recordIds(currentRecords)
+      .difference(candidateIds)
+      .forEach((id) => excludedRecordIds.add(id));
+
+    return { excludedRecordIds, records };
+  }
+
+  private commitReplacementProjection(
+    key: string,
+    excludedRecordIds: Set<string>,
+  ): void {
+    if (excludedRecordIds.size === 0) {
+      this.excludedRecordIds.delete(key);
+
+      return;
+    }
+
+    this.excludedRecordIds.set(key, excludedRecordIds);
+  }
+
+  private admitRecord(key: string, record: Record<string, unknown>): void {
+    const recordId = this.options.recordId(record);
+
+    if (!recordId) return;
+    const excludedRecordIds = this.excludedRecordIds.get(key);
+
+    excludedRecordIds?.delete(recordId);
+
+    if (excludedRecordIds?.size === 0) this.excludedRecordIds.delete(key);
   }
 
   private isRemoval(record: Record<string, unknown>): boolean {
@@ -139,15 +174,6 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     record: Record<string, unknown>,
     networkIds: string[],
   ): Promise<void> {
-    const cachedHead = this.registry.findCachedHead(key);
-
-    if (cachedHead) {
-      this.replacementRecords(
-        key,
-        this.recordsWithout(this.recordsFromHead(cachedHead), record),
-      );
-    }
-
     const previous = this.recordMergeQueues.get(key) ?? Promise.resolve();
     const next = previous
       .catch((): void => undefined)
@@ -155,16 +181,19 @@ export class OrbitDBHeadIndex<TDocument extends object> {
         const head =
           this.registry.findCachedHead(key) ??
           (await this.registry.findPersistedHead(key));
-        const records = this.replacementRecords(
+        const currentRecords = this.recordsFromHead(head);
+        const projection = this.replacementProjection(
           key,
-          this.recordsWithout(this.recordsFromHead(head), record),
+          currentRecords,
+          this.recordsWithout(currentRecords, record),
         );
 
         await this.registry.putHeadExactly(
           key,
-          this.recordsHead(metadata, records),
+          this.recordsHead(metadata, projection.records),
           networkIds,
         );
+        this.commitReplacementProjection(key, projection.excludedRecordIds);
       });
 
     this.recordMergeQueues.set(key, next);
@@ -274,7 +303,7 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     );
   }
 
-  private replicateRecordHead(
+  private async replicateRecordHead(
     key: string,
     metadata: Record<string, unknown>,
     head: Record<string, unknown> | undefined,
@@ -283,11 +312,12 @@ export class OrbitDBHeadIndex<TDocument extends object> {
   ): Promise<void> {
     const records = this.mergeRecords(this.recordsFromHead(head), record);
 
-    return this.registry.putHead(
+    await this.registry.putHead(
       key,
       this.recordsHead(metadata, records, this.nextHeadUpdatedAt(head)),
       networkIds,
     );
+    this.admitRecord(key, record);
   }
 
   private async replicateRecordHeadFromLatestState(
@@ -373,14 +403,14 @@ export class OrbitDBHeadIndex<TDocument extends object> {
   }
 
   private exactDocuments(key: string, documents: TDocument[]): TDocument[] {
-    const exactRecordIds = this.exactRecordIds.get(key);
+    const excludedRecordIds = this.excludedRecordIds.get(key);
 
-    if (!exactRecordIds) return documents;
+    if (!excludedRecordIds) return documents;
 
     return documents.filter((document) => {
       const id = this.options.recordId(document);
 
-      return id !== undefined && exactRecordIds.has(id);
+      return id !== undefined && !excludedRecordIds.has(id);
     });
   }
 
@@ -399,18 +429,22 @@ export class OrbitDBHeadIndex<TDocument extends object> {
         const currentRecords = this.recordsFromHead(
           cachedHead ?? (await this.registry.findPersistedHead(key)),
         );
-        const records = this.replacementRecords(
+        const candidateRecords = this.mergeRecords(
+          currentRecords,
+          record,
+        ).filter(options.recordFilter ?? (() => true));
+        const projection = this.replacementProjection(
           key,
-          this.mergeRecords(currentRecords, record).filter(
-            options.recordFilter ?? (() => true),
-          ),
+          currentRecords,
+          candidateRecords,
         );
 
         await this.registry.putHeadExactly(
           key,
-          this.recordsHead(metadata, records),
+          this.recordsHead(metadata, projection.records),
           networkIds,
         );
+        this.commitReplacementProjection(key, projection.excludedRecordIds);
       });
     this.recordMergeQueues.set(key, next);
 
@@ -437,16 +471,12 @@ export class OrbitDBHeadIndex<TDocument extends object> {
       ),
       record,
     ).filter(options.recordFilter ?? (() => true));
-    const recordId = this.options.recordId(record);
-    const exactRecordIds = this.exactRecordIds.get(key);
-
-    if (recordId && exactRecordIds) exactRecordIds.add(recordId);
-
     await this.registry.putHead(
       key,
       this.recordsHead(metadata, records),
       networkIds,
     );
+    this.admitRecord(key, record);
   }
 
   public recordsFromHead(
@@ -559,12 +589,18 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     let head = this.documentsHead(metadata, documents, options);
 
     if (options.replace) {
-      head = this.recordsHead(
-        metadata,
-        this.replacementRecords(key, this.recordsFromHead(head)),
+      const currentHead =
+        this.registry.findCachedHead(key) ??
+        (await this.registry.findPersistedHead(key));
+      const projection = this.replacementProjection(
+        key,
+        this.recordsFromHead(currentHead),
+        this.recordsFromHead(head),
       );
+      head = this.recordsHead(metadata, projection.records);
 
       await this.registry.putHeadExactly(key, head, options.networkIds ?? []);
+      this.commitReplacementProjection(key, projection.excludedRecordIds);
 
       return;
     }

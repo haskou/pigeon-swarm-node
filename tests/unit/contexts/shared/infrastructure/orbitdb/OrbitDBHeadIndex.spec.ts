@@ -254,6 +254,59 @@ describe('OrbitDBHeadIndex', () => {
     });
   });
 
+  it('admits later replicated records without resurrecting replaced records', async () => {
+    await index.putDocuments(
+      'index:key',
+      { id: 'index:key' },
+      [document('retained', 1), document('removed', 1)],
+      { networkIds: [networkId] },
+    );
+    await index.putDocuments(
+      'index:key',
+      { id: 'index:key' },
+      [document('retained', 2)],
+      { networkIds: [networkId], replace: true },
+    );
+
+    registry.cacheHeadLocally('index:key', {
+      id: 'index:key',
+      items: [
+        document('retained', 2),
+        document('removed', 1),
+        document('replicated-later', 3),
+      ],
+      updatedAt: Number.MAX_SAFE_INTEGER,
+    });
+
+    await expect(index.find('index:key')).resolves.toEqual([
+      document('retained', 2),
+      document('replicated-later', 3),
+    ]);
+  });
+
+  it('keeps the durable exact projection when its replacement fails', async () => {
+    await index.putDocuments(
+      'index:key',
+      { id: 'index:key' },
+      [document('durable', 1)],
+      { networkIds: [networkId], replace: true },
+    );
+    heads.put.mockRejectedValueOnce(new Error('persistence failed'));
+
+    await expect(
+      index.putDocuments(
+        'index:key',
+        { id: 'index:key' },
+        [document('rejected', 2)],
+        { networkIds: [networkId], replace: true },
+      ),
+    ).rejects.toThrow('persistence failed');
+
+    await expect(index.find('index:key')).resolves.toEqual([
+      document('durable', 1),
+    ]);
+  });
+
   it('updates an available cached head while a background record merge is queued', async () => {
     index.replicateRecordInBackground(
       'index:key',
