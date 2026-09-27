@@ -51,6 +51,10 @@ export class IdentityPublication {
     return this.version.isFirst();
   }
 
+  public getVersion(): IdentityVersion {
+    return this.version;
+  }
+
   public isNewerThan(other: IdentityPublication): boolean {
     return this.version.isGreaterThan(other.version);
   }

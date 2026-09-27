@@ -11,6 +11,7 @@ import { Identity } from '@app/contexts/identities/domain/Identity';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
+import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { OrbitDBHeadRecordMerger } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadRecordMerger';
@@ -108,7 +109,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000001',
       '10000000-0000-4000-8000-000000000001',
     );
-    await repository.provision(genesis);
+    await repository.provision(genesis, new IdentityVersion(1));
 
     const applied = await repository.compareAndApply(transition);
 
@@ -145,7 +146,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       target.sign(unsigned.getProofOfPossessionPayload()),
     );
     const transition = proven.authorize(owner.sign(proven.getSigningPayload()));
-    await repository.provision(genesis);
+    await repository.provision(genesis, new IdentityVersion(1));
 
     await expect(repository.compareAndApply(transition)).rejects.toThrow();
   });
@@ -175,7 +176,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       genesis,
       transition,
     );
-    await repository.provision(genesis);
+    await repository.provision(genesis, new IdentityVersion(1));
 
     const merged = getMerger()?.(getHead(), {
       authorization: authorization.toPrimitives(),
@@ -209,7 +210,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000002',
       pairingId,
     );
-    await repository.provision(genesis);
+    await repository.provision(genesis, new IdentityVersion(1));
     await repository.compareAndApply(accepted);
 
     await expect(repository.compareAndApply(replay)).rejects.toThrow();
@@ -235,8 +236,8 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000002',
       '10000000-0000-4000-8000-000000000002',
     );
-    await first.repository.provision(genesis);
-    await second.repository.provision(genesis);
+    await first.repository.provision(genesis, new IdentityVersion(1));
+    await second.repository.provision(genesis, new IdentityVersion(1));
     await first.repository.compareAndApply(lexicographicWinner);
     await second.repository.compareAndApply(other);
 
@@ -272,10 +273,10 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000001',
       '10000000-0000-4000-8000-000000000001',
     );
-    await first.repository.provision(genesis);
+    await first.repository.provision(genesis, new IdentityVersion(1));
     await first.repository.compareAndApply(enrolled);
     second.setHead(first.getHead() ?? {});
-    await second.repository.provision(genesis);
+    await second.repository.provision(genesis, new IdentityVersion(1));
     const revokeAttacker = DeviceAuthorizationTransition.revocation(
       identityId,
       new DeviceAuthorizationOperationId(
@@ -323,10 +324,10 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000001',
       '10000000-0000-4000-8000-000000000001',
     );
-    await first.repository.provision(genesis);
+    await first.repository.provision(genesis, new IdentityVersion(1));
     await first.repository.compareAndApply(initialEnrollment);
     second.setHead(first.getHead() ?? {});
-    await second.repository.provision(genesis);
+    await second.repository.provision(genesis, new IdentityVersion(1));
     const operationId = new DeviceAuthorizationOperationId(
       '00000000-0000-4000-8000-000000000002',
     );
@@ -386,10 +387,10 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000001',
       '10000000-0000-4000-8000-000000000001',
     );
-    await local.repository.provision(genesis);
+    await local.repository.provision(genesis, new IdentityVersion(1));
     await local.repository.compareAndApply(initialEnrollment);
     remote.setHead(local.getHead() ?? {});
-    await remote.repository.provision(genesis);
+    await remote.repository.provision(genesis, new IdentityVersion(1));
     const revocation = DeviceAuthorizationTransition.revocation(
       identityId,
       new DeviceAuthorizationOperationId(
@@ -455,7 +456,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000001',
       '10000000-0000-4000-8000-000000000001',
     );
-    await repository.provision(genesis);
+    await repository.provision(genesis, new IdentityVersion(1));
     const trusted = getHead();
     const injected = {
       ...trusted,
@@ -534,11 +535,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       genesis.getCredentials()[0],
       RecoveryAuthority.fromString(recovery.toPrimitives().publicKey),
     );
-    await repository.provision(genesis);
+    await repository.provision(genesis, new IdentityVersion(1));
     await repository.compareAndApply(enrolled);
     const revisionOne = getHead();
 
-    await repository.provision(expandedGenesis);
+    await repository.provision(expandedGenesis, new IdentityVersion(2));
+    await repository.provision(genesis, new IdentityVersion(1));
     await repository.compareAndApply(
       revocation.authorize(owner.sign(revocation.getSigningPayload())),
     );

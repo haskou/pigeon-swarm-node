@@ -1,3 +1,4 @@
+import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { DeviceAuthorization } from '../DeviceAuthorization';
@@ -12,5 +13,8 @@ export abstract class DeviceAuthorizationRepository {
     identityId: IdentityId,
   ): Promise<DeviceAuthorization | undefined>;
 
-  public abstract provision(authorization: DeviceAuthorization): Promise<void>;
+  public abstract provision(
+    authorization: DeviceAuthorization,
+    identityVersion: IdentityVersion,
+  ): Promise<void>;
 }

@@ -1,4 +1,5 @@
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
@@ -29,6 +30,11 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   >();
 
   private readonly routingNetworkIdsByIdentity = new Map<string, string[]>();
+
+  private readonly routingVersionByIdentity = new Map<
+    string,
+    IdentityVersion
+  >();
 
   public constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
@@ -69,11 +75,23 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     );
   }
 
-  private rememberRoutingNetworks(authorization: DeviceAuthorization): void {
+  private rememberRoutingNetworks(
+    authorization: DeviceAuthorization,
+    identityVersion: IdentityVersion,
+  ): void {
+    const identityId = authorization.getIdentityId().valueOf();
+    const currentVersion = this.routingVersionByIdentity.get(identityId);
+
+    if (currentVersion && !identityVersion.isGreaterThan(currentVersion)) {
+      return;
+    }
+
     this.routingNetworkIdsByIdentity.set(
-      authorization.getIdentityId().valueOf(),
+      identityId,
       this.networkIds(authorization),
     );
+    this.routingVersionByIdentity.set(identityId, identityVersion);
+    this.trustedGenesisByIdentity.set(identityId, authorization);
   }
 
   private canonicalValue(value: unknown): unknown {
@@ -113,8 +131,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
         identity.getInitialDeviceCredential(),
         identity.getRecoveryAuthority(),
       );
-      this.trustedGenesisByIdentity.set(identityId.valueOf(), genesis);
-      this.rememberRoutingNetworks(genesis);
+      this.rememberRoutingNetworks(genesis, identity.getVersion());
 
       return genesis;
     } catch {
@@ -537,14 +554,13 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     });
   }
 
-  public provision(authorization: DeviceAuthorization): Promise<void> {
+  public provision(
+    authorization: DeviceAuthorization,
+    identityVersion: IdentityVersion,
+  ): Promise<void> {
     return this.withIdentityLock(authorization.getIdentityId(), async () => {
       const key = this.headKey(authorization.getIdentityId());
-      this.rememberRoutingNetworks(authorization);
-      this.trustedGenesisByIdentity.set(
-        authorization.getIdentityId().valueOf(),
-        authorization,
-      );
+      this.rememberRoutingNetworks(authorization, identityVersion);
       const existing = await this.registry.findHead(key);
 
       if (existing) {

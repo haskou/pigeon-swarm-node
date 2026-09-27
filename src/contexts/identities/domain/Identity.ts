@@ -15,6 +15,7 @@ import { DeviceCredential } from './value-objects/DeviceCredential';
 import { DeviceCredentialCommitment } from './value-objects/DeviceCredentialCommitment';
 import { IdentityAuthorizationRevision } from './value-objects/IdentityAuthorizationRevision';
 import { IdentityExternalIdentifier } from './value-objects/IdentityExternalIdentifier';
+import { IdentityVersion } from './value-objects/IdentityVersion';
 import { ProfileHandle } from './value-objects/ProfileHandle';
 import { RecoveryAuthority } from './value-objects/RecoveryAuthority';
 
@@ -108,6 +109,10 @@ export class Identity extends AggregateRoot {
 
   public isFirstVersion(): boolean {
     return this.publication.isFirstVersion();
+  }
+
+  public getVersion(): IdentityVersion {
+    return this.publication.getVersion();
   }
 
   public hasInitialAuthorizationRevision(): boolean {

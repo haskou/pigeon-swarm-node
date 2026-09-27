@@ -70,6 +70,7 @@ describe(ProvisionDeviceAuthorizationWhenIdentityUpdated.name, () => {
 
     expect(message).toBeInstanceOf(DeviceAuthorizationProvisionMessage);
     expect(message.identityId.isEqual(mother.id)).toBe(true);
+    expect(message.identityVersion.valueOf()).toBe(2);
     expect(message.networkIds).toEqual(networkIds);
     expect(message.credential.isEqual(mother.deviceCredential)).toBe(true);
     expect(message.recoveryAuthority.isEqual(mother.recoveryAuthority)).toBe(

@@ -40,6 +40,7 @@ export default class IdentityPublisher {
     await this.deviceAuthorizationProvisioner.provision(
       new DeviceAuthorizationProvisionMessage(
         new IdentityId(primitives.id),
+        identity.getVersion(),
         identity.getNetworkIds(),
         identity.getInitialDeviceCredential(),
         identity.getRecoveryAuthority(),

@@ -10,6 +10,7 @@ import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/P
 import OrbitDBDeviceAuthorizationRepository from '@app/contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationRepository';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
+import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -226,7 +227,11 @@ async function main(): Promise<void> {
     DeviceCredential.fromString(owner.toPrimitives().publicKey),
     RecoveryAuthority.fromString(recovery.toPrimitives().publicKey),
   );
-  await Promise.all(nodes.map((node) => node.repository!.provision(genesis)));
+  await Promise.all(
+    nodes.map((node) =>
+      node.repository!.provision(genesis, new IdentityVersion(1)),
+    ),
+  );
 
   stage = 'partitioned concurrent authorization';
   const firstDevice = await KeyPair.generate();

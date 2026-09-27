@@ -62,6 +62,7 @@ export default class ProvisionDeviceAuthorizationWhenIdentityUpdated extends Con
     await this.provisioner.provision(
       new DeviceAuthorizationProvisionMessage(
         identityId,
+        identity.getVersion(),
         identity.getNetworkIds(),
         identity.getInitialDeviceCredential(),
         identity.getRecoveryAuthority(),

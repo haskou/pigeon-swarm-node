@@ -17,6 +17,7 @@ export default class DeviceAuthorizationProvisioner {
         message.credential,
         message.recoveryAuthority,
       ),
+      message.identityVersion,
     );
   }
 }
