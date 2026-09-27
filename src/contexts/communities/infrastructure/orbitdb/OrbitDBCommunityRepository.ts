@@ -39,6 +39,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
         typeof record.id === 'string' ? record.id : undefined,
       shouldReplace: (current, candidate) =>
         this.isNewerOrEqualDocument(current, candidate),
+      tombstoneMetadata: (record) => ({ networkId: record.networkId }),
     });
   }
 
@@ -168,6 +169,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       {
         recordFilter: (candidate) =>
           candidate.id === document.id &&
+          candidate.deleted !== true &&
           Array.isArray(candidate.memberIds) &&
           candidate.memberIds.includes(memberId),
         replace: true,
@@ -189,6 +191,14 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
   }
 
   private async persist(document: OrbitDBCommunityDocument): Promise<void> {
+    const current = this.registry.findCachedHead(
+      this.communityHeadKey(document.id),
+    );
+    const memberIds = new Set([
+      ...document.memberIds,
+      ...(current && this.isStoredDocument(current) ? current.memberIds : []),
+    ]);
+
     await this.publicStorageGuard.runWhilePublic(
       new CommunityId(document.id),
       async () => {
@@ -197,7 +207,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
           this.registry.putDocument('communities', document, [
             document.networkId,
           ]),
-          ...document.memberIds.map((memberId) =>
+          ...[...memberIds].map((memberId) =>
             this.putMemberIndex(memberId, document),
           ),
         ]);

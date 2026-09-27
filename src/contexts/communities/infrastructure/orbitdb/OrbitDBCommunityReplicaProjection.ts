@@ -1,4 +1,3 @@
-import { OrbitDBReplicatedHeadCollectionName } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCollectionName';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { CommunityId } from '../../domain/value-objects/CommunityId';
@@ -6,10 +5,13 @@ import PrivateCommunityPublicStorageGuard from '../PrivateCommunityPublicStorage
 import { OrbitDBCommunityDocument } from './documents/OrbitDBCommunityDocument';
 import OrbitDBCommunityReplicaMerger from './OrbitDBCommunityReplicaMerger';
 
-export default class OrbitDBCommunityReplicaProjection {
-  private readonly memberIndexCollectionName =
-    new OrbitDBReplicatedHeadCollectionName('communities');
+type OrbitDBCommunityTombstone = Record<string, unknown> & {
+  id: string;
+  networkId: string;
+  removed: true;
+};
 
+export default class OrbitDBCommunityReplicaProjection {
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly merger: OrbitDBCommunityReplicaMerger,
@@ -37,18 +39,13 @@ export default class OrbitDBCommunityReplicaProjection {
     key: string,
     value: Record<string, unknown>,
   ): void {
-    const communityIds = this.documents(value).map(
-      (document) => new CommunityId(document.id),
+    const communityIds = this.indexRecords(value).map(
+      (record) => new CommunityId(record.id),
     );
 
     if (communityIds.length === 0) return;
     this.publicStorageGuard.runInBackgroundWhilePublicScopes(communityIds, () =>
-      this.registry.putHeadReplacingReplicas(
-        key,
-        value,
-        [networkId],
-        this.memberIndexCollectionName,
-      ),
+      this.registry.putHeadExactly(key, value, [networkId]),
     );
   }
 
@@ -58,6 +55,7 @@ export default class OrbitDBCommunityReplicaProjection {
     const record = value as Record<string, unknown>;
 
     return (
+      record.removed !== true &&
       [
         'id',
         'networkId',
@@ -72,29 +70,81 @@ export default class OrbitDBCommunityReplicaProjection {
     );
   }
 
-  private documents(
+  private isTombstone(value: unknown): value is OrbitDBCommunityTombstone {
+    if (typeof value !== 'object' || value === null || Array.isArray(value))
+      return false;
+    const record = value as Record<string, unknown>;
+
+    return (
+      typeof record.id === 'string' &&
+      typeof record.networkId === 'string' &&
+      record.removed === true &&
+      typeof record.updatedAt === 'number' &&
+      Number.isFinite(record.updatedAt)
+    );
+  }
+
+  private indexRecords(
     record: Record<string, unknown> | undefined,
-  ): OrbitDBCommunityDocument[] {
+  ): Array<OrbitDBCommunityDocument | OrbitDBCommunityTombstone> {
     const values: unknown = record?.communities;
 
     return Array.isArray(values)
-      ? values.filter((value): value is OrbitDBCommunityDocument =>
-          this.isDocument(value),
+      ? values.filter(
+          (
+            value,
+          ): value is OrbitDBCommunityDocument | OrbitDBCommunityTombstone =>
+            this.isDocument(value) || this.isTombstone(value),
         )
       : [];
+  }
+
+  private documents(
+    record: Record<string, unknown> | undefined,
+  ): OrbitDBCommunityDocument[] {
+    return this.indexRecords(record).filter(
+      (value): value is OrbitDBCommunityDocument => this.isDocument(value),
+    );
+  }
+
+  private freshness(record: Record<string, unknown>): number {
+    return Math.max(
+      typeof record.updatedAt === 'number' ? record.updatedAt : 0,
+      typeof record.deletedAt === 'number' ? record.deletedAt : 0,
+      typeof record.createdAt === 'number' ? record.createdAt : 0,
+    );
+  }
+
+  private mergeIndexRecord(
+    current: OrbitDBCommunityDocument | OrbitDBCommunityTombstone,
+    candidate: OrbitDBCommunityDocument | OrbitDBCommunityTombstone,
+  ): OrbitDBCommunityDocument | OrbitDBCommunityTombstone {
+    if (this.isTombstone(current) || this.isTombstone(candidate)) {
+      return this.freshness(current) <= this.freshness(candidate)
+        ? candidate
+        : current;
+    }
+
+    return this.merger.merge(current, candidate);
   }
 
   private mergeIndex(
     current: Record<string, unknown> | undefined,
     candidate: Record<string, unknown>,
   ): Record<string, unknown> {
-    const documents = new Map<string, OrbitDBCommunityDocument>();
+    const documents = new Map<
+      string,
+      OrbitDBCommunityDocument | OrbitDBCommunityTombstone
+    >();
     for (const document of [
-      ...this.documents(current),
-      ...this.documents(candidate),
+      ...this.indexRecords(current),
+      ...this.indexRecords(candidate),
     ]) {
-      const previous = documents.get(document.id) ?? document;
-      documents.set(document.id, this.merger.merge(previous, document));
+      const previous = documents.get(document.id);
+      documents.set(
+        document.id,
+        previous ? this.mergeIndexRecord(previous, document) : document,
+      );
     }
 
     return {
@@ -113,7 +163,7 @@ export default class OrbitDBCommunityReplicaProjection {
     networkId: string,
     record: Record<string, unknown>,
   ): Record<string, unknown> | undefined {
-    const communities = this.documents(record).filter(
+    const communities = this.indexRecords(record).filter(
       (document) => document.networkId === networkId,
     );
 

@@ -169,6 +169,58 @@ describe('OrbitDBHeadIndex', () => {
     });
   });
 
+  it('replicates tombstones for documents omitted by a replacement', async () => {
+    await index.putDocuments(
+      'index:key',
+      { id: 'index:key' },
+      [document('retained', 1), document('removed', 1)],
+      { networkIds: [networkId] },
+    );
+
+    await index.putDocuments(
+      'index:key',
+      { id: 'index:key' },
+      [document('retained', 2)],
+      { networkIds: [networkId], replace: true },
+    );
+
+    await expect(heads.get('index:key')).resolves.toEqual({
+      id: 'index:key',
+      items: [
+        document('retained', 2),
+        expect.objectContaining({ id: 'removed', removed: true }),
+      ],
+      updatedAt: expect.any(Number),
+    });
+    await expect(index.find('index:key')).resolves.toEqual([
+      document('retained', 2),
+    ]);
+  });
+
+  it('replicates a tombstone when a filtered record leaves its index', async () => {
+    await index.putRecord(
+      'index:key',
+      { id: 'index:key' },
+      document('removed', 1, 'included'),
+      [networkId],
+    );
+
+    await index.putRecord(
+      'index:key',
+      { id: 'index:key' },
+      document('removed', 2, 'excluded'),
+      [networkId],
+      { recordFilter: (record) => record.value !== 'excluded', replace: true },
+    );
+
+    await expect(heads.get('index:key')).resolves.toEqual({
+      id: 'index:key',
+      items: [expect.objectContaining({ id: 'removed', removed: true })],
+      updatedAt: expect.any(Number),
+    });
+    await expect(index.find('index:key')).resolves.toEqual([]);
+  });
+
   it('updates an available cached head while a background record merge is queued', async () => {
     index.replicateRecordInBackground(
       'index:key',

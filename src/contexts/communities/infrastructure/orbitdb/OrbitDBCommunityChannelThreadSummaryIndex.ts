@@ -2,6 +2,7 @@ import { CommunityChannelThreadSummary } from '@app/contexts/communities/domain/
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -10,10 +11,24 @@ import { OrbitDBCommunityChannelThreadSummaryDocument } from './documents/OrbitD
 import OrbitDBCommunityChannelMessageIndex from './OrbitDBCommunityChannelMessageIndex';
 
 export default class OrbitDBCommunityChannelThreadSummaryIndex {
+  private readonly summaryIndex: OrbitDBHeadIndex<OrbitDBCommunityChannelThreadSummaryDocument>;
+
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly messageIndex: OrbitDBCommunityChannelMessageIndex,
-  ) {}
+  ) {
+    this.summaryIndex = new OrbitDBHeadIndex(this.registry, {
+      collectionName: 'summaries',
+      documentFromRecord: (record) =>
+        this.isThreadSummaryRecord(record) ? record : undefined,
+      recordId: (record) =>
+        typeof record.rootMessageId === 'string'
+          ? record.rootMessageId
+          : undefined,
+      shouldReplace: (current, candidate) =>
+        current.lastReplyAt <= candidate.lastReplyAt,
+    });
+  }
 
   private byCreatedAtAscending(
     documents: OrbitDBCommunityChannelMessageDocument[],
@@ -41,6 +56,7 @@ export default class OrbitDBCommunityChannelThreadSummaryIndex {
     const summary = value as Record<string, unknown>;
 
     return (
+      summary.removed !== true &&
       typeof summary.lastReplyAt === 'number' &&
       typeof summary.lastReplyMessageId === 'string' &&
       typeof summary.replyCount === 'number' &&
@@ -48,32 +64,16 @@ export default class OrbitDBCommunityChannelThreadSummaryIndex {
     );
   }
 
-  private summariesFromHead(
-    document: Record<string, unknown> | undefined,
-  ): CommunityChannelThreadSummary[] | undefined {
-    if (!document) {
-      return undefined;
-    }
-
-    const summaries = document.summaries;
-
-    if (!Array.isArray(summaries)) {
-      return [];
-    }
-
-    return summaries
-      .filter((summary) => this.isThreadSummaryRecord(summary))
-      .map((summary) => CommunityChannelThreadSummary.fromPrimitives(summary));
-  }
-
   private async findHead(
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<CommunityChannelThreadSummary[] | undefined> {
-    return this.summariesFromHead(
-      await this.registry.findHead(
-        this.threadSummaryHeadKey(communityId.valueOf(), channelId.valueOf()),
-      ),
+    const documents = await this.summaryIndex.find(
+      this.threadSummaryHeadKey(communityId.valueOf(), channelId.valueOf()),
+    );
+
+    return documents?.map((document) =>
+      CommunityChannelThreadSummary.fromPrimitives(document),
     );
   }
 
@@ -82,24 +82,21 @@ export default class OrbitDBCommunityChannelThreadSummaryIndex {
     channelId: CommunityChannelId,
     summaries: CommunityChannelThreadSummary[],
   ): Promise<void> {
-    await this.registry.putHeadExactly(
-      this.threadSummaryHeadKey(communityId.valueOf(), channelId.valueOf()),
-      this.headDocument(communityId, channelId, summaries),
+    const key = this.threadSummaryHeadKey(
+      communityId.valueOf(),
+      channelId.valueOf(),
     );
-  }
 
-  private headDocument(
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-    summaries: CommunityChannelThreadSummary[],
-  ): Record<string, unknown> {
-    return {
-      channelId: channelId.valueOf(),
-      communityId: communityId.valueOf(),
-      id: this.threadSummaryHeadKey(communityId.valueOf(), channelId.valueOf()),
-      summaries: summaries.map((summary) => summary.toPrimitives()),
-      updatedAt: Date.now(),
-    };
+    await this.summaryIndex.putDocuments(
+      key,
+      {
+        channelId: channelId.valueOf(),
+        communityId: communityId.valueOf(),
+        id: key,
+      },
+      summaries.map((summary) => summary.toPrimitives()),
+      { replace: true },
+    );
   }
 
   private channelIdValueSet(channelIds: CommunityChannelId[]): Set<string> {

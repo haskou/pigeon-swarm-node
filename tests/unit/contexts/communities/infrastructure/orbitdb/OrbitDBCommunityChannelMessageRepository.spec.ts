@@ -585,6 +585,17 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
 
     expect(query).toHaveBeenCalled();
     expect(summaries.get('channel-1')).toEqual([]);
+    expect(
+      heads.get(
+        'community-channel-thread-summaries:community-1:channel-1',
+      )?.summaries,
+    ).toEqual([
+      {
+        removed: true,
+        rootMessageId: 'root-1',
+        updatedAt: expect.any(Number),
+      },
+    ]);
   });
 });
 

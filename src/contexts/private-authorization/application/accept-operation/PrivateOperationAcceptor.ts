@@ -200,14 +200,29 @@ export default class PrivateOperationAcceptor {
     };
   }
 
-  private async acceptNewOperation(
+  private async authorizeCurrentOrReceipt(
     message: PrivateOperationAcceptMessage,
     routed: PrivateControlOperation,
+  ): Promise<
+    Awaited<ReturnType<PrivateOperationAuthorizer['authorize']>> | undefined
+  > {
+    try {
+      return await this.authorizer.authorize(
+        message.signedOperationJson,
+        routed,
+      );
+    } catch (error) {
+      if (await this.hasReceipt(message, routed)) return undefined;
+
+      throw error;
+    }
+  }
+
+  private async acceptAuthorizedOperation(
+    message: PrivateOperationAcceptMessage,
+    authorized: Awaited<ReturnType<PrivateOperationAuthorizer['authorize']>>,
   ): Promise<PrivateOperationAcceptanceResult> {
-    const { operation, scope } = await this.authorizer.authorize(
-      message.signedOperationJson,
-      routed,
-    );
+    const { operation, scope } = authorized;
     const value = operation.toPrimitives();
 
     if (await this.duplicate(operation)) return { status: 'duplicate' };
@@ -264,6 +279,17 @@ export default class PrivateOperationAcceptor {
     }
 
     return { status: 'accepted' };
+  }
+
+  private async acceptNewOperation(
+    message: PrivateOperationAcceptMessage,
+    routed: PrivateControlOperation,
+  ): Promise<PrivateOperationAcceptanceResult> {
+    const authorized = await this.authorizeCurrentOrReceipt(message, routed);
+
+    return authorized
+      ? this.acceptAuthorizedOperation(message, authorized)
+      : { status: 'duplicate' };
   }
 
   public async accept(

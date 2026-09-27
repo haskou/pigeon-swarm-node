@@ -5,4 +5,5 @@ export type OrbitDBHeadIndexOptions<TDocument extends object> = {
   recordId(record: Record<string, unknown> | TDocument): string | undefined;
   merge?(current: TDocument, candidate: TDocument): TDocument;
   shouldReplace?(current: TDocument, candidate: TDocument): boolean;
+  tombstoneMetadata?(record: Record<string, unknown>): Record<string, unknown>;
 };

@@ -7,7 +7,6 @@ import OrbitDBReplicatedHeadCache, {
 } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCache';
 import { OrbitDBEntry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBEntry';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { OrbitDBReplicatedHeadCollectionName } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCollectionName';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 
 type Entry = {
@@ -1980,107 +1979,6 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       key,
       value: { id: key, reactions: [], updatedAt: 2 },
     });
-  });
-
-  it('propagates exact collection replacement to live replicas', async () => {
-    const writer = new OrbitDBReplicatedStateRegistry();
-    const replica = new OrbitDBReplicatedStateRegistry();
-    const writerNetwork = createStores();
-    const replicaNetwork = createStores();
-    const key = 'replacement-test:conversation-replica';
-    const registerMerger = (registry: OrbitDBReplicatedStateRegistry): void => {
-      registry.registerHeadRecordMerger(
-        'replacement-test:',
-        (current, candidate) => {
-          const currentReactions =
-            (current?.reactions as Record<string, unknown>[] | undefined) ?? [];
-          const candidateReactions =
-            (candidate.reactions as Record<string, unknown>[] | undefined) ??
-            [];
-
-          return {
-            ...candidate,
-            reactions: candidateReactions.map((reaction) => ({
-              ...currentReactions.find(
-                (currentReaction) => currentReaction.id === reaction.id,
-              ),
-              ...reaction,
-            })),
-          };
-        },
-      );
-    };
-    const initial = {
-      id: key,
-      reactions: [
-        { id: 'reaction-retained', removed: true, updatedAt: 1 },
-        { id: 'reaction-removed', updatedAt: 1 },
-      ],
-      updatedAt: 1,
-    };
-    const replacement = {
-      id: key,
-      reactions: [{ id: 'reaction-retained', updatedAt: 2 }],
-      updatedAt: 2,
-    };
-
-    registerMerger(writer);
-    registerMerger(replica);
-    await writer.register('network-1', writerNetwork.stores);
-    await replica.register('network-1', replicaNetwork.stores);
-    await writer.putHead(key, initial, ['network-1']);
-    await replica.putHead(key, initial, ['network-1']);
-    await writer.putHeadReplacingReplicas(
-      key,
-      replacement,
-      ['network-1'],
-      new OrbitDBReplicatedHeadCollectionName('reactions'),
-    );
-    const replicatedReplacement = await writerNetwork.heads.get(key);
-
-    replicaNetwork.heads.emitUpdate({
-      payload: { key, value: replicatedReplacement },
-    });
-
-    await expect(replica.findHead(key)).resolves.toEqual({
-      ...replacement,
-      reactions: [{ id: 'reaction-retained', removed: true, updatedAt: 2 }],
-    });
-  });
-
-  it('rejects an older exact replacement from a live replica', async () => {
-    const writer = new OrbitDBReplicatedStateRegistry();
-    const replica = new OrbitDBReplicatedStateRegistry();
-    const writerNetwork = createStores();
-    const replicaNetwork = createStores();
-    const key = 'replacement-test:conversation-newer';
-    const current = {
-      id: key,
-      reactions: [{ id: 'reaction-current', updatedAt: 2 }],
-      updatedAt: 2,
-    };
-    const olderReplacement: Record<string, unknown> = {
-      id: key,
-      reactions: [],
-      updatedAt: 1,
-    };
-
-    await writer.register('network-1', writerNetwork.stores);
-    await replica.register('network-1', replicaNetwork.stores);
-    await replica.putHead(key, current, ['network-1']);
-    await writer.putHeadReplacingReplicas(
-      key,
-      olderReplacement,
-      ['network-1'],
-      new OrbitDBReplicatedHeadCollectionName('reactions'),
-    );
-    const replicatedReplacement = await writerNetwork.heads.get(key);
-
-    replicaNetwork.heads.emitUpdate({
-      payload: { key, value: replicatedReplacement },
-    });
-
-    await expect(replica.findHead(key)).resolves.toEqual(current);
   });
 
   it('rolls back an exact projection when durable replacement fails', async () => {

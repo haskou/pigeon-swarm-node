@@ -179,11 +179,14 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     await repository.save(ownReaction);
 
     const storedIndex = headRecords.get(indexKey);
-    expect(
-      (storedIndex?.reactions as Array<{ communityId: string }>).map(
-        (reaction) => reaction.communityId,
-      ),
-    ).toEqual([communityId.valueOf()]);
+    expect(storedIndex?.reactions).toEqual([
+      {
+        id: poisoned.id,
+        removed: true,
+        updatedAt: expect.any(Number),
+      },
+      expect.objectContaining({ communityId: communityId.valueOf() }),
+    ]);
   });
 
   it('keeps saving pending until reaction index persistence finishes', async () => {

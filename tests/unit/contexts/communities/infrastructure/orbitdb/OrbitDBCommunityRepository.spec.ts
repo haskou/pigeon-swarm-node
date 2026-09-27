@@ -297,6 +297,8 @@ describe('OrbitDBCommunityRepository', () => {
 
     community.addMember(identityMother.id, memberId);
     await repository.save(community);
+    const memberIndexKey = `community-member-index:${memberId.valueOf()}:community-1`;
+    const staleMemberIndex = registry.findCachedHead(memberIndexKey);
 
     community.leave(memberId);
     await repository.save(community);
@@ -306,6 +308,16 @@ describe('OrbitDBCommunityRepository', () => {
         memberIds: [identityMother.id.valueOf()],
       }),
     );
+    expect(registry.findCachedHead(memberIndexKey)).toEqual(
+      expect.objectContaining({
+        communities: [
+          expect.objectContaining({ id: 'community-1', removed: true }),
+        ],
+      }),
+    );
+    if (staleMemberIndex) {
+      await registry.putHead(memberIndexKey, staleMemberIndex, [networkId]);
+    }
     await expect(repository.findByMember(memberId)).resolves.toEqual([]);
   });
 
