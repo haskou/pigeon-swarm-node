@@ -478,6 +478,48 @@ describe('IpfsIdentityRepository', () => {
       expect(result.toPrimitives()).toEqual(primitives);
     });
 
+    it('should reject an embedded metadata identity that rolls back authorization revision', async () => {
+      const genesis = await mother.buildNext({
+        previousIdentityExternalIdentifier: undefined,
+        version: 1,
+      });
+      const advanced = await mother.buildNext({
+        authorizationRevision: 2,
+        previousIdentityExternalIdentifier: 'bafy-identity-v1',
+        version: 2,
+      });
+      const rollback = await mother.buildNext({
+        authorizationRevision: 1,
+        previousIdentityExternalIdentifier: 'bafy-identity-v2',
+        version: 3,
+      });
+      const primitives = rollback.toPrimitives();
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          cid: 'bafy-identity-v3',
+          identity: rollback,
+          identityId: primitives.id,
+          previousCid: primitives.previousIdentityExternalIdentifier,
+          receivedAt: Date.now(),
+          version: primitives.version,
+        },
+      ]);
+      ipfsManager.getJSON.mockImplementation(<T>(cid: IPFSId): Promise<T> => {
+        const identity =
+          cid.valueOf() === 'bafy-identity-v2' ? advanced : genesis;
+
+        return Promise.resolve(mapper.toDocument(identity) as T);
+      });
+
+      const result = await repository.findById(new IdentityId(primitives.id));
+
+      expect(result.toPrimitives()).toEqual(advanced.toPrimitives());
+      expect(metadataRepository.deleteByExternalIdentifier).toHaveBeenCalledWith(
+        new IPFSId('bafy-identity-v3'),
+      );
+    });
+
     it('should not wait for DHT candidates when metadata has a valid candidate without connected peers', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
@@ -728,7 +770,7 @@ describe('IpfsIdentityRepository', () => {
       expect(result.toPrimitives()).toEqual(candidate.toPrimitives());
     });
 
-    it('should not resolve previous identity versions for trusted mongo metadata', async () => {
+    it('should validate the previous chain for identity metadata', async () => {
       const previousIdentity = await mother.build();
       const previousPrimitives = previousIdentity.toPrimitives();
       const previousCidString = 'bafypreviousidentity';
@@ -747,15 +789,24 @@ describe('IpfsIdentityRepository', () => {
           version: candidate.toPrimitives().version,
         },
       ]);
-      ipfsManager.getJSON.mockResolvedValue(mapper.toDocument(candidate));
+      ipfsManager.getJSON.mockImplementation(<T>(cid: IPFSId): Promise<T> => {
+        const identity = cid.isEqual(new IPFSId(currentCidString))
+          ? candidate
+          : previousIdentity;
+
+        return Promise.resolve(mapper.toDocument(identity) as T);
+      });
 
       const result = await repository.findById(
         new IdentityId(previousPrimitives.id),
       );
 
-      expect(ipfsManager.getJSON).toHaveBeenCalledTimes(1);
+      expect(ipfsManager.getJSON).toHaveBeenCalledTimes(2);
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(
         new IPFSId(currentCidString),
+      );
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+        new IPFSId(previousCidString),
       );
       expect(result.toPrimitives()).toEqual(candidate.toPrimitives());
     });

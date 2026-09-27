@@ -221,7 +221,13 @@ export default class IpfsIdentityRepository extends IdentityRepository {
         metadata.identity ||
         (await this.getIdentityFromCid(cid, metadata.networkIds));
 
-      if (!this.validator.isValidFor(id, candidate)) {
+      const isValid = await this.validator.isValidChainFor(
+        id,
+        candidate,
+        (externalIdentifier) => this.findPreviousIdentity(externalIdentifier),
+      );
+
+      if (!isValid) {
         this.identityByCid.delete(cid.valueOf());
         await this.deleteMetadata(cid);
 
