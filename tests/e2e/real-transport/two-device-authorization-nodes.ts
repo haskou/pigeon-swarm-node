@@ -9,6 +9,7 @@ import { PairingAuthorization } from '@app/contexts/identity-devices/domain/valu
 import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/PairingId';
 import OrbitDBDeviceAuthorizationRepository from '@app/contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationRepository';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
@@ -229,7 +230,11 @@ async function main(): Promise<void> {
   );
   await Promise.all(
     nodes.map((node) =>
-      node.repository!.provision(genesis, new IdentityVersion(1)),
+      node.repository!.provision(
+        genesis,
+        new IdentityVersion(1),
+        new IdentityExternalIdentifier('bafy-genesis'),
+      ),
     ),
   );
 

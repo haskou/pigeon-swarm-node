@@ -1,4 +1,5 @@
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
@@ -34,6 +35,11 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   private readonly routingVersionByIdentity = new Map<
     string,
     IdentityVersion
+  >();
+
+  private readonly routingExternalIdentifierByIdentity = new Map<
+    string,
+    IdentityExternalIdentifier
   >();
 
   public constructor(
@@ -78,6 +84,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   private rememberRoutingNetworks(
     authorization: DeviceAuthorization,
     identityVersion: IdentityVersion,
+    identityExternalIdentifier: IdentityExternalIdentifier,
   ): void {
     const identityId = authorization.getIdentityId().valueOf();
     const currentVersion = this.routingVersionByIdentity.get(identityId);
@@ -89,7 +96,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
         identityId,
         currentVersion,
         identityVersion,
-        candidateNetworkIds,
+        identityExternalIdentifier,
       )
     ) {
       return;
@@ -97,6 +104,10 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
 
     this.routingNetworkIdsByIdentity.set(identityId, candidateNetworkIds);
     this.routingVersionByIdentity.set(identityId, identityVersion);
+    this.routingExternalIdentifierByIdentity.set(
+      identityId,
+      identityExternalIdentifier,
+    );
     this.trustedGenesisByIdentity.set(identityId, authorization);
   }
 
@@ -104,7 +115,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     identityId: string,
     currentVersion: IdentityVersion,
     candidateVersion: IdentityVersion,
-    candidateNetworkIds: string[],
+    candidateExternalIdentifier: IdentityExternalIdentifier,
   ): boolean {
     if (candidateVersion.isGreaterThan(currentVersion)) {
       return true;
@@ -114,16 +125,17 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       return false;
     }
 
-    const currentNetworkIds = this.routingNetworkIdsByIdentity.get(identityId);
+    const currentExternalIdentifier =
+      this.routingExternalIdentifierByIdentity.get(identityId);
 
     assert(
-      currentNetworkIds !== undefined,
+      currentExternalIdentifier !== undefined,
       new InvalidDeviceAuthorizationTransitionError(),
     );
 
     return (
-      this.canonicalString(candidateNetworkIds) <
-      this.canonicalString(currentNetworkIds)
+      candidateExternalIdentifier.valueOf() <
+      currentExternalIdentifier.valueOf()
     );
   }
 
@@ -157,14 +169,25 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     }
 
     try {
-      const identity = await this.identityRepository.findById(identityId);
+      const [candidate] =
+        await this.identityRepository.findCandidateReferencesById(identityId);
+
+      assert(
+        candidate !== undefined,
+        new InvalidDeviceAuthorizationTransitionError(),
+      );
+      const identity = candidate.getIdentity();
       const genesis = DeviceAuthorization.genesis(
         identityId,
         identity.getNetworkIds(),
         identity.getInitialDeviceCredential(),
         identity.getRecoveryAuthority(),
       );
-      this.rememberRoutingNetworks(genesis, identity.getVersion());
+      this.rememberRoutingNetworks(
+        genesis,
+        identity.getVersion(),
+        candidate.getExternalIdentifier(),
+      );
 
       return genesis;
     } catch {
@@ -580,21 +603,25 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
           ? candidate
           : this.toDocument(trustedGenesis, []);
 
-      if (document !== candidate) {
-        await this.save(document);
-      }
+      const resolved =
+        document !== candidate ? await this.save(document) : document;
 
-      return DeviceAuthorization.fromPrimitives(document.authorization);
+      return DeviceAuthorization.fromPrimitives(resolved.authorization);
     });
   }
 
   public provision(
     authorization: DeviceAuthorization,
     identityVersion: IdentityVersion,
+    identityExternalIdentifier: IdentityExternalIdentifier,
   ): Promise<void> {
     return this.withIdentityLock(authorization.getIdentityId(), async () => {
       const key = this.headKey(authorization.getIdentityId());
-      this.rememberRoutingNetworks(authorization, identityVersion);
+      this.rememberRoutingNetworks(
+        authorization,
+        identityVersion,
+        identityExternalIdentifier,
+      );
       const existing = await this.registry.findHead(key);
 
       if (existing) {

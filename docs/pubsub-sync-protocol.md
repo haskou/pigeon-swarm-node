@@ -394,12 +394,16 @@ The public identity publication binds an independent genesis device credential
 and its commitment under the identity signature. The node does not derive that
 credential from the identity key.
 
-Concurrent valid transitions from the same predecessor are ordered by operation
-UUID, independent of arrival time. Each replica replays the same signed candidates
-from the pinned genesis checkpoint and therefore selects the same authorization
-state after exchanging heads. Both devices sign the pairing identifier,
-authorization time and expiration, and the target client must refuse to complete
-an offer after that expiration. Replicas validate that signed interval but do not
+Concurrent valid transitions from the same predecessor are resolved independently
+of arrival time. A recovery transition has precedence over every sibling; when
+there are multiple recoveries, the lowest operation UUID wins. Without recovery,
+all sibling revocations are applied together before any enrollment. When only
+enrollments remain, the lowest operation UUID wins, with the canonical signed
+record as the final tie-break for equivocation. Each replica replays the same
+signed candidates from the pinned genesis checkpoint and therefore selects the
+same authorization state after exchanging heads. Both devices sign the pairing
+identifier, authorization time and expiration, and the target client must refuse
+to complete an offer after that expiration. Replicas validate that signed interval but do not
 compare it with their receipt clock: a fully signed enrollment may arrive after an
 offline partition and must replay identically everywhere. Pairing and operation
 identifiers remain permanent replay tombstones. Signed time never grants authority

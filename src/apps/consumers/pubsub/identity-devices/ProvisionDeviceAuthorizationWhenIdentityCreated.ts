@@ -63,6 +63,7 @@ export default class ProvisionDeviceAuthorizationWhenIdentityCreated extends Con
       new DeviceAuthorizationProvisionMessage(
         identityId,
         identity.getVersion(),
+        candidate.getExternalIdentifier(),
         identity.getNetworkIds(),
         identity.getInitialDeviceCredential(),
         identity.getRecoveryAuthority(),

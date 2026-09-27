@@ -1,3 +1,4 @@
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
@@ -16,5 +17,6 @@ export abstract class DeviceAuthorizationRepository {
   public abstract provision(
     authorization: DeviceAuthorization,
     identityVersion: IdentityVersion,
+    identityExternalIdentifier: IdentityExternalIdentifier,
   ): Promise<void>;
 }

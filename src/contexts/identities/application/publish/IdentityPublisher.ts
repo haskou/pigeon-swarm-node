@@ -41,6 +41,7 @@ export default class IdentityPublisher {
       new DeviceAuthorizationProvisionMessage(
         new IdentityId(primitives.id),
         identity.getVersion(),
+        externalIdentifier,
         identity.getNetworkIds(),
         identity.getInitialDeviceCredential(),
         identity.getRecoveryAuthority(),

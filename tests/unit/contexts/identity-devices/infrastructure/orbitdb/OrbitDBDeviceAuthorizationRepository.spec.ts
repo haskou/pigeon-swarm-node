@@ -8,9 +8,11 @@ import { PairingAuthorization } from '@app/contexts/identity-devices/domain/valu
 import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/PairingId';
 import OrbitDBDeviceAuthorizationRepository from '@app/contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationRepository';
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentityCandidate } from '@app/contexts/identities/domain/IdentityCandidate';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -22,6 +24,9 @@ import { mock } from 'jest-mock-extended';
 
 describe(OrbitDBDeviceAuthorizationRepository.name, () => {
   const now = new Timestamp(1_800_000_000_000);
+  const genesisExternalIdentifier = new IdentityExternalIdentifier(
+    'bafy-genesis',
+  );
 
   async function fixture() {
     const owner = await KeyPair.generate();
@@ -71,6 +76,19 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     };
   }
 
+  function provisionAuthorization(
+    repository: OrbitDBDeviceAuthorizationRepository,
+    authorization: DeviceAuthorization,
+    version = 1,
+    externalIdentifier = genesisExternalIdentifier,
+  ): Promise<void> {
+    return repository.provision(
+      authorization,
+      new IdentityVersion(version),
+      externalIdentifier,
+    );
+  }
+
   async function enrollment(
     identityId: IdentityId,
     owner: KeyPair,
@@ -109,7 +127,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000001',
       '10000000-0000-4000-8000-000000000001',
     );
-    await repository.provision(genesis, new IdentityVersion(1));
+    await provisionAuthorization(repository, genesis);
 
     const applied = await repository.compareAndApply(transition);
 
@@ -146,7 +164,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       target.sign(unsigned.getProofOfPossessionPayload()),
     );
     const transition = proven.authorize(owner.sign(proven.getSigningPayload()));
-    await repository.provision(genesis, new IdentityVersion(1));
+    await provisionAuthorization(repository, genesis);
 
     await expect(repository.compareAndApply(transition)).rejects.toThrow();
   });
@@ -176,7 +194,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       genesis,
       transition,
     );
-    await repository.provision(genesis, new IdentityVersion(1));
+    await provisionAuthorization(repository, genesis);
 
     const merged = getMerger()?.(getHead(), {
       authorization: authorization.toPrimitives(),
@@ -210,7 +228,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000002',
       pairingId,
     );
-    await repository.provision(genesis, new IdentityVersion(1));
+    await provisionAuthorization(repository, genesis);
     await repository.compareAndApply(accepted);
 
     await expect(repository.compareAndApply(replay)).rejects.toThrow();
@@ -236,8 +254,8 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000002',
       '10000000-0000-4000-8000-000000000002',
     );
-    await first.repository.provision(genesis, new IdentityVersion(1));
-    await second.repository.provision(genesis, new IdentityVersion(1));
+    await provisionAuthorization(first.repository, genesis);
+    await provisionAuthorization(second.repository, genesis);
     await first.repository.compareAndApply(lexicographicWinner);
     await second.repository.compareAndApply(other);
 
@@ -273,10 +291,10 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000001',
       '10000000-0000-4000-8000-000000000001',
     );
-    await first.repository.provision(genesis, new IdentityVersion(1));
+    await provisionAuthorization(first.repository, genesis);
     await first.repository.compareAndApply(enrolled);
     second.setHead(first.getHead() ?? {});
-    await second.repository.provision(genesis, new IdentityVersion(1));
+    await provisionAuthorization(second.repository, genesis);
     const revokeAttacker = DeviceAuthorizationTransition.revocation(
       identityId,
       new DeviceAuthorizationOperationId(
@@ -324,10 +342,10 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000001',
       '10000000-0000-4000-8000-000000000001',
     );
-    await first.repository.provision(genesis, new IdentityVersion(1));
+    await provisionAuthorization(first.repository, genesis);
     await first.repository.compareAndApply(initialEnrollment);
     second.setHead(first.getHead() ?? {});
-    await second.repository.provision(genesis, new IdentityVersion(1));
+    await provisionAuthorization(second.repository, genesis);
     const operationId = new DeviceAuthorizationOperationId(
       '00000000-0000-4000-8000-000000000002',
     );
@@ -387,10 +405,10 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000001',
       '10000000-0000-4000-8000-000000000001',
     );
-    await local.repository.provision(genesis, new IdentityVersion(1));
+    await provisionAuthorization(local.repository, genesis);
     await local.repository.compareAndApply(initialEnrollment);
     remote.setHead(local.getHead() ?? {});
-    await remote.repository.provision(genesis, new IdentityVersion(1));
+    await provisionAuthorization(remote.repository, genesis);
     const revocation = DeviceAuthorizationTransition.revocation(
       identityId,
       new DeviceAuthorizationOperationId(
@@ -456,7 +474,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000001',
       '10000000-0000-4000-8000-000000000001',
     );
-    await repository.provision(genesis, new IdentityVersion(1));
+    await provisionAuthorization(repository, genesis);
     const trusted = getHead();
     const injected = {
       ...trusted,
@@ -491,7 +509,13 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     identity.getRecoveryAuthority.mockReturnValue(
       genesis.getRecoveryAuthority(),
     );
-    identityRepository.findById.mockResolvedValue(identity);
+    identity.getVersion.mockReturnValue(new IdentityVersion(1));
+    identityRepository.findCandidateReferencesById.mockResolvedValue([
+      new IdentityCandidate(
+        genesisExternalIdentifier,
+        identity,
+      ),
+    ]);
     setHead({
       authorization: malicious.toPrimitives(),
       genesis: malicious.toPrimitives(),
@@ -504,6 +528,37 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const restored = await repository.find(identityId);
 
     expect(restored?.toPrimitives()).toEqual(genesis.toPrimitives());
+  });
+
+  it('returns a concurrently merged checkpoint when repairing an untrusted head', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const target = await KeyPair.generate();
+    const { getHead, registry, repository, setHead } = repositoryFixture();
+    const transition = await enrollment(
+      identityId,
+      owner,
+      target,
+      '00000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+    );
+    await provisionAuthorization(repository, genesis);
+    await repository.compareAndApply(transition);
+    const concurrentHead = getHead();
+    setHead({ kind: 'untrusted' });
+    registry.putHead.mockImplementationOnce(() => {
+      setHead(concurrentHead ?? {});
+
+      return Promise.resolve();
+    });
+
+    const restored = await repository.find(identityId);
+
+    expect(restored?.getRevision().valueOf()).toBe(1);
+    expect(
+      restored?.isAuthorized(
+        DeviceCredential.fromString(target.toPrimitives().publicKey),
+      ),
+    ).toBe(true);
   });
 
   it('preserves authorization history when identity routing networks expand', async () => {
@@ -535,12 +590,17 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       genesis.getCredentials()[0],
       RecoveryAuthority.fromString(recovery.toPrimitives().publicKey),
     );
-    await repository.provision(genesis, new IdentityVersion(1));
+    await provisionAuthorization(repository, genesis);
     await repository.compareAndApply(enrolled);
     const revisionOne = getHead();
 
-    await repository.provision(expandedGenesis, new IdentityVersion(2));
-    await repository.provision(genesis, new IdentityVersion(1));
+    await provisionAuthorization(
+      repository,
+      expandedGenesis,
+      2,
+      new IdentityExternalIdentifier('bafy-expanded'),
+    );
+    await provisionAuthorization(repository, genesis);
     await repository.compareAndApply(
       revocation.authorize(owner.sign(revocation.getSigningPayload())),
     );
@@ -573,11 +633,11 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     );
   });
 
-  it('selects the same routing networks for equal-version identity forks', async () => {
+  it('selects routing for equal-version identity forks by canonical content identifier', async () => {
     const { genesis, identityId } = await fixture();
     const preferredNetworkId =
-      '550e8400-e29b-41d4-a716-446655440001';
-    const otherNetworkId = '550e8400-e29b-41d4-a716-446655440002';
+      '550e8400-e29b-41d4-a716-446655440002';
+    const otherNetworkId = '550e8400-e29b-41d4-a716-446655440001';
     const preferred = DeviceAuthorization.genesis(
       identityId,
       [...genesis.getNetworkIds(), new NetworkId(preferredNetworkId)],
@@ -593,10 +653,13 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const first = repositoryFixture();
     const second = repositoryFixture();
 
-    await first.repository.provision(preferred, new IdentityVersion(2));
-    await first.repository.provision(other, new IdentityVersion(2));
-    await second.repository.provision(other, new IdentityVersion(2));
-    await second.repository.provision(preferred, new IdentityVersion(2));
+    const preferredIdentifier = new IdentityExternalIdentifier('bafy-a-fork');
+    const otherIdentifier = new IdentityExternalIdentifier('bafy-b-fork');
+
+    await provisionAuthorization(first.repository, preferred, 2, preferredIdentifier);
+    await provisionAuthorization(first.repository, other, 2, otherIdentifier);
+    await provisionAuthorization(second.repository, other, 2, otherIdentifier);
+    await provisionAuthorization(second.repository, preferred, 2, preferredIdentifier);
 
     const expectedNetworks = [
       '550e8400-e29b-41d4-a716-446655440000',
