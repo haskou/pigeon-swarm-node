@@ -9,6 +9,31 @@ type ServiceDefinition = {
 };
 
 describe('private authorization container wiring', () => {
+  it('resolves scope provisioning through the application service', () => {
+    const document = YAML.parse(
+      fs.readFileSync(
+        path.resolve(process.cwd(), 'config/container/services.yaml'),
+        'utf8',
+      ),
+    ) as { services: Record<string, ServiceDefinition> };
+    const definitions = Object.values(document.services);
+
+    expect(
+      definitions.some((definition) =>
+        definition.class?.endsWith(
+          '/private-authorization/application/provision-scope/PrivateAuthorizationScopeProvisioner',
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      definitions.some((definition) =>
+        definition.class?.endsWith(
+          '/apps/services/PigeonPrivateAuthorizationScopeProvisioner',
+        ),
+      ),
+    ).toBe(false);
+  });
+
   it('shares one storage coordinator across protection and public storage', () => {
     const document = YAML.parse(
       fs.readFileSync(

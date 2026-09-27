@@ -30,7 +30,6 @@ import { PrivateFreshnessGate } from '../contexts/private-authorization/applicat
 import { PrivateOperationAuthenticator } from '../contexts/private-authorization/application/accept-operation/PrivateOperationAuthenticator';
 import { PrivateOperationDecoder } from '../contexts/private-authorization/application/accept-operation/PrivateOperationDecoder';
 import { PrivateOperationUnitOfWork } from '../contexts/private-authorization/application/PrivateOperationUnitOfWork';
-import PrivateAuthorizationScopeProvisioner from '../contexts/private-authorization/application/provision-scope/PrivateAuthorizationScopeProvisioner';
 import { PrivateGenesisAuthenticator } from '../contexts/private-authorization/application/provision-scope/PrivateGenesisAuthenticator';
 import { PrivateGenesisProjectionAuthorizer } from '../contexts/private-authorization/application/provision-scope/PrivateGenesisProjectionAuthorizer';
 import { PrivateAuthorizationRepository } from '../contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
@@ -63,7 +62,6 @@ import { WebSocketRealtimeServer } from '../shared/infrastructure/websocket/WebS
 import { ApiSwaggerRegistrar } from './apis/ApiSwaggerRegistrar';
 import { applicationRoutes } from './ApplicationRoutes';
 import { ApplicationServiceClass } from './ApplicationServiceClass';
-import PigeonPrivateAuthorizationScopeProvisioner from './services/PigeonPrivateAuthorizationScopeProvisioner';
 
 export default class PigeonApplication {
   private readonly logger = new WinstonLogger();
@@ -232,10 +230,6 @@ export default class PigeonApplication {
         {
           token: PrivateGenesisProjectionAuthorizer,
           useClass: PrivateCommunityGenesisAuthorizer,
-        },
-        {
-          token: PrivateAuthorizationScopeProvisioner,
-          useClass: PigeonPrivateAuthorizationScopeProvisioner,
         },
         {
           token: CommunityRepository,

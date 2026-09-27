@@ -8,9 +8,9 @@
     { "$ref": "#/$defs/revocation" }
   ],
   "$defs": {
-    "base64url16": { "type": "string", "pattern": "^[A-Za-z0-9_-]{22}$" },
-    "base64url32": { "type": "string", "pattern": "^[A-Za-z0-9_-]{43}$" },
-    "base64url64": { "type": "string", "pattern": "^[A-Za-z0-9_-]{86}$" },
+    "base64url16": { "type": "string", "pattern": "^[A-Za-z0-9_-]{21}[AQgw]$" },
+    "base64url32": { "type": "string", "pattern": "^[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$" },
+    "base64url64": { "type": "string", "pattern": "^[A-Za-z0-9_-]{85}[AQgw]$" },
     "memberTarget": {
       "type": "object",
       "additionalProperties": false,
