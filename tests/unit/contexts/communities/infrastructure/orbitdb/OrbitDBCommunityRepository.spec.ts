@@ -171,6 +171,43 @@ describe('OrbitDBCommunityRepository', () => {
     );
   });
 
+  it('excludes protected communities before applying the discovery limit', async () => {
+    const protectedId = new CommunityId('protected');
+    const protectedCommunity = {
+      ...communityPrimitives(),
+      createdAt: 1780000000100,
+      id: protectedId.valueOf(),
+    };
+    await registry.putHead(
+      `community:${protectedId.valueOf()}`,
+      protectedCommunity,
+      [networkId],
+    );
+
+    for (let index = 0; index < 50; index += 1) {
+      const id = `public-${index}`;
+      await registry.putHead(
+        `community:${id}`,
+        {
+          ...communityPrimitives(),
+          createdAt: 1780000000000 - index,
+          id,
+        },
+        [networkId],
+      );
+    }
+
+    const discoverable = await repository.findDiscoverable(
+      { networkId },
+      [protectedId],
+    );
+
+    expect(discoverable).toHaveLength(50);
+    expect(
+      discoverable.map((community) => community.getId().valueOf()),
+    ).not.toContain(protectedId.valueOf());
+  });
+
   it('should persist channel mutations as newer community documents', async () => {
     const community = Community.fromPrimitives(communityPrimitives());
 

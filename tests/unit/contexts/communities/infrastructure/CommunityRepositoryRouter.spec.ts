@@ -30,6 +30,7 @@ describe('CommunityRepositoryRouter', () => {
     } as unknown as jest.Mocked<LocalPrivateCommunityRepository>;
     authorizationRepository = {
       findScope: jest.fn().mockResolvedValue({}),
+      findScopeIds: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<PrivateAuthorizationRepository>;
     router = new CommunityRepositoryRouter(
       publicRepository,
@@ -88,6 +89,17 @@ describe('CommunityRepositoryRouter', () => {
     await expect(router.findDiscoverable({})).resolves.toEqual([
       publicCommunity,
     ]);
+  });
+
+  it('excludes protected identifiers before public discovery pagination', async () => {
+    authorizationRepository.findScopeIds.mockResolvedValue(['protected']);
+
+    await router.findDiscoverable({ networkId: 'network' });
+
+    expect(publicRepository.findDiscoverable).toHaveBeenCalledWith(
+      { networkId: 'network' },
+      [id],
+    );
   });
 
   it('combines public and private member communities with private precedence', async () => {

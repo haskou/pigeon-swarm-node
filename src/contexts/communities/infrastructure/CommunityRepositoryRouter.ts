@@ -43,8 +43,12 @@ export default class CommunityRepositoryRouter extends CommunityRepository {
     networkId?: string;
     query?: string;
   }): Promise<Community[]> {
+    const protectedIds = (
+      await this.authorizationRepository.findScopeIds()
+    ).map((scopeId) => new CommunityId(scopeId));
+
     return this.removeProtected(
-      await this.publicRepository.findDiscoverable(options),
+      await this.publicRepository.findDiscoverable(options, protectedIds),
     );
   }
 

@@ -272,12 +272,16 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     return undefined;
   }
 
-  public async findDiscoverable(options: {
-    networkId?: string;
-    query?: string;
-  }): Promise<Community[]> {
+  public async findDiscoverable(
+    options: {
+      networkId?: string;
+      query?: string;
+    },
+    excludedIds: CommunityId[] = [],
+  ): Promise<Community[]> {
     const query = options.query?.trim();
     const regex = query ? new RegExp(this.escapeRegex(query), 'i') : undefined;
+    const excluded = new Set(excludedIds.map((id) => id.valueOf()));
     const documents = this.cachedCommunityDocuments().filter((document) => {
       const isDiscoverable = document.discoverable ?? true;
       const networkMatches = options.networkId
@@ -287,7 +291,12 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
         ? regex.test(document.name) || regex.test(document.description)
         : true;
 
-      return isDiscoverable && networkMatches && queryMatches;
+      return (
+        !excluded.has(document.id) &&
+        isDiscoverable &&
+        networkMatches &&
+        queryMatches
+      );
     });
 
     return Promise.resolve(
