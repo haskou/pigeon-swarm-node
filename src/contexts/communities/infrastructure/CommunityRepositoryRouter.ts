@@ -26,11 +26,18 @@ export default class CommunityRepositoryRouter extends CommunityRepository {
   private async removeProtected(
     communities: Community[],
   ): Promise<Community[]> {
-    const protectedValues = await Promise.all(
-      communities.map((community) => this.isProtected(community.getId())),
-    );
+    return this.storageCoordinator.exclusivelyAll(
+      communities.map((community) => community.getId().valueOf()),
+      async () => {
+        const protectedValues = await Promise.all(
+          communities.map((community) => this.isProtected(community.getId())),
+        );
 
-    return communities.filter((_community, index) => !protectedValues[index]);
+        return communities.filter(
+          (_community, index) => !protectedValues[index],
+        );
+      },
+    );
   }
 
   public async delete(community: Community): Promise<void> {

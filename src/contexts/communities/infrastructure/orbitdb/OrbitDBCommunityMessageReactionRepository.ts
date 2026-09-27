@@ -146,8 +146,6 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     channelId: CommunityChannelId,
     messageIds: CommunityChannelMessageId[],
   ): Promise<CommunityChannelMessageReaction[]> {
-    await this.publicStorageGuard.assertPublic(communityId);
-
     return this.findByMessageIdsInChannels(
       communityId,
       [channelId],
@@ -160,61 +158,62 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     channelIds: CommunityChannelId[],
     messageIds: CommunityChannelMessageId[],
   ): Promise<CommunityChannelMessageReaction[]> {
-    await this.publicStorageGuard.assertPublic(communityId);
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      if (messageIds.length === 0 || channelIds.length === 0) {
+        return [];
+      }
 
-    if (messageIds.length === 0 || channelIds.length === 0) {
-      return [];
-    }
+      const channelIdValues = new Set(
+        channelIds.map((channelId) => channelId.valueOf()),
+      );
+      const messageIdValues = new Set(
+        messageIds.map((messageId) => messageId.valueOf()),
+      );
+      const indexedDocuments = await this.reactionIndex.find(
+        this.indexHeadKey(communityId),
+      );
+      const documents = indexedDocuments ?? [];
 
-    const channelIdValues = new Set(
-      channelIds.map((channelId) => channelId.valueOf()),
-    );
-    const messageIdValues = new Set(
-      messageIds.map((messageId) => messageId.valueOf()),
-    );
-    const indexedDocuments = await this.reactionIndex.find(
-      this.indexHeadKey(communityId),
-    );
-    const documents = indexedDocuments ?? [];
-
-    return documents
-      .filter(
-        (
-          document,
-        ): document is OrbitDBCommunityChannelMessageReactionDocument =>
-          this.isDocument(document),
-      )
-      .filter(
-        (document) =>
-          document.communityId === communityId.valueOf() &&
-          channelIdValues.has(document.channelId) &&
-          messageIdValues.has(document.messageId),
-      )
-      .sort((left, right) => left.createdAt - right.createdAt)
-      .map((document) => this.mapper.toDomain(document));
+      return documents
+        .filter(
+          (
+            document,
+          ): document is OrbitDBCommunityChannelMessageReactionDocument =>
+            this.isDocument(document),
+        )
+        .filter(
+          (document) =>
+            document.communityId === communityId.valueOf() &&
+            channelIdValues.has(document.channelId) &&
+            messageIdValues.has(document.messageId),
+        )
+        .sort((left, right) => left.createdAt - right.createdAt)
+        .map((document) => this.mapper.toDomain(document));
+    });
   }
 
   public async findByCommunity(
     communityId: CommunityId,
     limit: number,
   ): Promise<CommunityChannelMessageReaction[]> {
-    await this.publicStorageGuard.assertPublic(communityId);
-    const indexedDocuments = await this.reactionIndex.find(
-      this.indexHeadKey(communityId),
-    );
-    const documents = indexedDocuments ?? [];
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const indexedDocuments = await this.reactionIndex.find(
+        this.indexHeadKey(communityId),
+      );
+      const documents = indexedDocuments ?? [];
 
-    return documents
-      .filter(
-        (
-          document,
-        ): document is OrbitDBCommunityChannelMessageReactionDocument =>
-          this.isDocument(document) &&
-          document.communityId === communityId.valueOf(),
-      )
-      .sort((left, right) => left.createdAt - right.createdAt)
-      .slice(-limit)
-      .map((document) => this.mapper.toDomain(document));
+      return documents
+        .filter(
+          (
+            document,
+          ): document is OrbitDBCommunityChannelMessageReactionDocument =>
+            this.isDocument(document) &&
+            document.communityId === communityId.valueOf(),
+        )
+        .sort((left, right) => left.createdAt - right.createdAt)
+        .slice(-limit)
+        .map((document) => this.mapper.toDomain(document));
+    });
   }
 
   public async deleteByChannel(

@@ -563,11 +563,16 @@ describe('OrbitDBCallRepository', () => {
     ]);
 
     expect(result).toBe('blocked');
+    const lookup = repository.findById(new CallId(callId));
     await expect(
-      repository.findById(new CallId(callId)),
-    ).resolves.toBeDefined();
+      Promise.race([
+        lookup.then(() => 'completed'),
+        new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+      ]),
+    ).resolves.toBe('blocked');
     delayedWrite.resolve(callId);
     await save;
+    await expect(lookup).resolves.toBeDefined();
   });
 });
 

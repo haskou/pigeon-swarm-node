@@ -5,6 +5,7 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -28,8 +29,6 @@ export default class OrbitDBCallRepository extends CallRepository {
   private async hydrate(document: OrbitDBCallDocument): Promise<Call> {
     const call = this.mapper.toDomain(document);
 
-    await this.assertPublicCommunityScope(call);
-
     if (call.getScope().isCommunityChannel()) {
       const leases = call.isActive()
         ? await this.leases.findByCallIds([call.getId()])
@@ -45,15 +44,6 @@ export default class OrbitDBCallRepository extends CallRepository {
     }
 
     return call;
-  }
-
-  private async assertPublicCommunityScope(call: Call): Promise<void> {
-    const scope = call.getScope();
-    const communityId = scope.getCommunityId();
-
-    if (scope.isCommunityChannel() && communityId) {
-      await this.publicStorageGuard.assertPublic(communityId);
-    }
   }
 
   private runWhilePublicCommunityScope<T>(
@@ -72,32 +62,57 @@ export default class OrbitDBCallRepository extends CallRepository {
     return Promise.all(documents.map((document) => this.hydrate(document)));
   }
 
-  private async filterPublicCommunityDocuments(
+  private async hydrateIfPublic(
+    document: OrbitDBCallDocument,
+  ): Promise<Call | undefined> {
+    const communityId =
+      document.scope.type === 'community_channel' &&
+      typeof document.scope.communityId === 'string'
+        ? new CommunityId(document.scope.communityId)
+        : undefined;
+
+    if (!communityId) return this.hydrate(document);
+
+    try {
+      return await this.publicStorageGuard.runWhilePublic(communityId, () =>
+        this.hydrate(document),
+      );
+    } catch (error: unknown) {
+      if (error instanceof InvalidPrivateAuthorizationError) return undefined;
+
+      throw error;
+    }
+  }
+
+  private async hydratePublicList(
     documents: OrbitDBCallDocument[],
-  ): Promise<OrbitDBCallDocument[]> {
-    const communityDocuments = documents.filter(
-      (document) =>
-        document.scope.type === 'community_channel' &&
-        typeof document.scope.communityId === 'string',
-    );
-    const publicCommunityDocuments = new Set(
-      await this.publicStorageGuard.filterPublic(
-        communityDocuments,
-        (document) => new CommunityId(document.scope.communityId!),
-      ),
+  ): Promise<Call[]> {
+    const calls = await Promise.all(
+      documents.map((document) => this.hydrateIfPublic(document)),
     );
 
-    return documents.filter(
-      (document) =>
-        document.scope.type !== 'community_channel' ||
-        publicCommunityDocuments.has(document),
-    );
+    return calls.filter((call): call is Call => call !== undefined);
   }
 
   public async findById(id: CallId): Promise<Call | undefined> {
     const document = await this.callProjection.findById(id);
 
-    return document ? this.hydrate(document) : undefined;
+    if (!document) return undefined;
+
+    const communityId =
+      document.scope.type === 'community_channel' &&
+      typeof document.scope.communityId === 'string'
+        ? new CommunityId(document.scope.communityId)
+        : undefined;
+    const read = async (): Promise<Call | undefined> => {
+      const lockedDocument = await this.callProjection.findById(id);
+
+      return lockedDocument ? this.hydrate(lockedDocument) : undefined;
+    };
+
+    return communityId
+      ? this.publicStorageGuard.runWhilePublic(communityId, read)
+      : read();
   }
 
   public async findActiveByParticipant(
@@ -107,20 +122,17 @@ export default class OrbitDBCallRepository extends CallRepository {
       this.callProjection.findActiveByParticipant(participantId),
       this.callProjection.findActiveCommunityCalls(),
     ]);
-    const documents = await this.filterPublicCommunityDocuments([
+    const calls = await this.hydratePublicList([
       ...conversations,
       ...communities,
     ]);
-    const calls = await this.hydrateList(documents);
 
     return calls.filter((call) => call.hasParticipant(participantId));
   }
 
   public async findByParticipant(participantId: IdentityId): Promise<Call[]> {
-    return this.hydrateList(
-      await this.filterPublicCommunityDocuments(
-        await this.callProjection.findByParticipant(participantId),
-      ),
+    return this.hydratePublicList(
+      await this.callProjection.findByParticipant(participantId),
     );
   }
 
@@ -136,10 +148,13 @@ export default class OrbitDBCallRepository extends CallRepository {
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<Call[]> {
-    await this.publicStorageGuard.assertPublic(communityId);
-
-    return this.hydrateList(
-      await this.callProjection.findByCommunityChannel(communityId, channelId),
+    return this.publicStorageGuard.runWhilePublic(communityId, async () =>
+      this.hydrateList(
+        await this.callProjection.findByCommunityChannel(
+          communityId,
+          channelId,
+        ),
+      ),
     );
   }
 
@@ -147,32 +162,31 @@ export default class OrbitDBCallRepository extends CallRepository {
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<Call | undefined> {
-    await this.publicStorageGuard.assertPublic(communityId);
-    const document = await this.callProjection.findActiveByCommunityChannel(
-      communityId,
-      channelId,
-    );
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const document = await this.callProjection.findActiveByCommunityChannel(
+        communityId,
+        channelId,
+      );
 
-    return document ? this.hydrate(document) : undefined;
+      return document ? this.hydrate(document) : undefined;
+    });
   }
 
   public async findActiveByCommunity(
     communityId: CommunityId,
   ): Promise<Call[]> {
-    await this.publicStorageGuard.assertPublic(communityId);
-
-    return this.hydrateList(
-      await this.callProjection.findActiveByCommunity(communityId),
+    return this.publicStorageGuard.runWhilePublic(communityId, async () =>
+      this.hydrateList(
+        await this.callProjection.findActiveByCommunity(communityId),
+      ),
     );
   }
 
   public async findTimedOutRingingCalls(
     timeoutThreshold: Timestamp,
   ): Promise<Call[]> {
-    return this.hydrateList(
-      await this.filterPublicCommunityDocuments(
-        await this.callProjection.findTimedOutRingingCalls(timeoutThreshold),
-      ),
+    return this.hydratePublicList(
+      await this.callProjection.findTimedOutRingingCalls(timeoutThreshold),
     );
   }
 

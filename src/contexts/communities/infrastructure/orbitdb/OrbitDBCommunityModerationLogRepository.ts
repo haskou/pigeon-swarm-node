@@ -168,41 +168,45 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
     limit: number,
     beforeLogId?: CommunityModerationLogId,
   ): Promise<CommunityModerationLogEntry[]> {
-    await this.publicStorageGuard.assertPublic(communityId);
-    const indexedDocuments =
-      (await this.logIndex.find(this.communityIndexHeadKey(communityId))) ?? [];
-    const typedDocuments = this.logIndex
-      .deduplicate([
-        ...indexedDocuments,
-        ...this.cachedStoredLogDocuments(communityId),
-      ])
-      .filter(
-        (document): document is OrbitDBCommunityModerationLogDocument =>
-          this.isDocument(document) &&
-          document.communityId === communityId.valueOf(),
-      )
-      .sort((left, right) => {
-        if (left.createdAt === right.createdAt) {
-          return right.id.localeCompare(left.id);
-        }
-
-        return right.createdAt - left.createdAt;
-      });
-    const beforeLog = beforeLogId
-      ? typedDocuments.find((document) => document.id === beforeLogId.valueOf())
-      : undefined;
-    const paginatedDocuments = beforeLog
-      ? typedDocuments.filter(
-          (document) =>
-            document.createdAt < beforeLog.createdAt ||
-            (document.createdAt === beforeLog.createdAt &&
-              document.id < beforeLog.id),
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const indexedDocuments =
+        (await this.logIndex.find(this.communityIndexHeadKey(communityId))) ??
+        [];
+      const typedDocuments = this.logIndex
+        .deduplicate([
+          ...indexedDocuments,
+          ...this.cachedStoredLogDocuments(communityId),
+        ])
+        .filter(
+          (document): document is OrbitDBCommunityModerationLogDocument =>
+            this.isDocument(document) &&
+            document.communityId === communityId.valueOf(),
         )
-      : typedDocuments;
+        .sort((left, right) => {
+          if (left.createdAt === right.createdAt) {
+            return right.id.localeCompare(left.id);
+          }
 
-    return paginatedDocuments
-      .slice(0, limit)
-      .map((document) => this.toDomain(document));
+          return right.createdAt - left.createdAt;
+        });
+      const beforeLog = beforeLogId
+        ? typedDocuments.find(
+            (document) => document.id === beforeLogId.valueOf(),
+          )
+        : undefined;
+      const paginatedDocuments = beforeLog
+        ? typedDocuments.filter(
+            (document) =>
+              document.createdAt < beforeLog.createdAt ||
+              (document.createdAt === beforeLog.createdAt &&
+                document.id < beforeLog.id),
+          )
+        : typedDocuments;
+
+      return paginatedDocuments
+        .slice(0, limit)
+        .map((document) => this.toDomain(document));
+    });
   }
 
   public async deleteByCommunity(communityId: CommunityId): Promise<void> {

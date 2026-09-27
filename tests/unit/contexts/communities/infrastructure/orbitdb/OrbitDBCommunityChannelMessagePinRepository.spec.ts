@@ -168,12 +168,17 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
       ]),
     ).resolves.toBe('blocked');
 
+    const lookup = repository.findByChannel(communityId, channelId);
     await expect(
-      repository.findByChannel(communityId, channelId),
-    ).resolves.toHaveLength(1);
+      Promise.race([
+        lookup.then(() => 'completed'),
+        new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+      ]),
+    ).resolves.toBe('blocked');
 
     heads.releaseWrites();
     await pin;
+    await expect(lookup).resolves.toHaveLength(1);
   });
 
   it('keeps unpinning pending until index persistence finishes', async () => {
@@ -195,12 +200,17 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
       ]),
     ).resolves.toBe('blocked');
 
+    const lookup = repository.findByChannel(communityId, channelId);
     await expect(
-      repository.findByChannel(communityId, channelId),
-    ).resolves.toEqual([]);
+      Promise.race([
+        lookup.then(() => 'completed'),
+        new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+      ]),
+    ).resolves.toBe('blocked');
 
     heads.releaseWrites();
     await unpin;
+    await expect(lookup).resolves.toEqual([]);
   });
 
   it('does not publish a pin index when document persistence fails', async () => {

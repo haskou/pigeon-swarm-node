@@ -244,26 +244,28 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
     communityId: CommunityId,
     identityId: IdentityId,
   ): Promise<CommunityMembershipRequest[]> {
-    await this.publicStorageGuard.assertPublic(communityId);
-    const indexedDocuments =
-      (await this.requestIndex.find(this.communityIndexHeadKey(communityId))) ??
-      [];
-    const cachedDocuments = this.cachedStoredRequestDocuments();
-    const documents = [...indexedDocuments, ...cachedDocuments].filter(
-      (document) =>
-        document.communityId === communityId.valueOf() &&
-        new IdentityId(document.identityId).isEqual(identityId),
-    );
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const indexedDocuments =
+        (await this.requestIndex.find(
+          this.communityIndexHeadKey(communityId),
+        )) ?? [];
+      const cachedDocuments = this.cachedStoredRequestDocuments();
+      const documents = [...indexedDocuments, ...cachedDocuments].filter(
+        (document) =>
+          document.communityId === communityId.valueOf() &&
+          new IdentityId(document.identityId).isEqual(identityId),
+      );
 
-    return this.toDomain(
-      this.requestIndex
-        .deduplicate(documents)
-        .filter(
-          (document): document is OrbitDBCommunityMembershipRequestDocument =>
-            this.isDocument(document),
-        )
-        .sort((left, right) => right.updatedAt - left.updatedAt),
-    );
+      return this.toDomain(
+        this.requestIndex
+          .deduplicate(documents)
+          .filter(
+            (document): document is OrbitDBCommunityMembershipRequestDocument =>
+              this.isDocument(document),
+          )
+          .sort((left, right) => right.updatedAt - left.updatedAt),
+      );
+    });
   }
 
   public async findById(
@@ -273,11 +275,15 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
     const document = head && this.isDocument(head) ? head : undefined;
 
     if (!document) return undefined;
-    await this.publicStorageGuard.assertPublic(
-      new CommunityId(document.communityId),
-    );
+    const communityId = new CommunityId(document.communityId);
 
-    return this.mapper.toDomain(document);
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const lockedHead = await this.registry.findHead(this.headKey(id));
+
+      return lockedHead && this.isDocument(lockedHead)
+        ? this.mapper.toDomain(lockedHead)
+        : undefined;
+    });
   }
 
   public async findByIdentity(

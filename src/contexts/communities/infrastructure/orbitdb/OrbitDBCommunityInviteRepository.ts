@@ -162,11 +162,17 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
     const document = head && this.isDocument(head) ? head : undefined;
 
     if (!document) return undefined;
-    await this.publicStorageGuard.assertPublic(
-      new CommunityId(document.communityId),
-    );
+    const communityId = new CommunityId(document.communityId);
 
-    return this.mapper.toDomain(document);
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const lockedHead = await this.registry.findHead(
+        this.tokenHeadKey(token.valueOf()),
+      );
+
+      return lockedHead && this.isDocument(lockedHead)
+        ? this.mapper.toDomain(lockedHead)
+        : undefined;
+    });
   }
 
   public async save(invite: CommunityInvite): Promise<void> {

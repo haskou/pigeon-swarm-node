@@ -131,14 +131,6 @@ export default class OrbitDBPollRepository extends PollRepository {
     };
   }
 
-  private async assertPublicCommunityScope(poll: Poll): Promise<void> {
-    await poll.getScope().match<Promise<void>>({
-      communityChannel: (communityId) =>
-        this.publicStorageGuard.assertPublic(communityId),
-      groupConversation: () => Promise.resolve(),
-    });
-  }
-
   private runWhilePublicCommunityScope<T>(
     poll: Poll,
     action: () => Promise<T>,
@@ -271,9 +263,17 @@ export default class OrbitDBPollRepository extends PollRepository {
     const poll =
       head && this.isDocument(head) ? this.toDomain(head) : undefined;
 
-    if (poll) await this.assertPublicCommunityScope(poll);
+    if (!poll) return undefined;
 
-    return poll;
+    return this.runWhilePublicCommunityScope(poll, async () => {
+      const lockedHead = await this.registry.findHead(
+        this.pollHeadKey(id.valueOf()),
+      );
+
+      return lockedHead && this.isDocument(lockedHead)
+        ? this.toDomain(lockedHead)
+        : undefined;
+    });
   }
 
   public async findByCommunityChannel(
@@ -282,20 +282,21 @@ export default class OrbitDBPollRepository extends PollRepository {
     limit: number,
     beforeCreatedAt?: number,
   ): Promise<Poll[]> {
-    await this.publicStorageGuard.assertPublic(communityId);
-    const key = this.communityChannelIndexHeadKey(
-      communityId.valueOf(),
-      channelId.valueOf(),
-    );
-    const indexedDocuments = await this.pollIndex.find(key);
-    const documents = indexedDocuments ?? [];
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const key = this.communityChannelIndexHeadKey(
+        communityId.valueOf(),
+        channelId.valueOf(),
+      );
+      const indexedDocuments = await this.pollIndex.find(key);
+      const documents = indexedDocuments ?? [];
 
-    return this.sortDocuments(documents)
-      .filter((document) =>
-        beforeCreatedAt ? document.createdAt <= beforeCreatedAt : true,
-      )
-      .slice(0, limit)
-      .map((document) => this.toDomain(document));
+      return this.sortDocuments(documents)
+        .filter((document) =>
+          beforeCreatedAt ? document.createdAt <= beforeCreatedAt : true,
+        )
+        .slice(0, limit)
+        .map((document) => this.toDomain(document));
+    });
   }
 
   public async findByGroupConversation(

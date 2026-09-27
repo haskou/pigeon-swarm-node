@@ -86,16 +86,17 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     channelId: CommunityChannelId,
     messageId: CommunityChannelMessageId,
   ): Promise<CommunityChannelMessage | undefined> {
-    await this.publicStorageGuard.assertPublic(communityId);
-    const document = (
-      await this.findMessageDocumentsByChannel(communityId, channelId)
-    ).find((candidate) =>
-      new CommunityChannelMessageId(
-        this.messageIndex.getMessageId(candidate),
-      ).isEqual(messageId),
-    );
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const document = (
+        await this.findMessageDocumentsByChannel(communityId, channelId)
+      ).find((candidate) =>
+        new CommunityChannelMessageId(
+          this.messageIndex.getMessageId(candidate),
+        ).isEqual(messageId),
+      );
 
-    return document ? this.mapper.toDomain(document) : undefined;
+      return document ? this.mapper.toDomain(document) : undefined;
+    });
   }
 
   public async findByChannel(
@@ -104,54 +105,59 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     limit: number,
     beforeMessageId?: CommunityChannelMessageId,
   ): Promise<CommunityChannelMessage[]> {
-    await this.publicStorageGuard.assertPublic(communityId);
-    const documents = await this.findMessageDocumentsByChannel(
-      communityId,
-      channelId,
-    );
-    const beforeDocument = beforeMessageId
-      ? documents.find((document) =>
-          new CommunityChannelMessageId(
-            this.messageIndex.getMessageId(document),
-          ).isEqual(beforeMessageId),
-        )
-      : undefined;
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const documents = await this.findMessageDocumentsByChannel(
+        communityId,
+        channelId,
+      );
+      const beforeDocument = beforeMessageId
+        ? documents.find((document) =>
+            new CommunityChannelMessageId(
+              this.messageIndex.getMessageId(document),
+            ).isEqual(beforeMessageId),
+          )
+        : undefined;
 
-    return this.toDomain(
-      this.byCreatedAtDescending(
-        documents.filter((document) =>
-          beforeDocument ? document.createdAt < beforeDocument.createdAt : true,
-        ),
-      )
-        .slice(0, limit)
-        .reverse(),
-    );
+      return this.toDomain(
+        this.byCreatedAtDescending(
+          documents.filter((document) =>
+            beforeDocument
+              ? document.createdAt < beforeDocument.createdAt
+              : true,
+          ),
+        )
+          .slice(0, limit)
+          .reverse(),
+      );
+    });
   }
 
   public async findByCommunity(
     communityId: CommunityId,
     limit: number,
   ): Promise<CommunityChannelMessage[]> {
-    await this.publicStorageGuard.assertPublic(communityId);
-    const documents = await this.messageIndex.allByCommunity(communityId);
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const documents = await this.messageIndex.allByCommunity(communityId);
 
-    return this.toDomain(
-      this.byCreatedAtDescending(documents).slice(0, limit).reverse(),
-    );
+      return this.toDomain(
+        this.byCreatedAtDescending(documents).slice(0, limit).reverse(),
+      );
+    });
   }
 
   public async findSyncableByCommunity(
     communityId: CommunityId,
     limit: number,
   ): Promise<CommunityChannelMessage[]> {
-    await this.publicStorageGuard.assertPublic(communityId);
-    const documents = (
-      await this.messageIndex.allByCommunity(communityId)
-    ).filter((document) => !document.plaintextPayload);
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const documents = (
+        await this.messageIndex.allByCommunity(communityId)
+      ).filter((document) => !document.plaintextPayload);
 
-    return this.toDomain(
-      this.byCreatedAtDescending(documents).slice(0, limit).reverse(),
-    );
+      return this.toDomain(
+        this.byCreatedAtDescending(documents).slice(0, limit).reverse(),
+      );
+    });
   }
 
   public async findThreadMessages(
@@ -160,14 +166,17 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     rootMessageId: CommunityChannelMessageId,
     limit: number,
   ): Promise<CommunityChannelMessage[]> {
-    await this.publicStorageGuard.assertPublic(communityId);
-    const documents = (
-      await this.findMessageDocumentsByChannel(communityId, channelId)
-    ).filter(
-      (document) => document.replyToMessageId === rootMessageId.valueOf(),
-    );
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const documents = (
+        await this.findMessageDocumentsByChannel(communityId, channelId)
+      ).filter(
+        (document) => document.replyToMessageId === rootMessageId.valueOf(),
+      );
 
-    return this.toDomain(this.byCreatedAtAscending(documents).slice(0, limit));
+      return this.toDomain(
+        this.byCreatedAtAscending(documents).slice(0, limit),
+      );
+    });
   }
 
   public async findThreadSummariesByChannel(
@@ -175,12 +184,12 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     channelIds: CommunityChannelId[],
     limitPerChannel: number,
   ): Promise<Map<string, CommunityChannelThreadSummary[]>> {
-    await this.publicStorageGuard.assertPublic(communityId);
-
-    return this.threadSummaryIndex.findByChannel(
-      communityId,
-      channelIds,
-      limitPerChannel,
+    return this.publicStorageGuard.runWhilePublic(communityId, async () =>
+      this.threadSummaryIndex.findByChannel(
+        communityId,
+        channelIds,
+        limitPerChannel,
+      ),
     );
   }
 
@@ -190,8 +199,6 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     query: string,
     limit: number,
   ): Promise<CommunityChannelMessage[]> {
-    await this.publicStorageGuard.assertPublic(communityId);
-
     return this.searchPublicByChannels(communityId, [channelId], query, limit);
   }
 
@@ -201,29 +208,30 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     query: string,
     limit: number,
   ): Promise<CommunityChannelMessage[]> {
-    await this.publicStorageGuard.assertPublic(communityId);
-    const trimmedQuery = query.trim();
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const trimmedQuery = query.trim();
 
-    if (!trimmedQuery || channelIds.length === 0) {
-      return Promise.resolve(this.toDomain([]));
-    }
+      if (!trimmedQuery || channelIds.length === 0) {
+        return this.toDomain([]);
+      }
 
-    const regex = new RegExp(this.escapeRegex(trimmedQuery), 'i');
-    const channelIdValues = new Set(
-      channelIds.map((channelId) => channelId.valueOf()),
-    );
-    const documents = (
-      await this.messageIndex.allByCommunity(communityId)
-    ).filter(
-      (document) =>
-        channelIdValues.has(document.channelId) &&
-        typeof document.plaintextPayload === 'string' &&
-        regex.test(document.plaintextPayload),
-    );
+      const regex = new RegExp(this.escapeRegex(trimmedQuery), 'i');
+      const channelIdValues = new Set(
+        channelIds.map((channelId) => channelId.valueOf()),
+      );
+      const documents = (
+        await this.messageIndex.allByCommunity(communityId)
+      ).filter(
+        (document) =>
+          channelIdValues.has(document.channelId) &&
+          typeof document.plaintextPayload === 'string' &&
+          regex.test(document.plaintextPayload),
+      );
 
-    return this.toDomain(
-      this.byCreatedAtDescending(documents).slice(0, limit).reverse(),
-    );
+      return this.toDomain(
+        this.byCreatedAtDescending(documents).slice(0, limit).reverse(),
+      );
+    });
   }
 
   public async save(message: CommunityChannelMessage): Promise<void> {

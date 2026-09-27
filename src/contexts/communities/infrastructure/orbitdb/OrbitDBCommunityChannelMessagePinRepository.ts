@@ -180,18 +180,19 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): Promise<CommunityChannelMessagePin[]> {
-    await this.publicStorageGuard.assertPublic(communityId);
-    const indexedDocuments = await this.pinIndex.find(
-      this.indexHeadKey(communityId, channelId),
-    );
-    const documents = indexedDocuments ?? [];
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const indexedDocuments = await this.pinIndex.find(
+        this.indexHeadKey(communityId, channelId),
+      );
+      const documents = indexedDocuments ?? [];
 
-    return documents
-      .filter(
-        (document): document is OrbitDBCommunityChannelMessagePinDocument =>
-          this.isDocument(document),
-      )
-      .sort((left, right) => right.createdAt - left.createdAt)
-      .map((document) => this.toPin(document));
+      return documents
+        .filter(
+          (document): document is OrbitDBCommunityChannelMessagePinDocument =>
+            this.isDocument(document),
+        )
+        .sort((left, right) => right.createdAt - left.createdAt)
+        .map((document) => this.toPin(document));
+    });
   }
 }

@@ -1,6 +1,21 @@
 export default class PrivateAuthorizationStorageCoordinator {
   private readonly queues = new Map<string, Promise<void>>();
 
+  public exclusivelyAll<T>(
+    scopeIds: string[],
+    action: () => Promise<T>,
+  ): Promise<T> {
+    const ids = [...new Set(scopeIds)].sort((left, right) =>
+      left.localeCompare(right),
+    );
+    const run = (index: number): Promise<T> =>
+      index === ids.length
+        ? action()
+        : this.exclusively(ids[index], () => run(index + 1));
+
+    return run(0);
+  }
+
   public async exclusively<T>(
     scopeId: string,
     action: () => Promise<T>,

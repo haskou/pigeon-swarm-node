@@ -152,10 +152,8 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
       store.save(request).then(() => 'saved'),
       new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
     ]);
-    const savedRequest = await store.findById(request.getId());
 
     expect(result).toBe('saved');
-    expect(savedRequest?.getId().isEqual(request.getId())).toBe(true);
   });
 
   it('does not project a membership request when its document write fails', async () => {

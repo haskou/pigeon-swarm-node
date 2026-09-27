@@ -207,18 +207,23 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
       ]),
     ).resolves.toBe('blocked');
 
-    const byMessage = await repository.findByMessageIds(
+    const byMessage = repository.findByMessageIds(
       communityId,
       channelId,
       [messageId],
     );
-
-    expect(byMessage.map((item) => item.toPrimitives())).toEqual([
-      reaction.toPrimitives(),
-    ]);
+    await expect(
+      Promise.race([
+        byMessage.then(() => 'completed'),
+        new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+      ]),
+    ).resolves.toBe('blocked');
 
     releaseHeadPersistence();
     await save;
+    await expect(
+      byMessage.then((items) => items.map((item) => item.toPrimitives())),
+    ).resolves.toEqual([reaction.toPrimitives()]);
   });
 
   it('keeps deleting pending until reaction index persistence finishes', async () => {
@@ -243,12 +248,19 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
       ]),
     ).resolves.toBe('blocked');
 
+    const byMessage = repository.findByMessageIds(communityId, channelId, [
+      messageId,
+    ]);
     await expect(
-      repository.findByMessageIds(communityId, channelId, [messageId]),
-    ).resolves.toEqual([]);
+      Promise.race([
+        byMessage.then(() => 'completed'),
+        new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+      ]),
+    ).resolves.toBe('blocked');
 
     releaseHeadPersistence();
     await deletion;
+    await expect(byMessage).resolves.toEqual([]);
   });
 
   it('does not publish a saved reaction index when canonical persistence fails', async () => {

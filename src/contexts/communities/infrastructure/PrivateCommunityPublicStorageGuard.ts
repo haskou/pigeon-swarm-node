@@ -14,25 +14,6 @@ export default class PrivateCommunityPublicStorageGuard {
     return !(await this.isProtected(communityId));
   }
 
-  private runExclusively<T>(
-    communityIds: CommunityId[],
-    action: () => Promise<T>,
-  ): Promise<T> {
-    const ids = [
-      ...new Map(
-        communityIds.map((communityId) => [communityId.valueOf(), communityId]),
-      ).values(),
-    ].sort((left, right) => left.valueOf().localeCompare(right.valueOf()));
-    const run = (index: number): Promise<T> =>
-      index === ids.length
-        ? action()
-        : this.storageCoordinator.exclusively(ids[index].valueOf(), () =>
-            run(index + 1),
-          );
-
-    return run(0);
-  }
-
   public async isProtected(communityId: CommunityId): Promise<boolean> {
     return Boolean(
       await this.authorizationRepository.findScope(communityId.valueOf()),
@@ -49,11 +30,18 @@ export default class PrivateCommunityPublicStorageGuard {
     values: T[],
     communityId: (value: T) => CommunityId,
   ): Promise<T[]> {
-    const decisions = await Promise.all(
-      values.map((value) => this.isPublic(communityId(value))),
-    );
+    const communityIds = values.map(communityId);
 
-    return values.filter((_value, index) => decisions[index]);
+    return this.storageCoordinator.exclusivelyAll(
+      communityIds.map((id) => id.valueOf()),
+      async () => {
+        const decisions = await Promise.all(
+          communityIds.map((id) => this.isPublic(id)),
+        );
+
+        return values.filter((_value, index) => decisions[index]);
+      },
+    );
   }
 
   public runWhilePublic<T>(
@@ -74,13 +62,16 @@ export default class PrivateCommunityPublicStorageGuard {
     communityIds: CommunityId[],
     action: () => Promise<T>,
   ): Promise<T> {
-    return this.runExclusively(communityIds, async () => {
-      await Promise.all(
-        communityIds.map((communityId) => this.assertPublic(communityId)),
-      );
+    return this.storageCoordinator.exclusivelyAll(
+      communityIds.map((id) => id.valueOf()),
+      async () => {
+        await Promise.all(
+          communityIds.map((communityId) => this.assertPublic(communityId)),
+        );
 
-      return action();
-    });
+        return action();
+      },
+    );
   }
 
   public runInBackgroundWhilePublic(
