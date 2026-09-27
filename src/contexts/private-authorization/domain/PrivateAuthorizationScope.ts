@@ -416,7 +416,14 @@ export class PrivateAuthorizationScope extends AggregateRoot {
 
     if (!existing) return undefined;
 
-    if (existing.toPrimitives().digest !== candidate.digest) this.freeze();
+    if (existing.toPrimitives().digest !== candidate.digest) {
+      assert(
+        !this.pendingOperations.includes(existing) ||
+          existing.isAuthoredBy(operation.getAuthorDeviceKey()),
+        new InvalidPrivateAuthorizationError(),
+      );
+      this.freeze();
+    }
 
     return this.acceptedOperations.includes(existing) ? 'duplicate' : 'pending';
   }

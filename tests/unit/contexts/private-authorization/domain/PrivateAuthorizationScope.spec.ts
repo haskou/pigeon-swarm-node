@@ -102,6 +102,34 @@ describe('PrivateAuthorizationScope', () => {
     ]);
   });
 
+  it('rejects a cross-author pending identifier collision without freezing', () => {
+    const scope = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
+    scope.acceptProposal(
+      operation({
+        authorizationRevision: 1,
+        digest: 'owner-pending',
+        id: 'pending-id',
+      }),
+    );
+    scope.pullDomainEvents();
+
+    expect(() =>
+      scope.acceptProposal(
+        operation({
+          authorDeviceKey: memberKey,
+          authorizationRevision: 1,
+          digest: 'member-collision',
+          id: 'pending-id',
+        }),
+      ),
+    ).toThrow(InvalidPrivateAuthorizationError);
+    expect(scope.toPrimitives()).toMatchObject({
+      pendingOperations: [{ authorDeviceKey: ownerKey, id: 'pending-id' }],
+      status: 'active',
+    });
+    expect(scope.pullDomainEvents()).toEqual([]);
+  });
+
   it.each([
     ['wrong scope', { scopeId: 'other-scope' }],
     ['old revision', { authorizationRevision: -1 }],
