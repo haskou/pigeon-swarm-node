@@ -389,8 +389,8 @@ unlock factors or recovery secrets. Operation and pairing UUIDs remain as replay
 tombstones. Their retention is required for replay safety and reveals that a
 control transition occurred to readers of the private network; it does not expose
 the paired device's local root or unlock material. Replicas reject non-canonical
-records, unknown unsigned fields and authorization histories above 128 records or
-one MiB before parsing or verifying transitions.
+records, unknown unsigned fields, transition records above 16 KiB and more than
+128 concurrent siblings from one predecessor before parsing or verifying them.
 
 The public identity publication binds an independent genesis device credential
 and its commitment under the identity signature. The node does not derive that

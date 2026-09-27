@@ -23,9 +23,9 @@ interface DeviceAuthorizationReplay {
 export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthorizationRepository {
   private static readonly HEAD_PREFIX = 'device-authorization:';
 
-  private static readonly MAX_HISTORY_RECORDS = 128;
+  private static readonly MAX_CONCURRENT_TRANSITIONS = 128;
 
-  private static readonly MAX_HISTORY_BYTES = 1_048_576;
+  private static readonly MAX_TRANSITION_RECORD_BYTES = 16_384;
 
   private readonly identityQueues = new Map<string, Promise<void>>();
 
@@ -348,7 +348,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     history: OrbitDBDeviceAuthorizationTransitionRecord[],
   ): OrbitDBDeviceAuthorizationDocument {
     assert(
-      this.isHistoryWithinLimits(history),
+      this.hasBoundedHistoryShape(history),
       new InvalidDeviceAuthorizationTransitionError(),
     );
     const replay = this.rebuild(genesis, history);
@@ -372,41 +372,74 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     return isDeepStrictEqual(keys, [...expected].sort());
   }
 
-  private isHistoryWithinLimits(history: unknown[]): boolean {
-    return (
-      history.length <=
-        OrbitDBDeviceAuthorizationRepository.MAX_HISTORY_RECORDS &&
-      Buffer.byteLength(JSON.stringify(history), 'utf8') <=
-        OrbitDBDeviceAuthorizationRepository.MAX_HISTORY_BYTES
-    );
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+  }
+
+  private isBoundedTransitionRecord(
+    value: unknown,
+  ): value is { transition: Record<string, unknown> } {
+    if (
+      !this.isRecord(value) ||
+      !this.hasExactKeys(value, ['transition']) ||
+      Buffer.byteLength(JSON.stringify(value), 'utf8') >
+        OrbitDBDeviceAuthorizationRepository.MAX_TRANSITION_RECORD_BYTES
+    ) {
+      return false;
+    }
+
+    return this.isRecord(value.transition);
+  }
+
+  private previousRevisionOf(record: {
+    transition: Record<string, unknown>;
+  }): number | undefined {
+    const { previousRevision } = record.transition;
+
+    return typeof previousRevision === 'number' &&
+      Number.isSafeInteger(previousRevision) &&
+      previousRevision >= 0
+      ? previousRevision
+      : undefined;
+  }
+
+  private hasBoundedHistoryShape(history: unknown[]): boolean {
+    const recordsByRevision = new Map<number, number>();
+
+    for (const value of history) {
+      if (!this.isBoundedTransitionRecord(value)) {
+        return false;
+      }
+
+      const previousRevision = this.previousRevisionOf(value);
+
+      if (previousRevision === undefined) {
+        return false;
+      }
+
+      const count = (recordsByRevision.get(previousRevision) ?? 0) + 1;
+
+      recordsByRevision.set(previousRevision, count);
+
+      if (
+        count > OrbitDBDeviceAuthorizationRepository.MAX_CONCURRENT_TRANSITIONS
+      ) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   private hasCanonicalHistory(
     history: unknown[],
   ): history is OrbitDBDeviceAuthorizationTransitionRecord[] {
-    if (!this.isHistoryWithinLimits(history)) {
+    if (!this.hasBoundedHistoryShape(history)) {
       return false;
     }
 
     return history.every((value) => {
-      if (
-        typeof value !== 'object' ||
-        value === null ||
-        Array.isArray(value) ||
-        !this.hasExactKeys(value as Record<string, unknown>, ['transition'])
-      ) {
-        return false;
-      }
-
       const { transition } = value as Record<string, unknown>;
-
-      if (
-        typeof transition !== 'object' ||
-        transition === null ||
-        Array.isArray(transition)
-      ) {
-        return false;
-      }
 
       const parsed = DeviceAuthorizationTransition.fromPrimitives(
         transition as OrbitDBDeviceAuthorizationTransitionRecord['transition'],
@@ -528,7 +561,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
 
     const history = this.transitionRecords(current, candidate);
 
-    if (!this.isHistoryWithinLimits(history)) {
+    if (!this.hasBoundedHistoryShape(history)) {
       return current;
     }
 

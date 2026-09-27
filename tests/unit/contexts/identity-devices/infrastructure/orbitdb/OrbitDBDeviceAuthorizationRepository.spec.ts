@@ -546,6 +546,49 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     expect(getMerger()?.(trusted, injected)).toEqual(trusted);
   });
 
+  it('accepts authorization history beyond the sibling limit across revisions', async () => {
+    const { genesis, identityId, recovery } = await fixture();
+    const target = await KeyPair.generate();
+    const credential = DeviceCredential.fromString(
+      target.toPrimitives().publicKey,
+    );
+    const { getHead, getMerger, repository } = repositoryFixture();
+    const policy = new DeviceAuthorizationPolicy();
+    const history: Array<{
+      transition: ReturnType<DeviceAuthorizationTransition['toPrimitives']>;
+    }> = [];
+    let authorization = genesis;
+    await provisionAuthorization(repository, genesis);
+    const trusted = getHead();
+
+    for (let revision = 0; revision < 129; revision += 1) {
+      const unsigned = DeviceAuthorizationTransition.recovery(
+        identityId,
+        DeviceAuthorizationOperationId.generate(),
+        new DeviceAuthorizationRevision(revision),
+        credential,
+      );
+      const proven = unsigned.provePossession(
+        target.sign(unsigned.getProofOfPossessionPayload()),
+      );
+      const transition = proven.authorizeRecovery(
+        recovery.sign(proven.getSigningPayload()),
+      );
+
+      authorization = policy.apply(authorization, transition);
+      history.push({ transition: transition.toPrimitives() });
+    }
+
+    const merged = getMerger()?.(trusted, {
+      ...(trusted ?? {}),
+      authorization: authorization.toPrimitives(),
+      history,
+    }) as { authorization?: { revision?: number }; history?: unknown[] };
+
+    expect(merged.authorization?.revision).toBe(129);
+    expect(merged.history).toHaveLength(129);
+  });
+
   it('rejects oversized authorization history before parsing transitions', async () => {
     const { genesis } = await fixture();
     const { getHead, getMerger, repository } = repositoryFixture();
