@@ -19,7 +19,7 @@ export default class OrbitDBMessageReactionRepository extends MessageReactionRep
     this.reactionIndex = new OrbitDBHeadIndex(this.registry, {
       belongsToCanonicalIndex: (key, record) =>
         typeof record.conversationId === 'string' &&
-        key === this.indexHeadKey(new ConversationId(record.conversationId)),
+        key === this.indexHeadKeyFromValue(record.conversationId),
       canonicalStoreName: 'reactions',
       collectionName: 'reactions',
       documentFromRecord: (record) =>
@@ -56,7 +56,11 @@ export default class OrbitDBMessageReactionRepository extends MessageReactionRep
   }
 
   private indexHeadKey(conversationId: ConversationId): string {
-    return `conversation-reaction-index:${conversationId.valueOf()}`;
+    return this.indexHeadKeyFromValue(conversationId.valueOf());
+  }
+
+  private indexHeadKeyFromValue(conversationId: string): string {
+    return `conversation-reaction-index:${conversationId}`;
   }
 
   private freshness(document: Record<string, unknown>): number {

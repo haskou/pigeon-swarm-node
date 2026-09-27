@@ -22,7 +22,7 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     this.reactionIndex = new OrbitDBHeadIndex(this.registry, {
       belongsToCanonicalIndex: (key, record) =>
         typeof record.communityId === 'string' &&
-        key === this.indexHeadKey(new CommunityId(record.communityId)),
+        key === this.indexHeadKeyFromValue(record.communityId),
       canonicalStoreName: 'reactions',
       collectionName: 'reactions',
       documentFromRecord: (record) =>
@@ -73,7 +73,11 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
   }
 
   private indexHeadKey(communityId: CommunityId): string {
-    return `community-reaction-index:${communityId.valueOf()}`;
+    return this.indexHeadKeyFromValue(communityId.valueOf());
+  }
+
+  private indexHeadKeyFromValue(communityId: string): string {
+    return `community-reaction-index:${communityId}`;
   }
 
   private freshness(document: Record<string, unknown>): number {

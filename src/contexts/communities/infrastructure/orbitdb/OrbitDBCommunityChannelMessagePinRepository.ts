@@ -24,10 +24,7 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
         typeof record.communityId === 'string' &&
         typeof record.channelId === 'string' &&
         key ===
-          this.indexHeadKey(
-            new CommunityId(record.communityId),
-            new CommunityChannelId(record.channelId),
-          ),
+          this.indexHeadKeyFromValues(record.communityId, record.channelId),
       canonicalStoreName: 'pins',
       collectionName: 'pins',
       documentFromRecord: (record) =>
@@ -51,7 +48,17 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
     communityId: CommunityId,
     channelId: CommunityChannelId,
   ): string {
-    return `community-channel-pin-index:${communityId.valueOf()}:${channelId.valueOf()}`;
+    return this.indexHeadKeyFromValues(
+      communityId.valueOf(),
+      channelId.valueOf(),
+    );
+  }
+
+  private indexHeadKeyFromValues(
+    communityId: string,
+    channelId: string,
+  ): string {
+    return `community-channel-pin-index:${communityId}:${channelId}`;
   }
 
   private freshness(document: Record<string, unknown>): number {

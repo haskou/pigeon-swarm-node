@@ -15,7 +15,7 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
     this.settingsIndex = new OrbitDBHeadIndex(this.registry, {
       belongsToCanonicalIndex: (key, record) =>
         typeof record.identityId === 'string' &&
-        key === this.identityIndexHeadKey(new IdentityId(record.identityId)),
+        key === this.identityIndexHeadKeyFromValue(record.identityId),
       canonicalStoreName: 'notificationSettings',
       collectionName: 'settings',
       documentFromRecord: (record) =>
@@ -36,7 +36,11 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
   }
 
   private identityIndexHeadKey(identityId: IdentityId) {
-    return `notification-settings-identity-index:${identityId.valueOf()}`;
+    return this.identityIndexHeadKeyFromValue(identityId.valueOf());
+  }
+
+  private identityIndexHeadKeyFromValue(identityId: string): string {
+    return `notification-settings-identity-index:${identityId}`;
   }
 
   private hasIdentityFields(document: Record<string, unknown>): boolean {

@@ -17,7 +17,7 @@ export default class OrbitDBConversationMessagePinRepository extends Conversatio
     this.pinIndex = new OrbitDBHeadIndex(this.registry, {
       belongsToCanonicalIndex: (key, record) =>
         typeof record.conversationId === 'string' &&
-        key === this.indexHeadKey(new ConversationId(record.conversationId)),
+        key === this.indexHeadKeyFromValue(record.conversationId),
       canonicalStoreName: 'pins',
       collectionName: 'pins',
       documentFromRecord: (record) =>
@@ -34,7 +34,11 @@ export default class OrbitDBConversationMessagePinRepository extends Conversatio
   }
 
   private indexHeadKey(conversationId: ConversationId): string {
-    return `conversation-pin-index:${conversationId.valueOf()}`;
+    return this.indexHeadKeyFromValue(conversationId.valueOf());
+  }
+
+  private indexHeadKeyFromValue(conversationId: string): string {
+    return `conversation-pin-index:${conversationId}`;
   }
 
   private freshness(document: Record<string, unknown>): number {
