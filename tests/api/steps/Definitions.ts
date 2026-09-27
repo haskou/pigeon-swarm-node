@@ -609,12 +609,12 @@ export default class Definitions {
   public iSetAMaximumSizePrivateAuthorizationOperationEnvelope(): void {
     this.body = JSON.stringify({
       controlFrame: {
-        encryptedMlsState: 'x'.repeat(1_398_102),
-        mlsMessage: 'x'.repeat(349_526),
-        signedTransitionJson: 'x'.repeat(262_144),
+        encryptedMlsState: '😀'.repeat(1_398_102),
+        mlsMessage: '😀'.repeat(349_526),
+        signedTransitionJson: '😀'.repeat(262_144),
       },
-      signedFreshnessProofJson: 'x'.repeat(262_144),
-      signedOperationJson: 'x'.repeat(262_144),
+      signedFreshnessProofJson: '😀'.repeat(262_144),
+      signedOperationJson: '😀'.repeat(262_144),
     });
   }
 

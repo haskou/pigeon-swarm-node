@@ -1,15 +1,17 @@
 import { IsString, MaxLength } from 'class-validator';
 
+import { PrivateAuthorizationBodyFieldLimits } from './PrivateAuthorizationBodyFieldLimits';
+
 export class PrivateControlFrameBody {
   @IsString()
-  @MaxLength(1_398_102)
+  @MaxLength(PrivateAuthorizationBodyFieldLimits.encryptedMlsState)
   public readonly encryptedMlsState: string;
 
   @IsString()
-  @MaxLength(349_526)
+  @MaxLength(PrivateAuthorizationBodyFieldLimits.mlsMessage)
   public readonly mlsMessage: string;
 
   @IsString()
-  @MaxLength(262_144)
+  @MaxLength(PrivateAuthorizationBodyFieldLimits.signedJson)
   public readonly signedTransitionJson: string;
 }

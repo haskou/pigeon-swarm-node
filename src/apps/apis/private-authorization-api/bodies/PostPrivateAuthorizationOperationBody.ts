@@ -6,6 +6,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+import { PrivateAuthorizationBodyFieldLimits } from './PrivateAuthorizationBodyFieldLimits';
 import { PrivateControlFrameBody } from './PrivateControlFrameBody';
 
 export class PostPrivateAuthorizationOperationBody {
@@ -15,10 +16,10 @@ export class PostPrivateAuthorizationOperationBody {
   public readonly controlFrame?: PrivateControlFrameBody;
 
   @IsString()
-  @MaxLength(262_144)
+  @MaxLength(PrivateAuthorizationBodyFieldLimits.signedJson)
   public readonly signedFreshnessProofJson: string;
 
   @IsString()
-  @MaxLength(262_144)
+  @MaxLength(PrivateAuthorizationBodyFieldLimits.signedJson)
   public readonly signedOperationJson: string;
 }
