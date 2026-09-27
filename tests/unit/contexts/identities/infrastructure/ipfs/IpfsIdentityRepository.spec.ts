@@ -478,6 +478,45 @@ describe('IpfsIdentityRepository', () => {
       expect(result.toPrimitives()).toEqual(primitives);
     });
 
+    it('should select same-version cached forks independently of receipt order', async () => {
+      const preferred = await mother.buildNext({
+        networks: ['550e8400-e29b-41d4-a716-446655440001'],
+        previousIdentityExternalIdentifier: undefined,
+        version: 1,
+      });
+      const other = await mother.buildNext({
+        networks: ['550e8400-e29b-41d4-a716-446655440002'],
+        previousIdentityExternalIdentifier: undefined,
+        version: 1,
+      });
+      const primitives = preferred.toPrimitives();
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          cid: 'bafy-b-fork',
+          identity: other,
+          identityId: primitives.id,
+          networkIds: other.toPrimitives().networks,
+          previousCid: undefined,
+          receivedAt: Date.now() + 1,
+          version: 1,
+        },
+        {
+          cid: 'bafy-a-fork',
+          identity: preferred,
+          identityId: primitives.id,
+          networkIds: primitives.networks,
+          previousCid: undefined,
+          receivedAt: Date.now(),
+          version: 1,
+        },
+      ]);
+
+      const result = await repository.findById(new IdentityId(primitives.id));
+
+      expect(result.getNetworkIds()).toEqual(preferred.getNetworkIds());
+    });
+
     it('should reject an embedded metadata identity that rolls back authorization revision', async () => {
       const genesis = await mother.buildNext({
         previousIdentityExternalIdentifier: undefined,

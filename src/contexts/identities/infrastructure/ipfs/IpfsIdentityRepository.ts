@@ -303,25 +303,29 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     return new IdentityCandidate(externalIdentifier, identity);
   }
 
-  private async findFirstCandidateReferenceFromMetadata(
+  private async findCandidateReferencesFromMetadata(
     metadata: IdentityMetadataRecord[],
-  ): Promise<IdentityCandidate | undefined> {
-    const [latestDocument] = metadata;
+  ): Promise<IdentityCandidate[]> {
+    const candidates = await Promise.all(
+      metadata.map((document) =>
+        this.findCandidateReferenceFromMetadata(document),
+      ),
+    );
 
-    return latestDocument
-      ? this.findCandidateReferenceFromMetadata(latestDocument)
-      : undefined;
+    return candidates.filter(
+      (candidate): candidate is IdentityCandidate => candidate !== undefined,
+    );
   }
 
   private sortCandidateReferencesByFreshness(
     candidates: IdentityCandidate[],
   ): IdentityCandidate[] {
     return [...candidates].sort((left, right) => {
-      if (left.isNewerThan(right)) {
+      if (left.takesPrecedenceOver(right)) {
         return -1;
       }
 
-      if (right.isNewerThan(left)) {
+      if (right.takesPrecedenceOver(left)) {
         return 1;
       }
 
@@ -611,9 +615,8 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     id: IdentityId,
   ): Promise<IdentityCandidate[]> {
     const metadata = await this.findValidMetadata(id);
-    const localCandidate =
-      await this.findFirstCandidateReferenceFromMetadata(metadata);
-    const localCandidates = localCandidate ? [localCandidate] : [];
+    const localCandidates =
+      await this.findCandidateReferencesFromMetadata(metadata);
     const knownCids = new Set(metadata.map((document) => document.cid));
 
     if (localCandidates.length > 0) {
