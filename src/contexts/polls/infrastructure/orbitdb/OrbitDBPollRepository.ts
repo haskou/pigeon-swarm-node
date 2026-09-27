@@ -317,9 +317,9 @@ export default class OrbitDBPollRepository extends PollRepository {
   }
 
   public async save(poll: Poll): Promise<void> {
-    await this.runWhilePublicCommunityScope(poll, async () => {
-      const document = await this.toDocument(poll);
+    const document = await this.toDocument(poll);
 
+    await this.runWhilePublicCommunityScope(poll, async () => {
       await this.registry.putDocument('polls', document);
       await this.putHeads(document);
     });

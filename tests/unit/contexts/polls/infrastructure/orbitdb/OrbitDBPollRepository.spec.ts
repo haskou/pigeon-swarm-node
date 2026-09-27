@@ -160,6 +160,40 @@ describe('OrbitDBPollRepository', () => {
     expect(polls.query).not.toHaveBeenCalled();
   });
 
+  it('resolves the community network before acquiring its public storage lock', async () => {
+    let activeScope: string | undefined;
+    const coordinator = mock<PrivateAuthorizationStorageCoordinator>();
+
+    coordinator.exclusively.mockImplementation(async (scopeId, action) => {
+      if (activeScope === scopeId) throw new Error('Reentrant scope lock');
+      activeScope = scopeId;
+
+      try {
+        return await action();
+      } finally {
+        activeScope = undefined;
+      }
+    });
+    communityRepository.findById.mockImplementation((id) =>
+      coordinator.exclusively(id.valueOf(), async () => ({
+        toPrimitives: () => ({ networkId }),
+      }) as never),
+    );
+    repository = new OrbitDBPollRepository(
+      registry,
+      communityRepository,
+      conversationRepository,
+      new PrivateCommunityPublicStorageGuard(
+        { findScope: jest.fn().mockResolvedValue(undefined) } as never,
+        coordinator,
+      ),
+    );
+
+    await expect(repository.save(poll('community_channel'))).resolves.toBe(
+      undefined,
+    );
+  });
+
   it('rejects protected community polls before publishing them', async () => {
     repository = new OrbitDBPollRepository(
       registry,

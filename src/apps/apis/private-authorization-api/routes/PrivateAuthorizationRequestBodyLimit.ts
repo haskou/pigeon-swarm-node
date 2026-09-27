@@ -8,5 +8,5 @@ const MaximumOperationEnvelopeCharacters =
 
 export const PrivateAuthorizationRequestBodyLimit =
   MaximumOperationEnvelopeCharacters *
-    PrivateAuthorizationRequestBodyCapacity.maximumUtf8BytesPerCharacter +
+    PrivateAuthorizationRequestBodyCapacity.maximumJsonBytesPerCharacter +
   PrivateAuthorizationRequestBodyCapacity.jsonEnvelopeOverheadBytes;
