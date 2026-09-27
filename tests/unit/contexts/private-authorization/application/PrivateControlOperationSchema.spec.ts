@@ -26,4 +26,12 @@ describe('private control operation schema', () => {
     expect(schema.$defs.commit.allOf[1].properties.payload.additionalProperties).toBe(false);
     expect(schema.$defs.revocation.allOf[1].properties.payload.additionalProperties).toBe(false);
   });
+
+  it('publishes the runtime authorization revision range', () => {
+    expect(schema.$defs.envelope.properties.authorizationRevision).toEqual({
+      maximum: Number.MAX_SAFE_INTEGER,
+      minimum: 0,
+      type: 'integer',
+    });
+  });
 });

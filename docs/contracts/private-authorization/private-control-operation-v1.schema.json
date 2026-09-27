@@ -71,7 +71,11 @@
         "version": { "const": 1 },
         "operationId": { "$ref": "#/$defs/base64url16" },
         "scopeId": { "$ref": "#/$defs/base64url32" },
-        "authorizationRevision": { "type": "integer", "minimum": 0 },
+        "authorizationRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
         "authorDeviceKey": { "$ref": "#/$defs/base64url32" },
         "kind": { "type": "string" },
         "payload": { "type": "object" },
