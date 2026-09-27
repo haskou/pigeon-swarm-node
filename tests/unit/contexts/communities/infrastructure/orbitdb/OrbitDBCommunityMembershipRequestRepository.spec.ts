@@ -2,8 +2,18 @@ import { CommunityMembershipRequest } from '@app/contexts/communities/domain/ent
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBCommunityMembershipRequestMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMembershipRequestMapper';
 import OrbitDBCommunityMembershipRequestRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityMembershipRequestRepository';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+
+const publicStorageGuard = () =>
+  new PrivateCommunityPublicStorageGuard(
+    {
+      findScope: jest.fn().mockResolvedValue(undefined),
+    } as never,
+    new PrivateAuthorizationStorageCoordinator(),
+  );
 
 describe('OrbitDBCommunityMembershipRequestRepository', () => {
   const communityId = new CommunityId('community-1');
@@ -17,6 +27,7 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
   const heads = new Map<string, Record<string, unknown>>();
   const requests: Record<string, unknown>[] = [];
   let headsPut: jest.Mock;
+  let requestsPut: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let store: OrbitDBCommunityMembershipRequestRepository;
 
@@ -26,6 +37,20 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     requests.splice(0);
     headsPut = jest.fn(async (key: string, value: Record<string, unknown>) => {
       heads.set(key, value);
+
+      return 'ok';
+    });
+    requestsPut = jest.fn(async (document) => {
+      const record = document as Record<string, unknown>;
+      const index = requests.findIndex(
+        (candidate) => candidate.id === record.id,
+      );
+
+      if (index >= 0) {
+        requests[index] = record;
+      } else {
+        requests.push(record);
+      }
 
       return 'ok';
     });
@@ -51,26 +76,14 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
         put: headsPut,
       },
       requests: {
-        put: jest.fn(async (document) => {
-          const record = document as Record<string, unknown>;
-          const index = requests.findIndex(
-            (candidate) => candidate.id === record.id,
-          );
-
-          if (index >= 0) {
-            requests[index] = record;
-          } else {
-            requests.push(record);
-          }
-
-          return 'ok';
-        }),
+        put: requestsPut,
         query: jest.fn(async (matcher) => requests.filter(matcher)),
       },
     } as never);
     store = new OrbitDBCommunityMembershipRequestRepository(
       registry,
       new OrbitDBCommunityMembershipRequestMapper(),
+      publicStorageGuard(),
     );
   });
 
@@ -139,10 +152,49 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
       store.save(request).then(() => 'saved'),
       new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
     ]);
-    const savedRequest = await store.findById(request.getId());
 
     expect(result).toBe('saved');
-    expect(savedRequest?.getId().isEqual(request.getId())).toBe(true);
+  });
+
+  it('does not project a membership request when its document write fails', async () => {
+    const request = CommunityMembershipRequest.invitation(
+      communityId,
+      ownerIdentityId,
+      invitedIdentityId,
+      ownerIdentityId,
+    );
+    requestsPut.mockRejectedValueOnce(new Error('document write failed'));
+
+    await expect(store.save(request)).rejects.toThrow('document write failed');
+    await flushBackgroundTasks();
+
+    await expect(store.findById(request.getId())).resolves.toBeUndefined();
+    await expect(store.findByIdentity(invitedIdentityId)).resolves.toEqual([]);
+    expect(
+      heads.has(`community-membership-request:${request.getId().valueOf()}`),
+    ).toBe(false);
+  });
+
+  it('does not project a tombstone when its document write fails', async () => {
+    const request = CommunityMembershipRequest.invitation(
+      communityId,
+      ownerIdentityId,
+      invitedIdentityId,
+      ownerIdentityId,
+    );
+    await store.save(request);
+    await flushBackgroundTasks();
+    requestsPut.mockRejectedValueOnce(new Error('tombstone write failed'));
+
+    await expect(store.deleteByCommunity(communityId)).rejects.toThrow(
+      'tombstone write failed',
+    );
+    await flushBackgroundTasks();
+
+    await expect(store.findById(request.getId())).resolves.toBeDefined();
+    await expect(store.findByIdentity(invitedIdentityId)).resolves.toHaveLength(
+      1,
+    );
   });
 
   it('should find membership requests from fresh heads when identity indexes lag', async () => {
@@ -190,6 +242,7 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     const replicatedStore = new OrbitDBCommunityMembershipRequestRepository(
       registry,
       new OrbitDBCommunityMembershipRequestMapper(),
+      publicStorageGuard(),
     );
 
     const byIdentity = await replicatedStore.findByIdentity(invitedIdentityId);

@@ -1,0 +1,80 @@
+@startuml PrivateAuthorizationClasses
+
+title Pigeon Swarm - Private Authorization Context
+
+skinparam classAttributeIconSize 0
+
+package "private-authorization/domain" {
+  class PrivateAuthorizationScope <<AggregateRoot>> {
+    -checkpoint: PrivateAuthorizationCheckpoint
+    -genesisHash: string
+    -status: active | frozen
+    -acceptedOperations: PrivateControlOperation[]
+    -pendingOperations: PrivateControlOperation[]
+    +pin(checkpoint, genesisHash): PrivateAuthorizationScope
+    +acceptProposal(operation): AcceptanceResult
+    +commitTransition(operation, candidate): AcceptanceResult
+    +revokeDevice(operation, candidate): AcceptanceResult
+    +retryable(): PrivateControlOperation[]
+  }
+
+  class PrivateAuthorizationCheckpoint {
+    -scopeId: string
+    -revision: number
+    -headHash: string
+    -parentHeadHash: string?
+    -admittedDeviceKeys: string[]
+    -authorityKeys: string[]
+    -revokedDeviceKeys: string[]
+  }
+
+  class PrivateControlOperation {
+    -id: string
+    -digest: string
+    -scopeId: string
+    -authorizationRevision: number
+    -authorDeviceKey: string
+    -kind: string
+    -previousOperationIds: string[]
+  }
+
+  class PrivateAuthorizationScopeWasPinnedEvent <<DomainEvent>>
+  class PrivateAuthorizationScopeWasFrozenEvent <<DomainEvent>>
+  class PrivateControlOperationWasAcceptedEvent <<DomainEvent>>
+
+  PrivateAuthorizationScope *-- PrivateAuthorizationCheckpoint
+  PrivateAuthorizationScope *-- PrivateControlOperation
+  PrivateAuthorizationScope ..> PrivateAuthorizationScopeWasPinnedEvent
+  PrivateAuthorizationScope ..> PrivateAuthorizationScopeWasFrozenEvent
+  PrivateAuthorizationScope ..> PrivateControlOperationWasAcceptedEvent
+}
+
+package "private-authorization/application" {
+  class PrivateAuthorizationScopeProvisioner {
+    +provision(message): ProvisionResult
+  }
+
+  interface PrivateGenesisAuthenticator
+  interface PrivateGenesisProjectionAuthorizer
+  interface PrivateOperationUnitOfWork
+
+  PrivateAuthorizationScopeProvisioner --> PrivateGenesisAuthenticator
+  PrivateAuthorizationScopeProvisioner --> PrivateGenesisProjectionAuthorizer
+  PrivateAuthorizationScopeProvisioner --> PrivateOperationUnitOfWork
+  PrivateAuthorizationScopeProvisioner ..> PrivateAuthorizationScope
+}
+
+note right of PrivateAuthorizationScope
+  A pinned local checkpoint is authoritative.
+  Conflicting genesis or operation digests
+  freeze the scope instead of merging.
+  Current and causally required accepted
+  operations are bounded by count and bytes.
+  Per-author quotas reserve capacity for an
+  authorized checkpoint advance.
+  Checkpoint advances retain a small recent
+  history and retire linked durable records.
+  Revoked-key history is also bounded.
+end note
+
+@enduml

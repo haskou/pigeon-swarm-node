@@ -2,6 +2,7 @@ import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
@@ -20,6 +21,7 @@ export default class OrbitDBPollRepository extends PollRepository {
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly communityRepository: CommunityRepository,
     private readonly conversationRepository: ConversationRepository,
+    private readonly publicStorageGuard: PrivateCommunityPublicStorageGuard,
   ) {
     super();
     this.pollIndex = new OrbitDBHeadIndex(this.registry, {
@@ -61,11 +63,28 @@ export default class OrbitDBPollRepository extends PollRepository {
   private isDocument(
     document: Record<string, unknown>,
   ): document is OrbitDBPollDocument {
-    return (
+    const hasRequiredFields =
       this.hasPollIdentityFields(document) &&
       this.hasPollConfigurationFields(document) &&
-      this.hasPollScopeField(document)
-    );
+      this.hasPollScopeField(document);
+
+    if (!hasRequiredFields) return false;
+    const candidate = document as OrbitDBPollDocument;
+
+    try {
+      const poll = this.toDomain(candidate);
+      poll.getScope().match<void>({
+        communityChannel: () => undefined,
+        groupConversation: () => undefined,
+      });
+
+      return (
+        poll.getId().valueOf() === candidate.id &&
+        poll.getCreatorIdentityId().valueOf() === candidate.creatorIdentityId
+      );
+    } catch {
+      return false;
+    }
   }
 
   private async resolveNetworkId(poll: Poll): Promise<string> {
@@ -112,6 +131,17 @@ export default class OrbitDBPollRepository extends PollRepository {
     };
   }
 
+  private runWhilePublicCommunityScope<T>(
+    poll: Poll,
+    action: () => Promise<T>,
+  ): Promise<T> {
+    return poll.getScope().match<Promise<T>>({
+      communityChannel: (communityId) =>
+        this.publicStorageGuard.runWhilePublic(communityId, action),
+      groupConversation: action,
+    });
+  }
+
   private toDomain(document: OrbitDBPollDocument): Poll {
     return Poll.fromPrimitives({
       allowsMultipleVotes: document.allowsMultipleVotes,
@@ -146,22 +176,21 @@ export default class OrbitDBPollRepository extends PollRepository {
     return `poll-group-conversation-index:${conversationId}`;
   }
 
-  private async putIndex(
-    key: string,
-    documents: OrbitDBPollDocument[],
-  ): Promise<void> {
-    const polls = this.pollIndex.deduplicate(documents);
-    const networkIds = [...new Set(polls.map((poll) => poll.networkId))];
+  private belongsToIndex(key: string, document: OrbitDBPollDocument): boolean {
+    if (document.scope.type === 'community_channel') {
+      return (
+        key ===
+        this.communityChannelIndexHeadKey(
+          document.scope.communityId ?? '',
+          document.scope.channelId ?? '',
+        )
+      );
+    }
 
-    await this.pollIndex.putDocuments(
-      key,
-      {
-        id: key,
-      },
-      polls,
-      {
-        networkIds,
-      },
+    return (
+      document.scope.type === 'group_conversation' &&
+      key ===
+        this.groupConversationIndexHeadKey(document.scope.conversationId ?? '')
     );
   }
 
@@ -169,14 +198,24 @@ export default class OrbitDBPollRepository extends PollRepository {
     key: string,
     document: OrbitDBPollDocument,
   ): Promise<void> {
-    await this.putIndex(key, [
-      ...((await this.pollIndex.find(key)) || []),
+    await this.pollIndex.putRecord(
+      key,
+      { id: key },
       document,
-    ]);
+      [document.networkId],
+      {
+        recordFilter: (candidate) => {
+          const poll = this.isDocument(candidate) ? candidate : undefined;
+
+          return poll !== undefined && this.belongsToIndex(key, poll);
+        },
+        replace: true,
+      },
+    );
   }
 
   private async putHeads(document: OrbitDBPollDocument): Promise<void> {
-    await this.registry.putHead(
+    await this.registry.putHeadExactly(
       this.pollHeadKey(document.id),
       { ...document },
       [document.networkId],
@@ -221,8 +260,24 @@ export default class OrbitDBPollRepository extends PollRepository {
 
   public async findById(id: PollId): Promise<Poll | undefined> {
     const head = await this.registry.findHead(this.pollHeadKey(id.valueOf()));
+    const poll =
+      head && this.isDocument(head) ? this.toDomain(head) : undefined;
 
-    return head && this.isDocument(head) ? this.toDomain(head) : undefined;
+    if (!poll) return undefined;
+
+    return this.runWhilePublicCommunityScope(poll, async () => {
+      const lockedHead = await this.registry.findHead(
+        this.pollHeadKey(id.valueOf()),
+      );
+      const lockedPoll =
+        lockedHead && this.isDocument(lockedHead)
+          ? this.toDomain(lockedHead)
+          : undefined;
+
+      return lockedPoll?.getScope().isEqual(poll.getScope())
+        ? lockedPoll
+        : undefined;
+    });
   }
 
   public async findByCommunityChannel(
@@ -231,19 +286,21 @@ export default class OrbitDBPollRepository extends PollRepository {
     limit: number,
     beforeCreatedAt?: number,
   ): Promise<Poll[]> {
-    const key = this.communityChannelIndexHeadKey(
-      communityId.valueOf(),
-      channelId.valueOf(),
-    );
-    const indexedDocuments = await this.pollIndex.find(key);
-    const documents = indexedDocuments ?? [];
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const key = this.communityChannelIndexHeadKey(
+        communityId.valueOf(),
+        channelId.valueOf(),
+      );
+      const indexedDocuments = await this.pollIndex.find(key);
+      const documents = indexedDocuments ?? [];
 
-    return this.sortDocuments(documents)
-      .filter((document) =>
-        beforeCreatedAt ? document.createdAt <= beforeCreatedAt : true,
-      )
-      .slice(0, limit)
-      .map((document) => this.toDomain(document));
+      return this.sortDocuments(documents)
+        .filter((document) =>
+          beforeCreatedAt ? document.createdAt <= beforeCreatedAt : true,
+        )
+        .slice(0, limit)
+        .map((document) => this.toDomain(document));
+    });
   }
 
   public async findByGroupConversation(
@@ -266,7 +323,9 @@ export default class OrbitDBPollRepository extends PollRepository {
   public async save(poll: Poll): Promise<void> {
     const document = await this.toDocument(poll);
 
-    await this.registry.putDocument('polls', document);
-    await this.putHeads(document);
+    await this.runWhilePublicCommunityScope(poll, async () => {
+      await this.registry.putDocument('polls', document);
+      await this.putHeads(document);
+    });
   }
 }

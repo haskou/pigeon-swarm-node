@@ -5,9 +5,19 @@ import { CommunityChannelMessageReactionEmoji } from '@app/contexts/communities/
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBCommunityChannelMessageReactionMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityChannelMessageReactionMapper';
 import OrbitDBCommunityMessageReactionRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityMessageReactionRepository';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
+
+const publicStorageGuard = () =>
+  new PrivateCommunityPublicStorageGuard(
+    {
+      findScope: jest.fn().mockResolvedValue(undefined),
+    } as never,
+    new PrivateAuthorizationStorageCoordinator(),
+  );
 
 describe('OrbitDBCommunityMessageReactionRepository', () => {
   const communityId = new CommunityId('community-1');
@@ -21,6 +31,8 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
   let blockHeadPersistence = false;
   let headPersistenceBlockers: Array<() => void>;
   let query: jest.Mock;
+  let putDocument: jest.Mock;
+  let putHead: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBCommunityMessageReactionRepository;
 
@@ -32,6 +44,24 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     query = jest.fn((matcher: (document: Record<string, unknown>) => boolean) =>
       Promise.resolve([...documents.values()].filter(matcher)),
     );
+    putDocument = jest.fn((document: unknown) => {
+      const record = document as Record<string, unknown>;
+
+      documents.set(String(record.id), record);
+
+      return Promise.resolve('ok');
+    });
+    putHead = jest.fn(async (key, value) => {
+      if (blockHeadPersistence) {
+        await new Promise<void>((resolve) =>
+          headPersistenceBlockers.push(resolve),
+        );
+      }
+
+      headRecords.set(key as string, value as Record<string, unknown>);
+
+      return 'ok';
+    });
     registry = new OrbitDBReplicatedStateRegistry();
     registry.register('network-1', {
       heads: {
@@ -42,32 +72,17 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
           on: jest.fn(),
         },
         get: jest.fn(async (key) => ({ key, value: headRecords.get(key) })),
-        put: jest.fn(async (key, value) => {
-          if (blockHeadPersistence) {
-            await new Promise<void>((resolve) =>
-              headPersistenceBlockers.push(resolve),
-            );
-          }
-
-          headRecords.set(key as string, value as Record<string, unknown>);
-
-          return 'ok';
-        }),
+        put: putHead,
       },
       reactions: {
-        put: jest.fn((document: unknown) => {
-          const record = document as Record<string, unknown>;
-
-          documents.set(String(record.id), record);
-
-          return Promise.resolve('ok');
-        }),
+        put: putDocument,
         query,
       },
     } as never);
     repository = new OrbitDBCommunityMessageReactionRepository(
       registry,
       new OrbitDBCommunityChannelMessageReactionMapper(),
+      publicStorageGuard(),
     );
   });
 
@@ -113,7 +128,67 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it('should not wait for reaction index head persistence when saving', async () => {
+  it('does not tombstone a reaction bound to another community through a poisoned index', async () => {
+    const otherCommunityId = new CommunityId('community-2');
+    const reaction = CommunityChannelMessageReaction.create(
+      otherCommunityId,
+      channelId,
+      messageId,
+      authorIdentityId,
+      new CommunityChannelMessageReactionEmoji('👍'),
+      new Timestamp(1780000000000),
+    );
+    await repository.save(reaction);
+    const stored = [...documents.values()][0];
+    headRecords.set(`community-reaction-index:${communityId.valueOf()}`, {
+      communityId: communityId.valueOf(),
+      id: `community-reaction-index:${communityId.valueOf()}`,
+      reactions: [stored],
+      updatedAt: 1,
+    });
+
+    await repository.deleteByCommunity(communityId);
+
+    expect(documents.get(String(stored.id))).toEqual(stored);
+  });
+
+  it('removes cross-community records when refreshing a community index', async () => {
+    const otherCommunityId = new CommunityId('community-2');
+    const otherReaction = CommunityChannelMessageReaction.create(
+      otherCommunityId,
+      channelId,
+      messageId,
+      authorIdentityId,
+      new CommunityChannelMessageReactionEmoji('👍'),
+      new Timestamp(1780000000000),
+    );
+    await repository.save(otherReaction);
+    const poisoned = [...documents.values()][0];
+    const indexKey = `community-reaction-index:${communityId.valueOf()}`;
+    headRecords.set(indexKey, {
+      communityId: communityId.valueOf(),
+      id: indexKey,
+      reactions: [poisoned],
+      updatedAt: 1,
+    });
+    const ownReaction = CommunityChannelMessageReaction.create(
+      communityId,
+      channelId,
+      messageId,
+      authorIdentityId,
+      new CommunityChannelMessageReactionEmoji('👍'),
+      new Timestamp(1780000000001),
+    );
+
+    await repository.save(ownReaction);
+
+    const storedIndex = headRecords.get(indexKey);
+    expect(storedIndex?.reactions).toEqual([
+      expect.objectContaining({ communityId: communityId.valueOf() }),
+    ]);
+  });
+
+  it('keeps saving pending until reaction index persistence finishes', async () => {
     const reaction = CommunityChannelMessageReaction.create(
       communityId,
       channelId,
@@ -124,23 +199,34 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     );
     blockHeadPersistence = true;
 
-    await expect(repository.save(reaction)).resolves.toBeUndefined();
+    const save = repository.save(reaction);
+    await expect(
+      Promise.race([
+        save.then(() => 'saved'),
+        new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+      ]),
+    ).resolves.toBe('blocked');
 
-    const byMessage = await repository.findByMessageIds(
+    const byMessage = repository.findByMessageIds(
       communityId,
       channelId,
       [messageId],
     );
-
-    expect(byMessage.map((item) => item.toPrimitives())).toEqual([
-      reaction.toPrimitives(),
-    ]);
+    await expect(
+      Promise.race([
+        byMessage.then(() => 'completed'),
+        new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+      ]),
+    ).resolves.toBe('blocked');
 
     releaseHeadPersistence();
-    await flushBackgroundTasks();
+    await save;
+    await expect(
+      byMessage.then((items) => items.map((item) => item.toPrimitives())),
+    ).resolves.toEqual([reaction.toPrimitives()]);
   });
 
-  it('should not wait for reaction index head persistence when deleting', async () => {
+  it('keeps deleting pending until reaction index persistence finishes', async () => {
     const reaction = CommunityChannelMessageReaction.create(
       communityId,
       channelId,
@@ -154,14 +240,82 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     await flushBackgroundTasks();
     blockHeadPersistence = true;
 
-    await expect(repository.delete(reaction)).resolves.toBeUndefined();
+    const deletion = repository.delete(reaction);
+    await expect(
+      Promise.race([
+        deletion.then(() => 'saved'),
+        new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+      ]),
+    ).resolves.toBe('blocked');
+
+    const byMessage = repository.findByMessageIds(communityId, channelId, [
+      messageId,
+    ]);
+    await expect(
+      Promise.race([
+        byMessage.then(() => 'completed'),
+        new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+      ]),
+    ).resolves.toBe('blocked');
+
+    releaseHeadPersistence();
+    await deletion;
+    await expect(byMessage).resolves.toEqual([]);
+  });
+
+  it('does not publish a saved reaction index when canonical persistence fails', async () => {
+    const reaction = CommunityChannelMessageReaction.create(
+      communityId,
+      channelId,
+      messageId,
+      authorIdentityId,
+      new CommunityChannelMessageReactionEmoji('👍'),
+      new Timestamp(1780000000000),
+    );
+    putDocument.mockRejectedValueOnce(new Error('canonical write failed'));
+
+    await expect(repository.save(reaction)).rejects.toThrow(
+      'canonical write failed',
+    );
+
+    expect(putHead).not.toHaveBeenCalled();
+  });
+
+  it('does not publish a deleted reaction index when canonical persistence fails', async () => {
+    const reaction = CommunityChannelMessageReaction.create(
+      communityId,
+      channelId,
+      messageId,
+      authorIdentityId,
+      new CommunityChannelMessageReactionEmoji('👍'),
+      new Timestamp(1780000000000),
+    );
+    await repository.save(reaction);
+    putHead.mockClear();
+    putDocument.mockRejectedValueOnce(new Error('canonical write failed'));
+
+    await expect(repository.delete(reaction)).rejects.toThrow(
+      'canonical write failed',
+    );
+
+    expect(putHead).not.toHaveBeenCalled();
+  });
+
+  it('ignores canonical reactions with malformed identities', async () => {
+    documents.set('malformed-reaction', {
+      authorIdentityId: 'malformed-public-key',
+      channelId: channelId.valueOf(),
+      communityId: communityId.valueOf(),
+      createdAt: 1780000000000,
+      emoji: '👍',
+      id: 'malformed-reaction',
+      messageId: messageId.valueOf(),
+      scopeType: 'community_channel',
+    });
 
     await expect(
       repository.findByMessageIds(communityId, channelId, [messageId]),
     ).resolves.toEqual([]);
-
-    releaseHeadPersistence();
-    await flushBackgroundTasks();
   });
 
   function releaseHeadPersistence(): void {

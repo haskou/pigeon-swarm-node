@@ -3,19 +3,34 @@ import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordReg
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import PigeonApplication from '@app/apps/PigeonApplication';
 import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime';
+import { PrivateAuthorizationRequestBodyLimit } from '@app/apps/apis/private-authorization-api/routes/PrivateAuthorizationRequestBodyLimit';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
+import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
+import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
+import LegacyIdentityDeviceBinding from '@app/contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { Kernel } from '@haskou/ddd-kernel';
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  KeyPair,
+  PrivateGenesisSignature,
+  PrivateKey,
+} from '@haskou/pigeon-swarm-crypto';
+import canonicalize from 'canonicalize';
 import { expect } from 'chai';
 import * as chai from 'chai';
 import chaiSubset from 'chai-subset';
-import { generateKeyPairSync, randomUUID } from 'crypto';
+import {
+  createHash,
+  generateKeyPairSync,
+  randomBytes,
+  randomUUID,
+} from 'crypto';
 import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import FormData from 'form-data';
 
@@ -52,6 +67,7 @@ export default class Definitions {
   private keychainExternalIdentifier: string | undefined;
   private messageId: string | undefined;
   private notificationId: string | undefined;
+  private privateAuthorizationScopeId: string | undefined;
   private otherIdentityId: IdentityId | undefined;
   private otherIdentityKeyPair: KeyPair | undefined;
 
@@ -443,6 +459,193 @@ export default class Definitions {
 
     this.body = JSON.stringify(signedBody);
     await this.signCurrentRequest('POST', '/keychains/');
+  }
+
+  @given('I sign the current private authorization challenge request')
+  public async iSignTheCurrentPrivateAuthorizationChallengeRequest(): Promise<void> {
+    await this.signCurrentRequest(
+      'POST',
+      '/private-authorization/challenges',
+    );
+  }
+
+  @given('I set a valid private authorization genesis body')
+  public async iSetAValidPrivateAuthorizationGenesisBody(): Promise<void> {
+    const keyPair = await this.ensureIdentityKeyPair();
+    const identityId = this.ownerIdentityId as IdentityId;
+    const ownerDeviceKey = new LegacyIdentityDeviceBinding().bind(
+      identityId.valueOf(),
+    );
+    const scopeId = randomBytes(32).toString('base64url');
+    const protectedState = Buffer.from('private-genesis-state');
+    const mlsContextHash = createHash('sha256')
+      .update(protectedState)
+      .digest('base64url');
+    const hash = (value: unknown) =>
+      createHash('sha256')
+        .update(canonicalize(value)!)
+        .digest('base64url');
+    const policy = {
+      authorityKeys: [ownerDeviceKey],
+      devices: [
+        {
+          deviceKey: ownerDeviceKey,
+          mlsCredentialHash: randomBytes(32).toString('base64url'),
+        },
+      ],
+      freshnessAuthorityKey: ownerDeviceKey,
+      leaseRevocationHpkeKey: randomBytes(32).toString('base64url'),
+      leaseRevocationKey: ownerDeviceKey,
+      sequencerKey: ownerDeviceKey,
+      threshold: 1,
+      version: 1,
+    };
+    const head = {
+      mlsContextHash,
+      mlsEpoch: 0,
+      parentHeadHash: null as string | null,
+      policyHash: hash(policy),
+      revision: 0,
+      scopeId,
+    };
+    const unsignedGenesis = {
+      ...head,
+      headHash: hash(head),
+      policy,
+      version: 1,
+    };
+    const signedGenesisJson = PrivateGenesisSignature.sign(
+      canonicalize(unsignedGenesis)!,
+      new PrivateKey(keyPair.toPrimitives().privateKey),
+    );
+
+    this.privateAuthorizationScopeId = scopeId;
+    this.body = JSON.stringify({
+      projection: {
+        autoJoinEnabled: false,
+        bannedMemberIds: [],
+        createdAt: 1,
+        description: 'Protected API community',
+        discoverable: false,
+        id: scopeId,
+        memberIds: [identityId.valueOf()],
+        memberRoles: [],
+        name: 'Protected API community',
+        networkId: '550e8400-e29b-41d4-a716-446655440000',
+        ownerIdentityId: identityId.valueOf(),
+        roles: [],
+        textChannels: [],
+        visibility: 'private',
+        voiceChannels: [],
+      },
+      protectedMlsState: protectedState.toString('base64url'),
+      signedGenesisJson,
+    });
+  }
+
+  @given('I add a large valid channel to the private authorization projection')
+  public iAddALargeValidChannelToThePrivateAuthorizationProjection(): void {
+    const body = JSON.parse(this.body) as {
+      projection: { textChannels: Record<string, unknown>[] };
+    };
+    const channel = (index: number) => ({
+      createdAt: 1,
+      id: `channel-${index}`,
+      name: 'Large projection channel',
+      permissions: { visibleRoleIds: ['everyone'] },
+      type: 'text',
+    });
+    const channelBytes = Buffer.byteLength(JSON.stringify(channel(0)));
+    const channelCount = Math.ceil(
+      PrivateAuthorizationRequestBodyLimit / channelBytes,
+    );
+
+    body.projection.textChannels = Array.from(
+      { length: channelCount },
+      (_, index) => channel(index),
+    );
+    this.body = JSON.stringify(body);
+  }
+
+  @given('I sign the current private authorization scope request')
+  public async iSignTheCurrentPrivateAuthorizationScopeRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/private-authorization/scopes');
+  }
+
+  @given('another identity signs the current private authorization scope request')
+  public async anotherIdentitySignsTheCurrentPrivateAuthorizationScopeRequest(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      'POST',
+      '/private-authorization/scopes',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('the current identity owns the node')
+  public async theCurrentIdentityOwnsTheNode(): Promise<void> {
+    await this.ensureIdentityKeyPair();
+    const identityId = this.ownerIdentityId as IdentityId;
+    const assigner = Kernel.di.getService<NodeOwnerAssigner>(NodeOwnerAssigner);
+
+    await assigner.assignOwner(
+      new NodeOwnerAssignerMessage(identityId.valueOf(), identityId.valueOf()),
+    );
+  }
+
+  @then('the private authorization scope is durably provisioned')
+  public async thePrivateAuthorizationScopeIsDurablyProvisioned(): Promise<void> {
+    const scopeId = this.privateAuthorizationScopeId as string;
+    const repository = Kernel.di.getService<PrivateAuthorizationRepository>(
+      PrivateAuthorizationRepository,
+    );
+
+    expect(await repository.findScope(scopeId)).not.to.equal(undefined);
+    expect(await repository.findProjection(scopeId)).to.containSubset({
+      id: scopeId,
+    });
+    expect(await repository.findProtectedMlsState(scopeId)).to.equal(
+      Buffer.from('private-genesis-state').toString('base64url'),
+    );
+  }
+
+  @given(
+    'I set a non-string private authorization challenge body containing {string}',
+  )
+  public iSetANonStringPrivateAuthorizationChallengeBodyContaining(
+    sensitiveValue: string,
+  ): void {
+    this.body = JSON.stringify({
+      signedOperationJson: { sensitiveValue },
+    });
+  }
+
+  @given('I set a maximum-length private authorization operation')
+  public iSetAMaximumLengthPrivateAuthorizationOperation(): void {
+    this.body = JSON.stringify({
+      signedOperationJson: 'x'.repeat(262144),
+    });
+  }
+
+  @given('I set a maximum-size private authorization operation envelope')
+  public iSetAMaximumSizePrivateAuthorizationOperationEnvelope(): void {
+    this.body = JSON.stringify({
+      controlFrame: {
+        encryptedMlsState: '😀'.repeat(1_398_102),
+        mlsMessage: '😀'.repeat(349_526),
+        signedTransitionJson: '😀'.repeat(262_144),
+      },
+      signedFreshnessProofJson: '😀'.repeat(262_144),
+      signedOperationJson: '😀'.repeat(262_144),
+    });
+  }
+
+  @given('I sign the current private authorization operation request')
+  public async iSignTheCurrentPrivateAuthorizationOperationRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/private-authorization/operations');
   }
 
   @given(

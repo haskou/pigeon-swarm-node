@@ -427,6 +427,13 @@ export class Community extends AggregateRoot {
     );
   }
 
+  public viewChannel(
+    identityId: IdentityId,
+    channelId: CommunityChannelId,
+  ): void {
+    this.createAccessValidator().assertCanViewChannel(identityId, channelId);
+  }
+
   public manageChannelMessages(
     identityId: IdentityId,
     channelId: CommunityChannelId,
@@ -726,6 +733,21 @@ export class Community extends AggregateRoot {
 
   public isOwner(identityId: IdentityId): boolean {
     return this.ownerIdentityId.isEqual(identityId);
+  }
+
+  public isPrivateGenesisFor(
+    communityId: CommunityId,
+    ownerIdentityId: IdentityId,
+  ): boolean {
+    return (
+      this.isIdentifiedBy(communityId) &&
+      this.isOwner(ownerIdentityId) &&
+      this.membership.hasOnlyMember(ownerIdentityId) &&
+      !this.membership.hasBannedMembers() &&
+      this.settings.isPrivate() &&
+      !this.settings.isDiscoverable() &&
+      !this.settings.isAutoJoinEnabled()
+    );
   }
 
   public hasMembers(): boolean {

@@ -6,6 +6,8 @@ import { CommunityRole } from '@app/contexts/communities/domain/entities/members
 import { CommunityName } from '@app/contexts/communities/domain/value-objects/CommunityName';
 import { CommunityDescription } from '@app/contexts/communities/domain/value-objects/CommunityDescription';
 import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import OrbitDBCommunityMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMapper';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { HeliaIPFS } from '@app/contexts/shared/infrastructure/ipfs/helia/HeliaIPFS';
@@ -41,6 +43,11 @@ const mapper = new OrbitDBCommunityMapper();
 const nodes: Replica[] = [];
 const pause = (milliseconds: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
+const publicStorageGuard = () =>
+  new PrivateCommunityPublicStorageGuard(
+    { findScope: async (): Promise<undefined> => undefined } as never,
+    new PrivateAuthorizationStorageCoordinator(),
+  );
 let stage = 'setup';
 let root: string;
 
@@ -103,6 +110,7 @@ async function open(
   for (const store of Object.values(replica.stores))
     store.events.on('error', () => undefined);
   replica.registry = registry;
+  const guard = publicStorageGuard();
   replica.repository = new OrbitDBCommunityRepository(
     replica.registry,
     mapper,
@@ -110,7 +118,9 @@ async function open(
     new OrbitDBCommunityReplicaProjection(
       replica.registry,
       new OrbitDBCommunityReplicaMerger(),
+      guard,
     ),
+    guard,
   );
   await replica.registry.register(
     scopedNetworkId,
@@ -145,22 +155,43 @@ async function synchronization(
 }
 
 async function exchanged(replicas: Replica[]): Promise<void> {
-  await until('actual OrbitDB heads exchanged after redial', async () => {
-    for (const storeName of ['communities', 'heads'] as const) {
-      const signatures = await Promise.all(
-        replicas.map(async (replica) => {
-          const store = replica.stores![storeName];
-          return (await store.log!.heads())
-            .map((entry) => entry.hash)
-            .sort()
-            .join(',');
-        }),
-      );
-      if (!signatures.every(Boolean) || new Set(signatures).size !== 1)
-        return false;
-    }
-    return true;
-  });
+  const exchangeId = randomUUID();
+  const minimumPeerCount = replicas.length > 1 ? 1 : 0;
+  await until('OrbitDB synchronization peers joined after redial', async () =>
+    replicas.every((replica) =>
+      Object.values(replica.stores!).every(
+        (store) => (store.peers?.size ?? 0) >= minimumPeerCount,
+      ),
+    ),
+  );
+
+  for (let index = 0; index < replicas.length; index += 1) {
+    const sentinel = {
+      id: `fixture-exchange:${exchangeId}:${index}`,
+      nonce: randomUUID(),
+    };
+    await replicas[index].stores!.communities.put!(sentinel);
+    await replicas[index].stores!.heads.put!(sentinel.id, sentinel);
+    await until('actual OrbitDB heads exchanged after redial', async () => {
+      for (const replica of replicas) {
+        const communities = await replica.stores!.communities.query!(
+          (record) => record.id === sentinel.id,
+        );
+        const head = await replica.stores!.heads.get!(sentinel.id);
+
+        if (
+          !communities.some((record) =>
+            isDeepStrictEqual(record, sentinel),
+          ) ||
+          !isDeepStrictEqual(head, sentinel)
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
   console.log(`PASS actual OrbitDB head exchange: ${replicas.length} replicas`);
 }
 
@@ -353,8 +384,8 @@ async function main(): Promise<void> {
     new CommunityDescription('Concurrent description'),
   );
   stage = 'concurrent additions and profile convergence';
-  await synchronization(true, nodes.slice(0, 2));
   await connect(nodes.slice(0, 2));
+  await synchronization(true, nodes.slice(0, 2));
   await exchanged(nodes.slice(0, 2));
   await until('first two replicas preserve both additions', async () =>
     (await Promise.all(nodes.slice(0, 2).map(load))).every(
@@ -366,8 +397,8 @@ async function main(): Promise<void> {
     canonical(branches[2]),
     'Delayed replica must remain independent until synchronization resumes',
   );
-  await synchronization(true, [nodes[2]]);
   await connect(nodes);
+  await synchronization(true, [nodes[2]]);
   await exchanged(nodes);
   await converged(expected);
   await synchronization(false);
@@ -388,14 +419,14 @@ async function main(): Promise<void> {
     new CommunityDescription('Stale unrelated edit'),
   );
   stage = 'explicit removal survives stale unrelated edit';
-  await synchronization(true);
   await connect(nodes);
+  await synchronization(true);
   await exchanged(nodes);
   await converged(expected);
   stage = 'repeated persisted log synchronization';
   await synchronization(false);
-  await synchronization(true);
   await connect(nodes);
+  await synchronization(true);
   await freshSynchronizationSentinel();
   await converged(expected);
   stage = 'fresh registry and OrbitDB reload';
@@ -409,8 +440,8 @@ async function main(): Promise<void> {
   stage = 'cold community reconstruction before reconnect';
   await converged(expected, [restarted]);
   stage = 'reconnecting restarted replica';
-  await synchronization(true, [restarted]);
   await connect(nodes);
+  await synchronization(true, [restarted]);
   await converged(expected);
   stage = 'two private networks sharing one backend registry';
   const secondNetworkId = randomUUID();
@@ -445,7 +476,6 @@ async function main(): Promise<void> {
     description: 'Only members of the second network may receive this profile',
   });
   await save(fourth, separate);
-  const indexKey = `community-member-index:${owner.valueOf()}`;
   const scopedStores = [
     ...nodes.slice(0, 3).map((node) => ({
       store: node.stores!.heads,
@@ -456,6 +486,7 @@ async function main(): Promise<void> {
   ];
   const assertPersistedIsolation = async (): Promise<void> => {
     for (const scoped of scopedStores) {
+      const indexKey = `community-member-index:${owner.valueOf()}:${scoped.expected.getId().valueOf()}`;
       await until('actual scoped member index persisted', async () => {
         const record = (await scoped.store.get!(indexKey)) as
           { communities?: Array<{ id: string }> } | undefined;
@@ -544,6 +575,7 @@ async function main(): Promise<void> {
   await assertPersistedIsolation();
   stage = 'reconstructing two network indexes from actual persisted stores';
   const reconstructedRegistry = new OrbitDBReplicatedStateRegistry();
+  const reconstructedGuard = publicStorageGuard();
   const reconstructedRepository = new OrbitDBCommunityRepository(
     reconstructedRegistry,
     mapper,
@@ -551,7 +583,9 @@ async function main(): Promise<void> {
     new OrbitDBCommunityReplicaProjection(
       reconstructedRegistry,
       new OrbitDBCommunityReplicaMerger(),
+      reconstructedGuard,
     ),
+    reconstructedGuard,
   );
   try {
     await reconstructedRegistry.register(

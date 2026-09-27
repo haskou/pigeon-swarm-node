@@ -61,6 +61,14 @@ export class CommunitySettings {
     return this.visibility.isPublic();
   }
 
+  public isPrivate(): boolean {
+    return this.visibility.isPrivate();
+  }
+
+  public isDiscoverable(): boolean {
+    return this.discoverable;
+  }
+
   public isAutoJoinEnabled(): boolean {
     return this.autoJoinEnabled;
   }

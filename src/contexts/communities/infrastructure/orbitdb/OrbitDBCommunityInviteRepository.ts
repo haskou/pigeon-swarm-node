@@ -6,6 +6,7 @@ import { CommunityInviteToken } from '@app/contexts/communities/domain/value-obj
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
+import PrivateCommunityPublicStorageGuard from '../PrivateCommunityPublicStorageGuard';
 import { OrbitDBCommunityInviteDocument } from './documents/OrbitDBCommunityInviteDocument';
 import OrbitDBCommunityInviteMapper from './mappers/OrbitDBCommunityInviteMapper';
 
@@ -15,6 +16,7 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBCommunityInviteMapper,
+    private readonly publicStorageGuard: PrivateCommunityPublicStorageGuard,
   ) {
     super();
     this.inviteIndex = new OrbitDBHeadIndex(this.registry, {
@@ -45,7 +47,7 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
   private isDocument(
     value: Record<string, unknown>,
   ): value is OrbitDBCommunityInviteDocument {
-    return (
+    const hasRequiredFields =
       value.kind === 'community_invite' &&
       value.deleted !== true &&
       this.hasStringFields(value, [
@@ -54,8 +56,18 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
         'id',
         'token',
       ]) &&
-      this.hasNumberFields(value, ['createdAt', 'maxUses', 'uses'])
-    );
+      this.hasNumberFields(value, ['createdAt', 'maxUses', 'uses']);
+
+    if (!hasRequiredFields) return false;
+    const candidate = value as OrbitDBCommunityInviteDocument;
+
+    try {
+      this.mapper.toDomain(candidate);
+
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private tokenHeadKey(token: string): string {
@@ -76,14 +88,18 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
   private async putHeads(
     document: OrbitDBCommunityInviteDocument,
   ): Promise<void> {
-    await this.registry.putHead(this.tokenHeadKey(document.token), {
+    await this.registry.putHeadExactly(this.tokenHeadKey(document.token), {
       ...document,
     });
 
     const key = this.communityIndexHeadKey(document.communityId);
     const invites = this.inviteIndex
       .deduplicate([...((await this.inviteIndex.find(key)) ?? []), document])
-      .filter((candidate) => this.isDocument(candidate));
+      .filter(
+        (candidate) =>
+          this.isDocument(candidate) &&
+          candidate.communityId === document.communityId,
+      );
 
     await this.inviteIndex.putDocuments(
       key,
@@ -92,6 +108,7 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
         id: key,
       },
       invites,
+      { replace: true },
     );
   }
 
@@ -109,22 +126,31 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
   }
 
   public async deleteByCommunity(communityId: CommunityId): Promise<void> {
-    const documents =
-      (await this.inviteIndex.find(this.communityIndexHeadKey(communityId))) ??
-      [];
+    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const documents =
+        (await this.inviteIndex.find(
+          this.communityIndexHeadKey(communityId),
+        )) ?? [];
 
-    await Promise.all(
-      documents.map(async (document) => {
-        const tombstone = {
-          ...document,
-          deleted: true,
-          deletedAt: Date.now(),
-        };
+      await Promise.all(
+        documents
+          .filter(
+            (document) =>
+              this.isDocument(document) &&
+              document.communityId === communityId.valueOf(),
+          )
+          .map(async (document) => {
+            const tombstone = {
+              ...document,
+              deleted: true,
+              deletedAt: Date.now(),
+            };
 
-        await this.registry.putDocument('requests', tombstone);
-        await this.putHeads(tombstone);
-      }),
-    );
+            await this.registry.putDocument('requests', tombstone);
+            await this.putHeads(tombstone);
+          }),
+      );
+    });
   }
 
   public async findByToken(
@@ -135,13 +161,28 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
     );
     const document = head && this.isDocument(head) ? head : undefined;
 
-    return document ? this.mapper.toDomain(document) : undefined;
+    if (!document) return undefined;
+    const communityId = new CommunityId(document.communityId);
+
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const lockedHead = await this.registry.findHead(
+        this.tokenHeadKey(token.valueOf()),
+      );
+
+      return lockedHead && this.isDocument(lockedHead)
+        ? this.mapper.toDomain(lockedHead)
+        : undefined;
+    });
   }
 
   public async save(invite: CommunityInvite): Promise<void> {
     const document = this.mapper.toDocument(invite);
-
-    await this.registry.putDocument('requests', document);
-    await this.putHeads(document);
+    await this.publicStorageGuard.runWhilePublic(
+      new CommunityId(document.communityId),
+      async () => {
+        await this.registry.putDocument('requests', document);
+        await this.putHeads(document);
+      },
+    );
   }
 }

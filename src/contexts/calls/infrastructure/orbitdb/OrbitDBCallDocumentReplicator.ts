@@ -6,7 +6,7 @@ import { OrbitDBCallDocument } from './documents/OrbitDBCallDocument';
 export default class OrbitDBCallDocumentReplicator {
   private readonly pendingDocuments = new Map<string, OrbitDBCallDocument>();
 
-  private readonly replicatingCallIds = new Set<string>();
+  private readonly replications = new Map<string, Promise<void>>();
 
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {}
 
@@ -24,24 +24,25 @@ export default class OrbitDBCallDocumentReplicator {
         await this.registry.putDocument('calls', document, [
           document.networkId,
         ]);
-      } catch (error) {
-        Kernel.logger.warn?.(
-          `Call document replication failed: callId=${document.id} error=${String(error)}`,
-        );
+      } catch {
+        Kernel.logger.warn?.('Call document replication failed');
       }
     }
 
-    this.replicatingCallIds.delete(callId);
+    this.replications.delete(callId);
   }
 
-  public replicate(document: OrbitDBCallDocument): void {
+  public replicate(document: OrbitDBCallDocument): Promise<void> {
     this.pendingDocuments.set(document.id, document);
+    const replication = this.replications.get(document.id);
 
-    if (this.replicatingCallIds.has(document.id)) {
-      return;
+    if (replication) {
+      return replication;
     }
 
-    this.replicatingCallIds.add(document.id);
-    void this.replicateLatestDocument(document.id);
+    const started = this.replicateLatestDocument(document.id);
+    this.replications.set(document.id, started);
+
+    return started;
   }
 }

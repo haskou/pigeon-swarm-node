@@ -1,5 +1,7 @@
 import OrbitDBCommunityReplicaProjection from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaProjection';
 import OrbitDBCommunityReplicaMerger from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaMerger';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import OrbitDBReplicatedHeadCache, {
   OrbitDBReplicatedHeadCacheEntry,
 } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCache';
@@ -220,9 +222,111 @@ function createStores(): {
 }
 
 describe('OrbitDBReplicatedStateRegistry', () => {
+  it('does not publish merged community heads after protection', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const network = createStores();
+    const guard = new PrivateCommunityPublicStorageGuard(
+      { findScope: jest.fn().mockResolvedValue({}) } as never,
+      new PrivateAuthorizationStorageCoordinator(),
+    );
+    new OrbitDBCommunityReplicaProjection(
+      registry,
+      new OrbitDBCommunityReplicaMerger(),
+      guard,
+    ).register();
+    await registry.register('network-1', network.stores);
+    const community = {
+      createdAt: 1,
+      description: 'private',
+      id: 'community-1',
+      memberIds: ['member'],
+      name: 'community',
+      networkId: 'network-1',
+      ownerIdentityId: 'owner',
+      textChannels: [] as unknown[],
+      updatedAt: 2,
+      visibility: 'private',
+    };
+    const key = 'community-member-index:member';
+    registry.cacheHeadLocally(key, {
+      communities: [community],
+      id: key,
+      memberId: 'member',
+      updatedAt: 2,
+    });
+    network.heads.put.mockClear();
+
+    network.heads.emitUpdate({
+      payload: {
+        key,
+        value: {
+          communities: [{ ...community, updatedAt: 1 }],
+          id: key,
+          memberId: 'member',
+          updatedAt: 1,
+        },
+      },
+    });
+    await flushPromises();
+    await flushPromises();
+
+    expect(network.heads.put).not.toHaveBeenCalled();
+  });
+
+  it('does not repair a community head whose key and document identity differ', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const network = createStores();
+    const findScope = jest.fn(async (communityId: { value: string }) =>
+      communityId.value === 'protected-community' ? {} : undefined,
+    );
+    new OrbitDBCommunityReplicaProjection(
+      registry,
+      new OrbitDBCommunityReplicaMerger(),
+      new PrivateCommunityPublicStorageGuard(
+        { findScope } as never,
+        new PrivateAuthorizationStorageCoordinator(),
+      ),
+    ).register();
+    await registry.register('network-1', network.stores);
+    const key = 'community:protected-community';
+    const community = {
+      createdAt: 1,
+      description: 'public',
+      id: 'public-community',
+      memberIds: ['member'],
+      name: 'community',
+      networkId: 'network-1',
+      ownerIdentityId: 'owner',
+      textChannels: [] as unknown[],
+      updatedAt: 2,
+      visibility: 'public',
+    };
+    network.heads.emitUpdate({ payload: { key, value: community } });
+    await flushPromises();
+    network.heads.put.mockClear();
+
+    network.heads.emitUpdate({
+      payload: { key, value: { ...community, updatedAt: 1 } },
+    });
+    await flushPromises();
+    await flushPromises();
+
+    expect(findScope).not.toHaveBeenCalledWith(
+      expect.objectContaining({ value: 'public-community' }),
+    );
+    expect(network.heads.put).not.toHaveBeenCalled();
+  });
+
   it('never persists another private network community through a shared member index', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
-    new OrbitDBCommunityReplicaProjection(registry, new OrbitDBCommunityReplicaMerger()).register();
+    new OrbitDBCommunityReplicaProjection(
+      registry,
+      new OrbitDBCommunityReplicaMerger(),
+      new PrivateCommunityPublicStorageGuard(
+        { findScope: jest.fn().mockResolvedValue(undefined) } as never,
+        new PrivateAuthorizationStorageCoordinator(),
+      ),
+    ).register();
     const first = createStores();
     const second = createStores();
     const key = 'community-member-index:member';
@@ -1817,6 +1921,143 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         },
       },
     ]);
+  });
+
+  it('replaces collection heads in projected, replicated and durable caches', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+    const firstNetwork = createStores();
+    const key = 'replacement-test:conversation-1';
+    let finishWrite!: () => void;
+    const pendingWrite = new Promise<void>(resolve => {
+      finishWrite = resolve;
+    });
+
+    registry.registerHeadRecordMerger('replacement-test:', (current, candidate) => ({
+      ...candidate,
+      reactions: [
+        ...((current?.reactions as Record<string, unknown>[] | undefined) ?? []),
+        ...((candidate.reactions as Record<string, unknown>[] | undefined) ?? []),
+      ],
+    }));
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.putHead(
+      key,
+      {
+        id: key,
+        reactions: [{ id: 'reaction-1', updatedAt: 1 }],
+        updatedAt: 1,
+      },
+      ['network-1'],
+    );
+    firstNetwork.heads.put.mockImplementationOnce(async () => {
+      await pendingWrite;
+
+      return key;
+    });
+
+    const replacement = registry.putHeadExactly(
+      key,
+      { id: key, reactions: [], updatedAt: 2 },
+      ['network-1'],
+    );
+    await Promise.resolve();
+
+    expect(registry.findCachedHead(key)).toEqual({
+      id: key,
+      reactions: [],
+      updatedAt: 2,
+    });
+    finishWrite();
+    await replacement;
+    expect(registry.findCachedHead(key)).toEqual({
+      id: key,
+      reactions: [],
+      updatedAt: 2,
+    });
+    await expect(headCache.findByNetworkId('network-1')).resolves.toContainEqual({
+      key,
+      value: { id: key, reactions: [], updatedAt: 2 },
+    });
+  });
+
+  it('rolls back an exact projection when durable replacement fails', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const key = 'replacement-test:conversation-failure';
+
+    await registry.register('network-1', firstNetwork.stores);
+    await registry.putHead(
+      key,
+      { id: key, reactions: [{ id: 'reaction-1' }], updatedAt: 1 },
+      ['network-1'],
+    );
+    firstNetwork.heads.put.mockRejectedValueOnce(new Error('write failed'));
+
+    await expect(
+      registry.putHeadExactly(
+        key,
+        { id: key, reactions: [], updatedAt: 2 },
+        ['network-1'],
+      ),
+    ).rejects.toThrow('write failed');
+    expect(registry.findCachedHead(key)).toEqual({
+      id: key,
+      reactions: [{ id: 'reaction-1' }],
+      updatedAt: 1,
+    });
+  });
+
+  it('preserves a newer exact projection when an older queued write fails', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+    const key = 'replacement-test:conversation-queued';
+    let failOlderWrite!: () => void;
+    let finishNewerWrite!: () => void;
+    let newerWriteStarted!: () => void;
+    const olderWriteReleased = new Promise<void>((resolve) => {
+      failOlderWrite = resolve;
+    });
+    const newerWriteReleased = new Promise<void>((resolve) => {
+      finishNewerWrite = resolve;
+    });
+    const newerWriteEntered = new Promise<void>((resolve) => {
+      newerWriteStarted = resolve;
+    });
+
+    await registry.register('network-1', firstNetwork.stores);
+    firstNetwork.heads.put
+      .mockImplementationOnce(async () => {
+        await olderWriteReleased;
+        throw new Error('older write failed');
+      })
+      .mockImplementationOnce(async () => {
+        newerWriteStarted();
+        await newerWriteReleased;
+
+        return key;
+      });
+    const olderReplacement = registry.putHeadExactly(
+      key,
+      { id: key, generation: 1 },
+      ['network-1'],
+    );
+    const olderFailure = expect(olderReplacement).rejects.toThrow(
+      'older write failed',
+    );
+    const newerReplacement = registry.putHeadExactly(
+      key,
+      { id: key, generation: 2 },
+      ['network-1'],
+    );
+
+    expect(registry.findCachedHead(key)).toEqual({ id: key, generation: 2 });
+    failOlderWrite();
+    await olderFailure;
+    await newerWriteEntered;
+    expect(registry.findCachedHead(key)).toEqual({ id: key, generation: 2 });
+    finishNewerWrite();
+    await newerReplacement;
   });
 
   it('bootstraps document projections from canonical stores', async () => {

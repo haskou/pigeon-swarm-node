@@ -350,6 +350,26 @@ in `test:ci`; unit regressions additionally exercise three-write permutations, s
 grants, role/channel deletion, legacy replay and malformed metadata. Loopback transport
 does not validate external NAT traversal or calls.
 
+## Protected control frame delivery
+
+Private authorization frames are excluded from shared PubSub, public IPFS,
+DHT records and global OrbitDB indexes. A sender obtains a recipient-generated
+freshness challenge inside the participant-encrypted channel, then delivers the
+signed operation, signed proof and optional control transition as one encrypted
+recipient frame. The decrypted-frame consumer invokes the same acceptance use
+case as HTTP.
+
+The recipient acknowledges only `accepted` and `duplicate`. It leaves `pending`
+unacknowledged so the sender can recover missing causal operations and retry
+with a new one-use challenge. A future operation is bounded by 128 normalized operations or one MiB per
+scope. Retention and rejoin deadlines belong to the opaque mailbox transport;
+elapsed time cannot authorize an operation or cause fallback to an older
+checkpoint or the public replication path.
+
+Version 1 accepts only `membership.propose`, `membership.commit` and
+`device.revoke`. There is no legacy private-format fallback or dual write.
+Public communities continue to use their public replication path.
+
 ## Live call projection boundary
 
 Conversation lifecycle documents retain merge tombstones; runtime leases stay

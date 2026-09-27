@@ -41,6 +41,10 @@ paths:
         - omitted: not muted
         - integer timestamp: muted until that instant
         - null: muted until manually reset
+
+        Protected community scopes require current membership and channel
+        visibility in the node's local projection. Protected settings are
+        limited to 256 scopes per identity and 4,096 scopes per node.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'

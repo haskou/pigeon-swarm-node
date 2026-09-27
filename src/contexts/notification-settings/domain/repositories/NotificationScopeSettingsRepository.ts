@@ -18,5 +18,9 @@ export default abstract class NotificationScopeSettingsRepository {
     scope: NotificationSettingScope,
   ): Promise<NotificationScopeSettings | undefined>;
 
+  public abstract isPrivateScope(
+    scope: NotificationSettingScope,
+  ): Promise<boolean>;
+
   public abstract save(settings: NotificationScopeSettings): Promise<void>;
 }

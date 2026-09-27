@@ -30,7 +30,11 @@ export default class OrbitDBConversationMessagePinRepository extends Conversatio
   }
 
   private indexHeadKey(conversationId: ConversationId): string {
-    return `conversation-pin-index:${conversationId.valueOf()}`;
+    return this.indexHeadKeyFromValue(conversationId.valueOf());
+  }
+
+  private indexHeadKeyFromValue(conversationId: string): string {
+    return `conversation-pin-index:${conversationId}`;
   }
 
   private freshness(document: Record<string, unknown>): number {
@@ -40,17 +44,37 @@ export default class OrbitDBConversationMessagePinRepository extends Conversatio
     );
   }
 
+  private hasRequiredFields(document: Record<string, unknown>): boolean {
+    const stringFields = [
+      'conversationId',
+      'id',
+      'messageId',
+      'pinnedByIdentityId',
+    ];
+
+    return (
+      document.removed !== true &&
+      document.scopeType === 'conversation' &&
+      typeof document.createdAt === 'number' &&
+      stringFields.every((field) => typeof document[field] === 'string')
+    );
+  }
+
   private isDocument(
     document: Record<string, unknown>,
   ): document is OrbitDBConversationMessagePinDocument {
-    return (
-      document.removed !== true &&
-      typeof document.id === 'string' &&
-      typeof document.conversationId === 'string' &&
-      typeof document.createdAt === 'number' &&
-      typeof document.messageId === 'string' &&
-      typeof document.pinnedByIdentityId === 'string'
-    );
+    if (!this.hasRequiredFields(document)) return false;
+    const candidate = document as OrbitDBConversationMessagePinDocument;
+
+    try {
+      const conversationId = new ConversationId(candidate.conversationId);
+      const messageId = new MessageId(candidate.messageId);
+      this.toPin(candidate);
+
+      return candidate.id === this.pinId(conversationId, messageId);
+    } catch {
+      return false;
+    }
   }
 
   private putIndexDocument(

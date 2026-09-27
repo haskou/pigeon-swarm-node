@@ -1,17 +1,20 @@
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import Kernel from '@haskou/ddd-kernel';
 
 import { CommunityModerationLogEntry } from '../../domain/entities/moderation/CommunityModerationLogEntry';
 import CommunityModerationLogRepository from '../../domain/repositories/CommunityModerationLogRepository';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { CommunityModerationLogId } from '../../domain/value-objects/CommunityModerationLogId';
+import PrivateCommunityPublicStorageGuard from '../PrivateCommunityPublicStorageGuard';
 import { OrbitDBCommunityModerationLogDocument } from './documents/OrbitDBCommunityModerationLogDocument';
 
 export default class OrbitDBCommunityModerationLogRepository extends CommunityModerationLogRepository {
   private readonly logIndex: OrbitDBHeadIndex<OrbitDBCommunityModerationLogDocument>;
 
-  constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
+  constructor(
+    private readonly registry: OrbitDBReplicatedStateRegistry,
+    private readonly publicStorageGuard: PrivateCommunityPublicStorageGuard,
+  ) {
     super();
     this.logIndex = new OrbitDBHeadIndex(this.registry, {
       collectionName: 'logs',
@@ -50,7 +53,17 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
   private isDocument(
     document: Record<string, unknown>,
   ): document is OrbitDBCommunityModerationLogDocument {
-    return this.isStoredDocument(document) && document.deleted !== true;
+    if (!this.isStoredDocument(document) || document.deleted === true) {
+      return false;
+    }
+
+    try {
+      this.toDomain(document);
+
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private isStoredDocument(
@@ -133,7 +146,11 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
     const key = this.communityIndexHeadKey(document.communityId);
     const logs = this.logIndex
       .deduplicate([...((await this.logIndex.find(key)) ?? []), document])
-      .filter((candidate) => this.isDocument(candidate));
+      .filter(
+        (candidate) =>
+          this.isStoredDocument(candidate) &&
+          candidate.communityId === document.communityId,
+      );
 
     await this.logIndex.putDocuments(
       key,
@@ -142,17 +159,8 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
         id: key,
       },
       logs,
+      { replace: true },
     );
-  }
-
-  private refreshIndexInBackground(
-    document: OrbitDBCommunityModerationLogDocument,
-  ): void {
-    void this.putIndex(document).catch((error) => {
-      Kernel.logger.warn?.(
-        `Community moderation log index refresh failed: logId=${document.id} error=${String(error)}`,
-      );
-    });
   }
 
   public async findByCommunity(
@@ -160,75 +168,94 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
     limit: number,
     beforeLogId?: CommunityModerationLogId,
   ): Promise<CommunityModerationLogEntry[]> {
-    const indexedDocuments =
-      (await this.logIndex.find(this.communityIndexHeadKey(communityId))) ?? [];
-    const typedDocuments = this.logIndex
-      .deduplicate([
-        ...indexedDocuments,
-        ...this.cachedStoredLogDocuments(communityId),
-      ])
-      .filter((document): document is OrbitDBCommunityModerationLogDocument =>
-        this.isDocument(document),
-      )
-      .sort((left, right) => {
-        if (left.createdAt === right.createdAt) {
-          return right.id.localeCompare(left.id);
-        }
-
-        return right.createdAt - left.createdAt;
-      });
-    const beforeLog = beforeLogId
-      ? typedDocuments.find((document) => document.id === beforeLogId.valueOf())
-      : undefined;
-    const paginatedDocuments = beforeLog
-      ? typedDocuments.filter(
-          (document) =>
-            document.createdAt < beforeLog.createdAt ||
-            (document.createdAt === beforeLog.createdAt &&
-              document.id < beforeLog.id),
+    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const indexedDocuments =
+        (await this.logIndex.find(this.communityIndexHeadKey(communityId))) ??
+        [];
+      const typedDocuments = this.logIndex
+        .deduplicate([
+          ...indexedDocuments,
+          ...this.cachedStoredLogDocuments(communityId),
+        ])
+        .filter(
+          (document): document is OrbitDBCommunityModerationLogDocument =>
+            this.isDocument(document) &&
+            document.communityId === communityId.valueOf(),
         )
-      : typedDocuments;
+        .sort((left, right) => {
+          if (left.createdAt === right.createdAt) {
+            return right.id.localeCompare(left.id);
+          }
 
-    return paginatedDocuments
-      .slice(0, limit)
-      .map((document) => this.toDomain(document));
+          return right.createdAt - left.createdAt;
+        });
+      const beforeLog = beforeLogId
+        ? typedDocuments.find(
+            (document) => document.id === beforeLogId.valueOf(),
+          )
+        : undefined;
+      const paginatedDocuments = beforeLog
+        ? typedDocuments.filter(
+            (document) =>
+              document.createdAt < beforeLog.createdAt ||
+              (document.createdAt === beforeLog.createdAt &&
+                document.id < beforeLog.id),
+          )
+        : typedDocuments;
+
+      return paginatedDocuments
+        .slice(0, limit)
+        .map((document) => this.toDomain(document));
+    });
   }
 
   public async deleteByCommunity(communityId: CommunityId): Promise<void> {
-    const documents = this.logIndex.deduplicate([
-      ...((await this.logIndex.find(this.communityIndexHeadKey(communityId))) ??
-        []),
-      ...this.cachedLogDocuments(communityId),
-    ]);
+    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      const documents = this.logIndex.deduplicate([
+        ...((await this.logIndex.find(
+          this.communityIndexHeadKey(communityId),
+        )) ?? []),
+        ...this.cachedLogDocuments(communityId),
+      ]);
 
-    await Promise.all(
-      documents
-        .filter((document): document is OrbitDBCommunityModerationLogDocument =>
-          this.isDocument(document),
-        )
-        .map(async (document) => {
-          const tombstone = {
-            ...document,
-            deleted: true,
-            deletedAt: Date.now(),
-          };
+      await Promise.all(
+        documents
+          .filter(
+            (document): document is OrbitDBCommunityModerationLogDocument =>
+              this.isDocument(document) &&
+              document.communityId === communityId.valueOf(),
+          )
+          .map(async (document) => {
+            const tombstone = {
+              ...document,
+              deleted: true,
+              deletedAt: Date.now(),
+            };
 
-          await this.registry.putDocument('moderationLogs', tombstone);
-          await this.registry.putHead(this.logHeadKey(document.id), {
-            ...tombstone,
-          });
-          await this.putIndex(tombstone);
-        }),
-    );
+            await this.registry.putDocument('moderationLogs', tombstone);
+            await this.registry.putHeadExactly(this.logHeadKey(document.id), {
+              ...tombstone,
+            });
+            await this.putIndex(tombstone);
+          }),
+      );
+    });
   }
 
   public async save(entry: CommunityModerationLogEntry): Promise<void> {
     const document = this.toDocument(entry);
-
-    await this.registry.putDocument('moderationLogs', document);
-    await this.registry.putHead(this.logHeadKey(document.id), {
-      ...document,
-    });
-    this.refreshIndexInBackground(document);
+    await this.publicStorageGuard.runWhilePublic(
+      new CommunityId(document.communityId),
+      async () => {
+        await this.registry.putDocument('moderationLogs', document);
+        await this.registry.putHeadExactly(this.logHeadKey(document.id), {
+          ...document,
+        });
+        this.publicStorageGuard.runInBackgroundWhilePublic(
+          new CommunityId(document.communityId),
+          () => this.putIndex(document),
+        );
+      },
+    );
   }
 }

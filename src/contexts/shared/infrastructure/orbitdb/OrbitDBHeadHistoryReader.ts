@@ -1,7 +1,7 @@
 import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBEntry } from './OrbitDBEntry';
 
-export default class OrbitDBHeadHistoryReader {
+export class OrbitDBHeadHistoryReader {
   constructor(private readonly log: NonNullable<OrbitDBDatabase['log']>) {}
 
   private async appendAncestors(

@@ -32,7 +32,11 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
   }
 
   private identityIndexHeadKey(identityId: IdentityId) {
-    return `notification-settings-identity-index:${identityId.valueOf()}`;
+    return this.identityIndexHeadKeyFromValue(identityId.valueOf());
+  }
+
+  private identityIndexHeadKeyFromValue(identityId: string): string {
+    return `notification-settings-identity-index:${identityId}`;
   }
 
   private hasIdentityFields(document: Record<string, unknown>): boolean {
@@ -62,11 +66,26 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
   private isDocument(
     document: Record<string, unknown>,
   ): document is OrbitDBNotificationScopeSettingsDocument {
-    return (
+    const hasRequiredFields =
       this.hasIdentityFields(document) &&
       this.hasPreferenceFields(document) &&
-      this.hasScopeField(document)
-    );
+      this.hasScopeField(document);
+
+    if (!hasRequiredFields) return false;
+    const candidate = document as OrbitDBNotificationScopeSettingsDocument;
+
+    try {
+      const settings = this.toDomain(candidate);
+
+      return (
+        candidate.identityId === settings.getIdentityId().valueOf() &&
+        candidate.scopeKey === settings.getScope().key() &&
+        candidate.id ===
+          this.documentId(settings.getIdentityId(), settings.getScope())
+      );
+    } catch {
+      return false;
+    }
   }
 
   private toDocument(
@@ -188,6 +207,10 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
     return document && this.isDocument(document)
       ? this.toDomain(document)
       : undefined;
+  }
+
+  public isPrivateScope(): Promise<boolean> {
+    return Promise.resolve(false);
   }
 
   public async save(settings: NotificationScopeSettings): Promise<void> {

@@ -4,8 +4,18 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import OrbitDBCommunityModerationLogRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityModerationLogRepository';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+
+const publicStorageGuard = () =>
+  new PrivateCommunityPublicStorageGuard(
+    {
+      findScope: jest.fn().mockResolvedValue(undefined),
+    } as never,
+    new PrivateAuthorizationStorageCoordinator(),
+  );
 
 describe('OrbitDBCommunityModerationLogRepository', () => {
   const communityId = new CommunityId('community-1');
@@ -52,7 +62,10 @@ describe('OrbitDBCommunityModerationLogRepository', () => {
       id: communityId.valueOf(),
       networkId: 'network-1',
     });
-    repository = new OrbitDBCommunityModerationLogRepository(registry);
+    repository = new OrbitDBCommunityModerationLogRepository(
+      registry,
+      publicStorageGuard(),
+    );
   });
 
   afterEach(() => {
@@ -80,8 +93,9 @@ describe('OrbitDBCommunityModerationLogRepository', () => {
     ]);
 
     expect(result).toBe('saved');
-    expect(heads.get(`community-moderation-log:${entry.getId().valueOf()}`))
-      .toEqual(expect.objectContaining({ id: entry.getId().valueOf() }));
+    expect(
+      heads.get(`community-moderation-log:${entry.getId().valueOf()}`),
+    ).toEqual(expect.objectContaining({ id: entry.getId().valueOf() }));
   });
 
   it('should find moderation logs from fresh heads when indexes lag', async () => {
@@ -114,8 +128,9 @@ describe('OrbitDBCommunityModerationLogRepository', () => {
     const logs = await repository.findByCommunity(communityId, 10);
 
     expect(logs).toEqual([]);
-    expect(heads.get(`community-moderation-log:${entry.getId().valueOf()}`))
-      .toEqual(expect.objectContaining({ deleted: true }));
+    expect(
+      heads.get(`community-moderation-log:${entry.getId().valueOf()}`),
+    ).toEqual(expect.objectContaining({ deleted: true }));
   });
 
   function moderationLogEntry(): CommunityModerationLogEntry {

@@ -100,6 +100,9 @@ import { PostPollVoteRoute } from '@app/apps/apis/polls-api/routes/PostPollVoteR
 import { DeletePresenceCustomMessageRoute } from '@app/apps/apis/presence-api/routes/DeletePresenceCustomMessageRoute';
 import { GetPresenceRoute } from '@app/apps/apis/presence-api/routes/GetPresenceRoute';
 import { PutPresenceRoute } from '@app/apps/apis/presence-api/routes/PutPresenceRoute';
+import { PostPrivateAuthorizationChallengeRoute } from '@app/apps/apis/private-authorization-api/routes/PostPrivateAuthorizationChallengeRoute';
+import { PostPrivateAuthorizationOperationRoute } from '@app/apps/apis/private-authorization-api/routes/PostPrivateAuthorizationOperationRoute';
+import { PostPrivateAuthorizationScopeRoute } from '@app/apps/apis/private-authorization-api/routes/PostPrivateAuthorizationScopeRoute';
 import { DeletePushSubscriptionRoute } from '@app/apps/apis/push-api/routes/DeletePushSubscriptionRoute';
 import { GetPushVapidPublicKeyRoute } from '@app/apps/apis/push-api/routes/GetPushVapidPublicKeyRoute';
 import { PostPushTestRoute } from '@app/apps/apis/push-api/routes/PostPushTestRoute';
@@ -134,6 +137,9 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   DeleteCallParticipantRoute,
   DeleteCallRoute,
   PostCallSignalRoute,
+  PostPrivateAuthorizationChallengeRoute,
+  PostPrivateAuthorizationOperationRoute,
+  PostPrivateAuthorizationScopeRoute,
   GetIdentityRoute,
   PostIdentityRoute,
   PutIdentityRoute,

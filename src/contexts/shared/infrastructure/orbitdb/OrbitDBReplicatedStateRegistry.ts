@@ -6,9 +6,10 @@ import LocalOrbitDBReplicatedHeadCache from './LocalOrbitDBReplicatedHeadCache';
 import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBDocumentHistory } from './OrbitDBDocumentHistory';
 import { OrbitDBEntry } from './OrbitDBEntry';
-import OrbitDBHeadHistoryReader from './OrbitDBHeadHistoryReader';
+import { OrbitDBHeadHistoryReader } from './OrbitDBHeadHistoryReader';
 import { OrbitDBHeadRecordMerger } from './OrbitDBHeadRecordMerger';
 import { OrbitDBHeadRecordScope } from './OrbitDBHeadRecordScope';
+import { OrbitDBHeadRepairPublisher } from './OrbitDBHeadRepairPublisher';
 import { OrbitDBHistoryReplayObserver } from './OrbitDBHistoryReplayObserver';
 import { OrbitDBPendingHeadReconciliation } from './OrbitDBPendingHeadReconciliation';
 import { OrbitDBPrivateNetworkStores } from './OrbitDBPrivateNetworkStores';
@@ -62,6 +63,8 @@ export default class OrbitDBReplicatedStateRegistry {
   >();
 
   private readonly projectedHeads = new Map<string, Record<string, unknown>>();
+
+  private readonly exactProjectedHeadKeys = new Set<string>();
 
   private readonly replicatedHeadsByNetworkId = new Map<
     string,
@@ -122,6 +125,11 @@ export default class OrbitDBReplicatedStateRegistry {
   >();
 
   private readonly headRecordScopes = new Map<string, OrbitDBHeadRecordScope>();
+
+  private readonly headRepairPublishers = new Map<
+    string,
+    OrbitDBHeadRepairPublisher
+  >();
 
   private readonly headWriteQueues = new Map<string, Promise<void>>();
 
@@ -720,12 +728,18 @@ export default class OrbitDBReplicatedStateRegistry {
     stores: OrbitDBPrivateNetworkStores,
     key: string,
     value: Record<string, unknown>,
+    replace: boolean = false,
   ): Promise<void> {
     const scoped = this.scopedHeadRecord(networkId, key, value);
 
     if (!scoped) return;
     await stores.heads.put?.(key, scoped);
-    this.cacheReplicatedHead(networkId, key, scoped);
+
+    if (replace) {
+      this.replicatedHeads(networkId).set(key, scoped);
+    } else {
+      this.cacheReplicatedHead(networkId, key, scoped);
+    }
     this.markPersistedHeadKey(networkId, key);
     await this.persistHeadCache(networkId, key, scoped);
   }
@@ -749,16 +763,31 @@ export default class OrbitDBReplicatedStateRegistry {
     return this.cacheHeadIn(this.projectedHeads, key, value);
   }
 
+  private cacheExactProjectedHead(
+    key: string,
+    value: Record<string, unknown>,
+  ): Record<string, unknown> {
+    this.projectedHeads.set(key, value);
+    this.exactProjectedHeadKeys.add(key);
+
+    return value;
+  }
+
   private removeProjectedHead(
     key: string,
     projectedHead: Record<string, unknown> | undefined,
   ): void {
     if (projectedHead && this.projectedHeads.get(key) === projectedHead) {
       this.projectedHeads.delete(key);
+      this.exactProjectedHeadKeys.delete(key);
     }
   }
 
   private cachedHead(key: string): Record<string, unknown> | undefined {
+    if (this.exactProjectedHeadKeys.has(key)) {
+      return this.projectedHeads.get(key);
+    }
+
     const candidates = [
       ...[...this.replicatedHeadsByNetworkId.values()].map((heads) =>
         heads.get(key),
@@ -818,14 +847,21 @@ export default class OrbitDBReplicatedStateRegistry {
     received: Record<string, unknown>,
     merged: Record<string, unknown>,
   ): void {
-    if (
-      ![...this.headRecordMergers.keys()].some((prefix) =>
-        key.startsWith(prefix),
-      )
-    )
-      return;
+    const prefix = [...this.headRecordMergers.keys()].find((candidate) =>
+      key.startsWith(candidate),
+    );
+
+    if (!prefix) return;
 
     if (this.isSameHeadContent(received, merged)) return;
+    const publisher = this.headRepairPublishers.get(prefix);
+
+    if (publisher) {
+      publisher(networkId, key, merged);
+
+      return;
+    }
+
     this.replicateHeadInBackground(key, merged, [networkId], true);
   }
 
@@ -1542,11 +1578,15 @@ export default class OrbitDBReplicatedStateRegistry {
     prefix: string,
     merger: OrbitDBHeadRecordMerger,
     scope?: OrbitDBHeadRecordScope,
+    repairPublisher?: OrbitDBHeadRepairPublisher,
   ): void {
     this.headRecordMergers.set(prefix, merger);
 
     if (scope) this.headRecordScopes.set(prefix, scope);
     else this.headRecordScopes.delete(prefix);
+
+    if (repairPublisher) this.headRepairPublishers.set(prefix, repairPublisher);
+    else this.headRepairPublishers.delete(prefix);
   }
 
   public async register(
@@ -1603,6 +1643,7 @@ export default class OrbitDBReplicatedStateRegistry {
     this.persistedHeadKeysByNetworkId.delete(networkId);
     this.replicatedHeadsByNetworkId.delete(networkId);
     this.projectedHeads.clear();
+    this.exactProjectedHeadKeys.clear();
 
     await stores?.stop();
   }
@@ -1612,6 +1653,7 @@ export default class OrbitDBReplicatedStateRegistry {
     this.persistedHeadKeysByNetworkId.clear();
     this.replicatedHeadsByNetworkId.clear();
     this.projectedHeads.clear();
+    this.exactProjectedHeadKeys.clear();
   }
 
   public async onDocumentUpdated(
@@ -1829,19 +1871,49 @@ export default class OrbitDBReplicatedStateRegistry {
     const projectedHead = this.cacheProjectedHead(key, cachedValue);
 
     await this.enqueueHeadWrite(key, async () => {
-      const targetNetworkIds = await this.targetNetworkIdsForHeadWrite(
-        cachedValue,
-        networkIds,
-      );
+      try {
+        const targetNetworkIds = await this.targetNetworkIdsForHeadWrite(
+          cachedValue,
+          networkIds,
+        );
 
-      await Promise.all(
-        this.networkStoreEntriesForNetworkIds(targetNetworkIds).map(
-          ({ networkId, stores }) =>
-            this.persistNetworkHead(networkId, stores, key, cachedValue),
-        ),
-      );
+        await Promise.all(
+          this.networkStoreEntriesForNetworkIds(targetNetworkIds).map(
+            ({ networkId, stores }) =>
+              this.persistNetworkHead(networkId, stores, key, cachedValue),
+          ),
+        );
+      } finally {
+        this.removeProjectedHead(key, projectedHead);
+      }
+    });
+  }
 
-      this.removeProjectedHead(key, projectedHead);
+  public async putHeadExactly(
+    key: string,
+    value: Record<string, unknown>,
+    networkIds: string[] = [],
+  ): Promise<void> {
+    this.assertReady();
+    const cleanValue = this.cleanDocument(value);
+    const projectedHead = this.cacheExactProjectedHead(key, cleanValue);
+
+    await this.enqueueHeadWrite(key, async () => {
+      try {
+        const targetNetworkIds = await this.targetNetworkIdsForHeadWrite(
+          cleanValue,
+          networkIds,
+        );
+
+        await Promise.all(
+          this.networkStoreEntriesForNetworkIds(targetNetworkIds).map(
+            ({ networkId, stores }) =>
+              this.persistNetworkHead(networkId, stores, key, cleanValue, true),
+          ),
+        );
+      } finally {
+        this.removeProjectedHead(key, projectedHead);
+      }
     });
   }
 }

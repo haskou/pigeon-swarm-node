@@ -13,6 +13,9 @@ import OrbitDBCallProjection from '@app/contexts/calls/infrastructure/orbitdb/Or
 import OrbitDBCallRepository from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
@@ -80,6 +83,12 @@ describe('OrbitDBCallRepository', () => {
   let repository: OrbitDBCallRepository;
   let leases: InMemoryCallParticipantLeaseRepository;
 
+  const publicStorageGuard = () =>
+    new PrivateCommunityPublicStorageGuard(
+      { findScope: jest.fn().mockResolvedValue(undefined) } as never,
+      new PrivateAuthorizationStorageCoordinator(),
+    );
+
   function communityCall(status: 'active' | 'ended' = 'active'): Call {
     return Call.fromPrimitives({
       createdAt: 1_780_000_000_000,
@@ -131,6 +140,7 @@ describe('OrbitDBCallRepository', () => {
       registry,
       new OrbitDBCallDocumentMerger(),
       new OrbitDBCallDocumentReplicator(registry),
+      publicStorageGuard(),
     );
     leases = new InMemoryCallParticipantLeaseRepository();
     repository = new OrbitDBCallRepository(
@@ -138,6 +148,7 @@ describe('OrbitDBCallRepository', () => {
       new OrbitDBCallDocumentReplicator(registry),
       projection,
       leases,
+      publicStorageGuard(),
     );
     await projection.start();
   }
@@ -152,7 +163,7 @@ describe('OrbitDBCallRepository', () => {
 
   it.each([true, false])('does not expose historical active calls while a running projection replays (success=%s)', async (success) => {
     const subscribe = jest.spyOn(registry, 'onDocumentUpdated');
-    const laterProjection = new OrbitDBCallProjection(registry, new OrbitDBCallDocumentMerger(), new OrbitDBCallDocumentReplicator(registry));
+    const laterProjection = new OrbitDBCallProjection(registry, new OrbitDBCallDocumentMerger(), new OrbitDBCallDocumentReplicator(registry), publicStorageGuard());
 
     await laterProjection.start();
     const observer = subscribe.mock.calls[0][2]!.historyObserver!;
@@ -172,7 +183,7 @@ describe('OrbitDBCallRepository', () => {
 
   it('keeps a successful replay when an overlapping replay fails', async () => {
     const subscribe = jest.spyOn(registry, 'onDocumentUpdated');
-    const laterProjection = new OrbitDBCallProjection(registry, new OrbitDBCallDocumentMerger(), new OrbitDBCallDocumentReplicator(registry));
+    const laterProjection = new OrbitDBCallProjection(registry, new OrbitDBCallDocumentMerger(), new OrbitDBCallDocumentReplicator(registry), publicStorageGuard());
 
     await laterProjection.start();
     const observer = subscribe.mock.calls[0][2]!.historyObserver!;
@@ -205,17 +216,133 @@ describe('OrbitDBCallRepository', () => {
     ).resolves.toBeDefined();
   });
 
+  it('does not return a call whose scope changes during guarded lookup', async () => {
+    const communityDocument = document();
+    const conversationDocument: OrbitDBCallDocument = {
+      ...communityDocument,
+      creatorIdentityId,
+      scope: {
+        channelId: undefined,
+        communityId: undefined,
+        conversationId: new ConversationId('group:conversation-1').valueOf(),
+        type: 'conversation',
+      },
+    };
+
+    jest
+      .spyOn(projection, 'findById')
+      .mockResolvedValueOnce(conversationDocument)
+      .mockResolvedValueOnce(communityDocument);
+
+    await expect(
+      repository.findById(new CallId(callId)),
+    ).resolves.toBeUndefined();
+  });
+
+  it('rejects protected community call reads and writes through OrbitDB', async () => {
+    const protectedRepository = new OrbitDBCallRepository(
+      new OrbitDBCallMapper(),
+      new OrbitDBCallDocumentReplicator(registry),
+      projection,
+      leases,
+      new PrivateCommunityPublicStorageGuard(
+        { findScope: jest.fn().mockResolvedValue({}) } as never,
+        new PrivateAuthorizationStorageCoordinator(),
+      ),
+    );
+
+    await expect(protectedRepository.save(communityCall())).rejects.toThrow(
+      'Invalid private authorization',
+    );
+    await expect(
+      protectedRepository.findByCommunityChannel(communityId, channelId),
+    ).rejects.toThrow('Invalid private authorization');
+    expect(calls.put).not.toHaveBeenCalled();
+  });
+
+  it('filters protected calls before hydrating aggregate results', async () => {
+    await repository.save(communityCall());
+    const leaseLookup = jest.spyOn(leases, 'findByCallIds');
+    const protectedRepository = new OrbitDBCallRepository(
+      new OrbitDBCallMapper(),
+      new OrbitDBCallDocumentReplicator(registry),
+      projection,
+      leases,
+      new PrivateCommunityPublicStorageGuard(
+        {
+          findScope: jest.fn().mockImplementation((scopeId: string) =>
+            Promise.resolve(
+              scopeId === communityId.valueOf() ? ({} as never) : undefined,
+            ),
+          ),
+        } as never,
+        new PrivateAuthorizationStorageCoordinator(),
+      ),
+    );
+
+    await expect(
+      protectedRepository.findActiveByParticipant(
+        new IdentityId(participantIdentityId),
+      ),
+    ).resolves.toEqual([]);
+    await expect(
+      protectedRepository.findTimedOutRingingCalls(
+        new Timestamp(1_780_000_010_000),
+      ),
+    ).resolves.toEqual([]);
+    expect(leaseLookup).not.toHaveBeenCalled();
+  });
+
+  it('keeps scope protection behind an admitted call publication', async () => {
+    const coordinator = new PrivateAuthorizationStorageCoordinator();
+    let protectedScope = false;
+    let releaseWrite!: () => void;
+    const write = new Promise<string>((resolve) => {
+      releaseWrite = () => resolve(callId);
+    });
+    calls.put.mockReturnValueOnce(write);
+    const fencedRepository = new OrbitDBCallRepository(
+      new OrbitDBCallMapper(),
+      new OrbitDBCallDocumentReplicator(registry),
+      projection,
+      leases,
+      new PrivateCommunityPublicStorageGuard(
+        {
+          findScope: jest.fn(async () => (protectedScope ? {} : undefined)),
+        } as never,
+        coordinator,
+      ),
+    );
+
+    const publication = fencedRepository.save(communityCall());
+    await flushBackgroundTasks();
+    const protection = coordinator.exclusively(
+      communityId.valueOf(),
+      async () => {
+        protectedScope = true;
+      },
+    );
+    await flushBackgroundTasks();
+
+    expect(protectedScope).toBe(false);
+    releaseWrite();
+    await Promise.all([publication, protection]);
+    expect(protectedScope).toBe(true);
+  });
+
   it('rejects reads until canonical documents have been projected', async () => {
     const unstartedProjection = new OrbitDBCallProjection(
       registry,
       new OrbitDBCallDocumentMerger(),
       new OrbitDBCallDocumentReplicator(registry),
+      publicStorageGuard(),
     );
     const unstartedRepository = new OrbitDBCallRepository(
       new OrbitDBCallMapper(),
       new OrbitDBCallDocumentReplicator(registry),
       unstartedProjection,
       new InMemoryCallParticipantLeaseRepository(),
+      publicStorageGuard(),
     );
 
     await expect(
@@ -319,6 +446,35 @@ describe('OrbitDBCallRepository', () => {
     ).resolves.toEqual([]);
   });
 
+  it('does not repair call documents after their community is protected', async () => {
+    const protectedCalls = createStore();
+    const protectedRegistry = new OrbitDBReplicatedStateRegistry();
+    await protectedRegistry.register(networkId, {
+      calls: protectedCalls,
+      heads: createStore(),
+    } as never);
+    const protectedProjection = new OrbitDBCallProjection(
+      protectedRegistry,
+      new OrbitDBCallDocumentMerger(),
+      new OrbitDBCallDocumentReplicator(protectedRegistry),
+      new PrivateCommunityPublicStorageGuard(
+        { findScope: jest.fn().mockResolvedValue({}) } as never,
+        new PrivateAuthorizationStorageCoordinator(),
+      ),
+    );
+    await protectedProjection.start();
+    protectedCalls.emitUpdate(document('ended', 1_780_000_005_000));
+    await flushBackgroundTasks();
+    protectedCalls.put.mockClear();
+
+    protectedCalls.emitUpdate(document('active', 1_780_000_000_000));
+    await flushBackgroundTasks();
+    await flushBackgroundTasks();
+
+    expect(protectedCalls.put).not.toHaveBeenCalled();
+    protectedRegistry.clear();
+  });
+
   it.each(['forward', 'reverse'] as const)(
     'does not restore community participation from competing legacy snapshots in %s order',
     async (order) => {
@@ -420,20 +576,41 @@ describe('OrbitDBCallRepository', () => {
     await expect(repository.findActiveByCommunity(communityId)).resolves.toEqual([]);
   });
 
-  it('does not wait for canonical document replication', async () => {
-    calls.put.mockImplementationOnce(() => new Promise(() => undefined));
+  it('keeps the save pending until canonical document replication finishes', async () => {
+    const delayedWrite = deferred<string>();
+    calls.put.mockImplementationOnce(() => delayedWrite.promise);
 
+    const save = repository.save(communityCall());
     const result = await Promise.race([
-      repository.save(communityCall()).then(() => 'saved'),
+      save.then(() => 'saved'),
       new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
     ]);
 
-    expect(result).toBe('saved');
+    expect(result).toBe('blocked');
+    const lookup = repository.findById(new CallId(callId));
     await expect(
-      repository.findById(new CallId(callId)),
-    ).resolves.toBeDefined();
+      Promise.race([
+        lookup.then(() => 'completed'),
+        new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+      ]),
+    ).resolves.toBe('blocked');
+    delayedWrite.resolve(callId);
+    await save;
+    await expect(lookup).resolves.toBeDefined();
   });
 });
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolver) => {
+    resolve = resolver;
+  });
+
+  return { promise, resolve };
+}
 
 function flushBackgroundTasks(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));

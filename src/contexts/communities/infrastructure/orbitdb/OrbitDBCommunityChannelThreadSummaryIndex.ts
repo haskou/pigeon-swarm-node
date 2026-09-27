@@ -2,6 +2,7 @@ import { CommunityChannelThreadSummary } from '@app/contexts/communities/domain/
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -10,10 +11,24 @@ import { OrbitDBCommunityChannelThreadSummaryDocument } from './documents/OrbitD
 import OrbitDBCommunityChannelMessageIndex from './OrbitDBCommunityChannelMessageIndex';
 
 export default class OrbitDBCommunityChannelThreadSummaryIndex {
+  private readonly summaryIndex: OrbitDBHeadIndex<OrbitDBCommunityChannelThreadSummaryDocument>;
+
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly messageIndex: OrbitDBCommunityChannelMessageIndex,
-  ) {}
+  ) {
+    this.summaryIndex = new OrbitDBHeadIndex(this.registry, {
+      collectionName: 'summaries',
+      documentFromRecord: (record) =>
+        this.isThreadSummaryRecord(record) ? record : undefined,
+      recordId: (record) =>
+        typeof record.rootMessageId === 'string'
+          ? record.rootMessageId
+          : undefined,
+      shouldReplace: (current, candidate) =>
+        current.lastReplyAt <= candidate.lastReplyAt,
+    });
+  }
 
   private byCreatedAtAscending(
     documents: OrbitDBCommunityChannelMessageDocument[],
@@ -41,39 +56,11 @@ export default class OrbitDBCommunityChannelThreadSummaryIndex {
     const summary = value as Record<string, unknown>;
 
     return (
+      summary.removed !== true &&
       typeof summary.lastReplyAt === 'number' &&
       typeof summary.lastReplyMessageId === 'string' &&
       typeof summary.replyCount === 'number' &&
       typeof summary.rootMessageId === 'string'
-    );
-  }
-
-  private summariesFromHead(
-    document: Record<string, unknown> | undefined,
-  ): CommunityChannelThreadSummary[] | undefined {
-    if (!document) {
-      return undefined;
-    }
-
-    const summaries = document.summaries;
-
-    if (!Array.isArray(summaries)) {
-      return [];
-    }
-
-    return summaries
-      .filter((summary) => this.isThreadSummaryRecord(summary))
-      .map((summary) => CommunityChannelThreadSummary.fromPrimitives(summary));
-  }
-
-  private async findHead(
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-  ): Promise<CommunityChannelThreadSummary[] | undefined> {
-    return this.summariesFromHead(
-      await this.registry.findHead(
-        this.threadSummaryHeadKey(communityId.valueOf(), channelId.valueOf()),
-      ),
     );
   }
 
@@ -82,34 +69,20 @@ export default class OrbitDBCommunityChannelThreadSummaryIndex {
     channelId: CommunityChannelId,
     summaries: CommunityChannelThreadSummary[],
   ): Promise<void> {
-    await this.registry.putHead(
-      this.threadSummaryHeadKey(communityId.valueOf(), channelId.valueOf()),
-      this.headDocument(communityId, channelId, summaries),
+    const key = this.threadSummaryHeadKey(
+      communityId.valueOf(),
+      channelId.valueOf(),
     );
-  }
 
-  private headDocument(
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-    summaries: CommunityChannelThreadSummary[],
-  ): Record<string, unknown> {
-    return {
-      channelId: channelId.valueOf(),
-      communityId: communityId.valueOf(),
-      id: this.threadSummaryHeadKey(communityId.valueOf(), channelId.valueOf()),
-      summaries: summaries.map((summary) => summary.toPrimitives()),
-      updatedAt: Date.now(),
-    };
-  }
-
-  private replicateHeadInBackground(
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-    summaries: CommunityChannelThreadSummary[],
-  ): void {
-    this.registry.replicateHeadInBackground(
-      this.threadSummaryHeadKey(communityId.valueOf(), channelId.valueOf()),
-      this.headDocument(communityId, channelId, summaries),
+    await this.summaryIndex.putDocuments(
+      key,
+      {
+        channelId: channelId.valueOf(),
+        communityId: communityId.valueOf(),
+        id: key,
+      },
+      summaries.map((summary) => summary.toPrimitives()),
+      { replace: true },
     );
   }
 
@@ -280,27 +253,6 @@ export default class OrbitDBCommunityChannelThreadSummaryIndex {
     await this.hydrateHeads(communityId, [channelId]);
   }
 
-  public refreshForChannelInBackground(
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-  ): void {
-    void this.findThreadCandidateDocuments(
-      communityId,
-      new Set([channelId.valueOf()]),
-    ).then((documents) => {
-      const summariesByChannelId = this.summariesFromDocuments(
-        documents,
-        Number.MAX_SAFE_INTEGER,
-      );
-
-      this.replicateHeadInBackground(
-        communityId,
-        channelId,
-        summariesByChannelId.get(channelId.valueOf()) || [],
-      );
-    });
-  }
-
   public async refreshForDocuments(
     documents: OrbitDBCommunityChannelMessageDocument[],
   ): Promise<void> {
@@ -322,28 +274,6 @@ export default class OrbitDBCommunityChannelThreadSummaryIndex {
     );
   }
 
-  public refreshForDocumentsInBackground(
-    documents: OrbitDBCommunityChannelMessageDocument[],
-  ): void {
-    const affectedChannels = new Map<string, CommunityChannelId>();
-
-    for (const document of documents) {
-      affectedChannels.set(
-        `${document.communityId}:${document.channelId}`,
-        new CommunityChannelId(document.channelId),
-      );
-    }
-
-    for (const [key, channelId] of affectedChannels.entries()) {
-      const [communityId] = key.split(':');
-
-      this.refreshForChannelInBackground(
-        new CommunityId(communityId),
-        channelId,
-      );
-    }
-  }
-
   public async findByChannel(
     communityId: CommunityId,
     channelIds: CommunityChannelId[],
@@ -353,52 +283,19 @@ export default class OrbitDBCommunityChannelThreadSummaryIndex {
       return new Map();
     }
 
-    const summariesByChannelId = new Map<
-      string,
-      CommunityChannelThreadSummary[]
-    >();
-    const missingChannelIds: CommunityChannelId[] = [];
+    const summariesByChannelId = this.summariesFromDocuments(
+      await this.findThreadCandidateDocuments(
+        communityId,
+        this.channelIdValueSet(channelIds),
+      ),
+      limitPerChannel,
+    );
 
-    for (const channelId of channelIds) {
-      const summaries = await this.findHead(communityId, channelId);
-
-      if (summaries === undefined) {
-        missingChannelIds.push(channelId);
-
-        continue;
+    channelIds.forEach((channelId) => {
+      if (!summariesByChannelId.has(channelId.valueOf())) {
+        summariesByChannelId.set(channelId.valueOf(), []);
       }
-
-      summariesByChannelId.set(
-        channelId.valueOf(),
-        [...summaries]
-          .sort(
-            (left, right) =>
-              right.getLastReplyAt().valueOf() -
-              left.getLastReplyAt().valueOf(),
-          )
-          .slice(0, limitPerChannel),
-      );
-    }
-
-    if (missingChannelIds.length > 0) {
-      const calculatedSummaries = this.summariesFromDocuments(
-        await this.findThreadCandidateDocuments(
-          communityId,
-          this.channelIdValueSet(missingChannelIds),
-        ),
-        Number.MAX_SAFE_INTEGER,
-      );
-
-      for (const channelId of missingChannelIds) {
-        summariesByChannelId.set(
-          channelId.valueOf(),
-          (calculatedSummaries.get(channelId.valueOf()) || []).slice(
-            0,
-            limitPerChannel,
-          ),
-        );
-      }
-    }
+    });
 
     return summariesByChannelId;
   }

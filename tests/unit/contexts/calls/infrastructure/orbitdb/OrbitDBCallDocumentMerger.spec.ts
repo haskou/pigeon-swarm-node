@@ -69,17 +69,58 @@ describe('OrbitDBCallDocumentMerger', () => {
     expect(merger.merge(legacy, current).sessionEpoch).toBe(3);
   });
 
-  it('selects immutable session fields independently of accumulated update timestamps', () => {
-    const a = { ...document([], 1), status: 'ended', endedAt: 10, creatorIdentityId: 'z', createdAt: 1 };
-    const b = { ...document([], 100), creatorIdentityId: 'c', createdAt: 2 };
-    const c = { ...document([], 50), status: 'ended', endedAt: 10, creatorIdentityId: 'b', createdAt: 3 };
-    const expected = merger.merge(merger.merge(a, b), c);
-    for (const order of [[a, b, c], [a, c, b], [b, a, c], [b, c, a], [c, a, b], [c, b, a]]) {
-      const result = order.reduce((current, incoming) => merger.merge(current, incoming), undefined as OrbitDBCallDocument | undefined);
-      expect(result).toEqual(expected);
-    }
-    expect(expected.creatorIdentityId).toBe('b');
-    expect(expected.createdAt).toBe(1);
+  it('does not merge a call update from a different immutable scope', () => {
+    const communityCall: OrbitDBCallDocument = {
+      ...document([]),
+      creatorIdentityId: undefined,
+      participantIds: [],
+      participants: [],
+      scope: {
+        channelId: 'voice',
+        communityId: 'private-community',
+        conversationId: undefined,
+        type: 'community_channel',
+      },
+    };
+    const forgedConversation = {
+      ...document([{ identityId: 'attacker', joinedAt: 100, status: 'joined' }]),
+      updatedAt: 100,
+    };
+
+    const forward = merger.merge(communityCall, forgedConversation);
+    const reverse = merger.merge(forgedConversation, communityCall);
+
+    expect(forward).toEqual(reverse);
+    expect([communityCall, forgedConversation]).toContainEqual(forward);
+  });
+
+  it('keeps the accepted call origin immutable', () => {
+    const accepted = document([], 1);
+    const differentCreator = {
+      ...accepted,
+      creatorIdentityId: 'b',
+      updatedAt: 100,
+    };
+    const differentCreation = { ...accepted, createdAt: 2, updatedAt: 100 };
+
+    expect(merger.merge(accepted, differentCreator)).toEqual(
+      merger.merge(differentCreator, accepted),
+    );
+    expect(merger.merge(accepted, differentCreation)).toEqual(
+      merger.merge(differentCreation, accepted),
+    );
+  });
+
+  it('converges when conflicting scope fields differ by null and absence', () => {
+    const absent = document([]);
+    const explicitNull = {
+      ...absent,
+      scope: { ...absent.scope, channelId: null },
+    } as unknown as OrbitDBCallDocument;
+
+    expect(merger.merge(absent, explicitNull)).toEqual(
+      merger.merge(explicitNull, absent),
+    );
   });
 
   it('converges across three versions, duplicates and every delivery order', () => {

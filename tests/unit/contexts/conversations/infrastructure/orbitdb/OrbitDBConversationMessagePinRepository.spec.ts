@@ -175,6 +175,21 @@ describe('OrbitDBConversationMessagePinRepository', () => {
     heads.releaseWrites();
     await flushBackgroundTasks();
   });
+
+  it('ignores canonical pins with malformed identities', async () => {
+    await pins.put({
+      conversationId: conversationId.valueOf(),
+      createdAt: 1780000000000,
+      id: `conversation:${conversationId.valueOf()}:${messageId.valueOf()}`,
+      messageId: messageId.valueOf(),
+      pinnedByIdentityId: 'malformed-public-key',
+      scopeType: 'conversation',
+    });
+
+    await expect(
+      repository.findByConversation(conversationId),
+    ).resolves.toEqual([]);
+  });
 });
 
 function flushBackgroundTasks(): Promise<void> {

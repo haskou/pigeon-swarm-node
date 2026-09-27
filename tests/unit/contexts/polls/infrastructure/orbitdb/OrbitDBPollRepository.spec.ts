@@ -1,8 +1,9 @@
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { Poll } from '@app/contexts/polls/domain/Poll';
 import { PollOption } from '@app/contexts/polls/domain/PollOption';
 import { PollScope } from '@app/contexts/polls/domain/PollScope';
@@ -10,6 +11,7 @@ import { PollOptionId } from '@app/contexts/polls/domain/value-objects/PollOptio
 import { PollOptionText } from '@app/contexts/polls/domain/value-objects/PollOptionText';
 import { PollQuestion } from '@app/contexts/polls/domain/value-objects/PollQuestion';
 import OrbitDBPollRepository from '@app/contexts/polls/infrastructure/orbitdb/OrbitDBPollRepository';
+import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -78,6 +80,7 @@ describe('OrbitDBPollRepository', () => {
   let repository: OrbitDBPollRepository;
   let communityRepository: MockProxy<CommunityRepository>;
   let conversationRepository: MockProxy<ConversationRepository>;
+  let publicStorageGuard: PrivateCommunityPublicStorageGuard;
 
   function poll(scope: 'community_channel' | 'group_conversation'): Poll {
     return Poll.create(
@@ -87,10 +90,7 @@ describe('OrbitDBPollRepository', () => {
         : PollScope.groupConversation(conversationId),
       new PollQuestion('Question?'),
       [
-        PollOption.create(
-          new PollOptionId('yes-1'),
-          new PollOptionText('Yes'),
-        ),
+        PollOption.create(new PollOptionId('yes-1'), new PollOptionText('Yes')),
         PollOption.create(new PollOptionId('no-1'), new PollOptionText('No')),
       ],
       false,
@@ -102,6 +102,12 @@ describe('OrbitDBPollRepository', () => {
     registry = new OrbitDBReplicatedStateRegistry();
     communityRepository = mock<CommunityRepository>();
     conversationRepository = mock<ConversationRepository>();
+    publicStorageGuard = new PrivateCommunityPublicStorageGuard(
+      {
+        findScope: jest.fn().mockResolvedValue(undefined),
+      } as never,
+      new PrivateAuthorizationStorageCoordinator(),
+    );
     registry.register(networkId, {
       heads: createStore(),
       polls,
@@ -116,6 +122,7 @@ describe('OrbitDBPollRepository', () => {
       registry,
       communityRepository,
       conversationRepository,
+      publicStorageGuard,
     );
   });
 
@@ -153,6 +160,59 @@ describe('OrbitDBPollRepository', () => {
     expect(polls.query).not.toHaveBeenCalled();
   });
 
+  it('resolves the community network before acquiring its public storage lock', async () => {
+    let activeScope: string | undefined;
+    const coordinator = mock<PrivateAuthorizationStorageCoordinator>();
+
+    coordinator.exclusively.mockImplementation(async (scopeId, action) => {
+      if (activeScope === scopeId) throw new Error('Reentrant scope lock');
+      activeScope = scopeId;
+
+      try {
+        return await action();
+      } finally {
+        activeScope = undefined;
+      }
+    });
+    communityRepository.findById.mockImplementation((id) =>
+      coordinator.exclusively(id.valueOf(), async () => ({
+        toPrimitives: () => ({ networkId }),
+      }) as never),
+    );
+    repository = new OrbitDBPollRepository(
+      registry,
+      communityRepository,
+      conversationRepository,
+      new PrivateCommunityPublicStorageGuard(
+        { findScope: jest.fn().mockResolvedValue(undefined) } as never,
+        coordinator,
+      ),
+    );
+
+    await expect(repository.save(poll('community_channel'))).resolves.toBe(
+      undefined,
+    );
+  });
+
+  it('rejects protected community polls before publishing them', async () => {
+    repository = new OrbitDBPollRepository(
+      registry,
+      communityRepository,
+      conversationRepository,
+      new PrivateCommunityPublicStorageGuard(
+        {
+          findScope: jest.fn().mockResolvedValue({}),
+        } as never,
+        new PrivateAuthorizationStorageCoordinator(),
+      ),
+    );
+
+    await expect(repository.save(poll('community_channel'))).rejects.toThrow(
+      'Invalid private authorization',
+    );
+    expect(polls.put).not.toHaveBeenCalled();
+  });
+
   it('reads group conversation polls from the scope index after saving', async () => {
     const savedPoll = poll('group_conversation');
 
@@ -160,10 +220,7 @@ describe('OrbitDBPollRepository', () => {
     const storedDocument = await polls.get(savedPoll.getId().valueOf());
     polls.query.mockClear();
 
-    const result = await repository.findByGroupConversation(
-      conversationId,
-      10,
-    );
+    const result = await repository.findByGroupConversation(conversationId, 10);
 
     expect(result.map((item) => item.toPrimitives().id)).toEqual([
       savedPoll.getId().valueOf(),
@@ -194,5 +251,54 @@ describe('OrbitDBPollRepository', () => {
 
     expect(result?.toPrimitives().id).toBe(savedPoll.getId().valueOf());
     expect(polls.query).not.toHaveBeenCalled();
+  });
+
+  it('does not return a poll whose scope changes during guarded lookup', async () => {
+    const initial = poll('group_conversation');
+    const document = {
+      ...initial.toPrimitives(),
+      networkId,
+      updatedAt: Date.now(),
+    };
+
+    jest
+      .spyOn(registry, 'findHead')
+      .mockResolvedValueOnce(document)
+      .mockResolvedValueOnce({
+        ...document,
+        scope: PollScope.communityChannel(
+          communityId,
+          channelId,
+        ).toPrimitives(),
+      });
+
+    await expect(repository.findById(initial.getId())).resolves.toBeUndefined();
+  });
+
+  it('ignores canonical polls with malformed identities', async () => {
+    await polls.put({
+      allowsMultipleVotes: false,
+      createdAt: 1780000000000,
+      creatorIdentityId: 'malformed-public-key',
+      id: 'malformed-poll',
+      networkId,
+      options: [
+        { id: 'yes-1', text: 'Yes' },
+        { id: 'no-1', text: 'No' },
+      ],
+      question: 'Question?',
+      scope: {
+        channelId: channelId.valueOf(),
+        communityId: communityId.valueOf(),
+        type: 'community_channel',
+      },
+      status: 'open',
+      updatedAt: 1780000000000,
+      votes: [],
+    });
+
+    await expect(
+      repository.findByCommunityChannel(communityId, channelId, 10),
+    ).resolves.toEqual([]);
   });
 });

@@ -93,6 +93,60 @@ export default class OrbitDBCallDocumentMerger {
     );
   }
 
+  private sameSession(
+    left: OrbitDBCallDocument,
+    right: OrbitDBCallDocument,
+  ): boolean {
+    return (
+      left.id === right.id &&
+      left.networkId === right.networkId &&
+      left.createdAt === right.createdAt &&
+      this.sameScope(left, right) &&
+      (left.scope.type === 'community_channel' ||
+        left.creatorIdentityId === right.creatorIdentityId)
+    );
+  }
+
+  private sameScope(
+    left: OrbitDBCallDocument,
+    right: OrbitDBCallDocument,
+  ): boolean {
+    return (
+      left.scope.type === right.scope.type &&
+      left.scope.communityId === right.scope.communityId &&
+      left.scope.channelId === right.scope.channelId &&
+      left.scope.conversationId === right.scope.conversationId
+    );
+  }
+
+  private sessionKey(document: OrbitDBCallDocument): string {
+    const field = (value: unknown): [string, unknown?] =>
+      value === undefined ? ['undefined'] : [typeof value, value];
+
+    return JSON.stringify([
+      document.id,
+      document.networkId,
+      document.createdAt,
+      document.scope.type,
+      field(document.scope.communityId),
+      field(document.scope.channelId),
+      field(document.scope.conversationId),
+      document.scope.type === 'community_channel'
+        ? ['community']
+        : field(document.creatorIdentityId),
+    ]);
+  }
+
+  private resolveSessionConflict(
+    left: OrbitDBCallDocument,
+    right: OrbitDBCallDocument,
+  ): OrbitDBCallDocument {
+    const selected =
+      this.sessionKey(left) <= this.sessionKey(right) ? left : right;
+
+    return this.withoutCommunityParticipation(selected);
+  }
+
   private withoutCommunityParticipation(
     document: OrbitDBCallDocument,
   ): OrbitDBCallDocument {
@@ -120,6 +174,8 @@ export default class OrbitDBCallDocumentMerger {
     current: OrbitDBCallDocument | undefined,
     incoming: OrbitDBCallDocument,
   ): OrbitDBCallDocument {
+    if (current && !this.sameSession(current, incoming))
+      return this.resolveSessionConflict(current, incoming);
     const base =
       current && this.compareCalls(current, incoming) > 0 ? current : incoming;
     const documents = current ? [current, incoming] : [incoming];

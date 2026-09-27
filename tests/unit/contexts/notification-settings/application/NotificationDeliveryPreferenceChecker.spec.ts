@@ -37,6 +37,10 @@ class InMemoryNotificationScopeSettingsRepository
     return this.settings.get(this.key(identityId, scope));
   }
 
+  public async isPrivateScope(): Promise<boolean> {
+    return false;
+  }
+
   public async save(settings: NotificationScopeSettings): Promise<void> {
     this.settings.set(
       this.key(settings.getIdentityId(), settings.getScope()),

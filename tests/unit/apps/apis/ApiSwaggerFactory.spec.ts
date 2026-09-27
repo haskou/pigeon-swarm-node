@@ -24,6 +24,7 @@ describe('ApiSwaggerFactory', () => {
         'notifications-api',
         'polls-api',
         'presence-api',
+        'private-authorization-api',
         'push-api',
         'stickers-api',
       ]);
@@ -40,6 +41,9 @@ describe('ApiSwaggerFactory', () => {
       );
       expect(specs['notifications-api']).toContain('/notifications/:');
       expect(specs['presence-api']).toContain('/presence/:');
+      expect(specs['private-authorization-api']).toContain(
+        '/private-authorization/challenges:',
+      );
       expect(specs['push-api']).toContain('/push/subscriptions:');
       expect(specs['stickers-api']).toContain('/stickers/packs:');
     });
@@ -81,6 +85,12 @@ describe('ApiSwaggerFactory', () => {
         "$ref: './presence-api/swagger.yaml#/paths/~1presence~1'",
       );
       expect(spec).toContain(
+        "$ref: './private-authorization-api/swagger.yaml#/paths/~1private-authorization~1challenges'",
+      );
+      expect(spec).toContain(
+        "$ref: './private-authorization-api/swagger.yaml#/paths/~1private-authorization~1operations'",
+      );
+      expect(spec).toContain(
         "$ref: './push-api/swagger.yaml#/paths/~1push~1subscriptions'",
       );
       expect(spec).toContain(
@@ -107,6 +117,8 @@ describe('ApiSwaggerFactory', () => {
         'notifications-api': '/api/swagger/notifications-api/swagger.yaml',
         'polls-api': '/api/swagger/polls-api/swagger.yaml',
         'presence-api': '/api/swagger/presence-api/swagger.yaml',
+        'private-authorization-api':
+          '/api/swagger/private-authorization-api/swagger.yaml',
         'push-api': '/api/swagger/push-api/swagger.yaml',
         'stickers-api': '/api/swagger/stickers-api/swagger.yaml',
       });
