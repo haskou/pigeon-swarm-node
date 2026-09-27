@@ -269,9 +269,13 @@ export default class OrbitDBPollRepository extends PollRepository {
       const lockedHead = await this.registry.findHead(
         this.pollHeadKey(id.valueOf()),
       );
+      const lockedPoll =
+        lockedHead && this.isDocument(lockedHead)
+          ? this.toDomain(lockedHead)
+          : undefined;
 
-      return lockedHead && this.isDocument(lockedHead)
-        ? this.toDomain(lockedHead)
+      return lockedPoll?.getScope().isEqual(poll.getScope())
+        ? lockedPoll
         : undefined;
     });
   }

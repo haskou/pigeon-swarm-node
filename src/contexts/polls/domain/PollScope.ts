@@ -53,6 +53,18 @@ export class PollScope {
     return this.conversationId?.isEqual(conversationId) ?? false;
   }
 
+  public isEqual(scope: PollScope): boolean {
+    const candidate = scope.toPrimitives();
+    const current = this.toPrimitives();
+
+    return (
+      current.type === candidate.type &&
+      current.communityId === candidate.communityId &&
+      current.channelId === candidate.channelId &&
+      current.conversationId === candidate.conversationId
+    );
+  }
+
   public match<T>(cases: {
     communityChannel: (
       communityId: CommunityId,

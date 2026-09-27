@@ -253,6 +253,28 @@ describe('OrbitDBPollRepository', () => {
     expect(polls.query).not.toHaveBeenCalled();
   });
 
+  it('does not return a poll whose scope changes during guarded lookup', async () => {
+    const initial = poll('group_conversation');
+    const document = {
+      ...initial.toPrimitives(),
+      networkId,
+      updatedAt: Date.now(),
+    };
+
+    jest
+      .spyOn(registry, 'findHead')
+      .mockResolvedValueOnce(document)
+      .mockResolvedValueOnce({
+        ...document,
+        scope: PollScope.communityChannel(
+          communityId,
+          channelId,
+        ).toPrimitives(),
+      });
+
+    await expect(repository.findById(initial.getId())).resolves.toBeUndefined();
+  });
+
   it('ignores canonical polls with malformed identities', async () => {
     await polls.put({
       allowsMultipleVotes: false,
