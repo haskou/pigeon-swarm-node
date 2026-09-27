@@ -11,6 +11,7 @@ import { PrivateControlOperationWasAcceptedEvent } from './events/PrivateControl
 import { PrivateAuthorizationCheckpoint } from './PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScopePrimitives } from './PrivateAuthorizationScopePrimitives';
 import { PrivateControlOperation } from './PrivateControlOperation';
+import { PrivateOperationDependencyGraph } from './PrivateOperationDependencyGraph';
 import { PrivateAuthorizationDeviceKey } from './value-objects/PrivateAuthorizationDeviceKey';
 
 export class PrivateAuthorizationScope extends AggregateRoot {
@@ -80,6 +81,7 @@ export class PrivateAuthorizationScope extends AggregateRoot {
     private readonly pendingOperations: PrivateControlOperation[],
   ) {
     super();
+    new PrivateOperationDependencyGraph(this.pendingOperations).assertAcyclic();
     this.compactAccepted();
   }
 
@@ -361,6 +363,11 @@ export class PrivateAuthorizationScope extends AggregateRoot {
 
       return;
     }
+
+    new PrivateOperationDependencyGraph([
+      ...this.pendingOperations,
+      operation,
+    ]).assertAcyclic();
 
     const byAuthor = this.pendingOperations.filter(
       (pending) =>

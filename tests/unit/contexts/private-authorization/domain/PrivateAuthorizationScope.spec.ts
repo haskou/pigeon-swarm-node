@@ -163,6 +163,71 @@ describe('PrivateAuthorizationScope', () => {
     expect(scope.toPrimitives().pendingOperations).toHaveLength(2);
   });
 
+  it('rejects a self-referencing causal dependency', () => {
+    const scope = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
+
+    expect(() =>
+      scope.acceptProposal(
+        operation({
+          digest: 'self-reference',
+          id: 'self-reference',
+          previousOperationIds: ['self-reference'],
+        }),
+      ),
+    ).toThrow(InvalidPrivateAuthorizationError);
+    expect(scope.toPrimitives().pendingOperations).toEqual([]);
+  });
+
+  it('rejects a transitive cycle in pending causal dependencies', () => {
+    const scope = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
+
+    expect(
+      scope.acceptProposal(
+        operation({
+          digest: 'first',
+          id: 'first',
+          previousOperationIds: ['second'],
+        }),
+      ),
+    ).toBe('pending');
+    expect(() =>
+      scope.acceptProposal(
+        operation({
+          digest: 'second',
+          id: 'second',
+          previousOperationIds: ['first'],
+        }),
+      ),
+    ).toThrow(InvalidPrivateAuthorizationError);
+    expect(
+      scope.toPrimitives().pendingOperations.map(({ id }) => id),
+    ).toEqual(['first']);
+  });
+
+  it('fails closed when persisted pending dependencies contain a cycle', () => {
+    expect(() =>
+      PrivateAuthorizationScope.fromPrimitives({
+        acceptedOperations: [],
+        checkpoint: genesis().toPrimitives(),
+        genesisHash: 'genesis-hash',
+        ownerDeviceKey: ownerKey,
+        pendingOperations: [
+          operation({
+            digest: 'first',
+            id: 'first',
+            previousOperationIds: ['second'],
+          }).toPrimitives(),
+          operation({
+            digest: 'second',
+            id: 'second',
+            previousOperationIds: ['first'],
+          }).toPrimitives(),
+        ],
+        status: 'active',
+      }),
+    ).toThrow(InvalidPrivateAuthorizationError);
+  });
+
   it('commits the exact proposed mutation with an exact successor checkpoint', () => {
     const scope = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
     const proposal = operation();

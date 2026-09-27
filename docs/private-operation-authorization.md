@@ -180,7 +180,8 @@ any visible or durable acceptance change.
    checkpoint revision. A future revision enters the bounded pending queue; an old
    revision is rejected after the newer checkpoint is observed.
 8. Require every causal predecessor to be accepted with the same scope. Missing
-   predecessors enter the bounded pending queue.
+   predecessors enter the bounded pending queue. Self-references and cycles in
+   the pending dependency graph are rejected before persistence.
 9. For a sensitive outbound or newly received batch, verify the outstanding
    challenge, batch commitment, exact checkpoint and one-use freshness proof. The
    proof is invalid after ten seconds measured from the local monotonic challenge
