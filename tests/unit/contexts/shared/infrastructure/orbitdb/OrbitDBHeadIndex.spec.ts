@@ -231,9 +231,21 @@ describe('OrbitDBHeadIndex', () => {
   });
 
   it('derives removals from the canonical store on receiving replicas', async () => {
+    jest
+      .spyOn(registry, 'onDocumentUpdated')
+      .mockImplementation(async (_storeName, listener) => {
+        await listener({
+          ...document('removed', 1),
+          scopeId: 'scope-1',
+        });
+        await listener({
+          ...document('removed', 2),
+          removed: true,
+          scopeId: 'scope-1',
+        });
+      });
     const canonicalIndex = new OrbitDBHeadIndex(registry, {
-      belongsToCanonicalIndex: (key, record) =>
-        key === `index:${String(record.scopeId)}`,
+      canonicalIndexKeys: (record) => [`index:${String(record.scopeId)}`],
       canonicalStoreName: 'pins',
       collectionName: 'items',
       documentFromRecord: (record) =>
@@ -253,15 +265,11 @@ describe('OrbitDBHeadIndex', () => {
       items: [document('removed', 1)],
       updatedAt: 1,
     });
-    jest.spyOn(registry, 'queryDocuments').mockResolvedValue([
-      {
-        ...document('removed', 2),
-        removed: true,
-        scopeId: 'scope-1',
-      },
-    ]);
+    const queryDocuments = jest.spyOn(registry, 'queryDocuments');
 
     await expect(canonicalIndex.find('index:scope-1')).resolves.toEqual([]);
+    await expect(canonicalIndex.find('index:scope-1')).resolves.toEqual([]);
+    expect(queryDocuments).not.toHaveBeenCalled();
   });
 
   it('bounds exact replacement storage by the live record set', async () => {
@@ -289,8 +297,14 @@ describe('OrbitDBHeadIndex', () => {
   });
 
   it('admits later canonical records without resurrecting removed records', async () => {
+    jest
+      .spyOn(registry, 'onDocumentUpdated')
+      .mockImplementation(async (_storeName, listener) => {
+        await listener(document('retained', 2));
+        await listener(document('replicated-later', 3));
+      });
     const canonicalIndex = new OrbitDBHeadIndex(registry, {
-      belongsToCanonicalIndex: () => true,
+      canonicalIndexKeys: () => ['index:key'],
       canonicalStoreName: 'pins',
       collectionName: 'items',
       documentFromRecord: (record) =>
@@ -313,15 +327,57 @@ describe('OrbitDBHeadIndex', () => {
       ],
       updatedAt: Number.MAX_SAFE_INTEGER,
     });
-    jest.spyOn(registry, 'queryDocuments').mockResolvedValue([
-      document('retained', 2),
-      document('replicated-later', 3),
-    ]);
-
     await expect(canonicalIndex.find('index:key')).resolves.toEqual([
       document('retained', 2),
       document('replicated-later', 3),
     ]);
+  });
+
+  it('rebuilds each canonical key once after the registered networks change', async () => {
+    jest
+      .spyOn(registry, 'onDocumentUpdated')
+      .mockImplementation(async (_storeName, listener) => {
+        await listener(document('before-reconfiguration', 1));
+      });
+    const keys = (record: Record<string, unknown>): string[] =>
+      record.id === 'second-key' ? ['index:other'] : ['index:key'];
+    const canonicalIndex = new OrbitDBHeadIndex(registry, {
+      canonicalIndexKeys: keys,
+      canonicalStoreName: 'pins',
+      collectionName: 'items',
+      documentFromRecord: (record) =>
+        typeof record.id === 'string' &&
+        typeof record.updatedAt === 'number' &&
+        typeof record.value === 'string'
+          ? (record as TestDocument)
+          : undefined,
+      recordId: (record) =>
+        typeof record.id === 'string' ? record.id : undefined,
+    });
+    const queryDocuments = jest
+      .spyOn(registry, 'queryDocuments')
+      .mockImplementation(async (_storeName, predicate) =>
+        [
+          document('after-reconfiguration', 2),
+          document('second-key', 3),
+        ].filter(predicate),
+      );
+
+    await registry.register('network-2', { heads: createStore() } as never);
+
+    await expect(canonicalIndex.find('index:key')).resolves.toEqual([
+      document('after-reconfiguration', 2),
+    ]);
+    await expect(canonicalIndex.find('index:key')).resolves.toEqual([
+      document('after-reconfiguration', 2),
+    ]);
+    await expect(canonicalIndex.find('index:other')).resolves.toEqual([
+      document('second-key', 3),
+    ]);
+    await expect(canonicalIndex.find('index:other')).resolves.toEqual([
+      document('second-key', 3),
+    ]);
+    expect(queryDocuments).toHaveBeenCalledTimes(2);
   });
 
   it('keeps the durable exact projection when its replacement fails', async () => {

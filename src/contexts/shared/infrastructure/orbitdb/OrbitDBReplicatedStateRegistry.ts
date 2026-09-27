@@ -64,6 +64,8 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private readonly projectedHeads = new Map<string, Record<string, unknown>>();
 
+  private documentProjectionRevision = 0;
+
   private readonly exactProjectedHeadKeys = new Set<string>();
 
   private readonly replicatedHeadsByNetworkId = new Map<
@@ -1595,6 +1597,7 @@ export default class OrbitDBReplicatedStateRegistry {
     networkId: string,
     stores: OrbitDBPrivateNetworkStores,
   ): Promise<void> {
+    this.documentProjectionRevision += 1;
     this.storesByNetworkId.set(networkId, stores);
     this.registerDocumentUpdateListeners(stores);
     this.registerHeadCacheListeners(networkId, stores);
@@ -1646,6 +1649,7 @@ export default class OrbitDBReplicatedStateRegistry {
     this.replicatedHeadsByNetworkId.delete(networkId);
     this.projectedHeads.clear();
     this.exactProjectedHeadKeys.clear();
+    this.documentProjectionRevision += 1;
 
     await stores?.stop();
   }
@@ -1656,6 +1660,11 @@ export default class OrbitDBReplicatedStateRegistry {
     this.replicatedHeadsByNetworkId.clear();
     this.projectedHeads.clear();
     this.exactProjectedHeadKeys.clear();
+    this.documentProjectionRevision += 1;
+  }
+
+  public getDocumentProjectionRevision(): number {
+    return this.documentProjectionRevision;
   }
 
   public async onDocumentUpdated(

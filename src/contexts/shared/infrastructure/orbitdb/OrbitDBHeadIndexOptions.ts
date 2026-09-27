@@ -1,10 +1,7 @@
 import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
 
 export type OrbitDBHeadIndexOptions<TDocument extends object> = {
-  belongsToCanonicalIndex?(
-    key: string,
-    document: Record<string, unknown>,
-  ): boolean;
+  canonicalIndexKeys?(document: Record<string, unknown>): string[];
   canonicalStoreName?: OrbitDBReplicatedDocumentStoreName;
   collectionName: string;
   documentFromRecord(record: Record<string, unknown>): TDocument | undefined;

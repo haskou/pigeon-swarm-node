@@ -17,9 +17,10 @@ export default class OrbitDBMessageReactionRepository extends MessageReactionRep
   ) {
     super();
     this.reactionIndex = new OrbitDBHeadIndex(this.registry, {
-      belongsToCanonicalIndex: (key, record) =>
-        typeof record.conversationId === 'string' &&
-        key === this.indexHeadKeyFromValue(record.conversationId),
+      canonicalIndexKeys: (record) =>
+        typeof record.conversationId === 'string'
+          ? [this.indexHeadKeyFromValue(record.conversationId)]
+          : [],
       canonicalStoreName: 'reactions',
       collectionName: 'reactions',
       documentFromRecord: (record) =>

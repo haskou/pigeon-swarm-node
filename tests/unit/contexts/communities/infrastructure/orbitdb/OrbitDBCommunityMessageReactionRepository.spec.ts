@@ -125,7 +125,7 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
       reaction.toPrimitives(),
     ]);
     expect(afterDelete).toEqual([]);
-    expect(query).toHaveBeenCalled();
+    expect(query).not.toHaveBeenCalled();
   });
 
   it('does not tombstone a reaction bound to another community through a poisoned index', async () => {

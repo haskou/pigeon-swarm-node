@@ -20,9 +20,10 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
   ) {
     super();
     this.inviteIndex = new OrbitDBHeadIndex(this.registry, {
-      belongsToCanonicalIndex: (key, record) =>
-        typeof record.communityId === 'string' &&
-        key === this.communityIndexHeadKey(record.communityId),
+      canonicalIndexKeys: (record) =>
+        typeof record.communityId === 'string'
+          ? [this.communityIndexHeadKey(record.communityId)]
+          : [],
       canonicalStoreName: 'requests',
       collectionName: 'invites',
       documentFromRecord: (record) =>

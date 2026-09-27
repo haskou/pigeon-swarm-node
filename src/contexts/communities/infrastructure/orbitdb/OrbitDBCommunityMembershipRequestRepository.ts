@@ -25,8 +25,7 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
   ) {
     super();
     this.requestIndex = new OrbitDBHeadIndex(this.registry, {
-      belongsToCanonicalIndex: (key, record) =>
-        this.belongsToCanonicalIndex(key, record),
+      canonicalIndexKeys: (record) => this.canonicalIndexKeys(record),
       canonicalStoreName: 'requests',
       collectionName: 'requests',
       documentFromRecord: (record) =>
@@ -44,18 +43,15 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
     );
   }
 
-  private belongsToCanonicalIndex(
-    key: string,
-    document: Record<string, unknown>,
-  ): boolean {
-    if (!this.isStoredDocument(document)) return false;
-    const communityKey = this.communityIndexHeadKey(document.communityId);
-    const identityKeys = [document.creatorIdentityId, document.identityId].map(
-      (identityId) =>
-        this.identityIndexHeadKey(identityId, document.communityId),
-    );
+  private canonicalIndexKeys(document: Record<string, unknown>): string[] {
+    if (!this.isStoredDocument(document)) return [];
 
-    return key === communityKey || identityKeys.includes(key);
+    return [
+      this.communityIndexHeadKey(document.communityId),
+      ...[document.creatorIdentityId, document.identityId].map((identityId) =>
+        this.identityIndexHeadKey(identityId, document.communityId),
+      ),
+    ];
   }
 
   private hasNumberFields(

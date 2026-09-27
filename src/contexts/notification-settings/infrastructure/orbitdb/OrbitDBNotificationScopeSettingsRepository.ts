@@ -13,9 +13,10 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
     this.settingsIndex = new OrbitDBHeadIndex(this.registry, {
-      belongsToCanonicalIndex: (key, record) =>
-        typeof record.identityId === 'string' &&
-        key === this.identityIndexHeadKeyFromValue(record.identityId),
+      canonicalIndexKeys: (record) =>
+        typeof record.identityId === 'string'
+          ? [this.identityIndexHeadKeyFromValue(record.identityId)]
+          : [],
       canonicalStoreName: 'notificationSettings',
       collectionName: 'settings',
       documentFromRecord: (record) =>

@@ -1,4 +1,5 @@
 import Kernel from '@haskou/ddd-kernel';
+import { assert } from '@haskou/value-objects';
 
 import { OrbitDBDocumentDeduplicator } from './OrbitDBDocumentDeduplicator';
 import { OrbitDBHeadIndexOptions } from './OrbitDBHeadIndexOptions';
@@ -12,6 +13,31 @@ export class OrbitDBHeadIndex<TDocument extends object> {
   >();
 
   private readonly deduplicator: OrbitDBDocumentDeduplicator<TDocument>;
+
+  private readonly canonicalProjection?: Promise<void>;
+
+  private readonly canonicalRecordsById = new Map<
+    string,
+    Record<string, unknown>
+  >();
+
+  private readonly canonicalRecordsByKey = new Map<
+    string,
+    Record<string, unknown>[]
+  >();
+
+  private readonly canonicalKeysByRecordId = new Map<string, Set<string>>();
+
+  private readonly canonicalProjectionKeys = new Set<string>();
+
+  private readonly canonicalProjectionRefreshes = new Map<
+    string,
+    Promise<void>
+  >();
+
+  private canonicalProjectionCompleteRevision?: number;
+
+  private canonicalProjectionRevision: number;
 
   private readonly recordMergeQueues = new Map<string, Promise<void>>();
 
@@ -35,11 +61,168 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly options: OrbitDBHeadIndexOptions<TDocument>,
   ) {
+    this.canonicalProjectionRevision = this.registryProjectionRevision();
     this.deduplicator = new OrbitDBDocumentDeduplicator({
       merge: this.options.merge,
       recordId: (document) => this.options.recordId(document),
       shouldReplace: this.options.shouldReplace,
     });
+    const storeName = this.options.canonicalStoreName;
+
+    if (storeName && this.options.canonicalIndexKeys) {
+      const initialRevision = this.canonicalProjectionRevision;
+      this.canonicalProjection = this.registry
+        .onDocumentUpdated?.(storeName, (document) =>
+          this.projectCanonicalRecord(document),
+        )
+        .then(() => {
+          if (initialRevision === this.registryProjectionRevision()) {
+            this.canonicalProjectionCompleteRevision = initialRevision;
+          }
+        });
+    }
+  }
+
+  private registryProjectionRevision(): number {
+    return this.registry.getDocumentProjectionRevision?.() ?? 0;
+  }
+
+  private isCanonicalRemoval(record: Record<string, unknown>): boolean {
+    return record.removed === true || record.deleted === true;
+  }
+
+  private canonicalRecord(
+    current: Record<string, unknown> | undefined,
+    candidate: Record<string, unknown>,
+  ): Record<string, unknown> | undefined {
+    if (!current) return candidate;
+    const candidateDocument = this.options.documentFromRecord(candidate);
+
+    if (!candidateDocument && !this.isCanonicalRemoval(candidate)) {
+      return current;
+    }
+
+    if (
+      this.isCanonicalRemoval(current) ||
+      this.isCanonicalRemoval(candidate)
+    ) {
+      return this.shouldReplaceRecord(current, candidate) ? candidate : current;
+    }
+
+    return this.mergeRecord(current, candidate);
+  }
+
+  private projectCanonicalKey(
+    key: string,
+    canonical: Record<string, unknown>,
+    included: boolean,
+  ): void {
+    const records = this.recordsWithout(
+      this.canonicalRecordsByKey.get(key) ?? [],
+      canonical,
+    );
+
+    if (included) records.push(canonical);
+    this.canonicalRecordsByKey.set(key, records);
+  }
+
+  private projectCanonicalRecord(record: Record<string, unknown>): void {
+    const recordId = this.options.recordId(record);
+    const indexKeys = this.options.canonicalIndexKeys;
+
+    if (!recordId || !indexKeys) return;
+    const current = this.canonicalRecordsById.get(recordId);
+    const canonical = this.canonicalRecord(current, record);
+
+    if (!canonical || canonical === current) return;
+    this.updateCanonicalProjection(recordId, canonical);
+  }
+
+  private updateCanonicalProjection(
+    recordId: string,
+    canonical: Record<string, unknown>,
+  ): void {
+    const indexKeys = this.options.canonicalIndexKeys;
+
+    assert(indexKeys, new Error('Canonical index keys are required'));
+    const previousKeys =
+      this.canonicalKeysByRecordId.get(recordId) ?? new Set();
+    const nextKeys = new Set(indexKeys(canonical));
+    const affectedKeys = new Set([...previousKeys, ...nextKeys]);
+    const isDocument = this.options.documentFromRecord(canonical) !== undefined;
+
+    this.canonicalRecordsById.set(recordId, canonical);
+    this.canonicalKeysByRecordId.set(recordId, nextKeys);
+
+    for (const key of affectedKeys) {
+      this.projectCanonicalKey(key, canonical, isDocument && nextKeys.has(key));
+    }
+  }
+
+  private clearCanonicalProjection(): void {
+    this.canonicalRecordsById.clear();
+    this.canonicalRecordsByKey.clear();
+    this.canonicalKeysByRecordId.clear();
+    this.canonicalProjectionKeys.clear();
+  }
+
+  private invalidateCanonicalProjectionIfStale(): number {
+    const revision = this.registryProjectionRevision();
+
+    if (revision !== this.canonicalProjectionRevision) {
+      this.clearCanonicalProjection();
+      this.canonicalProjectionRevision = revision;
+      this.canonicalProjectionCompleteRevision = undefined;
+    }
+
+    return revision;
+  }
+
+  private async refreshCanonicalProjection(key: string): Promise<void> {
+    const revision = this.invalidateCanonicalProjectionIfStale();
+
+    if (
+      this.canonicalProjectionCompleteRevision === revision ||
+      this.canonicalProjectionKeys.has(key)
+    ) {
+      return;
+    }
+    const pending = this.canonicalProjectionRefreshes.get(key);
+
+    if (pending) {
+      await pending;
+
+      return this.refreshCanonicalProjection(key);
+    }
+    const storeName = this.options.canonicalStoreName;
+    const indexKeys = this.options.canonicalIndexKeys;
+
+    if (!storeName || !indexKeys) return;
+    const refresh = (async () => {
+      const documents = await this.registry.queryDocuments(
+        storeName,
+        (document) => indexKeys(document).includes(key),
+      );
+
+      if (revision !== this.registryProjectionRevision()) return;
+
+      for (const document of documents) {
+        this.projectCanonicalRecord(document);
+      }
+
+      this.canonicalProjectionKeys.add(key);
+    })();
+    this.canonicalProjectionRefreshes.set(key, refresh);
+
+    try {
+      await refresh;
+    } finally {
+      this.canonicalProjectionRefreshes.delete(key);
+    }
+
+    if (revision !== this.registryProjectionRevision()) {
+      await this.refreshCanonicalProjection(key);
+    }
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {
@@ -386,19 +569,13 @@ export class OrbitDBHeadIndex<TDocument extends object> {
   private async canonicalDocuments(
     key: string,
   ): Promise<TDocument[] | undefined> {
-    const storeName = this.options.canonicalStoreName;
-    const belongsToIndex = this.options.belongsToCanonicalIndex;
+    if (!this.canonicalProjection) return undefined;
+    await this.canonicalProjection;
+    await this.refreshCanonicalProjection(key);
 
-    if (!storeName || !belongsToIndex) return undefined;
-    const records = await this.registry.queryDocuments(storeName, (document) =>
-      belongsToIndex(key, document),
-    );
-
-    return this.deduplicate(
-      records
-        .map((record) => this.options.documentFromRecord(record))
-        .filter((document): document is TDocument => document !== undefined),
-    );
+    return (this.canonicalRecordsByKey.get(key) ?? [])
+      .map((record) => this.options.documentFromRecord(record))
+      .filter((document): document is TDocument => document !== undefined);
   }
 
   public recordsFromHead(
@@ -447,9 +624,19 @@ export class OrbitDBHeadIndex<TDocument extends object> {
   }
 
   public cachedByPrefix(prefix: string): TDocument[] {
-    return this.registry
+    this.invalidateCanonicalProjectionIfStale();
+    const replicated = this.registry
       .findCachedHeadsByPrefix(prefix)
       .flatMap((value) => this.documentsFromHead(value) ?? []);
+    const canonical = [...this.canonicalRecordsByKey.entries()]
+      .filter(([key]) => key.startsWith(prefix))
+      .flatMap(([, records]) =>
+        records
+          .map((record) => this.options.documentFromRecord(record))
+          .filter((document): document is TDocument => document !== undefined),
+      );
+
+    return this.deduplicate([...replicated, ...canonical]);
   }
 
   public documentIds(documents: TDocument[]): Set<string> {
@@ -505,6 +692,9 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     documents: TDocument[],
     options: OrbitDBHeadIndexPutOptions<TDocument> = {},
   ): Promise<void> {
+    documents.forEach((document) =>
+      this.projectCanonicalRecord(Object.fromEntries(Object.entries(document))),
+    );
     const head = this.documentsHead(metadata, documents, options);
 
     if (options.replace) {
@@ -522,6 +712,9 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     documents: TDocument[],
     options: OrbitDBHeadIndexPutOptions<TDocument> = {},
   ): void {
+    documents.forEach((document) =>
+      this.projectCanonicalRecord(Object.fromEntries(Object.entries(document))),
+    );
     this.registry.replicateHeadInBackground(
       key,
       this.documentsHead(metadata, documents, options),
@@ -536,6 +729,8 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     networkIds: string[] = [],
     options: OrbitDBHeadIndexPutOptions<TDocument> = {},
   ): Promise<void> {
+    this.projectCanonicalRecord(record);
+
     if (this.isRemoval(record)) {
       await this.removeRecord(key, metadata, record, networkIds);
 
@@ -563,6 +758,8 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     record: Record<string, unknown>,
     networkIds: string[] = [],
   ): Promise<void> {
+    this.projectCanonicalRecord(record);
+
     if (this.isRemoval(record)) {
       return this.removeRecord(key, metadata, record, networkIds);
     }

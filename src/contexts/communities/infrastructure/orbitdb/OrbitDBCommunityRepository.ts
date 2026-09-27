@@ -30,8 +30,12 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     super();
     this.projection.register();
     this.communityIndex = new OrbitDBHeadIndex(this.registry, {
-      belongsToCanonicalIndex: (key, record) =>
-        this.belongsToMemberIndex(key, record),
+      canonicalIndexKeys: (record) =>
+        this.isStoredDocument(record)
+          ? record.memberIds.map((memberId) =>
+              this.memberIndexHeadKey(memberId, record.id),
+            )
+          : [],
       canonicalStoreName: 'communities',
       collectionName: 'communities',
       documentFromRecord: (record) =>
@@ -103,18 +107,6 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     const prefix = `community-member-index:${identityId}`;
 
     return communityId ? `${prefix}:${communityId}` : `${prefix}:`;
-  }
-
-  private belongsToMemberIndex(
-    key: string,
-    document: Record<string, unknown>,
-  ): boolean {
-    return (
-      this.isStoredDocument(document) &&
-      document.memberIds.some(
-        (memberId) => key === this.memberIndexHeadKey(memberId, document.id),
-      )
-    );
   }
 
   private freshestDocumentsFirst(

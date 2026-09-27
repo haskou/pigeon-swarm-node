@@ -21,11 +21,13 @@ describe('OrbitDBNotificationScopeSettingsRepository', () => {
       },
     ];
     const registry = {
-      queryDocuments: jest.fn(
+      onDocumentUpdated: jest.fn(
         async (
           _storeName: string,
-          matcher: (document: Record<string, unknown>) => boolean,
-        ) => documents.filter(matcher),
+          listener: (document: Record<string, unknown>) => void | Promise<void>,
+        ) => {
+          for (const document of documents) await listener(document);
+        },
       ),
     } as unknown as OrbitDBReplicatedStateRegistry;
     const repository = new OrbitDBNotificationScopeSettingsRepository(registry);

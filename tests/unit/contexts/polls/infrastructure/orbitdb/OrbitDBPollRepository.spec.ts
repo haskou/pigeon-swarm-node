@@ -157,7 +157,7 @@ describe('OrbitDBPollRepository', () => {
     });
     expect(storedDocument?.scope).not.toHaveProperty('networkId');
     expect(storedDocument?.scope).not.toHaveProperty('conversationId');
-    expect(polls.query).toHaveBeenCalled();
+    expect(polls.query).not.toHaveBeenCalled();
   });
 
   it('rejects protected community polls before publishing them', async () => {
@@ -204,7 +204,7 @@ describe('OrbitDBPollRepository', () => {
     expect(storedDocument?.scope).not.toHaveProperty('networkId');
     expect(storedDocument?.scope).not.toHaveProperty('channelId');
     expect(storedDocument?.scope).not.toHaveProperty('communityId');
-    expect(polls.query).toHaveBeenCalled();
+    expect(polls.query).not.toHaveBeenCalled();
   });
 
   it('reads polls by id from the direct head after saving', async () => {
