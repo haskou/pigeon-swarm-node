@@ -25,6 +25,9 @@ export default class OrbitDBPollRepository extends PollRepository {
   ) {
     super();
     this.pollIndex = new OrbitDBHeadIndex(this.registry, {
+      belongsToCanonicalIndex: (key, record) =>
+        this.isDocument(record) && this.belongsToIndex(key, record),
+      canonicalStoreName: 'polls',
       collectionName: 'polls',
       documentFromRecord: (record) =>
         this.isDocument(record) ? record : undefined,

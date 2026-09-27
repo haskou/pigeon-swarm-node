@@ -131,7 +131,7 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
     expect(result[0].getCreatedAt().valueOf()).toBe(1780000000000);
     expect(result[0].getMessageId().valueOf()).toBe('message-1');
     expect(result[0].getPinnedByIdentityId().isEqual(identityId)).toBe(true);
-    expect(pins.query).not.toHaveBeenCalled();
+    expect(pins.query).toHaveBeenCalled();
   });
 
   it('removes channel pins from the scope index after unpinning', async () => {
@@ -148,7 +148,7 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
     await expect(
       repository.findByChannel(communityId, channelId),
     ).resolves.toEqual([]);
-    expect(pins.query).not.toHaveBeenCalled();
+    expect(pins.query).toHaveBeenCalled();
   });
 
   it('keeps pinning pending until index persistence finishes', async () => {

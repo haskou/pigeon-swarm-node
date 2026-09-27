@@ -230,6 +230,40 @@ describe('OrbitDBHeadIndex', () => {
     ).toEqual([stored]);
   });
 
+  it('derives removals from the canonical store on receiving replicas', async () => {
+    const canonicalIndex = new OrbitDBHeadIndex(registry, {
+      belongsToCanonicalIndex: (key, record) =>
+        key === `index:${String(record.scopeId)}`,
+      canonicalStoreName: 'pins',
+      collectionName: 'items',
+      documentFromRecord: (record) =>
+        record.removed !== true &&
+        typeof record.id === 'string' &&
+        typeof record.updatedAt === 'number' &&
+        typeof record.value === 'string'
+          ? (record as TestDocument)
+          : undefined,
+      recordId: (record) =>
+        typeof record.id === 'string' ? record.id : undefined,
+      shouldReplace: (current, candidate) =>
+        current.updatedAt <= candidate.updatedAt,
+    });
+    registry.cacheHeadLocally('index:scope-1', {
+      id: 'index:scope-1',
+      items: [document('removed', 1)],
+      updatedAt: 1,
+    });
+    jest.spyOn(registry, 'queryDocuments').mockResolvedValue([
+      {
+        ...document('removed', 2),
+        removed: true,
+        scopeId: 'scope-1',
+      },
+    ]);
+
+    await expect(canonicalIndex.find('index:scope-1')).resolves.toEqual([]);
+  });
+
   it('bounds exact replacement storage by the live record set', async () => {
     await index.putDocuments(
       'index:key',
@@ -254,20 +288,22 @@ describe('OrbitDBHeadIndex', () => {
     });
   });
 
-  it('admits later replicated records without resurrecting replaced records', async () => {
-    await index.putDocuments(
-      'index:key',
-      { id: 'index:key' },
-      [document('retained', 1), document('removed', 1)],
-      { networkIds: [networkId] },
-    );
-    await index.putDocuments(
-      'index:key',
-      { id: 'index:key' },
-      [document('retained', 2)],
-      { networkIds: [networkId], replace: true },
-    );
-
+  it('admits later canonical records without resurrecting removed records', async () => {
+    const canonicalIndex = new OrbitDBHeadIndex(registry, {
+      belongsToCanonicalIndex: () => true,
+      canonicalStoreName: 'pins',
+      collectionName: 'items',
+      documentFromRecord: (record) =>
+        typeof record.id === 'string' &&
+        typeof record.updatedAt === 'number' &&
+        typeof record.value === 'string'
+          ? (record as TestDocument)
+          : undefined,
+      recordId: (record) =>
+        typeof record.id === 'string' ? record.id : undefined,
+      shouldReplace: (current, candidate) =>
+        current.updatedAt <= candidate.updatedAt,
+    });
     registry.cacheHeadLocally('index:key', {
       id: 'index:key',
       items: [
@@ -277,8 +313,12 @@ describe('OrbitDBHeadIndex', () => {
       ],
       updatedAt: Number.MAX_SAFE_INTEGER,
     });
+    jest.spyOn(registry, 'queryDocuments').mockResolvedValue([
+      document('retained', 2),
+      document('replicated-later', 3),
+    ]);
 
-    await expect(index.find('index:key')).resolves.toEqual([
+    await expect(canonicalIndex.find('index:key')).resolves.toEqual([
       document('retained', 2),
       document('replicated-later', 3),
     ]);

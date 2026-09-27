@@ -115,7 +115,7 @@ describe('OrbitDBConversationMessagePinRepository', () => {
     expect(result[0].getCreatedAt().valueOf()).toBe(1780000000000);
     expect(result[0].getMessageId().valueOf()).toBe('message-1');
     expect(result[0].getPinnedByIdentityId().isEqual(identityId)).toBe(true);
-    expect(pins.query).not.toHaveBeenCalled();
+    expect(pins.query).toHaveBeenCalled();
   });
 
   it('removes conversation pins from the scope index after unpinning', async () => {
@@ -131,7 +131,7 @@ describe('OrbitDBConversationMessagePinRepository', () => {
     await expect(
       repository.findByConversation(conversationId),
     ).resolves.toEqual([]);
-    expect(pins.query).not.toHaveBeenCalled();
+    expect(pins.query).toHaveBeenCalled();
   });
 
   it('does not wait for pin index head persistence when pinning', async () => {

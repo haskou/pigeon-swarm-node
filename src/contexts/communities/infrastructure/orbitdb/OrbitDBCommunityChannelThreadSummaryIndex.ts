@@ -64,19 +64,6 @@ export default class OrbitDBCommunityChannelThreadSummaryIndex {
     );
   }
 
-  private async findHead(
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-  ): Promise<CommunityChannelThreadSummary[] | undefined> {
-    const documents = await this.summaryIndex.find(
-      this.threadSummaryHeadKey(communityId.valueOf(), channelId.valueOf()),
-    );
-
-    return documents?.map((document) =>
-      CommunityChannelThreadSummary.fromPrimitives(document),
-    );
-  }
-
   private async putHead(
     communityId: CommunityId,
     channelId: CommunityChannelId,
@@ -296,52 +283,19 @@ export default class OrbitDBCommunityChannelThreadSummaryIndex {
       return new Map();
     }
 
-    const summariesByChannelId = new Map<
-      string,
-      CommunityChannelThreadSummary[]
-    >();
-    const missingChannelIds: CommunityChannelId[] = [];
+    const summariesByChannelId = this.summariesFromDocuments(
+      await this.findThreadCandidateDocuments(
+        communityId,
+        this.channelIdValueSet(channelIds),
+      ),
+      limitPerChannel,
+    );
 
-    for (const channelId of channelIds) {
-      const summaries = await this.findHead(communityId, channelId);
-
-      if (summaries === undefined) {
-        missingChannelIds.push(channelId);
-
-        continue;
+    channelIds.forEach((channelId) => {
+      if (!summariesByChannelId.has(channelId.valueOf())) {
+        summariesByChannelId.set(channelId.valueOf(), []);
       }
-
-      summariesByChannelId.set(
-        channelId.valueOf(),
-        [...summaries]
-          .sort(
-            (left, right) =>
-              right.getLastReplyAt().valueOf() -
-              left.getLastReplyAt().valueOf(),
-          )
-          .slice(0, limitPerChannel),
-      );
-    }
-
-    if (missingChannelIds.length > 0) {
-      const calculatedSummaries = this.summariesFromDocuments(
-        await this.findThreadCandidateDocuments(
-          communityId,
-          this.channelIdValueSet(missingChannelIds),
-        ),
-        Number.MAX_SAFE_INTEGER,
-      );
-
-      for (const channelId of missingChannelIds) {
-        summariesByChannelId.set(
-          channelId.valueOf(),
-          (calculatedSummaries.get(channelId.valueOf()) || []).slice(
-            0,
-            limitPerChannel,
-          ),
-        );
-      }
-    }
+    });
 
     return summariesByChannelId;
   }

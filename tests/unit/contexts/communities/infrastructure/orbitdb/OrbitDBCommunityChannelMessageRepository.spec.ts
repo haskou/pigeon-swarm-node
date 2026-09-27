@@ -492,7 +492,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       2,
     );
 
-    expect(query).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalled();
     expect(cachedSummaries.get('channel-1')).toEqual(
       summaries.get('channel-1'),
     );

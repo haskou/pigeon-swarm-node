@@ -103,7 +103,7 @@ describe('OrbitDBMessageReactionRepository', () => {
       reaction.toPrimitives(),
     ]);
     expect(afterDelete).toEqual([]);
-    expect(query).not.toHaveBeenCalled();
+    expect(query).toHaveBeenCalled();
   });
 
   it('should not wait for reaction index head persistence when saving', async () => {

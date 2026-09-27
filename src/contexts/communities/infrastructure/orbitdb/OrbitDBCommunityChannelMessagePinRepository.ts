@@ -20,6 +20,15 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
   ) {
     super();
     this.pinIndex = new OrbitDBHeadIndex(this.registry, {
+      belongsToCanonicalIndex: (key, record) =>
+        typeof record.communityId === 'string' &&
+        typeof record.channelId === 'string' &&
+        key ===
+          this.indexHeadKey(
+            new CommunityId(record.communityId),
+            new CommunityChannelId(record.channelId),
+          ),
+      canonicalStoreName: 'pins',
       collectionName: 'pins',
       documentFromRecord: (record) =>
         this.isDocument(record) ? record : undefined,

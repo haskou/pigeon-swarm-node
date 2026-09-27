@@ -20,6 +20,10 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
   ) {
     super();
     this.reactionIndex = new OrbitDBHeadIndex(this.registry, {
+      belongsToCanonicalIndex: (key, record) =>
+        typeof record.communityId === 'string' &&
+        key === this.indexHeadKey(new CommunityId(record.communityId)),
+      canonicalStoreName: 'reactions',
       collectionName: 'reactions',
       documentFromRecord: (record) =>
         this.isDocument(record) ? record : undefined,

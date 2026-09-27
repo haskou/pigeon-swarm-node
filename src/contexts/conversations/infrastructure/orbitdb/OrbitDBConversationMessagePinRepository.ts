@@ -15,6 +15,10 @@ export default class OrbitDBConversationMessagePinRepository extends Conversatio
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
     this.pinIndex = new OrbitDBHeadIndex(this.registry, {
+      belongsToCanonicalIndex: (key, record) =>
+        typeof record.conversationId === 'string' &&
+        key === this.indexHeadKey(new ConversationId(record.conversationId)),
+      canonicalStoreName: 'pins',
       collectionName: 'pins',
       documentFromRecord: (record) =>
         this.isDocument(record) ? record : undefined,
