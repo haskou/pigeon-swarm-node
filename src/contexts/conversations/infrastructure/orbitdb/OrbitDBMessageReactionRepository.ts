@@ -41,7 +41,7 @@ export default class OrbitDBMessageReactionRepository extends MessageReactionRep
   private isDocument(
     value: Record<string, unknown>,
   ): value is OrbitDBMessageReactionDocument {
-    return (
+    const hasRequiredFields =
       value.removed !== true &&
       value.scopeType === 'conversation' &&
       this.hasStringFields(value, [
@@ -51,8 +51,18 @@ export default class OrbitDBMessageReactionRepository extends MessageReactionRep
         'id',
         'messageId',
       ]) &&
-      typeof value.createdAt === 'number'
-    );
+      typeof value.createdAt === 'number';
+
+    if (!hasRequiredFields) return false;
+    const candidate = value as OrbitDBMessageReactionDocument;
+
+    try {
+      const reaction = this.mapper.toDomain(candidate);
+
+      return candidate.id === this.mapper.toDocument(reaction).id;
+    } catch {
+      return false;
+    }
   }
 
   private indexHeadKey(conversationId: ConversationId): string {

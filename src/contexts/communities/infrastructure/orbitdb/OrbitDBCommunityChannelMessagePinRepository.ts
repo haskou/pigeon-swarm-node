@@ -68,18 +68,39 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
     );
   }
 
+  private hasRequiredFields(document: Record<string, unknown>): boolean {
+    const stringFields = [
+      'channelId',
+      'communityId',
+      'id',
+      'messageId',
+      'pinnedByIdentityId',
+    ];
+
+    return (
+      document.removed !== true &&
+      document.scopeType === 'community_channel' &&
+      typeof document.createdAt === 'number' &&
+      stringFields.every((field) => typeof document[field] === 'string')
+    );
+  }
+
   private isDocument(
     document: Record<string, unknown>,
   ): document is OrbitDBCommunityChannelMessagePinDocument {
-    return (
-      document.removed !== true &&
-      typeof document.id === 'string' &&
-      typeof document.channelId === 'string' &&
-      typeof document.communityId === 'string' &&
-      typeof document.createdAt === 'number' &&
-      typeof document.messageId === 'string' &&
-      typeof document.pinnedByIdentityId === 'string'
-    );
+    if (!this.hasRequiredFields(document)) return false;
+    const candidate = document as OrbitDBCommunityChannelMessagePinDocument;
+
+    try {
+      const communityId = new CommunityId(candidate.communityId);
+      const channelId = new CommunityChannelId(candidate.channelId);
+      const messageId = new CommunityChannelMessageId(candidate.messageId);
+      this.toPin(candidate);
+
+      return candidate.id === this.pinId(communityId, channelId, messageId);
+    } catch {
+      return false;
+    }
   }
 
   private putIndexDocument(

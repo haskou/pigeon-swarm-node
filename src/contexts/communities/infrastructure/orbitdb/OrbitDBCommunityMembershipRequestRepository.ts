@@ -75,7 +75,15 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
   private isDocument(
     value: Record<string, unknown>,
   ): value is OrbitDBCommunityMembershipRequestDocument {
-    return this.isStoredDocument(value) && value.deleted !== true;
+    if (!this.isStoredDocument(value) || value.deleted === true) return false;
+
+    try {
+      this.mapper.toDomain(value);
+
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private isStoredDocument(

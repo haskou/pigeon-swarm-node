@@ -289,6 +289,23 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     expect(putHead).not.toHaveBeenCalled();
   });
 
+  it('ignores canonical reactions with malformed identities', async () => {
+    documents.set('malformed-reaction', {
+      authorIdentityId: 'malformed-public-key',
+      channelId: channelId.valueOf(),
+      communityId: communityId.valueOf(),
+      createdAt: 1780000000000,
+      emoji: '👍',
+      id: 'malformed-reaction',
+      messageId: messageId.valueOf(),
+      scopeType: 'community_channel',
+    });
+
+    await expect(
+      repository.findByMessageIds(communityId, channelId, [messageId]),
+    ).resolves.toEqual([]);
+  });
+
   function releaseHeadPersistence(): void {
     blockHeadPersistence = false;
     headPersistenceBlockers.splice(0).forEach((release) => release());

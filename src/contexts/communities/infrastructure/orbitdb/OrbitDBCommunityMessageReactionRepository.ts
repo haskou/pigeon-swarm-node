@@ -57,7 +57,7 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
   private isDocument(
     value: Record<string, unknown>,
   ): value is OrbitDBCommunityChannelMessageReactionDocument {
-    return (
+    const hasRequiredFields =
       value.removed !== true &&
       value.scopeType === 'community_channel' &&
       this.hasStringFields(value, [
@@ -68,8 +68,18 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
         'id',
         'messageId',
       ]) &&
-      typeof value.createdAt === 'number'
-    );
+      typeof value.createdAt === 'number';
+
+    if (!hasRequiredFields) return false;
+    const candidate = value as OrbitDBCommunityChannelMessageReactionDocument;
+
+    try {
+      const reaction = this.mapper.toDomain(candidate);
+
+      return candidate.id === this.documentId(reaction);
+    } catch {
+      return false;
+    }
   }
 
   private indexHeadKey(communityId: CommunityId): string {

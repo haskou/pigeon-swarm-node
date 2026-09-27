@@ -51,7 +51,7 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
   private isDocument(
     value: Record<string, unknown>,
   ): value is OrbitDBCommunityInviteDocument {
-    return (
+    const hasRequiredFields =
       value.kind === 'community_invite' &&
       value.deleted !== true &&
       this.hasStringFields(value, [
@@ -60,8 +60,18 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
         'id',
         'token',
       ]) &&
-      this.hasNumberFields(value, ['createdAt', 'maxUses', 'uses'])
-    );
+      this.hasNumberFields(value, ['createdAt', 'maxUses', 'uses']);
+
+    if (!hasRequiredFields) return false;
+    const candidate = value as OrbitDBCommunityInviteDocument;
+
+    try {
+      this.mapper.toDomain(candidate);
+
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private tokenHeadKey(token: string): string {

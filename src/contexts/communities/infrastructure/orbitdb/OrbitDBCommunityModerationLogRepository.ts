@@ -57,7 +57,17 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
   private isDocument(
     document: Record<string, unknown>,
   ): document is OrbitDBCommunityModerationLogDocument {
-    return this.isStoredDocument(document) && document.deleted !== true;
+    if (!this.isStoredDocument(document) || document.deleted === true) {
+      return false;
+    }
+
+    try {
+      this.toDomain(document);
+
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private isStoredDocument(

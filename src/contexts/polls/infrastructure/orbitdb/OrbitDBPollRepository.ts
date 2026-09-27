@@ -66,11 +66,28 @@ export default class OrbitDBPollRepository extends PollRepository {
   private isDocument(
     document: Record<string, unknown>,
   ): document is OrbitDBPollDocument {
-    return (
+    const hasRequiredFields =
       this.hasPollIdentityFields(document) &&
       this.hasPollConfigurationFields(document) &&
-      this.hasPollScopeField(document)
-    );
+      this.hasPollScopeField(document);
+
+    if (!hasRequiredFields) return false;
+    const candidate = document as OrbitDBPollDocument;
+
+    try {
+      const poll = this.toDomain(candidate);
+      poll.getScope().match<void>({
+        communityChannel: () => undefined,
+        groupConversation: () => undefined,
+      });
+
+      return (
+        poll.getId().valueOf() === candidate.id &&
+        poll.getCreatorIdentityId().valueOf() === candidate.creatorIdentityId
+      );
+    } catch {
+      return false;
+    }
   }
 
   private async resolveNetworkId(poll: Poll): Promise<string> {

@@ -218,4 +218,31 @@ describe('OrbitDBPollRepository', () => {
     expect(result?.toPrimitives().id).toBe(savedPoll.getId().valueOf());
     expect(polls.query).not.toHaveBeenCalled();
   });
+
+  it('ignores canonical polls with malformed identities', async () => {
+    await polls.put({
+      allowsMultipleVotes: false,
+      createdAt: 1780000000000,
+      creatorIdentityId: 'malformed-public-key',
+      id: 'malformed-poll',
+      networkId,
+      options: [
+        { id: 'yes-1', text: 'Yes' },
+        { id: 'no-1', text: 'No' },
+      ],
+      question: 'Question?',
+      scope: {
+        channelId: channelId.valueOf(),
+        communityId: communityId.valueOf(),
+        type: 'community_channel',
+      },
+      status: 'open',
+      updatedAt: 1780000000000,
+      votes: [],
+    });
+
+    await expect(
+      repository.findByCommunityChannel(communityId, channelId, 10),
+    ).resolves.toEqual([]);
+  });
 });

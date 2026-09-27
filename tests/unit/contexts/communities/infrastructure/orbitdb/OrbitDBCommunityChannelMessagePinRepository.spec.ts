@@ -240,6 +240,22 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
       repository.findByChannel(communityId, channelId),
     ).resolves.toHaveLength(1);
   });
+
+  it('ignores canonical pins with malformed identities', async () => {
+    await pins.put({
+      channelId: channelId.valueOf(),
+      communityId: communityId.valueOf(),
+      createdAt: 1780000000000,
+      id: `community:${communityId.valueOf()}:${channelId.valueOf()}:${messageId.valueOf()}`,
+      messageId: messageId.valueOf(),
+      pinnedByIdentityId: 'malformed-public-key',
+      scopeType: 'community_channel',
+    });
+
+    await expect(
+      repository.findByChannel(communityId, channelId),
+    ).resolves.toEqual([]);
+  });
 });
 
 function flushBackgroundTasks(): Promise<void> {
