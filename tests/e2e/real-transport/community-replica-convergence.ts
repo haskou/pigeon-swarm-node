@@ -155,21 +155,39 @@ async function synchronization(
 }
 
 async function exchanged(replicas: Replica[]): Promise<void> {
+  const exchangeId = randomUUID();
+  const sentinels = replicas.map((_replica, index) => ({
+    id: `fixture-exchange:${exchangeId}:${index}`,
+    nonce: randomUUID(),
+  }));
+  await Promise.all(
+    replicas.flatMap((replica, index) => [
+      replica.stores!.communities.put!(sentinels[index]),
+      replica.stores!.heads.put!(sentinels[index].id, sentinels[index]),
+    ]),
+  );
   await until('actual OrbitDB heads exchanged after redial', async () => {
-    for (const storeName of ['communities', 'heads'] as const) {
-      const signatures = await Promise.all(
-        replicas.map(async (replica) => {
-          const store = replica.stores![storeName];
-          return (await store.log!.heads())
-            .map((entry) => entry.hash)
-            .sort()
-            .join(',');
-        }),
-      );
-      if (!signatures.every(Boolean) || new Set(signatures).size !== 1)
-        return false;
-    }
-    return true;
+    const received = await Promise.all(
+      replicas.map(async (replica) => {
+        const communities = await replica.stores!.communities.query!((record) =>
+          sentinels.some((sentinel) => sentinel.id === record.id),
+        );
+        const heads = await Promise.all(
+          sentinels.map((sentinel) => replica.stores!.heads.get!(sentinel.id)),
+        );
+
+        return (
+          sentinels.every((sentinel) =>
+            communities.some((record) => isDeepStrictEqual(record, sentinel)),
+          ) &&
+          sentinels.every((sentinel, index) =>
+            isDeepStrictEqual(heads[index], sentinel),
+          )
+        );
+      }),
+    );
+
+    return received.every(Boolean);
   });
   console.log(`PASS actual OrbitDB head exchange: ${replicas.length} replicas`);
 }
