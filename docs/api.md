@@ -4381,13 +4381,36 @@ the pairing expiry. Enrollment and revocation are signed by an authorized
 device credential; recovery is signed by the identity's pinned recovery
 authority and replaces the authorized device set.
 
+Signatures cover the UTF-8 bytes of compact JSON with no whitespace. Keys are
+written in the order shown below and properties whose value is `undefined` are
+omitted. The target proof preimage is:
+
+```json
+{"domain":"pigeon:device-authorization:proof-of-possession:v1","transition":{"authorCredential":"<public credential>","authorizedAt":1770000000000,"identityId":"<identity id>","operation":"enroll","operationId":"<uuid>","pairingExpiration":1770000060000,"pairingId":"<uuid>","previousRevision":0,"revision":1,"targetCredential":"<public credential>","targetCredentialCommitment":"<lowercase SHA-256 hex>"}}
+```
+
+After inserting the resulting target signature, the author signature preimage
+is:
+
+```json
+{"domain":"pigeon:device-authorization:transition:v2","proofOfPossession":"<target signature>","transition":{"authorCredential":"<public credential>","authorizedAt":1770000000000,"identityId":"<identity id>","operation":"enroll","operationId":"<uuid>","pairingExpiration":1770000060000,"pairingId":"<uuid>","previousRevision":0,"revision":1,"targetCredential":"<public credential>","targetCredentialCommitment":"<lowercase SHA-256 hex>"}}
+```
+
+Revocation omits `authorizedAt`, `pairingExpiration`, `pairingId` and
+`proofOfPossession`. Recovery also omits `authorCredential`; its target proof
+uses the proof envelope above, and the recovery authority signs the transition
+envelope. Credentials and signatures use their API string representation
+without decoding or normalization.
+
 The response contains only the identity identifier and deterministic current
 revision; it does not return an authorized-device catalog. Replayed operation or
 pairing identifiers, stale predecessors, pairing authorizations signed after
 their declared expiry, substituted identities or credentials, revoked authors
 and unrelated recovery authorities return `409`. Replicas accept an otherwise
-valid fully signed enrollment after an offline partition; the target client must
-refuse to finish a pairing after its expiry. The endpoint never returns local
+valid fully signed enrollment after an offline partition. A complete artifact
+signed by both devices is authorization, rather than an unsigned bearer offer;
+transport delay does not invalidate it. The author must refuse to create that
+final signature after the pairing deadline. The endpoint never returns local
 vault envelopes or secret recovery material.
 
 ## Planned API

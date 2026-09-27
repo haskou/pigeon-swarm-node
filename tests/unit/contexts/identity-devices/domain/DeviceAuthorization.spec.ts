@@ -146,6 +146,55 @@ describe(DeviceAuthorization.name, () => {
     ).toThrow();
   });
 
+  it('uses the documented byte-exact enrollment signature payloads', () => {
+    const operationId = new DeviceAuthorizationOperationId(
+      '00000000-0000-4000-8000-000000000001',
+    );
+    const pairingId = new PairingId(
+      '10000000-0000-4000-8000-000000000001',
+    );
+    const expiration = new PairingExpiration(now.valueOf() + 60_000);
+    const authorCredential = DeviceCredential.fromString(
+      owner.toPrimitives().publicKey,
+    );
+    const targetCredential = DeviceCredential.fromString(
+      candidate.toPrimitives().publicKey,
+    );
+    const unsigned = DeviceAuthorizationTransition.enrollment(
+      identityId,
+      operationId,
+      DeviceAuthorizationRevision.initial(),
+      authorCredential,
+      targetCredential,
+      new PairingAuthorization(pairingId, expiration, now),
+    );
+    const transition = JSON.stringify({
+      authorCredential: authorCredential.valueOf(),
+      authorizedAt: now.valueOf(),
+      identityId: identityId.valueOf(),
+      operation: 'enroll',
+      operationId: operationId.valueOf(),
+      pairingExpiration: expiration.valueOf(),
+      pairingId: pairingId.valueOf(),
+      previousRevision: 0,
+      revision: 1,
+      targetCredential: targetCredential.valueOf(),
+      targetCredentialCommitment: targetCredential.getCommitment().valueOf(),
+    });
+
+    expect(unsigned.getProofOfPossessionPayload().valueOf()).toBe(
+      `{"domain":"pigeon:device-authorization:proof-of-possession:v1","transition":${transition}}`,
+    );
+    const proofOfPossession = candidate.sign(
+      unsigned.getProofOfPossessionPayload(),
+    );
+    const proven = unsigned.provePossession(proofOfPossession);
+
+    expect(proven.getSigningPayload().valueOf()).toBe(
+      `{"domain":"pigeon:device-authorization:transition:v2","proofOfPossession":${JSON.stringify(proofOfPossession.valueOf())},"transition":${transition}}`,
+    );
+  });
+
   it('rejects substitution of the signed pairing authorization time', async () => {
     const primitives = (await enrollment()).toPrimitives();
     const substituted = DeviceAuthorizationTransition.fromPrimitives({

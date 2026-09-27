@@ -13,6 +13,18 @@ paths:
         its causal revision, author authority, target proof of possession and
         replay identifiers. The request never contains passwords, protected
         device roots, password KDF metadata or recovery secrets.
+
+        Signatures cover UTF-8 compact JSON with no whitespace. Keys use the
+        order shown by the request schema and undefined properties are omitted.
+        The target proof envelope is
+        {"domain":"pigeon:device-authorization:proof-of-possession:v1",
+        "transition":<unsigned transition>}. The author envelope is
+        {"domain":"pigeon:device-authorization:transition:v2",
+        "proofOfPossession":"<target signature>",
+        "transition":<unsigned transition>}. The unsigned transition key order
+        is authorCredential, authorizedAt, identityId, operation, operationId,
+        pairingExpiration, pairingId, previousRevision, revision,
+        targetCredential, targetCredentialCommitment.
       requestBody:
         required: true
         content:
@@ -63,7 +75,7 @@ components:
         pairingExpiration:
           type: integer
           format: int64
-          description: Enrollment deadline enforced when a node first accepts the transition.
+          description: Enrollment authorization deadline covered by both device signatures. A completely signed transition remains replayable across offline replicas.
         pairingId:
           type: string
           format: uuid

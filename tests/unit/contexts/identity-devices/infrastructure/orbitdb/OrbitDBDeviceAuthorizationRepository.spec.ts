@@ -142,6 +142,44 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     await expect(repository.compareAndApply(transition)).rejects.toThrow();
   });
 
+  it('replays a fully signed enrollment after an offline transport delay', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const target = await KeyPair.generate();
+    const { getHead, getMerger, repository } = repositoryFixture();
+    const authorizedAt = new Timestamp(Date.now() - 2_000);
+    const unsigned = DeviceAuthorizationTransition.enrollment(
+      identityId,
+      DeviceAuthorizationOperationId.generate(),
+      DeviceAuthorizationRevision.initial(),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+      DeviceCredential.fromString(target.toPrimitives().publicKey),
+      new PairingAuthorization(
+        PairingId.generate(),
+        new PairingExpiration(Date.now() - 1_000),
+        authorizedAt,
+      ),
+    );
+    const proven = unsigned.provePossession(
+      target.sign(unsigned.getProofOfPossessionPayload()),
+    );
+    const transition = proven.authorize(owner.sign(proven.getSigningPayload()));
+    const authorization = new DeviceAuthorizationPolicy().apply(
+      genesis,
+      transition,
+    );
+    await repository.provision(genesis);
+
+    const merged = getMerger()?.(getHead(), {
+      authorization: authorization.toPrimitives(),
+      genesis: genesis.toPrimitives(),
+      history: [{ transition: transition.toPrimitives() }],
+      id: identityId.valueOf(),
+      kind: 'device_authorization',
+    }) as { authorization?: { revision?: number } };
+
+    expect(merged.authorization?.revision).toBe(1);
+  });
+
   it('consumes a pairing identifier even when the operation identifier changes', async () => {
     const { genesis, identityId, owner } = await fixture();
     const target = await KeyPair.generate();
@@ -261,6 +299,69 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
     expect(merged.authorization?.revision).toBe(2);
     expect(merged.authorization?.credentials).toEqual([]);
+  });
+
+  it('preserves a revocation when a sibling enrollment reuses its operation identifier', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const revoked = await KeyPair.generate();
+    const enrolled = await KeyPair.generate();
+    const first = repositoryFixture();
+    const second = repositoryFixture();
+    const initialEnrollment = await enrollment(
+      identityId,
+      owner,
+      revoked,
+      '00000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+    );
+    await first.repository.provision(genesis);
+    await first.repository.compareAndApply(initialEnrollment);
+    second.setHead(first.getHead() ?? {});
+    await second.repository.provision(genesis);
+    const operationId = new DeviceAuthorizationOperationId(
+      '00000000-0000-4000-8000-000000000002',
+    );
+    const revocation = DeviceAuthorizationTransition.revocation(
+      identityId,
+      operationId,
+      new DeviceAuthorizationRevision(1),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+      DeviceCredential.fromString(revoked.toPrimitives().publicKey),
+    );
+    const unsignedEnrollment = DeviceAuthorizationTransition.enrollment(
+      identityId,
+      operationId,
+      new DeviceAuthorizationRevision(1),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+      DeviceCredential.fromString(enrolled.toPrimitives().publicKey),
+      new PairingAuthorization(
+        PairingId.generate(),
+        new PairingExpiration(now.valueOf() + 60_000),
+        now,
+      ),
+    );
+    const provenEnrollment = unsignedEnrollment.provePossession(
+      enrolled.sign(unsignedEnrollment.getProofOfPossessionPayload()),
+    );
+    await first.repository.compareAndApply(
+      revocation.authorize(owner.sign(revocation.getSigningPayload())),
+    );
+    await second.repository.compareAndApply(
+      provenEnrollment.authorize(owner.sign(provenEnrollment.getSigningPayload())),
+    );
+
+    const merged = first.getMerger()?.(
+      first.getHead(),
+      second.getHead() ?? {},
+    ) as { authorization?: { credentials?: string[]; revision?: number } };
+
+    expect(merged.authorization?.revision).toBe(2);
+    expect(merged.authorization?.credentials).not.toContain(
+      revoked.toPrimitives().publicKey,
+    );
+    expect(merged.authorization?.credentials).not.toContain(
+      enrolled.toPrimitives().publicKey,
+    );
   });
 
   it('rejects replicated documents containing unverified transition history', async () => {

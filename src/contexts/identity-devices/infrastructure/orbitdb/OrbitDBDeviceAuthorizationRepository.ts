@@ -138,20 +138,19 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     >();
 
     for (const record of [...left.history, ...right.history]) {
-      const operationId = record.transition.operationId;
-      const current = records.get(operationId);
-
-      if (
-        !current ||
-        this.canonicalString(record) < this.canonicalString(current)
-      ) {
-        records.set(operationId, record);
-      }
+      records.set(this.canonicalString(record), record);
     }
 
-    return [...records.values()].sort((left, right) =>
-      left.transition.operationId.localeCompare(right.transition.operationId),
-    );
+    return [...records.values()].sort((left, right) => {
+      const operationOrder = left.transition.operationId.localeCompare(
+        right.transition.operationId,
+      );
+
+      return (
+        operationOrder ||
+        this.canonicalString(left).localeCompare(this.canonicalString(right))
+      );
+    });
   }
 
   private transitionRecordsByRevision(
@@ -171,9 +170,16 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     }
 
     for (const records of recordsByRevision.values()) {
-      records.sort((left, right) =>
-        left.transition.operationId.localeCompare(right.transition.operationId),
-      );
+      records.sort((left, right) => {
+        const operationOrder = left.transition.operationId.localeCompare(
+          right.transition.operationId,
+        );
+
+        return (
+          operationOrder ||
+          this.canonicalString(left).localeCompare(this.canonicalString(right))
+        );
+      });
     }
 
     return recordsByRevision;
