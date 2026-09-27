@@ -17,6 +17,7 @@ import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversatio
 import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenPublished';
 import SynchronizeIdentityWhenUpdated from '@app/apps/consumers/pubsub/identities/SynchronizeIdentityWhenUpdated';
 import ProvisionDeviceAuthorizationWhenIdentityCreated from '@app/apps/consumers/pubsub/identity-devices/ProvisionDeviceAuthorizationWhenIdentityCreated';
+import ProvisionDeviceAuthorizationWhenIdentityUpdated from '@app/apps/consumers/pubsub/identity-devices/ProvisionDeviceAuthorizationWhenIdentityUpdated';
 import RegisterContentReplicaClaimWhenClaimed from '@app/apps/consumers/pubsub/ipfs/RegisterContentReplicaClaimWhenClaimed';
 import RegisterContentReplicationWhenRegistered from '@app/apps/consumers/pubsub/ipfs/RegisterContentReplicationWhenRegistered';
 import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenPublished';
@@ -39,6 +40,7 @@ export const applicationConsumers: ApplicationServiceClass<Consumer>[] = [
   RegisterCallWhenStarted,
   RegisterIdentityWhenPublished,
   ProvisionDeviceAuthorizationWhenIdentityCreated,
+  ProvisionDeviceAuthorizationWhenIdentityUpdated,
   SynchronizeIdentityWhenUpdated,
   RegisterKeychainWhenPublished,
   SynchronizeKeychainWhenUpdated,

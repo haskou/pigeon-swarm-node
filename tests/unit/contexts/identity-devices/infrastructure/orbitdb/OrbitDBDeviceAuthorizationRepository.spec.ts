@@ -326,7 +326,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
   it('preserves authorization history when identity routing networks expand', async () => {
     const { genesis, identityId, owner, recovery } = await fixture();
     const target = await KeyPair.generate();
-    const { registry, repository } = repositoryFixture();
+    const { getHead, getMerger, registry, repository } = repositoryFixture();
     const enrolled = await enrollment(
       identityId,
       owner,
@@ -354,13 +354,20 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     );
     await repository.provision(genesis);
     await repository.compareAndApply(enrolled);
+    const revisionOne = getHead();
+
+    await repository.provision(expandedGenesis);
     await repository.compareAndApply(
       revocation.authorize(owner.sign(revocation.getSigningPayload())),
     );
+    const revisionTwo = getHead();
+    const merged = getMerger()?.(revisionOne, revisionTwo ?? {}) as {
+      authorization?: { revision?: number };
+    };
 
-    await repository.provision(expandedGenesis);
     const authorization = await repository.find(identityId);
 
+    expect(merged.authorization?.revision).toBe(2);
     expect(authorization?.getRevision().valueOf()).toBe(2);
     expect(
       authorization?.isAuthorized(

@@ -333,7 +333,8 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     const trusted = this.trustedGenesisByIdentity.get(document.id);
 
     return Boolean(
-      trusted && !isDeepStrictEqual(document.genesis, trusted.toPrimitives()),
+      trusted &&
+      !this.sameAuthorizationGenesis(document.genesis, trusted.toPrimitives()),
     );
   }
 
