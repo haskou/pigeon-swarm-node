@@ -284,10 +284,11 @@ an authorized checkpoint advance. After a checkpoint advances, the aggregate
 additionally keeps up to 32 of the most recent historical operations while
 capacity permits. An acceptance that would make required history exceed any
 bound fails closed. Compaction deletes the corresponding receipts, replay
-markers, sequencer reservations and outbox records in the same local database
-batch, so restart does not restore unbounded records. Frames outside the retained
-history are stale under the current checkpoint and must be resynchronized
-instead of being replayed as current operations.
+markers and outbox records in the same local database batch. Compact transition
+anchors remain available and count toward the protected scope storage quota, so
+an authenticated fork can still be detected after its receipt has been retired.
+Frames outside the retained history are stale under the current checkpoint and
+must be resynchronized instead of being replayed as current operations.
 
 `retryable()` exposes currently satisfiable pending operations in deterministic
 operation-ID order. Transport retention and rejoin deadlines belong to the opaque

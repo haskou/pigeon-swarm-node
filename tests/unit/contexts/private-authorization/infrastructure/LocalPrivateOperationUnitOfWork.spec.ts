@@ -1,11 +1,13 @@
 import { PrivateOperationAcceptance } from '@app/contexts/private-authorization/application/PrivateOperationAcceptance';
-import { PrivateAuthorizationStorageCapacityExceededError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationStorageCapacityExceededError';
+import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationConflictError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationConflictError';
+import { PrivateAuthorizationStorageCapacityExceededError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationStorageCapacityExceededError';
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
-import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationDeviceKey } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationDeviceKey';
+import { PrivateAuthorizationRevision } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationRevision';
+import { PrivateAuthorizationScopeId } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationScopeId';
 import LocalPrivateAuthorizationRepository from '@app/contexts/private-authorization/infrastructure/local-db/LocalPrivateAuthorizationRepository';
 import LocalPrivateOperationUnitOfWork from '@app/contexts/private-authorization/infrastructure/local-db/LocalPrivateOperationUnitOfWork';
 import {
@@ -13,8 +15,8 @@ import {
   PrivateAuthorizationLocalNamespaces,
 } from '@app/contexts/private-authorization/infrastructure/local-db/PrivateAuthorizationLocalNamespaces';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
-import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { Buffer } from 'buffer';
 import { generateKeyPairSync } from 'crypto';
 import * as fs from 'fs/promises';
@@ -131,7 +133,9 @@ describe('LocalPrivateOperationUnitOfWork', () => {
 
   const provisionedDocumentBytes = async (scopeId: string): Promise<number> => {
     const prefix = `${scopeId}:`;
-    const namespaces = Object.values(PrivateAuthorizationLocalNamespaces).filter(
+    const namespaces = Object.values(
+      PrivateAuthorizationLocalNamespaces,
+    ).filter(
       (namespace) =>
         namespace !== PrivateAuthorizationLocalNamespaces.provisioning,
     );
@@ -154,7 +158,9 @@ describe('LocalPrivateOperationUnitOfWork', () => {
         entry.documents.reduce(
           (subtotal, document) =>
             subtotal +
-            Buffer.byteLength(JSON.stringify({ document, namespace: entry.namespace })),
+            Buffer.byteLength(
+              JSON.stringify({ document, namespace: entry.namespace }),
+            ),
           0,
         ),
       0,
@@ -442,9 +448,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       checkpoint: { headHash: 'advanced-head', revision: 1 },
       status: 'active',
     });
-    await expect(
-      repository.findProjection('advanced-scope'),
-    ).resolves.toEqual({
+    await expect(repository.findProjection('advanced-scope')).resolves.toEqual({
       id: 'advanced-scope',
       members: ['member'],
     });
@@ -626,22 +630,36 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     ).toEqual(['future']);
   });
 
-  it('atomically removes durable records retired by history compaction', async () => {
-    const proposals = Array.from({ length: 40 }, (_value, index) =>
+  it('removes retired delivery records while retaining the fork anchor', async () => {
+    const currentCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
+      ...checkpoint(1, 'head-1').toPrimitives(),
+      parentHeadHash: 'head-0',
+      revokedDeviceKeys: ['old-device'],
+    });
+    const historicalRevocation = PrivateControlOperation.fromPrimitives({
+      ...operation().toPrimitives(),
+      digest: 'historical-revocation-digest',
+      id: 'historical-revocation',
+      mutation: { deviceKey: 'old-device', type: 'device.revoke' },
+    });
+    const proposals = Array.from({ length: 39 }, (_value, index) =>
       PrivateControlOperation.fromPrimitives({
         ...operation('membership.propose').toPrimitives(),
+        authorizationRevision: 1,
         byteSize: 1,
+        control: { parentHeadHash: 'head-1' },
         digest: `proposal-digest-${index}`,
         id: `proposal-${index}`,
       }),
     );
-    const oldest = proposals[0].toPrimitives();
+    const acceptedOperations = [historicalRevocation, ...proposals];
+    const oldest = historicalRevocation.toPrimitives();
     await repository.saveScope(
       PrivateAuthorizationScope.fromPrimitives({
-        acceptedOperations: proposals.map((proposal) =>
+        acceptedOperations: acceptedOperations.map((proposal) =>
           proposal.toPrimitives(),
         ),
-        checkpoint: checkpoint().toPrimitives(),
+        checkpoint: currentCheckpoint.toPrimitives(),
         genesisHash: 'genesis',
         ownerDeviceKey: 'owner',
         pendingOperations: [],
@@ -670,15 +688,16 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       privateAuthorizationLocalId('scope', oldest.id),
       { eventName: 'retired', operationId: oldest.id, payload: {} },
     );
-    await database.save(
-      PrivateAuthorizationLocalNamespaces.reservations,
-      privateAuthorizationLocalId('scope', 'retired-parent'),
-      { childHeadHash: 'retired-child', operationId: oldest.id },
-    );
-    const revocation = operation();
+    const revocation = PrivateControlOperation.fromPrimitives({
+      ...operation().toPrimitives(),
+      authorizationRevision: 1,
+      control: { parentHeadHash: 'head-1' },
+    });
     const nextScope = PrivateAuthorizationScope.fromPrimitives({
-      acceptedOperations: proposals.map((proposal) => proposal.toPrimitives()),
-      checkpoint: checkpoint().toPrimitives(),
+      acceptedOperations: acceptedOperations.map((proposal) =>
+        proposal.toPrimitives(),
+      ),
+      checkpoint: currentCheckpoint.toPrimitives(),
       genesisHash: 'genesis',
       ownerDeviceKey: 'owner',
       pendingOperations: [],
@@ -687,9 +706,10 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     nextScope.revokeDevice(
       revocation,
       PrivateAuthorizationCheckpoint.fromPrimitives({
-        ...checkpoint(1, 'head-1').toPrimitives(),
+        ...checkpoint(2, 'head-2').toPrimitives(),
         admittedDeviceKeys: ['owner'],
-        revokedDeviceKeys: ['device'],
+        parentHeadHash: 'head-1',
+        revokedDeviceKeys: ['old-device', 'device'],
       }),
     );
     const compactingAcceptance: PrivateOperationAcceptance = {
@@ -702,13 +722,20 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       },
       receipt: revocation,
       replayMarkerId: 'current-replay',
+      reservation: {
+        authorDeviceKey: 'owner',
+        childHeadHash: 'head-2',
+        operationId: revocation.toPrimitives().id,
+        parentCheckpoint: currentCheckpoint.toPrimitives(),
+        parentHeadHash: 'head-1',
+      },
       scope: nextScope,
     };
 
     await expect(
       unitOfWork.commitAcceptance(
         'scope',
-        { headHash: 'head-0', revision: 0 },
+        { headHash: 'head-1', revision: 1 },
         compactingAcceptance,
       ),
     ).resolves.toBe('committed');
@@ -721,7 +748,21 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     ).resolves.toBe(false);
     await expect(
       repository.findReservation('scope', 'retired-parent'),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual(
+      expect.objectContaining({
+        toPrimitives: expect.any(Function),
+      }),
+    );
+    await expect(
+      repository.findReservationAtRevision(
+        new PrivateAuthorizationScopeId('scope'),
+        new PrivateAuthorizationRevision(0),
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        toPrimitives: expect.any(Function),
+      }),
+    );
     await expect(repository.findOutbox('scope')).resolves.toHaveLength(1);
   });
 

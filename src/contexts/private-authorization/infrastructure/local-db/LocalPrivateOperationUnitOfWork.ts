@@ -467,7 +467,6 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     const linkedNamespaces = [
       PrivateAuthorizationLocalNamespaces.outbox,
       PrivateAuthorizationLocalNamespaces.replay,
-      PrivateAuthorizationLocalNamespaces.reservations,
     ];
     const linkedDocuments = await Promise.all(
       linkedNamespaces.map(async (namespace) => ({
@@ -511,17 +510,6 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
           type: 'del',
         },
       );
-
-      if (acceptance.reservation) {
-        operations.push({
-          id: privateAuthorizationLocalId(
-            scopeId,
-            acceptance.reservation.parentHeadHash,
-          ),
-          namespace: PrivateAuthorizationLocalNamespaces.reservations,
-          type: 'del',
-        });
-      }
     }
 
     return operations;
