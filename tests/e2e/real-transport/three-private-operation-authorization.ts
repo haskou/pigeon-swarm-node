@@ -535,6 +535,57 @@ async function main(): Promise<void> {
     });
     await assert.rejects(() => nodes[0].accept(wrongScope, owner));
 
+    const historicalForkMessage = Buffer.from('historical-fork-message');
+    const historicalForkState = Buffer.from('historical-fork-state');
+    const historicalForkOperation: UnsignedPrivateOperation = {
+      authorDeviceKey: ownerDeviceKey,
+      authorizationRevision: 0,
+      kind: 'membership.commit',
+      operationId: encoded(16, 26),
+      payload: {
+        change: {
+          roleIds: [],
+          targetIdentityId: ownerIdentityId,
+          type: 'member.roles.set',
+        },
+        mlsMessageHash: createHash('sha256')
+          .update(historicalForkMessage)
+          .digest('base64url'),
+        proposalOperationId: encoded(16, 27),
+      },
+      previousOperationIds: [encoded(16, 27)],
+      scopeId,
+      version: 1,
+    };
+    const historicalForkTransition = signedControlTransition(
+      1,
+      initialControl,
+      scopeId,
+      policy,
+      historicalForkOperation,
+      historicalForkMessage,
+      historicalForkState,
+    );
+    const historicalFork = signedOperation(owner, {
+      ...historicalForkOperation,
+      payload: {
+        ...historicalForkOperation.payload,
+        resultingHeadHash: historicalForkTransition.headHash,
+      },
+    });
+
+    await assert.rejects(() =>
+      nodes[0].accept(historicalFork, owner, {
+        encryptedMlsState: historicalForkState.toString('base64url'),
+        mlsMessage: historicalForkMessage.toString('base64url'),
+        signedTransitionJson: historicalForkTransition.signedJson,
+      }),
+    );
+    assert.equal(
+      (await nodes[0].repository.findScope(scopeId))?.toPrimitives().status,
+      'frozen',
+    );
+
     const equivocation = signedOperation(owner, {
       authorDeviceKey: ownerDeviceKey,
       authorizationRevision: 1,

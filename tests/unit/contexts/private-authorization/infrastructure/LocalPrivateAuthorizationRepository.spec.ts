@@ -3,6 +3,8 @@ import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infras
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
+import { PrivateAuthorizationRevision } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationRevision';
+import { PrivateAuthorizationScopeId } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationScopeId';
 import LocalPrivateAuthorizationRepository from '@app/contexts/private-authorization/infrastructure/local-db/LocalPrivateAuthorizationRepository';
 import { PrivateAuthorizationLocalNamespaces } from '@app/contexts/private-authorization/infrastructure/local-db/PrivateAuthorizationLocalNamespaces';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
@@ -132,6 +134,71 @@ describe('LocalPrivateAuthorizationRepository', () => {
     await expect(repository.findProjection('scope')).resolves.toEqual({
       members: ['member'],
     });
+  });
+
+  it('finds a retained transition reservation by its parent revision', async () => {
+    const repository = new LocalPrivateAuthorizationRepository(
+      database,
+      coordinator,
+    );
+    await repository.saveReservation(
+      'scope',
+      'head-0',
+      'head-1',
+      'accepted',
+      'owner',
+      checkpoint(),
+    );
+
+    const reservation = await repository.findReservationAtRevision(
+      new PrivateAuthorizationScopeId('scope'),
+      new PrivateAuthorizationRevision(0),
+    );
+
+    expect(reservation?.toPrimitives()).toEqual({
+      authorDeviceKey: 'owner',
+      childHeadHash: 'head-1',
+      operationId: 'accepted',
+      parentCheckpoint: checkpoint().toPrimitives(),
+    });
+  });
+
+  it('rejects multiple retained parents at the same revision', async () => {
+    const repository = new LocalPrivateAuthorizationRepository(
+      database,
+      coordinator,
+    );
+    const reservation = {
+      authorDeviceKey: 'owner',
+      childHeadHash: 'head-1',
+      operationId: 'accepted',
+      parentCheckpoint: checkpoint().toPrimitives(),
+    };
+    await database.save(
+      PrivateAuthorizationLocalNamespaces.reservations,
+      'scope:head-0',
+      reservation,
+    );
+    await database.save(
+      PrivateAuthorizationLocalNamespaces.reservations,
+      'scope:other-head',
+      {
+        ...reservation,
+        childHeadHash: 'other-child',
+        operationId: 'other-operation',
+        parentCheckpoint: {
+          ...reservation.parentCheckpoint,
+          headHash: 'other-head',
+        },
+      },
+    );
+
+    await expect(
+      repository.findReservationAtRevision(
+        new PrivateAuthorizationScopeId('scope'),
+        new PrivateAuthorizationRevision(0),
+      ),
+    ).rejects.toThrow('Invalid private authorization');
   });
 
   it.each([

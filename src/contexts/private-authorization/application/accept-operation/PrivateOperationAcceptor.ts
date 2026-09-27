@@ -76,14 +76,18 @@ export default class PrivateOperationAcceptor {
     throw new PrivateAuthorizationConflictError();
   }
 
-  private historicalParent(
+  private async historicalReservation(
     operation: PrivateControlOperation,
-    checkpoint: ReturnType<PrivateAuthorizationCheckpoint['toPrimitives']>,
-  ): string | null {
-    return operation.toPrimitives().authorizationRevision ===
-      checkpoint.revision - 1
-      ? checkpoint.parentHeadHash
-      : null;
+    checkpoint: PrivateAuthorizationCheckpoint,
+  ): Promise<PrivateControlTransitionReservation | undefined> {
+    const revision = operation.getAuthorizationRevision();
+
+    if (!revision.isLessThan(checkpoint.getRevision())) return undefined;
+
+    return this.repository.findReservationAtRevision(
+      operation.getScopeId(),
+      revision,
+    );
   }
 
   private reservationConflict(
@@ -135,14 +139,8 @@ export default class PrivateOperationAcceptor {
     const scope = await this.repository.findScope(value.scopeId);
 
     if (!scope) return;
-    const checkpoint = scope.toPrimitives().checkpoint;
-    const parentHead = this.historicalParent(routed, checkpoint);
-
-    if (!parentHead) return;
-    const reservedChild = await this.repository.findReservation(
-      value.scopeId,
-      parentHead,
-    );
+    const checkpoint = scope.getCheckpoint();
+    const reservedChild = await this.historicalReservation(routed, checkpoint);
     const candidateHead = value.control?.resultingHeadHash;
     const conflict = this.reservationConflict(
       reservedChild,

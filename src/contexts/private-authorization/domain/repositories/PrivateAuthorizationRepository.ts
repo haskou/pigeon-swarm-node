@@ -3,6 +3,8 @@ import { PrivateAuthorizationScope } from '../PrivateAuthorizationScope';
 import { PrivateControlOperation } from '../PrivateControlOperation';
 import { PrivateControlOperationPrimitives } from '../PrivateControlOperationPrimitives';
 import { PrivateControlTransitionReservation } from '../PrivateControlTransitionReservation';
+import { PrivateAuthorizationRevision } from '../value-objects/PrivateAuthorizationRevision';
+import { PrivateAuthorizationScopeId } from '../value-objects/PrivateAuthorizationScopeId';
 
 export abstract class PrivateAuthorizationRepository {
   public abstract findOutbox(
@@ -29,6 +31,11 @@ export abstract class PrivateAuthorizationRepository {
   public abstract findReservation(
     scopeId: string,
     parentHeadHash: string,
+  ): Promise<PrivateControlTransitionReservation | undefined>;
+
+  public abstract findReservationAtRevision(
+    scopeId: PrivateAuthorizationScopeId,
+    revision: PrivateAuthorizationRevision,
   ): Promise<PrivateControlTransitionReservation | undefined>;
 
   public abstract findScope(

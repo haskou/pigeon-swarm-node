@@ -3,6 +3,7 @@ import { UniqueObjectArray } from '@haskou/value-objects';
 import { InvalidPrivateAuthorizationError } from './errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationCheckpointPrimitives } from './PrivateAuthorizationCheckpointPrimitives';
 import { PrivateAuthorizationDeviceKey } from './value-objects/PrivateAuthorizationDeviceKey';
+import { PrivateAuthorizationRevision } from './value-objects/PrivateAuthorizationRevision';
 import { PrivateAuthorizationScopeId } from './value-objects/PrivateAuthorizationScopeId';
 
 export class PrivateAuthorizationCheckpoint {
@@ -109,6 +110,10 @@ export class PrivateAuthorizationCheckpoint {
 
   public getScopeId(): PrivateAuthorizationScopeId {
     return new PrivateAuthorizationScopeId(this.primitives.scopeId);
+  }
+
+  public getRevision(): PrivateAuthorizationRevision {
+    return new PrivateAuthorizationRevision(this.primitives.revision);
   }
 
   public getFreshnessAuthorityKey(): PrivateAuthorizationDeviceKey {

@@ -7,9 +7,12 @@ import { PrivateControlOperation } from '@app/contexts/private-authorization/dom
 import { PrivateControlOperationPrimitives } from '@app/contexts/private-authorization/domain/PrivateControlOperationPrimitives';
 import { PrivateControlTransitionReservation } from '@app/contexts/private-authorization/domain/PrivateControlTransitionReservation';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
+import { PrivateAuthorizationRevision } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationRevision';
+import { PrivateAuthorizationScopeId } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationScopeId';
 import EmbeddedLocalDatabase, {
   EmbeddedLocalDatabaseOperation,
 } from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import { assert } from '@haskou/value-objects';
 
 import PrivateAuthorizationStorageCoordinator from '../PrivateAuthorizationStorageCoordinator';
 import {
@@ -42,6 +45,28 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
     ];
 
     return !checks.includes(false);
+  }
+
+  private reservationFrom(
+    document: Record<string, unknown> | undefined,
+  ): PrivateControlTransitionReservation | undefined {
+    if (
+      typeof document?.authorDeviceKey !== 'string' ||
+      typeof document.childHeadHash !== 'string' ||
+      typeof document.operationId !== 'string' ||
+      !document.parentCheckpoint ||
+      typeof document.parentCheckpoint !== 'object'
+    ) {
+      return undefined;
+    }
+
+    return PrivateControlTransitionReservation.fromPrimitives({
+      authorDeviceKey: document.authorDeviceKey,
+      childHeadHash: document.childHeadHash,
+      operationId: document.operationId,
+      parentCheckpoint:
+        document.parentCheckpoint as unknown as PrivateAuthorizationCheckpointPrimitives,
+    });
   }
 
   private scopeOperation(
@@ -159,24 +184,45 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
       privateAuthorizationLocalId(scopeId, parentHeadHash),
     );
 
-    if (
-      typeof document?.authorDeviceKey !== 'string' ||
-      typeof document?.childHeadHash !== 'string' ||
-      typeof document.operationId !== 'string' ||
-      !document.parentCheckpoint ||
-      typeof document.parentCheckpoint !== 'object'
-    ) {
-      return undefined;
-    }
+    const reservation = this.reservationFrom(document);
 
-    const reservation = PrivateControlTransitionReservation.fromPrimitives({
-      authorDeviceKey: document.authorDeviceKey,
-      childHeadHash: document.childHeadHash,
-      operationId: document.operationId,
-      parentCheckpoint:
-        document.parentCheckpoint as unknown as PrivateAuthorizationCheckpointPrimitives,
-    });
+    if (!reservation) return undefined;
     reservation.assertParent(scopeId, parentHeadHash);
+
+    return reservation;
+  }
+
+  public async findReservationAtRevision(
+    scopeId: PrivateAuthorizationScopeId,
+    revision: PrivateAuthorizationRevision,
+  ): Promise<PrivateControlTransitionReservation | undefined> {
+    const scope = scopeId.valueOf();
+    const prefix = `${scope}:`;
+    const documents = await this.database.find(
+      PrivateAuthorizationLocalNamespaces.reservations,
+      (document) => {
+        const checkpoint = document.parentCheckpoint as
+          Record<string, unknown> | undefined;
+
+        return (
+          typeof document._id === 'string' &&
+          document._id.startsWith(prefix) &&
+          checkpoint?.revision === revision.valueOf()
+        );
+      },
+    );
+
+    assert(documents.length <= 1, new InvalidPrivateAuthorizationError());
+    const reservation = this.reservationFrom(documents[0]);
+
+    if (!reservation) return undefined;
+    const parent = reservation.getParentCheckpoint();
+
+    assert(
+      parent.getScopeId().isEqual(scopeId) &&
+        parent.getRevision().isEqual(revision),
+      new InvalidPrivateAuthorizationError(),
+    );
 
     return reservation;
   }

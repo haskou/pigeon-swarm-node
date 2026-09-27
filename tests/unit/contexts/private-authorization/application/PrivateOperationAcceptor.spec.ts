@@ -88,6 +88,7 @@ describe('PrivateOperationAcceptor', () => {
       findProtectedMlsState: jest.fn(),
       findReceipt: jest.fn(),
       findReservation: jest.fn(),
+      findReservationAtRevision: jest.fn(),
       findScope: jest.fn().mockResolvedValue(scope()),
       findScopeIds: jest.fn(),
       hasReplayMarker: jest.fn(),
@@ -498,7 +499,7 @@ describe('PrivateOperationAcceptor', () => {
     repository.findScope.mockResolvedValue(
       PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
     );
-    repository.findReservation.mockResolvedValue(
+    repository.findReservationAtRevision.mockResolvedValue(
       PrivateControlTransitionReservation.fromPrimitives({
         authorDeviceKey: authorKey,
         childHeadHash: encoded(32, 11),
@@ -513,7 +514,15 @@ describe('PrivateOperationAcceptor', () => {
       ),
     ).rejects.toThrow('Private authorization conflict');
     expect(verifier.verify).toHaveBeenCalledWith(sibling, authorKey);
-    expect(repository.findReservation).toHaveBeenCalledWith(scopeId, headHash);
+    expect(repository.findReservationAtRevision).toHaveBeenCalledWith(
+      expect.objectContaining({ valueOf: expect.any(Function) }),
+      expect.objectContaining({ valueOf: expect.any(Function) }),
+    );
+    const [foundScope, foundRevision] =
+      repository.findReservationAtRevision.mock.calls[0];
+
+    expect(foundScope.valueOf()).toBe(scopeId);
+    expect(foundRevision.valueOf()).toBe(0);
     const retainedParent = checkpoint();
     expect(transitions.verify).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -526,6 +535,62 @@ describe('PrivateOperationAcceptor', () => {
     expect(
       transitions.verify.mock.calls[0][0].toPrimitives(),
     ).toEqual(retainedParent.toPrimitives());
+    expect(unitOfWork.quarantine).toHaveBeenCalledWith(scopeId);
+    expect(freshness.verify).not.toHaveBeenCalled();
+  });
+
+  it('quarantines an authenticated child fork older than the previous revision', async () => {
+    const activeKey = encoded(32, 10);
+    const currentCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
+      ...checkpoint().toPrimitives(),
+      admittedDeviceKeys: [activeKey],
+      authorityKeys: [activeKey],
+      freshnessAuthorityKey: activeKey,
+      headHash: encoded(32, 13),
+      parentHeadHash: encoded(32, 11),
+      revision: 2,
+      revokedDeviceKeys: [authorKey],
+    });
+    const sibling = revocation({
+      payload: {
+        deviceKey: authorKey,
+        resultingHeadHash: encoded(32, 12),
+      },
+    });
+    const genesisReservation =
+      PrivateControlTransitionReservation.fromPrimitives({
+        authorDeviceKey: authorKey,
+        childHeadHash: encoded(32, 11),
+        operationId,
+        parentCheckpoint: checkpoint().toPrimitives(),
+      });
+    repository.findScope.mockResolvedValue(
+      PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
+    );
+    repository.findReservationAtRevision.mockResolvedValue(
+      genesisReservation,
+    );
+
+    await expect(
+      acceptor.accept(
+        new PrivateOperationAcceptMessage(sibling, 'proof', controlFrame),
+      ),
+    ).rejects.toThrow(PrivateAuthorizationConflictError);
+    expect(repository.findReservationAtRevision).toHaveBeenCalledWith(
+      expect.objectContaining({ valueOf: expect.any(Function) }),
+      expect.objectContaining({ valueOf: expect.any(Function) }),
+    );
+    const [foundScope, foundRevision] =
+      repository.findReservationAtRevision.mock.calls[0];
+
+    expect(foundScope.valueOf()).toBe(scopeId);
+    expect(foundRevision.valueOf()).toBe(0);
+    expect(transitions.verify).toHaveBeenCalledWith(
+      expect.objectContaining({ toPrimitives: expect.any(Function) }),
+      expect.anything(),
+      expect.any(AuthenticatedPrivateOperationJson),
+      controlFrame,
+    );
     expect(unitOfWork.quarantine).toHaveBeenCalledWith(scopeId);
     expect(freshness.verify).not.toHaveBeenCalled();
   });
@@ -551,7 +616,7 @@ describe('PrivateOperationAcceptor', () => {
     repository.findScope.mockResolvedValue(
       PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
     );
-    repository.findReservation.mockResolvedValue(
+    repository.findReservationAtRevision.mockResolvedValue(
       PrivateControlTransitionReservation.fromPrimitives({
         authorDeviceKey: authorKey,
         childHeadHash: encoded(32, 11),
@@ -603,7 +668,7 @@ describe('PrivateOperationAcceptor', () => {
     repository.findScope.mockResolvedValue(
       PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
     );
-    repository.findReservation.mockResolvedValue(
+    repository.findReservationAtRevision.mockResolvedValue(
       PrivateControlTransitionReservation.fromPrimitives({
         authorDeviceKey: authorKey,
         childHeadHash: encoded(32, 11),

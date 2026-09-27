@@ -1,5 +1,7 @@
 import { PrivateControlOperationPrimitives } from './PrivateControlOperationPrimitives';
 import { PrivateAuthorizationDeviceKey } from './value-objects/PrivateAuthorizationDeviceKey';
+import { PrivateAuthorizationRevision } from './value-objects/PrivateAuthorizationRevision';
+import { PrivateAuthorizationScopeId } from './value-objects/PrivateAuthorizationScopeId';
 
 export class PrivateControlOperation {
   public static fromPrimitives(
@@ -18,6 +20,16 @@ export class PrivateControlOperation {
 
   public getAuthorDeviceKey(): PrivateAuthorizationDeviceKey {
     return new PrivateAuthorizationDeviceKey(this.primitives.authorDeviceKey);
+  }
+
+  public getAuthorizationRevision(): PrivateAuthorizationRevision {
+    return new PrivateAuthorizationRevision(
+      this.primitives.authorizationRevision,
+    );
+  }
+
+  public getScopeId(): PrivateAuthorizationScopeId {
+    return new PrivateAuthorizationScopeId(this.primitives.scopeId);
   }
 
   public hasSameIdentityAs(operation: PrivateControlOperation): boolean {
