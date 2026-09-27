@@ -288,9 +288,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     if (revocations.length > 0) {
       return [
         authorization.revokeConcurrently(
-          revocations.map(({ transition }) =>
-            transition.getTargetCredential(),
-          ),
+          revocations.map(({ transition }) => transition.getTargetCredential()),
         ),
       ];
     }
@@ -363,10 +361,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
 
     return {
       authorization: selected.authorization,
-      history: [
-        ...candidates.map(({ record }) => record),
-        ...selected.history,
-      ],
+      history: [...candidates.map(({ record }) => record), ...selected.history],
     };
   }
 
