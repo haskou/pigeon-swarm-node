@@ -23,14 +23,14 @@ export class PostIdentityRequest {
 
   public getIdentityPublishMessage(): IdentityPublishMessage {
     return new IdentityPublishMessage({
-      encryptedKeyPair: this.body.encryptedKeyPair,
-      encryptedMasterKey: this.body.encryptedMasterKey,
+      authorizationRevision: this.body.authorizationRevision,
+      deviceCredentialCommitment: this.body.deviceCredentialCommitment,
       id: this.body.id || '',
-      masterKeyDerivation: this.body.masterKeyDerivation,
       networks: this.body.networks,
       previousIdentityExternalIdentifier:
         this.body.previousIdentityExternalIdentifier,
       profile: this.getProfile(),
+      recoveryAuthority: this.body.recoveryAuthority,
       signature: this.body.signature,
       timestamp: this.body.timestamp,
       version: this.body.version,

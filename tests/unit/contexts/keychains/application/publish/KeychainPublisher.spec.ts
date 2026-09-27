@@ -1,4 +1,5 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import KeychainPublisher from '@app/contexts/keychains/application/publish/KeychainPublisher';
 import { KeychainPublishMessage } from '@app/contexts/keychains/application/publish/messages/KeychainPublishMessage';
@@ -40,25 +41,25 @@ describe('KeychainPublisher', () => {
 
   function mockOwnerIdentity(networkIds: NetworkId[]): Identity {
     return {
-      toPrimitives: () => ({
-        encryptedKeyPair: {
-          encryptedPrivateKey: 'encrypted-private-key',
-          publicKey: 'public-key',
-        },
+      toPrimitives: (): IdentityPrimitives => ({
+        authorizationRevision: 0,
+        deviceCredentialCommitment: 'credential-commitment',
         id: 'identity-id',
         networks: networkIds.map((networkId) => networkId.valueOf()),
         previousIdentityExternalIdentifier: undefined,
         profile: {
+          banner: undefined,
           biography: undefined,
           handle: undefined,
           name: 'Alice',
           picture: undefined,
         },
+        recoveryAuthority: 'recovery-authority',
         signature: 'signature',
         timestamp: 1,
         version: 1,
       }),
-    } as Identity;
+    } as unknown as Identity;
   }
 
   it('should publish a valid encrypted keychain version', async () => {

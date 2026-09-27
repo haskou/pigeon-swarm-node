@@ -132,19 +132,16 @@ describe('OrbitDBIdentityMetadataIndex', () => {
   it('should project identity tombstones without replicating handle heads', async () => {
     const identityMother = new IdentityMother();
     const handle = new ProfileHandle('hasko');
-    const identity = await identityMother
-      .build()
-      .updateProfile(
-        new Profile(
-          new ProfileName('Hasko'),
-          undefined,
-          undefined,
-          undefined,
-          handle,
-        ),
-        identityMother.password,
-        new IdentityExternalIdentifier('bafypreviousidentity'),
-      );
+    const identity = await identityMother.buildNext({
+      previousIdentityExternalIdentifier: 'bafypreviousidentity',
+      profile: new Profile(
+        new ProfileName('Hasko'),
+        undefined,
+        undefined,
+        undefined,
+        handle,
+      ).toPrimitives(),
+    });
     const networkId = identityMother.networks[0];
     await registry.register(
       networkId.valueOf(),
@@ -265,19 +262,16 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     const handle = new ProfileHandle('hasko');
     const mother = new IdentityMother();
     const networkId = mother.networks[0];
-    const identity = await mother
-      .build()
-      .updateProfile(
-        new Profile(
-          new ProfileName('Hasko'),
-          undefined,
-          undefined,
-          undefined,
-          handle,
-        ),
-        mother.password,
-        new IdentityExternalIdentifier('bafypreviousidentity'),
-      );
+    const identity = await mother.buildNext({
+      previousIdentityExternalIdentifier: 'bafypreviousidentity',
+      profile: new Profile(
+        new ProfileName('Hasko'),
+        undefined,
+        undefined,
+        undefined,
+        handle,
+      ).toPrimitives(),
+    });
 
     await registry.register(
       networkId.valueOf(),

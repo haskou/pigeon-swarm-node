@@ -1,16 +1,25 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
+import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
 import { IdentityPublication } from '@app/contexts/identities/domain/IdentityPublication';
+import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { Profile } from '@app/contexts/identities/domain/Profile';
-import { EncryptedMasterKey } from '@app/contexts/identities/domain/value-objects/EncryptedMasterKey';
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
+import { DeviceCredentialCommitment } from '@app/contexts/identities/domain/value-objects/DeviceCredentialCommitment';
+import { IdentityAuthorizationRevision } from '@app/contexts/identities/domain/value-objects/IdentityAuthorizationRevision';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
-import { IdentitySigningKey } from '@app/contexts/identities/domain/value-objects/IdentitySigningKey';
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
-import { MasterKeyDerivation } from '@app/contexts/identities/domain/value-objects/MasterKeyDerivation';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
+import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Password } from '@app/contexts/shared/domain/value-objects/Password';
-import { EncryptedKeyPair, EncryptedPrivateKey, PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
+import {
+  EncryptedKeyPair,
+  EncryptedPrivateKey,
+  PublicKey,
+  Signature,
+} from '@haskou/pigeon-swarm-crypto';
 import { Timestamp, UniqueObjectArray } from '@haskou/value-objects';
 
 export class IdentityMother {
@@ -27,18 +36,19 @@ export class IdentityMother {
     'MCowBQYDK2VwAyEAj3dYus5qe3I0IrvPl/oEM+678lbO9+1vzJSlXnlb0v4=',
   );
 
-  public encryptedMasterKey: EncryptedMasterKey = new EncryptedMasterKey(
-    'v1.fixture.encrypted-master-key',
+  public deviceCredential: DeviceCredential = DeviceCredential.fromString(
+    this.encryptedKeyPair.toPrimitives().publicKey,
   );
 
-  public masterKeyDerivation: MasterKeyDerivation = new MasterKeyDerivation({
-    passkeyPrf: {
-      algorithm: 'webauthn-prf',
-      credentialId: 'fixture-credential-id',
-      salt: 'fixture-salt',
-      version: 1,
-    },
-  });
+  public deviceCredentialCommitment: DeviceCredentialCommitment =
+    this.deviceCredential.getCommitment();
+
+  public recoveryAuthority: RecoveryAuthority = RecoveryAuthority.fromString(
+    '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAjWO3/ZwPzc9aKCos71hCsW0bIx5uiBG4rZGqz9R/i4E=\n-----END PUBLIC KEY-----\n',
+  );
+
+  public authorizationRevision: IdentityAuthorizationRevision =
+    IdentityAuthorizationRevision.initial();
 
   public profile: Profile = new Profile(new ProfileName('John'));
 
@@ -51,7 +61,7 @@ export class IdentityMother {
   public timestamp: Timestamp = new Timestamp(1773848829055);
 
   public signature: Signature = new Signature(
-    'ZG+h/Sof7J5IZ/5xF1g5UxMyxjRQ8d6ia0nkvT22/u52chX27J4Pr0EtZ92gH/LCsa1A63U4Zodnw9ByEtwAAA==',
+    'GIZD7S8AiGkBqyP0AIfkEciWWvMUmHp7IeTxJHGxLnTrDZRZJ7NiluCTmD75MbDnfWrlkR15wDuAd/LbhpCMDQ==',
   );
 
   public version: IdentityVersion = new IdentityVersion(1);
@@ -61,26 +71,6 @@ export class IdentityMother {
 
   public withId(id: IdentityId): this {
     this.id = id;
-
-    return this;
-  }
-
-  public withEncryptedKeyPair(encryptedKeyPair: EncryptedKeyPair): this {
-    this.encryptedKeyPair = encryptedKeyPair;
-
-    return this;
-  }
-
-  public withEncryptedMasterKey(encryptedMasterKey: EncryptedMasterKey): this {
-    this.encryptedMasterKey = encryptedMasterKey;
-
-    return this;
-  }
-
-  public withMasterKeyDerivation(
-    masterKeyDerivation: MasterKeyDerivation,
-  ): this {
-    this.masterKeyDerivation = masterKeyDerivation;
 
     return this;
   }
@@ -127,9 +117,9 @@ export class IdentityMother {
   public build(): Identity {
     return new Identity(
       this.id,
-      new IdentitySigningKey(this.encryptedKeyPair),
-      this.encryptedMasterKey,
-      this.masterKeyDerivation,
+      this.deviceCredentialCommitment,
+      this.recoveryAuthority,
+      this.authorizationRevision,
       UniqueObjectArray.fromArray(this.networks),
       new IdentityPublication(
         this.profile,
@@ -139,5 +129,34 @@ export class IdentityMother {
         this.previousIdentityExternalIdentifier,
       ),
     );
+  }
+
+  public async buildNext(
+    overrides: Partial<Omit<IdentityPrimitives, 'signature'>> = {},
+  ): Promise<Identity> {
+    const current = this.build().toPrimitives();
+    const unsigned: Omit<IdentityPrimitives, 'signature'> = {
+      authorizationRevision: current.authorizationRevision,
+      deviceCredentialCommitment: current.deviceCredentialCommitment,
+      id: current.id,
+      networks: current.networks,
+      previousIdentityExternalIdentifier: 'bafypreviousidentity',
+      profile: current.profile,
+      recoveryAuthority: current.recoveryAuthority,
+      timestamp: current.timestamp + 1,
+      version: current.version + 1,
+      ...overrides,
+    };
+    const signature = await this.encryptedKeyPair.sign(
+      new IdentitySignatureDomainService().getCanonicalSigningContent(
+        IdentitySignaturePayload.fromPrimitives(unsigned),
+      ),
+      this.password,
+    );
+
+    return Identity.fromPrimitives({
+      ...unsigned,
+      signature: signature.valueOf(),
+    });
   }
 }

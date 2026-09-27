@@ -7,9 +7,13 @@ import { IdentityVersion } from './value-objects/IdentityVersion';
 import { ProfileHandle } from './value-objects/ProfileHandle';
 
 export class IdentityPublication {
-  public static fromPrimitives(
-    primitives: PrimitiveOf<IdentityPublication>,
-  ): IdentityPublication {
+  public static fromPrimitives(primitives: {
+    previousIdentityExternalIdentifier?: string;
+    profile: PrimitiveOf<Profile>;
+    signature: string;
+    timestamp: number;
+    version: number;
+  }): IdentityPublication {
     return new IdentityPublication(
       Profile.fromPrimitives(primitives.profile),
       new Timestamp(primitives.timestamp),

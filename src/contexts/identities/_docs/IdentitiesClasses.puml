@@ -5,16 +5,13 @@ title Pigeon Swarm - Identities Context
 package "identities.domain" {
   class Identity <<AggregateRoot>> {
     -id: IdentityId
-    -encryptedKeyPair: EncryptedKeyPair
-    -version: number
-    -previousIdentityExternalIdentifier?: IdentityExternalIdentifier
+    -deviceCredentialCommitment: DeviceCredentialCommitment
+    -recoveryAuthority: RecoveryAuthority
+    -authorizationRevision: IdentityAuthorizationRevision
     -networks: UniqueObjectArray<NetworkId>
     -profile: Profile
-    -timestamp: Timestamp
-    -signature: Signature
+    -publication: IdentityPublication
     +fromSignedPublication(primitives): Identity
-    +updateProfile(profile, password): Identity
-    +updateNetworks(networks, password): Identity
   }
 
   class Profile {
@@ -31,6 +28,10 @@ package "identities.domain" {
   class ProfileImage <<ValueObject>>
   class ProfileBanner <<ValueObject>>
   class IdentityExternalIdentifier <<ValueObject>>
+  class DeviceCredential <<ValueObject>>
+  class DeviceCredentialCommitment <<ValueObject>>
+  class RecoveryAuthority <<ValueObject>>
+  class IdentityAuthorizationRevision <<ValueObject>>
 
   class IdentityCandidate {
     -externalIdentifier: IdentityExternalIdentifier
@@ -58,8 +59,7 @@ package "identities.domain" {
   end note
 
   class IdentitySignatureDomainService {
-    +generateSignature(payload, encryptedKeyPair, password): Promise<Signature>
-    +isValidSignature(identityId, payload, signature): boolean
+    +isValidSignature(deviceCredential, payload, signature): boolean
   }
 
   class IdentityResolutionDomainService {
@@ -144,7 +144,9 @@ package "identities.infrastructure" {
     -_id: string
     -version: number
     -previousExternalIdentifier?: string
-    -encryptedKeyPair: object
+    -deviceCredentialCommitment: string
+    -recoveryAuthority: string
+    -authorizationRevision: number
     -networks: string[]
     -profile: object
     -timestamp: number

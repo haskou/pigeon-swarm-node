@@ -1,28 +1,37 @@
-import { PrimitiveOf } from '@haskou/value-objects';
-
-import type { Identity } from './Identity';
+import type { IdentityPrimitives } from './IdentityPrimitives';
 
 export class IdentitySignaturePayload {
   public static fromPrimitives(
-    primitives: Omit<PrimitiveOf<Identity>, 'signature'>,
+    primitives: IdentityPrimitives | Omit<IdentityPrimitives, 'signature'>,
   ): IdentitySignaturePayload {
-    return new IdentitySignaturePayload(primitives);
+    return new IdentitySignaturePayload({
+      authorizationRevision: primitives.authorizationRevision,
+      deviceCredentialCommitment: primitives.deviceCredentialCommitment,
+      id: primitives.id,
+      networks: primitives.networks,
+      previousIdentityExternalIdentifier:
+        primitives.previousIdentityExternalIdentifier,
+      profile: primitives.profile,
+      recoveryAuthority: primitives.recoveryAuthority,
+      timestamp: primitives.timestamp,
+      version: primitives.version,
+    });
   }
 
   private constructor(
-    private readonly primitives: Omit<PrimitiveOf<Identity>, 'signature'>,
+    private readonly primitives: Omit<IdentityPrimitives, 'signature'>,
   ) {}
 
-  public toPrimitives(): Omit<PrimitiveOf<Identity>, 'signature'> {
+  public toPrimitives(): Omit<IdentityPrimitives, 'signature'> {
     return {
-      encryptedKeyPair: this.primitives.encryptedKeyPair,
-      encryptedMasterKey: this.primitives.encryptedMasterKey,
+      authorizationRevision: this.primitives.authorizationRevision,
+      deviceCredentialCommitment: this.primitives.deviceCredentialCommitment,
       id: this.primitives.id,
-      masterKeyDerivation: this.primitives.masterKeyDerivation,
       networks: this.primitives.networks,
       previousIdentityExternalIdentifier:
         this.primitives.previousIdentityExternalIdentifier,
       profile: this.primitives.profile,
+      recoveryAuthority: this.primitives.recoveryAuthority,
       timestamp: this.primitives.timestamp,
       version: this.primitives.version,
     };

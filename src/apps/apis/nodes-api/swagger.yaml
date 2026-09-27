@@ -258,7 +258,7 @@ components:
           enum: [pigeon-swarm]
         apiVersion:
           type: integer
-          enum: [1]
+          enum: [2]
     NodeResource:
       type: object
       required:

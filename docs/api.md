@@ -30,7 +30,7 @@ It returns HTTP 200 with `Content-Type: application/json`,
 `Cache-Control: no-store`, and exactly:
 
 ```json
-{"protocol":"pigeon-swarm","apiVersion":1}
+{ "protocol": "pigeon-swarm", "apiVersion": 2 }
 ```
 
 `apiVersion` identifies the breaking-major client API contract implemented by
@@ -309,53 +309,53 @@ Implemented:
 
 Event contracts used by frontend:
 
-| Event type                                            | Aggregate id      | Attributes used by clients/routing                                                                                   |
-| ----------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `conversations.v1.conversation.was_created`           | conversation id   | `networkId`, `participantIds`                                                                                        |
-| `conversations.v1.message.was_sent`                   | conversation id   | `messageId`, `authorId`, `networkId`, `participantIds`                                                               |
-| `conversations.v1.message.was_edited`                 | conversation id   | `messageId`, `targetMessageId`, `networkId`, `participantIds`                                                        |
-| `conversations.v1.message.was_deleted`                | conversation id   | `messageId`, `targetMessageId`, `networkId`, `participantIds`                                                        |
-| `conversations.v1.message.was_pinned`                 | conversation id   | `messageId`, `pinnedByIdentityId`, `networkId`, `participantIds`                                                     |
-| `conversations.v1.message.was_unpinned`               | conversation id   | `messageId`, `unpinnedByIdentityId`, `networkId`, `participantIds`                                                   |
-| `conversations.v1.messages.were_read`                 | conversation id   | `messageId`, `readerIdentityId`, `networkId`, `participantIds`                                                       |
-| `conversations.v1.message.reaction.was_added`         | conversation id   | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds`                                         |
-| `conversations.v1.message.reaction.was_removed`       | conversation id   | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds`                                         |
-| `calls.v1.call.snapshot_changed`                     | call id           | `callId`, `liveCallRevision`, `liveCall` |
-| `calls.v1.call.started`                               | call id           | `callId`, `liveCallRevision`, `liveCall` |
-| `calls.v1.participant.joined`                         | call id           | `callId`, `liveCallRevision`, `liveCall` |
-| `calls.v1.participant.left`                           | call id           | `callId`, `liveCallRevision`, `liveCall` |
-| `calls.v1.participant.declined`                       | call id           | `callId`, `liveCallRevision`, `liveCall` |
-| `calls.v1.participant.missed`                         | call id           | `callId`, `liveCallRevision`, `liveCall` |
-| `calls.v1.call.ended`                                 | call id           | `callId`, `liveCallRevision`, `liveCall` |
-| `calls.v1.call.missed`                                | call id           | `callId`, `liveCallRevision`, `liveCall` |
+| Event type                                            | Aggregate id      | Attributes used by clients/routing                                                                                         |
+| ----------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `conversations.v1.conversation.was_created`           | conversation id   | `networkId`, `participantIds`                                                                                              |
+| `conversations.v1.message.was_sent`                   | conversation id   | `messageId`, `authorId`, `networkId`, `participantIds`                                                                     |
+| `conversations.v1.message.was_edited`                 | conversation id   | `messageId`, `targetMessageId`, `networkId`, `participantIds`                                                              |
+| `conversations.v1.message.was_deleted`                | conversation id   | `messageId`, `targetMessageId`, `networkId`, `participantIds`                                                              |
+| `conversations.v1.message.was_pinned`                 | conversation id   | `messageId`, `pinnedByIdentityId`, `networkId`, `participantIds`                                                           |
+| `conversations.v1.message.was_unpinned`               | conversation id   | `messageId`, `unpinnedByIdentityId`, `networkId`, `participantIds`                                                         |
+| `conversations.v1.messages.were_read`                 | conversation id   | `messageId`, `readerIdentityId`, `networkId`, `participantIds`                                                             |
+| `conversations.v1.message.reaction.was_added`         | conversation id   | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds`                                               |
+| `conversations.v1.message.reaction.was_removed`       | conversation id   | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds`                                               |
+| `calls.v1.call.snapshot_changed`                      | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `calls.v1.call.started`                               | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `calls.v1.participant.joined`                         | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `calls.v1.participant.left`                           | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `calls.v1.participant.declined`                       | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `calls.v1.participant.missed`                         | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `calls.v1.call.ended`                                 | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `calls.v1.call.missed`                                | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
 | `calls.v1.signal.sent`                                | call id           | `signalId`, `callId`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload`, `attempt`, `sentAt`, `expiresAt` |
-| `calls.v1.participant_lease.was_updated`              | call id     | `callId`, `liveCallRevision`, `liveCall` |
-| `communities.v1.community.was_created`                | community id      | `communityId`, `networkId`, `ownerIdentityId`, `memberIds`, `community`                                              |
-| `communities.v1.channel.was_created`                  | community id      | `communityId`, `networkId`, `memberIds`, `channel`                                                                   |
-| `communities.v1.channel.was_renamed`                  | community id      | `communityId`, `networkId`, `memberIds`, `channelId`, `name`                                                         |
-| `communities.v1.channel.was_deleted`                  | community id      | `communityId`, `networkId`, `memberIds`, `channelId`                                                                 |
-| `communities.v1.community.was_updated`                | community id      | `communityId`, `networkId`, `memberIds`, `community`                                                                 |
-| `communities.v1.member.was_added`                     | community id      | `communityId`, `networkId`, `memberIds`, `identityId`, `community`                                                   |
-| `communities.v1.member.was_left`                      | community id      | `communityId`, `networkId`, `memberIds`, `identityId`, `community`                                                   |
-| `communities.v1.channel.message.was_sent`             | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds`                                |
-| `communities.v1.channel.message.was_deleted`          | community id      | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds`          |
-| `communities.v1.channel.message.was_pinned`           | community id      | `communityId`, `channelId`, `messageId`, `pinnedByIdentityId`, `networkId`, `memberIds`                              |
-| `communities.v1.channel.message.was_unpinned`         | community id      | `communityId`, `channelId`, `messageId`, `unpinnedByIdentityId`, `networkId`, `memberIds`                            |
-| `communities.v1.channel.message.reaction.was_added`   | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`          |
-| `communities.v1.channel.message.reaction.was_removed` | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`          |
-| `polls.v1.poll.was_created`                           | poll scope id     | `pollId`, `poll`, `participantIds` for group conversations                                                            |
-| `stickers.v1.pack.was_created`                        | sticker pack id   | `packId`, `ownerIdentityId`, `pack`                                                                                   |
-| `stickers.v1.user_library.was_created`                | identity id       | `identityId`, `library`                                                                                               |
-| `notifications.v1.notification.was_created`           | notification id   | `recipientIdentityId`, `type`                                                                                        |
-| `notifications.v1.notification.was_accepted`          | notification id   | `recipientIdentityId`                                                                                                |
-| `notifications.v1.notification.was_declined`          | notification id   | `recipientIdentityId`                                                                                                |
-| `identities.v1.identity.was_created`                  | identity id       | `externalIdentifier`, `handle`, `networkIds`, `previousExternalIdentifier`, `version`                                |
-| `identities.v1.identity.was_updated`                  | identity id       | `externalIdentifier`, `handle`, `networkIds`, `previousExternalIdentifier`, `version`                                |
-| `keychains.v1.keychain.was_published`                 | owner identity id | owner is the aggregate id                                                                                            |
-| `nodes.v1.node.heartbeat.was_sent`                    | node id           | `owner`, `networks` with `id`, `name` and `type`                                                                      |
-| `nodes.v1.node.network.was_added`                     | node id           | node/network metadata                                                                                                |
-| `nodes.v1.node.network.was_removed`                   | node id           | `networkId`                                                                                                          |
-| `nodes.v1.node.relay_configuration.was_updated`       | node id           | `relayConfiguration`                                                                                                 |
+| `calls.v1.participant_lease.was_updated`              | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `communities.v1.community.was_created`                | community id      | `communityId`, `networkId`, `ownerIdentityId`, `memberIds`, `community`                                                    |
+| `communities.v1.channel.was_created`                  | community id      | `communityId`, `networkId`, `memberIds`, `channel`                                                                         |
+| `communities.v1.channel.was_renamed`                  | community id      | `communityId`, `networkId`, `memberIds`, `channelId`, `name`                                                               |
+| `communities.v1.channel.was_deleted`                  | community id      | `communityId`, `networkId`, `memberIds`, `channelId`                                                                       |
+| `communities.v1.community.was_updated`                | community id      | `communityId`, `networkId`, `memberIds`, `community`                                                                       |
+| `communities.v1.member.was_added`                     | community id      | `communityId`, `networkId`, `memberIds`, `identityId`, `community`                                                         |
+| `communities.v1.member.was_left`                      | community id      | `communityId`, `networkId`, `memberIds`, `identityId`, `community`                                                         |
+| `communities.v1.channel.message.was_sent`             | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds`                                      |
+| `communities.v1.channel.message.was_deleted`          | community id      | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds`                |
+| `communities.v1.channel.message.was_pinned`           | community id      | `communityId`, `channelId`, `messageId`, `pinnedByIdentityId`, `networkId`, `memberIds`                                    |
+| `communities.v1.channel.message.was_unpinned`         | community id      | `communityId`, `channelId`, `messageId`, `unpinnedByIdentityId`, `networkId`, `memberIds`                                  |
+| `communities.v1.channel.message.reaction.was_added`   | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`                |
+| `communities.v1.channel.message.reaction.was_removed` | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`                |
+| `polls.v1.poll.was_created`                           | poll scope id     | `pollId`, `poll`, `participantIds` for group conversations                                                                 |
+| `stickers.v1.pack.was_created`                        | sticker pack id   | `packId`, `ownerIdentityId`, `pack`                                                                                        |
+| `stickers.v1.user_library.was_created`                | identity id       | `identityId`, `library`                                                                                                    |
+| `notifications.v1.notification.was_created`           | notification id   | `recipientIdentityId`, `type`                                                                                              |
+| `notifications.v1.notification.was_accepted`          | notification id   | `recipientIdentityId`                                                                                                      |
+| `notifications.v1.notification.was_declined`          | notification id   | `recipientIdentityId`                                                                                                      |
+| `identities.v1.identity.was_created`                  | identity id       | `externalIdentifier`, `handle`, `networkIds`, `previousExternalIdentifier`, `version`                                      |
+| `identities.v1.identity.was_updated`                  | identity id       | `externalIdentifier`, `handle`, `networkIds`, `previousExternalIdentifier`, `version`                                      |
+| `keychains.v1.keychain.was_published`                 | owner identity id | owner is the aggregate id                                                                                                  |
+| `nodes.v1.node.heartbeat.was_sent`                    | node id           | `owner`, `networks` with `id`, `name` and `type`                                                                           |
+| `nodes.v1.node.network.was_added`                     | node id           | node/network metadata                                                                                                      |
+| `nodes.v1.node.network.was_removed`                   | node id           | `networkId`                                                                                                                |
+| `nodes.v1.node.relay_configuration.was_updated`       | node id           | `relayConfiguration`                                                                                                       |
 
 For `conversations.v1.message.*`, use `event.aggregate_id` as
 `conversationId` and `event.attributes.messageId` as the message id to fetch.
@@ -1404,48 +1404,29 @@ refreshed, backend emits:
 
 ## Identity HTTP API
 
+Identity publications contain only public profile data and public authorization
+material. They never contain encrypted private keys, protected root-key
+envelopes, password KDF parameters, device unlock secrets or recovery secrets.
+Legacy identity payloads containing those fields are rejected.
+
 ### Get identity
 
 ```http
 GET /identities/{reference}
 ```
 
-Path parameters:
-
-- `reference`: either a percent-encoded identity id or a profile handle.
-- Identity ids must use `encodeURIComponent(identityId)`.
-- Handles are stored lowercase and must be passed without `@`.
-
-Implemented:
-
-- resolve the latest valid known identity candidate
-- resolve by identity id or profile handle
-- return profile, networks, version, current identity reference, previous
-  identity reference and signature
+`reference` is a percent-encoded identity id or a lowercase profile handle
+without `@`. Identity ids must use `encodeURIComponent(identityId)`.
 
 Response:
 
 ```json
 {
   "id": "<identityId>",
+  "authorizationRevision": 0,
+  "deviceCredentialCommitment": "<64 lowercase hexadecimal characters>",
+  "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
   "identityExternalIdentifier": "<currentIdentityCid>",
-  "encryptedKeyPair": {
-    "publicKey": "<publicKeyPem>",
-    "encryptedPrivateKey": "<opaqueEncryptedPrivateKey>"
-  },
-  "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
-  "masterKeyDerivation": {
-    "algorithm": "scrypt",
-    "N": 262144,
-    "r": 8,
-    "p": 1,
-    "salt": "<base64urlSalt>",
-    "version": 1,
-    "recoveryKey": {
-      "algorithm": "pigeon-recovery-key",
-      "version": 1
-    }
-  },
   "networks": ["<networkId>"],
   "profile": {
     "name": "Alice",
@@ -1474,23 +1455,9 @@ Request:
 ```json
 {
   "id": "<identityId>",
-  "encryptedKeyPair": {
-    "publicKey": "<publicKeyPem>",
-    "encryptedPrivateKey": "<opaqueEncryptedPrivateKey>"
-  },
-  "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
-  "masterKeyDerivation": {
-    "algorithm": "scrypt",
-    "N": 262144,
-    "r": 8,
-    "p": 1,
-    "salt": "<base64urlSalt>",
-    "version": 1,
-    "recoveryKey": {
-      "algorithm": "pigeon-recovery-key",
-      "version": 1
-    }
-  },
+  "authorizationRevision": 0,
+  "deviceCredentialCommitment": "<64 lowercase hexadecimal characters>",
+  "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
   "networks": ["<networkId>"],
   "profile": {
     "name": "Alice",
@@ -1502,65 +1469,37 @@ Request:
 }
 ```
 
-Implemented:
+The initial identity id identifies the genesis device signing credential.
+`deviceCredentialCommitment` is the SHA-256 digest of that credential's
+canonical PEM representation. `recoveryAuthority` is a public key; its private
+recovery material remains exclusively with the client. The initial
+`authorizationRevision` is `0`.
 
-- require client-generated encrypted keypairs and signed identity candidates
-- accept client-generated encrypted master keys and client-controlled master key
-  derivation metadata as signed opaque identity fields
-- keep client passwords, recovery keys, passkey PRF envelopes, KEKs, MasterKey
-  material, keychain plaintext and identity decryption secrets out of the
-  backend
-- accept identities without `passkeyPrf`; local WebAuthn PRF envelopes may
-  remain only on the client
-- store `profile.handle` as part of the signed identity profile
-- normalize handles to lowercase
-- reject handles containing spaces, `@` or any character outside letters,
-  numbers, dots, hyphens and underscores
-- return `identityExternalIdentifier`, which is the current published identity
-  CID to send as `previousIdentityExternalIdentifier` in the next update
-- store `profile.picture` and `profile.banner` as public IPFS image CIDs, not as
-  base64 or data URLs
-
-Client-signed identity signatures must cover the canonical identity payload:
+The signature covers this canonical property order:
 
 ```json
 {
-  "encryptedKeyPair": {
-    "publicKey": "<publicKeyPem>",
-    "encryptedPrivateKey": "<opaqueEncryptedPrivateKey>"
-  },
-  "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
+  "authorizationRevision": 0,
+  "deviceCredentialCommitment": "<commitment>",
   "id": "<identityId>",
-  "masterKeyDerivation": {
-    "algorithm": "scrypt",
-    "N": 262144,
-    "r": 8,
-    "p": 1,
-    "salt": "<base64urlSalt>",
-    "version": 1,
-    "recoveryKey": {
-      "algorithm": "pigeon-recovery-key",
-      "version": 1
-    }
-  },
   "networks": ["<networkId>"],
   "previousIdentityExternalIdentifier": null,
   "profile": {
-    "picture": "<publicImageCid>",
-    "banner": "<publicBannerCid>",
+    "picture": null,
+    "banner": null,
     "biography": null,
     "handle": "alice",
     "name": "Alice"
   },
+  "recoveryAuthority": "<publicRecoveryAuthorityPem>",
   "timestamp": 1773848829055,
   "version": 1
 }
 ```
 
-The actual JSON signature payload should omit undefined optional fields; handles
-must already be normalized before signing. The backend preserves
-`masterKeyDerivation` as sent and does not sort nested metadata keys, so clients
-must sign the exact `masterKeyDerivation` object order they send.
+Undefined optional properties are omitted before signing. Handles must already
+be normalized. Current requests reject `encryptedKeyPair`,
+`encryptedPrivateKey`, `encryptedMasterKey` and `masterKeyDerivation`.
 
 ### Update identity
 
@@ -1568,58 +1507,11 @@ must sign the exact `masterKeyDerivation` object order they send.
 PUT /identities/{identityId}
 ```
 
-Request:
-
-```json
-{
-  "id": "<identityId>",
-  "encryptedKeyPair": {
-    "publicKey": "<publicKeyPem>",
-    "encryptedPrivateKey": "<opaqueEncryptedPrivateKey>"
-  },
-  "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
-  "masterKeyDerivation": {
-    "algorithm": "scrypt",
-    "N": 262144,
-    "r": 8,
-    "p": 1,
-    "salt": "<base64urlSalt>",
-    "version": 1,
-    "recoveryKey": {
-      "algorithm": "pigeon-recovery-key",
-      "version": 1
-    }
-  },
-  "networks": ["<networkId>"],
-  "previousIdentityExternalIdentifier": "<previousIdentityCid>",
-  "profile": {
-    "name": "Alice Updated",
-    "handle": "alice_new",
-    "picture": "<newPublicImageCid>",
-    "banner": "<newPublicBannerCid>"
-  },
-  "timestamp": 1773848829056,
-  "signature": "<identitySignature>",
-  "version": 2
-}
-```
-
-Implemented:
-
-- require signed request auth from the identity owner
-- accept profile changes, profile image/banner removal and handle changes as signed
-  identity updates
-- accept encrypted master key and derivation metadata changes for client-side
-  password/passkey changes; `encryptedKeyPair.encryptedPrivateKey` is stored and
-  signed as an opaque client-encrypted blob
-- allow adding networks, but reject signed identity updates that remove any
-  previously joined network
-- validate the signed identity candidate and previous identity chain before
-  publishing
-- return the new `identityExternalIdentifier` for the just-published identity
-  version
-- store `profile.picture` and `profile.banner` as public IPFS image CIDs; omit
-  them or send `null` in the signed profile to remove the media
+Updates use the same signed public shape and add
+`previousIdentityExternalIdentifier`. They may update public profile data and
+add networks, but cannot remove a previously joined network or replace the
+pinned genesis credential commitment or recovery authority. The node validates
+the complete previous-publication chain before publishing the new CID.
 
 ## Keychain HTTP API
 

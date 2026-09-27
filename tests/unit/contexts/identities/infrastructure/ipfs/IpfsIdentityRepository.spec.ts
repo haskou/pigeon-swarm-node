@@ -4,6 +4,7 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import { IdentityNotFoundError } from '../../../../../../src/contexts/identities/domain/errors/IdentityNotFoundError';
 import { Identity } from '../../../../../../src/contexts/identities/domain/Identity';
 import { Profile } from '../../../../../../src/contexts/identities/domain/Profile';
+import { DeviceCredential } from '../../../../../../src/contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityExternalIdentifier } from '../../../../../../src/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '../../../../../../src/contexts/identities/domain/value-objects/ProfileHandle';
 import { ProfileName } from '../../../../../../src/contexts/identities/domain/value-objects/ProfileName';
@@ -45,23 +46,16 @@ describe('IpfsIdentityRepository', () => {
     handle?: string,
   ): Promise<Identity> {
     const keyPair = await KeyPair.generate();
-    const encryptedKeyPair = await keyPair.encryptKeyPair(
-      'Super-secret-password1!',
+    const recoveryKeyPair = await KeyPair.generate();
+    const deviceCredential = DeviceCredential.fromString(
+      keyPair.toPrimitives().publicKey,
     );
     const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
     const previousIdentityExternalIdentifier: string | undefined = undefined;
     const signaturePayload = {
-      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
-      encryptedMasterKey: 'v1.test.encrypted-master-key',
+      authorizationRevision: 0,
+      deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),
       id: identityId.valueOf(),
-      masterKeyDerivation: {
-        passkeyPrf: {
-          algorithm: 'webauthn-prf',
-          credentialId: 'test-credential-id',
-          salt: 'test-salt',
-          version: 1,
-        },
-      },
       networks: [networkId],
       previousIdentityExternalIdentifier,
       profile: new Profile(
@@ -71,6 +65,7 @@ describe('IpfsIdentityRepository', () => {
         undefined,
         handle ? new ProfileHandle(handle) : undefined,
       ).toPrimitives(),
+      recoveryAuthority: recoveryKeyPair.toPrimitives().publicKey,
       timestamp: 1773848829055,
       version: 1,
     };
@@ -517,11 +512,10 @@ describe('IpfsIdentityRepository', () => {
       const previousPrimitives = previousIdentity.toPrimitives();
       const previousCidString = 'bafyidentity-v1';
       const currentCidString = 'bafyidentity-v2';
-      const currentIdentity = await previousIdentity.updateProfile(
-        new Profile(new ProfileName('Jane')),
-        mother.password,
-        new IdentityExternalIdentifier(previousCidString),
-      );
+      const currentIdentity = await mother.buildNext({
+        previousIdentityExternalIdentifier: previousCidString,
+        profile: new Profile(new ProfileName('Jane')).toPrimitives(),
+      });
 
       metadataRepository.findByIdentityId.mockResolvedValue([
         {
@@ -705,11 +699,10 @@ describe('IpfsIdentityRepository', () => {
       const previousPrimitives = previousIdentity.toPrimitives();
       const previousCidString = 'bafypreviousidentity';
       const candidateCidString = 'bafyupdatedidentity';
-      const candidate = await previousIdentity.updateProfile(
-        new Profile(new ProfileName('Jane')),
-        mother.password,
-        new IdentityExternalIdentifier(previousCidString),
-      );
+      const candidate = await mother.buildNext({
+        previousIdentityExternalIdentifier: previousCidString,
+        profile: new Profile(new ProfileName('Jane')).toPrimitives(),
+      });
 
       metadataRepository.findByIdentityId.mockResolvedValue([]);
       ipfsManager.getRecordCandidates.mockResolvedValue([candidateCidString]);
@@ -738,11 +731,10 @@ describe('IpfsIdentityRepository', () => {
       const previousPrimitives = previousIdentity.toPrimitives();
       const previousCidString = 'bafypreviousidentity';
       const currentCidString = 'bafycurrentidentity';
-      const candidate = await previousIdentity.updateProfile(
-        new Profile(new ProfileName('Jane')),
-        mother.password,
-        new IdentityExternalIdentifier(previousCidString),
-      );
+      const candidate = await mother.buildNext({
+        previousIdentityExternalIdentifier: previousCidString,
+        profile: new Profile(new ProfileName('Jane')).toPrimitives(),
+      });
 
       metadataRepository.findByIdentityId.mockResolvedValue([
         {
@@ -795,11 +787,10 @@ describe('IpfsIdentityRepository', () => {
       const previousPrimitives = previousIdentity.toPrimitives();
       const previousCidString = 'bafyunknownpreviousidentity';
       const candidateCidString = 'bafyupdatedidentity';
-      const candidate = await previousIdentity.updateProfile(
-        new Profile(new ProfileName('Jane')),
-        mother.password,
-        new IdentityExternalIdentifier(previousCidString),
-      );
+      const candidate = await mother.buildNext({
+        previousIdentityExternalIdentifier: previousCidString,
+        profile: new Profile(new ProfileName('Jane')).toPrimitives(),
+      });
 
       metadataRepository.findByIdentityId.mockResolvedValue([]);
       ipfsManager.getRecordCandidates.mockResolvedValue([candidateCidString]);

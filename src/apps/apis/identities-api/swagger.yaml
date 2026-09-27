@@ -91,9 +91,9 @@ components:
       type: object
       required:
         - id
-        - encryptedKeyPair
-        - encryptedMasterKey
-        - masterKeyDerivation
+        - authorizationRevision
+        - deviceCredentialCommitment
+        - recoveryAuthority
         - networks
         - profile
         - timestamp
@@ -102,24 +102,17 @@ components:
       properties:
         id:
           type: string
-        encryptedKeyPair:
-          type: object
-          required:
-            - encryptedPrivateKey
-            - publicKey
-          properties:
-            encryptedPrivateKey:
-              type: string
-              description: Opaque encrypted private key blob. Backend stores and signs it but never decrypts it.
-            publicKey:
-              type: string
-        encryptedMasterKey:
+        authorizationRevision:
+          type: integer
+          minimum: 0
+          description: Authorization checkpoint revision covered by the identity signature.
+        deviceCredentialCommitment:
           type: string
-          description: Opaque encrypted identity master key. Backend stores and signs it but does not decrypt it.
-        masterKeyDerivation:
-          type: object
-          additionalProperties: true
-          description: Opaque client-controlled metadata required to decrypt encryptedMasterKey. Backend stores and signs the complete object but never interprets or decrypts recovery keys, passkey PRF envelopes, KEKs, MasterKey material or keychains. New identities may omit passkeyPrf.
+          pattern: '^[a-f0-9]{64}$'
+          description: SHA-256 commitment to the canonical genesis device signing credential.
+        recoveryAuthority:
+          type: string
+          description: Public recovery authority key in canonical PEM form. No recovery secret is published.
         networks:
           type: array
           description: Identity networks. Signed updates may add networks but cannot remove existing ones.
@@ -167,9 +160,9 @@ components:
       type: object
       required:
         - id
-        - encryptedKeyPair
-        - encryptedMasterKey
-        - masterKeyDerivation
+        - authorizationRevision
+        - deviceCredentialCommitment
+        - recoveryAuthority
         - profile
         - networks
         - timestamp
@@ -179,37 +172,18 @@ components:
         id:
           type: string
           example: MCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=
-        encryptedKeyPair:
-          type: object
-          required:
-            - encryptedPrivateKey
-            - publicKey
-          properties:
-            encryptedPrivateKey:
-              type: string
-              description: Opaque encrypted private key blob. Backend stores and signs it but never decrypts it.
-              example: 2s2IhQsbhsmzNWia+DRGOMIQHEcR+Gi45fSM6Di1FOhOPFTs1NB3Fzhi8/bCEcmGdn0WRq5AjN1pb8iZkZpGpNstPm9v4gcPbGqAUnGCAtAQqiPMiJ1Tr9YQCSIUodxwfowdFvBAZaFGNcoObVoYJgnRjWWq2YQ=.f1itGk2AXdi33/e8.OEIZELL7lzYRXWwFSB0wtA==.CuZAT6/b/TiVLT+sp03ULg==
-            publicKey:
-              type: string
-              example: -----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=\n-----END PUBLIC KEY-----\n
-        encryptedMasterKey:
+        authorizationRevision:
+          type: integer
+          minimum: 0
+          example: 0
+        deviceCredentialCommitment:
           type: string
-          description: Opaque encrypted identity master key. The backend never decrypts it.
-          example: v1.aes-gcm.exampleEncryptedMasterKey
-        masterKeyDerivation:
-          type: object
-          additionalProperties: true
-          description: Opaque derivation metadata used by clients to decrypt encryptedMasterKey. Backend stores and signs the complete object, including recoveryKey when present, but never interprets or decrypts recovery keys, passkey PRF envelopes, KEKs, MasterKey material or keychains. passkeyPrf is optional because local WebAuthn PRF envelopes may remain only on the client.
-          example:
-            algorithm: scrypt
-            N: 262144
-            r: 8
-            p: 1
-            salt: base64urlSalt
-            version: 1
-            recoveryKey:
-              algorithm: pigeon-recovery-key
-              version: 1
+          pattern: '^[a-f0-9]{64}$'
+          example: 97f378b2eceeac872a5deeafeaf28e4ca6af31e98aa9302651df30386de067c8
+        recoveryAuthority:
+          type: string
+          description: Public recovery authority key in canonical PEM form. No recovery secret is published.
+          example: -----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=\n-----END PUBLIC KEY-----\n
         networks:
           type: array
           items:

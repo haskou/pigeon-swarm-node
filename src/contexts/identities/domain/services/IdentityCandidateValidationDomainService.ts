@@ -10,7 +10,7 @@ export default class IdentityCandidateValidationDomainService {
   ): boolean {
     return (
       candidate.isNextVersionAfter(previousIdentity) &&
-      candidate.usesSameSigningKeyAs(previousIdentity) &&
+      candidate.usesSameGenesisAuthorizationAs(previousIdentity) &&
       candidate.keepsNetworksFrom(previousIdentity)
     );
   }

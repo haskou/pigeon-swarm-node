@@ -1,4 +1,4 @@
 export type ClientContractResource = {
   protocol: 'pigeon-swarm';
-  apiVersion: 1;
+  apiVersion: 2;
 };

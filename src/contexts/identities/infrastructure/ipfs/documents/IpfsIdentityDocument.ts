@@ -1,11 +1,7 @@
 export interface IpfsIdentityDocument {
   _id: string;
-  encryptedKeyPair: {
-    publicKey: string;
-    encryptedPrivateKey: string;
-  };
-  encryptedMasterKey: string;
-  masterKeyDerivation: Record<string, unknown>;
+  authorizationRevision: number;
+  deviceCredentialCommitment: string;
   networks: string[];
   previousCid: string | undefined;
   profile: {
@@ -15,6 +11,7 @@ export interface IpfsIdentityDocument {
     name: string;
     picture: string | undefined;
   };
+  recoveryAuthority: string;
   timestamp: number;
   version: number;
   signature: string;

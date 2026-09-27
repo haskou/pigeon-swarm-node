@@ -1,5 +1,4 @@
-import { Identity } from '@app/contexts/identities/domain/Identity';
-import { PrimitiveOf } from '@haskou/value-objects';
+import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
 
 export interface OrbitDBIdentityMetadataDocument extends Record<
   string,
@@ -9,7 +8,7 @@ export interface OrbitDBIdentityMetadataDocument extends Record<
   deleted?: boolean;
   handle?: string;
   id: string;
-  identity?: PrimitiveOf<Identity>;
+  identity?: IdentityPrimitives;
   identityId: string;
   networkId?: string;
   networkIds?: string[];

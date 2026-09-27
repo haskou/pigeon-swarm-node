@@ -5,6 +5,7 @@ import IdentityPublisher from '@app/contexts/identities/application/publish/Iden
 import { IdentityPublishMessage } from '@app/contexts/identities/application/publish/messages/IdentityPublishMessage';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import IdentityMetadataIndex from '@app/contexts/identities/infrastructure/metadata/IdentityMetadataIndex';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -136,8 +137,9 @@ export default class RegisterIdentityWhenPublishedDefinition {
     const publisher =
       Kernel.di.getService<IdentityPublisher>(IdentityPublisher);
     const keyPair = await KeyPair.generate();
-    const encryptedKeyPair = await keyPair.encryptKeyPair(
-      'Super-secret-password1!',
+    const recoveryKeyPair = await KeyPair.generate();
+    const deviceCredential = DeviceCredential.fromString(
+      keyPair.toPrimitives().publicKey,
     );
     const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
     const previousIdentityExternalIdentifier: string | undefined = undefined;
@@ -155,20 +157,13 @@ export default class RegisterIdentityWhenPublishedDefinition {
       picture: undefined,
     };
     const signaturePayload = {
-      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
-      encryptedMasterKey: 'v1.test.encrypted-master-key',
+      authorizationRevision: 0,
+      deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),
       id: identityId.valueOf(),
-      masterKeyDerivation: {
-        passkeyPrf: {
-          algorithm: 'webauthn-prf',
-          credentialId: 'test-credential-id',
-          salt: 'test-salt',
-          version: 1,
-        },
-      },
       networks: [networkId],
       previousIdentityExternalIdentifier,
       profile,
+      recoveryAuthority: recoveryKeyPair.toPrimitives().publicKey,
       timestamp: 1773848829055,
       version: 1,
     };

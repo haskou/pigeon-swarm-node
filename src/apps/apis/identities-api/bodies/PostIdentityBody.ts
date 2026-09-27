@@ -1,27 +1,40 @@
 import {
   ArrayMinSize,
   IsArray,
+  IsInt,
+  IsEmpty,
   IsNumber,
   IsObject,
   IsOptional,
   IsString,
+  Min,
 } from 'class-validator';
 
 export class PostIdentityBody {
+  @IsEmpty()
+  public readonly encryptedKeyPair?: never;
+
+  @IsEmpty()
+  public readonly encryptedMasterKey?: never;
+
+  @IsEmpty()
+  public readonly encryptedPrivateKey?: never;
+
+  @IsEmpty()
+  public readonly masterKeyDerivation?: never;
+
   @IsString()
   public readonly id: string;
 
-  @IsObject()
-  public readonly encryptedKeyPair: {
-    encryptedPrivateKey: string;
-    publicKey: string;
-  };
+  @IsInt()
+  @Min(0)
+  public readonly authorizationRevision: number;
 
   @IsString()
-  public readonly encryptedMasterKey: string;
+  public readonly deviceCredentialCommitment: string;
 
-  @IsObject()
-  public readonly masterKeyDerivation: Record<string, unknown>;
+  @IsString()
+  public readonly recoveryAuthority: string;
 
   @IsArray()
   @IsString({ each: true })

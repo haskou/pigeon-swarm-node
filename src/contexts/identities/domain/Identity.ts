@@ -1,41 +1,30 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import { Password } from '@app/contexts/shared/domain/value-objects/Password';
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
-import {
-  assert,
-  PrimitiveOf,
-  Timestamp,
-  UniqueObjectArray,
-} from '@haskou/value-objects';
+import { UniqueObjectArray, assert } from '@haskou/value-objects';
 
 import { IdentitySignatureDomainService } from './domain-services/IdentitySignatureDomainService';
-import { IdentityCannotLeaveNetworkError } from './errors/IdentityCannotLeaveNetworkError';
 import { IdentityMustHaveAtLeastOneNetworkError } from './errors/IdentityMustHaveAtLeastOneNetworkError';
 import { InvalidIdentitySignatureError } from './errors/InvalidIdentitySignatureError';
 import { IdentityWasCreatedEvent } from './events/IdentityWasCreatedEvent';
 import { IdentityWasUpdatedEvent } from './events/IdentityWasUpdatedEvent';
+import { IdentityPrimitives } from './IdentityPrimitives';
 import { IdentityPublication } from './IdentityPublication';
 import { IdentitySignaturePayload } from './IdentitySignaturePayload';
-import { Profile } from './Profile';
-import { EncryptedMasterKey } from './value-objects/EncryptedMasterKey';
+import { DeviceCredential } from './value-objects/DeviceCredential';
+import { DeviceCredentialCommitment } from './value-objects/DeviceCredentialCommitment';
+import { IdentityAuthorizationRevision } from './value-objects/IdentityAuthorizationRevision';
 import { IdentityExternalIdentifier } from './value-objects/IdentityExternalIdentifier';
-import { IdentitySigningKey } from './value-objects/IdentitySigningKey';
-import { MasterKeyDerivation } from './value-objects/MasterKeyDerivation';
 import { ProfileHandle } from './value-objects/ProfileHandle';
+import { RecoveryAuthority } from './value-objects/RecoveryAuthority';
 
 export class Identity extends AggregateRoot {
-  public static fromPrimitives(
-    primitives: Omit<PrimitiveOf<Identity>, 'masterKeyDerivation'> & {
-      masterKeyDerivation: Record<string, unknown>;
-    },
-  ): Identity {
+  public static fromPrimitives(primitives: IdentityPrimitives): Identity {
     return new Identity(
       new IdentityId(primitives.id),
-      IdentitySigningKey.fromPrimitives(primitives.encryptedKeyPair),
-      new EncryptedMasterKey(primitives.encryptedMasterKey),
-      MasterKeyDerivation.fromPrimitives(primitives.masterKeyDerivation),
+      new DeviceCredentialCommitment(primitives.deviceCredentialCommitment),
+      RecoveryAuthority.fromString(primitives.recoveryAuthority),
+      new IdentityAuthorizationRevision(primitives.authorizationRevision),
       UniqueObjectArray.fromArray(
         primitives.networks.map((networkId) => new NetworkId(networkId)),
       ),
@@ -44,9 +33,7 @@ export class Identity extends AggregateRoot {
   }
 
   public static fromSignedPublication(
-    primitives: Omit<PrimitiveOf<Identity>, 'masterKeyDerivation'> & {
-      masterKeyDerivation: Record<string, unknown>;
-    },
+    primitives: IdentityPrimitives,
   ): Identity {
     const identity = Identity.fromPrimitives(primitives);
 
@@ -63,23 +50,27 @@ export class Identity extends AggregateRoot {
     return identity;
   }
 
-  constructor(
+  public constructor(
     private readonly id: IdentityId,
-    private readonly signingKey: IdentitySigningKey,
-    private readonly encryptedMasterKey: EncryptedMasterKey,
-    private readonly masterKeyDerivation: MasterKeyDerivation,
+    private readonly deviceCredentialCommitment: DeviceCredentialCommitment,
+    private readonly recoveryAuthority: RecoveryAuthority,
+    private readonly authorizationRevision: IdentityAuthorizationRevision,
     private readonly networks: UniqueObjectArray<NetworkId>,
     private readonly publication: IdentityPublication,
   ) {
     super();
 
+    const genesisCredential = DeviceCredential.fromIdentityId(this.id);
+
     assert(
-      this.signingKey.identifies(this.id),
+      genesisCredential
+        .getCommitment()
+        .isEqual(this.deviceCredentialCommitment),
       new InvalidIdentitySignatureError(),
     );
     assert(
       new IdentitySignatureDomainService().isValidSignature(
-        this.id,
+        genesisCredential,
         IdentitySignaturePayload.fromPrimitives(this.toPrimitives()),
         this.publication.getSignature(),
       ),
@@ -88,28 +79,6 @@ export class Identity extends AggregateRoot {
     assert(
       this.networks.length() > 0,
       new IdentityMustHaveAtLeastOneNetworkError(),
-    );
-  }
-
-  private async signPublication(
-    payload: IdentitySignaturePayload,
-    password: Password,
-  ): Promise<Signature> {
-    return new IdentitySignatureDomainService().generateSignature(
-      payload,
-      this.signingKey,
-      password,
-    );
-  }
-
-  private ensureKeepsCurrentNetworks(networks: NetworkId[]): void {
-    assert(
-      this.networks
-        .toArray()
-        .every((currentNetworkId) =>
-          networks.some((networkId) => networkId.isEqual(currentNetworkId)),
-        ),
-      new IdentityCannotLeaveNetworkError(),
     );
   }
 
@@ -145,8 +114,12 @@ export class Identity extends AggregateRoot {
     return this.publication.isNextVersionAfter(previous.publication);
   }
 
-  public usesSameSigningKeyAs(previous: Identity): boolean {
-    return this.signingKey.signsSameIdentityAs(previous.signingKey);
+  public usesSameGenesisAuthorizationAs(previous: Identity): boolean {
+    return (
+      this.deviceCredentialCommitment.isEqual(
+        previous.deviceCredentialCommitment,
+      ) && this.recoveryAuthority.isEqual(previous.recoveryAuthority)
+    );
   }
 
   public keepsNetworksFrom(previous: Identity): boolean {
@@ -159,82 +132,14 @@ export class Identity extends AggregateRoot {
       );
   }
 
-  public toPrimitives() {
+  public toPrimitives(): IdentityPrimitives {
     return {
-      encryptedKeyPair: this.signingKey.toPrimitives(),
-      encryptedMasterKey: this.encryptedMasterKey.valueOf(),
+      authorizationRevision: this.authorizationRevision.valueOf(),
+      deviceCredentialCommitment: this.deviceCredentialCommitment.valueOf(),
       id: this.id.valueOf(),
-      masterKeyDerivation: this.masterKeyDerivation.toPrimitives(),
       networks: this.networks.toArray().map((networkId) => networkId.valueOf()),
+      recoveryAuthority: this.recoveryAuthority.valueOf(),
       ...this.publication.toPrimitives(),
     };
-  }
-
-  public async updateNetworks(
-    networks: NetworkId[],
-    password: Password,
-    previousIdentityExternalIdentifier: IdentityExternalIdentifier,
-  ): Promise<Identity> {
-    this.ensureKeepsCurrentNetworks(networks);
-
-    const unsignedPublication = {
-      ...this.toPrimitives(),
-      networks: networks.map((networkId) => networkId.valueOf()),
-      previousIdentityExternalIdentifier:
-        previousIdentityExternalIdentifier.valueOf(),
-      signature: '',
-      timestamp: Timestamp.now().valueOf(),
-      version: this.publication.nextVersion().valueOf(),
-    };
-    const signature = await this.signPublication(
-      IdentitySignaturePayload.fromPrimitives(unsignedPublication),
-      password,
-    );
-    const primitives = {
-      ...unsignedPublication,
-      signature: signature.valueOf(),
-    };
-    const identity = Identity.fromPrimitives(primitives);
-
-    identity.record(
-      new IdentityWasUpdatedEvent(primitives.id, {
-        networkIds: primitives.networks,
-      }),
-    );
-
-    return identity;
-  }
-
-  public async updateProfile(
-    profile: Profile,
-    password: Password,
-    previousIdentityExternalIdentifier: IdentityExternalIdentifier,
-  ): Promise<Identity> {
-    const unsignedPublication = {
-      ...this.toPrimitives(),
-      previousIdentityExternalIdentifier:
-        previousIdentityExternalIdentifier.valueOf(),
-      profile: profile.toPrimitives(),
-      signature: '',
-      timestamp: Timestamp.now().valueOf(),
-      version: this.publication.nextVersion().valueOf(),
-    };
-    const signature = await this.signPublication(
-      IdentitySignaturePayload.fromPrimitives(unsignedPublication),
-      password,
-    );
-    const primitives = {
-      ...unsignedPublication,
-      signature: signature.valueOf(),
-    };
-    const identity = Identity.fromPrimitives(primitives);
-
-    identity.record(
-      new IdentityWasUpdatedEvent(primitives.id, {
-        networkIds: primitives.networks,
-      }),
-    );
-
-    return identity;
   }
 }

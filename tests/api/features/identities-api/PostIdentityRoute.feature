@@ -30,8 +30,12 @@ Feature: Post identity route
 	      | profile.name   | bob                                  |
 	      | profile.handle | bob                                  |
 	      | networks[0]    | 123e4567-e89b-12d3-a456-426614174000 |
-	    And response body should contain "encryptedMasterKey"
-	    And response body should contain "masterKeyDerivation"
+	    And response body should contain "deviceCredentialCommitment"
+	    And response body should contain "recoveryAuthority"
+	    And response body should contain "authorizationRevision"
+	    And response body should not contain "encryptedPrivateKey"
+	    And response body should not contain "encryptedMasterKey"
+	    And response body should not contain "masterKeyDerivation"
 	    And response body should contain "identityExternalIdentifier"
     And it has been pinned in ipfs
     When I GET "/identities/bob"
@@ -40,6 +44,14 @@ Feature: Post identity route
       | profile.name   | bob |
       | profile.handle | bob |
     And response body should contain "identityExternalIdentifier"
+
+  Scenario: Reject legacy unlock material on a signed identity
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
+    And I set a client-signed identity body with name "legacy" and handle "legacy"
+    And I add legacy identity unlock fields
+    When I POST to "/identities/"
+    Then response code is equal to 400
 
   Scenario: Update a client-signed identity profile and encrypted key pair
     Given I am an anonymous user

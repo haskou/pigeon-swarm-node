@@ -1,4 +1,5 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
 import IdentityMetadataIndex from '@app/contexts/identities/infrastructure/metadata/IdentityMetadataIndex';
@@ -6,7 +7,6 @@ import { IdentityMetadataRecord } from '@app/contexts/identities/infrastructure/
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { PrimitiveOf } from '@haskou/value-objects';
 
 import { OrbitDBIdentityMetadataDocument } from './documents/OrbitDBIdentityMetadataDocument';
 
@@ -92,7 +92,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
 
     try {
       return Identity.fromPrimitives(
-        document.identity as PrimitiveOf<Identity>,
+        document.identity as unknown as IdentityPrimitives,
       );
     } catch {
       return undefined;
