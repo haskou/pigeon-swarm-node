@@ -253,7 +253,6 @@ Acknowledgements are internal node-to-node events and are not forwarded to
 frontend WebSockets. If an acknowledgement is lost, the next signal retry
 causes the frontend to acknowledge the same `signalId` again.
 
-
 ## Community replica convergence
 
 Community documents carry optional `replicaState: { version: 1, entries }` metadata.
@@ -369,6 +368,39 @@ checkpoint or the public replication path.
 Version 1 accepts only `membership.propose`, `membership.commit` and
 `device.revoke`. There is no legacy private-format fallback or dual write.
 Public communities continue to use their public replication path.
+
+## Identity device authorization convergence
+
+Device authorization transitions are not published on shared PubSub. OrbitDB
+replicates their signed history only through the identity's configured private
+networks. Every replica rebuilds the checkpoint from the identity-pinned genesis
+and runs the same credential, proof-of-possession, causal revision and recovery
+authority checks before accepting a transition. Invalid and duplicate records
+cannot change the materialized checkpoint.
+
+OrbitDB stores the verified genesis checkpoint, signed public transition history
+and current materialized checkpoint in the identity's private networks. It never
+stores passwords, password derivation metadata, protected device roots, device
+unlock factors or recovery secrets. Operation and pairing UUIDs remain as replay
+tombstones. Their retention is required for replay safety and reveals that a
+control transition occurred to readers of the private network; it does not expose
+the paired device's local root or unlock material.
+
+The public identity publication binds an independent genesis device credential
+and its commitment under the identity signature. The node does not derive that
+credential from the identity key.
+
+Concurrent valid transitions from the same predecessor are ordered by operation
+UUID, independent of arrival time. Each replica replays the same signed candidates
+from the pinned genesis checkpoint and therefore selects the same authorization
+state after exchanging heads. Both devices sign the pairing identifier,
+authorization time and expiration, and the target client must refuse to complete
+an offer after that expiration. Replicas validate that signed interval but do not
+compare it with their receipt clock: a fully signed enrollment may arrive after an
+offline partition and must replay identically everywhere. Pairing and operation
+identifiers remain permanent replay tombstones. Signed time never grants authority
+or wins a conflict. A transition authored from a losing branch is rechecked against
+the selected checkpoint before it can affect later revisions.
 
 ## Live call projection boundary
 

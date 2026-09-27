@@ -31,9 +31,9 @@ second canonical JSON or signature format.
 - This boundary does not make a participant-owned node safe after its process or
   local storage is compromised. Every participant independently verifies remote
   input and no node vouches for another node.
-- It does not provide opaque mailbox delivery, browser vault storage, device
-  enrollment, total-loss recovery or traffic-analysis resistance. Those features
-  consume this authorization boundary separately.
+- It does not provide opaque mailbox delivery, browser vault storage, recovery UX
+  or traffic-analysis resistance. Those features consume this authorization
+  boundary separately.
 - It does not authorize ordinary messages, reactions, receipts, presence or call
   signaling in the node. Version 1 node integration accepts only private control
   operations. Private content remains unavailable through this path rather than
@@ -131,28 +131,31 @@ are rejected. The commit must reproduce the proposal intent byte-for-byte after
 canonical normalization; a control transition cannot smuggle another domain
 change behind an approved proposal.
 
-## Initial identity binding
+## Device identity binding
 
-The current identity model has one Ed25519 signing credential shared by that
-identity's clients. For newly created protected scopes, version 1 binds an
-`authorDeviceKey` to an existing `IdentityId` only when the raw 32-byte Ed25519
-key extracted from the independently verified identity SPKI is an exact match.
-The operation's own key field is never sufficient evidence for this binding.
+Each private operation binds an `authorIdentityId`, independent Ed25519
+`authorDeviceKey` and exact identity-authorization revision inside the signed
+payload. The node resolves the private device key to its canonical public
+credential, verifies that credential against the current device-authorization
+checkpoint and requires the same identity-to-device mapping in the scope-local
+checkpoint. A claimed identity or device key is never sufficient evidence by
+itself.
 
-This is an explicit single-credential compatibility boundary, not a device model.
-Malformed, non-Ed25519 or non-canonical identity keys fail closed. There is no
-lookup fallback and no acceptance based on a claimed identity in the payload.
-Independent per-device credentials will replace this binding through an admitted,
-scope-private credential record; the signed operation envelope and authorization
-pipeline remain unchanged.
+Malformed, non-Ed25519 and stale credentials fail closed. Revoking a credential
+in the identity authorization checkpoint immediately prevents it from signing
+new operations at that node. The corresponding private control transition also
+removes it from the scope's MLS policy and rotates the protected state; neither
+step can make ciphertext already obtained by that device secret again.
 
 ## Genesis provisioning
 
 An attached client provisions a new protected scope through the authenticated
-`POST /private-authorization/scopes` endpoint. The signed HTTP identity is
-converted to the expected owner device key before the owner-signed genesis is
-verified. The verifier binds the signature to the scope identifier and MLS
-context hash, and the supplied protected MLS state must hash to that context.
+`POST /private-authorization/scopes` endpoint. The request declares the owner
+device key and exact identity-authorization revision. The node requires that
+credential to be authorized for the signed HTTP identity before verifying the
+device-signed genesis. The verifier binds the signature to the scope identifier
+and MLS context hash, and the supplied protected MLS state must hash to that
+context.
 
 Version 1 genesis contains one owner credential. Its community projection must
 use the same scope and owner, contain only that owner as a member, and disable
@@ -174,7 +177,8 @@ any visible or durable acceptance change.
 4. If the operation identifier already exists, return success only when its stored
    digest is identical. A different digest freezes the scope as an equivocation.
 5. Require exact scope equality and a supported control kind.
-6. Resolve the expected author key from the local checkpoint and identity binding,
+6. Resolve the author identity and device from the local scope checkpoint, require
+   the device credential at the exact current identity-authorization revision,
    then call `PrivateOperationSignature.verify` with that expected key.
 7. Require the operation authorization revision to equal the locally accepted
    checkpoint revision. A future revision enters the bounded pending queue; an old

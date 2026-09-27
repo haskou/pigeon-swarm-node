@@ -25,6 +25,8 @@ export class PostPrivateAuthorizationScopeRoute extends NodeOwnerRouteSupport {
     const result = await this.provisioner.provision(
       new PrivateAuthorizationScopeProvisionMessage(
         identityId.valueOf(),
+        body.identityAuthorizationRevision,
+        body.ownerDeviceKey,
         body.signedGenesisJson,
         body.protectedMlsState,
         body.projection,

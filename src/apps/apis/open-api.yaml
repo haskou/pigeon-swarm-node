@@ -8,6 +8,7 @@ tags:
   - name: communities
   - name: conversations
   - name: identities
+  - name: identity-devices
   - name: ipfs
   - name: keychains
   - name: link-previews
@@ -20,6 +21,8 @@ tags:
   - name: push
   - name: realtime
 paths:
+  /identity-devices/transitions:
+    $ref: './identity-devices-api/swagger.yaml#/paths/~1identity-devices~1transitions'
   /private-authorization/scopes:
     $ref: './private-authorization-api/swagger.yaml#/paths/~1private-authorization~1scopes'
   /private-authorization/challenges:

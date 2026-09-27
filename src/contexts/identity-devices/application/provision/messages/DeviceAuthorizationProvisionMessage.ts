@@ -1,0 +1,13 @@
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
+import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+
+export class DeviceAuthorizationProvisionMessage {
+  public constructor(
+    public readonly identityId: IdentityId,
+    public readonly networkIds: NetworkId[],
+    public readonly credential: DeviceCredential,
+    public readonly recoveryAuthority: RecoveryAuthority,
+  ) {}
+}

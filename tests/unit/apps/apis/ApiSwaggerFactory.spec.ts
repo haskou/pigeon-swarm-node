@@ -16,6 +16,7 @@ describe('ApiSwaggerFactory', () => {
         'communities-api',
         'conversations-api',
         'identities-api',
+        'identity-devices-api',
         'ipfs-api',
         'keychains-api',
         'link-previews-api',
@@ -108,6 +109,8 @@ describe('ApiSwaggerFactory', () => {
         'communities-api': '/api/swagger/communities-api/swagger.yaml',
         'conversations-api': '/api/swagger/conversations-api/swagger.yaml',
         'identities-api': '/api/swagger/identities-api/swagger.yaml',
+        'identity-devices-api':
+          '/api/swagger/identity-devices-api/swagger.yaml',
         'ipfs-api': '/api/swagger/ipfs-api/swagger.yaml',
         'keychains-api': '/api/swagger/keychains-api/swagger.yaml',
         'link-previews-api': '/api/swagger/link-previews-api/swagger.yaml',

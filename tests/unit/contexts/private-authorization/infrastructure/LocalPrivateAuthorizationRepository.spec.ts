@@ -24,6 +24,7 @@ describe('LocalPrivateAuthorizationRepository', () => {
       admittedDeviceKeys: ['owner'],
       authorityKeys: ['owner'],
       controlCheckpointJson: '{}',
+      deviceIdentities: [{ deviceKey: 'owner', identityId: 'identity' }],
       freshnessAuthorityKey: 'owner',
       headHash: 'head-0',
       scopeId: 'scope',
@@ -31,11 +32,13 @@ describe('LocalPrivateAuthorizationRepository', () => {
   const operation = (id: string) =>
     PrivateControlOperation.fromPrimitives({
       authorDeviceKey: 'owner',
+      authorIdentityId: 'identity',
       authorizationRevision: 1,
       byteSize: 10,
       control: { parentHeadHash: 'head-0' },
       digest: `digest-${id}`,
       id,
+      identityAuthorizationRevision: 0,
       kind: 'membership.propose',
       mutation: { targetIdentityId: 'member', type: 'member.ban' },
       previousOperationIds: [],

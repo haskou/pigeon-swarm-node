@@ -69,6 +69,7 @@ import { PutConversationMessagesReadUntilRoute } from '@app/apps/apis/conversati
 import { GetIdentityRoute } from '@app/apps/apis/identities-api/routes/GetIdentityRoute';
 import { PostIdentityRoute } from '@app/apps/apis/identities-api/routes/PostIdentityRoute';
 import { PutIdentityRoute } from '@app/apps/apis/identities-api/routes/PutIdentityRoute';
+import { PostDeviceAuthorizationTransitionRoute } from '@app/apps/apis/identity-devices-api/routes/PostDeviceAuthorizationTransitionRoute';
 import { GetContentReplicationStatusRoute } from '@app/apps/apis/ipfs-api/routes/GetContentReplicationStatusRoute';
 import { GetIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/GetIPFSContentRoute';
 import { PostNetworkIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/PostNetworkIPFSContentRoute';
@@ -143,6 +144,7 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   GetIdentityRoute,
   PostIdentityRoute,
   PutIdentityRoute,
+  PostDeviceAuthorizationTransitionRoute,
   GetKeychainRoute,
   PostKeychainRoute,
   PostLinkPreviewRoute,

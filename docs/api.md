@@ -4327,9 +4327,11 @@ polls reject new votes.
 
 Create a protected scope with `POST /private-authorization/scopes`. The signed
 request identity must own the submitted private community projection. The body
-contains the owner-signed genesis, its protected MLS state and an owner-only,
-non-discoverable private community projection. The node verifies and commits
-all three atomically. An identical retry returns `duplicate`; conflicting
+contains an independently authorized owner device key, the exact identity
+authorization revision, the device-signed genesis, its protected MLS state and
+an owner-only, non-discoverable private community projection. The node verifies
+the identity-to-device authorization and commits the initial state atomically.
+An identical retry returns `duplicate`; conflicting
 genesis data is rejected. A node admits at most 16 scopes and 32 MiB of initial
 scope data per owner, and 64 scopes and 256 MiB across all owners.
 
@@ -4338,9 +4340,10 @@ submits the complete signed operation and, for control operations, the same
 participant-encrypted control frame used for acceptance to
 `POST /private-authorization/challenges`. The node verifies the operation
 signature against its local checkpoint and authenticates a control transition
-before durably reserving its child head and returning the exact one-use freshness
-request. The request expires after ten seconds of local monotonic time and is
-consumed only after a valid proof is successfully verified.
+only after the author credential is authorized at the exact current identity
+authorization revision. It then durably reserves the child head and returns the
+exact one-use freshness request. The request expires after ten seconds of local
+monotonic time and is consumed only after a valid proof is successfully verified.
 
 Submit the signed operation, signed freshness proof and, for commits or device
 revocation, the participant-encrypted control frame to
@@ -4355,6 +4358,37 @@ access to the attached node; operation authorship and permissions come only
 from the private operation signature, local checkpoint and community aggregate.
 Errors are fixed and never include the submitted scope, identity, key, payload
 or nested cryptographic error.
+
+## Identity device authorization
+
+Identity creation publishes only a genesis device credential commitment, a
+public recovery authority and authorization revision zero. Passwords, password
+KDF parameters, protected device roots, recovery secrets and encrypted private
+keys are client-local data and are rejected by the identity API.
+
+Submit an enrollment, revocation or recovery operation to:
+
+```http
+POST /identity-devices/transitions
+```
+
+Every transition binds the identity, operation UUID, exact predecessor and next
+revision, operation kind, target public credential and its commitment. Device
+enrollment additionally binds a single-use pairing UUID, a short expiry, the
+authorization time and a proof signed by the target credential. Both device
+signatures cover that time, and the domain rejects an authorization time after
+the pairing expiry. Enrollment and revocation are signed by an authorized
+device credential; recovery is signed by the identity's pinned recovery
+authority and replaces the authorized device set.
+
+The response contains only the identity identifier and deterministic current
+revision; it does not return an authorized-device catalog. Replayed operation or
+pairing identifiers, stale predecessors, pairing authorizations signed after
+their declared expiry, substituted identities or credentials, revoked authors
+and unrelated recovery authorities return `409`. Replicas accept an otherwise
+valid fully signed enrollment after an offline partition; the target client must
+refuse to finish a pairing after its expiry. The endpoint never returns local
+vault envelopes or secret recovery material.
 
 ## Planned API
 

@@ -8,6 +8,7 @@ describe('PrivateAuthorizationCheckpoint', () => {
         admittedDeviceKeys: ['owner'],
         authorityKeys: ['owner'],
         controlCheckpointJson: '{}',
+        deviceIdentities: [{ deviceKey: 'owner', identityId: 'identity' }],
         freshnessAuthorityKey: 'owner',
         headHash: 'head-1',
         parentHeadHash: 'head-0',

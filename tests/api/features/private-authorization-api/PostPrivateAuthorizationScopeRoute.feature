@@ -2,6 +2,8 @@ Feature: Provision a private authorization scope
 
   Scenario: Provision an authenticated private scope atomically and idempotently
     Given the current identity owns the node
+    And the current node has a test network with id "123e4567-e89b-12d3-a456-426614174000" and name "private-authorization-network"
+    And the current identity is published
     And I set a valid private authorization genesis body
     And I sign the current private authorization scope request
     When I POST to "/private-authorization/scopes"
@@ -15,6 +17,8 @@ Feature: Provision a private authorization scope
 
   Scenario: Reject provisioning from an identity that does not own the node
     Given the current identity owns the node
+    And the current node has a test network with id "123e4567-e89b-12d3-a456-426614174000" and name "private-authorization-network"
+    And the current identity is published
     And I set a valid private authorization genesis body
     And another identity signs the current private authorization scope request
     When I POST to "/private-authorization/scopes"
@@ -22,6 +26,8 @@ Feature: Provision a private authorization scope
 
   Scenario: Parse a valid projection larger than the operation envelope limit
     Given the current identity owns the node
+    And the current node has a test network with id "123e4567-e89b-12d3-a456-426614174000" and name "private-authorization-network"
+    And the current identity is published
     And I set a valid private authorization genesis body
     And I add a large valid channel to the private authorization projection
     And I sign the current private authorization scope request

@@ -1,3 +1,5 @@
+import DeviceAuthorizationAccessPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationAccessPolicy';
+import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { PrivateControlFrame } from '@app/contexts/private-authorization/application/accept-operation/messages/PrivateControlFrame';
 import { PrivateControlTransitionProcessor } from '@app/contexts/private-authorization/application/accept-operation/PrivateControlTransitionProcessor';
 import { PrivateVerifiedControlTransition } from '@app/contexts/private-authorization/application/accept-operation/PrivateVerifiedControlTransition';
@@ -5,10 +7,11 @@ import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authoriz
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
 import { PrivateMlsPolicyDevice } from '@app/contexts/private-authorization/domain/PrivateMlsPolicyDevice';
-import { PrivateIdentityBinding } from '@app/contexts/private-authorization/domain/services/PrivateIdentityBinding';
+import { PrivateDeviceCredentialCodec } from '@app/contexts/private-authorization/domain/services/PrivateDeviceCredentialCodec';
 import { AuthenticatedPrivateOperationJson } from '@app/contexts/private-authorization/domain/value-objects/AuthenticatedPrivateOperationJson';
 import { PrivateAuthorizationDeviceKey } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationDeviceKey';
 import { PrivateProtectedMlsState } from '@app/contexts/private-authorization/domain/value-objects/PrivateProtectedMlsState';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Buffer } from 'buffer';
 import { createHash } from 'crypto';
 
@@ -20,7 +23,8 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
   public constructor(
     private readonly verifier: PrivateControlTransitionVerifier,
     private readonly policyVerifier: PrivateMlsPolicyVerifier,
-    private readonly identityBinding: PrivateIdentityBinding,
+    private readonly deviceAuthorization: DeviceAuthorizationAccessPolicy,
+    private readonly credentialCodec: PrivateDeviceCredentialCodec,
   ) {
     super();
   }
@@ -138,25 +142,29 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
     }
   }
 
-  private expectedPolicyDevices(
+  private async expectedPolicyDevices(
     current: PrivateAuthorizationCheckpoint,
     operation: PrivateControlOperation,
-  ): PrivateMlsPolicyDevice[] {
+  ): Promise<PrivateMlsPolicyDevice[]> {
     const mutation = operation.toPrimitives().mutation;
     const devices = this.trustedPolicyDevices(current);
 
     if (mutation.type === 'member.admit') {
-      if (
-        this.identityBinding.bind(mutation.identityId as string) !==
-        mutation.deviceKey
-      ) {
-        throw new InvalidPrivateAuthorizationError();
-      }
+      const deviceKey = new PrivateAuthorizationDeviceKey(
+        mutation.deviceKey as string,
+      );
+      await this.deviceAuthorization.assertAuthorized(
+        new IdentityId(mutation.identityId as string),
+        this.credentialCodec.toCredential(deviceKey),
+        new DeviceAuthorizationRevision(
+          mutation.identityAuthorizationRevision as number,
+        ),
+      );
 
       return [
         ...devices,
         {
-          deviceKey: mutation.deviceKey as string,
+          deviceKey: deviceKey.valueOf(),
           mlsCredentialHash: mutation.mlsCredentialHash as string,
         },
       ];
@@ -169,14 +177,45 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
     }
 
     if (mutation.type === 'member.remove' || mutation.type === 'member.ban') {
-      const targetKey = this.identityBinding.bind(
-        mutation.targetIdentityId as string,
-      );
+      const targetKeys = current
+        .deviceKeysFor(new IdentityId(mutation.targetIdentityId as string))
+        .map((key) => key.valueOf());
 
-      return devices.filter((device) => device.deviceKey !== targetKey);
+      return devices.filter((device) => !targetKeys.includes(device.deviceKey));
     }
 
     if (mutation.type === 'member.roles.set') return devices;
+
+    throw new InvalidPrivateAuthorizationError();
+  }
+
+  private expectedDeviceIdentities(
+    current: PrivateAuthorizationCheckpoint,
+    operation: PrivateControlOperation,
+  ): Array<{ deviceKey: string; identityId: string }> {
+    const identities = current.toPrimitives().deviceIdentities;
+    const mutation = operation.toPrimitives().mutation;
+
+    if (mutation.type === 'member.admit') {
+      return [
+        ...identities.filter(
+          (identity) => identity.deviceKey !== mutation.deviceKey,
+        ),
+        {
+          deviceKey: mutation.deviceKey as string,
+          identityId: mutation.identityId as string,
+        },
+      ];
+    }
+
+    if (
+      mutation.type === 'device.revoke' ||
+      mutation.type === 'member.remove' ||
+      mutation.type === 'member.ban' ||
+      mutation.type === 'member.roles.set'
+    ) {
+      return identities;
+    }
 
     throw new InvalidPrivateAuthorizationError();
   }
@@ -191,12 +230,12 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
     });
   }
 
-  private verifyNow(
+  private async verifyNow(
     checkpoint: PrivateAuthorizationCheckpoint,
     operation: PrivateControlOperation,
     authenticatedOperation: AuthenticatedPrivateOperationJson,
     frame: PrivateControlFrame,
-  ): PrivateVerifiedControlTransition {
+  ): Promise<PrivateVerifiedControlTransition> {
     const mlsMessageHash = this.hash(this.bytes(frame.mlsMessage, 256 * 1024));
     const protectedState = new PrivateProtectedMlsState(
       frame.encryptedMlsState,
@@ -230,7 +269,7 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
     }
     this.policyVerifier.verify(
       candidate.policy.devices,
-      this.expectedPolicyDevices(checkpoint, operation),
+      await this.expectedPolicyDevices(checkpoint, operation),
     );
     const admittedDeviceKeys = candidate.policy.devices.map(
       (device) => device.deviceKey,
@@ -240,12 +279,21 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
         admittedDeviceKeys.map((key) => new PrivateAuthorizationDeviceKey(key)),
       )
       .map((key) => key.valueOf());
+    const recognizedDeviceKeys = new Set([
+      ...admittedDeviceKeys,
+      ...revokedDeviceKeys,
+    ]);
+    const deviceIdentities = this.expectedDeviceIdentities(
+      checkpoint,
+      operation,
+    ).filter((identity) => recognizedDeviceKeys.has(identity.deviceKey));
 
     return {
       checkpoint: PrivateAuthorizationCheckpoint.fromPrimitives({
         admittedDeviceKeys,
         authorityKeys: candidate.policy.authorityKeys,
         controlCheckpointJson: this.controlCheckpointJson(candidate),
+        deviceIdentities,
         freshnessAuthorityKey: candidate.policy.freshnessAuthorityKey,
         headHash: candidate.headHash,
         parentHeadHash: candidate.parentHeadHash,
@@ -263,8 +311,6 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
     authenticatedOperation: AuthenticatedPrivateOperationJson,
     frame: PrivateControlFrame,
   ): Promise<PrivateVerifiedControlTransition> {
-    return Promise.resolve().then(() =>
-      this.verifyNow(checkpoint, operation, authenticatedOperation, frame),
-    );
+    return this.verifyNow(checkpoint, operation, authenticatedOperation, frame);
   }
 }

@@ -9,14 +9,27 @@ import { MessageId } from '@app/contexts/conversations/domain/value-objects/Mess
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
+import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNetworkAdder';
+import { NodeNetworkAdderMessage } from '@app/contexts/nodes/application/add-network/messages/NodeNetworkAdderMessage';
+import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
+import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
+import { DeviceAuthorizationOperationId } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperationId';
+import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
+import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
+import { PairingAuthorization } from '@app/contexts/identity-devices/domain/value-objects/PairingAuthorization';
+import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/PairingId';
+import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
-import LegacyIdentityDeviceBinding from '@app/contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
+import Ed25519PrivateDeviceCredentialCodec from '@app/contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { Kernel } from '@haskou/ddd-kernel';
+import { Timestamp } from '@haskou/value-objects';
 import {
   KeyPair,
   PrivateGenesisSignature,
@@ -63,6 +76,7 @@ export default class Definitions {
   private identityKeyPair: KeyPair | undefined;
   private identityDeviceOwnerKeyPair: KeyPair | undefined;
   private identityRecoveryKeyPair: KeyPair | undefined;
+  private identityDeviceTargetKeyPair: KeyPair | undefined;
 
   private conversationId: string | undefined;
   private currentNetworkId: string | undefined;
@@ -113,6 +127,34 @@ export default class Definitions {
     this.identityRecoveryKeyPair ??= await KeyPair.generate();
 
     return this.identityRecoveryKeyPair;
+  }
+
+  private async waitForReplicatedState(): Promise<void> {
+    const registry = Kernel.di.getService<OrbitDBReplicatedStateRegistry>(
+      OrbitDBReplicatedStateRegistry,
+    );
+    const deadline = Date.now() + 5_000;
+
+    while (Date.now() < deadline) {
+      try {
+        await registry.findHead('api-test-readiness');
+
+        return;
+      } catch (error: unknown) {
+        const code =
+          typeof error === 'object' && error !== null && 'code' in error
+            ? error.code
+            : undefined;
+
+        if (code !== ReplicatedStateNotReadyError.CODE) {
+          throw error;
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    throw new Error('Replicated state did not become ready for the API test.');
   }
 
   private async buildClientSignedIdentityBody(
@@ -479,11 +521,11 @@ export default class Definitions {
 
   @given('I set a valid private authorization genesis body')
   public async iSetAValidPrivateAuthorizationGenesisBody(): Promise<void> {
-    const keyPair = await this.ensureIdentityKeyPair();
+    const keyPair = await this.ensureIdentityDeviceOwnerKeyPair();
     const identityId = this.ownerIdentityId as IdentityId;
-    const ownerDeviceKey = new LegacyIdentityDeviceBinding().bind(
-      identityId.valueOf(),
-    );
+    const ownerDeviceKey = new Ed25519PrivateDeviceCredentialCodec()
+      .toDeviceKey(DeviceCredential.fromString(keyPair.toPrimitives().publicKey))
+      .valueOf();
     const scopeId = randomBytes(32).toString('base64url');
     const protectedState = Buffer.from('private-genesis-state');
     const mlsContextHash = createHash('sha256')
@@ -527,6 +569,8 @@ export default class Definitions {
 
     this.privateAuthorizationScopeId = scopeId;
     this.body = JSON.stringify({
+      identityAuthorizationRevision: 0,
+      ownerDeviceKey,
       projection: {
         autoJoinEnabled: false,
         bannedMemberIds: [],
@@ -595,13 +639,20 @@ export default class Definitions {
 
   @given('the current identity owns the node')
   public async theCurrentIdentityOwnsTheNode(): Promise<void> {
-    await this.ensureIdentityKeyPair();
-    const identityId = this.ownerIdentityId as IdentityId;
+    const identityId = new IdentityId(
+      (await this.ensureIdentityKeyPair()).toPrimitives().publicKey,
+    );
     const assigner = Kernel.di.getService<NodeOwnerAssigner>(NodeOwnerAssigner);
 
     await assigner.assignOwner(
       new NodeOwnerAssignerMessage(identityId.valueOf(), identityId.valueOf()),
     );
+    await Kernel.di.getService<NodeLoaderService>(NodeLoaderService).loadNode();
+  }
+
+  @given('the current identity is published')
+  public async theCurrentIdentityIsPublished(): Promise<void> {
+    await this.ensureAuthenticatedIdentityIsPublished();
   }
 
   @then('the private authorization scope is durably provisioned')
@@ -664,6 +715,45 @@ export default class Definitions {
     handle: string,
   ): Promise<void> {
     await this.buildClientSignedIdentityBody(name, handle);
+  }
+
+  @given('I set a signed device enrollment transition body')
+  public async iSetASignedDeviceEnrollmentTransitionBody(): Promise<void> {
+    const owner = await this.ensureIdentityDeviceOwnerKeyPair();
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.identityDeviceTargetKeyPair = await KeyPair.generate();
+    const target = this.identityDeviceTargetKeyPair;
+    const unsigned = DeviceAuthorizationTransition.enrollment(
+      identityId,
+      DeviceAuthorizationOperationId.generate(),
+      DeviceAuthorizationRevision.initial(),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+      DeviceCredential.fromString(target.toPrimitives().publicKey),
+      new PairingAuthorization(
+        PairingId.generate(),
+        new PairingExpiration(Timestamp.now().valueOf() + 60_000),
+        Timestamp.now(),
+      ),
+    );
+
+    this.body = JSON.stringify(
+      unsigned
+        .authorize(
+          owner.sign(unsigned.getSigningPayload()),
+          target.sign(unsigned.getProofOfPossessionPayload()),
+        )
+        .toPrimitives(),
+    );
+  }
+
+  @then('the genesis device authorization checkpoint exists')
+  public async theGenesisDeviceAuthorizationCheckpointExists(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    const authorization = await Kernel.di
+      .getService<DeviceAuthorizationRepository>(DeviceAuthorizationRepository)
+      .find(identityId);
+
+    expect(authorization?.getRevision().valueOf()).to.equal(0);
   }
 
   @given('I add legacy identity unlock fields')
@@ -3218,6 +3308,19 @@ export default class Definitions {
       networkId,
       networkName,
     );
+  }
+
+  @given('the current node has a test network with id {string} and name {string}')
+  public async theCurrentNodeHasATestNetworkWithIdAndName(
+    networkId: string,
+    networkName: string,
+  ): Promise<void> {
+    await Kernel.di
+      .getService<NodeNetworkAdder>(NodeNetworkAdder)
+      .addNetwork(new NodeNetworkAdderMessage(networkId, networkName));
+    await Kernel.di.getService<NodeLoaderService>(NodeLoaderService).loadNode();
+    await this.waitForReplicatedState();
+    this.currentNetworkId = networkId;
   }
 
   @given('I store the following json in IPFS network {string}')

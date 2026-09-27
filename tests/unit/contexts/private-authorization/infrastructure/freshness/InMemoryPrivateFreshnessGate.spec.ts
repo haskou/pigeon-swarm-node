@@ -2,7 +2,8 @@ import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorizat
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
 import PrivateFreshnessVerifier from '@app/contexts/private-authorization/infrastructure/crypto/PrivateFreshnessVerifier';
 import InMemoryPrivateFreshnessGate from '@app/contexts/private-authorization/infrastructure/freshness/InMemoryPrivateFreshnessGate';
-import LegacyIdentityDeviceBinding from '@app/contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
+import Ed25519PrivateDeviceCredentialCodec from '@app/contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec';
 import { PrivateFreshnessProof, PrivateKey } from '@haskou/pigeon-swarm-crypto';
 
 describe('InMemoryPrivateFreshnessGate', () => {
@@ -15,21 +16,29 @@ describe('InMemoryPrivateFreshnessGate', () => {
     .getPublicKey()
     .toString()
     .replace(/-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s/g, '');
-  const deviceKey = new LegacyIdentityDeviceBinding().bind(publicSpki);
+  const credentialCodec = new Ed25519PrivateDeviceCredentialCodec();
+  const deviceKeyFor = (key: PrivateKey) =>
+    credentialCodec
+      .toDeviceKey(DeviceCredential.fromString(key.getPublicKey().valueOf()))
+      .valueOf();
+  const deviceKey = deviceKeyFor(privateKey);
   const checkpoint = PrivateAuthorizationCheckpoint.genesis({
     admittedDeviceKeys: [deviceKey],
     authorityKeys: [deviceKey],
     controlCheckpointJson: '{}',
+    deviceIdentities: [{ deviceKey, identityId: publicSpki }],
     freshnessAuthorityKey: deviceKey,
     headHash,
     scopeId,
   });
   const operation = PrivateControlOperation.fromPrimitives({
     authorDeviceKey: deviceKey,
+    authorIdentityId: publicSpki,
     authorizationRevision: 0,
     byteSize: 1,
     digest,
     id: Buffer.alloc(16, 5).toString('base64url'),
+    identityAuthorizationRevision: 0,
     kind: 'membership.propose',
     mutation: { targetIdentityId: publicSpki, type: 'member.remove' },
     previousOperationIds: [],
@@ -120,15 +129,7 @@ describe('InMemoryPrivateFreshnessGate', () => {
   it('rejects authors outside the current admitted policy', () => {
     const unknown = PrivateControlOperation.fromPrimitives({
       ...operation.toPrimitives(),
-      authorDeviceKey: new LegacyIdentityDeviceBinding().bind(
-        PrivateKey.generate()
-          .getPublicKey()
-          .toString()
-          .replace(
-            /-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s/g,
-            '',
-          ),
-      ),
+      authorDeviceKey: deviceKeyFor(PrivateKey.generate()),
     });
 
     expect(() => gate.issue(checkpoint, unknown)).toThrow(
@@ -206,12 +207,7 @@ describe('InMemoryPrivateFreshnessGate', () => {
     expect(() => gate.issue(checkpoint, overflow)).toThrow(
       'Invalid private authorization',
     );
-    const alternateKey = new LegacyIdentityDeviceBinding().bind(
-      PrivateKey.generate()
-        .getPublicKey()
-        .toString()
-        .replace(/-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s/g, ''),
-    );
+    const alternateKey = deviceKeyFor(PrivateKey.generate());
     const alternateAuthor = PrivateControlOperation.fromPrimitives({
       ...overflow.toPrimitives(),
       authorDeviceKey: alternateKey,
@@ -219,6 +215,10 @@ describe('InMemoryPrivateFreshnessGate', () => {
     const sharedScope = PrivateAuthorizationCheckpoint.fromPrimitives({
       ...checkpoint.toPrimitives(),
       admittedDeviceKeys: [deviceKey, alternateKey],
+      deviceIdentities: [
+        ...checkpoint.toPrimitives().deviceIdentities,
+        { deviceKey: alternateKey, identityId: publicSpki },
+      ],
     });
     expect(() => gate.issue(sharedScope, alternateAuthor)).not.toThrow();
     const alternateScopeId = Buffer.alloc(32, 7).toString('base64url');
@@ -240,19 +240,18 @@ describe('InMemoryPrivateFreshnessGate', () => {
 
   it('bounds each scope without denying challenges in another scope', () => {
     const authorKeys = Array.from({ length: 17 }, () =>
-      new LegacyIdentityDeviceBinding().bind(
-        PrivateKey.generate()
-          .getPublicKey()
-          .toString()
-          .replace(
-            /-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s/g,
-            '',
-          ),
-      ),
+      deviceKeyFor(PrivateKey.generate()),
     );
     const crowdedScope = PrivateAuthorizationCheckpoint.fromPrimitives({
       ...checkpoint.toPrimitives(),
       admittedDeviceKeys: [deviceKey, ...authorKeys],
+      deviceIdentities: [
+        ...checkpoint.toPrimitives().deviceIdentities,
+        ...authorKeys.map((authorDeviceKey) => ({
+          deviceKey: authorDeviceKey,
+          identityId: publicSpki,
+        })),
+      ],
     });
 
     for (let authorIndex = 0; authorIndex < 16; authorIndex++) {

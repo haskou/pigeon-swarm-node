@@ -1,7 +1,10 @@
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
+import DeviceAuthorizationAccessPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationAccessPolicy';
 import { AuthenticatedPrivateOperationJson } from '@app/contexts/private-authorization/domain/value-objects/AuthenticatedPrivateOperationJson';
-import LegacyIdentityDeviceBinding from '@app/contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
+import { PrivateAuthorizationDeviceKey } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationDeviceKey';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import Ed25519PrivateDeviceCredentialCodec from '@app/contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec';
 import PrivateControlTransitionVerifier from '@app/contexts/private-authorization/infrastructure/crypto/PrivateControlTransitionVerifier';
 import PrivateMlsPolicyVerifier from '@app/contexts/private-authorization/infrastructure/crypto/PrivateMlsPolicyVerifier';
 import VerifiedPrivateControlTransitionProcessor from '@app/contexts/private-authorization/infrastructure/crypto/VerifiedPrivateControlTransitionProcessor';
@@ -33,6 +36,16 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
       .toString('base64url');
   const ownerKey = raw(ownerPrivateKey);
   const targetKey = raw(targetPrivateKey);
+  const deviceAuthorization = {
+    assertAuthorized: jest.fn(),
+  } as unknown as jest.Mocked<DeviceAuthorizationAccessPolicy>;
+  const credentialCodec = new Ed25519PrivateDeviceCredentialCodec();
+  const identityIdFor = (deviceKey: string) =>
+    new IdentityId(
+      credentialCodec
+        .toCredential(new PrivateAuthorizationDeviceKey(deviceKey))
+        .valueOf(),
+    ).valueOf();
   const encoded = (byte: number) =>
     Buffer.alloc(32, byte).toString('base64url');
   const digest = (value: unknown) =>
@@ -49,7 +62,12 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
         authorizationRevision: 0,
         kind,
         operationId: Buffer.alloc(16, 1).toString('base64url'),
-        payload: { ...payload, resultingHeadHash },
+        payload: {
+          authorIdentityId: identityIdFor(ownerKey),
+          identityAuthorizationRevision: 0,
+          ...payload,
+          resultingHeadHash,
+        },
         previousOperationIds: [],
         scopeId,
         signature: Buffer.alloc(64, 1).toString('base64url'),
@@ -87,6 +105,10 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
     admittedDeviceKeys: [ownerKey, targetKey],
     authorityKeys: [ownerKey],
     controlCheckpointJson: JSON.stringify(currentControl),
+    deviceIdentities: [
+      { deviceKey: ownerKey, identityId: identityIdFor(ownerKey) },
+      { deviceKey: targetKey, identityId: identityIdFor(targetKey) },
+    ],
     freshnessAuthorityKey: ownerKey,
     headHash: currentControl.headHash,
     scopeId,
@@ -143,11 +165,13 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
     });
     const operation = PrivateControlOperation.fromPrimitives({
       authorDeviceKey: ownerKey,
+      authorIdentityId: identityIdFor(ownerKey),
       authorizationRevision: 0,
       byteSize: 1,
       control: { resultingHeadHash: unsigned.headHash },
       digest: encoded(9),
       id: Buffer.alloc(16, 1).toString('base64url'),
+      identityAuthorizationRevision: 0,
       kind: 'device.revoke',
       mutation: { deviceKey: targetKey, type: 'device.revoke' },
       previousOperationIds: [],
@@ -156,7 +180,8 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
     const processor = new VerifiedPrivateControlTransitionProcessor(
       new PrivateControlTransitionVerifier(),
       new PrivateMlsPolicyVerifier(),
-      new LegacyIdentityDeviceBinding(),
+      deviceAuthorization,
+      credentialCodec,
     );
 
     const result = await processor.verify(
@@ -234,11 +259,13 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
     });
     const operation = PrivateControlOperation.fromPrimitives({
       authorDeviceKey: ownerKey,
+      authorIdentityId: identityIdFor(ownerKey),
       authorizationRevision: 0,
       byteSize: 1,
       control: { resultingHeadHash: unsigned.headHash },
       digest: encoded(9),
       id: Buffer.alloc(16, 1).toString('base64url'),
+      identityAuthorizationRevision: 0,
       kind: 'device.revoke',
       mutation: { deviceKey: targetKey, type: 'device.revoke' },
       previousOperationIds: [],
@@ -247,7 +274,8 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
     const processor = new VerifiedPrivateControlTransitionProcessor(
       new PrivateControlTransitionVerifier(),
       new PrivateMlsPolicyVerifier(),
-      new LegacyIdentityDeviceBinding(),
+      deviceAuthorization,
+      credentialCodec,
     );
 
     await expect(
@@ -268,23 +296,29 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
     ).rejects.toThrow('Invalid private authorization');
   });
 
-  it('rejects admission when the identity does not own the admitted device key', () => {
-    const binding = new LegacyIdentityDeviceBinding();
+  it('rejects admission when the identity does not own the admitted device key', async () => {
+    deviceAuthorization.assertAuthorized.mockRejectedValueOnce(
+      new Error('device does not belong to identity'),
+    );
     const processor = new VerifiedPrivateControlTransitionProcessor(
       new PrivateControlTransitionVerifier(),
       new PrivateMlsPolicyVerifier(),
-      binding,
+      deviceAuthorization,
+      credentialCodec,
     );
     const operation = PrivateControlOperation.fromPrimitives({
       authorDeviceKey: ownerKey,
+      authorIdentityId: identityIdFor(ownerKey),
       authorizationRevision: 0,
       byteSize: 1,
       digest: encoded(9),
       id: Buffer.alloc(16, 1).toString('base64url'),
+      identityAuthorizationRevision: 0,
       kind: 'membership.commit',
       mutation: {
         deviceKey: targetKey,
-        identityId: binding.identityIdFor(encoded(20)),
+        identityId: identityIdFor(encoded(20)),
+        identityAuthorizationRevision: 0,
         mlsCredentialHash: encoded(21),
         type: 'member.admit',
       },
@@ -292,21 +326,20 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
       scopeId,
     });
 
-    expect(() =>
+    await expect(
       (
         processor as unknown as {
           expectedPolicyDevices(
             current: PrivateAuthorizationCheckpoint,
             candidate: PrivateControlOperation,
-          ): unknown;
+          ): Promise<unknown>;
         }
       ).expectedPolicyDevices(checkpoint, operation),
-    ).toThrow('Invalid private authorization');
+    ).rejects.toThrow('device does not belong to identity');
   });
 
   it('removes a re-admitted device key from retained revocation history', async () => {
-    const binding = new LegacyIdentityDeviceBinding();
-    const previousPolicy = {
+      const previousPolicy = {
       ...currentPolicy,
       devices: [currentPolicy.devices[0]],
     };
@@ -324,7 +357,7 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
     const state = Buffer.from('re-admitted-state');
     const operationPayload = {
       deviceKey: targetKey,
-      identityId: binding.identityIdFor(targetKey),
+      identityId: identityIdFor(targetKey),
       mlsCredentialHash: currentPolicy.devices[1].mlsCredentialHash,
     };
     const head = {
@@ -361,15 +394,18 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
     });
     const operation = PrivateControlOperation.fromPrimitives({
       authorDeviceKey: ownerKey,
+      authorIdentityId: identityIdFor(ownerKey),
       authorizationRevision: 0,
       byteSize: 1,
       control: { resultingHeadHash: unsigned.headHash },
       digest: encoded(9),
       id: Buffer.alloc(16, 1).toString('base64url'),
+      identityAuthorizationRevision: 0,
       kind: 'membership.commit',
       mutation: {
         deviceKey: targetKey,
-        identityId: binding.identityIdFor(targetKey),
+        identityId: identityIdFor(targetKey),
+        identityAuthorizationRevision: 0,
         mlsCredentialHash: currentPolicy.devices[1].mlsCredentialHash,
         type: 'member.admit',
       },
@@ -379,7 +415,8 @@ describe('VerifiedPrivateControlTransitionProcessor', () => {
     const processor = new VerifiedPrivateControlTransitionProcessor(
       new PrivateControlTransitionVerifier(),
       new PrivateMlsPolicyVerifier(),
-      binding,
+      deviceAuthorization,
+      credentialCodec,
     );
 
     const result = await processor.verify(

@@ -13,7 +13,11 @@ describe('PrivateControlOperationContract', () => {
       authorizationRevision: 4,
       kind,
       operationId: encoded(16, 1),
-      payload,
+      payload: {
+        authorIdentityId: 'identity',
+        identityAuthorizationRevision: 2,
+        ...payload,
+      },
       previousOperationIds: [],
       scopeId: encoded(32, 2),
       signature: encoded(64, 4),
@@ -56,6 +60,8 @@ describe('PrivateControlOperationContract', () => {
 
     expect(operation.toPrimitives()).toMatchObject({
       authorizationRevision: 4,
+      authorIdentityId: 'identity',
+      identityAuthorizationRevision: 2,
       kind,
       proposalOperationId: proposalId,
     });

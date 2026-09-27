@@ -1,0 +1,96 @@
+openapi: 3.0.3
+info:
+  title: Pigeon Swarm identity device authorization API
+  version: 1.0.0
+paths:
+  /identity-devices/transitions:
+    post:
+      tags:
+        - identity-devices
+      summary: Apply a signed device authorization transition
+      description: |
+        Applies an enrollment, revocation or recovery transition after checking
+        its causal revision, author authority, target proof of possession and
+        replay identifiers. The request never contains passwords, protected
+        device roots, password KDF metadata or recovery secrets.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceAuthorizationTransition'
+      responses:
+        '200':
+          description: Current deterministic authorization checkpoint.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceAuthorization'
+        '400':
+          description: Malformed transition.
+        '409':
+          description: Expired, replayed, causally stale or unauthorized transition.
+components:
+  schemas:
+    DeviceAuthorizationTransition:
+      type: object
+      additionalProperties: false
+      required:
+        - identityId
+        - operation
+        - operationId
+        - previousRevision
+        - revision
+        - signature
+        - targetCredential
+        - targetCredentialCommitment
+      properties:
+        authorCredential:
+          type: string
+          description: Public credential of the currently authorized device.
+        authorizedAt:
+          type: integer
+          format: int64
+          description: Time accepted by both device signatures; required for enrollment and no later than pairingExpiration.
+        identityId:
+          type: string
+        operation:
+          type: string
+          enum: [enroll, revoke, recover]
+        operationId:
+          type: string
+          format: uuid
+        pairingExpiration:
+          type: integer
+          format: int64
+        pairingId:
+          type: string
+          format: uuid
+        previousRevision:
+          type: integer
+          minimum: 0
+        proofOfPossession:
+          type: string
+          description: Signature made by the target device credential.
+        revision:
+          type: integer
+          minimum: 1
+        signature:
+          type: string
+          description: Signature made by an authorized device or the recovery authority.
+        targetCredential:
+          type: string
+        targetCredentialCommitment:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+    DeviceAuthorization:
+      type: object
+      required:
+        - identityId
+        - revision
+      properties:
+        identityId:
+          type: string
+        revision:
+          type: integer
+          minimum: 0

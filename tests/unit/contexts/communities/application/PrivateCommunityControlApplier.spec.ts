@@ -2,10 +2,17 @@ import PrivateCommunityControlApplier from '@app/contexts/communities/applicatio
 import { Community } from '@app/contexts/communities/domain/Community';
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
-import LegacyIdentityDeviceBinding from '@app/contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
+import { PrivateAuthorizationDeviceKey } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationDeviceKey';
+import Ed25519PrivateDeviceCredentialCodec from '@app/contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec';
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 
 describe('PrivateCommunityControlApplier', () => {
+  const credentialCodec = new Ed25519PrivateDeviceCredentialCodec();
+  const deviceKeyFor = (pair: KeyPair) =>
+    credentialCodec
+      .toDeviceKey(DeviceCredential.fromString(pair.toPrimitives().publicKey))
+      .valueOf();
   const scopeId = Buffer.alloc(32, 1).toString('base64url');
   let ownerIdentityId: string;
   let ownerDeviceKey: string;
@@ -16,10 +23,12 @@ describe('PrivateCommunityControlApplier', () => {
   const operation = (mutation: Record<string, unknown>) =>
     PrivateControlOperation.fromPrimitives({
       authorDeviceKey: ownerDeviceKey,
+      authorIdentityId: ownerIdentityId,
       authorizationRevision: 0,
       byteSize: 1,
       digest: 'digest',
       id: 'operation',
+      identityAuthorizationRevision: 0,
       kind: 'membership.propose',
       mutation,
       previousOperationIds: [],
@@ -27,8 +36,8 @@ describe('PrivateCommunityControlApplier', () => {
     });
 
   beforeEach(async () => {
-    const binding = new LegacyIdentityDeviceBinding();
     const owner = await KeyPair.generate();
+    const ownerDevice = await KeyPair.generate();
     const target = await KeyPair.generate();
     ownerIdentityId = owner.toPrimitives().publicKey.replace(
       /-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s/g,
@@ -38,11 +47,24 @@ describe('PrivateCommunityControlApplier', () => {
       /-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s/g,
       '',
     );
-    ownerDeviceKey = binding.bind(ownerIdentityId);
+    ownerDeviceKey = deviceKeyFor(ownerDevice);
     checkpoint = PrivateAuthorizationCheckpoint.genesis({
       admittedDeviceKeys: [ownerDeviceKey],
       authorityKeys: [ownerDeviceKey],
-      controlCheckpointJson: '{}',
+      controlCheckpointJson: JSON.stringify({
+        policy: {
+          devices: [
+            {
+              deviceKey: ownerDeviceKey,
+              identityId: ownerIdentityId,
+              mlsCredentialHash: 'credential',
+            },
+          ],
+        },
+      }),
+      deviceIdentities: [
+        { deviceKey: ownerDeviceKey, identityId: ownerIdentityId },
+      ],
       freshnessAuthorityKey: ownerDeviceKey,
       headHash: Buffer.alloc(32, 2).toString('base64url'),
       scopeId,
@@ -69,9 +91,7 @@ describe('PrivateCommunityControlApplier', () => {
   });
 
   it('applies a ban through the existing community permission rules', async () => {
-    const result = await new PrivateCommunityControlApplier(
-      new LegacyIdentityDeviceBinding(),
-    ).apply(
+    const result = await new PrivateCommunityControlApplier().apply(
       checkpoint,
       operation({ targetIdentityId, type: 'member.ban' }),
       projection,
@@ -82,9 +102,7 @@ describe('PrivateCommunityControlApplier', () => {
   });
 
   it('applies complete role assignment and removal through the aggregate', async () => {
-    const applier = new PrivateCommunityControlApplier(
-      new LegacyIdentityDeviceBinding(),
-    );
+    const applier = new PrivateCommunityControlApplier();
     const roleId = '550e8400-e29b-41d4-a716-446655440001';
     projection = {
       ...projection,
@@ -112,9 +130,7 @@ describe('PrivateCommunityControlApplier', () => {
 
   it('does not change community projection for a device-only revocation', async () => {
     await expect(
-      new PrivateCommunityControlApplier(
-        new LegacyIdentityDeviceBinding(),
-      ).apply(
+      new PrivateCommunityControlApplier().apply(
         checkpoint,
         operation({ deviceKey: ownerDeviceKey, type: 'device.revoke' }),
         projection,
@@ -124,16 +140,29 @@ describe('PrivateCommunityControlApplier', () => {
 
   it('applies identical community permission checks to any accepted ingress', async () => {
     const member = await KeyPair.generate();
+    const memberDevice = await KeyPair.generate();
     const memberIdentityId = member.toPrimitives().publicKey.replace(
       /-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s/g,
       '',
     );
-    const binding = new LegacyIdentityDeviceBinding();
-    const memberDeviceKey = binding.bind(memberIdentityId);
+    const memberDeviceKey = deviceKeyFor(memberDevice);
     const memberCheckpoint = PrivateAuthorizationCheckpoint.genesis({
       admittedDeviceKeys: [memberDeviceKey],
       authorityKeys: [memberDeviceKey],
-      controlCheckpointJson: '{}',
+      controlCheckpointJson: JSON.stringify({
+        policy: {
+          devices: [
+            {
+              deviceKey: memberDeviceKey,
+              identityId: memberIdentityId,
+              mlsCredentialHash: 'credential',
+            },
+          ],
+        },
+      }),
+      deviceIdentities: [
+        { deviceKey: memberDeviceKey, identityId: memberIdentityId },
+      ],
       freshnessAuthorityKey: memberDeviceKey,
       headHash: Buffer.alloc(32, 2).toString('base64url'),
       scopeId,
@@ -145,10 +174,11 @@ describe('PrivateCommunityControlApplier', () => {
     const unauthorized = PrivateControlOperation.fromPrimitives({
       ...operation({ targetIdentityId, type: 'member.ban' }).toPrimitives(),
       authorDeviceKey: memberDeviceKey,
+      authorIdentityId: memberIdentityId,
     });
 
     await expect(
-      new PrivateCommunityControlApplier(binding).apply(
+      new PrivateCommunityControlApplier().apply(
         memberCheckpoint,
         unauthorized,
         projection,

@@ -1,0 +1,20 @@
+Feature: Device authorization route
+  As an identity owner
+  I want device authorization transitions to be verified atomically
+  So that copied or replayed control messages cannot authorize a device
+
+  Scenario: Enroll a device once with proof of possession
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "device owner" and handle "device-owner"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    And the genesis device authorization checkpoint exists
+    Given I set a signed device enrollment transition body
+    When I POST to "/identity-devices/transitions"
+    Then response code is equal to 200
+    And response contains a valid resource with the following fields
+      | revision | 1 |
+    And response body should not contain "authorizedCredentialCommitments"
+    When I POST to "/identity-devices/transitions"
+    Then response code is equal to 409

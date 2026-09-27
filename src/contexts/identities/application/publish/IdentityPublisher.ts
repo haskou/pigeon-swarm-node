@@ -1,3 +1,5 @@
+import DeviceAuthorizationProvisioner from '@app/contexts/identity-devices/application/provision/DeviceAuthorizationProvisioner';
+import { DeviceAuthorizationProvisionMessage } from '@app/contexts/identity-devices/application/provision/messages/DeviceAuthorizationProvisionMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
@@ -14,6 +16,7 @@ export default class IdentityPublisher {
     private readonly repository: IdentityRepository,
     private readonly validator: IdentityCandidateValidationDomainService,
     private readonly eventPublisher: DomainEventPublisher,
+    private readonly deviceAuthorizationProvisioner: DeviceAuthorizationProvisioner,
   ) {}
 
   public async publish(
@@ -33,14 +36,29 @@ export default class IdentityPublisher {
     }
 
     const externalIdentifier = await this.saver.save(identity);
+
+    if (identity.isFirstVersion()) {
+      await this.deviceAuthorizationProvisioner.provision(
+        new DeviceAuthorizationProvisionMessage(
+          new IdentityId(primitives.id),
+          identity.getNetworkIds(),
+          identity.getInitialDeviceCredential(),
+          identity.getRecoveryAuthority(),
+        ),
+      );
+    }
+
     const events = identity.pullDomainEvents();
 
     for (const event of events) {
       event.attributes.externalIdentifier = externalIdentifier.valueOf();
+      event.attributes.deviceCredentialCommitment =
+        primitives.deviceCredentialCommitment;
       event.attributes.handle = primitives.profile.handle;
       event.attributes.networkIds = primitives.networks;
       event.attributes.previousExternalIdentifier =
         primitives.previousIdentityExternalIdentifier;
+      event.attributes.recoveryAuthority = primitives.recoveryAuthority;
       event.attributes.version = primitives.version;
     }
 

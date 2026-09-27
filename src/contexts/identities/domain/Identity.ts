@@ -90,6 +90,14 @@ export class Identity extends AggregateRoot {
     return this.networks.toArray();
   }
 
+  public getInitialDeviceCredential(): DeviceCredential {
+    return this.deviceCredential;
+  }
+
+  public getRecoveryAuthority(): RecoveryAuthority {
+    return this.recoveryAuthority;
+  }
+
   public hasNoPreviousReference(): boolean {
     return this.publication.hasNoPreviousReference();
   }

@@ -12,20 +12,29 @@ import { PrivateControlTransitionReservation } from '@app/contexts/private-autho
 import { PrivateAuthorizationConflictError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationConflictError';
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
-import { PrivateIdentityBinding } from '@app/contexts/private-authorization/domain/services/PrivateIdentityBinding';
+import DeviceAuthorizationAccessPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationAccessPolicy';
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
+import { PrivateDeviceCredentialCodec } from '@app/contexts/private-authorization/domain/services/PrivateDeviceCredentialCodec';
+import { PrivateAuthorizationDeviceKey } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationDeviceKey';
 import { AuthenticatedPrivateOperationJson } from '@app/contexts/private-authorization/domain/value-objects/AuthenticatedPrivateOperationJson';
 import PrivateControlOperationContract from '@app/contexts/private-authorization/infrastructure/contracts/PrivateControlOperationContract';
-import LegacyIdentityDeviceBinding from '@app/contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
+import Ed25519PrivateDeviceCredentialCodec from '@app/contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec';
 import PrivateOperationVerifier from '@app/contexts/private-authorization/infrastructure/crypto/PrivateOperationVerifier';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 describe('PrivateOperationAcceptor', () => {
   const encoded = (bytes: number, value: number) =>
     Buffer.alloc(bytes, value).toString('base64url');
   const scopeId = encoded(32, 1);
   const authorKey = encoded(32, 2);
-  const authorIdentityId = new LegacyIdentityDeviceBinding().identityIdFor(
-    authorKey,
-  );
+  const deviceCredentialCodec = new Ed25519PrivateDeviceCredentialCodec();
+  const identityIdFor = (deviceKey: string) =>
+    new IdentityId(
+      deviceCredentialCodec.toCredential(
+        new PrivateAuthorizationDeviceKey(deviceKey),
+      ).valueOf(),
+    ).valueOf();
+  const authorIdentityId = identityIdFor(authorKey);
   const headHash = encoded(32, 3);
   const operationId = encoded(16, 4);
   const proposalId = encoded(16, 5);
@@ -34,28 +43,40 @@ describe('PrivateOperationAcceptor', () => {
       admittedDeviceKeys: [authorKey],
       authorityKeys: [authorKey],
       controlCheckpointJson: '{}',
+      deviceIdentities: [{ deviceKey: authorKey, identityId: authorIdentityId }],
       freshnessAuthorityKey: authorKey,
       headHash,
       scopeId,
     });
   const scope = () => PrivateAuthorizationScope.pin(checkpoint(), 'genesis');
-  const signed = (changes: Record<string, unknown> = {}) =>
-    JSON.stringify({
+  const signed = (changes: Record<string, unknown> = {}) => {
+    const defaultPayload = {
+      change: { targetIdentityId: 'member', type: 'member.ban' },
+      parentHeadHash: headHash,
+      proposalId,
+    };
+    const payload = (changes.payload ?? defaultPayload) as Record<
+      string,
+      unknown
+    >;
+
+    return JSON.stringify({
       authorDeviceKey: authorKey,
       authorizationRevision: 0,
       kind: 'membership.propose',
       operationId,
-      payload: {
-        change: { targetIdentityId: 'member', type: 'member.ban' },
-        parentHeadHash: headHash,
-        proposalId,
-      },
       previousOperationIds: [],
       scopeId,
       signature: encoded(64, 6),
       version: 1,
       ...changes,
+      payload: {
+        authorIdentityId,
+        identityAuthorizationRevision: 0,
+        ...payload,
+      },
     });
+  };
   const revocation = (changes: Record<string, unknown> = {}) =>
     signed({
       kind: 'device.revoke',
@@ -88,7 +109,8 @@ describe('PrivateOperationAcceptor', () => {
   let freshness: jest.Mocked<PrivateFreshnessGate>;
   let transitions: jest.Mocked<PrivateControlTransitionProcessor>;
   let mutations: jest.Mocked<PrivateControlMutationAuthorizer>;
-  let identityBinding: jest.Mocked<PrivateIdentityBinding>;
+  let deviceAuthorization: jest.Mocked<DeviceAuthorizationAccessPolicy>;
+  let credentialCodec: jest.Mocked<PrivateDeviceCredentialCodec>;
   let acceptor: PrivateOperationAcceptor;
 
   beforeEach(() => {
@@ -129,9 +151,14 @@ describe('PrivateOperationAcceptor', () => {
     mutations = {
       apply: jest.fn().mockResolvedValue({ members: ['member'] }),
     };
-    identityBinding = {
-      bind: jest.fn().mockReturnValue(authorKey),
-      identityIdFor: jest.fn(),
+    deviceAuthorization = {
+      assertAuthorized: jest.fn(),
+    } as unknown as jest.Mocked<DeviceAuthorizationAccessPolicy>;
+    credentialCodec = {
+      toCredential: jest.fn().mockReturnValue(
+        DeviceCredential.fromIdentityId(new IdentityId(authorIdentityId)),
+      ),
+      toDeviceKey: jest.fn(),
     };
     acceptor = new PrivateOperationAcceptor(
       repository,
@@ -140,7 +167,8 @@ describe('PrivateOperationAcceptor', () => {
         repository,
         verifier,
         new PrivateControlOperationContract(),
-        identityBinding,
+        deviceAuthorization,
+        credentialCodec,
       ),
       freshness,
       transitions,
@@ -160,13 +188,56 @@ describe('PrivateOperationAcceptor', () => {
   });
 
   it('rejects freshness requested by an identity other than the operation author', async () => {
-    identityBinding.bind.mockReturnValue(encoded(32, 9));
+    await expect(
+      acceptor.challenge(
+        new PrivateOperationChallengeMessage(
+          authorIdentityId,
+          signed({
+            authorIdentityId: identityIdFor(
+              encoded(32, 9),
+            ),
+          }),
+        ),
+      ),
+    ).rejects.toThrow(InvalidPrivateAuthorizationError);
+    expect(freshness.issue).not.toHaveBeenCalled();
+  });
+
+  it('rejects a device absent from the current identity authorization revision', async () => {
+    deviceAuthorization.assertAuthorized.mockRejectedValue(
+      new Error('revoked device'),
+    );
 
     await expect(
       acceptor.challenge(
         new PrivateOperationChallengeMessage(authorIdentityId, signed()),
       ),
+    ).rejects.toThrow('revoked device');
+    expect(freshness.issue).not.toHaveBeenCalled();
+  });
+
+  it('rejects a device claimed by an identity other than its scope mapping', async () => {
+    const claimedIdentityId = identityIdFor(
+      encoded(32, 9),
+    );
+
+    await expect(
+      acceptor.challenge(
+        new PrivateOperationChallengeMessage(
+          claimedIdentityId,
+          signed({
+            payload: {
+              authorIdentityId: claimedIdentityId,
+              change: { targetIdentityId: 'member', type: 'member.ban' },
+              identityAuthorizationRevision: 0,
+              parentHeadHash: headHash,
+              proposalId,
+            },
+          }),
+        ),
+      ),
     ).rejects.toThrow(InvalidPrivateAuthorizationError);
+    expect(deviceAuthorization.assertAuthorized).not.toHaveBeenCalled();
     expect(freshness.issue).not.toHaveBeenCalled();
   });
 
@@ -467,6 +538,9 @@ describe('PrivateOperationAcceptor', () => {
       ...checkpoint().toPrimitives(),
       admittedDeviceKeys: [activeKey],
       authorityKeys: [activeKey],
+      deviceIdentities: [
+        { deviceKey: activeKey, identityId: 'active-identity' },
+      ],
       freshnessAuthorityKey: activeKey,
       revokedDeviceKeys: [authorKey],
     });
@@ -491,6 +565,9 @@ describe('PrivateOperationAcceptor', () => {
       ...checkpoint().toPrimitives(),
       admittedDeviceKeys: [activeKey],
       authorityKeys: [activeKey],
+      deviceIdentities: [
+        { deviceKey: activeKey, identityId: 'active-identity' },
+      ],
       freshnessAuthorityKey: activeKey,
       revokedDeviceKeys: [authorKey],
     });
@@ -521,6 +598,9 @@ describe('PrivateOperationAcceptor', () => {
       ...checkpoint().toPrimitives(),
       admittedDeviceKeys: [activeKey],
       authorityKeys: [activeKey],
+      deviceIdentities: [
+        { deviceKey: activeKey, identityId: 'active-identity' },
+      ],
       freshnessAuthorityKey: activeKey,
       revokedDeviceKeys: [authorKey],
     });
@@ -545,9 +625,16 @@ describe('PrivateOperationAcceptor', () => {
 
   it('rejects a concurrent receipt owned by another admitted author without freezing the scope', async () => {
     const competingAuthorKey = encoded(32, 10);
+    const competingIdentityId = identityIdFor(
+      competingAuthorKey,
+    );
     const competingCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
       ...checkpoint().toPrimitives(),
       admittedDeviceKeys: [authorKey, competingAuthorKey],
+      deviceIdentities: [
+        { deviceKey: authorKey, identityId: authorIdentityId },
+        { deviceKey: competingAuthorKey, identityId: competingIdentityId },
+      ],
     });
     const receipt = new PrivateControlOperationContract()
       .decode(signed())
@@ -555,7 +642,9 @@ describe('PrivateOperationAcceptor', () => {
     const competingOperation = signed({
       authorDeviceKey: competingAuthorKey,
       payload: {
+        authorIdentityId: competingIdentityId,
         change: { targetIdentityId: 'different-member', type: 'member.ban' },
+        identityAuthorizationRevision: 0,
         parentHeadHash: headHash,
         proposalId,
       },
@@ -588,6 +677,9 @@ describe('PrivateOperationAcceptor', () => {
       ...checkpoint().toPrimitives(),
       admittedDeviceKeys: [activeKey],
       authorityKeys: [activeKey],
+      deviceIdentities: [
+        { deviceKey: activeKey, identityId: 'active-identity' },
+      ],
       freshnessAuthorityKey: activeKey,
       revokedDeviceKeys: [],
     });
@@ -635,6 +727,9 @@ describe('PrivateOperationAcceptor', () => {
       ...checkpoint().toPrimitives(),
       admittedDeviceKeys: [activeKey],
       authorityKeys: [activeKey],
+      deviceIdentities: [
+        { deviceKey: activeKey, identityId: 'active-identity' },
+      ],
       freshnessAuthorityKey: activeKey,
       headHash: encoded(32, 11),
       parentHeadHash: headHash,
@@ -699,6 +794,9 @@ describe('PrivateOperationAcceptor', () => {
       ...checkpoint().toPrimitives(),
       admittedDeviceKeys: [activeKey],
       authorityKeys: [activeKey],
+      deviceIdentities: [
+        { deviceKey: activeKey, identityId: 'active-identity' },
+      ],
       freshnessAuthorityKey: activeKey,
       headHash: encoded(32, 13),
       parentHeadHash: encoded(32, 11),
@@ -755,6 +853,9 @@ describe('PrivateOperationAcceptor', () => {
       ...checkpoint().toPrimitives(),
       admittedDeviceKeys: [activeKey],
       authorityKeys: [activeKey],
+      deviceIdentities: [
+        { deviceKey: activeKey, identityId: 'active-identity' },
+      ],
       freshnessAuthorityKey: activeKey,
       headHash: encoded(32, 11),
       parentHeadHash: headHash,
@@ -806,6 +907,9 @@ describe('PrivateOperationAcceptor', () => {
       ...checkpoint().toPrimitives(),
       admittedDeviceKeys: [activeKey],
       authorityKeys: [activeKey],
+      deviceIdentities: [
+        { deviceKey: activeKey, identityId: 'active-identity' },
+      ],
       freshnessAuthorityKey: activeKey,
       headHash: encoded(32, 11),
       parentHeadHash: headHash,
