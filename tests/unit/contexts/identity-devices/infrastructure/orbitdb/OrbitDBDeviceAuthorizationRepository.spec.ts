@@ -491,6 +491,86 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     expect(getMerger()?.(trusted, injected)).toEqual(trusted);
   });
 
+  it('rejects replicated transitions containing unsigned fields', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const target = await KeyPair.generate();
+    const { getHead, getMerger, repository } = repositoryFixture();
+    const transition = await enrollment(
+      identityId,
+      owner,
+      target,
+      '00000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+    );
+    await provisionAuthorization(repository, genesis);
+    const trusted = getHead();
+    await repository.compareAndApply(transition);
+    const accepted = getHead();
+    const injected = {
+      ...accepted,
+      history: [
+        {
+          transition: {
+            ...transition.toPrimitives(),
+            unsigned: 'attacker-controlled',
+          },
+        },
+      ],
+    };
+
+    expect(getMerger()?.(trusted, injected)).toEqual(trusted);
+  });
+
+  it('rejects replicated authorization history above the replay limit', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const target = await KeyPair.generate();
+    const { getHead, getMerger, repository } = repositoryFixture();
+    const transition = await enrollment(
+      identityId,
+      owner,
+      target,
+      '00000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+    );
+    await provisionAuthorization(repository, genesis);
+    const trusted = getHead();
+    await repository.compareAndApply(transition);
+    const accepted = getHead();
+    const injected = {
+      ...accepted,
+      history: Array.from({ length: 129 }, () => ({
+        transition: transition.toPrimitives(),
+      })),
+    };
+
+    expect(getMerger()?.(trusted, injected)).toEqual(trusted);
+  });
+
+  it('rejects oversized authorization history before parsing transitions', async () => {
+    const { genesis } = await fixture();
+    const { getHead, getMerger, repository } = repositoryFixture();
+    await provisionAuthorization(repository, genesis);
+    const trusted = getHead();
+    const parser = jest.spyOn(
+      DeviceAuthorizationTransition,
+      'fromPrimitives',
+    );
+    const injected = {
+      ...trusted,
+      history: [
+        {
+          transition: {
+            signature: 'a'.repeat(1_048_576),
+          },
+        },
+      ],
+    };
+
+    expect(getMerger()?.(trusted, injected)).toEqual(trusted);
+    expect(parser).not.toHaveBeenCalled();
+    parser.mockRestore();
+  });
+
   it('restores the signed identity genesis after an untrusted restart head', async () => {
     const { genesis, identityId } = await fixture();
     const attackerRecovery = await KeyPair.generate();

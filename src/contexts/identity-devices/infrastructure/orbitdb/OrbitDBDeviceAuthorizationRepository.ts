@@ -23,6 +23,10 @@ interface DeviceAuthorizationReplay {
 export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthorizationRepository {
   private static readonly HEAD_PREFIX = 'device-authorization:';
 
+  private static readonly MAX_HISTORY_RECORDS = 128;
+
+  private static readonly MAX_HISTORY_BYTES = 1_048_576;
+
   private readonly identityQueues = new Map<string, Promise<void>>();
 
   private readonly trustedGenesisByIdentity = new Map<
@@ -343,6 +347,10 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     genesis: DeviceAuthorization,
     history: OrbitDBDeviceAuthorizationTransitionRecord[],
   ): OrbitDBDeviceAuthorizationDocument {
+    assert(
+      this.isHistoryWithinLimits(history),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
     const replay = this.rebuild(genesis, history);
 
     return {
@@ -355,8 +363,72 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     };
   }
 
+  private hasExactKeys(
+    value: Record<string, unknown>,
+    expected: string[],
+  ): boolean {
+    const keys = Object.keys(value).sort();
+
+    return isDeepStrictEqual(keys, [...expected].sort());
+  }
+
+  private isHistoryWithinLimits(history: unknown[]): boolean {
+    return (
+      history.length <=
+        OrbitDBDeviceAuthorizationRepository.MAX_HISTORY_RECORDS &&
+      Buffer.byteLength(JSON.stringify(history), 'utf8') <=
+        OrbitDBDeviceAuthorizationRepository.MAX_HISTORY_BYTES
+    );
+  }
+
+  private hasCanonicalHistory(
+    history: unknown[],
+  ): history is OrbitDBDeviceAuthorizationTransitionRecord[] {
+    if (!this.isHistoryWithinLimits(history)) {
+      return false;
+    }
+
+    return history.every((value) => {
+      if (
+        typeof value !== 'object' ||
+        value === null ||
+        Array.isArray(value) ||
+        !this.hasExactKeys(value as Record<string, unknown>, ['transition'])
+      ) {
+        return false;
+      }
+
+      const { transition } = value as Record<string, unknown>;
+
+      if (
+        typeof transition !== 'object' ||
+        transition === null ||
+        Array.isArray(transition)
+      ) {
+        return false;
+      }
+
+      const parsed = DeviceAuthorizationTransition.fromPrimitives(
+        transition as OrbitDBDeviceAuthorizationTransitionRecord['transition'],
+      );
+
+      return (
+        this.canonicalString(parsed.toPrimitives()) ===
+        this.canonicalString(transition)
+      );
+    });
+  }
+
   private hasDocumentShape(value: Record<string, unknown>): boolean {
     return [
+      this.hasExactKeys(value, [
+        'authorization',
+        'genesis',
+        'history',
+        'id',
+        'identityId',
+        'kind',
+      ]),
       value.kind === 'device_authorization',
       typeof value.id === 'string',
       typeof value.identityId === 'string',
@@ -401,11 +473,17 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       }
 
       const document = value as unknown as OrbitDBDeviceAuthorizationDocument;
+
+      if (!this.hasCanonicalHistory(document.history)) {
+        return false;
+      }
+
       const genesis = DeviceAuthorization.fromPrimitives(document.genesis);
       const replay = this.rebuild(genesis, document.history);
 
       return (
         this.hasValidGenesis(document, genesis) &&
+        isDeepStrictEqual(document.genesis, genesis.toPrimitives()) &&
         this.matchesReplay(document, replay)
       );
     } catch {
@@ -448,9 +526,15 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       return current;
     }
 
+    const history = this.transitionRecords(current, candidate);
+
+    if (!this.isHistoryWithinLimits(history)) {
+      return current;
+    }
+
     return this.toDocument(
       DeviceAuthorization.fromPrimitives(current.genesis),
-      this.transitionRecords(current, candidate),
+      history,
     );
   }
 
