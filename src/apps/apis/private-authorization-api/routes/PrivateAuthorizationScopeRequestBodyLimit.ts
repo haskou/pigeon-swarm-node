@@ -8,7 +8,7 @@ const MaximumScopeEnvelopeCharacters =
   PrivateAuthorizationBodyFieldLimits.signedJson;
 
 export const PrivateAuthorizationScopeRequestBodyLimit =
-  PrivateAuthorizationProvisioningQuota.maximumOwnerBytes().valueOf() +
-  MaximumScopeEnvelopeCharacters *
+  (PrivateAuthorizationProvisioningQuota.maximumOwnerBytes().valueOf() +
+    MaximumScopeEnvelopeCharacters) *
     PrivateAuthorizationRequestBodyCapacity.maximumJsonBytesPerCharacter +
   PrivateAuthorizationRequestBodyCapacity.jsonEnvelopeOverheadBytes;
