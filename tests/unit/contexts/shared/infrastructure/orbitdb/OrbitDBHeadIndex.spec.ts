@@ -169,7 +169,7 @@ describe('OrbitDBHeadIndex', () => {
     });
   });
 
-  it('replicates tombstones for documents omitted by a replacement', async () => {
+  it('persists only live documents in an exact replacement', async () => {
     await index.putDocuments(
       'index:key',
       { id: 'index:key' },
@@ -186,10 +186,7 @@ describe('OrbitDBHeadIndex', () => {
 
     await expect(heads.get('index:key')).resolves.toEqual({
       id: 'index:key',
-      items: [
-        document('retained', 2),
-        expect.objectContaining({ id: 'removed', removed: true }),
-      ],
+      items: [document('retained', 2)],
       updatedAt: expect.any(Number),
     });
     await expect(index.find('index:key')).resolves.toEqual([
@@ -197,7 +194,7 @@ describe('OrbitDBHeadIndex', () => {
     ]);
   });
 
-  it('replicates a tombstone when a filtered record leaves its index', async () => {
+  it('persists an empty exact replacement when a record leaves its index', async () => {
     await index.putRecord(
       'index:key',
       { id: 'index:key' },
@@ -215,10 +212,46 @@ describe('OrbitDBHeadIndex', () => {
 
     await expect(heads.get('index:key')).resolves.toEqual({
       id: 'index:key',
-      items: [expect.objectContaining({ id: 'removed', removed: true })],
+      items: [],
       updatedAt: expect.any(Number),
     });
     await expect(index.find('index:key')).resolves.toEqual([]);
+  });
+
+  it('does not let an untrusted tombstone replace a valid record', () => {
+    const stored = document('same', 1, 'stored');
+
+    expect(
+      index.mergeRecords([stored], {
+        id: 'same',
+        removed: true,
+        updatedAt: Number.MAX_SAFE_INTEGER,
+      }),
+    ).toEqual([stored]);
+  });
+
+  it('bounds exact replacement storage by the live record set', async () => {
+    await index.putDocuments(
+      'index:key',
+      { id: 'index:key' },
+      Array.from({ length: 100 }, (_, position) =>
+        document(`removed-${position}`, position),
+      ),
+      { networkIds: [networkId], replace: true },
+    );
+
+    await index.putDocuments(
+      'index:key',
+      { id: 'index:key' },
+      [document('retained', 101)],
+      { networkIds: [networkId], replace: true },
+    );
+
+    await expect(heads.get('index:key')).resolves.toEqual({
+      id: 'index:key',
+      items: [document('retained', 101)],
+      updatedAt: expect.any(Number),
+    });
   });
 
   it('updates an available cached head while a background record merge is queued', async () => {
@@ -231,15 +264,12 @@ describe('OrbitDBHeadIndex', () => {
       document('queued', 1),
       [networkId],
     );
-    registry.cacheHeadLocally(
-      'index:key',
-      {
-        id: 'index:key',
-        items: [document('first', 1)],
-        ownerId: 'owner',
-        updatedAt: 1,
-      },
-    );
+    registry.cacheHeadLocally('index:key', {
+      id: 'index:key',
+      items: [document('first', 1)],
+      ownerId: 'owner',
+      updatedAt: 1,
+    });
 
     index.replicateRecordInBackground(
       'index:key',

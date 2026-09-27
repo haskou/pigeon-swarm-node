@@ -6,6 +6,11 @@ import { OrbitDBHeadIndexPutOptions } from './OrbitDBHeadIndexPutOptions';
 import OrbitDBReplicatedStateRegistry from './OrbitDBReplicatedStateRegistry';
 
 export class OrbitDBHeadIndex<TDocument extends object> {
+  private static readonly exactRecordIdsByRegistry = new WeakMap<
+    OrbitDBReplicatedStateRegistry,
+    Map<string, Set<string>>
+  >();
+
   private static readonly pendingRecordsByRegistry = new WeakMap<
     OrbitDBReplicatedStateRegistry,
     Map<string, Record<string, unknown>[]>
@@ -14,6 +19,22 @@ export class OrbitDBHeadIndex<TDocument extends object> {
   private readonly deduplicator: OrbitDBDocumentDeduplicator<TDocument>;
 
   private readonly recordMergeQueues = new Map<string, Promise<void>>();
+
+  private get exactRecordIds(): Map<string, Set<string>> {
+    let exactRecordIds = OrbitDBHeadIndex.exactRecordIdsByRegistry.get(
+      this.registry,
+    );
+
+    if (!exactRecordIds) {
+      exactRecordIds = new Map<string, Set<string>>();
+      OrbitDBHeadIndex.exactRecordIdsByRegistry.set(
+        this.registry,
+        exactRecordIds,
+      );
+    }
+
+    return exactRecordIds;
+  }
 
   private get pendingRecords(): Map<string, Record<string, unknown>[]> {
     let pendingRecords = OrbitDBHeadIndex.pendingRecordsByRegistry.get(
@@ -76,53 +97,83 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     };
   }
 
-  private isTombstone(record: Record<string, unknown>): boolean {
-    return record.removed === true;
-  }
-
-  private tombstone(record: Record<string, unknown>): Record<string, unknown> {
-    const id = this.options.recordId(record);
-    const identity = Object.fromEntries(
-      ['id', 'messageId', 'rootMessageId']
-        .filter((attribute) => record[attribute] === id)
-        .map((attribute) => [attribute, id]),
-    );
-
-    return {
-      ...identity,
-      ...this.options.tombstoneMetadata?.(record),
-      removed: true,
-      updatedAt: Math.max(Date.now(), this.recordFreshness(record) + 1),
-    };
-  }
-
   private replacementRecords(
-    currentRecords: Record<string, unknown>[],
+    key: string,
     candidateRecords: Record<string, unknown>[],
   ): Record<string, unknown>[] {
-    const candidateIds = new Set(
-      candidateRecords
-        .map((record) => this.options.recordId(record))
-        .filter((id): id is string => id !== undefined),
+    const records = candidateRecords.filter(
+      (record) => this.options.documentFromRecord(record) !== undefined,
     );
-    const omittedRecords = currentRecords
-      .filter((record) => {
-        const id = this.options.recordId(record);
+    this.exactRecordIds.set(
+      key,
+      new Set(
+        records
+          .map((record) => this.options.recordId(record))
+          .filter((id): id is string => id !== undefined),
+      ),
+    );
 
-        return id !== undefined && !candidateIds.has(id);
-      })
-      .map((record) =>
-        this.isTombstone(record) ? record : this.tombstone(record),
-      );
-
-    return [...candidateRecords, ...omittedRecords];
+    return records;
   }
 
-  private replacementFilter(
+  private isRemoval(record: Record<string, unknown>): boolean {
+    return (
+      record.removed === true && this.options.recordId(record) !== undefined
+    );
+  }
+
+  private recordsWithout(
+    records: Record<string, unknown>[],
     record: Record<string, unknown>,
-    filter: ((record: Record<string, unknown>) => boolean) | undefined,
-  ): boolean {
-    return this.isTombstone(record) || (filter?.(record) ?? true);
+  ): Record<string, unknown>[] {
+    const removedId = this.options.recordId(record);
+
+    return records.filter(
+      (candidate) => this.options.recordId(candidate) !== removedId,
+    );
+  }
+
+  private removeRecord(
+    key: string,
+    metadata: Record<string, unknown>,
+    record: Record<string, unknown>,
+    networkIds: string[],
+  ): Promise<void> {
+    const cachedHead = this.registry.findCachedHead(key);
+
+    if (cachedHead) {
+      this.replacementRecords(
+        key,
+        this.recordsWithout(this.recordsFromHead(cachedHead), record),
+      );
+    }
+
+    const previous = this.recordMergeQueues.get(key) ?? Promise.resolve();
+    const next = previous
+      .catch((): void => undefined)
+      .then(async () => {
+        const head =
+          this.registry.findCachedHead(key) ??
+          (await this.registry.findPersistedHead(key));
+        const records = this.replacementRecords(
+          key,
+          this.recordsWithout(this.recordsFromHead(head), record),
+        );
+
+        await this.registry.putHeadExactly(
+          key,
+          this.recordsHead(metadata, records),
+          networkIds,
+        );
+      });
+
+    this.recordMergeQueues.set(key, next);
+
+    return next.finally(() => {
+      if (this.recordMergeQueues.get(key) === next) {
+        this.recordMergeQueues.delete(key);
+      }
+    });
   }
 
   private nextHeadUpdatedAt(head: Record<string, unknown> | undefined): number {
@@ -301,43 +352,100 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     return next;
   }
 
-  private mergeTombstone(
-    current: Record<string, unknown> | undefined,
-    candidate: Record<string, unknown>,
-  ): Record<string, unknown> | undefined {
-    if (
-      !current ||
-      (!this.isTombstone(current) && !this.isTombstone(candidate))
-    )
-      return undefined;
-
-    return this.shouldReplaceRecord(current, candidate) ? candidate : current;
-  }
-
-  private mergeDocuments(
-    current: Record<string, unknown> | undefined,
-    candidate: Record<string, unknown>,
-  ): Record<string, unknown> | undefined {
-    const currentDocument = current && this.options.documentFromRecord(current);
-    const candidateDocument = this.options.documentFromRecord(candidate);
-
-    return currentDocument && candidateDocument && this.options.merge
-      ? Object.fromEntries(
-          Object.entries(
-            this.options.merge(currentDocument, candidateDocument),
-          ),
-        )
-      : undefined;
-  }
-
   private mergeRecord(
     current: Record<string, unknown> | undefined,
     record: Record<string, unknown>,
   ): Record<string, unknown> {
-    return (
-      this.mergeTombstone(current, record) ??
-      this.mergeDocuments(current, record) ??
-      (!current || this.shouldReplaceRecord(current, record) ? record : current)
+    const currentDocument = current && this.options.documentFromRecord(current);
+    const candidateDocument = this.options.documentFromRecord(record);
+
+    if (!candidateDocument) return current ?? record;
+
+    if (!currentDocument) return record;
+
+    if (this.options.merge) {
+      return Object.fromEntries(
+        Object.entries(this.options.merge(currentDocument, candidateDocument)),
+      );
+    }
+
+    return this.shouldReplaceRecord(current, record) ? record : current;
+  }
+
+  private exactDocuments(key: string, documents: TDocument[]): TDocument[] {
+    const exactRecordIds = this.exactRecordIds.get(key);
+
+    if (!exactRecordIds) return documents;
+
+    return documents.filter((document) => {
+      const id = this.options.recordId(document);
+
+      return id !== undefined && exactRecordIds.has(id);
+    });
+  }
+
+  private async putReplacementRecord(
+    key: string,
+    metadata: Record<string, unknown>,
+    record: Record<string, unknown>,
+    networkIds: string[],
+    options: OrbitDBHeadIndexPutOptions<TDocument>,
+  ): Promise<void> {
+    const previous = this.recordMergeQueues.get(key) ?? Promise.resolve();
+    const next = previous
+      .catch((): void => undefined)
+      .then(async () => {
+        const cachedHead = this.registry.findCachedHead(key);
+        const currentRecords = this.recordsFromHead(
+          cachedHead ?? (await this.registry.findPersistedHead(key)),
+        );
+        const records = this.replacementRecords(
+          key,
+          this.mergeRecords(currentRecords, record).filter(
+            options.recordFilter ?? (() => true),
+          ),
+        );
+
+        await this.registry.putHeadExactly(
+          key,
+          this.recordsHead(metadata, records),
+          networkIds,
+        );
+      });
+    this.recordMergeQueues.set(key, next);
+
+    try {
+      await next;
+    } finally {
+      if (this.recordMergeQueues.get(key) === next) {
+        this.recordMergeQueues.delete(key);
+      }
+    }
+  }
+
+  private async putMergedRecord(
+    key: string,
+    metadata: Record<string, unknown>,
+    record: Record<string, unknown>,
+    networkIds: string[],
+    options: OrbitDBHeadIndexPutOptions<TDocument>,
+  ): Promise<void> {
+    const cachedHead = this.registry.findCachedHead(key);
+    const records = this.mergeRecords(
+      this.recordsFromHead(
+        cachedHead ?? (await this.registry.findPersistedHead(key)),
+      ),
+      record,
+    ).filter(options.recordFilter ?? (() => true));
+    const recordId = this.options.recordId(record);
+    const exactRecordIds = this.exactRecordIds.get(key);
+
+    if (recordId && exactRecordIds) exactRecordIds.add(recordId);
+
+    await this.registry.putHead(
+      key,
+      this.recordsHead(metadata, records),
+      networkIds,
     );
   }
 
@@ -363,7 +471,6 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     }
 
     return this.recordsFromHead(head)
-      .filter((record) => !this.isTombstone(record))
       .map((record) => this.options.documentFromRecord(record))
       .filter((document): document is TDocument => document !== undefined);
   }
@@ -373,21 +480,27 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     const head = await this.registry.findHead(key);
 
     if (pendingRecords.length === 0) {
-      return this.documentsFromHead(head);
+      const documents = this.documentsFromHead(head);
+
+      return documents && this.exactDocuments(key, documents);
     }
 
-    return this.documentsFromHead(
+    const documents = this.documentsFromHead(
       this.pendingRecordsHead(
         head ?? (await this.registry.findPersistedHead(key)),
         pendingRecords,
       ),
     );
+
+    return documents && this.exactDocuments(key, documents);
   }
 
   public cachedByPrefix(prefix: string): TDocument[] {
     return this.registry
-      .findCachedHeadsByPrefix(prefix)
-      .flatMap((head) => this.documentsFromHead(head) ?? []);
+      .findCachedHeadEntriesByPrefix(prefix)
+      .flatMap(({ key, value }) =>
+        this.exactDocuments(key, this.documentsFromHead(value) ?? []),
+      );
   }
 
   public documentIds(documents: TDocument[]): Set<string> {
@@ -446,16 +559,14 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     let head = this.documentsHead(metadata, documents, options);
 
     if (options.replace) {
-      const currentHead =
-        this.registry.findCachedHead(key) ??
-        (await this.registry.findPersistedHead(key));
       head = this.recordsHead(
         metadata,
-        this.replacementRecords(
-          this.recordsFromHead(currentHead),
-          this.recordsFromHead(head),
-        ),
+        this.replacementRecords(key, this.recordsFromHead(head)),
       );
+
+      await this.registry.putHeadExactly(key, head, options.networkIds ?? []);
+
+      return;
     }
 
     await this.registry.putHead(key, head, options.networkIds ?? []);
@@ -481,51 +592,25 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     networkIds: string[] = [],
     options: OrbitDBHeadIndexPutOptions<TDocument> = {},
   ): Promise<void> {
-    if (options.replace) {
-      const previous = this.recordMergeQueues.get(key) ?? Promise.resolve();
-      const next = previous
-        .catch((): void => undefined)
-        .then(async () => {
-          const cachedHead = this.registry.findCachedHead(key);
-          const currentRecords = this.recordsFromHead(
-            cachedHead ?? (await this.registry.findPersistedHead(key)),
-          );
-          const records = this.replacementRecords(
-            currentRecords,
-            this.mergeRecords(currentRecords, record).filter((candidate) =>
-              this.replacementFilter(candidate, options.recordFilter),
-            ),
-          );
-
-          await this.registry.putHead(
-            key,
-            this.recordsHead(metadata, records),
-            networkIds,
-          );
-        });
-      this.recordMergeQueues.set(key, next);
-
-      try {
-        await next;
-      } finally {
-        if (this.recordMergeQueues.get(key) === next) {
-          this.recordMergeQueues.delete(key);
-        }
-      }
+    if (this.isRemoval(record)) {
+      await this.removeRecord(key, metadata, record, networkIds);
 
       return;
     }
-    const cachedHead = this.registry.findCachedHead(key);
-    const records = this.mergeRecords(
-      this.recordsFromHead(
-        cachedHead ?? (await this.registry.findPersistedHead(key)),
-      ),
-      record,
-    ).filter(options.recordFilter ?? (() => true));
 
-    const head = this.recordsHead(metadata, records);
+    if (options.replace) {
+      await this.putReplacementRecord(
+        key,
+        metadata,
+        record,
+        networkIds,
+        options,
+      );
 
-    await this.registry.putHead(key, head, networkIds);
+      return;
+    }
+
+    await this.putMergedRecord(key, metadata, record, networkIds, options);
   }
 
   public replicateRecordInBackground(
@@ -534,6 +619,10 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     record: Record<string, unknown>,
     networkIds: string[] = [],
   ): Promise<void> {
+    if (this.isRemoval(record)) {
+      return this.removeRecord(key, metadata, record, networkIds);
+    }
+
     const queue = this.recordMergeQueues.get(key);
     const cachedHead = this.registry.findCachedHead(key);
 

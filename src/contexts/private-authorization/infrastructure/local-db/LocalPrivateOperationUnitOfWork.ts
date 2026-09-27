@@ -481,7 +481,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   ): Promise<'committed' | 'stale'> {
     const receipt = acceptance.receipt.toPrimitives();
 
-    if (await this.isCommitted(scopeId, receipt.id, receipt.digest)) {
+    if (await this.isCommitted(scopeId, acceptance.receipt)) {
       return 'committed';
     }
 
@@ -629,14 +629,19 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
 
   private async isCommitted(
     scopeId: string,
-    operationId: string,
-    digest: string,
+    operation: PrivateControlOperation,
   ): Promise<boolean> {
-    const existing = await this.repository.findReceipt(scopeId, operationId);
+    const candidate = operation.toPrimitives();
+    const existing = await this.repository.findReceipt(scopeId, candidate.id);
 
     if (!existing) return false;
 
-    if (existing.digest !== digest) {
+    if (existing.digest !== candidate.digest) {
+      const receipt = PrivateControlOperation.fromPrimitives(existing);
+      assert(
+        receipt.isAuthoredBy(operation.getAuthorDeviceKey()),
+        new InvalidPrivateAuthorizationError(),
+      );
       const scope = await this.repository.findScope(scopeId);
 
       if (scope) {

@@ -308,13 +308,9 @@ describe('OrbitDBCommunityRepository', () => {
         memberIds: [identityMother.id.valueOf()],
       }),
     );
-    expect(registry.findCachedHead(memberIndexKey)).toEqual(
-      expect.objectContaining({
-        communities: [
-          expect.objectContaining({ id: 'community-1', removed: true }),
-        ],
-      }),
-    );
+    expect(
+      JSON.stringify(registry.findCachedHead(memberIndexKey)),
+    ).not.toContain('"removed":true');
     if (staleMemberIndex) {
       await registry.putHead(memberIndexKey, staleMemberIndex, [networkId]);
     }

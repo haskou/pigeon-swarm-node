@@ -564,7 +564,6 @@ export default class OrbitDBReplicatedStateRegistry {
         ([key, value]) =>
           OrbitDBReplicatedStateRegistry.INDEX_HEAD_COLLECTION_NAMES.has(key) &&
           Array.isArray(value) &&
-          value.length > 0 &&
           value.every((item) => this.isRecord(item)),
       )
       .map(([key]) => key);
@@ -597,7 +596,9 @@ export default class OrbitDBReplicatedStateRegistry {
     const merged = new Map<string, Record<string, unknown>>();
     const withoutId: Record<string, unknown>[] = [];
 
-    for (const record of [...currentRecords, ...candidateRecords]) {
+    for (const record of [...currentRecords, ...candidateRecords].filter(
+      (candidate) => candidate.removed !== true,
+    )) {
       const id = this.recordId(record);
 
       if (!id) {
@@ -1792,10 +1793,19 @@ export default class OrbitDBReplicatedStateRegistry {
   public findCachedHeadsByPrefix(
     prefix: string,
   ): Array<Record<string, unknown>> {
+    return this.findCachedHeadEntriesByPrefix(prefix).map(({ value }) => value);
+  }
+
+  public findCachedHeadEntriesByPrefix(
+    prefix: string,
+  ): Array<{ key: string; value: Record<string, unknown> }> {
     return [...this.cachedHeadKeys()]
       .filter((key) => key.startsWith(prefix))
-      .map((key) => this.cachedHead(key))
-      .filter((head): head is Record<string, unknown> => head !== undefined);
+      .flatMap((key) => {
+        const value = this.cachedHead(key);
+
+        return value ? [{ key, value }] : [];
+      });
   }
 
   public findCachedHead(key: string): Record<string, unknown> | undefined {

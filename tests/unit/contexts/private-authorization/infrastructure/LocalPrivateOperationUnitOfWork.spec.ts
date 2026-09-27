@@ -728,6 +728,37 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     );
   });
 
+  it('rejects a cross-author concurrent receipt collision without freezing', async () => {
+    const conflicting = acceptance();
+    conflicting.receipt = PrivateControlOperation.fromPrimitives({
+      ...operation().toPrimitives(),
+      authorDeviceKey: 'device',
+      digest: 'cross-author-digest',
+    });
+
+    const results = await Promise.allSettled([
+      unitOfWork.commitAcceptance(
+        'scope',
+        { headHash: 'head-0', revision: 0 },
+        acceptance(),
+      ),
+      unitOfWork.commitAcceptance(
+        'scope',
+        { headHash: 'head-0', revision: 0 },
+        conflicting,
+      ),
+    ]);
+
+    expect(results[0]).toEqual({ status: 'fulfilled', value: 'committed' });
+    expect(results[1]).toEqual({
+      reason: expect.any(InvalidPrivateAuthorizationError),
+      status: 'rejected',
+    });
+    expect((await repository.findScope('scope'))?.toPrimitives().status).toBe(
+      'active',
+    );
+  });
+
   it('persists quarantine when a rebase finds a conflicting pending operation', async () => {
     const proposal = PrivateControlOperation.fromPrimitives({
       ...operation('membership.propose').toPrimitives(),

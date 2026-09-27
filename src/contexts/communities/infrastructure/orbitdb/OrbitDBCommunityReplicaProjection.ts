@@ -5,12 +5,6 @@ import PrivateCommunityPublicStorageGuard from '../PrivateCommunityPublicStorage
 import { OrbitDBCommunityDocument } from './documents/OrbitDBCommunityDocument';
 import OrbitDBCommunityReplicaMerger from './OrbitDBCommunityReplicaMerger';
 
-type OrbitDBCommunityTombstone = Record<string, unknown> & {
-  id: string;
-  networkId: string;
-  removed: true;
-};
-
 export default class OrbitDBCommunityReplicaProjection {
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
@@ -70,31 +64,14 @@ export default class OrbitDBCommunityReplicaProjection {
     );
   }
 
-  private isTombstone(value: unknown): value is OrbitDBCommunityTombstone {
-    if (typeof value !== 'object' || value === null || Array.isArray(value))
-      return false;
-    const record = value as Record<string, unknown>;
-
-    return (
-      typeof record.id === 'string' &&
-      typeof record.networkId === 'string' &&
-      record.removed === true &&
-      typeof record.updatedAt === 'number' &&
-      Number.isFinite(record.updatedAt)
-    );
-  }
-
   private indexRecords(
     record: Record<string, unknown> | undefined,
-  ): Array<OrbitDBCommunityDocument | OrbitDBCommunityTombstone> {
+  ): OrbitDBCommunityDocument[] {
     const values: unknown = record?.communities;
 
     return Array.isArray(values)
-      ? values.filter(
-          (
-            value,
-          ): value is OrbitDBCommunityDocument | OrbitDBCommunityTombstone =>
-            this.isDocument(value) || this.isTombstone(value),
+      ? values.filter((value): value is OrbitDBCommunityDocument =>
+          this.isDocument(value),
         )
       : [];
   }
@@ -107,44 +84,17 @@ export default class OrbitDBCommunityReplicaProjection {
     );
   }
 
-  private freshness(record: Record<string, unknown>): number {
-    return Math.max(
-      typeof record.updatedAt === 'number' ? record.updatedAt : 0,
-      typeof record.deletedAt === 'number' ? record.deletedAt : 0,
-      typeof record.createdAt === 'number' ? record.createdAt : 0,
-    );
-  }
-
-  private mergeIndexRecord(
-    current: OrbitDBCommunityDocument | OrbitDBCommunityTombstone,
-    candidate: OrbitDBCommunityDocument | OrbitDBCommunityTombstone,
-  ): OrbitDBCommunityDocument | OrbitDBCommunityTombstone {
-    if (this.isTombstone(current) || this.isTombstone(candidate)) {
-      return this.freshness(current) <= this.freshness(candidate)
-        ? candidate
-        : current;
-    }
-
-    return this.merger.merge(current, candidate);
-  }
-
   private mergeIndex(
     current: Record<string, unknown> | undefined,
     candidate: Record<string, unknown>,
   ): Record<string, unknown> {
-    const documents = new Map<
-      string,
-      OrbitDBCommunityDocument | OrbitDBCommunityTombstone
-    >();
+    const documents = new Map<string, OrbitDBCommunityDocument>();
     for (const document of [
       ...this.indexRecords(current),
       ...this.indexRecords(candidate),
     ]) {
-      const previous = documents.get(document.id);
-      documents.set(
-        document.id,
-        previous ? this.mergeIndexRecord(previous, document) : document,
-      );
+      const previous = documents.get(document.id) ?? document;
+      documents.set(document.id, this.merger.merge(previous, document));
     }
 
     return {

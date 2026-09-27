@@ -39,7 +39,6 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
         typeof record.id === 'string' ? record.id : undefined,
       shouldReplace: (current, candidate) =>
         this.isNewerOrEqualDocument(current, candidate),
-      tombstoneMetadata: (record) => ({ networkId: record.networkId }),
     });
   }
 

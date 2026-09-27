@@ -180,11 +180,6 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
 
     const storedIndex = headRecords.get(indexKey);
     expect(storedIndex?.reactions).toEqual([
-      {
-        id: poisoned.id,
-        removed: true,
-        updatedAt: expect.any(Number),
-      },
       expect.objectContaining({ communityId: communityId.valueOf() }),
     ]);
   });
