@@ -84,7 +84,11 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     protectedMlsState: 'encrypted-mls-state',
     receipt: operation(),
     replayMarkerId: 'request',
-    reservation: { childHeadHash: 'head-1', parentHeadHash: 'head-0' },
+    reservation: {
+      childHeadHash: 'head-1',
+      operationId: 'operation',
+      parentHeadHash: 'head-0',
+    },
     scope: PrivateAuthorizationScope.fromPrimitives({
       acceptedOperations: [operation().toPrimitives()],
       checkpoint: {
@@ -598,6 +602,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       'scope',
       'retired-parent',
       'retired-child',
+      oldest.id,
     );
     await database.save(
       PrivateAuthorizationLocalNamespaces.replay,
@@ -933,7 +938,35 @@ describe('LocalPrivateOperationUnitOfWork', () => {
   });
 
   it('durably freezes a scope when another child was reserved for the parent', async () => {
-    await repository.saveReservation('scope', 'head-0', 'other-head');
+    await repository.saveReservation(
+      'scope',
+      'head-0',
+      'other-head',
+      'other-operation',
+    );
+
+    await expect(
+      unitOfWork.commitAcceptance(
+        'scope',
+        { headHash: 'head-0', revision: 0 },
+        acceptance(),
+      ),
+    ).rejects.toBeInstanceOf(PrivateAuthorizationConflictError);
+    await expect(
+      repository.findReceipt('scope', 'operation'),
+    ).resolves.toBeUndefined();
+    expect((await repository.findScope('scope'))?.toPrimitives().status).toBe(
+      'frozen',
+    );
+  });
+
+  it('durably freezes a scope when another operation reserved the same child', async () => {
+    await repository.saveReservation(
+      'scope',
+      'head-0',
+      'head-1',
+      'other-operation',
+    );
 
     await expect(
       unitOfWork.commitAcceptance(
@@ -972,6 +1005,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     });
     sibling.reservation = {
       childHeadHash: 'head-2',
+      operationId: 'sibling',
       parentHeadHash: 'head-0',
     };
 
@@ -1024,12 +1058,12 @@ describe('LocalPrivateOperationUnitOfWork', () => {
 
     await expect(
       Promise.all([
-        unitOfWork.reserveChild('scope', 'head-0', 'head-1'),
-        another.reserveChild('scope', 'head-0', 'head-2'),
+        unitOfWork.reserveChild('scope', 'head-0', 'head-1', 'operation-1'),
+        another.reserveChild('scope', 'head-0', 'head-2', 'operation-2'),
       ]),
     ).resolves.toEqual(['reserved', 'conflict']);
     await expect(
-      another.reserveChild('scope', 'head-0', 'head-1'),
+      another.reserveChild('scope', 'head-0', 'head-1', 'operation-1'),
     ).resolves.toBe('same');
     const storageReservation = await database.findOne(
       PrivateAuthorizationLocalNamespaces.provisioning,

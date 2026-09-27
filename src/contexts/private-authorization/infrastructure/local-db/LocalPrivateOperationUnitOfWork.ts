@@ -9,6 +9,7 @@ import { PrivateAuthorizationProvisioningQuota } from '@app/contexts/private-aut
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
 import { PrivateAuthorizationStorageReservationPrimitives } from '@app/contexts/private-authorization/domain/PrivateAuthorizationStorageReservationPrimitives';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
+import { PrivateControlTransitionReservation } from '@app/contexts/private-authorization/domain/PrivateControlTransitionReservation';
 import { PrivateAuthorizationDeviceKey } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationDeviceKey';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase, {
@@ -555,7 +556,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       operations.push({
         document: {
           childHeadHash: acceptance.reservation.childHeadHash,
-          operationId: receipt.id,
+          operationId: acceptance.reservation.operationId,
         },
         id: privateAuthorizationLocalId(
           scopeId,
@@ -734,11 +735,12 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       scopeId,
       acceptance.reservation.parentHeadHash,
     );
+    const candidate = PrivateControlTransitionReservation.fromPrimitives({
+      childHeadHash: acceptance.reservation.childHeadHash,
+      operationId: acceptance.reservation.operationId,
+    });
 
-    if (
-      !reservedChild ||
-      reservedChild === acceptance.reservation.childHeadHash
-    ) {
+    if (!reservedChild || reservedChild.matches(candidate)) {
       return;
     }
 
@@ -902,6 +904,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     scopeId: string,
     parentHeadHash: string,
     childHeadHash: string,
+    operationId: string,
   ): Promise<'reserved' | 'same' | 'conflict'> {
     return this.exclusivelyProvisioning(() =>
       this.exclusively(scopeId, async () => {
@@ -909,9 +912,13 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
           scopeId,
           parentHeadHash,
         );
+        const candidate = PrivateControlTransitionReservation.fromPrimitives({
+          childHeadHash,
+          operationId,
+        });
 
         if (existing) {
-          if (existing === childHeadHash) return 'same';
+          if (existing.matches(candidate)) return 'same';
           const scope = await this.repository.findScope(scopeId);
 
           if (scope) {
@@ -923,7 +930,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
         }
         const operations: EmbeddedLocalDatabaseOperation[] = [
           {
-            document: { childHeadHash },
+            document: { ...candidate.toPrimitives() },
             id: privateAuthorizationLocalId(scopeId, parentHeadHash),
             namespace: PrivateAuthorizationLocalNamespaces.reservations,
             type: 'put',

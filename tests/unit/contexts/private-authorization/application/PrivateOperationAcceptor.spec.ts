@@ -8,6 +8,7 @@ import PrivateOperationAuthorizer from '@app/contexts/private-authorization/appl
 import { PrivateOperationUnitOfWork } from '@app/contexts/private-authorization/application/PrivateOperationUnitOfWork';
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
+import { PrivateControlTransitionReservation } from '@app/contexts/private-authorization/domain/PrivateControlTransitionReservation';
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import { PrivateIdentityBinding } from '@app/contexts/private-authorization/domain/services/PrivateIdentityBinding';
@@ -462,7 +463,12 @@ describe('PrivateOperationAcceptor', () => {
     repository.findScope.mockResolvedValue(
       PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
     );
-    repository.findReservation.mockResolvedValue(encoded(32, 11));
+    repository.findReservation.mockResolvedValue(
+      PrivateControlTransitionReservation.fromPrimitives({
+        childHeadHash: encoded(32, 11),
+        operationId,
+      }),
+    );
 
     await expect(
       acceptor.accept(new PrivateOperationAcceptMessage(sibling, 'proof')),
@@ -470,6 +476,47 @@ describe('PrivateOperationAcceptor', () => {
     expect(verifier.verify).toHaveBeenCalledWith(sibling, authorKey);
     expect(repository.findReservation).toHaveBeenCalledWith(scopeId, headHash);
     expect(unitOfWork.quarantine).not.toHaveBeenCalled();
+    expect(freshness.verify).not.toHaveBeenCalled();
+  });
+
+  it('freezes a historical operation that reuses another operation transition', async () => {
+    const activeKey = encoded(32, 10);
+    const currentCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
+      ...checkpoint().toPrimitives(),
+      admittedDeviceKeys: [activeKey],
+      authorityKeys: [activeKey],
+      freshnessAuthorityKey: activeKey,
+      headHash: encoded(32, 11),
+      parentHeadHash: headHash,
+      revision: 1,
+      revokedDeviceKeys: [authorKey],
+    });
+    const reusedTransition = revocation({
+      payload: {
+        deviceKey: authorKey,
+        resultingHeadHash: encoded(32, 11),
+      },
+    });
+    repository.findScope.mockResolvedValue(
+      PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
+    );
+    repository.findReservation.mockResolvedValue(
+      PrivateControlTransitionReservation.fromPrimitives({
+        childHeadHash: encoded(32, 11),
+        operationId: encoded(16, 12),
+      }),
+    );
+
+    await expect(
+      acceptor.accept(
+        new PrivateOperationAcceptMessage(reusedTransition, 'proof'),
+      ),
+    ).rejects.toThrow('Private authorization conflict');
+    expect(verifier.verify).toHaveBeenCalledWith(
+      reusedTransition,
+      authorKey,
+    );
+    expect(unitOfWork.quarantine).toHaveBeenCalledWith(scopeId);
     expect(freshness.verify).not.toHaveBeenCalled();
   });
 

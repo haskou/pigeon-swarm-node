@@ -1,0 +1,41 @@
+import { assert } from '@haskou/value-objects';
+
+import { InvalidPrivateAuthorizationError } from './errors/InvalidPrivateAuthorizationError';
+import { PrivateControlTransitionReservationPrimitives } from './PrivateControlTransitionReservationPrimitives';
+
+export class PrivateControlTransitionReservation {
+  public static fromPrimitives(
+    primitives: PrivateControlTransitionReservationPrimitives,
+  ): PrivateControlTransitionReservation {
+    assert(
+      primitives.childHeadHash.length > 0 && primitives.operationId.length > 0,
+      new InvalidPrivateAuthorizationError(),
+    );
+
+    return new PrivateControlTransitionReservation(primitives);
+  }
+
+  private constructor(
+    private readonly primitives: PrivateControlTransitionReservationPrimitives,
+  ) {}
+
+  public conflictWith(
+    candidate: PrivateControlTransitionReservation,
+  ): 'head' | 'none' | 'operation' {
+    if (this.primitives.childHeadHash !== candidate.primitives.childHeadHash) {
+      return 'head';
+    }
+
+    return this.primitives.operationId === candidate.primitives.operationId
+      ? 'none'
+      : 'operation';
+  }
+
+  public matches(candidate: PrivateControlTransitionReservation): boolean {
+    return this.conflictWith(candidate) === 'none';
+  }
+
+  public toPrimitives(): PrivateControlTransitionReservationPrimitives {
+    return { ...this.primitives };
+  }
+}

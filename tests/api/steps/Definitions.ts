@@ -598,6 +598,13 @@ export default class Definitions {
     });
   }
 
+  @given('I set a maximum-length private authorization operation')
+  public iSetAMaximumLengthPrivateAuthorizationOperation(): void {
+    this.body = JSON.stringify({
+      signedOperationJson: 'x'.repeat(262144),
+    });
+  }
+
   @given(
     'I set a client-signed identity body with name {string} and handle {string}',
   )

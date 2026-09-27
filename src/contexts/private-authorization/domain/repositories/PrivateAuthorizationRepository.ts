@@ -1,6 +1,7 @@
 import { PrivateAuthorizationScope } from '../PrivateAuthorizationScope';
 import { PrivateControlOperation } from '../PrivateControlOperation';
 import { PrivateControlOperationPrimitives } from '../PrivateControlOperationPrimitives';
+import { PrivateControlTransitionReservation } from '../PrivateControlTransitionReservation';
 
 export abstract class PrivateAuthorizationRepository {
   public abstract findOutbox(
@@ -27,7 +28,7 @@ export abstract class PrivateAuthorizationRepository {
   public abstract findReservation(
     scopeId: string,
     parentHeadHash: string,
-  ): Promise<string | undefined>;
+  ): Promise<PrivateControlTransitionReservation | undefined>;
 
   public abstract findScope(
     scopeId: string,
@@ -59,6 +60,7 @@ export abstract class PrivateAuthorizationRepository {
     scopeId: string,
     parentHeadHash: string,
     childHeadHash: string,
+    operationId: string,
   ): Promise<void>;
 
   public abstract saveScope(scope: PrivateAuthorizationScope): Promise<void>;

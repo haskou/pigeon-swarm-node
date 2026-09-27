@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 
 import { PostPrivateAuthorizationOperationBody } from '../bodies/PostPrivateAuthorizationOperationBody';
+import { PrivateAuthorizationRequestBodyLimit } from './PrivateAuthorizationRequestBodyLimit';
 import { PrivateAuthorizationRouteSupport } from './PrivateAuthorizationRouteSupport';
 
 @JsonController('/private-authorization')
@@ -15,7 +16,7 @@ export class PostPrivateAuthorizationOperationRoute extends PrivateAuthorization
 
   @Post('/operations')
   public async accept(
-    @Body({ options: { limit: '2mb' } })
+    @Body({ options: { limit: PrivateAuthorizationRequestBodyLimit } })
     body: PostPrivateAuthorizationOperationBody,
     @Req() request: Request,
     @Res() response: Response,

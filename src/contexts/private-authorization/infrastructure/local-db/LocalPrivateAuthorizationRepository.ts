@@ -3,6 +3,7 @@ import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/d
 import { PrivateAuthorizationScopePrimitives } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScopePrimitives';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
 import { PrivateControlOperationPrimitives } from '@app/contexts/private-authorization/domain/PrivateControlOperationPrimitives';
+import { PrivateControlTransitionReservation } from '@app/contexts/private-authorization/domain/PrivateControlTransitionReservation';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import EmbeddedLocalDatabase, {
   EmbeddedLocalDatabaseOperation,
@@ -150,15 +151,23 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
   public async findReservation(
     scopeId: string,
     parentHeadHash: string,
-  ): Promise<string | undefined> {
+  ): Promise<PrivateControlTransitionReservation | undefined> {
     const document = await this.database.findOne(
       PrivateAuthorizationLocalNamespaces.reservations,
       privateAuthorizationLocalId(scopeId, parentHeadHash),
     );
 
-    return typeof document?.childHeadHash === 'string'
-      ? document.childHeadHash
-      : undefined;
+    if (
+      typeof document?.childHeadHash !== 'string' ||
+      typeof document.operationId !== 'string'
+    ) {
+      return undefined;
+    }
+
+    return PrivateControlTransitionReservation.fromPrimitives({
+      childHeadHash: document.childHeadHash,
+      operationId: document.operationId,
+    });
   }
 
   public async findScope(
@@ -271,10 +280,15 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
     scopeId: string,
     parentHeadHash: string,
     childHeadHash: string,
+    operationId: string,
   ): Promise<void> {
     const existing = await this.findReservation(scopeId, parentHeadHash);
+    const candidate = PrivateControlTransitionReservation.fromPrimitives({
+      childHeadHash,
+      operationId,
+    });
 
-    if (existing && existing !== childHeadHash) {
+    if (existing && !existing.matches(candidate)) {
       throw new Error('Private authorization conflict');
     }
 
@@ -283,7 +297,7 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
     await this.database.save(
       PrivateAuthorizationLocalNamespaces.reservations,
       privateAuthorizationLocalId(scopeId, parentHeadHash),
-      { childHeadHash },
+      { ...candidate.toPrimitives() },
     );
   }
 

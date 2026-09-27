@@ -5,6 +5,7 @@ import { PrivateAuthorizationConflictError } from '../../domain/errors/PrivateAu
 import { PrivateAuthorizationCheckpoint } from '../../domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '../../domain/PrivateAuthorizationScope';
 import { PrivateControlOperation } from '../../domain/PrivateControlOperation';
+import { PrivateControlTransitionReservation } from '../../domain/PrivateControlTransitionReservation';
 import { PrivateAuthorizationRepository } from '../../domain/repositories/PrivateAuthorizationRepository';
 import { PrivateOperationAcceptance } from '../PrivateOperationAcceptance';
 import { PrivateOperationUnitOfWork } from '../PrivateOperationUnitOfWork';
@@ -83,14 +84,18 @@ export default class PrivateOperationAcceptor {
       : null;
   }
 
-  private isConflictingReservation(
-    reservedChild: string | null,
+  private reservationConflict(
+    reservation: PrivateControlTransitionReservation | undefined,
     candidateHead: unknown,
-  ): candidateHead is string {
-    return (
-      typeof candidateHead === 'string' &&
-      reservedChild !== null &&
-      reservedChild !== candidateHead
+    operationId: string,
+  ): 'head' | 'none' | 'operation' {
+    if (!reservation || typeof candidateHead !== 'string') return 'none';
+
+    return reservation.conflictWith(
+      PrivateControlTransitionReservation.fromPrimitives({
+        childHeadHash: candidateHead,
+        operationId,
+      }),
     );
   }
 
@@ -113,12 +118,22 @@ export default class PrivateOperationAcceptor {
       parentHead,
     );
     const candidateHead = value.control?.resultingHeadHash;
+    const conflict = this.reservationConflict(
+      reservedChild,
+      candidateHead,
+      value.id,
+    );
 
-    if (!this.isConflictingReservation(reservedChild, candidateHead)) return;
+    if (conflict === 'none') return;
     await this.authorizer.authorizeHistorical(
       message.signedOperationJson,
       routed,
     );
+
+    if (conflict === 'operation') {
+      await this.unitOfWork.quarantine(value.scopeId);
+    }
+
     throw new PrivateAuthorizationConflictError();
   }
 
@@ -167,6 +182,7 @@ export default class PrivateOperationAcceptor {
       const candidate = verified.checkpoint.toPrimitives();
       reservation = {
         childHeadHash: candidate.headHash,
+        operationId: value.id,
         parentHeadHash: currentCheckpoint.toPrimitives().headHash,
       };
       result =

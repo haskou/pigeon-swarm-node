@@ -14,6 +14,7 @@ export interface PrivateOperationAcceptance {
   replayMarkerId: string;
   reservation?: {
     childHeadHash: string;
+    operationId: string;
     parentHeadHash: string;
   };
   scope: PrivateAuthorizationScope;

@@ -5,6 +5,7 @@ import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 
 import { PostPrivateAuthorizationChallengeBody } from '../bodies/PostPrivateAuthorizationChallengeBody';
+import { PrivateAuthorizationRequestBodyLimit } from './PrivateAuthorizationRequestBodyLimit';
 import { PrivateAuthorizationRouteSupport } from './PrivateAuthorizationRouteSupport';
 
 @JsonController('/private-authorization')
@@ -15,7 +16,7 @@ export class PostPrivateAuthorizationChallengeRoute extends PrivateAuthorization
 
   @Post('/challenges')
   public async challenge(
-    @Body({ options: { limit: '256kb' } })
+    @Body({ options: { limit: PrivateAuthorizationRequestBodyLimit } })
     body: PostPrivateAuthorizationChallengeBody,
     @Req() request: Request,
     @Res() response: Response,

@@ -108,15 +108,23 @@ describe('LocalPrivateAuthorizationRepository', () => {
     const receipt = operation('accepted');
 
     await repository.saveReceipt('scope', receipt);
-    await repository.saveReservation('scope', 'head-0', 'head-1');
+    await repository.saveReservation(
+      'scope',
+      'head-0',
+      'head-1',
+      'accepted',
+    );
     await repository.saveProjection('scope', { members: ['member'] });
 
     await expect(repository.findReceipt('scope', 'accepted')).resolves.toEqual(
       receipt.toPrimitives(),
     );
-    await expect(repository.findReservation('scope', 'head-0')).resolves.toBe(
-      'head-1',
-    );
+    const reservation = await repository.findReservation('scope', 'head-0');
+
+    expect(reservation?.toPrimitives()).toEqual({
+      childHeadHash: 'head-1',
+      operationId: 'accepted',
+    });
     await expect(repository.findProjection('scope')).resolves.toEqual({
       members: ['member'],
     });
