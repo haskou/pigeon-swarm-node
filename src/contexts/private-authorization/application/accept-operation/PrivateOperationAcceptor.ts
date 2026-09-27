@@ -11,6 +11,7 @@ import { AuthenticatedPrivateOperationJson } from '../../domain/value-objects/Au
 import { PrivateProtectedMlsState } from '../../domain/value-objects/PrivateProtectedMlsState';
 import { PrivateOperationAcceptance } from '../PrivateOperationAcceptance';
 import { PrivateOperationUnitOfWork } from '../PrivateOperationUnitOfWork';
+import { PrivateControlFrame } from './messages/PrivateControlFrame';
 import { PrivateOperationAcceptMessage } from './messages/PrivateOperationAcceptMessage';
 import { PrivateOperationChallengeMessage } from './messages/PrivateOperationChallengeMessage';
 import { PrivateControlMutationAuthorizer } from './PrivateControlMutationAuthorizer';
@@ -57,8 +58,16 @@ export default class PrivateOperationAcceptor {
   private async reserveControlChild(
     checkpoint: PrivateAuthorizationCheckpoint,
     operation: PrivateControlOperation,
+    authenticatedOperation: AuthenticatedPrivateOperationJson,
+    controlFrame?: PrivateControlFrame,
   ): Promise<void> {
     if (!operation.isControlChildOf(checkpoint)) return;
+    await this.transition(
+      controlFrame,
+      checkpoint,
+      operation,
+      authenticatedOperation,
+    );
     const result = await this.unitOfWork.reserveChild(
       PrivateControlTransitionReservation.forOperation(checkpoint, operation),
     );
@@ -176,12 +185,12 @@ export default class PrivateOperationAcceptor {
   }
 
   private async transition(
-    message: PrivateOperationAcceptMessage,
+    controlFrame: PrivateControlFrame | undefined,
     checkpoint: PrivateAuthorizationCheckpoint,
     operation: PrivateControlOperation,
     authenticatedOperation: AuthenticatedPrivateOperationJson,
   ) {
-    assert(message.controlFrame, new InvalidPrivateAuthorizationError());
+    assert(controlFrame, new InvalidPrivateAuthorizationError());
     const scopeId = checkpoint.toPrimitives().scopeId;
     const protectedState = await this.repository.findProtectedMlsState(scopeId);
 
@@ -192,7 +201,7 @@ export default class PrivateOperationAcceptor {
       checkpoint,
       operation,
       authenticatedOperation,
-      message.controlFrame,
+      controlFrame,
     );
   }
 
@@ -215,7 +224,7 @@ export default class PrivateOperationAcceptor {
       result = scope.acceptProposal(operation);
     } else {
       const verified = await this.transition(
-        message,
+        message.controlFrame,
         currentCheckpoint,
         operation,
         authenticatedOperation,
@@ -377,9 +386,8 @@ export default class PrivateOperationAcceptor {
   public async challenge(
     message: PrivateOperationChallengeMessage,
   ): Promise<string> {
-    const { operation, scope } = await this.authorizer.authorize(
-      message.signedOperationJson,
-    );
+    const { authenticatedOperation, operation, scope } =
+      await this.authorizer.authorize(message.signedOperationJson);
     this.authorizer.assertAuthoredBy(
       operation,
       message.authenticatedIdentityId,
@@ -389,7 +397,12 @@ export default class PrivateOperationAcceptor {
       scope.toPrimitives().checkpoint,
     );
 
-    await this.reserveControlChild(checkpoint, operation);
+    await this.reserveControlChild(
+      checkpoint,
+      operation,
+      authenticatedOperation,
+      message.controlFrame,
+    );
 
     return this.freshness.issue(checkpoint, operation);
   }

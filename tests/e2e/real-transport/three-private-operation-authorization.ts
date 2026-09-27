@@ -131,6 +131,7 @@ class AuthorizationNode {
       new PrivateOperationChallengeMessage(
         this.identityBinding.identityIdFor(rawDeviceKey(signer)),
         signedOperationJson,
+        controlFrame,
       ),
     );
     const request = JSON.parse(requestJson) as Record<string, unknown>;

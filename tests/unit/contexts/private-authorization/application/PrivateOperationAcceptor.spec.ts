@@ -174,11 +174,16 @@ describe('PrivateOperationAcceptor', () => {
   });
 
   it('durably reserves a control child before issuing freshness', async () => {
+    repository.findProtectedMlsState.mockResolvedValue(encoded(32, 14));
     unitOfWork.reserveChild.mockResolvedValue('reserved');
 
     await expect(
       acceptor.challenge(
-        new PrivateOperationChallengeMessage(authorIdentityId, revocation()),
+        new PrivateOperationChallengeMessage(
+          authorIdentityId,
+          revocation(),
+          controlFrame,
+        ),
       ),
     ).resolves.toBe('challenge-request');
 
@@ -193,20 +198,48 @@ describe('PrivateOperationAcceptor', () => {
       operationId,
       parentCheckpoint: checkpoint().toPrimitives(),
     });
+    expect(transitions.verify.mock.invocationCallOrder[0]).toBeLessThan(
+      unitOfWork.reserveChild.mock.invocationCallOrder[0],
+    );
     expect(unitOfWork.reserveChild.mock.invocationCallOrder[0]).toBeLessThan(
       freshness.issue.mock.invocationCallOrder[0],
     );
   });
 
   it('rejects a competing control child before issuing freshness', async () => {
+    repository.findProtectedMlsState.mockResolvedValue(encoded(32, 14));
     unitOfWork.reserveChild.mockResolvedValue('conflict');
 
     await expect(
       acceptor.challenge(
-        new PrivateOperationChallengeMessage(authorIdentityId, revocation()),
+        new PrivateOperationChallengeMessage(
+          authorIdentityId,
+          revocation(),
+          controlFrame,
+        ),
       ),
     ).rejects.toThrow(PrivateAuthorizationConflictError);
 
+    expect(freshness.issue).not.toHaveBeenCalled();
+  });
+
+  it('does not reserve a control claim without an authenticated transition', async () => {
+    repository.findProtectedMlsState.mockResolvedValue(encoded(32, 14));
+    transitions.verify.mockRejectedValue(
+      new InvalidPrivateAuthorizationError(),
+    );
+
+    await expect(
+      acceptor.challenge(
+        new PrivateOperationChallengeMessage(
+          authorIdentityId,
+          revocation(),
+          controlFrame,
+        ),
+      ),
+    ).rejects.toThrow(InvalidPrivateAuthorizationError);
+
+    expect(unitOfWork.reserveChild).not.toHaveBeenCalled();
     expect(freshness.issue).not.toHaveBeenCalled();
   });
 

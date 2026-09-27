@@ -64,6 +64,7 @@ describe('private authorization OpenAPI contract', () => {
 
     expect(schemas.PostPrivateAuthorizationChallengeBody).toMatchObject({
       properties: {
+        controlFrame: { $ref: '#/components/schemas/PrivateControlFrameBody' },
         signedOperationJson: { maxLength: 262144, type: 'string' },
       },
       required: ['signedOperationJson'],

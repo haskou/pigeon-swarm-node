@@ -43,7 +43,7 @@ paths:
     post:
       tags: [private-authorization]
       summary: Issue a one-use freshness challenge for a verified operation
-      description: The returned canonical JSON must be signed exactly as supplied and used once within ten seconds.
+      description: The returned canonical JSON must be signed exactly as supplied and used once within ten seconds. Control operations require the same participant-encrypted control frame submitted with the operation so the transition is authenticated before its child head is durably reserved.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -160,6 +160,8 @@ components:
       type: object
       required: [signedOperationJson]
       properties:
+        controlFrame:
+          $ref: '#/components/schemas/PrivateControlFrameBody'
         signedOperationJson:
           type: string
           maxLength: 262144

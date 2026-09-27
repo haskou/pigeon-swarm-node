@@ -26,6 +26,7 @@ export class PostPrivateAuthorizationChallengeRoute extends PrivateAuthorization
       new PrivateOperationChallengeMessage(
         identityId.valueOf(),
         body.signedOperationJson,
+        body.controlFrame,
       ),
     );
 

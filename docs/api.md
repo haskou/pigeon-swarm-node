@@ -4445,11 +4445,13 @@ genesis data is rejected. A node admits at most 16 scopes and 32 MiB of initial
 scope data per owner, and 64 scopes and 256 MiB across all owners.
 
 Protected communities reject the legacy mutation routes. A signed client first
-submits the complete signed operation to
+submits the complete signed operation and, for control operations, the same
+participant-encrypted control frame used for acceptance to
 `POST /private-authorization/challenges`. The node verifies the operation
-signature against its local checkpoint before returning the exact one-use
-freshness request. The request expires after ten seconds of local monotonic
-time and is consumed only after a valid proof is successfully verified.
+signature against its local checkpoint and authenticates a control transition
+before durably reserving its child head and returning the exact one-use freshness
+request. The request expires after ten seconds of local monotonic time and is
+consumed only after a valid proof is successfully verified.
 
 Submit the signed operation, signed freshness proof and, for commits or device
 revocation, the participant-encrypted control frame to
