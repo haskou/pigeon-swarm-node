@@ -191,35 +191,86 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     return new PrivateAuthorizationProvisioningQuota(reservations);
   }
 
-  private async updatedStorageReservation(
+  private async updatedStorageReservationForState(
     scopeId: string,
-    acceptance: PrivateOperationAcceptance,
+    state: {
+      projection: Record<string, unknown>;
+      protectedMlsState: string;
+      scope: PrivateAuthorizationScope;
+    },
   ): Promise<PrivateAuthorizationStorageReservationPrimitives> {
     const current = await this.database.findOne(
       PrivateAuthorizationLocalNamespaces.provisioning,
       scopeId,
     );
-    const protectedMlsState =
-      acceptance.protectedMlsState ??
-      (await this.repository.findProtectedMlsState(scopeId));
 
     assert(current, new InvalidPrivateAuthorizationError());
-    assert(
-      typeof protectedMlsState === 'string',
-      new InvalidPrivateAuthorizationError(),
-    );
     const quota = await this.provisioningQuota(scopeId);
 
     return quota.reserve(
       new IdentityId(String(current.ownerIdentityId)),
-      new Integer(
-        this.provisionedBytes({
-          projection: acceptance.projection,
-          protectedMlsState,
-          scope: acceptance.scope,
-        }),
-      ),
+      new Integer(this.provisionedBytes(state)),
     );
+  }
+
+  private async updatedStorageReservation(
+    scopeId: string,
+    acceptance: PrivateOperationAcceptance,
+  ): Promise<PrivateAuthorizationStorageReservationPrimitives> {
+    const protectedMlsState =
+      acceptance.protectedMlsState ??
+      (await this.repository.findProtectedMlsState(scopeId));
+
+    assert(
+      typeof protectedMlsState === 'string',
+      new InvalidPrivateAuthorizationError(),
+    );
+
+    return this.updatedStorageReservationForState(scopeId, {
+      projection: acceptance.projection,
+      protectedMlsState,
+      scope: acceptance.scope,
+    });
+  }
+
+  private pendingStateOperations(
+    scope: PrivateAuthorizationScope,
+    storedPendingIds: string[],
+    storageReservation: PrivateAuthorizationStorageReservationPrimitives,
+  ): EmbeddedLocalDatabaseOperation[] {
+    const primitives = scope.toPrimitives();
+    const scopeId = primitives.checkpoint.scopeId;
+    const pendingIds = new Set(
+      primitives.pendingOperations.map((pending) => pending.id),
+    );
+
+    return [
+      {
+        document: { ...primitives, pendingOperations: [] },
+        id: scopeId,
+        namespace: PrivateAuthorizationLocalNamespaces.scopes,
+        type: 'put',
+      },
+      {
+        document: { ...storageReservation },
+        id: scopeId,
+        namespace: PrivateAuthorizationLocalNamespaces.provisioning,
+        type: 'put',
+      },
+      ...primitives.pendingOperations.map((pending) => ({
+        document: { ...pending },
+        id: privateAuthorizationLocalId(scopeId, pending.id),
+        namespace: PrivateAuthorizationLocalNamespaces.pending,
+        type: 'put' as const,
+      })),
+      ...storedPendingIds
+        .filter((id) => !pendingIds.has(id))
+        .map((id) => ({
+          id: privateAuthorizationLocalId(scopeId, id),
+          namespace: PrivateAuthorizationLocalNamespaces.pending,
+          type: 'del' as const,
+        })),
+    ];
   }
 
   private equal(left: unknown, right: unknown): boolean {
@@ -706,7 +757,26 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     }
 
     if (assessment === 'ready') return 'stale';
-    await this.repository.saveScope(scope);
+    const [projection, protectedMlsState] = await Promise.all([
+      this.repository.findProjection(scopeId),
+      this.repository.findProtectedMlsState(scopeId),
+    ]);
+
+    assert(projection, new InvalidPrivateAuthorizationError());
+    assert(
+      typeof protectedMlsState === 'string',
+      new InvalidPrivateAuthorizationError(),
+    );
+    const storageReservation = await this.updatedStorageReservationForState(
+      scopeId,
+      { projection, protectedMlsState, scope },
+    );
+    const storedPendingIds = (await this.repository.findPending(scopeId)).map(
+      (pending) => pending.toPrimitives().id,
+    );
+    await this.database.commit(
+      this.pendingStateOperations(scope, storedPendingIds, storageReservation),
+    );
 
     return 'committed';
   }
@@ -749,8 +819,10 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     expectedCheckpoint: PrivateExpectedCheckpoint,
     operation: PrivateControlOperation,
   ): Promise<'committed' | 'stale'> {
-    return this.exclusively(scopeId, () =>
-      this.commitPendingExclusively(scopeId, expectedCheckpoint, operation),
+    return this.exclusivelyProvisioning(() =>
+      this.exclusively(scopeId, () =>
+        this.commitPendingExclusively(scopeId, expectedCheckpoint, operation),
+      ),
     );
   }
 

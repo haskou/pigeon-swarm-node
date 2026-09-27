@@ -258,6 +258,98 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     ).resolves.toEqual(reservation);
   });
 
+  it('atomically reserves storage for pending operations', async () => {
+    await repository.saveProjection('scope', { members: [] });
+    await database.save(PrivateAuthorizationLocalNamespaces.mls, 'scope', {
+      state: 'protected-state',
+    });
+    const proposal = PrivateControlOperation.fromPrimitives({
+      ...operation('membership.propose').toPrimitives(),
+      authorizationRevision: 1,
+      byteSize: 2048,
+      control: { padding: 'x'.repeat(2048), parentHeadHash: 'head-1' },
+      digest: 'future-digest',
+      id: 'future',
+    });
+    const databaseCommit = jest.spyOn(database, 'commit');
+
+    await expect(
+      unitOfWork.commitPending(
+        'scope',
+        { headHash: 'head-0', revision: 0 },
+        proposal,
+      ),
+    ).resolves.toBe('committed');
+
+    const storedScope = await repository.findScope('scope');
+    const reservation = await database.findOne(
+      PrivateAuthorizationLocalNamespaces.provisioning,
+      'scope',
+    );
+    expect(databaseCommit).toHaveBeenCalledTimes(1);
+    expect(reservation?.provisionedBytes).toBe(
+      Buffer.byteLength(
+        JSON.stringify({
+          projection: { members: [] },
+          protectedMlsState: 'protected-state',
+          scope: storedScope?.toPrimitives(),
+        }),
+      ),
+    );
+    expect(
+      storedScope
+        ?.toPrimitives()
+        .pendingOperations.map((pending) => pending.id),
+    ).toEqual(['future', 'operation']);
+  });
+
+  it('rejects pending storage that exceeds the owner quota without partial writes', async () => {
+    await repository.saveProjection('scope', { members: [] });
+    await database.save(PrivateAuthorizationLocalNamespaces.mls, 'scope', {
+      state: 'protected-state',
+    });
+    const reservation = await database.findOne(
+      PrivateAuthorizationLocalNamespaces.provisioning,
+      'scope',
+    );
+    await database.save(
+      PrivateAuthorizationLocalNamespaces.provisioning,
+      'other-scope',
+      {
+        ownerIdentityId: ownerIdentityId.valueOf(),
+        provisionedBytes: 32 * 1024 * 1024 - 100,
+      },
+    );
+    const proposal = PrivateControlOperation.fromPrimitives({
+      ...operation('membership.propose').toPrimitives(),
+      authorizationRevision: 1,
+      byteSize: 2048,
+      control: { padding: 'x'.repeat(2048), parentHeadHash: 'head-1' },
+      digest: 'future-digest',
+      id: 'future',
+    });
+
+    await expect(
+      unitOfWork.commitPending(
+        'scope',
+        { headHash: 'head-0', revision: 0 },
+        proposal,
+      ),
+    ).rejects.toThrow(PrivateAuthorizationStorageCapacityExceededError);
+
+    expect(
+      (await repository.findPending('scope')).map(
+        (pending) => pending.toPrimitives().id,
+      ),
+    ).toEqual(['operation']);
+    await expect(
+      database.findOne(
+        PrivateAuthorizationLocalNamespaces.provisioning,
+        'scope',
+      ),
+    ).resolves.toEqual(reservation);
+  });
+
   it('atomically provisions a private authorization genesis', async () => {
     const commit = genesis('new-scope');
     const databaseCommit = jest.spyOn(database, 'commit');

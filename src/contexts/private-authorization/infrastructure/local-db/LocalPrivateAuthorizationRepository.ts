@@ -94,7 +94,12 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
 
     return documents
       .filter((document) => this.isOperation(document))
-      .map((document) => PrivateControlOperation.fromPrimitives(document))
+      .map((document) => {
+        const operation = { ...document };
+        delete operation._id;
+
+        return PrivateControlOperation.fromPrimitives(operation);
+      })
       .sort((left, right) =>
         left.toPrimitives().id.localeCompare(right.toPrimitives().id),
       );
