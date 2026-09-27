@@ -54,6 +54,18 @@ export default class PrivateOperationAcceptor {
     throw new PrivateAuthorizationConflictError();
   }
 
+  private async reserveControlChild(
+    checkpoint: PrivateAuthorizationCheckpoint,
+    operation: PrivateControlOperation,
+  ): Promise<void> {
+    if (!operation.isControlChildOf(checkpoint)) return;
+    const result = await this.unitOfWork.reserveChild(
+      PrivateControlTransitionReservation.forOperation(checkpoint, operation),
+    );
+
+    assert(result !== 'conflict', new PrivateAuthorizationConflictError());
+  }
+
   private async hasReceipt(
     message: PrivateOperationAcceptMessage,
     routed: PrivateControlOperation,
@@ -376,6 +388,8 @@ export default class PrivateOperationAcceptor {
     const checkpoint = PrivateAuthorizationCheckpoint.fromPrimitives(
       scope.toPrimitives().checkpoint,
     );
+
+    await this.reserveControlChild(checkpoint, operation);
 
     return this.freshness.issue(checkpoint, operation);
   }

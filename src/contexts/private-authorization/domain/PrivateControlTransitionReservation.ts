@@ -2,9 +2,35 @@ import { assert } from '@haskou/value-objects';
 
 import { InvalidPrivateAuthorizationError } from './errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationCheckpoint } from './PrivateAuthorizationCheckpoint';
+import { PrivateControlOperation } from './PrivateControlOperation';
 import { PrivateControlTransitionReservationPrimitives } from './PrivateControlTransitionReservationPrimitives';
 
 export class PrivateControlTransitionReservation {
+  public static forOperation(
+    parentCheckpoint: PrivateAuthorizationCheckpoint,
+    operation: PrivateControlOperation,
+  ): PrivateControlTransitionReservation {
+    const candidate = operation.toPrimitives();
+    const resultingHeadHash = candidate.control?.resultingHeadHash;
+
+    assert(
+      operation.getScopeId().isEqual(parentCheckpoint.getScopeId()) &&
+        operation
+          .getAuthorizationRevision()
+          .isEqual(parentCheckpoint.getRevision()) &&
+        typeof resultingHeadHash === 'string',
+      new InvalidPrivateAuthorizationError(),
+    );
+    const childHeadHash = resultingHeadHash as string;
+
+    return PrivateControlTransitionReservation.fromPrimitives({
+      authorDeviceKey: candidate.authorDeviceKey,
+      childHeadHash,
+      operationId: candidate.id,
+      parentCheckpoint: parentCheckpoint.toPrimitives(),
+    });
+  }
+
   public static fromPrimitives(
     primitives: PrivateControlTransitionReservationPrimitives,
   ): PrivateControlTransitionReservation {

@@ -1,3 +1,4 @@
+import { PrivateAuthorizationCheckpoint } from './PrivateAuthorizationCheckpoint';
 import { PrivateControlOperationPrimitives } from './PrivateControlOperationPrimitives';
 import { PrivateAuthorizationDeviceKey } from './value-objects/PrivateAuthorizationDeviceKey';
 import { PrivateAuthorizationRevision } from './value-objects/PrivateAuthorizationRevision';
@@ -30,6 +31,18 @@ export class PrivateControlOperation {
 
   public getScopeId(): PrivateAuthorizationScopeId {
     return new PrivateAuthorizationScopeId(this.primitives.scopeId);
+  }
+
+  public isProposal(): boolean {
+    return this.primitives.kind === 'membership.propose';
+  }
+
+  public isControlChildOf(checkpoint: PrivateAuthorizationCheckpoint): boolean {
+    return (
+      !this.isProposal() &&
+      this.getScopeId().isEqual(checkpoint.getScopeId()) &&
+      this.getAuthorizationRevision().isEqual(checkpoint.getRevision())
+    );
   }
 
   public hasSameIdentityAs(operation: PrivateControlOperation): boolean {

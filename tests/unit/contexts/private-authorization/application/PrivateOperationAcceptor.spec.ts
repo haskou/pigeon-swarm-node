@@ -173,6 +173,67 @@ describe('PrivateOperationAcceptor', () => {
     expect(freshness.issue).not.toHaveBeenCalled();
   });
 
+  it('durably reserves a control child before issuing freshness', async () => {
+    unitOfWork.reserveChild.mockResolvedValue('reserved');
+
+    await expect(
+      acceptor.challenge(
+        new PrivateOperationChallengeMessage(authorIdentityId, revocation()),
+      ),
+    ).resolves.toBe('challenge-request');
+
+    expect(unitOfWork.reserveChild).toHaveBeenCalledWith(
+      expect.any(PrivateControlTransitionReservation),
+    );
+    const reservation = unitOfWork.reserveChild.mock.calls[0][0];
+
+    expect(reservation.toPrimitives()).toEqual({
+      authorDeviceKey: authorKey,
+      childHeadHash: encoded(32, 7),
+      operationId,
+      parentCheckpoint: checkpoint().toPrimitives(),
+    });
+    expect(unitOfWork.reserveChild.mock.invocationCallOrder[0]).toBeLessThan(
+      freshness.issue.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('rejects a competing control child before issuing freshness', async () => {
+    unitOfWork.reserveChild.mockResolvedValue('conflict');
+
+    await expect(
+      acceptor.challenge(
+        new PrivateOperationChallengeMessage(authorIdentityId, revocation()),
+      ),
+    ).rejects.toThrow(PrivateAuthorizationConflictError);
+
+    expect(freshness.issue).not.toHaveBeenCalled();
+  });
+
+  it('issues freshness for a historical control child without reserving it against the current checkpoint', async () => {
+    const currentCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
+      ...checkpoint().toPrimitives(),
+      headHash: encoded(32, 8),
+      parentHeadHash: headHash,
+      revision: 1,
+    });
+    repository.findScope.mockResolvedValue(
+      PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
+    );
+
+    await expect(
+      acceptor.challenge(
+        new PrivateOperationChallengeMessage(authorIdentityId, revocation()),
+      ),
+    ).resolves.toBe('challenge-request');
+
+    expect(unitOfWork.reserveChild).not.toHaveBeenCalled();
+    expect(freshness.issue).toHaveBeenCalledWith(
+      currentCheckpoint,
+      expect.anything(),
+    );
+  });
+
   it('verifies and atomically accepts an authorized proposal', async () => {
     await expect(
       acceptor.accept(new PrivateOperationAcceptMessage(signed(), 'proof')),

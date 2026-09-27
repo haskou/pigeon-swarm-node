@@ -5,6 +5,7 @@ import { PrivateAuthorizationStorageCapacityExceededError } from '@app/contexts/
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
+import { PrivateControlTransitionReservation } from '@app/contexts/private-authorization/domain/PrivateControlTransitionReservation';
 import { PrivateAuthorizationDeviceKey } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationDeviceKey';
 import { PrivateAuthorizationRevision } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationRevision';
 import { PrivateAuthorizationScopeId } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationScopeId';
@@ -75,6 +76,16 @@ describe('LocalPrivateOperationUnitOfWork', () => {
           : { targetIdentityId: 'member', type: 'member.ban' },
       previousOperationIds: [],
       scopeId: 'scope',
+    });
+  const transitionReservation = (
+    childHeadHash = 'head-1',
+    operationId = 'operation-1',
+  ) =>
+    PrivateControlTransitionReservation.fromPrimitives({
+      authorDeviceKey: 'owner',
+      childHeadHash,
+      operationId,
+      parentCheckpoint: checkpoint().toPrimitives(),
     });
   const acceptance = (): PrivateOperationAcceptance => ({
     clearPendingOperationIds: ['operation'],
@@ -1200,33 +1211,12 @@ describe('LocalPrivateOperationUnitOfWork', () => {
 
     await expect(
       Promise.all([
-        unitOfWork.reserveChild(
-          'scope',
-          'head-0',
-          'head-1',
-          'operation-1',
-          'owner',
-          checkpoint(),
-        ),
-        another.reserveChild(
-          'scope',
-          'head-0',
-          'head-2',
-          'operation-2',
-          'owner',
-          checkpoint(),
-        ),
+        unitOfWork.reserveChild(transitionReservation()),
+        another.reserveChild(transitionReservation('head-2', 'operation-2')),
       ]),
     ).resolves.toEqual(['reserved', 'conflict']);
     await expect(
-      another.reserveChild(
-        'scope',
-        'head-0',
-        'head-1',
-        'operation-1',
-        'owner',
-        checkpoint(),
-      ),
+      another.reserveChild(transitionReservation()),
     ).resolves.toBe('same');
     const storageReservation = await database.findOne(
       PrivateAuthorizationLocalNamespaces.provisioning,

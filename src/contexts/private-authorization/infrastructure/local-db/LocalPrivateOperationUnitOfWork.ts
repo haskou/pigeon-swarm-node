@@ -927,25 +927,19 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   }
 
   public async reserveChild(
-    scopeId: string,
-    parentHeadHash: string,
-    childHeadHash: string,
-    operationId: string,
-    authorDeviceKey: string,
-    parentCheckpoint: PrivateAuthorizationCheckpoint,
+    candidate: PrivateControlTransitionReservation,
   ): Promise<'reserved' | 'same' | 'conflict'> {
+    const value = candidate.toPrimitives();
+    const parent = candidate.getParentCheckpoint().toPrimitives();
+    const scopeId = parent.scopeId;
+    const parentHeadHash = parent.headHash;
+
     return this.exclusivelyProvisioning(() =>
       this.exclusively(scopeId, async () => {
         const existing = await this.repository.findReservation(
           scopeId,
           parentHeadHash,
         );
-        const candidate = PrivateControlTransitionReservation.fromPrimitives({
-          authorDeviceKey,
-          childHeadHash,
-          operationId,
-          parentCheckpoint: parentCheckpoint.toPrimitives(),
-        });
         candidate.assertParent(scopeId, parentHeadHash);
 
         if (existing) {
@@ -961,7 +955,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
         }
         const operations: EmbeddedLocalDatabaseOperation[] = [
           {
-            document: { ...candidate.toPrimitives() },
+            document: { ...value },
             id: privateAuthorizationLocalId(scopeId, parentHeadHash),
             namespace: PrivateAuthorizationLocalNamespaces.reservations,
             type: 'put',

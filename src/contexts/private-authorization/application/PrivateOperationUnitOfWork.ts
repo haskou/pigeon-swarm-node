@@ -1,5 +1,5 @@
-import { PrivateAuthorizationCheckpoint } from '../domain/PrivateAuthorizationCheckpoint';
 import { PrivateControlOperation } from '../domain/PrivateControlOperation';
+import { PrivateControlTransitionReservation } from '../domain/PrivateControlTransitionReservation';
 import { PrivateAuthorizationGenesisCommit } from './PrivateAuthorizationGenesisCommit';
 import { PrivateExpectedCheckpoint } from './PrivateExpectedCheckpoint';
 import { PrivateOperationAcceptance } from './PrivateOperationAcceptance';
@@ -22,12 +22,7 @@ export abstract class PrivateOperationUnitOfWork {
   ): Promise<'committed' | 'stale'>;
 
   public abstract reserveChild(
-    scopeId: string,
-    parentHeadHash: string,
-    childHeadHash: string,
-    operationId: string,
-    authorDeviceKey: string,
-    parentCheckpoint: PrivateAuthorizationCheckpoint,
+    reservation: PrivateControlTransitionReservation,
   ): Promise<'reserved' | 'same' | 'conflict'>;
 
   public abstract quarantine(scopeId: string): Promise<void>;
