@@ -373,6 +373,7 @@ export default class PrivateOperationAcceptor {
       operation,
       message.authenticatedIdentityId,
     );
+    scope.assertAcceptingOperations();
     const checkpoint = PrivateAuthorizationCheckpoint.fromPrimitives(
       scope.toPrimitives().checkpoint,
     );

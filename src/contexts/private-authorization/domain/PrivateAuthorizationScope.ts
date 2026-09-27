@@ -429,9 +429,7 @@ export class PrivateAuthorizationScope extends AggregateRoot {
   }
 
   private assertActive(): void {
-    if (this.status !== 'active') {
-      throw new PrivateAuthorizationConflictError();
-    }
+    assert(this.status === 'active', new PrivateAuthorizationConflictError());
   }
 
   private freeze(): never {
@@ -449,6 +447,10 @@ export class PrivateAuthorizationScope extends AggregateRoot {
 
   private equal(left: unknown, right: unknown): boolean {
     return JSON.stringify(left) === JSON.stringify(right);
+  }
+
+  public assertAcceptingOperations(): void {
+    this.assertActive();
   }
 
   public pinGenesis(

@@ -9,6 +9,7 @@ import { PrivateOperationUnitOfWork } from '@app/contexts/private-authorization/
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
 import { PrivateControlTransitionReservation } from '@app/contexts/private-authorization/domain/PrivateControlTransitionReservation';
+import { PrivateAuthorizationConflictError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationConflictError';
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import { PrivateIdentityBinding } from '@app/contexts/private-authorization/domain/services/PrivateIdentityBinding';
@@ -154,6 +155,20 @@ describe('PrivateOperationAcceptor', () => {
         new PrivateOperationChallengeMessage(authorIdentityId, signed()),
       ),
     ).rejects.toThrow(InvalidPrivateAuthorizationError);
+    expect(freshness.issue).not.toHaveBeenCalled();
+  });
+
+  it('rejects freshness challenges for a frozen scope', async () => {
+    const frozen = scope();
+    frozen.quarantine();
+    frozen.pullDomainEvents();
+    repository.findScope.mockResolvedValue(frozen);
+
+    await expect(
+      acceptor.challenge(
+        new PrivateOperationChallengeMessage(authorIdentityId, signed()),
+      ),
+    ).rejects.toThrow(PrivateAuthorizationConflictError);
     expect(freshness.issue).not.toHaveBeenCalled();
   });
 
