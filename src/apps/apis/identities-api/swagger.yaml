@@ -89,6 +89,7 @@ components:
       $ref: '#/components/schemas/SignedIdentityBody'
     SignedIdentityBody:
       type: object
+      additionalProperties: false
       required:
         - id
         - authorizationRevision
@@ -125,6 +126,7 @@ components:
             format: uuid
         profile:
           type: object
+          additionalProperties: false
           required:
             - name
           properties:

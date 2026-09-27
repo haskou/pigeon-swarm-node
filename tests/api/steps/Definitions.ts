@@ -772,6 +772,14 @@ export default class Definitions {
     this.body = JSON.stringify(body);
   }
 
+  @given('I add undeclared identity field {string}')
+  public iAddUndeclaredIdentityField(field: string): void {
+    const body = JSON.parse(this.body ?? '{}') as Record<string, unknown>;
+
+    body[field] = 'must-not-be-accepted';
+    this.body = JSON.stringify(body);
+  }
+
   @given(
     'I set a client-signed identity update body with name {string}, handle {string} and password {string}',
   )

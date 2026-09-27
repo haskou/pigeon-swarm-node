@@ -54,6 +54,14 @@ Feature: Post identity route
     When I POST to "/identities/"
     Then response code is equal to 400
 
+  Scenario: Reject an undeclared secret on a signed identity
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
+    And I set a client-signed identity body with name "secret" and handle "secret"
+    And I add undeclared identity field "recoverySecret"
+    When I POST to "/identities/"
+    Then response code is equal to 400
+
   Scenario: Update a client-signed identity profile and encrypted key pair
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
@@ -69,6 +77,10 @@ Feature: Post identity route
       | profile.handle | carol_new     |
       | version        | 2             |
     And response body should contain "identityExternalIdentifier"
+    And I add undeclared identity field "password"
+    And I sign the current identity update request
+    When I PUT the created identity
+    Then response code is equal to 400
     When I GET "/identities/carol_new"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
