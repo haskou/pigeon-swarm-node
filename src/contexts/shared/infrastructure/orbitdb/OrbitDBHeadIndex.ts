@@ -16,6 +16,11 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     Map<string, Record<string, unknown>[]>
   >();
 
+  private static readonly pendingRemovalsByRegistry = new WeakMap<
+    OrbitDBReplicatedStateRegistry,
+    Map<string, Record<string, unknown>[]>
+  >();
+
   private readonly deduplicator: OrbitDBDocumentDeduplicator<TDocument>;
 
   private readonly recordMergeQueues = new Map<string, Promise<void>>();
@@ -50,6 +55,22 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     }
 
     return pendingRecords;
+  }
+
+  private get pendingRemovals(): Map<string, Record<string, unknown>[]> {
+    let pendingRemovals = OrbitDBHeadIndex.pendingRemovalsByRegistry.get(
+      this.registry,
+    );
+
+    if (!pendingRemovals) {
+      pendingRemovals = new Map<string, Record<string, unknown>[]>();
+      OrbitDBHeadIndex.pendingRemovalsByRegistry.set(
+        this.registry,
+        pendingRemovals,
+      );
+    }
+
+    return pendingRemovals;
   }
 
   constructor(
@@ -174,6 +195,7 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     record: Record<string, unknown>,
     networkIds: string[],
   ): Promise<void> {
+    this.addPendingRemoval(key, record);
     const previous = this.recordMergeQueues.get(key) ?? Promise.resolve();
     const next = previous
       .catch((): void => undefined)
@@ -199,6 +221,8 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     this.recordMergeQueues.set(key, next);
 
     return next.finally(() => {
+      this.removePendingRemoval(key, record);
+
       if (this.recordMergeQueues.get(key) === next) {
         this.recordMergeQueues.delete(key);
       }
@@ -242,6 +266,33 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     }
 
     this.pendingRecords.set(key, records);
+  }
+
+  private addPendingRemoval(
+    key: string,
+    record: Record<string, unknown>,
+  ): void {
+    this.pendingRemovals.set(key, [
+      ...(this.pendingRemovals.get(key) ?? []),
+      record,
+    ]);
+  }
+
+  private removePendingRemoval(
+    key: string,
+    record: Record<string, unknown>,
+  ): void {
+    const removals = (this.pendingRemovals.get(key) ?? []).filter(
+      (pendingRemoval) => pendingRemoval !== record,
+    );
+
+    if (removals.length === 0) {
+      this.pendingRemovals.delete(key);
+
+      return;
+    }
+
+    this.pendingRemovals.set(key, removals);
   }
 
   private pendingRecordsHead(
@@ -404,13 +455,20 @@ export class OrbitDBHeadIndex<TDocument extends object> {
 
   private exactDocuments(key: string, documents: TDocument[]): TDocument[] {
     const excludedRecordIds = this.excludedRecordIds.get(key);
+    const pendingRemovalIds = this.recordIds(
+      this.pendingRemovals.get(key) ?? [],
+    );
 
-    if (!excludedRecordIds) return documents;
+    if (!excludedRecordIds && pendingRemovalIds.size === 0) return documents;
 
     return documents.filter((document) => {
       const id = this.options.recordId(document);
 
-      return id !== undefined && !excludedRecordIds.has(id);
+      return (
+        id !== undefined &&
+        !excludedRecordIds?.has(id) &&
+        !pendingRemovalIds.has(id)
+      );
     });
   }
 
