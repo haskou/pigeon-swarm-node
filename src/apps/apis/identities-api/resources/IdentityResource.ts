@@ -1,6 +1,7 @@
 export interface IdentityResource {
   id: string;
   authorizationRevision: number;
+  deviceCredential: string;
   deviceCredentialCommitment: string;
   networks: string[];
   profile: {

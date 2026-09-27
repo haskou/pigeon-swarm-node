@@ -6,6 +6,7 @@ export class IdentitySignaturePayload {
   ): IdentitySignaturePayload {
     return new IdentitySignaturePayload({
       authorizationRevision: primitives.authorizationRevision,
+      deviceCredential: primitives.deviceCredential,
       deviceCredentialCommitment: primitives.deviceCredentialCommitment,
       id: primitives.id,
       networks: primitives.networks,
@@ -25,6 +26,7 @@ export class IdentitySignaturePayload {
   public toPrimitives(): Omit<IdentityPrimitives, 'signature'> {
     return {
       authorizationRevision: this.primitives.authorizationRevision,
+      deviceCredential: this.primitives.deviceCredential,
       deviceCredentialCommitment: this.primitives.deviceCredentialCommitment,
       id: this.primitives.id,
       networks: this.primitives.networks,

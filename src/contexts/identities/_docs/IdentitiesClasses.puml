@@ -5,6 +5,7 @@ title Pigeon Swarm - Identities Context
 package "identities.domain" {
   class Identity <<AggregateRoot>> {
     -id: IdentityId
+    -deviceCredential: DeviceCredential
     -deviceCredentialCommitment: DeviceCredentialCommitment
     -recoveryAuthority: RecoveryAuthority
     -authorizationRevision: IdentityAuthorizationRevision
@@ -144,6 +145,7 @@ package "identities.infrastructure" {
     -_id: string
     -version: number
     -previousExternalIdentifier?: string
+    -deviceCredential: string
     -deviceCredentialCommitment: string
     -recoveryAuthority: string
     -authorizationRevision: number

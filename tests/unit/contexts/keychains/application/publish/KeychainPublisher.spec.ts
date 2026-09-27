@@ -43,6 +43,7 @@ describe('KeychainPublisher', () => {
     return {
       toPrimitives: (): IdentityPrimitives => ({
         authorizationRevision: 0,
+        deviceCredential: 'device-credential',
         deviceCredentialCommitment: 'credential-commitment',
         id: 'identity-id',
         networks: networkIds.map((networkId) => networkId.valueOf()),

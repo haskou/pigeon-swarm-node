@@ -6,6 +6,7 @@ export default class IpfsIdentityMapper {
   public toDomain(document: IpfsIdentityDocument): Identity {
     return Identity.fromPrimitives({
       authorizationRevision: document.authorizationRevision,
+      deviceCredential: document.deviceCredential,
       deviceCredentialCommitment: document.deviceCredentialCommitment,
       id: document._id,
       networks: document.networks,
@@ -24,6 +25,7 @@ export default class IpfsIdentityMapper {
     return {
       _id: primitives.id,
       authorizationRevision: primitives.authorizationRevision,
+      deviceCredential: primitives.deviceCredential,
       deviceCredentialCommitment: primitives.deviceCredentialCommitment,
       networks: primitives.networks,
       previousCid: primitives.previousIdentityExternalIdentifier,

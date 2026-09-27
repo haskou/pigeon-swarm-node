@@ -37,7 +37,7 @@ export class IdentityMother {
   );
 
   public deviceCredential: DeviceCredential = DeviceCredential.fromString(
-    this.encryptedKeyPair.toPrimitives().publicKey,
+    '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAnbnkVQtA3GY3Ag1NixZgrk8S/emZiEuvCnRLrfGZJLs=\n-----END PUBLIC KEY-----\n',
   );
 
   public deviceCredentialCommitment: DeviceCredentialCommitment =
@@ -61,7 +61,7 @@ export class IdentityMother {
   public timestamp: Timestamp = new Timestamp(1773848829055);
 
   public signature: Signature = new Signature(
-    'GIZD7S8AiGkBqyP0AIfkEciWWvMUmHp7IeTxJHGxLnTrDZRZJ7NiluCTmD75MbDnfWrlkR15wDuAd/LbhpCMDQ==',
+    'm7XqWFHeZqRuuQplLYI7AdwTs79+stkLF6HZxl6rU+/oGIdXcQnNnUxziVLhAUJymE2sAuR5M1cT16ZrNuhvAg==',
   );
 
   public version: IdentityVersion = new IdentityVersion(1);
@@ -117,6 +117,7 @@ export class IdentityMother {
   public build(): Identity {
     return new Identity(
       this.id,
+      this.deviceCredential,
       this.deviceCredentialCommitment,
       this.recoveryAuthority,
       this.authorizationRevision,
@@ -137,6 +138,7 @@ export class IdentityMother {
     const current = this.build().toPrimitives();
     const unsigned: Omit<IdentityPrimitives, 'signature'> = {
       authorizationRevision: current.authorizationRevision,
+      deviceCredential: current.deviceCredential,
       deviceCredentialCommitment: current.deviceCredentialCommitment,
       id: current.id,
       networks: current.networks,

@@ -24,6 +24,7 @@ export class PostIdentityRequest {
   public getIdentityPublishMessage(): IdentityPublishMessage {
     return new IdentityPublishMessage({
       authorizationRevision: this.body.authorizationRevision,
+      deviceCredential: this.body.deviceCredential,
       deviceCredentialCommitment: this.body.deviceCredentialCommitment,
       id: this.body.id || '',
       networks: this.body.networks,

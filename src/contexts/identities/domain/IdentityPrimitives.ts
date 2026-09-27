@@ -4,6 +4,7 @@ import { Profile } from './Profile';
 
 export interface IdentityPrimitives {
   authorizationRevision: number;
+  deviceCredential: string;
   deviceCredentialCommitment: string;
   id: string;
   networks: string[];

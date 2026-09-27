@@ -14,6 +14,7 @@ import WebSocket from 'ws';
 
 type IdentityFixture = {
   authorizationRevision: number;
+  deviceCredential: string;
   deviceCredentialCommitment: string;
   externalIdentifier?: string;
   id: string;
@@ -77,6 +78,7 @@ type CallSignalReceiverContext = {
 
 type IdentityResponse = {
   authorizationRevision: number;
+  deviceCredential: string;
   deviceCredentialCommitment: string;
   identityExternalIdentifier: string;
   id: string;
@@ -445,15 +447,17 @@ async function publishIdentity(
   handle: string,
 ): Promise<IdentityFixture> {
   const keyPair = await KeyPair.generate();
+  const deviceKeyPair = await KeyPair.generate();
   const recoveryKeyPair = await KeyPair.generate();
   const deviceCredential = DeviceCredential.fromString(
-    keyPair.toPrimitives().publicKey,
+    deviceKeyPair.toPrimitives().publicKey,
   );
   const id = new IdentityId(keyPair.toPrimitives().publicKey).valueOf();
   const timestamp = Date.now();
   const version = 1;
   const signaturePayload = {
     authorizationRevision: 0,
+    deviceCredential: deviceCredential.valueOf(),
     deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),
     id,
     networks: [NETWORK_ID],
@@ -482,6 +486,7 @@ async function publishIdentity(
 
   return {
     authorizationRevision: response.authorizationRevision,
+    deviceCredential: response.deviceCredential,
     deviceCredentialCommitment: response.deviceCredentialCommitment,
     externalIdentifier: response.identityExternalIdentifier,
     id: response.id,
@@ -499,6 +504,7 @@ async function updateIdentity(
 ): Promise<IdentityFixture> {
   const signaturePayload = {
     authorizationRevision: identity.authorizationRevision,
+    deviceCredential: identity.deviceCredential,
     deviceCredentialCommitment: identity.deviceCredentialCommitment,
     id: identity.id,
     networks: [NETWORK_ID],
@@ -530,6 +536,7 @@ async function updateIdentity(
 
   return {
     authorizationRevision: response.authorizationRevision,
+    deviceCredential: response.deviceCredential,
     deviceCredentialCommitment: response.deviceCredentialCommitment,
     externalIdentifier: response.identityExternalIdentifier,
     id: response.id,

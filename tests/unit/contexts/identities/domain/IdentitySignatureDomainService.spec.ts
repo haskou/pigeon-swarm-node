@@ -7,6 +7,7 @@ describe('IdentitySignatureDomainService', () => {
       new IdentitySignatureDomainService().getCanonicalSigningContent(
         IdentitySignaturePayload.fromPrimitives({
           authorizationRevision: 3,
+          deviceCredential: 'device-credential',
           deviceCredentialCommitment: 'credential-commitment',
           id: 'identity-id',
           networks: ['network-id'],
@@ -25,7 +26,7 @@ describe('IdentitySignatureDomainService', () => {
       );
 
     expect(serializedPayload).toBe(
-      '{"authorizationRevision":3,"deviceCredentialCommitment":"credential-commitment","id":"identity-id","networks":["network-id"],"previousIdentityExternalIdentifier":"previous-identity-cid","profile":{"banner":"banner-cid","biography":"bio","handle":"handle","name":"Name","picture":"picture-cid"},"recoveryAuthority":"recovery-public-key","timestamp":1778536870557,"version":2}',
+      '{"authorizationRevision":3,"deviceCredential":"device-credential","deviceCredentialCommitment":"credential-commitment","id":"identity-id","networks":["network-id"],"previousIdentityExternalIdentifier":"previous-identity-cid","profile":{"banner":"banner-cid","biography":"bio","handle":"handle","name":"Name","picture":"picture-cid"},"recoveryAuthority":"recovery-public-key","timestamp":1778536870557,"version":2}',
     );
     expect(serializedPayload).not.toContain('encryptedPrivateKey');
     expect(serializedPayload).not.toContain('encryptedMasterKey');

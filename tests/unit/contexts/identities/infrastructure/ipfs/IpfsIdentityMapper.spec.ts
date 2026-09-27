@@ -21,6 +21,7 @@ describe('IpfsIdentityMapper', () => {
       expect(document).toEqual(
         expect.objectContaining({
           authorizationRevision: 0,
+          deviceCredential: expect.any(String),
           deviceCredentialCommitment: expect.any(String),
           recoveryAuthority: expect.any(String),
         }),
@@ -47,6 +48,7 @@ describe('IpfsIdentityMapper', () => {
       const document: IpfsIdentityDocument = {
         _id: primitives.id,
         authorizationRevision: primitives.authorizationRevision,
+        deviceCredential: primitives.deviceCredential,
         deviceCredentialCommitment: primitives.deviceCredentialCommitment,
         networks: primitives.networks,
         previousCid: primitives.previousIdentityExternalIdentifier,

@@ -46,14 +46,16 @@ describe('IpfsIdentityRepository', () => {
     handle?: string,
   ): Promise<Identity> {
     const keyPair = await KeyPair.generate();
+    const deviceKeyPair = await KeyPair.generate();
     const recoveryKeyPair = await KeyPair.generate();
     const deviceCredential = DeviceCredential.fromString(
-      keyPair.toPrimitives().publicKey,
+      deviceKeyPair.toPrimitives().publicKey,
     );
     const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
     const previousIdentityExternalIdentifier: string | undefined = undefined;
     const signaturePayload = {
       authorizationRevision: 0,
+      deviceCredential: deviceCredential.valueOf(),
       deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),
       id: identityId.valueOf(),
       networks: [networkId],

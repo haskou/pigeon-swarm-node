@@ -1424,6 +1424,7 @@ Response:
 {
   "id": "<identityId>",
   "authorizationRevision": 0,
+  "deviceCredential": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
   "deviceCredentialCommitment": "<64 lowercase hexadecimal characters>",
   "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
   "identityExternalIdentifier": "<currentIdentityCid>",
@@ -1453,6 +1454,7 @@ Request:
 {
   "id": "<identityId>",
   "authorizationRevision": 0,
+  "deviceCredential": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
   "deviceCredentialCommitment": "<64 lowercase hexadecimal characters>",
   "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
   "networks": ["<networkId>"],
@@ -1466,9 +1468,10 @@ Request:
 }
 ```
 
-The initial identity id identifies the genesis device signing credential.
-`deviceCredentialCommitment` is the SHA-256 digest of that credential's
-canonical PEM representation. `recoveryAuthority` is a public key; its private
+The identity id and genesis device signing credential are independent public
+keys. `deviceCredentialCommitment` is the SHA-256 digest of `deviceCredential`'s
+canonical PEM representation, and both are covered by the identity signature.
+`recoveryAuthority` is a separate public key; its private
 recovery material remains exclusively with the client. The initial
 `authorizationRevision` is `0`.
 
@@ -1477,6 +1480,7 @@ The signature covers this canonical property order:
 ```json
 {
   "authorizationRevision": 0,
+  "deviceCredential": "<genesisDeviceCredential>",
   "deviceCredentialCommitment": "<commitment>",
   "id": "<identityId>",
   "networks": ["<networkId>"],

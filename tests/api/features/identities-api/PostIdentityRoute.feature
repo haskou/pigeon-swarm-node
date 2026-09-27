@@ -31,6 +31,7 @@ Feature: Post identity route
 	      | profile.handle | bob                                  |
 	      | networks[0]    | 123e4567-e89b-12d3-a456-426614174000 |
 	    And response body should contain "deviceCredentialCommitment"
+	    And response body should contain "deviceCredential"
 	    And response body should contain "recoveryAuthority"
 	    And response body should contain "authorizationRevision"
 	    And response body should not contain "encryptedPrivateKey"

@@ -31,6 +31,9 @@ export class PutIdentityBody {
   public readonly authorizationRevision: number;
 
   @IsString()
+  public readonly deviceCredential: string;
+
+  @IsString()
   public readonly deviceCredentialCommitment: string;
 
   @IsString()

@@ -1,6 +1,7 @@
 export interface IpfsIdentityDocument {
   _id: string;
   authorizationRevision: number;
+  deviceCredential: string;
   deviceCredentialCommitment: string;
   networks: string[];
   previousCid: string | undefined;

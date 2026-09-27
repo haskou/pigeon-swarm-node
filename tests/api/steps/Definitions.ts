@@ -61,6 +61,7 @@ export default class Definitions {
   private formData: FormData | undefined;
   private headers: Record<string, string> = {};
   private identityKeyPair: KeyPair | undefined;
+  private identityDeviceOwnerKeyPair: KeyPair | undefined;
   private identityRecoveryKeyPair: KeyPair | undefined;
 
   private conversationId: string | undefined;
@@ -102,6 +103,12 @@ export default class Definitions {
     return this.otherIdentityKeyPair;
   }
 
+  private async ensureIdentityDeviceOwnerKeyPair(): Promise<KeyPair> {
+    this.identityDeviceOwnerKeyPair ??= await KeyPair.generate();
+
+    return this.identityDeviceOwnerKeyPair;
+  }
+
   private async ensureIdentityRecoveryKeyPair(): Promise<KeyPair> {
     this.identityRecoveryKeyPair ??= await KeyPair.generate();
 
@@ -118,7 +125,7 @@ export default class Definitions {
     const recoveryKeyPair = await this.ensureIdentityRecoveryKeyPair();
     const ownerIdentityId = this.ownerIdentityId as IdentityId;
     const deviceCredential = DeviceCredential.fromString(
-      keyPair.toPrimitives().publicKey,
+      (await this.ensureIdentityDeviceOwnerKeyPair()).toPrimitives().publicKey,
     );
     const networks = [
       this.currentNetworkId ?? '123e4567-e89b-12d3-a456-426614174000',
@@ -139,6 +146,7 @@ export default class Definitions {
     };
     const signaturePayload = {
       authorizationRevision: 0,
+      deviceCredential: deviceCredential.valueOf(),
       deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),
       id: ownerIdentityId.valueOf(),
       networks,
@@ -321,6 +329,7 @@ export default class Definitions {
     this.formData = undefined;
     this.headers = {};
     this.identityKeyPair = undefined;
+    this.identityDeviceOwnerKeyPair = undefined;
     this.conversationId = undefined;
     this.currentNetworkId = undefined;
     this.createdIdentityId = undefined;

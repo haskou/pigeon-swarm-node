@@ -25,6 +25,7 @@ describe(Identity.name, () => {
 
     expect(primitives).toEqual({
       authorizationRevision: mother.authorizationRevision.valueOf(),
+      deviceCredential: mother.deviceCredential.valueOf(),
       deviceCredentialCommitment: mother.deviceCredentialCommitment.valueOf(),
       id: mother.id.valueOf(),
       networks: mother.networks.map((network) => network.valueOf()),
@@ -38,6 +39,7 @@ describe(Identity.name, () => {
     expect(primitives).not.toHaveProperty('encryptedKeyPair');
     expect(primitives).not.toHaveProperty('encryptedMasterKey');
     expect(primitives).not.toHaveProperty('masterKeyDerivation');
+    expect(primitives.deviceCredential).not.toBe(primitives.id);
   });
 
   it('restores a valid signed publication', () => {
@@ -108,6 +110,7 @@ describe(Identity.name, () => {
     );
     const unsigned: Omit<IdentityPrimitives, 'signature'> = {
       authorizationRevision: 0,
+      deviceCredential: victimCredential.valueOf(),
       deviceCredentialCommitment: victimCredential.getCommitment().valueOf(),
       id: new IdentityId(victim.toPrimitives().publicKey).valueOf(),
       networks: mother.networks.map((network) => network.valueOf()),

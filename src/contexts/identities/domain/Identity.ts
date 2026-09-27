@@ -22,6 +22,7 @@ export class Identity extends AggregateRoot {
   public static fromPrimitives(primitives: IdentityPrimitives): Identity {
     return new Identity(
       new IdentityId(primitives.id),
+      DeviceCredential.fromString(primitives.deviceCredential),
       new DeviceCredentialCommitment(primitives.deviceCredentialCommitment),
       RecoveryAuthority.fromString(primitives.recoveryAuthority),
       new IdentityAuthorizationRevision(primitives.authorizationRevision),
@@ -52,6 +53,7 @@ export class Identity extends AggregateRoot {
 
   public constructor(
     private readonly id: IdentityId,
+    private readonly deviceCredential: DeviceCredential,
     private readonly deviceCredentialCommitment: DeviceCredentialCommitment,
     private readonly recoveryAuthority: RecoveryAuthority,
     private readonly authorizationRevision: IdentityAuthorizationRevision,
@@ -60,17 +62,15 @@ export class Identity extends AggregateRoot {
   ) {
     super();
 
-    const genesisCredential = DeviceCredential.fromIdentityId(this.id);
-
     assert(
-      genesisCredential
+      this.deviceCredential
         .getCommitment()
         .isEqual(this.deviceCredentialCommitment),
       new InvalidIdentitySignatureError(),
     );
     assert(
       new IdentitySignatureDomainService().isValidSignature(
-        genesisCredential,
+        DeviceCredential.fromIdentityId(this.id),
         IdentitySignaturePayload.fromPrimitives(this.toPrimitives()),
         this.publication.getSignature(),
       ),
@@ -130,7 +130,9 @@ export class Identity extends AggregateRoot {
     return (
       this.deviceCredentialCommitment.isEqual(
         previous.deviceCredentialCommitment,
-      ) && this.recoveryAuthority.isEqual(previous.recoveryAuthority)
+      ) &&
+      this.deviceCredential.isEqual(previous.deviceCredential) &&
+      this.recoveryAuthority.isEqual(previous.recoveryAuthority)
     );
   }
 
@@ -147,6 +149,7 @@ export class Identity extends AggregateRoot {
   public toPrimitives(): IdentityPrimitives {
     return {
       authorizationRevision: this.authorizationRevision.valueOf(),
+      deviceCredential: this.deviceCredential.valueOf(),
       deviceCredentialCommitment: this.deviceCredentialCommitment.valueOf(),
       id: this.id.valueOf(),
       networks: this.networks.toArray().map((networkId) => networkId.valueOf()),

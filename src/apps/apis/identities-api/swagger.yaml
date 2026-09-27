@@ -92,6 +92,7 @@ components:
       required:
         - id
         - authorizationRevision
+        - deviceCredential
         - deviceCredentialCommitment
         - recoveryAuthority
         - networks
@@ -106,6 +107,9 @@ components:
           type: integer
           minimum: 0
           description: Authorization checkpoint revision covered by the identity signature.
+        deviceCredential:
+          type: string
+          description: Independent public signing credential of the genesis device.
         deviceCredentialCommitment:
           type: string
           pattern: '^[a-f0-9]{64}$'
@@ -161,6 +165,7 @@ components:
       required:
         - id
         - authorizationRevision
+        - deviceCredential
         - deviceCredentialCommitment
         - recoveryAuthority
         - profile
@@ -176,6 +181,9 @@ components:
           type: integer
           minimum: 0
           example: 0
+        deviceCredential:
+          type: string
+          description: Independent public signing credential of the genesis device.
         deviceCredentialCommitment:
           type: string
           pattern: '^[a-f0-9]{64}$'
