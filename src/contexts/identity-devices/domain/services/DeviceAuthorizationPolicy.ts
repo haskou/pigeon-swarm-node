@@ -1,4 +1,4 @@
-import { assert } from '@haskou/value-objects';
+import { Timestamp, assert } from '@haskou/value-objects';
 
 import { DeviceAuthorization } from '../DeviceAuthorization';
 import { DeviceAuthorizationTransition } from '../DeviceAuthorizationTransition';
@@ -87,6 +87,20 @@ export default class DeviceAuthorizationPolicy {
     );
 
     return authorization.recover(transition.getTargetCredential());
+  }
+
+  public verifyFirstAcceptance(
+    transition: DeviceAuthorizationTransition,
+    acceptedAt: Timestamp,
+  ): void {
+    if (!transition.isEnrollment()) {
+      return;
+    }
+
+    assert(
+      !transition.getPairingExpiration().isExpiredAt(acceptedAt),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
   }
 
   public apply(

@@ -66,10 +66,11 @@ describe(DeviceAuthorization.name, () => {
       ),
     );
 
-    return unsigned.authorize(
-      author.sign(unsigned.getSigningPayload()),
+    const proven = unsigned.provePossession(
       target.sign(unsigned.getProofOfPossessionPayload()),
     );
+
+    return proven.authorize(author.sign(proven.getSigningPayload()));
   }
 
   it('enrolls a credential with author and target proof of possession', async () => {
@@ -109,6 +110,42 @@ describe(DeviceAuthorization.name, () => {
     ).rejects.toThrow();
   });
 
+  it('rejects first acceptance after the signed pairing expiration', async () => {
+    const expiration = new PairingExpiration(now.valueOf() + 1);
+    const transition = await enrollment({ pairingExpiration: expiration });
+
+    expect(() =>
+      policy.verifyFirstAcceptance(
+        transition,
+        new Timestamp(expiration.valueOf() + 1),
+      ),
+    ).toThrow();
+    expect(() => policy.apply(authorization, transition)).not.toThrow();
+  });
+
+  it('binds the author signature to the target proof of possession', async () => {
+    const unsigned = DeviceAuthorizationTransition.enrollment(
+      identityId,
+      DeviceAuthorizationOperationId.generate(),
+      DeviceAuthorizationRevision.initial(),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+      DeviceCredential.fromString(candidate.toPrimitives().publicKey),
+      new PairingAuthorization(
+        PairingId.generate(),
+        new PairingExpiration(now.valueOf() + 60_000),
+        now,
+      ),
+    );
+    const signatureWithoutProof = owner.sign(unsigned.getSigningPayload());
+    const proven = unsigned.provePossession(
+      candidate.sign(unsigned.getProofOfPossessionPayload()),
+    );
+
+    expect(() =>
+      policy.apply(authorization, proven.authorize(signatureWithoutProof)),
+    ).toThrow();
+  });
+
   it('rejects substitution of the signed pairing authorization time', async () => {
     const primitives = (await enrollment()).toPrimitives();
     const substituted = DeviceAuthorizationTransition.fromPrimitives({
@@ -146,9 +183,11 @@ describe(DeviceAuthorization.name, () => {
       DeviceAuthorizationRevision.initial(),
       target,
     );
-    const transition = unsigned.authorizeRecovery(
-      attacker.sign(unsigned.getSigningPayload()),
+    const proven = unsigned.provePossession(
       candidate.sign(unsigned.getProofOfPossessionPayload()),
+    );
+    const transition = proven.authorizeRecovery(
+      attacker.sign(proven.getSigningPayload()),
     );
 
     expect(() => policy.apply(authorization, transition)).toThrow();
@@ -164,12 +203,12 @@ describe(DeviceAuthorization.name, () => {
       DeviceAuthorizationRevision.initial(),
       target,
     );
+    const proven = unsigned.provePossession(
+      candidate.sign(unsigned.getProofOfPossessionPayload()),
+    );
     const recovered = policy.apply(
       authorization,
-      unsigned.authorizeRecovery(
-        recovery.sign(unsigned.getSigningPayload()),
-        candidate.sign(unsigned.getProofOfPossessionPayload()),
-      ),
+      proven.authorizeRecovery(recovery.sign(proven.getSigningPayload())),
     );
 
     expect(recovered.getCredentials()).toHaveLength(1);
@@ -213,11 +252,11 @@ describe(DeviceAuthorization.name, () => {
       DeviceAuthorizationRevision.initial(),
       target,
     );
-    const primitives = unsigned
-      .authorizeRecovery(
-        recovery.sign(unsigned.getSigningPayload()),
-        candidate.sign(unsigned.getProofOfPossessionPayload()),
-      )
+    const proven = unsigned.provePossession(
+      candidate.sign(unsigned.getProofOfPossessionPayload()),
+    );
+    const primitives = proven
+      .authorizeRecovery(recovery.sign(proven.getSigningPayload()))
       .toPrimitives();
 
     expect(() =>

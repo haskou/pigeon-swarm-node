@@ -17,7 +17,7 @@ import { PairingId } from './value-objects/PairingId';
 
 export class DeviceAuthorizationTransition {
   private static readonly SIGNATURE_DOMAIN =
-    'pigeon:device-authorization:transition:v1';
+    'pigeon:device-authorization:transition:v2';
 
   private static readonly PROOF_DOMAIN =
     'pigeon:device-authorization:proof-of-possession:v1';
@@ -166,24 +166,33 @@ export class DeviceAuthorizationTransition {
     };
   }
 
-  public authorize(
-    signature: Signature,
-    proofOfPossession?: Signature,
+  public authorize(signature: Signature): DeviceAuthorizationTransition {
+    return new DeviceAuthorizationTransition({
+      ...this.state,
+      signature,
+    });
+  }
+
+  public provePossession(
+    proofOfPossession: Signature,
   ): DeviceAuthorizationTransition {
+    assert(
+      !this.isRevocation(),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
     return new DeviceAuthorizationTransition({
       ...this.state,
       proofOfPossession,
-      signature,
     });
   }
 
   public authorizeRecovery(
     signature: Signature,
-    proofOfPossession: Signature,
   ): DeviceAuthorizationTransition {
     assert(this.isRecovery(), new InvalidDeviceAuthorizationTransitionError());
 
-    return this.authorize(signature, proofOfPossession);
+    return this.authorize(signature);
   }
 
   public withTargetCredential(
@@ -284,6 +293,7 @@ export class DeviceAuthorizationTransition {
     return new DeviceAuthorizationPayload(
       JSON.stringify({
         domain: DeviceAuthorizationTransition.SIGNATURE_DOMAIN,
+        proofOfPossession: this.state.proofOfPossession?.valueOf(),
         transition: this.getUnsignedPrimitives(),
       }),
     );

@@ -7,7 +7,7 @@ import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/ser
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { assert } from '@haskou/value-objects';
+import { Timestamp, assert } from '@haskou/value-objects';
 import { isDeepStrictEqual } from 'node:util';
 
 import { OrbitDBDeviceAuthorizationDocument } from './documents/OrbitDBDeviceAuthorizationDocument';
@@ -179,6 +179,35 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     return recordsByRevision;
   }
 
+  private resolveConcurrentAuthorization(
+    authorization: DeviceAuthorization,
+    candidates: Array<{
+      authorization: DeviceAuthorization;
+      record: OrbitDBDeviceAuthorizationTransitionRecord;
+      transition: DeviceAuthorizationTransition;
+    }>,
+  ): DeviceAuthorization {
+    const recovery = candidates.find(({ transition }) =>
+      transition.isRecovery(),
+    );
+
+    if (recovery) {
+      return recovery.authorization;
+    }
+
+    const revocations = candidates.filter(({ transition }) =>
+      transition.isRevocation(),
+    );
+
+    if (revocations.length > 0) {
+      return authorization.revokeConcurrently(
+        revocations.map(({ transition }) => transition.getTargetCredential()),
+      );
+    }
+
+    return candidates[0].authorization;
+  }
+
   private rebuild(
     genesis: DeviceAuthorization,
     history: OrbitDBDeviceAuthorizationTransitionRecord[],
@@ -193,18 +222,19 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       const validCandidates: Array<{
         authorization: DeviceAuthorization;
         record: OrbitDBDeviceAuthorizationTransitionRecord;
+        transition: DeviceAuthorizationTransition;
       }> = [];
 
       for (const candidate of candidates) {
         try {
+          const transition = DeviceAuthorizationTransition.fromPrimitives(
+            candidate.transition,
+          );
+
           validCandidates.push({
-            authorization: this.policy.apply(
-              authorization,
-              DeviceAuthorizationTransition.fromPrimitives(
-                candidate.transition,
-              ),
-            ),
+            authorization: this.policy.apply(authorization, transition),
             record: candidate,
+            transition,
           });
         } catch {
           continue;
@@ -219,7 +249,10 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       }
 
       verifiedHistory.push(...validCandidates.map(({ record }) => record));
-      authorization = validCandidates[0].authorization;
+      authorization = this.resolveConcurrentAuthorization(
+        authorization,
+        validCandidates,
+      );
     }
   }
 
@@ -430,6 +463,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
         !this.hasReplay(stored, transition),
         new InvalidDeviceAuthorizationTransitionError(),
       );
+      this.policy.verifyFirstAcceptance(transition, new Timestamp(Date.now()));
 
       const current = this.rebuild(
         DeviceAuthorization.fromPrimitives(stored.genesis),

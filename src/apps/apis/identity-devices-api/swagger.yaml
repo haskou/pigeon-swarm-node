@@ -63,6 +63,7 @@ components:
         pairingExpiration:
           type: integer
           format: int64
+          description: Enrollment deadline enforced when a node first accepts the transition.
         pairingId:
           type: string
           format: uuid
@@ -71,13 +72,13 @@ components:
           minimum: 0
         proofOfPossession:
           type: string
-          description: Signature made by the target device credential.
+          description: Signature made by the target device credential before the author signs the enrollment.
         revision:
           type: integer
           minimum: 1
         signature:
           type: string
-          description: Signature made by an authorized device or the recovery authority.
+          description: Signature made by an authorized device or the recovery authority over the transition and target proof of possession.
         targetCredential:
           type: string
         targetCredentialCommitment:

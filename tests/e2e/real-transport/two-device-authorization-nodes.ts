@@ -174,10 +174,11 @@ async function enrollment(
     ),
   );
 
-  return unsigned.authorize(
-    owner.sign(unsigned.getSigningPayload()),
+  const proven = unsigned.provePossession(
     target.sign(unsigned.getProofOfPossessionPayload()),
   );
+
+  return proven.authorize(owner.sign(proven.getSigningPayload()));
 }
 
 async function main(): Promise<void> {

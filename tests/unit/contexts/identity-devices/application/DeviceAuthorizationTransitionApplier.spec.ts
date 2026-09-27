@@ -42,10 +42,10 @@ describe(DeviceAuthorizationTransitionApplier.name, () => {
         Timestamp.now(),
       ),
     );
-    const transition = unsigned.authorize(
-      owner.sign(unsigned.getSigningPayload()),
+    const proven = unsigned.provePossession(
       target.sign(unsigned.getProofOfPossessionPayload()),
     );
+    const transition = proven.authorize(owner.sign(proven.getSigningPayload()));
     const message = new ApplyDeviceAuthorizationTransitionMessage(transition);
     repository.compareAndApply.mockResolvedValue(authorization);
 

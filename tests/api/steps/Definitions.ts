@@ -736,13 +736,12 @@ export default class Definitions {
       ),
     );
 
+    const proven = unsigned.provePossession(
+      target.sign(unsigned.getProofOfPossessionPayload()),
+    );
+
     this.body = JSON.stringify(
-      unsigned
-        .authorize(
-          owner.sign(unsigned.getSigningPayload()),
-          target.sign(unsigned.getProofOfPossessionPayload()),
-        )
-        .toPrimitives(),
+      proven.authorize(owner.sign(proven.getSigningPayload())).toPrimitives(),
     );
   }
 
