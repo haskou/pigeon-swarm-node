@@ -156,39 +156,42 @@ async function synchronization(
 
 async function exchanged(replicas: Replica[]): Promise<void> {
   const exchangeId = randomUUID();
-  const sentinels = replicas.map((_replica, index) => ({
-    id: `fixture-exchange:${exchangeId}:${index}`,
-    nonce: randomUUID(),
-  }));
-  await Promise.all(
-    replicas.flatMap((replica, index) => [
-      replica.stores!.communities.put!(sentinels[index]),
-      replica.stores!.heads.put!(sentinels[index].id, sentinels[index]),
-    ]),
+  const minimumPeerCount = replicas.length > 1 ? 1 : 0;
+  await until('OrbitDB synchronization peers joined after redial', async () =>
+    replicas.every((replica) =>
+      Object.values(replica.stores!).every(
+        (store) => (store.peers?.size ?? 0) >= minimumPeerCount,
+      ),
+    ),
   );
-  await until('actual OrbitDB heads exchanged after redial', async () => {
-    const received = await Promise.all(
-      replicas.map(async (replica) => {
-        const communities = await replica.stores!.communities.query!((record) =>
-          sentinels.some((sentinel) => sentinel.id === record.id),
-        );
-        const heads = await Promise.all(
-          sentinels.map((sentinel) => replica.stores!.heads.get!(sentinel.id)),
-        );
 
-        return (
-          sentinels.every((sentinel) =>
-            communities.some((record) => isDeepStrictEqual(record, sentinel)),
-          ) &&
-          sentinels.every((sentinel, index) =>
-            isDeepStrictEqual(heads[index], sentinel),
-          )
+  for (let index = 0; index < replicas.length; index += 1) {
+    const sentinel = {
+      id: `fixture-exchange:${exchangeId}:${index}`,
+      nonce: randomUUID(),
+    };
+    await replicas[index].stores!.communities.put!(sentinel);
+    await replicas[index].stores!.heads.put!(sentinel.id, sentinel);
+    await until('actual OrbitDB heads exchanged after redial', async () => {
+      for (const replica of replicas) {
+        const communities = await replica.stores!.communities.query!(
+          (record) => record.id === sentinel.id,
         );
-      }),
-    );
+        const head = await replica.stores!.heads.get!(sentinel.id);
 
-    return received.every(Boolean);
-  });
+        if (
+          !communities.some((record) =>
+            isDeepStrictEqual(record, sentinel),
+          ) ||
+          !isDeepStrictEqual(head, sentinel)
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
   console.log(`PASS actual OrbitDB head exchange: ${replicas.length} replicas`);
 }
 
