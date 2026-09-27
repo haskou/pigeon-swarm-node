@@ -122,6 +122,38 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     ),
   });
 
+  const provisionedDocumentBytes = async (scopeId: string): Promise<number> => {
+    const prefix = `${scopeId}:`;
+    const namespaces = Object.values(PrivateAuthorizationLocalNamespaces).filter(
+      (namespace) =>
+        namespace !== PrivateAuthorizationLocalNamespaces.provisioning,
+    );
+    const documents = await Promise.all(
+      namespaces.map(async (namespace) => ({
+        documents: await database.find(
+          namespace,
+          (document) =>
+            document._id === scopeId ||
+            (typeof document._id === 'string' &&
+              document._id.startsWith(prefix)),
+        ),
+        namespace,
+      })),
+    );
+
+    return documents.reduce(
+      (total, entry) =>
+        total +
+        entry.documents.reduce(
+          (subtotal, document) =>
+            subtotal +
+            Buffer.byteLength(JSON.stringify({ document, namespace: entry.namespace })),
+          0,
+        ),
+      0,
+    );
+  };
+
   beforeEach(async () => {
     previousDatabasePath = process.env.PIGEON_LOCAL_DB_PATH;
     databasePath = await fs.mkdtemp(
@@ -206,15 +238,8 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       PrivateAuthorizationLocalNamespaces.provisioning,
       'scope',
     );
-    const storedScope = await repository.findScope('scope');
     expect(after?.provisionedBytes).toBe(
-      Buffer.byteLength(
-        JSON.stringify({
-          projection: expanded.projection,
-          protectedMlsState: expanded.protectedMlsState,
-          scope: storedScope?.toPrimitives(),
-        }),
-      ),
+      await provisionedDocumentBytes('scope'),
     );
     expect(Number(after?.provisionedBytes)).toBeGreaterThan(
       Number(before?.provisionedBytes),
@@ -288,13 +313,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     );
     expect(databaseCommit).toHaveBeenCalledTimes(1);
     expect(reservation?.provisionedBytes).toBe(
-      Buffer.byteLength(
-        JSON.stringify({
-          projection: { members: [] },
-          protectedMlsState: 'protected-state',
-          scope: storedScope?.toPrimitives(),
-        }),
-      ),
+      await provisionedDocumentBytes('scope'),
     );
     expect(
       storedScope
@@ -1012,6 +1031,14 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     await expect(
       another.reserveChild('scope', 'head-0', 'head-1'),
     ).resolves.toBe('same');
+    const storageReservation = await database.findOne(
+      PrivateAuthorizationLocalNamespaces.provisioning,
+      'scope',
+    );
+
+    expect(storageReservation?.provisionedBytes).toBe(
+      await provisionedDocumentBytes('scope'),
+    );
   });
 
   it('returns an identical committed receipt without executing the transition twice', async () => {

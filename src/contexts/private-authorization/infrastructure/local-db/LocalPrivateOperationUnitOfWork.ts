@@ -158,18 +158,98 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     return operations;
   }
 
-  private provisionedBytes(state: {
-    projection: Record<string, unknown>;
-    protectedMlsState: string;
-    scope: PrivateAuthorizationScope;
-  }): number {
-    return Buffer.byteLength(
-      JSON.stringify({
-        projection: state.projection,
-        protectedMlsState: state.protectedMlsState,
-        scope: state.scope.toPrimitives(),
+  private storageNamespaces(): string[] {
+    return Object.values(PrivateAuthorizationLocalNamespaces).filter(
+      (namespace) =>
+        namespace !== PrivateAuthorizationLocalNamespaces.provisioning,
+    );
+  }
+
+  private belongsToScope(
+    document: Record<string, unknown>,
+    scopeId: string,
+  ): boolean {
+    return (
+      document._id === scopeId ||
+      (typeof document._id === 'string' &&
+        document._id.startsWith(`${scopeId}:`))
+    );
+  }
+
+  private documentStorageBytes(
+    namespace: string,
+    document: Record<string, unknown>,
+  ): number {
+    return Buffer.byteLength(JSON.stringify({ document, namespace }));
+  }
+
+  private async storedDocumentsByNamespace(
+    scopeId: string,
+    namespaces: string[],
+  ): Promise<Map<string, Map<string, Record<string, unknown>>>> {
+    const entries = await Promise.all(
+      namespaces.map(async (namespace) => {
+        const documents = await this.database.find(namespace, (document) =>
+          this.belongsToScope(document, scopeId),
+        );
+
+        return [
+          namespace,
+          new Map(
+            documents.map((document) => [String(document._id), document]),
+          ),
+        ] as const;
       }),
     );
+
+    return new Map(entries);
+  }
+
+  private applyStorageOperations(
+    documentsByNamespace: Map<string, Map<string, Record<string, unknown>>>,
+    operations: EmbeddedLocalDatabaseOperation[],
+  ): void {
+    for (const operation of operations) {
+      const documents = documentsByNamespace.get(operation.namespace);
+
+      if (!documents) continue;
+
+      if (operation.type === 'del') documents.delete(operation.id);
+      else {
+        documents.set(operation.id, {
+          ...operation.document,
+          _id: operation.id,
+        });
+      }
+    }
+  }
+
+  private storageBytes(
+    documentsByNamespace: Map<string, Map<string, Record<string, unknown>>>,
+  ): number {
+    let total = 0;
+
+    for (const [namespace, documents] of documentsByNamespace) {
+      for (const document of documents.values()) {
+        total += this.documentStorageBytes(namespace, document);
+      }
+    }
+
+    return total;
+  }
+
+  private async provisionedBytesAfter(
+    scopeId: string,
+    operations: EmbeddedLocalDatabaseOperation[],
+  ): Promise<number> {
+    const namespaces = this.storageNamespaces();
+    const documentsByNamespace = await this.storedDocumentsByNamespace(
+      scopeId,
+      namespaces,
+    );
+    this.applyStorageOperations(documentsByNamespace, operations);
+
+    return this.storageBytes(documentsByNamespace);
   }
 
   private async provisioningQuota(
@@ -191,52 +271,28 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     return new PrivateAuthorizationProvisioningQuota(reservations);
   }
 
-  private async updatedStorageReservationForState(
+  private async storageReservationForOperations(
     scopeId: string,
-    state: {
-      projection: Record<string, unknown>;
-      protectedMlsState: string;
-      scope: PrivateAuthorizationScope;
-    },
+    operations: EmbeddedLocalDatabaseOperation[],
+    ownerIdentityId?: IdentityId,
   ): Promise<PrivateAuthorizationStorageReservationPrimitives> {
     const current = await this.database.findOne(
       PrivateAuthorizationLocalNamespaces.provisioning,
       scopeId,
     );
 
-    assert(current, new InvalidPrivateAuthorizationError());
+    assert(current || ownerIdentityId, new InvalidPrivateAuthorizationError());
     const quota = await this.provisioningQuota(scopeId);
 
     return quota.reserve(
-      new IdentityId(String(current.ownerIdentityId)),
-      new Integer(this.provisionedBytes(state)),
+      ownerIdentityId ?? new IdentityId(String(current?.ownerIdentityId)),
+      new Integer(await this.provisionedBytesAfter(scopeId, operations)),
     );
-  }
-
-  private async updatedStorageReservation(
-    scopeId: string,
-    acceptance: PrivateOperationAcceptance,
-  ): Promise<PrivateAuthorizationStorageReservationPrimitives> {
-    const protectedMlsState =
-      acceptance.protectedMlsState ??
-      (await this.repository.findProtectedMlsState(scopeId));
-
-    assert(
-      typeof protectedMlsState === 'string',
-      new InvalidPrivateAuthorizationError(),
-    );
-
-    return this.updatedStorageReservationForState(scopeId, {
-      projection: acceptance.projection,
-      protectedMlsState,
-      scope: acceptance.scope,
-    });
   }
 
   private pendingStateOperations(
     scope: PrivateAuthorizationScope,
     storedPendingIds: string[],
-    storageReservation: PrivateAuthorizationStorageReservationPrimitives,
   ): EmbeddedLocalDatabaseOperation[] {
     const primitives = scope.toPrimitives();
     const scopeId = primitives.checkpoint.scopeId;
@@ -249,12 +305,6 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
         document: { ...primitives, pendingOperations: [] },
         id: scopeId,
         namespace: PrivateAuthorizationLocalNamespaces.scopes,
-        type: 'put',
-      },
-      {
-        document: { ...storageReservation },
-        id: scopeId,
-        namespace: PrivateAuthorizationLocalNamespaces.provisioning,
         type: 'put',
       },
       ...primitives.pendingOperations.map((pending) => ({
@@ -273,6 +323,27 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     ];
   }
 
+  private async persistScopeState(
+    scope: PrivateAuthorizationScope,
+  ): Promise<void> {
+    const scopeId = scope.toPrimitives().checkpoint.scopeId;
+    const storedPendingIds = (await this.repository.findPending(scopeId)).map(
+      (pending) => pending.toPrimitives().id,
+    );
+    const operations = this.pendingStateOperations(scope, storedPendingIds);
+    const storageReservation = await this.storageReservationForOperations(
+      scopeId,
+      operations,
+    );
+    operations.push({
+      document: { ...storageReservation },
+      id: scopeId,
+      namespace: PrivateAuthorizationLocalNamespaces.provisioning,
+      type: 'put',
+    });
+    await this.database.commit(operations);
+  }
+
   private equal(left: unknown, right: unknown): boolean {
     return JSON.stringify(left) === JSON.stringify(right);
   }
@@ -285,10 +356,11 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     const current = await this.repository.findScope(scopeId);
 
     if (!current) {
-      const quota = await this.provisioningQuota();
-      const reservation = quota.reserve(
+      const operations = this.genesisOperations(genesis);
+      const reservation = await this.storageReservationForOperations(
+        scopeId,
+        operations,
         genesis.ownerIdentityId,
-        new Integer(this.provisionedBytes(genesis)),
       );
       await this.database.commit(this.genesisOperations(genesis, reservation));
 
@@ -430,7 +502,6 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     scopeId: string,
     acceptance: PrivateOperationAcceptance,
     retiredOperationIds: string[],
-    storageReservation: PrivateAuthorizationStorageReservationPrimitives,
   ): Promise<EmbeddedLocalDatabaseOperation[]> {
     const scope = acceptance.scope.toPrimitives();
     const receipt = acceptance.receipt.toPrimitives();
@@ -451,12 +522,6 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
         document: acceptance.projection,
         id: scopeId,
         namespace: PrivateAuthorizationLocalNamespaces.projections,
-        type: 'put',
-      },
-      {
-        document: { ...storageReservation },
-        id: scopeId,
-        namespace: PrivateAuthorizationLocalNamespaces.provisioning,
         type: 'put',
       },
       {
@@ -572,19 +637,23 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     const retiredOperationIds = [
       ...new Set([...acceptedBefore, receipt.id]),
     ].filter((operationId) => !retained.has(operationId));
-    const storageReservation = await this.updatedStorageReservation(
+    const operations = await this.acceptanceOperations(
       scopeId,
       rebasedAcceptance,
+      retiredOperationIds,
     );
+    const storageReservation = await this.storageReservationForOperations(
+      scopeId,
+      operations,
+    );
+    operations.push({
+      document: { ...storageReservation },
+      id: scopeId,
+      namespace: PrivateAuthorizationLocalNamespaces.provisioning,
+      type: 'put',
+    });
 
-    await this.database.commit(
-      await this.acceptanceOperations(
-        scopeId,
-        rebasedAcceptance,
-        retiredOperationIds,
-        storageReservation,
-      ),
-    );
+    await this.database.commit(operations);
 
     return 'committed';
   }
@@ -599,7 +668,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       return this.rebaseAcceptance(currentScope, acceptance);
     } catch (error) {
       if (error instanceof PrivateAuthorizationConflictError) {
-        await this.repository.saveScope(currentScope);
+        await this.persistScopeState(currentScope);
       }
 
       throw error;
@@ -674,7 +743,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     }
 
     scope.quarantine();
-    await this.repository.saveScope(scope);
+    await this.persistScopeState(scope);
     throw new PrivateAuthorizationConflictError();
   }
 
@@ -697,7 +766,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
 
       if (scope) {
         scope.quarantine();
-        await this.repository.saveScope(scope);
+        await this.persistScopeState(scope);
       }
 
       throw new PrivateAuthorizationConflictError();
@@ -750,7 +819,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       assessment = scope.assess(operation);
     } catch (error) {
       if (error instanceof PrivateAuthorizationConflictError) {
-        await this.repository.saveScope(scope);
+        await this.persistScopeState(scope);
       }
 
       throw error;
@@ -767,16 +836,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       typeof protectedMlsState === 'string',
       new InvalidPrivateAuthorizationError(),
     );
-    const storageReservation = await this.updatedStorageReservationForState(
-      scopeId,
-      { projection, protectedMlsState, scope },
-    );
-    const storedPendingIds = (await this.repository.findPending(scopeId)).map(
-      (pending) => pending.toPrimitives().id,
-    );
-    await this.database.commit(
-      this.pendingStateOperations(scope, storedPendingIds, storageReservation),
-    );
+    await this.persistScopeState(scope);
 
     return 'committed';
   }
@@ -827,13 +887,15 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   }
 
   public async quarantine(scopeId: string): Promise<void> {
-    return this.exclusively(scopeId, async () => {
-      const scope = await this.repository.findScope(scopeId);
+    return this.exclusivelyProvisioning(() =>
+      this.exclusively(scopeId, async () => {
+        const scope = await this.repository.findScope(scopeId);
 
-      if (!scope) throw new PrivateAuthorizationConflictError();
-      scope.quarantine();
-      await this.repository.saveScope(scope);
-    });
+        if (!scope) throw new PrivateAuthorizationConflictError();
+        scope.quarantine();
+        await this.persistScopeState(scope);
+      }),
+    );
   }
 
   public async reserveChild(
@@ -841,31 +903,46 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     parentHeadHash: string,
     childHeadHash: string,
   ): Promise<'reserved' | 'same' | 'conflict'> {
-    return this.exclusively(scopeId, async () => {
-      const existing = await this.repository.findReservation(
-        scopeId,
-        parentHeadHash,
-      );
+    return this.exclusivelyProvisioning(() =>
+      this.exclusively(scopeId, async () => {
+        const existing = await this.repository.findReservation(
+          scopeId,
+          parentHeadHash,
+        );
 
-      if (existing) {
-        if (existing === childHeadHash) return 'same';
-        const scope = await this.repository.findScope(scopeId);
+        if (existing) {
+          if (existing === childHeadHash) return 'same';
+          const scope = await this.repository.findScope(scopeId);
 
-        if (scope) {
-          scope.quarantine();
-          await this.repository.saveScope(scope);
+          if (scope) {
+            scope.quarantine();
+            await this.persistScopeState(scope);
+          }
+
+          return 'conflict';
         }
+        const operations: EmbeddedLocalDatabaseOperation[] = [
+          {
+            document: { childHeadHash },
+            id: privateAuthorizationLocalId(scopeId, parentHeadHash),
+            namespace: PrivateAuthorizationLocalNamespaces.reservations,
+            type: 'put',
+          },
+        ];
+        const storageReservation = await this.storageReservationForOperations(
+          scopeId,
+          operations,
+        );
+        operations.push({
+          document: { ...storageReservation },
+          id: scopeId,
+          namespace: PrivateAuthorizationLocalNamespaces.provisioning,
+          type: 'put',
+        });
+        await this.database.commit(operations);
 
-        return 'conflict';
-      }
-
-      await this.repository.saveReservation(
-        scopeId,
-        parentHeadHash,
-        childHeadHash,
-      );
-
-      return 'reserved';
-    });
+        return 'reserved';
+      }),
+    );
   }
 }
