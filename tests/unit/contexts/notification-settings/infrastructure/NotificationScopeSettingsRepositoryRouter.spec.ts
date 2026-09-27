@@ -43,6 +43,18 @@ describe('NotificationScopeSettingsRepositoryRouter', () => {
       save: jest.fn(),
     } as unknown as jest.Mocked<LocalNotificationScopeSettingsRepository>;
     guard = {
+      filterPublic: jest.fn().mockImplementation(
+        async <T>(
+          values: T[],
+          communityId: (value: T) => CommunityId,
+        ) => {
+          const decisions = await Promise.all(
+            values.map((value) => guard.isProtected(communityId(value))),
+          );
+
+          return values.filter((_value, index) => !decisions[index]);
+        },
+      ),
       isProtected: jest
         .fn()
         .mockImplementation(
@@ -172,6 +184,7 @@ describe('NotificationScopeSettingsRepositoryRouter', () => {
       publicSettings,
       protectedLocal,
     ]);
+    expect(guard.filterPublic).toHaveBeenCalled();
   });
 });
 

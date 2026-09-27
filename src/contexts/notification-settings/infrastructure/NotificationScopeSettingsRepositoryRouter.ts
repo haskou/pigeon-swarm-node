@@ -21,11 +21,23 @@ export default class NotificationScopeSettingsRepositoryRouter extends Notificat
   private async publicSettings(
     settings: NotificationScopeSettings[],
   ): Promise<NotificationScopeSettings[]> {
-    const decisions = await Promise.all(
-      settings.map((value) => this.isPrivateScope(value.getScope())),
+    const communitySettings = settings.flatMap((value) => {
+      const communityId = value.getScope().getCommunityId();
+
+      return communityId ? [{ communityId, value }] : [];
+    });
+    const admitted = new Set(
+      (
+        await this.publicStorageGuard.filterPublic(
+          communitySettings,
+          (candidate) => candidate.communityId,
+        )
+      ).map((candidate) => candidate.value),
     );
 
-    return settings.filter((_value, index) => !decisions[index]);
+    return settings.filter(
+      (value) => !value.getScope().getCommunityId() || admitted.has(value),
+    );
   }
 
   private async privateSettings(

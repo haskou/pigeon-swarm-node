@@ -98,16 +98,17 @@ export default class OrbitDBCallRepository extends CallRepository {
     const document = await this.callProjection.findById(id);
 
     if (!document) return undefined;
-
-    const communityId =
-      document.scope.type === 'community_channel' &&
-      typeof document.scope.communityId === 'string'
-        ? new CommunityId(document.scope.communityId)
-        : undefined;
+    const initialScope = this.mapper.toDomain(document).getScope();
+    const communityId = initialScope.getCommunityId();
     const read = async (): Promise<Call | undefined> => {
       const lockedDocument = await this.callProjection.findById(id);
 
-      return lockedDocument ? this.hydrate(lockedDocument) : undefined;
+      if (!lockedDocument) return undefined;
+      const lockedScope = this.mapper.toDomain(lockedDocument).getScope();
+
+      return lockedScope.isEqual(initialScope)
+        ? this.hydrate(lockedDocument)
+        : undefined;
     };
 
     return communityId

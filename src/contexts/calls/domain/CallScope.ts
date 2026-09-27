@@ -70,6 +70,18 @@ export class CallScope {
     return this.channelId;
   }
 
+  public isEqual(scope: CallScope): boolean {
+    const candidate = scope.toPrimitives();
+    const current = this.toPrimitives();
+
+    return (
+      current.type === candidate.type &&
+      current.communityId === candidate.communityId &&
+      current.channelId === candidate.channelId &&
+      current.conversationId === candidate.conversationId
+    );
+  }
+
   public toPrimitives() {
     return {
       channelId: this.channelId?.valueOf(),

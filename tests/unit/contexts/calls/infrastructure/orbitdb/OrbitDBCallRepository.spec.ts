@@ -14,6 +14,7 @@ import OrbitDBCallRepository from '@app/contexts/calls/infrastructure/orbitdb/Or
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
@@ -213,6 +214,29 @@ describe('OrbitDBCallRepository', () => {
     await expect(
       repository.findById(new CallId(callId)),
     ).resolves.toBeDefined();
+  });
+
+  it('does not return a call whose scope changes during guarded lookup', async () => {
+    const communityDocument = document();
+    const conversationDocument: OrbitDBCallDocument = {
+      ...communityDocument,
+      creatorIdentityId,
+      scope: {
+        channelId: undefined,
+        communityId: undefined,
+        conversationId: new ConversationId('group:conversation-1').valueOf(),
+        type: 'conversation',
+      },
+    };
+
+    jest
+      .spyOn(projection, 'findById')
+      .mockResolvedValueOnce(conversationDocument)
+      .mockResolvedValueOnce(communityDocument);
+
+    await expect(
+      repository.findById(new CallId(callId)),
+    ).resolves.toBeUndefined();
   });
 
   it('rejects protected community call reads and writes through OrbitDB', async () => {
