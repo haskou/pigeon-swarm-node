@@ -31,6 +31,8 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
   let blockHeadPersistence = false;
   let headPersistenceBlockers: Array<() => void>;
   let query: jest.Mock;
+  let putDocument: jest.Mock;
+  let putHead: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBCommunityMessageReactionRepository;
 
@@ -42,6 +44,24 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     query = jest.fn((matcher: (document: Record<string, unknown>) => boolean) =>
       Promise.resolve([...documents.values()].filter(matcher)),
     );
+    putDocument = jest.fn((document: unknown) => {
+      const record = document as Record<string, unknown>;
+
+      documents.set(String(record.id), record);
+
+      return Promise.resolve('ok');
+    });
+    putHead = jest.fn(async (key, value) => {
+      if (blockHeadPersistence) {
+        await new Promise<void>((resolve) =>
+          headPersistenceBlockers.push(resolve),
+        );
+      }
+
+      headRecords.set(key as string, value as Record<string, unknown>);
+
+      return 'ok';
+    });
     registry = new OrbitDBReplicatedStateRegistry();
     registry.register('network-1', {
       heads: {
@@ -52,26 +72,10 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
           on: jest.fn(),
         },
         get: jest.fn(async (key) => ({ key, value: headRecords.get(key) })),
-        put: jest.fn(async (key, value) => {
-          if (blockHeadPersistence) {
-            await new Promise<void>((resolve) =>
-              headPersistenceBlockers.push(resolve),
-            );
-          }
-
-          headRecords.set(key as string, value as Record<string, unknown>);
-
-          return 'ok';
-        }),
+        put: putHead,
       },
       reactions: {
-        put: jest.fn((document: unknown) => {
-          const record = document as Record<string, unknown>;
-
-          documents.set(String(record.id), record);
-
-          return Promise.resolve('ok');
-        }),
+        put: putDocument,
         query,
       },
     } as never);
@@ -245,6 +249,44 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
 
     releaseHeadPersistence();
     await deletion;
+  });
+
+  it('does not publish a saved reaction index when canonical persistence fails', async () => {
+    const reaction = CommunityChannelMessageReaction.create(
+      communityId,
+      channelId,
+      messageId,
+      authorIdentityId,
+      new CommunityChannelMessageReactionEmoji('👍'),
+      new Timestamp(1780000000000),
+    );
+    putDocument.mockRejectedValueOnce(new Error('canonical write failed'));
+
+    await expect(repository.save(reaction)).rejects.toThrow(
+      'canonical write failed',
+    );
+
+    expect(putHead).not.toHaveBeenCalled();
+  });
+
+  it('does not publish a deleted reaction index when canonical persistence fails', async () => {
+    const reaction = CommunityChannelMessageReaction.create(
+      communityId,
+      channelId,
+      messageId,
+      authorIdentityId,
+      new CommunityChannelMessageReactionEmoji('👍'),
+      new Timestamp(1780000000000),
+    );
+    await repository.save(reaction);
+    putHead.mockClear();
+    putDocument.mockRejectedValueOnce(new Error('canonical write failed'));
+
+    await expect(repository.delete(reaction)).rejects.toThrow(
+      'canonical write failed',
+    );
+
+    expect(putHead).not.toHaveBeenCalled();
   });
 
   function releaseHeadPersistence(): void {

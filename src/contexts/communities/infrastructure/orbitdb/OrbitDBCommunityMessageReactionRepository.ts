@@ -107,10 +107,8 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     );
     const communityId = new CommunityId(document.communityId);
     await this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      await Promise.all([
-        this.registry.putDocument('reactions', document),
-        this.putIndexDocument(communityId, document),
-      ]);
+      await this.registry.putDocument('reactions', document);
+      await this.putIndexDocument(communityId, document);
     });
   }
 
@@ -124,10 +122,8 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     };
     const communityId = new CommunityId(document.communityId);
     await this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      await Promise.all([
-        this.registry.putDocument('reactions', document),
-        this.putIndexDocument(communityId, document),
-      ]);
+      await this.registry.putDocument('reactions', document);
+      await this.putIndexDocument(communityId, document);
     });
   }
 
