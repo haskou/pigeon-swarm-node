@@ -1,1 +1,1 @@
-export const PrivateAuthorizationRequestBodyLimit = '2mb';
+export const PrivateAuthorizationRequestBodyLimit = 3 * 1024 * 1024;

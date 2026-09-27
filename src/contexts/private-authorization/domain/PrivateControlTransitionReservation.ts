@@ -41,6 +41,15 @@ export class PrivateControlTransitionReservation {
     );
   }
 
+  public isCrossAuthorClaimForSameChild(
+    candidate: PrivateControlTransitionReservation,
+  ): boolean {
+    return (
+      this.primitives.childHeadHash === candidate.primitives.childHeadHash &&
+      this.primitives.authorDeviceKey !== candidate.primitives.authorDeviceKey
+    );
+  }
+
   public isAuthoredBy(author: PrivateAuthorizationDeviceKey): boolean {
     return this.primitives.authorDeviceKey === author.valueOf();
   }

@@ -746,6 +746,11 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       return;
     }
 
+    assert(
+      !reservedChild.isCrossAuthorClaimForSameChild(candidate),
+      new InvalidPrivateAuthorizationError(),
+    );
+
     scope.quarantine();
     await this.persistScopeState(scope);
     throw new PrivateAuthorizationConflictError();

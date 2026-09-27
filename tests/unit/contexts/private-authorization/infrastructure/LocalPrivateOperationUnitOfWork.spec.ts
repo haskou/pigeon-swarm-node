@@ -987,6 +987,43 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     );
   });
 
+  it('rejects a cross-author claim on a reserved child without freezing', async () => {
+    await repository.saveReservation(
+      'scope',
+      'head-0',
+      'head-1',
+      'owner-operation',
+      'owner',
+    );
+    const claimed = acceptance();
+    claimed.receipt = PrivateControlOperation.fromPrimitives({
+      ...operation().toPrimitives(),
+      authorDeviceKey: 'device',
+      digest: 'device-digest',
+      id: 'device-operation',
+    });
+    claimed.reservation = {
+      authorDeviceKey: 'device',
+      childHeadHash: 'head-1',
+      operationId: 'device-operation',
+      parentHeadHash: 'head-0',
+    };
+
+    await expect(
+      unitOfWork.commitAcceptance(
+        'scope',
+        { headHash: 'head-0', revision: 0 },
+        claimed,
+      ),
+    ).rejects.toBeInstanceOf(InvalidPrivateAuthorizationError);
+    await expect(
+      repository.findReceipt('scope', 'device-operation'),
+    ).resolves.toBeUndefined();
+    expect((await repository.findScope('scope'))?.toPrimitives().status).toBe(
+      'active',
+    );
+  });
+
   it('freezes a sibling arriving after the winning child advanced the checkpoint', async () => {
     await unitOfWork.commitAcceptance(
       'scope',

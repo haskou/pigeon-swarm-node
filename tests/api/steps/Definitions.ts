@@ -605,6 +605,24 @@ export default class Definitions {
     });
   }
 
+  @given('I set a maximum-size private authorization operation envelope')
+  public iSetAMaximumSizePrivateAuthorizationOperationEnvelope(): void {
+    this.body = JSON.stringify({
+      controlFrame: {
+        encryptedMlsState: 'x'.repeat(1_398_102),
+        mlsMessage: 'x'.repeat(349_526),
+        signedTransitionJson: 'x'.repeat(262_144),
+      },
+      signedFreshnessProofJson: 'x'.repeat(262_144),
+      signedOperationJson: 'x'.repeat(262_144),
+    });
+  }
+
+  @given('I sign the current private authorization operation request')
+  public async iSignTheCurrentPrivateAuthorizationOperationRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/private-authorization/operations');
+  }
+
   @given(
     'I set a client-signed identity body with name {string} and handle {string}',
   )
