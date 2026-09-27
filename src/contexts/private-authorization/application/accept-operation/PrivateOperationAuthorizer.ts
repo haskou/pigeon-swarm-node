@@ -2,6 +2,7 @@ import { assert } from '@haskou/value-objects';
 
 import { IdentityId } from '../../../shared/domain/value-objects/IdentityId';
 import { InvalidPrivateAuthorizationError } from '../../domain/errors/InvalidPrivateAuthorizationError';
+import { PrivateAuthorizationCheckpoint } from '../../domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '../../domain/PrivateAuthorizationScope';
 import { PrivateControlOperation } from '../../domain/PrivateControlOperation';
 import { PrivateAuthorizationRepository } from '../../domain/repositories/PrivateAuthorizationRepository';
@@ -96,16 +97,20 @@ export default class PrivateOperationAuthorizer {
   public async authorizeHistorical(
     signedOperationJson: string,
     routed: PrivateControlOperation = this.decode(signedOperationJson),
+    parentCheckpoint: PrivateAuthorizationCheckpoint,
   ): Promise<{
     authenticatedOperation: AuthenticatedPrivateOperationJson;
     operation: PrivateControlOperation;
     scope: PrivateAuthorizationScope;
   }> {
     const scope = await this.scopeFor(routed);
-    const checkpoint = scope.getCheckpoint();
 
     assert(
-      checkpoint.recognizes(routed.getAuthorDeviceKey()),
+      parentCheckpoint.getScopeId().isEqual(routed.getScopeId()) &&
+        parentCheckpoint
+          .getRevision()
+          .isEqual(routed.getAuthorizationRevision()) &&
+        parentCheckpoint.admits(routed.getAuthorDeviceKey()),
       new InvalidPrivateAuthorizationError(),
     );
 

@@ -153,6 +153,7 @@ export default class PrivateOperationAcceptor {
     const authorized = await this.authorizer.authorizeHistorical(
       message.signedOperationJson,
       routed,
+      reservedChild.getParentCheckpoint(),
     );
     await this.rejectHistoricalReservationConflict(
       message,

@@ -539,8 +539,11 @@ describe('PrivateOperationAcceptor', () => {
     expect(freshness.verify).not.toHaveBeenCalled();
   });
 
-  it('quarantines an authenticated child fork older than the previous revision', async () => {
+  it('quarantines a historical fork after its author leaves bounded key history', async () => {
     const activeKey = encoded(32, 10);
+    const retainedRevocations = Array.from({ length: 128 }, (_value, index) =>
+      encoded(32, index + 20),
+    );
     const currentCheckpoint = PrivateAuthorizationCheckpoint.fromPrimitives({
       ...checkpoint().toPrimitives(),
       admittedDeviceKeys: [activeKey],
@@ -549,7 +552,7 @@ describe('PrivateOperationAcceptor', () => {
       headHash: encoded(32, 13),
       parentHeadHash: encoded(32, 11),
       revision: 2,
-      revokedDeviceKeys: [authorKey],
+      revokedDeviceKeys: retainedRevocations,
     });
     const sibling = revocation({
       payload: {
@@ -689,10 +692,8 @@ describe('PrivateOperationAcceptor', () => {
         ),
       ),
     ).rejects.toBeInstanceOf(InvalidPrivateAuthorizationError);
-    expect(verifier.verify).toHaveBeenCalledWith(
-      claimedTransition,
-      historicalKey,
-    );
+    expect(verifier.verify).not.toHaveBeenCalled();
+    expect(transitions.verify).not.toHaveBeenCalled();
     expect(unitOfWork.quarantine).not.toHaveBeenCalled();
     expect(freshness.verify).not.toHaveBeenCalled();
   });
