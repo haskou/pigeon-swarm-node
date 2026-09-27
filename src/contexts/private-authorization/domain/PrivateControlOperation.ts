@@ -37,12 +37,15 @@ export class PrivateControlOperation {
     return this.primitives.kind === 'membership.propose';
   }
 
-  public isControlChildOf(checkpoint: PrivateAuthorizationCheckpoint): boolean {
+  public isAuthorizedBy(checkpoint: PrivateAuthorizationCheckpoint): boolean {
     return (
-      !this.isProposal() &&
       this.getScopeId().isEqual(checkpoint.getScopeId()) &&
       this.getAuthorizationRevision().isEqual(checkpoint.getRevision())
     );
+  }
+
+  public isControlChildOf(checkpoint: PrivateAuthorizationCheckpoint): boolean {
+    return !this.isProposal() && this.isAuthorizedBy(checkpoint);
   }
 
   public hasSameIdentityAs(operation: PrivateControlOperation): boolean {

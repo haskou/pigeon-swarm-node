@@ -299,11 +299,29 @@ describe('PrivateOperationAcceptor', () => {
       ),
     ).resolves.toBe('challenge-request');
 
+    expect(mutations.apply).not.toHaveBeenCalled();
     expect(unitOfWork.reserveChild).not.toHaveBeenCalled();
     expect(freshness.issue).toHaveBeenCalledWith(
       currentCheckpoint,
       expect.anything(),
     );
+  });
+
+  it('defers mutation validation for an operation authorized by a future checkpoint', async () => {
+    mutations.apply.mockRejectedValue(new InvalidPrivateAuthorizationError());
+
+    await expect(
+      acceptor.challenge(
+        new PrivateOperationChallengeMessage(
+          authorIdentityId,
+          signed({ authorizationRevision: 1 }),
+        ),
+      ),
+    ).resolves.toBe('challenge-request');
+
+    expect(mutations.apply).not.toHaveBeenCalled();
+    expect(unitOfWork.reserveChild).not.toHaveBeenCalled();
+    expect(freshness.issue).toHaveBeenCalled();
   });
 
   it('verifies and atomically accepts an authorized proposal', async () => {

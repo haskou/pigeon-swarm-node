@@ -403,12 +403,14 @@ export default class PrivateOperationAcceptor {
       scope.toPrimitives().checkpoint,
     );
 
-    const projection =
-      (await this.repository.findProjection(
-        operation.getScopeId().valueOf(),
-      )) ?? {};
+    if (operation.isAuthorizedBy(checkpoint)) {
+      const projection =
+        (await this.repository.findProjection(
+          operation.getScopeId().valueOf(),
+        )) ?? {};
 
-    await this.applyMutation(checkpoint, operation, projection);
+      await this.applyMutation(checkpoint, operation, projection);
+    }
 
     await this.reserveControlChild(
       checkpoint,
