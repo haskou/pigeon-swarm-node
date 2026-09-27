@@ -1,3 +1,4 @@
+import { OrbitDBReplicatedHeadCollectionName } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCollectionName';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { CommunityId } from '../../domain/value-objects/CommunityId';
@@ -6,6 +7,9 @@ import { OrbitDBCommunityDocument } from './documents/OrbitDBCommunityDocument';
 import OrbitDBCommunityReplicaMerger from './OrbitDBCommunityReplicaMerger';
 
 export default class OrbitDBCommunityReplicaProjection {
+  private readonly memberIndexCollectionName =
+    new OrbitDBReplicatedHeadCollectionName('communities');
+
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly merger: OrbitDBCommunityReplicaMerger,
@@ -39,7 +43,12 @@ export default class OrbitDBCommunityReplicaProjection {
 
     if (communityIds.length === 0) return;
     this.publicStorageGuard.runInBackgroundWhilePublicScopes(communityIds, () =>
-      this.registry.putHeadExactly(key, value, [networkId]),
+      this.registry.putHeadReplacingReplicas(
+        key,
+        value,
+        [networkId],
+        this.memberIndexCollectionName,
+      ),
     );
   }
 

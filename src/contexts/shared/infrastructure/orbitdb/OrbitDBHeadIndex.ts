@@ -3,6 +3,7 @@ import Kernel from '@haskou/ddd-kernel';
 import { OrbitDBDocumentDeduplicator } from './OrbitDBDocumentDeduplicator';
 import { OrbitDBHeadIndexOptions } from './OrbitDBHeadIndexOptions';
 import { OrbitDBHeadIndexPutOptions } from './OrbitDBHeadIndexPutOptions';
+import { OrbitDBReplicatedHeadCollectionName } from './OrbitDBReplicatedHeadCollectionName';
 import OrbitDBReplicatedStateRegistry from './OrbitDBReplicatedStateRegistry';
 
 export class OrbitDBHeadIndex<TDocument extends object> {
@@ -12,6 +13,8 @@ export class OrbitDBHeadIndex<TDocument extends object> {
   >();
 
   private readonly deduplicator: OrbitDBDocumentDeduplicator<TDocument>;
+
+  private readonly collectionName: OrbitDBReplicatedHeadCollectionName;
 
   private readonly recordMergeQueues = new Map<string, Promise<void>>();
 
@@ -35,6 +38,9 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly options: OrbitDBHeadIndexOptions<TDocument>,
   ) {
+    this.collectionName = new OrbitDBReplicatedHeadCollectionName(
+      this.options.collectionName,
+    );
     this.deduplicator = new OrbitDBDocumentDeduplicator({
       merge: this.options.merge,
       recordId: (document) => this.options.recordId(document),
@@ -374,7 +380,12 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     const head = this.documentsHead(metadata, documents, options);
 
     if (options.replace) {
-      await this.registry.putHeadExactly(key, head, options.networkIds ?? []);
+      await this.registry.putHeadReplacingReplicas(
+        key,
+        head,
+        options.networkIds ?? [],
+        this.collectionName,
+      );
     } else {
       await this.registry.putHead(key, head, options.networkIds ?? []);
     }
@@ -413,10 +424,11 @@ export class OrbitDBHeadIndex<TDocument extends object> {
             record,
           ).filter(options.recordFilter ?? (() => true));
 
-          await this.registry.putHeadExactly(
+          await this.registry.putHeadReplacingReplicas(
             key,
             this.recordsHead(metadata, records),
             networkIds,
+            this.collectionName,
           );
         });
       this.recordMergeQueues.set(key, next);

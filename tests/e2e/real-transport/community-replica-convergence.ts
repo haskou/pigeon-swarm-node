@@ -363,8 +363,8 @@ async function main(): Promise<void> {
     new CommunityDescription('Concurrent description'),
   );
   stage = 'concurrent additions and profile convergence';
-  await synchronization(true, nodes.slice(0, 2));
   await connect(nodes.slice(0, 2));
+  await synchronization(true, nodes.slice(0, 2));
   await exchanged(nodes.slice(0, 2));
   await until('first two replicas preserve both additions', async () =>
     (await Promise.all(nodes.slice(0, 2).map(load))).every(
@@ -376,8 +376,8 @@ async function main(): Promise<void> {
     canonical(branches[2]),
     'Delayed replica must remain independent until synchronization resumes',
   );
-  await synchronization(true, [nodes[2]]);
   await connect(nodes);
+  await synchronization(true, [nodes[2]]);
   await exchanged(nodes);
   await converged(expected);
   await synchronization(false);
@@ -398,14 +398,14 @@ async function main(): Promise<void> {
     new CommunityDescription('Stale unrelated edit'),
   );
   stage = 'explicit removal survives stale unrelated edit';
-  await synchronization(true);
   await connect(nodes);
+  await synchronization(true);
   await exchanged(nodes);
   await converged(expected);
   stage = 'repeated persisted log synchronization';
   await synchronization(false);
-  await synchronization(true);
   await connect(nodes);
+  await synchronization(true);
   await freshSynchronizationSentinel();
   await converged(expected);
   stage = 'fresh registry and OrbitDB reload';
@@ -419,8 +419,8 @@ async function main(): Promise<void> {
   stage = 'cold community reconstruction before reconnect';
   await converged(expected, [restarted]);
   stage = 'reconnecting restarted replica';
-  await synchronization(true, [restarted]);
   await connect(nodes);
+  await synchronization(true, [restarted]);
   await converged(expected);
   stage = 'two private networks sharing one backend registry';
   const secondNetworkId = randomUUID();
