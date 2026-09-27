@@ -37,16 +37,14 @@ export default class IdentityPublisher {
 
     const externalIdentifier = await this.saver.save(identity);
 
-    if (identity.isFirstVersion()) {
-      await this.deviceAuthorizationProvisioner.provision(
-        new DeviceAuthorizationProvisionMessage(
-          new IdentityId(primitives.id),
-          identity.getNetworkIds(),
-          identity.getInitialDeviceCredential(),
-          identity.getRecoveryAuthority(),
-        ),
-      );
-    }
+    await this.deviceAuthorizationProvisioner.provision(
+      new DeviceAuthorizationProvisionMessage(
+        new IdentityId(primitives.id),
+        identity.getNetworkIds(),
+        identity.getInitialDeviceCredential(),
+        identity.getRecoveryAuthority(),
+      ),
+    );
 
     const events = identity.pullDomainEvents();
 

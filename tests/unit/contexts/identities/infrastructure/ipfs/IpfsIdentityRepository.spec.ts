@@ -500,17 +500,20 @@ describe('IpfsIdentityRepository', () => {
           cid: 'bafy-identity-v3',
           identity: rollback,
           identityId: primitives.id,
+          networkIds: primitives.networks,
           previousCid: primitives.previousIdentityExternalIdentifier,
           receivedAt: Date.now(),
           version: primitives.version,
         },
       ]);
-      ipfsManager.getJSON.mockImplementation(<T>(cid: IPFSId): Promise<T> => {
+      ipfsManager.getJSONFromNetworks.mockImplementation(
+        <T>(cid: IPFSId): Promise<T> => {
         const identity =
           cid.valueOf() === 'bafy-identity-v2' ? advanced : genesis;
 
         return Promise.resolve(mapper.toDocument(identity) as T);
-      });
+        },
+      );
 
       const result = await repository.findById(new IdentityId(primitives.id));
 
@@ -1047,10 +1050,9 @@ describe('IpfsIdentityRepository', () => {
           version: primitives.version + 1,
         },
       ]);
-      ipfsManager.getJSONFromNetworks.mockRejectedValueOnce(
-        new Error('broken latest identity'),
-      );
-      ipfsManager.getJSON.mockResolvedValueOnce(mapper.toDocument(identity));
+      ipfsManager.getJSONFromNetworks
+        .mockRejectedValueOnce(new Error('broken latest identity'))
+        .mockResolvedValueOnce(mapper.toDocument(identity));
 
       const result = await repository.findCandidateByHandle(handle);
 
@@ -1058,9 +1060,11 @@ describe('IpfsIdentityRepository', () => {
         new IPFSId(latestCidString),
         [networkId],
       );
-      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+      expect(ipfsManager.getJSONFromNetworks).toHaveBeenCalledWith(
         new IPFSId(previousCidString),
+        [networkId],
       );
+      expect(ipfsManager.getJSON).not.toHaveBeenCalled();
       expect(metadataRepository.save).toHaveBeenCalledWith(
         identity,
         new IPFSId(previousCidString),

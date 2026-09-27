@@ -22,10 +22,13 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   private static readonly HEAD_PREFIX = 'device-authorization:';
 
   private readonly identityQueues = new Map<string, Promise<void>>();
+
   private readonly trustedGenesisByIdentity = new Map<
     string,
     DeviceAuthorization
   >();
+
+  private readonly routingNetworkIdsByIdentity = new Map<string, string[]>();
 
   public constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
@@ -47,7 +50,26 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     left: OrbitDBDeviceAuthorizationDocument,
     right: OrbitDBDeviceAuthorizationDocument,
   ): boolean {
-    return isDeepStrictEqual(left.genesis, right.genesis);
+    return this.sameAuthorizationGenesis(left.genesis, right.genesis);
+  }
+
+  private sameAuthorizationGenesis(
+    left: OrbitDBDeviceAuthorizationDocument['genesis'],
+    right: OrbitDBDeviceAuthorizationDocument['genesis'],
+  ): boolean {
+    return (
+      left.identityId === right.identityId &&
+      left.recoveryAuthority === right.recoveryAuthority &&
+      left.revision === right.revision &&
+      isDeepStrictEqual(left.credentials, right.credentials)
+    );
+  }
+
+  private rememberRoutingNetworks(authorization: DeviceAuthorization): void {
+    this.routingNetworkIdsByIdentity.set(
+      authorization.getIdentityId().valueOf(),
+      this.networkIds(authorization),
+    );
   }
 
   private canonicalValue(value: unknown): unknown {
@@ -88,6 +110,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
         identity.getRecoveryAuthority(),
       );
       this.trustedGenesisByIdentity.set(identityId.valueOf(), genesis);
+      this.rememberRoutingNetworks(genesis);
 
       return genesis;
     } catch {
@@ -99,7 +122,10 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     document: OrbitDBDeviceAuthorizationDocument,
     genesis: DeviceAuthorization,
   ): boolean {
-    return isDeepStrictEqual(document.genesis, genesis.toPrimitives());
+    return this.sameAuthorizationGenesis(
+      document.genesis,
+      genesis.toPrimitives(),
+    );
   }
 
   private transitionRecords(
@@ -362,7 +388,10 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     const authorization = DeviceAuthorization.fromPrimitives(
       document.authorization,
     );
-    const networkIds = this.networkIds(authorization);
+    const networkIds =
+      this.routingNetworkIdsByIdentity.get(
+        authorization.getIdentityId().valueOf(),
+      ) ?? this.networkIds(authorization);
 
     await this.registry.putDocument('identities', document, networkIds);
     await this.registry.putHead(
@@ -453,6 +482,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   public provision(authorization: DeviceAuthorization): Promise<void> {
     return this.withIdentityLock(authorization.getIdentityId(), async () => {
       const key = this.headKey(authorization.getIdentityId());
+      this.rememberRoutingNetworks(authorization);
       this.trustedGenesisByIdentity.set(
         authorization.getIdentityId().valueOf(),
         authorization,
@@ -462,9 +492,14 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       if (existing) {
         if (
           !this.isDocument(existing) ||
-          !isDeepStrictEqual(existing.genesis, authorization.toPrimitives())
+          !this.sameAuthorizationGenesis(
+            existing.genesis,
+            authorization.toPrimitives(),
+          )
         ) {
           await this.save(this.toDocument(authorization, []));
+        } else {
+          await this.save(existing);
         }
 
         return;

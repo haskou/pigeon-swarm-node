@@ -169,10 +169,12 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
   private async findPreviousIdentity(
     externalIdentifier: IdentityExternalIdentifier,
+    networkIds?: string[],
   ): Promise<Identity | undefined> {
     try {
       return await this.getIdentityFromCid(
         new IPFSId(externalIdentifier.valueOf()),
+        networkIds,
       );
     } catch {
       return undefined;
@@ -224,7 +226,8 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       const isValid = await this.validator.isValidChainFor(
         id,
         candidate,
-        (externalIdentifier) => this.findPreviousIdentity(externalIdentifier),
+        (externalIdentifier) =>
+          this.findPreviousIdentity(externalIdentifier, metadata.networkIds),
       );
 
       if (!isValid) {
@@ -271,7 +274,10 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     const externalIdentifier = new IdentityExternalIdentifier(
       metadata.previousCid,
     );
-    const identity = await this.findPreviousIdentity(externalIdentifier);
+    const identity = await this.findPreviousIdentity(
+      externalIdentifier,
+      metadata.networkIds,
+    );
 
     if (!identity) {
       return undefined;
@@ -282,7 +288,10 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       identityId,
       identity,
       (previousExternalIdentifier) =>
-        this.findPreviousIdentity(previousExternalIdentifier),
+        this.findPreviousIdentity(
+          previousExternalIdentifier,
+          metadata.networkIds,
+        ),
     );
 
     if (!isValid) {

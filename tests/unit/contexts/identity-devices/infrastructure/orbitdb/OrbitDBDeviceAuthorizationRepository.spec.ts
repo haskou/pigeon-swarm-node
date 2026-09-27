@@ -34,7 +34,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       RecoveryAuthority.fromString(recovery.toPrimitives().publicKey),
     );
 
-    return { genesis, identityId, owner };
+    return { genesis, identityId, owner, recovery };
   }
 
   function repositoryFixture() {
@@ -58,6 +58,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       getHead: () => head,
       getMerger: () => merger,
       identityRepository,
+      registry,
       repository: new OrbitDBDeviceAuthorizationRepository(
         registry,
         new DeviceAuthorizationPolicy(),
@@ -243,5 +244,64 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const restored = await repository.find(identityId);
 
     expect(restored?.toPrimitives()).toEqual(genesis.toPrimitives());
+  });
+
+  it('preserves authorization history when identity routing networks expand', async () => {
+    const { genesis, identityId, owner, recovery } = await fixture();
+    const target = await KeyPair.generate();
+    const { registry, repository } = repositoryFixture();
+    const enrolled = await enrollment(
+      identityId,
+      owner,
+      target,
+      '00000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+    );
+    const revocation = DeviceAuthorizationTransition.revocation(
+      identityId,
+      new DeviceAuthorizationOperationId(
+        '00000000-0000-4000-8000-000000000002',
+      ),
+      new DeviceAuthorizationRevision(1),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+    );
+    const expandedGenesis = DeviceAuthorization.genesis(
+      identityId,
+      [
+        ...genesis.getNetworkIds(),
+        new NetworkId('550e8400-e29b-41d4-a716-446655440001'),
+      ],
+      genesis.getCredentials()[0],
+      RecoveryAuthority.fromString(recovery.toPrimitives().publicKey),
+    );
+    await repository.provision(genesis);
+    await repository.compareAndApply(enrolled);
+    await repository.compareAndApply(
+      revocation.authorize(owner.sign(revocation.getSigningPayload())),
+    );
+
+    await repository.provision(expandedGenesis);
+    const authorization = await repository.find(identityId);
+
+    expect(authorization?.getRevision().valueOf()).toBe(2);
+    expect(
+      authorization?.isAuthorized(
+        DeviceCredential.fromString(owner.toPrimitives().publicKey),
+      ),
+    ).toBe(false);
+    expect(
+      authorization?.isAuthorized(
+        DeviceCredential.fromString(target.toPrimitives().publicKey),
+      ),
+    ).toBe(true);
+    expect(registry.putHead).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      [
+        '550e8400-e29b-41d4-a716-446655440000',
+        '550e8400-e29b-41d4-a716-446655440001',
+      ],
+    );
   });
 });
