@@ -266,20 +266,19 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     return recordsByRevision;
   }
 
-  private resolveConcurrentAuthorization(
+  private concurrentAuthorizations(
     authorization: DeviceAuthorization,
     candidates: Array<{
       authorization: DeviceAuthorization;
-      record: OrbitDBDeviceAuthorizationTransitionRecord;
       transition: DeviceAuthorizationTransition;
     }>,
-  ): DeviceAuthorization {
-    const recovery = candidates.find(({ transition }) =>
+  ): DeviceAuthorization[] {
+    const recoveries = candidates.filter(({ transition }) =>
       transition.isRecovery(),
     );
 
-    if (recovery) {
-      return recovery.authorization;
+    if (recoveries.length > 0) {
+      return recoveries.map((candidate) => candidate.authorization);
     }
 
     const revocations = candidates.filter(({ transition }) =>
@@ -287,60 +286,97 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     );
 
     if (revocations.length > 0) {
-      return authorization.revokeConcurrently(
-        revocations.map(({ transition }) => transition.getTargetCredential()),
-      );
+      return [
+        authorization.revokeConcurrently(
+          revocations.map(({ transition }) =>
+            transition.getTargetCredential(),
+          ),
+        ),
+      ];
     }
 
-    return candidates[0].authorization;
+    return candidates.map((candidate) => candidate.authorization);
+  }
+
+  private transitionFromRecord(
+    record: OrbitDBDeviceAuthorizationTransitionRecord,
+  ): DeviceAuthorizationTransition | undefined {
+    const transition = DeviceAuthorizationTransition.fromPrimitives(
+      record.transition,
+    );
+
+    return this.canonicalString(transition.toPrimitives()) ===
+      this.canonicalString(record.transition)
+      ? transition
+      : undefined;
+  }
+
+  private replayFrom(
+    authorization: DeviceAuthorization,
+    recordsByRevision: Map<
+      number,
+      OrbitDBDeviceAuthorizationTransitionRecord[]
+    >,
+  ): DeviceAuthorizationReplay {
+    const records =
+      recordsByRevision.get(authorization.getRevision().valueOf()) ?? [];
+    const candidates: Array<{
+      authorization: DeviceAuthorization;
+      record: OrbitDBDeviceAuthorizationTransitionRecord;
+      transition: DeviceAuthorizationTransition;
+    }> = [];
+
+    for (const record of records) {
+      try {
+        const transition = this.transitionFromRecord(record);
+
+        if (transition) {
+          candidates.push({
+            authorization: this.policy.apply(authorization, transition),
+            record,
+            transition,
+          });
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    if (candidates.length === 0) {
+      return { authorization, history: [] };
+    }
+
+    const replays = this.concurrentAuthorizations(
+      authorization,
+      candidates,
+    ).map((candidate) => this.replayFrom(candidate, recordsByRevision));
+    const [selected] = replays.sort(
+      (left, right) =>
+        right.authorization.getRevision().valueOf() -
+        left.authorization.getRevision().valueOf(),
+    );
+
+    assert(
+      selected !== undefined,
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return {
+      authorization: selected.authorization,
+      history: [
+        ...candidates.map(({ record }) => record),
+        ...selected.history,
+      ],
+    };
   }
 
   private rebuild(
     genesis: DeviceAuthorization,
     history: OrbitDBDeviceAuthorizationTransitionRecord[],
   ): DeviceAuthorizationReplay {
-    let authorization = genesis;
-    const verifiedHistory: OrbitDBDeviceAuthorizationTransitionRecord[] = [];
     const recordsByRevision = this.transitionRecordsByRevision(history);
 
-    while (true) {
-      const candidates =
-        recordsByRevision.get(authorization.getRevision().valueOf()) ?? [];
-      const validCandidates: Array<{
-        authorization: DeviceAuthorization;
-        record: OrbitDBDeviceAuthorizationTransitionRecord;
-        transition: DeviceAuthorizationTransition;
-      }> = [];
-
-      for (const candidate of candidates) {
-        try {
-          const transition = DeviceAuthorizationTransition.fromPrimitives(
-            candidate.transition,
-          );
-
-          validCandidates.push({
-            authorization: this.policy.apply(authorization, transition),
-            record: candidate,
-            transition,
-          });
-        } catch {
-          continue;
-        }
-      }
-
-      if (validCandidates.length === 0) {
-        return {
-          authorization,
-          history: verifiedHistory,
-        };
-      }
-
-      verifiedHistory.push(...validCandidates.map(({ record }) => record));
-      authorization = this.resolveConcurrentAuthorization(
-        authorization,
-        validCandidates,
-      );
-    }
+    return this.replayFrom(genesis, recordsByRevision);
   }
 
   private toDocument(
@@ -431,27 +467,6 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     return true;
   }
 
-  private hasCanonicalHistory(
-    history: unknown[],
-  ): history is OrbitDBDeviceAuthorizationTransitionRecord[] {
-    if (!this.hasBoundedHistoryShape(history)) {
-      return false;
-    }
-
-    return history.every((value) => {
-      const { transition } = value as Record<string, unknown>;
-
-      const parsed = DeviceAuthorizationTransition.fromPrimitives(
-        transition as OrbitDBDeviceAuthorizationTransitionRecord['transition'],
-      );
-
-      return (
-        this.canonicalString(parsed.toPrimitives()) ===
-        this.canonicalString(transition)
-      );
-    });
-  }
-
   private hasDocumentShape(value: Record<string, unknown>): boolean {
     return [
       this.hasExactKeys(value, [
@@ -507,7 +522,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
 
       const document = value as unknown as OrbitDBDeviceAuthorizationDocument;
 
-      if (!this.hasCanonicalHistory(document.history)) {
+      if (!this.hasBoundedHistoryShape(document.history)) {
         return false;
       }
 

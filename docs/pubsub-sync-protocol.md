@@ -397,13 +397,15 @@ and its commitment under the identity signature. The node does not derive that
 credential from the identity key.
 
 Concurrent valid transitions from the same predecessor are resolved independently
-of arrival time. A recovery transition has precedence over every sibling; when
-there are multiple recoveries, the lowest operation UUID wins. Without recovery,
-all sibling revocations are applied together before any enrollment. When only
-enrollments remain, the lowest operation UUID wins, with the canonical signed
-record as the final tie-break for equivocation. Each replica replays the same
-signed candidates from the pinned genesis checkpoint and therefore selects the
-same authorization state after exchanging heads. Both devices sign the pairing
+of arrival time. Recovery transitions form the highest-precedence class; without
+recovery, all sibling revocations are applied together before any enrollment.
+When recovery or enrollment leaves multiple candidate states, the branch whose
+valid descendants reach the greatest authorization revision wins, so a later
+revocation cannot be discarded by a lower operation UUID at an ancestor. Equal-
+depth branches use the lowest operation UUID, with the canonical signed record as
+the final tie-break for equivocation. Each replica replays the same signed candidates
+from the pinned genesis checkpoint and therefore selects the same authorization
+state after exchanging heads. Both devices sign the pairing
 identifier, authorization time and expiration, and the target client must refuse
 to complete an offer after that expiration. Replicas validate that signed interval but do not
 compare it with their receipt clock: a fully signed enrollment may arrive after an

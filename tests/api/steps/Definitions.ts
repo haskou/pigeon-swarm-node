@@ -794,6 +794,14 @@ export default class Definitions {
     this.body = JSON.stringify(body);
   }
 
+  @given('I remove the identity profile')
+  public iRemoveTheIdentityProfile(): void {
+    const body = JSON.parse(this.body ?? '{}') as Record<string, unknown>;
+
+    delete body.profile;
+    this.body = JSON.stringify(body);
+  }
+
   @given(
     'I set a client-signed identity update body with name {string}, handle {string} and password {string}',
   )

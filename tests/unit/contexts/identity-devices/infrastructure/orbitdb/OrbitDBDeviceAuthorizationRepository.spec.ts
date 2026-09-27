@@ -279,6 +279,60 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     });
   });
 
+  it('keeps the branch with a valid descendant revocation', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const revoker = await KeyPair.generate();
+    const sibling = await KeyPair.generate();
+    const first = repositoryFixture();
+    const second = repositoryFixture();
+    const revokerEnrollment = await enrollment(
+      identityId,
+      owner,
+      revoker,
+      '00000000-0000-4000-8000-000000000002',
+      '10000000-0000-4000-8000-000000000002',
+    );
+    const siblingEnrollment = await enrollment(
+      identityId,
+      owner,
+      sibling,
+      '00000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+    );
+    await provisionAuthorization(first.repository, genesis);
+    await provisionAuthorization(second.repository, genesis);
+    await first.repository.compareAndApply(revokerEnrollment);
+    const revocation = DeviceAuthorizationTransition.revocation(
+      identityId,
+      new DeviceAuthorizationOperationId(
+        '00000000-0000-4000-8000-000000000003',
+      ),
+      new DeviceAuthorizationRevision(1),
+      DeviceCredential.fromString(revoker.toPrimitives().publicKey),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+    );
+    await first.repository.compareAndApply(
+      revocation.authorize(revoker.sign(revocation.getSigningPayload())),
+    );
+    await second.repository.compareAndApply(siblingEnrollment);
+
+    const merged = first.getMerger()?.(
+      first.getHead(),
+      second.getHead() ?? {},
+    ) as { authorization?: { credentials?: string[]; revision?: number } };
+
+    expect(merged.authorization?.revision).toBe(2);
+    expect(merged.authorization?.credentials).toContain(
+      revoker.toPrimitives().publicKey,
+    );
+    expect(merged.authorization?.credentials).not.toContain(
+      owner.toPrimitives().publicKey,
+    );
+    expect(merged.authorization?.credentials).not.toContain(
+      sibling.toPrimitives().publicKey,
+    );
+  });
+
   it('applies every concurrent revocation before any sibling enrollment', async () => {
     const { genesis, identityId, owner } = await fixture();
     const attacker = await KeyPair.generate();
@@ -611,6 +665,40 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
     expect(getMerger()?.(trusted, injected)).toEqual(trusted);
     expect(parser).not.toHaveBeenCalled();
+    parser.mockRestore();
+  });
+
+  it('does not parse unreachable fabricated revisions', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const target = await KeyPair.generate();
+    const { getHead, getMerger, repository } = repositoryFixture();
+    const transition = await enrollment(
+      identityId,
+      owner,
+      target,
+      '00000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+    );
+    await provisionAuthorization(repository, genesis);
+    const trusted = getHead();
+    const primitives = transition.toPrimitives();
+    const parser = jest.spyOn(
+      DeviceAuthorizationTransition,
+      'fromPrimitives',
+    );
+    const injected = {
+      ...trusted,
+      history: Array.from({ length: 1_000 }, (_, previousRevision) => ({
+        transition: {
+          ...primitives,
+          previousRevision,
+          revision: previousRevision + 1,
+        },
+      })),
+    };
+
+    expect(getMerger()?.(trusted, injected)).toEqual(trusted);
+    expect(parser.mock.calls.length).toBeLessThanOrEqual(2);
     parser.mockRestore();
   });
 

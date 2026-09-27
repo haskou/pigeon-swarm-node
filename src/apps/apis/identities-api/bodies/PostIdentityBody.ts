@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsDefined,
   IsInt,
   IsEmpty,
   IsNumber,
@@ -47,6 +48,7 @@ export class PostIdentityBody {
   @ArrayMinSize(1)
   public readonly networks: string[];
 
+  @IsDefined()
   @ValidateNested()
   @Type(() => IdentityProfileBody)
   public readonly profile: IdentityProfileBody;

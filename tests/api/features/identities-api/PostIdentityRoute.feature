@@ -70,6 +70,14 @@ Feature: Post identity route
     When I POST to "/identities/"
     Then response code is equal to 400
 
+  Scenario: Reject a signed identity without a profile
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
+    And I set a client-signed identity body with name "missing profile" and handle "missing-profile"
+    And I remove the identity profile
+    When I POST to "/identities/"
+    Then response code is equal to 400
+
   Scenario: Update a client-signed identity profile and encrypted key pair
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
@@ -95,3 +103,15 @@ Feature: Post identity route
       | profile.name   | carol updated |
       | profile.handle | carol_new     |
     And response body should contain "identityExternalIdentifier"
+
+  Scenario: Reject a signed identity update without a profile
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
+    And I set a client-signed identity body with name "profile owner" and handle "profile-owner"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I set a client-signed identity update body with name "missing profile", handle "missing_profile" and password "New-client-password1!"
+    And I remove the identity profile
+    And I sign the current identity update request
+    When I PUT the created identity
+    Then response code is equal to 400
