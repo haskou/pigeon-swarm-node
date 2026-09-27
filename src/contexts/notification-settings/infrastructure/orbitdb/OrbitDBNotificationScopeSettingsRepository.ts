@@ -70,11 +70,26 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
   private isDocument(
     document: Record<string, unknown>,
   ): document is OrbitDBNotificationScopeSettingsDocument {
-    return (
+    const hasRequiredFields =
       this.hasIdentityFields(document) &&
       this.hasPreferenceFields(document) &&
-      this.hasScopeField(document)
-    );
+      this.hasScopeField(document);
+
+    if (!hasRequiredFields) return false;
+    const candidate = document as OrbitDBNotificationScopeSettingsDocument;
+
+    try {
+      const settings = this.toDomain(candidate);
+
+      return (
+        candidate.identityId === settings.getIdentityId().valueOf() &&
+        candidate.scopeKey === settings.getScope().key() &&
+        candidate.id ===
+          this.documentId(settings.getIdentityId(), settings.getScope())
+      );
+    } catch {
+      return false;
+    }
   }
 
   private toDocument(

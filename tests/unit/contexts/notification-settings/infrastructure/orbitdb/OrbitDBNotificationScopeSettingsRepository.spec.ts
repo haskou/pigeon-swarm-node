@@ -4,8 +4,22 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 import { generateKeyPairSync } from 'node:crypto';
 
 describe('OrbitDBNotificationScopeSettingsRepository', () => {
-  it('ignores replicated documents with malformed identity identifiers', async () => {
-    const documents = [{ identityId: 'malformed-public-key' }];
+  it('ignores replicated documents with malformed notification scopes', async () => {
+    const identityId = validIdentityId();
+    const documents = [
+      {
+        hideMutedChannels: false,
+        id: `${identityId.valueOf()}:invalid`,
+        identityId: identityId.valueOf(),
+        mobilePushEnabled: true,
+        notificationLevel: 'all',
+        scope: {},
+        scopeKey: 'invalid',
+        suppressEveryoneAndHere: false,
+        suppressRoleMentions: false,
+        updatedAt: Date.now(),
+      },
+    ];
     const registry = {
       queryDocuments: jest.fn(
         async (
@@ -15,7 +29,6 @@ describe('OrbitDBNotificationScopeSettingsRepository', () => {
       ),
     } as unknown as OrbitDBReplicatedStateRegistry;
     const repository = new OrbitDBNotificationScopeSettingsRepository(registry);
-    const identityId = validIdentityId();
 
     await expect(repository.findByIdentityId(identityId)).resolves.toEqual([]);
   });
