@@ -13,6 +13,10 @@ export class PrivateAuthorizationProvisioningQuota {
 
   private readonly reservations: PrivateAuthorizationStorageReservation[];
 
+  public static maximumOwnerBytes(): Integer {
+    return PrivateAuthorizationProvisioningQuota.MAX_OWNER_BYTES;
+  }
+
   public constructor(
     reservations: PrivateAuthorizationStorageReservationPrimitives[],
   ) {

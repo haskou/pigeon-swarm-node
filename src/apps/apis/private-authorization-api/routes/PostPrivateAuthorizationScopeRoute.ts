@@ -6,7 +6,7 @@ import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 
 import { PostPrivateAuthorizationScopeBody } from '../bodies/PostPrivateAuthorizationScopeBody';
-import { PrivateAuthorizationRequestBodyLimit } from './PrivateAuthorizationRequestBodyLimit';
+import { PrivateAuthorizationScopeRequestBodyLimit } from './PrivateAuthorizationScopeRequestBodyLimit';
 
 @JsonController('/private-authorization')
 export class PostPrivateAuthorizationScopeRoute extends NodeOwnerRouteSupport {
@@ -16,7 +16,7 @@ export class PostPrivateAuthorizationScopeRoute extends NodeOwnerRouteSupport {
 
   @Post('/scopes')
   public async provision(
-    @Body({ options: { limit: PrivateAuthorizationRequestBodyLimit } })
+    @Body({ options: { limit: PrivateAuthorizationScopeRequestBodyLimit } })
     body: PostPrivateAuthorizationScopeBody,
     @Req() request: Request,
     @Res() response: Response,

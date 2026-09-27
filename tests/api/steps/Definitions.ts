@@ -3,6 +3,7 @@ import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordReg
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import PigeonApplication from '@app/apps/PigeonApplication';
 import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime';
+import { PrivateAuthorizationRequestBodyLimit } from '@app/apps/apis/private-authorization-api/routes/PrivateAuthorizationRequestBodyLimit';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
@@ -540,6 +541,30 @@ export default class Definitions {
       protectedMlsState: protectedState.toString('base64url'),
       signedGenesisJson,
     });
+  }
+
+  @given('I add a large valid channel to the private authorization projection')
+  public iAddALargeValidChannelToThePrivateAuthorizationProjection(): void {
+    const body = JSON.parse(this.body) as {
+      projection: { textChannels: Record<string, unknown>[] };
+    };
+    const channel = (index: number) => ({
+      createdAt: 1,
+      id: `channel-${index}`,
+      name: 'Large projection channel',
+      permissions: { visibleRoleIds: ['everyone'] },
+      type: 'text',
+    });
+    const channelBytes = Buffer.byteLength(JSON.stringify(channel(0)));
+    const channelCount = Math.ceil(
+      PrivateAuthorizationRequestBodyLimit / channelBytes,
+    );
+
+    body.projection.textChannels = Array.from(
+      { length: channelCount },
+      (_, index) => channel(index),
+    );
+    this.body = JSON.stringify(body);
   }
 
   @given('I sign the current private authorization scope request')
