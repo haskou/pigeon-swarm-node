@@ -11,12 +11,15 @@ import { PrivateAuthorizationStorageReservationPrimitives } from '@app/contexts/
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
 import { PrivateControlTransitionReservation } from '@app/contexts/private-authorization/domain/PrivateControlTransitionReservation';
 import { PrivateAuthorizationDeviceKey } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationDeviceKey';
+import { PrivateAuthorizationGenesisFingerprint } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationGenesisFingerprint';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase, {
   EmbeddedLocalDatabaseOperation,
 } from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { assert, Integer } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
+import canonicalize from 'canonicalize';
+import { createHash } from 'crypto';
 
 import PrivateAuthorizationStorageCoordinator from '../PrivateAuthorizationStorageCoordinator';
 import LocalPrivateAuthorizationRepository from './LocalPrivateAuthorizationRepository';
@@ -24,6 +27,10 @@ import {
   privateAuthorizationLocalId,
   PrivateAuthorizationLocalNamespaces,
 } from './PrivateAuthorizationLocalNamespaces';
+
+interface PrivateAuthorizationProvisioningRecord extends PrivateAuthorizationStorageReservationPrimitives {
+  genesisFingerprint: string;
+}
 
 export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUnitOfWork {
   private static readonly scopeQueuesByDatabase = new WeakMap<
@@ -121,7 +128,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
 
   private genesisOperations(
     genesis: PrivateAuthorizationGenesisCommit,
-    reservation?: PrivateAuthorizationStorageReservationPrimitives,
+    reservation?: PrivateAuthorizationProvisioningRecord,
   ): EmbeddedLocalDatabaseOperation[] {
     const scope = genesis.scope.toPrimitives();
     const scopeId = scope.checkpoint.scopeId;
@@ -276,18 +283,44 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     scopeId: string,
     operations: EmbeddedLocalDatabaseOperation[],
     ownerIdentityId?: IdentityId,
-  ): Promise<PrivateAuthorizationStorageReservationPrimitives> {
+    initialGenesisFingerprint?: PrivateAuthorizationGenesisFingerprint,
+  ): Promise<PrivateAuthorizationProvisioningRecord> {
     const current = await this.database.findOne(
       PrivateAuthorizationLocalNamespaces.provisioning,
       scopeId,
     );
 
     assert(current || ownerIdentityId, new InvalidPrivateAuthorizationError());
+    const genesisFingerprint = initialGenesisFingerprint
+      ? initialGenesisFingerprint
+      : new PrivateAuthorizationGenesisFingerprint(
+          String(current?.genesisFingerprint),
+        );
     const quota = await this.provisioningQuota(scopeId);
 
-    return quota.reserve(
-      ownerIdentityId ?? new IdentityId(String(current?.ownerIdentityId)),
-      new Integer(await this.provisionedBytesAfter(scopeId, operations)),
+    return {
+      ...quota.reserve(
+        ownerIdentityId ?? new IdentityId(String(current?.ownerIdentityId)),
+        new Integer(await this.provisionedBytesAfter(scopeId, operations)),
+      ),
+      genesisFingerprint: genesisFingerprint.valueOf(),
+    };
+  }
+
+  private genesisFingerprint(
+    genesis: PrivateAuthorizationGenesisCommit,
+  ): PrivateAuthorizationGenesisFingerprint {
+    const canonical = canonicalize({
+      ownerIdentityId: genesis.ownerIdentityId.valueOf(),
+      projection: genesis.projection,
+      protectedMlsState: genesis.protectedMlsState,
+      scope: genesis.scope.toPrimitives(),
+    });
+
+    assert(canonical, new InvalidPrivateAuthorizationError());
+
+    return new PrivateAuthorizationGenesisFingerprint(
+      createHash('sha256').update(canonical).digest('base64url'),
     );
   }
 
@@ -345,16 +378,13 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     await this.database.commit(operations);
   }
 
-  private equal(left: unknown, right: unknown): boolean {
-    return JSON.stringify(left) === JSON.stringify(right);
-  }
-
   private async commitGenesisExclusively(
     genesis: PrivateAuthorizationGenesisCommit,
   ): Promise<'committed' | 'duplicate'> {
     const candidate = genesis.scope.toPrimitives();
     const scopeId = candidate.checkpoint.scopeId;
     const current = await this.repository.findScope(scopeId);
+    const candidateFingerprint = this.genesisFingerprint(genesis);
 
     if (!current) {
       const operations = this.genesisOperations(genesis);
@@ -362,6 +392,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
         scopeId,
         operations,
         genesis.ownerIdentityId,
+        candidateFingerprint,
       );
       await this.database.commit(this.genesisOperations(genesis, reservation));
 
@@ -375,23 +406,20 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       new InvalidPrivateAuthorizationError(),
     );
 
+    const provisioning = await this.database.findOne(
+      PrivateAuthorizationLocalNamespaces.provisioning,
+      scopeId,
+    );
+    const storedFingerprint = new PrivateAuthorizationGenesisFingerprint(
+      String(provisioning?.genesisFingerprint),
+    );
+
     try {
       if (current.toPrimitives().status === 'frozen') {
         throw new PrivateAuthorizationConflictError();
       }
-      current.pinGenesis(
-        PrivateAuthorizationCheckpoint.fromPrimitives(candidate.checkpoint),
-        candidate.genesisHash,
-      );
-      const [projection, protectedMlsState] = await Promise.all([
-        this.repository.findProjection(scopeId),
-        this.repository.findProtectedMlsState(scopeId),
-      ]);
 
-      if (
-        !this.equal(projection, genesis.projection) ||
-        protectedMlsState !== genesis.protectedMlsState
-      ) {
+      if (!storedFingerprint.hasValue(candidateFingerprint)) {
         current.quarantine();
         throw new PrivateAuthorizationConflictError();
       }

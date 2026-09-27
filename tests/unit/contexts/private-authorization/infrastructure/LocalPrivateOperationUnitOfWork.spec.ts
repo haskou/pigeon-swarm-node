@@ -38,6 +38,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       })
       .toString('base64'),
   );
+  const genesisFingerprint = Buffer.alloc(32).toString('base64url');
   let databasePath: string;
   let database: EmbeddedLocalDatabase;
   let repository: LocalPrivateAuthorizationRepository;
@@ -183,7 +184,11 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     await database.save(
       PrivateAuthorizationLocalNamespaces.provisioning,
       'scope',
-      { ownerIdentityId: ownerIdentityId.valueOf(), provisionedBytes: 1 },
+      {
+        genesisFingerprint,
+        ownerIdentityId: ownerIdentityId.valueOf(),
+        provisionedBytes: 1,
+      },
     );
     await repository.savePending('scope', operation());
   });
@@ -402,6 +407,50 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       ownerIdentityId: ownerIdentityId.valueOf(),
       provisionedBytes: expect.any(Number),
     });
+  });
+
+  it('accepts an exact genesis retry after the live scope has advanced', async () => {
+    const commit = genesis('advanced-scope');
+    await unitOfWork.commitGenesis(commit);
+    const stored = await repository.findScope('advanced-scope');
+    const primitives = stored!.toPrimitives();
+    await repository.saveScope(
+      PrivateAuthorizationScope.fromPrimitives({
+        ...primitives,
+        checkpoint: {
+          ...primitives.checkpoint,
+          headHash: 'advanced-head',
+          parentHeadHash: primitives.checkpoint.headHash,
+          revision: 1,
+        },
+      }),
+    );
+    await repository.saveProjection('advanced-scope', {
+      id: 'advanced-scope',
+      members: ['member'],
+    });
+    await database.save(
+      PrivateAuthorizationLocalNamespaces.mls,
+      'advanced-scope',
+      { state: 'advanced-protected-state' },
+    );
+
+    await expect(unitOfWork.commitGenesis(commit)).resolves.toBe('duplicate');
+    expect(
+      (await repository.findScope('advanced-scope'))?.toPrimitives(),
+    ).toMatchObject({
+      checkpoint: { headHash: 'advanced-head', revision: 1 },
+      status: 'active',
+    });
+    await expect(
+      repository.findProjection('advanced-scope'),
+    ).resolves.toEqual({
+      id: 'advanced-scope',
+      members: ['member'],
+    });
+    await expect(
+      repository.findProtectedMlsState('advanced-scope'),
+    ).resolves.toBe('advanced-protected-state');
   });
 
   it('does not share scope queues between independent node databases', async () => {
