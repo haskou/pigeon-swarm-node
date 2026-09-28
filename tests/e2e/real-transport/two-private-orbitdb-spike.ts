@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import 'module-alias/register';
 
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
+import IpfsIdentityMapper from '@app/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import OrbitDBIdentityMetadataIndex from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex';
 import OrbitDBIdentityMetadataProjection from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataProjection';
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
@@ -24,10 +25,12 @@ import { generateKeyPairSync } from 'crypto';
 import fs from 'fs-extra';
 import path from 'path';
 
+import { IdentityMother } from '../../unit/mothers/IdentityMother';
+
 const ROOT = path.resolve(__dirname, '../../..');
 const TMP_ROOT = path.join(ROOT, '.tmp', 'two-private-orbitdb-spike-e2e');
 const WAIT_TIMEOUT_MS = 15000;
-const NETWORK_ID = 'orbitdb-private-network';
+const NETWORK_ID = '550e8400-e29b-41d4-a716-446655440099';
 const NETWORK_NAME = 'orbitdb-private-sync-e2e';
 const IDENTITY_ID =
   'MCowBQYDK2VwAyEAj3dYus5qe3I0IrvPl/oEM+678lbO9+1vzJSlXnlb0v4=';
@@ -186,10 +189,10 @@ async function main(): Promise<void> {
       requester.orbitdb.identity.id,
     ]);
 
-    await writeReplicatedDocuments(providerStores);
+    const identityCid = await writeReplicatedDocuments(providerStores);
 
-    await assertQueryViability(requesterStores);
-    await assertProjectedMetadataIndexes(requesterStores);
+    await assertQueryViability(requesterStores, identityCid);
+    await assertProjectedMetadataIndexes(requesterStores, identityCid);
     await assertUnauthorizedWriteIsRejected(
       orbitdbCore,
       intruder,
@@ -201,8 +204,11 @@ async function main(): Promise<void> {
       requester,
       writers,
     );
-    await assertQueryViability(restartedRequester.stores);
-    await assertProjectedMetadataIndexes(restartedRequester.stores);
+    await assertQueryViability(restartedRequester.stores, identityCid);
+    await assertProjectedMetadataIndexes(
+      restartedRequester.stores,
+      identityCid,
+    );
     await restartedRequester.orbitdb.stop();
 
     console.info(
@@ -524,11 +530,32 @@ function generateNetworkKey(): string {
   return privateKey.export({ format: 'pem', type: 'pkcs8' }).toString();
 }
 
-async function writeReplicatedDocuments(stores: PrivateOrbitDbStores): Promise<void> {
+async function writeReplicatedDocuments(
+  stores: PrivateOrbitDbStores,
+): Promise<string> {
+  const mother = new IdentityMother();
+  const current = mother.build().toPrimitives();
+  const identity = await mother.buildNext({
+    networks: [NETWORK_ID],
+    profile: {
+      ...current.profile,
+      name: 'Hasko',
+      handle: 'hasko',
+    },
+  });
+  const identityDocument = new IpfsIdentityMapper().toDocument(identity);
+  const identityPrimitives = JSON.parse(
+    JSON.stringify(identity.toPrimitives()),
+  ) as Record<string, unknown>;
+  const identityCid = (
+    await heliaRuntimeAdapter.createJsonSha256Cid(identityDocument)
+  ).toString();
+
   await stores.identities.put?.({
-    cid: 'cid-identity-hasko-v2',
+    cid: identityCid,
     handle: 'hasko',
     id: IDENTITY_ID,
+    identity: identityPrimitives,
     identityId: IDENTITY_ID,
     lastEventId: 'identity-event-hasko-v2',
     networkIds: [NETWORK_ID],
@@ -587,6 +614,8 @@ async function writeReplicatedDocuments(stores: PrivateOrbitDbStores): Promise<v
     kind: 'join_request',
     status: 'pending',
   });
+
+  return identityCid;
 }
 
 async function assertAccessControl(
@@ -631,11 +660,14 @@ async function assertUnauthorizedWriteIsRejected(
   }
 }
 
-async function assertQueryViability(stores: PrivateOrbitDbStores): Promise<void> {
+async function assertQueryViability(
+  stores: PrivateOrbitDbStores,
+  identityCid: string,
+): Promise<void> {
   await waitFor(async () => {
     const identity = await getDocumentValue(stores.identities, IDENTITY_ID);
 
-    return identity?.cid === 'cid-identity-hasko-v2' ? true : undefined;
+    return identity?.cid === identityCid ? true : undefined;
   }, 'latest identity replication');
 
   await waitFor(async () => {
@@ -707,6 +739,7 @@ async function assertQueryViability(stores: PrivateOrbitDbStores): Promise<void>
 
 async function assertProjectedMetadataIndexes(
   stores: PrivateOrbitDbStores,
+  identityCid: string,
 ): Promise<void> {
   const identityId = new IdentityId(IDENTITY_ID);
   const registry = new OrbitDBReplicatedStateRegistry();
@@ -742,8 +775,8 @@ async function assertProjectedMetadataIndexes(
   );
 
   if (
-    identities[0]?.cid !== 'cid-identity-hasko-v2' ||
-    identitiesById[0]?.cid !== 'cid-identity-hasko-v2'
+    identities[0]?.cid !== identityCid ||
+    identitiesById[0]?.cid !== identityCid
   ) {
     throw new Error(
       'Replicated identity metadata was not projected by handle and id',
