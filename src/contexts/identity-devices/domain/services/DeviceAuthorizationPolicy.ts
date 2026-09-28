@@ -103,6 +103,32 @@ export default class DeviceAuthorizationPolicy {
     );
   }
 
+  public applyRecoveryCheckpoint(
+    genesis: DeviceAuthorization,
+    transition: DeviceAuthorizationTransition,
+  ): DeviceAuthorization {
+    assert(
+      transition.isRecovery() &&
+        genesis.getIdentityId().isEqual(transition.getIdentityId()),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+    this.verifyTargetProof(transition);
+    assert(
+      genesis
+        .getRecoveryAuthority()
+        .isValidSignature(
+          transition.getSigningPayload(),
+          transition.getSignature(),
+        ),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return genesis.recoverAt(
+      transition.getRevision(),
+      transition.getTargetCredential(),
+    );
+  }
+
   public apply(
     authorization: DeviceAuthorization,
     transition: DeviceAuthorizationTransition,

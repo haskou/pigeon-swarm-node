@@ -8,6 +8,7 @@ import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/do
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp, assert } from '@haskou/value-objects';
 import { isDeepStrictEqual } from 'node:util';
@@ -24,6 +25,10 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   private static readonly HEAD_PREFIX = 'device-authorization:';
 
   private static readonly MAX_CONCURRENT_TRANSITIONS = 128;
+
+  private static readonly MAX_TRANSITION_RECORDS = 256;
+
+  private static readonly MAX_TRANSITION_HISTORY_BYTES = 1_048_576;
 
   private static readonly MAX_TRANSITION_RECORD_BYTES = 16_384;
 
@@ -50,12 +55,21 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly policy: DeviceAuthorizationPolicy,
     private readonly identityRepository: IdentityRepository,
+    private readonly networkRegistry: IPFSNetworkRegistry,
   ) {
     super();
     this.registry.registerHeadRecordMerger(
       OrbitDBDeviceAuthorizationRepository.HEAD_PREFIX,
       (current, candidate) => this.mergeRecords(current, candidate),
+      (networkId, value) =>
+        this.isPrivateNetwork(networkId) ? value : undefined,
     );
+  }
+
+  private isPrivateNetwork(networkId: string): boolean {
+    return this.networkRegistry
+      .getAll()
+      .some((network) => network.getId() === networkId && network.isPrivate());
   }
 
   private headKey(identityId: IdentityId): string {
@@ -168,13 +182,11 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   ): Promise<DeviceAuthorization | undefined> {
     const cached = this.trustedGenesisByIdentity.get(identityId.valueOf());
 
-    if (cached) {
-      return cached;
-    }
-
     try {
       const [candidate] =
-        await this.identityRepository.findCandidateReferencesById(identityId);
+        await this.identityRepository.findFreshCandidateReferencesById(
+          identityId,
+        );
 
       assert(
         candidate !== undefined,
@@ -195,7 +207,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
 
       return genesis;
     } catch {
-      return undefined;
+      return cached;
     }
   }
 
@@ -278,7 +290,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     );
 
     if (recoveries.length > 0) {
-      return recoveries.map((candidate) => candidate.authorization);
+      return [recoveries[0].authorization];
     }
 
     const revocations = candidates.filter(({ transition }) =>
@@ -293,7 +305,11 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       ];
     }
 
-    return candidates.map((candidate) => candidate.authorization);
+    return [
+      authorization.enrollConcurrently(
+        candidates.map(({ transition }) => transition.getTargetCredential()),
+      ),
+    ];
   }
 
   private transitionFromRecord(
@@ -344,24 +360,20 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       return { authorization, history: [] };
     }
 
-    const replays = this.concurrentAuthorizations(
+    const [checkpoint] = this.concurrentAuthorizations(
       authorization,
       candidates,
-    ).map((candidate) => this.replayFrom(candidate, recordsByRevision));
-    const [selected] = replays.sort(
-      (left, right) =>
-        right.authorization.getRevision().valueOf() -
-        left.authorization.getRevision().valueOf(),
     );
 
     assert(
-      selected !== undefined,
+      checkpoint !== undefined,
       new InvalidDeviceAuthorizationTransitionError(),
     );
+    const replay = this.replayFrom(checkpoint, recordsByRevision);
 
     return {
-      authorization: selected.authorization,
-      history: [...candidates.map(({ record }) => record), ...selected.history],
+      authorization: replay.authorization,
+      history: [...candidates.map(({ record }) => record), ...replay.history],
     };
   }
 
@@ -377,15 +389,20 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   private toDocument(
     genesis: DeviceAuthorization,
     history: OrbitDBDeviceAuthorizationTransitionRecord[],
+    checkpoint?: OrbitDBDeviceAuthorizationDocument['checkpoint'],
   ): OrbitDBDeviceAuthorizationDocument {
     assert(
       this.hasBoundedHistoryShape(history),
       new InvalidDeviceAuthorizationTransitionError(),
     );
-    const replay = this.rebuild(genesis, history);
+    const baseAuthorization = checkpoint
+      ? this.authorizationFromCheckpoint(genesis, checkpoint)
+      : genesis;
+    const replay = this.rebuild(baseAuthorization, history);
 
     return {
       authorization: replay.authorization.toPrimitives(),
+      ...(checkpoint ? { checkpoint } : {}),
       genesis: genesis.toPrimitives(),
       history: replay.history,
       id: this.documentId(replay.authorization.getIdentityId()),
@@ -435,10 +452,27 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   }
 
   private hasBoundedHistoryShape(history: unknown[]): boolean {
+    if (
+      history.length >
+      OrbitDBDeviceAuthorizationRepository.MAX_TRANSITION_RECORDS
+    ) {
+      return false;
+    }
+
     const recordsByRevision = new Map<number, number>();
+    let historyBytes = 0;
 
     for (const value of history) {
       if (!this.isBoundedTransitionRecord(value)) {
+        return false;
+      }
+
+      historyBytes += Buffer.byteLength(JSON.stringify(value), 'utf8');
+
+      if (
+        historyBytes >
+        OrbitDBDeviceAuthorizationRepository.MAX_TRANSITION_HISTORY_BYTES
+      ) {
         return false;
       }
 
@@ -463,6 +497,8 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   }
 
   private hasDocumentShape(value: Record<string, unknown>): boolean {
+    const checkpoint = value.checkpoint;
+
     return [
       this.hasExactKeys(value, [
         'authorization',
@@ -471,6 +507,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
         'id',
         'identityId',
         'kind',
+        ...(checkpoint === undefined ? [] : ['checkpoint']),
       ]),
       value.kind === 'device_authorization',
       typeof value.id === 'string',
@@ -478,7 +515,35 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       Array.isArray(value.history),
       typeof value.genesis === 'object' && value.genesis !== null,
       typeof value.authorization === 'object' && value.authorization !== null,
+      checkpoint === undefined ||
+        (this.isRecord(checkpoint) &&
+          this.hasExactKeys(checkpoint, ['authorization', 'transition']) &&
+          this.isRecord(checkpoint.authorization) &&
+          this.isBoundedTransitionRecord(checkpoint.transition)),
     ].every(Boolean);
+  }
+
+  private authorizationFromCheckpoint(
+    genesis: DeviceAuthorization,
+    checkpoint: NonNullable<OrbitDBDeviceAuthorizationDocument['checkpoint']>,
+  ): DeviceAuthorization {
+    const transition = this.transitionFromRecord(checkpoint.transition);
+
+    assert(
+      transition !== undefined && transition.isRecovery(),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+    const authorization = this.policy.applyRecoveryCheckpoint(
+      genesis,
+      transition,
+    );
+
+    assert(
+      isDeepStrictEqual(checkpoint.authorization, authorization.toPrimitives()),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return authorization;
   }
 
   private hasValidGenesis(
@@ -522,7 +587,10 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       }
 
       const genesis = DeviceAuthorization.fromPrimitives(document.genesis);
-      const replay = this.rebuild(genesis, document.history);
+      const baseAuthorization = document.checkpoint
+        ? this.authorizationFromCheckpoint(genesis, document.checkpoint)
+        : genesis;
+      const replay = this.rebuild(baseAuthorization, document.history);
 
       return (
         this.hasValidGenesis(document, genesis) &&
@@ -549,36 +617,93 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     current: Record<string, unknown> | undefined,
     candidate: Record<string, unknown>,
   ): Record<string, unknown> | undefined {
-    if (!this.isDocument(candidate)) {
+    const acceptedCandidate = this.trustedDocument(candidate);
+
+    if (!acceptedCandidate) {
       return current;
     }
 
-    if (this.conflictsWithTrustedGenesis(candidate)) {
-      return current;
+    const acceptedCurrent = this.trustedDocument(current);
+
+    if (!acceptedCurrent) {
+      return acceptedCandidate;
     }
 
-    if (!current || !this.isDocument(current)) {
-      return candidate;
+    if (!this.sameGenesis(acceptedCurrent, acceptedCandidate)) {
+      return acceptedCurrent;
     }
 
-    if (this.conflictsWithTrustedGenesis(current)) {
-      return candidate;
-    }
-
-    if (!this.sameGenesis(current, candidate)) {
-      return current;
-    }
-
-    const history = this.transitionRecords(current, candidate);
+    const checkpoint = this.preferredCheckpoint(
+      acceptedCurrent,
+      acceptedCandidate,
+    );
+    const checkpointRevision = checkpoint?.authorization.revision ?? 0;
+    const history = this.transitionRecords(
+      acceptedCurrent,
+      acceptedCandidate,
+    ).filter(
+      (record) => record.transition.previousRevision >= checkpointRevision,
+    );
 
     if (!this.hasBoundedHistoryShape(history)) {
-      return current;
+      return this.preferredBoundedDocument(acceptedCurrent, acceptedCandidate);
     }
 
     return this.toDocument(
-      DeviceAuthorization.fromPrimitives(current.genesis),
+      DeviceAuthorization.fromPrimitives(acceptedCurrent.genesis),
       history,
+      checkpoint,
     );
+  }
+
+  private trustedDocument(
+    value: Record<string, unknown> | undefined,
+  ): OrbitDBDeviceAuthorizationDocument | undefined {
+    if (!value || !this.isDocument(value)) {
+      return undefined;
+    }
+
+    return this.conflictsWithTrustedGenesis(value) ? undefined : value;
+  }
+
+  private preferredBoundedDocument(
+    left: OrbitDBDeviceAuthorizationDocument,
+    right: OrbitDBDeviceAuthorizationDocument,
+  ): OrbitDBDeviceAuthorizationDocument {
+    const documents: [
+      OrbitDBDeviceAuthorizationDocument,
+      OrbitDBDeviceAuthorizationDocument,
+    ] = [left, right];
+
+    documents.sort(
+      (first, second) =>
+        (second.checkpoint?.authorization.revision ?? 0) -
+          (first.checkpoint?.authorization.revision ?? 0) ||
+        first.authorization.credentials.length -
+          second.authorization.credentials.length ||
+        this.canonicalString(first).localeCompare(this.canonicalString(second)),
+    );
+
+    return documents[0];
+  }
+
+  private preferredCheckpoint(
+    left: OrbitDBDeviceAuthorizationDocument,
+    right: OrbitDBDeviceAuthorizationDocument,
+  ): OrbitDBDeviceAuthorizationDocument['checkpoint'] {
+    const checkpoints = [left.checkpoint, right.checkpoint].filter(
+      (
+        checkpoint,
+      ): checkpoint is NonNullable<
+        OrbitDBDeviceAuthorizationDocument['checkpoint']
+      > => checkpoint !== undefined,
+    );
+
+    return checkpoints.sort(
+      (first, second) =>
+        second.authorization.revision - first.authorization.revision ||
+        this.canonicalString(first).localeCompare(this.canonicalString(second)),
+    )[0];
   }
 
   private async withIdentityLock<T>(
@@ -616,10 +741,14 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       ? transition.getPairingId().valueOf()
       : undefined;
 
-    return document.history.some(
-      (record) =>
-        record.transition.operationId === operationId ||
-        (pairingId !== undefined && record.transition.pairingId === pairingId),
+    return (
+      document.history.some(
+        (record) =>
+          record.transition.operationId === operationId ||
+          (pairingId !== undefined &&
+            record.transition.pairingId === pairingId),
+      ) ||
+      document.checkpoint?.transition.transition.operationId === operationId
     );
   }
 
@@ -630,16 +759,35 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       .sort();
   }
 
+  private privateNetworkIds(networkIds: string[]): string[] {
+    const routableNetworkIds = new Set(networkIds);
+
+    return this.networkRegistry
+      .getAll()
+      .filter(
+        (network) =>
+          network.isPrivate() && routableNetworkIds.has(network.getId()),
+      )
+      .map((network) => network.getId())
+      .sort();
+  }
+
   private async save(
     document: OrbitDBDeviceAuthorizationDocument,
   ): Promise<OrbitDBDeviceAuthorizationDocument> {
     const authorization = DeviceAuthorization.fromPrimitives(
       document.authorization,
     );
-    const networkIds =
+    const routableNetworkIds =
       this.routingNetworkIdsByIdentity.get(
         authorization.getIdentityId().valueOf(),
       ) ?? this.networkIds(authorization);
+    const networkIds = this.privateNetworkIds(routableNetworkIds);
+
+    assert(
+      networkIds.length > 0,
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
 
     await this.registry.putDocument('identities', document, networkIds);
     await this.registry.putHead(
@@ -690,21 +838,26 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       );
       this.policy.verifyFirstAcceptance(transition, new Timestamp(Date.now()));
 
+      const genesis = DeviceAuthorization.fromPrimitives(stored.genesis);
+      const baseAuthorization = stored.checkpoint
+        ? this.authorizationFromCheckpoint(genesis, stored.checkpoint)
+        : genesis;
       const current = this.rebuild(
-        DeviceAuthorization.fromPrimitives(stored.genesis),
+        baseAuthorization,
         stored.history,
       ).authorization;
-      this.policy.apply(current, transition);
-
-      const document = this.toDocument(
-        DeviceAuthorization.fromPrimitives(stored.genesis),
-        [
-          ...stored.history,
-          {
-            transition: transition.toPrimitives(),
-          },
-        ],
-      );
+      const authorization = this.policy.apply(current, transition);
+      const transitionRecord = { transition: transition.toPrimitives() };
+      const document = transition.isRecovery()
+        ? this.toDocument(genesis, [], {
+            authorization: authorization.toPrimitives(),
+            transition: transitionRecord,
+          })
+        : this.toDocument(
+            genesis,
+            [...stored.history, transitionRecord],
+            stored.checkpoint,
+          );
 
       const saved = await this.save(document);
 

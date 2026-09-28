@@ -75,6 +75,12 @@ export default class IPFS {
     return this.racer.raceGetJSON<T>(this.registry.getAll(), cid);
   }
 
+  public async calculateJSONId(data: unknown): Promise<IPFSId> {
+    const cid = await heliaRuntimeAdapter.createJsonSha256Cid(data);
+
+    return new IPFSId(cid.toString());
+  }
+
   public async getBytes(cid: IPFSId): Promise<Buffer> {
     await this.initialize();
 

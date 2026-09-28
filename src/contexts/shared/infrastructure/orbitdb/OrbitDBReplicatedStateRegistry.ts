@@ -1574,6 +1574,40 @@ export default class OrbitDBReplicatedStateRegistry {
     );
   }
 
+  private applyHeadRecordScope(
+    prefix: string,
+    scope: OrbitDBHeadRecordScope,
+  ): void {
+    for (const [networkId, heads] of this.replicatedHeadsByNetworkId) {
+      this.applyHeadRecordScopeToNetwork(networkId, heads, prefix, scope);
+    }
+
+    for (const key of this.projectedHeads.keys()) {
+      if (key.startsWith(prefix)) {
+        this.projectedHeads.delete(key);
+        this.exactProjectedHeadKeys.delete(key);
+      }
+    }
+  }
+
+  private applyHeadRecordScopeToNetwork(
+    networkId: string,
+    heads: Map<string, Record<string, unknown>>,
+    prefix: string,
+    scope: OrbitDBHeadRecordScope,
+  ): void {
+    for (const [key, value] of heads) {
+      if (!key.startsWith(prefix)) {
+        continue;
+      }
+
+      const scoped = scope(networkId, value);
+
+      if (scoped) heads.set(key, scoped);
+      else heads.delete(key);
+    }
+  }
+
   public registerHeadRecordMerger(
     prefix: string,
     merger: OrbitDBHeadRecordMerger,
@@ -1582,8 +1616,10 @@ export default class OrbitDBReplicatedStateRegistry {
   ): void {
     this.headRecordMergers.set(prefix, merger);
 
-    if (scope) this.headRecordScopes.set(prefix, scope);
-    else this.headRecordScopes.delete(prefix);
+    if (scope) {
+      this.headRecordScopes.set(prefix, scope);
+      this.applyHeadRecordScope(prefix, scope);
+    } else this.headRecordScopes.delete(prefix);
 
     if (repairPublisher) this.headRepairPublishers.set(prefix, repairPublisher);
     else this.headRepairPublishers.delete(prefix);

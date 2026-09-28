@@ -1,26 +1,29 @@
+import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentityCandidate } from '@app/contexts/identities/domain/IdentityCandidate';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
+import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
+import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
 import { DeviceAuthorizationOperationId } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
-import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
 import { PairingAuthorization } from '@app/contexts/identity-devices/domain/value-objects/PairingAuthorization';
+import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
 import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/PairingId';
 import OrbitDBDeviceAuthorizationRepository from '@app/contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationRepository';
-import { Identity } from '@app/contexts/identities/domain/Identity';
-import { IdentityCandidate } from '@app/contexts/identities/domain/IdentityCandidate';
-import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
-import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
-import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
-import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
-import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
+import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { OrbitDBHeadRecordMerger } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadRecordMerger';
+import { OrbitDBHeadRecordScope } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadRecordScope';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
-import { mock } from 'jest-mock-extended';
+import { mock, MockProxy } from 'jest-mock-extended';
 
 describe(OrbitDBDeviceAuthorizationRepository.name, () => {
   const now = new Timestamp(1_800_000_000_000);
@@ -46,12 +49,23 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
   function repositoryFixture() {
     const registry = mock<OrbitDBReplicatedStateRegistry>();
     const identityRepository = mock<IdentityRepository>();
+    const networkRegistry = mock<IPFSNetworkRegistry>();
+    const privateNetwork = mock<IPFSNetwork>();
     let head: Record<string, unknown> | undefined;
     let merger: OrbitDBHeadRecordMerger | undefined;
+    let scope: OrbitDBHeadRecordScope | undefined;
+    privateNetwork.getId.mockReturnValue(
+      '550e8400-e29b-41d4-a716-446655440000',
+    );
+    privateNetwork.isPrivate.mockReturnValue(true);
+    networkRegistry.getAll.mockReturnValue([privateNetwork]);
 
-    registry.registerHeadRecordMerger.mockImplementation((_prefix, value) => {
-      merger = value;
-    });
+    registry.registerHeadRecordMerger.mockImplementation(
+      (_prefix, value, recordScope) => {
+        merger = value;
+        scope = recordScope;
+      },
+    );
     registry.findHead.mockImplementation(() => Promise.resolve(head));
     registry.putDocument.mockResolvedValue();
     registry.putHead.mockImplementation((_key, value) => {
@@ -63,17 +77,29 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     return {
       getHead: () => head,
       getMerger: () => merger,
+      getScope: () => scope,
       identityRepository,
+      networkRegistry,
       registry,
       repository: new OrbitDBDeviceAuthorizationRepository(
         registry,
         new DeviceAuthorizationPolicy(),
         identityRepository,
+        networkRegistry,
       ),
       setHead: (value: Record<string, unknown>): void => {
         head = value;
       },
     };
+  }
+
+  function privateNetwork(networkId: string): MockProxy<IPFSNetwork> {
+    const network = mock<IPFSNetwork>();
+
+    network.getId.mockReturnValue(networkId);
+    network.isPrivate.mockReturnValue(true);
+
+    return network;
   }
 
   function provisionAuthorization(
@@ -89,17 +115,18 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     );
   }
 
-  async function enrollment(
+  function enrollment(
     identityId: IdentityId,
     owner: KeyPair,
     target: KeyPair,
     operationId: string,
     pairingId: string,
-  ): Promise<DeviceAuthorizationTransition> {
+    previousRevision = DeviceAuthorizationRevision.initial(),
+  ): DeviceAuthorizationTransition {
     const unsigned = DeviceAuthorizationTransition.enrollment(
       identityId,
       new DeviceAuthorizationOperationId(operationId),
-      DeviceAuthorizationRevision.initial(),
+      previousRevision,
       DeviceCredential.fromString(owner.toPrimitives().publicKey),
       DeviceCredential.fromString(target.toPrimitives().publicKey),
       new PairingAuthorization(
@@ -141,6 +168,67 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       expect.any(Array),
     );
     await expect(repository.compareAndApply(transition)).rejects.toThrow();
+  });
+
+  it('replicates authorization state only through registered private networks', async () => {
+    const { genesis, identityId } = await fixture();
+    const publicNetworkId = '550e8400-e29b-41d4-a716-446655440099';
+    const publicNetwork = mock<IPFSNetwork>();
+    const { getScope, networkRegistry, registry, repository } =
+      repositoryFixture();
+    publicNetwork.getId.mockReturnValue(publicNetworkId);
+    publicNetwork.isPrivate.mockReturnValue(false);
+    networkRegistry.getAll.mockReturnValue([
+      ...networkRegistry.getAll(),
+      publicNetwork,
+    ]);
+    const authorization = DeviceAuthorization.genesis(
+      identityId,
+      [...genesis.getNetworkIds(), new NetworkId(publicNetworkId)],
+      genesis.getCredentials()[0],
+      genesis.getRecoveryAuthority(),
+    );
+
+    await provisionAuthorization(repository, authorization);
+
+    expect(registry.putDocument).toHaveBeenCalledWith(
+      'identities',
+      expect.any(Object),
+      ['550e8400-e29b-41d4-a716-446655440000'],
+    );
+    expect(registry.putHead).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      ['550e8400-e29b-41d4-a716-446655440000'],
+    );
+    expect(getScope()?.(publicNetworkId, { trusted: false })).toBeUndefined();
+    expect(
+      getScope()?.('550e8400-e29b-41d4-a716-446655440000', {
+        trusted: true,
+      }),
+    ).toEqual({ trusted: true });
+  });
+
+  it('fails closed when authorization has no registered private network', async () => {
+    const { genesis, identityId } = await fixture();
+    const publicNetworkId = '550e8400-e29b-41d4-a716-446655440099';
+    const publicNetwork = mock<IPFSNetwork>();
+    const { networkRegistry, registry, repository } = repositoryFixture();
+    publicNetwork.getId.mockReturnValue(publicNetworkId);
+    publicNetwork.isPrivate.mockReturnValue(false);
+    networkRegistry.getAll.mockReturnValue([publicNetwork]);
+    const authorization = DeviceAuthorization.genesis(
+      identityId,
+      [new NetworkId(publicNetworkId)],
+      genesis.getCredentials()[0],
+      genesis.getRecoveryAuthority(),
+    );
+
+    await expect(
+      provisionAuthorization(repository, authorization),
+    ).rejects.toThrow();
+    expect(registry.putDocument).not.toHaveBeenCalled();
+    expect(registry.putHead).not.toHaveBeenCalled();
   });
 
   it('rejects an enrollment first submitted after pairing expiration', async () => {
@@ -273,11 +361,90 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       authorization: {
         credentials: expect.arrayContaining([
           firstTarget.toPrimitives().publicKey,
+          secondTarget.toPrimitives().publicKey,
         ]),
         revision: 1,
       },
     });
   });
+
+  it('converges when valid histories exceed the replay limit after merging', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const first = repositoryFixture();
+    const second = repositoryFixture();
+    const targets = await Promise.all(
+      Array.from({ length: 257 }, () => KeyPair.generate()),
+    );
+    const transitions = await Promise.all(
+      targets
+        .slice(0, 256)
+        .map((target, index) =>
+          enrollment(
+            identityId,
+            owner,
+            target,
+            `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+            `10000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+          ),
+        ),
+    );
+    const descendant = await enrollment(
+      identityId,
+      owner,
+      targets[256],
+      '20000000-0000-4000-8000-000000000001',
+      '30000000-0000-4000-8000-000000000001',
+      new DeviceAuthorizationRevision(1),
+    );
+    const firstTransitions = transitions.slice(0, 128);
+    const secondTransitions = transitions.slice(128);
+    const policy = new DeviceAuthorizationPolicy();
+    const firstAuthorization = genesis.enrollConcurrently(
+      firstTransitions.map((transition) => transition.getTargetCredential()),
+    );
+    const secondRevision = genesis.enrollConcurrently(
+      secondTransitions.map((transition) => transition.getTargetCredential()),
+    );
+    const secondAuthorization = policy.apply(secondRevision, descendant);
+
+    await provisionAuthorization(first.repository, genesis);
+    await provisionAuthorization(second.repository, genesis);
+    first.setHead({
+      authorization: firstAuthorization.toPrimitives(),
+      genesis: genesis.toPrimitives(),
+      history: firstTransitions.map((transition) => ({
+        transition: transition.toPrimitives(),
+      })),
+      id: `device-authorization:${identityId.valueOf()}`,
+      identityId: identityId.valueOf(),
+      kind: 'device_authorization',
+    });
+    second.setHead({
+      authorization: secondAuthorization.toPrimitives(),
+      genesis: genesis.toPrimitives(),
+      history: [
+        ...secondTransitions.map((transition) => ({
+          transition: transition.toPrimitives(),
+        })),
+        { transition: descendant.toPrimitives() },
+      ],
+      id: `device-authorization:${identityId.valueOf()}`,
+      identityId: identityId.valueOf(),
+      kind: 'device_authorization',
+    });
+
+    const mergedFromFirst = first.getMerger()?.(
+      first.getHead(),
+      second.getHead() ?? {},
+    );
+    const mergedFromSecond = second.getMerger()?.(
+      second.getHead(),
+      first.getHead() ?? {},
+    );
+
+    expect(mergedFromFirst).toEqual(mergedFromSecond);
+    expect(mergedFromFirst).toEqual(first.getHead());
+  }, 30_000);
 
   it('keeps the branch with a valid descendant revocation', async () => {
     const { genesis, identityId, owner } = await fixture();
@@ -328,8 +495,87 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     expect(merged.authorization?.credentials).not.toContain(
       owner.toPrimitives().publicKey,
     );
-    expect(merged.authorization?.credentials).not.toContain(
+    expect(merged.authorization?.credentials).toContain(
       sibling.toPrimitives().publicKey,
+    );
+  });
+
+  it('does not let a longer enrollment branch restore a revoked credential', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const revoker = await KeyPair.generate();
+    const attacker = await KeyPair.generate();
+    const descendant = await KeyPair.generate();
+    const laterDescendant = await KeyPair.generate();
+    const honest = repositoryFixture();
+    const malicious = repositoryFixture();
+    const revokerEnrollment = await enrollment(
+      identityId,
+      owner,
+      revoker,
+      '00000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+    );
+    const attackerEnrollment = await enrollment(
+      identityId,
+      owner,
+      attacker,
+      '00000000-0000-4000-8000-000000000002',
+      '10000000-0000-4000-8000-000000000002',
+    );
+    await provisionAuthorization(honest.repository, genesis);
+    await provisionAuthorization(malicious.repository, genesis);
+    await honest.repository.compareAndApply(revokerEnrollment);
+    await malicious.repository.compareAndApply(attackerEnrollment);
+
+    const revocation = DeviceAuthorizationTransition.revocation(
+      identityId,
+      new DeviceAuthorizationOperationId(
+        '00000000-0000-4000-8000-000000000003',
+      ),
+      new DeviceAuthorizationRevision(1),
+      DeviceCredential.fromString(revoker.toPrimitives().publicKey),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+    );
+    await honest.repository.compareAndApply(
+      revocation.authorize(revoker.sign(revocation.getSigningPayload())),
+    );
+    await malicious.repository.compareAndApply(
+      await enrollment(
+        identityId,
+        owner,
+        descendant,
+        '00000000-0000-4000-8000-000000000004',
+        '10000000-0000-4000-8000-000000000004',
+        new DeviceAuthorizationRevision(1),
+      ),
+    );
+    await malicious.repository.compareAndApply(
+      await enrollment(
+        identityId,
+        owner,
+        laterDescendant,
+        '00000000-0000-4000-8000-000000000005',
+        '10000000-0000-4000-8000-000000000005',
+        new DeviceAuthorizationRevision(2),
+      ),
+    );
+
+    const merged = honest.getMerger()?.(
+      honest.getHead(),
+      malicious.getHead() ?? {},
+    ) as { authorization?: { credentials?: string[]; revision?: number } };
+    const reversed = malicious.getMerger()?.(
+      malicious.getHead(),
+      honest.getHead() ?? {},
+    );
+
+    expect(merged).toEqual(reversed);
+    expect(merged.authorization?.revision).toBe(2);
+    expect(merged.authorization?.credentials).not.toContain(
+      owner.toPrimitives().publicKey,
+    );
+    expect(merged.authorization?.credentials).toContain(
+      revoker.toPrimitives().publicKey,
     );
   });
 
@@ -429,7 +675,9 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       revocation.authorize(owner.sign(revocation.getSigningPayload())),
     );
     await second.repository.compareAndApply(
-      provenEnrollment.authorize(owner.sign(provenEnrollment.getSigningPayload())),
+      provenEnrollment.authorize(
+        owner.sign(provenEnrollment.getSigningPayload()),
+      ),
     );
 
     const merged = first.getMerger()?.(
@@ -643,15 +891,123 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     expect(merged.history).toHaveLength(129);
   });
 
+  it('compacts accepted history into a signed recovery checkpoint', async () => {
+    const { genesis, identityId, owner, recovery } = await fixture();
+    const firstTarget = await KeyPair.generate();
+    const recovered = await KeyPair.generate();
+    const nextTarget = await KeyPair.generate();
+    const { getHead, repository } = repositoryFixture();
+    await provisionAuthorization(repository, genesis);
+    await repository.compareAndApply(
+      await enrollment(
+        identityId,
+        owner,
+        firstTarget,
+        '00000000-0000-4000-8000-000000000001',
+        '10000000-0000-4000-8000-000000000001',
+      ),
+    );
+    const unsignedRecovery = DeviceAuthorizationTransition.recovery(
+      identityId,
+      new DeviceAuthorizationOperationId(
+        '00000000-0000-4000-8000-000000000002',
+      ),
+      new DeviceAuthorizationRevision(1),
+      DeviceCredential.fromString(recovered.toPrimitives().publicKey),
+    );
+    const provenRecovery = unsignedRecovery.provePossession(
+      recovered.sign(unsignedRecovery.getProofOfPossessionPayload()),
+    );
+    await repository.compareAndApply(
+      provenRecovery.authorizeRecovery(
+        recovery.sign(provenRecovery.getSigningPayload()),
+      ),
+    );
+
+    expect(getHead()).toMatchObject({
+      authorization: { revision: 2 },
+      checkpoint: {
+        authorization: { revision: 2 },
+        transition: {
+          transition: { operation: 'recover', revision: 2 },
+        },
+      },
+      history: [],
+    });
+
+    const authorization = await repository.compareAndApply(
+      await enrollment(
+        identityId,
+        recovered,
+        nextTarget,
+        '00000000-0000-4000-8000-000000000003',
+        '10000000-0000-4000-8000-000000000003',
+        new DeviceAuthorizationRevision(2),
+      ),
+    );
+
+    expect(authorization.getRevision().valueOf()).toBe(3);
+    expect(authorization.getCredentials()).toHaveLength(2);
+  });
+
+  it('rejects sequential history above the total replay limit before parsing', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const target = await KeyPair.generate();
+    const { getHead, getMerger, repository } = repositoryFixture();
+    const transition = await enrollment(
+      identityId,
+      owner,
+      target,
+      '00000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+    );
+    await provisionAuthorization(repository, genesis);
+    const trusted = getHead();
+    const primitives = transition.toPrimitives();
+    const parser = jest.spyOn(DeviceAuthorizationTransition, 'fromPrimitives');
+    const injected = {
+      ...trusted,
+      history: Array.from({ length: 257 }, (_, previousRevision) => ({
+        transition: {
+          ...primitives,
+          previousRevision,
+          revision: previousRevision + 1,
+        },
+      })),
+    };
+
+    expect(getMerger()?.(trusted, injected)).toEqual(trusted);
+    expect(parser).not.toHaveBeenCalled();
+    parser.mockRestore();
+  });
+
+  it('rejects aggregate history bytes before parsing transitions', async () => {
+    const { genesis } = await fixture();
+    const { getHead, getMerger, repository } = repositoryFixture();
+    await provisionAuthorization(repository, genesis);
+    const trusted = getHead();
+    const parser = jest.spyOn(DeviceAuthorizationTransition, 'fromPrimitives');
+    const injected = {
+      ...trusted,
+      history: Array.from({ length: 70 }, (_, previousRevision) => ({
+        transition: {
+          padding: 'a'.repeat(15_000),
+          previousRevision,
+        },
+      })),
+    };
+
+    expect(getMerger()?.(trusted, injected)).toEqual(trusted);
+    expect(parser).not.toHaveBeenCalled();
+    parser.mockRestore();
+  });
+
   it('rejects oversized authorization history before parsing transitions', async () => {
     const { genesis } = await fixture();
     const { getHead, getMerger, repository } = repositoryFixture();
     await provisionAuthorization(repository, genesis);
     const trusted = getHead();
-    const parser = jest.spyOn(
-      DeviceAuthorizationTransition,
-      'fromPrimitives',
-    );
+    const parser = jest.spyOn(DeviceAuthorizationTransition, 'fromPrimitives');
     const injected = {
       ...trusted,
       history: [
@@ -682,10 +1038,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     await provisionAuthorization(repository, genesis);
     const trusted = getHead();
     const primitives = transition.toPrimitives();
-    const parser = jest.spyOn(
-      DeviceAuthorizationTransition,
-      'fromPrimitives',
-    );
+    const parser = jest.spyOn(DeviceAuthorizationTransition, 'fromPrimitives');
     const injected = {
       ...trusted,
       history: Array.from({ length: 1_000 }, (_, previousRevision) => ({
@@ -721,11 +1074,8 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       genesis.getRecoveryAuthority(),
     );
     identity.getVersion.mockReturnValue(new IdentityVersion(1));
-    identityRepository.findCandidateReferencesById.mockResolvedValue([
-      new IdentityCandidate(
-        genesisExternalIdentifier,
-        identity,
-      ),
+    identityRepository.findFreshCandidateReferencesById.mockResolvedValue([
+      new IdentityCandidate(genesisExternalIdentifier, identity),
     ]);
     setHead({
       authorization: malicious.toPrimitives(),
@@ -775,7 +1125,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
   it('preserves authorization history when identity routing networks expand', async () => {
     const { genesis, identityId, owner, recovery } = await fixture();
     const target = await KeyPair.generate();
-    const { getHead, getMerger, registry, repository } = repositoryFixture();
+    const { getHead, getMerger, networkRegistry, registry, repository } =
+      repositoryFixture();
+    networkRegistry.getAll.mockReturnValue([
+      ...networkRegistry.getAll(),
+      privateNetwork('550e8400-e29b-41d4-a716-446655440001'),
+    ]);
     const enrolled = await enrollment(
       identityId,
       owner,
@@ -844,10 +1199,70 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     );
   });
 
+  it('refreshes cached routing before persisting a device transition', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const enrolled = await KeyPair.generate();
+    const expandedNetworkId = '550e8400-e29b-41d4-a716-446655440001';
+    const { identityRepository, networkRegistry, registry, repository } =
+      repositoryFixture();
+    networkRegistry.getAll.mockReturnValue([
+      ...networkRegistry.getAll(),
+      privateNetwork(expandedNetworkId),
+    ]);
+    await provisionAuthorization(repository, genesis);
+    await repository.compareAndApply(
+      await enrollment(
+        identityId,
+        owner,
+        enrolled,
+        '00000000-0000-4000-8000-000000000001',
+        '10000000-0000-4000-8000-000000000001',
+      ),
+    );
+    const identity = mock<Identity>();
+    identity.getNetworkIds.mockReturnValue([
+      ...genesis.getNetworkIds(),
+      new NetworkId(expandedNetworkId),
+    ]);
+    identity.getInitialDeviceCredential.mockReturnValue(
+      genesis.getCredentials()[0],
+    );
+    identity.getRecoveryAuthority.mockReturnValue(
+      genesis.getRecoveryAuthority(),
+    );
+    identity.getVersion.mockReturnValue(new IdentityVersion(2));
+    identityRepository.findFreshCandidateReferencesById.mockResolvedValue([
+      new IdentityCandidate(
+        new IdentityExternalIdentifier('bafy-expanded'),
+        identity,
+      ),
+    ]);
+    const revocation = DeviceAuthorizationTransition.revocation(
+      identityId,
+      new DeviceAuthorizationOperationId(
+        '00000000-0000-4000-8000-000000000002',
+      ),
+      new DeviceAuthorizationRevision(1),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+    );
+
+    await repository.compareAndApply(
+      revocation.authorize(owner.sign(revocation.getSigningPayload())),
+    );
+
+    expect(registry.putHead).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        authorization: expect.objectContaining({ revision: 2 }),
+      }),
+      ['550e8400-e29b-41d4-a716-446655440000', expandedNetworkId],
+    );
+  });
+
   it('selects routing for equal-version identity forks by canonical content identifier', async () => {
     const { genesis, identityId } = await fixture();
-    const preferredNetworkId =
-      '550e8400-e29b-41d4-a716-446655440002';
+    const preferredNetworkId = '550e8400-e29b-41d4-a716-446655440002';
     const otherNetworkId = '550e8400-e29b-41d4-a716-446655440001';
     const preferred = DeviceAuthorization.genesis(
       identityId,
@@ -863,14 +1278,31 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     );
     const first = repositoryFixture();
     const second = repositoryFixture();
+    for (const current of [first, second]) {
+      current.networkRegistry.getAll.mockReturnValue([
+        ...current.networkRegistry.getAll(),
+        privateNetwork(preferredNetworkId),
+        privateNetwork(otherNetworkId),
+      ]);
+    }
 
     const preferredIdentifier = new IdentityExternalIdentifier('bafy-a-fork');
     const otherIdentifier = new IdentityExternalIdentifier('bafy-b-fork');
 
-    await provisionAuthorization(first.repository, preferred, 2, preferredIdentifier);
+    await provisionAuthorization(
+      first.repository,
+      preferred,
+      2,
+      preferredIdentifier,
+    );
     await provisionAuthorization(first.repository, other, 2, otherIdentifier);
     await provisionAuthorization(second.repository, other, 2, otherIdentifier);
-    await provisionAuthorization(second.repository, preferred, 2, preferredIdentifier);
+    await provisionAuthorization(
+      second.repository,
+      preferred,
+      2,
+      preferredIdentifier,
+    );
 
     const expectedNetworks = [
       '550e8400-e29b-41d4-a716-446655440000',

@@ -14,7 +14,9 @@ import {
   HeliaInstance,
 } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
 import { HeliaIPFS } from '@app/contexts/shared/infrastructure/ipfs/helia/HeliaIPFS';
+import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { IPFSOptions } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSOptions';
+import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
@@ -708,7 +710,16 @@ async function assertProjectedMetadataIndexes(
 ): Promise<void> {
   const identityId = new IdentityId(IDENTITY_ID);
   const registry = new OrbitDBReplicatedStateRegistry();
-  const identityIndex = new OrbitDBIdentityMetadataIndex(registry);
+  const ipfsManager = {
+    calculateJSONId: async (document: unknown) =>
+      new IPFSId(
+        (await heliaRuntimeAdapter.createJsonSha256Cid(document)).toString(),
+      ),
+  } as IPFS;
+  const identityIndex = new OrbitDBIdentityMetadataIndex(
+    registry,
+    ipfsManager,
+  );
   const keychainIndex = new OrbitDBKeychainMetadataIndex(registry);
 
   await assertMetadataHeadsAreAbsent(stores);

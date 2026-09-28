@@ -6,6 +6,10 @@ export interface OrbitDBDeviceAuthorizationDocument extends Record<
   unknown
 > {
   authorization: DeviceAuthorizationPrimitives;
+  checkpoint?: {
+    authorization: DeviceAuthorizationPrimitives;
+    transition: OrbitDBDeviceAuthorizationTransitionRecord;
+  };
   genesis: DeviceAuthorizationPrimitives;
   history: OrbitDBDeviceAuthorizationTransitionRecord[];
   id: string;

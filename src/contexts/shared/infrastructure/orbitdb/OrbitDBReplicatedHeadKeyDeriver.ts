@@ -45,6 +45,27 @@ export default class OrbitDBReplicatedHeadKeyDeriver {
     return identityId || embeddedIdentityId || projectedIdentityId;
   }
 
+  private addAlias(
+    keys: Set<string>,
+    prefix: string,
+    value: string | undefined,
+  ): void {
+    if (value) {
+      keys.add(`${prefix}${value}`);
+    }
+  }
+
+  private addScopedAlias(
+    keys: Set<string>,
+    prefix: string,
+    value: string | undefined,
+    scope: string | undefined,
+  ): void {
+    if (value && scope) {
+      keys.add(`${prefix}${value}`);
+    }
+  }
+
   private aliasKeysFromRecord(record: Record<string, unknown>): string[] {
     const keys = new Set<string>();
     const identityId = this.identityIdFrom(record);
@@ -53,25 +74,11 @@ export default class OrbitDBReplicatedHeadKeyDeriver {
     const cid = this.stringValue(record, 'cid');
     const id = this.stringValue(record, 'id');
 
-    if (identityId) {
-      keys.add(`identity:${identityId}`);
-    }
-
-    if (identityId && handle) {
-      keys.add(`identity-handle:${handle}`);
-    }
-
-    if (ownerIdentityId) {
-      keys.add(`keychain:${ownerIdentityId}`);
-    }
-
-    if (ownerIdentityId && cid) {
-      keys.add(`keychain-cid:${cid}`);
-    }
-
-    if (id) {
-      keys.add(id);
-    }
+    this.addAlias(keys, 'identity:', identityId);
+    this.addScopedAlias(keys, 'identity-handle:', handle, identityId);
+    this.addAlias(keys, 'keychain:', ownerIdentityId);
+    this.addScopedAlias(keys, 'keychain-cid:', cid, ownerIdentityId);
+    this.addAlias(keys, '', id);
 
     return [...keys];
   }

@@ -390,7 +390,12 @@ tombstones. Their retention is required for replay safety and reveals that a
 control transition occurred to readers of the private network; it does not expose
 the paired device's local root or unlock material. Replicas reject non-canonical
 records, unknown unsigned fields, transition records above 16 KiB and more than
-128 concurrent siblings from one predecessor before parsing or verifying them.
+128 concurrent siblings from one predecessor, 256 post-checkpoint records and
+1 MiB of aggregate post-checkpoint history before parsing or verifying them.
+An authority-signed recovery becomes a new verified checkpoint and discards the
+older transition history, so those limits bound replay work without imposing a
+lifetime operation limit. Public-network heads are rejected and writes fail
+closed when no configured private network is available.
 
 The public identity publication binds an independent genesis device credential
 and its commitment under the identity signature. The node does not derive that
@@ -398,12 +403,12 @@ credential from the identity key.
 
 Concurrent valid transitions from the same predecessor are resolved independently
 of arrival time. Recovery transitions form the highest-precedence class; without
-recovery, all sibling revocations are applied together before any enrollment.
-When recovery or enrollment leaves multiple candidate states, the branch whose
-valid descendants reach the greatest authorization revision wins, so a later
-revocation cannot be discarded by a lower operation UUID at an ancestor. Equal-
-depth branches use the lowest operation UUID, with the canonical signed record as
-the final tie-break for equivocation. Each replica replays the same signed candidates
+recovery, all sibling revocations are applied together before any enrollment;
+otherwise every valid sibling enrollment is folded into one checkpoint. Branch
+length never grants precedence, so a compromised credential cannot restore itself
+by appending enrollment descendants after another device revokes it. Concurrent
+recovery equivocation uses the lowest operation UUID, with the canonical signed
+record as the final tie-break. Each replica replays the same signed candidates
 from the pinned genesis checkpoint and therefore selects the same authorization
 state after exchanging heads. Both devices sign the pairing
 identifier, authorization time and expiration, and the target client must refuse

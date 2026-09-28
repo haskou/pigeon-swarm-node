@@ -1,18 +1,18 @@
 import 'reflect-metadata';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
+import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
+import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
 import { DeviceAuthorizationOperationId } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
-import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
 import { PairingAuthorization } from '@app/contexts/identity-devices/domain/value-objects/PairingAuthorization';
+import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
 import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/PairingId';
 import OrbitDBDeviceAuthorizationRepository from '@app/contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationRepository';
-import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
-import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
-import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
-import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
-import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import {
@@ -20,6 +20,7 @@ import {
   heliaRuntimeAdapter,
 } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
 import { HeliaIPFS } from '@app/contexts/shared/infrastructure/ipfs/helia/HeliaIPFS';
+import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { OrbitDBDatabase } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDatabase';
 import { OrbitDBInstance } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBInstance';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
@@ -55,7 +56,7 @@ const pause = (milliseconds: number): Promise<void> =>
 
 async function until(
   label: string,
-  condition: () => Promise<boolean>,
+  condition: () => boolean | Promise<boolean>,
 ): Promise<void> {
   const deadline = Date.now() + 25_000;
 
@@ -95,6 +96,14 @@ async function open(replica: Replica): Promise<void> {
     replica.registry,
     new DeviceAuthorizationPolicy(),
     {} as IdentityRepository,
+    {
+      getAll: () => [
+        {
+          getId: () => networkId,
+          isPrivate: () => true,
+        },
+      ],
+    } as IPFSNetworkRegistry,
   );
   await replica.registry.register(
     networkId,
@@ -128,7 +137,7 @@ async function startSynchronization(): Promise<void> {
 }
 
 async function verifyExchange(): Promise<void> {
-  await until('OrbitDB peers join', async () =>
+  await until('OrbitDB peers join', () =>
     nodes.every((node) =>
       Object.values(node.stores!).every(
         (store) => (store.peers?.size ?? 0) > 0,
@@ -147,6 +156,7 @@ async function verifyExchange(): Promise<void> {
         const identities = await node.stores!.identities.query!(
           (record) => record.id === key,
         );
+
         if (!identities.some((record) => isDeepStrictEqual(record, sentinel)))
           return false;
       }
@@ -156,13 +166,13 @@ async function verifyExchange(): Promise<void> {
   }
 }
 
-async function enrollment(
+function enrollment(
   identityId: IdentityId,
   owner: KeyPair,
   target: KeyPair,
   operationId: string,
   pairingId: string,
-): Promise<DeviceAuthorizationTransition> {
+): DeviceAuthorizationTransition {
   const unsigned = DeviceAuthorizationTransition.enrollment(
     identityId,
     new DeviceAuthorizationOperationId(operationId),
@@ -264,7 +274,7 @@ async function main(): Promise<void> {
   await connect();
   await startSynchronization();
   await verifyExchange();
-  await until('both replicas choose the deterministic transition', async () => {
+  await until('both replicas merge concurrent enrollments', async () => {
     const authorizations = await Promise.all(
       nodes.map(async (node) =>
         (await node.repository!.find(identityId))?.toPrimitives(),
@@ -277,14 +287,14 @@ async function main(): Promise<void> {
         authorization.credentials.includes(
           firstDevice.toPrimitives().publicKey,
         ) &&
-        !authorization.credentials.includes(
+        authorization.credentials.includes(
           secondDevice.toPrimitives().publicKey,
         ),
     );
   });
 
   console.log(
-    'PASS device authorization convergence: two real private Helia/OrbitDB replicas resolved partitioned concurrent enrollment deterministically. Local loopback transport only; no external NAT claim.',
+    'PASS device authorization convergence: two real private Helia/OrbitDB replicas merged partitioned concurrent enrollments. Local loopback transport only; no external NAT claim.',
   );
 }
 
@@ -311,8 +321,10 @@ main()
           }
         }),
       );
+
       if (results.some((result) => result.status === 'rejected'))
         process.exitCode = 1;
+
       if (root) await rm(root, { force: true, recursive: true });
     } finally {
       clearTimeout(watchdog);

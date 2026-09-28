@@ -102,6 +102,30 @@ export class DeviceAuthorization extends AggregateRoot {
     );
   }
 
+  public enrollConcurrently(
+    credentials: DeviceCredential[],
+  ): DeviceAuthorization {
+    const newCredentials = credentials.filter(
+      (credential) => !this.isAuthorized(credential),
+    );
+
+    assert(
+      newCredentials.length > 0,
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return new DeviceAuthorization(
+      this.identityId,
+      this.networkIds,
+      this.recoveryAuthority,
+      this.revision.next(),
+      UniqueObjectArray.fromArray([
+        ...this.credentials.toArray(),
+        ...newCredentials,
+      ]),
+    );
+  }
+
   public revoke(credential: DeviceCredential): DeviceAuthorization {
     assert(
       this.isAuthorized(credential) && this.credentials.length() > 1,
@@ -154,6 +178,24 @@ export class DeviceAuthorization extends AggregateRoot {
       this.networkIds,
       this.recoveryAuthority,
       this.revision.next(),
+      UniqueObjectArray.fromArray([credential]),
+    );
+  }
+
+  public recoverAt(
+    revision: DeviceAuthorizationRevision,
+    credential: DeviceCredential,
+  ): DeviceAuthorization {
+    assert(
+      revision.valueOf() > this.revision.valueOf(),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return new DeviceAuthorization(
+      this.identityId,
+      this.networkIds,
+      this.recoveryAuthority,
+      revision,
       UniqueObjectArray.fromArray([credential]),
     );
   }

@@ -52,7 +52,9 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
     return [...deduplicated.values()].sort(
       (left, right) =>
-        right.version - left.version || right.receivedAt - left.receivedAt,
+        right.version - left.version ||
+        left.cid.localeCompare(right.cid) ||
+        right.receivedAt - left.receivedAt,
     );
   }
 
@@ -103,16 +105,6 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     return document.identity
       ? this.mapper.toDocument(document.identity).profile.handle
       : undefined;
-  }
-
-  private async deleteMetadata(cid: IPFSId): Promise<void> {
-    try {
-      await this.metadataIndex.deleteByExternalIdentifier(
-        new IdentityExternalIdentifier(cid.valueOf()),
-      );
-    } catch {
-      return;
-    }
   }
 
   private async saveMetadata(identity: Identity, cid: IPFSId): Promise<void> {
@@ -197,7 +189,6 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
       if (!isValid) {
         this.identityByCid.delete(cid.valueOf());
-        await this.deleteMetadata(cid);
 
         return undefined;
       }
@@ -223,6 +214,16 @@ export default class IpfsIdentityRepository extends IdentityRepository {
         metadata.identity ||
         (await this.getIdentityFromCid(cid, metadata.networkIds));
 
+      if (hasEmbeddedIdentity) {
+        const calculatedCid = await this.ipfsManager.calculateJSONId(
+          this.mapper.toDocument(candidate),
+        );
+
+        if (!calculatedCid.isEqual(cid)) {
+          return undefined;
+        }
+      }
+
       const isValid = await this.validator.isValidChainFor(
         id,
         candidate,
@@ -232,7 +233,6 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
       if (!isValid) {
         this.identityByCid.delete(cid.valueOf());
-        await this.deleteMetadata(cid);
 
         return undefined;
       }
@@ -473,7 +473,6 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
       if (!isValid) {
         this.identityByCid.delete(cid.valueOf());
-        await this.deleteMetadata(cid);
 
         return undefined;
       }
@@ -541,6 +540,42 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     }
 
     return undefined;
+  }
+
+  private async findCandidateReferences(
+    id: IdentityId,
+    awaitRemoteCandidates: boolean,
+  ): Promise<IdentityCandidate[]> {
+    const metadata = await this.findValidMetadata(id);
+    const localCandidates =
+      await this.findCandidateReferencesFromMetadata(metadata);
+    const knownCids = new Set(
+      localCandidates.map((candidate) =>
+        candidate.getExternalIdentifier().valueOf(),
+      ),
+    );
+
+    if (localCandidates.length > 0 && !awaitRemoteCandidates) {
+      this.refreshRemoteCandidateReferencesInBackground(id, knownCids);
+
+      return this.sortCandidateReferencesByFreshness(localCandidates);
+    }
+
+    if (await this.shouldUseOnlyLocalMetadata(metadata)) {
+      return this.localCandidatesOrNotFound(id, localCandidates);
+    }
+
+    const remoteCandidates = await this.findRemoteCandidateReferencesOrFallback(
+      id,
+      knownCids,
+      localCandidates,
+    );
+    const candidates = this.sortCandidateReferencesByFreshness([
+      ...localCandidates,
+      ...remoteCandidates,
+    ]);
+
+    return this.localCandidatesOrNotFound(id, candidates);
   }
 
   public async findById(id: IdentityId): Promise<Identity> {
@@ -614,32 +649,13 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   public async findCandidateReferencesById(
     id: IdentityId,
   ): Promise<IdentityCandidate[]> {
-    const metadata = await this.findValidMetadata(id);
-    const localCandidates =
-      await this.findCandidateReferencesFromMetadata(metadata);
-    const knownCids = new Set(metadata.map((document) => document.cid));
+    return this.findCandidateReferences(id, false);
+  }
 
-    if (localCandidates.length > 0) {
-      this.refreshRemoteCandidateReferencesInBackground(id, knownCids);
-
-      return this.sortCandidateReferencesByFreshness(localCandidates);
-    }
-
-    if (await this.shouldUseOnlyLocalMetadata(metadata)) {
-      return this.localCandidatesOrNotFound(id, localCandidates);
-    }
-
-    const remoteCandidates = await this.findRemoteCandidateReferencesOrFallback(
-      id,
-      knownCids,
-      localCandidates,
-    );
-    const candidates = this.sortCandidateReferencesByFreshness([
-      ...localCandidates,
-      ...remoteCandidates,
-    ]);
-
-    return this.localCandidatesOrNotFound(id, candidates);
+  public async findFreshCandidateReferencesById(
+    id: IdentityId,
+  ): Promise<IdentityCandidate[]> {
+    return this.findCandidateReferences(id, true);
   }
 
   public async findCandidatesById(id: IdentityId): Promise<Identity[]> {
@@ -678,7 +694,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   ): Promise<number> {
     let republished = 0;
     const documents = this.latestMetadataByIdentity(
-      await this.metadataIndex.findAll(),
+      await this.metadataIndex.findAllCanonical(),
     );
     const routableNetworkIds = documents
       .flatMap((document) => this.routingNetworkIdsFrom(document))

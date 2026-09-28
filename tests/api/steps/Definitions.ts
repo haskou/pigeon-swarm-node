@@ -1,40 +1,40 @@
-import CallParticipantLeaseExpirationRegistrar from '@app/contexts/calls/application/expire-participant-leases/CallParticipantLeaseExpirationRegistrar';
 import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
+import { PrivateAuthorizationRequestBodyLimit } from '@app/apps/apis/private-authorization-api/routes/PrivateAuthorizationRequestBodyLimit';
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import PigeonApplication from '@app/apps/PigeonApplication';
 import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime';
-import { PrivateAuthorizationRequestBodyLimit } from '@app/apps/apis/private-authorization-api/routes/PrivateAuthorizationRequestBodyLimit';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
+import CallParticipantLeaseExpirationRegistrar from '@app/contexts/calls/application/expire-participant-leases/CallParticipantLeaseExpirationRegistrar';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
-import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
-import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
-import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNetworkAdder';
-import { NodeNetworkAdderMessage } from '@app/contexts/nodes/application/add-network/messages/NodeNetworkAdderMessage';
-import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
+import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
 import { DeviceAuthorizationOperationId } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
-import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
 import { PairingAuthorization } from '@app/contexts/identity-devices/domain/value-objects/PairingAuthorization';
+import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
 import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/PairingId';
-import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
+import { NodeNetworkAdderMessage } from '@app/contexts/nodes/application/add-network/messages/NodeNetworkAdderMessage';
+import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNetworkAdder';
+import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
+import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
+import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import Ed25519PrivateDeviceCredentialCodec from '@app/contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { Kernel } from '@haskou/ddd-kernel';
-import { Timestamp, assert } from '@haskou/value-objects';
 import {
   KeyPair,
   PrivateGenesisSignature,
   PrivateKey,
 } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp, assert } from '@haskou/value-objects';
 import canonicalize from 'canonicalize';
 import { expect } from 'chai';
 import * as chai from 'chai';
@@ -524,7 +524,9 @@ export default class Definitions {
     const keyPair = await this.ensureIdentityDeviceOwnerKeyPair();
     const identityId = this.ownerIdentityId as IdentityId;
     const ownerDeviceKey = new Ed25519PrivateDeviceCredentialCodec()
-      .toDeviceKey(DeviceCredential.fromString(keyPair.toPrimitives().publicKey))
+      .toDeviceKey(
+        DeviceCredential.fromString(keyPair.toPrimitives().publicKey),
+      )
       .valueOf();
     const scopeId = randomBytes(32).toString('base64url');
     const protectedState = Buffer.from('private-genesis-state');
@@ -2110,6 +2112,7 @@ export default class Definitions {
   @then('the current voice channel has {int} connected identities')
   public theCurrentVoiceChannelHasConnectedIdentities(count: number): void {
     const channels = this.response.data.channels;
+
     if (!Array.isArray(channels)) {
       throw new Error('Response must contain a channels array.');
     }
@@ -3339,14 +3342,24 @@ export default class Definitions {
     );
   }
 
-  @given('the current node has a test network with id {string} and name {string}')
+  @given(
+    'the current node has a test network with id {string} and name {string}',
+  )
   public async theCurrentNodeHasATestNetworkWithIdAndName(
     networkId: string,
     networkName: string,
   ): Promise<void> {
+    const { privateKey } = generateKeyPairSync('ed25519');
+
     await Kernel.di
       .getService<NodeNetworkAdder>(NodeNetworkAdder)
-      .addNetwork(new NodeNetworkAdderMessage(networkId, networkName));
+      .addNetwork(
+        new NodeNetworkAdderMessage(
+          networkId,
+          networkName,
+          privateKey.export({ format: 'pem', type: 'pkcs8' }).toString(),
+        ),
+      );
     await Kernel.di.getService<NodeLoaderService>(NodeLoaderService).loadNode();
     await this.waitForReplicatedState();
     this.currentNetworkId = networkId;
