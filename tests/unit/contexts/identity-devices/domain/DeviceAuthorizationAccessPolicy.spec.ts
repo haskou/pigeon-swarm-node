@@ -3,6 +3,7 @@ import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/do
 import DeviceAuthorizationAccessPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationAccessPolicy';
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
+import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -38,6 +39,7 @@ describe(DeviceAuthorizationAccessPolicy.name, () => {
       policy.assertAuthorized(
         identityId,
         credential,
+        DeviceAuthorizationEpoch.genesis(),
         DeviceAuthorizationRevision.initial(),
       ),
     ).resolves.toBeUndefined();
@@ -50,6 +52,7 @@ describe(DeviceAuthorizationAccessPolicy.name, () => {
       policy.assertAuthorized(
         identityId,
         credential,
+        DeviceAuthorizationEpoch.genesis(),
         new DeviceAuthorizationRevision(1),
       ),
     ).rejects.toThrow(InvalidDeviceAuthorizationTransitionError);
@@ -57,6 +60,7 @@ describe(DeviceAuthorizationAccessPolicy.name, () => {
       policy.assertAuthorized(
         identityId,
         DeviceCredential.fromString(unauthorized.toPrimitives().publicKey),
+        DeviceAuthorizationEpoch.genesis(),
         DeviceAuthorizationRevision.initial(),
       ),
     ).rejects.toThrow(InvalidDeviceAuthorizationTransitionError);

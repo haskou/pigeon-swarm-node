@@ -13,6 +13,7 @@ export class PostDeviceAuthorizationTransitionRequest {
       DeviceAuthorizationTransition.fromPrimitives({
         authorCredential: this.body.authorCredential,
         authorizedAt: this.body.authorizedAt,
+        epoch: this.body.epoch,
         identityId: this.body.identityId,
         operation: this.body.operation,
         operationId: this.body.operationId,

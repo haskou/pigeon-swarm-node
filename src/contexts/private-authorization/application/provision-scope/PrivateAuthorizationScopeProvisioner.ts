@@ -25,6 +25,7 @@ export default class PrivateAuthorizationScopeProvisioner {
     await this.deviceAuthorization.assertAuthorized(
       message.authenticatedIdentityId,
       this.credentialCodec.toCredential(message.ownerDeviceKey),
+      message.identityAuthorizationEpoch,
       message.identityAuthorizationRevision,
     );
     const genesis = this.genesisAuthenticator.verify(

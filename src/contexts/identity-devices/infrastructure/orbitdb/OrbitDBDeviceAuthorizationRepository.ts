@@ -11,9 +11,11 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp, assert } from '@haskou/value-objects';
+import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 
 import { OrbitDBDeviceAuthorizationDocument } from './documents/OrbitDBDeviceAuthorizationDocument';
+import { OrbitDBDeviceAuthorizationSource } from './documents/OrbitDBDeviceAuthorizationSource';
 import { OrbitDBDeviceAuthorizationTransitionRecord } from './documents/OrbitDBDeviceAuthorizationTransitionRecord';
 
 interface DeviceAuthorizationReplay {
@@ -32,7 +34,19 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
 
   private static readonly MAX_TRANSITION_RECORD_BYTES = 16_384;
 
+  private static readonly MAX_OVERFLOW_SOURCE_RECORDS = 512;
+
+  private static readonly MAX_OVERFLOW_SOURCE_BYTES = 2_200_000;
+
+  private static readonly MAX_DOCUMENT_ADMISSION_BYTES = 6_000_000;
+
+  private static readonly MAX_DOCUMENT_ADMISSION_NODES = 100_000;
+
+  private static readonly MAX_DOCUMENT_ADMISSION_DEPTH = 64;
+
   private readonly identityQueues = new Map<string, Promise<void>>();
+
+  private readonly documentValidationCache = new Map<string, boolean>();
 
   private readonly trustedGenesisByIdentity = new Map<
     string,
@@ -93,6 +107,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   ): boolean {
     return (
       left.identityId === right.identityId &&
+      left.epoch === right.epoch &&
       left.recoveryAuthority === right.recoveryAuthority &&
       left.revision === right.revision &&
       isDeepStrictEqual(left.credentials, right.credentials)
@@ -221,17 +236,18 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     );
   }
 
-  private transitionRecords(
-    left: OrbitDBDeviceAuthorizationDocument,
-    right: OrbitDBDeviceAuthorizationDocument,
+  private uniqueTransitionRecords(
+    histories: OrbitDBDeviceAuthorizationTransitionRecord[][],
   ): OrbitDBDeviceAuthorizationTransitionRecord[] {
     const uniqueRecords = new Map<
       string,
       OrbitDBDeviceAuthorizationTransitionRecord
     >();
 
-    for (const record of [...left.history, ...right.history]) {
-      uniqueRecords.set(this.canonicalString(record), record);
+    for (const history of histories) {
+      for (const record of history) {
+        uniqueRecords.set(this.canonicalString(record), record);
+      }
     }
 
     return [...uniqueRecords.values()].sort((left, right) => {
@@ -244,6 +260,34 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
         this.canonicalString(left).localeCompare(this.canonicalString(right))
       );
     });
+  }
+
+  private effectiveHistory(
+    document: OrbitDBDeviceAuthorizationDocument,
+  ): OrbitDBDeviceAuthorizationTransitionRecord[] {
+    return this.uniqueTransitionRecords(
+      this.documentSources(document).map((source) => source.history),
+    );
+  }
+
+  private effectiveCheckpoint(
+    document: OrbitDBDeviceAuthorizationDocument,
+  ): OrbitDBDeviceAuthorizationDocument['checkpoint'] {
+    return this.preferredSourceCheckpoint(this.documentSources(document));
+  }
+
+  private documentSources(
+    document: OrbitDBDeviceAuthorizationDocument,
+  ): OrbitDBDeviceAuthorizationSource[] {
+    return (
+      document.overflow?.sources ??
+      document.sources ?? [
+        {
+          ...(document.checkpoint ? { checkpoint: document.checkpoint } : {}),
+          history: document.history,
+        },
+      ]
+    );
   }
 
   private transitionRecordsByRevision(
@@ -428,6 +472,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     genesis: DeviceAuthorization,
     history: OrbitDBDeviceAuthorizationTransitionRecord[],
     checkpoint?: OrbitDBDeviceAuthorizationDocument['checkpoint'],
+    sources?: OrbitDBDeviceAuthorizationSource[],
   ): OrbitDBDeviceAuthorizationDocument {
     assert(
       this.hasBoundedHistoryShape(history),
@@ -437,6 +482,38 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       ? this.authorizationFromCheckpoint(genesis, checkpoint)
       : genesis;
     const replay = this.rebuild(baseAuthorization, history);
+    const canonicalSources = this.sourcesAtPreferredCheckpoint(
+      genesis,
+      this.canonicalSources(
+        sources ?? [
+          {
+            ...(checkpoint ? { checkpoint } : {}),
+            history: replay.history,
+          },
+        ],
+      ),
+    );
+    const projection = this.replaySources(genesis, canonicalSources);
+
+    return this.documentFromReplay(
+      genesis,
+      projection.replay,
+      canonicalSources,
+      projection.checkpoint,
+    );
+  }
+
+  private documentFromReplay(
+    genesis: DeviceAuthorization,
+    replay: DeviceAuthorizationReplay,
+    sources: OrbitDBDeviceAuthorizationSource[],
+    checkpoint?: OrbitDBDeviceAuthorizationDocument['checkpoint'],
+  ): OrbitDBDeviceAuthorizationDocument {
+    assert(
+      this.hasBoundedHistoryShape(replay.history) &&
+        this.hasBoundedSourcesShape(sources),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
 
     return {
       authorization: replay.authorization.toPrimitives(),
@@ -446,6 +523,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       id: this.documentId(replay.authorization.getIdentityId()),
       identityId: replay.authorization.getIdentityId().valueOf(),
       kind: 'device_authorization',
+      sources,
     };
   }
 
@@ -534,10 +612,131 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     return true;
   }
 
+  private canonicalSources(
+    sources: OrbitDBDeviceAuthorizationSource[],
+  ): OrbitDBDeviceAuthorizationSource[] {
+    const unique = new Map<string, OrbitDBDeviceAuthorizationSource>();
+
+    for (const source of sources) {
+      unique.set(this.canonicalString(source), source);
+    }
+
+    const candidates = [...unique.values()];
+    const retained = candidates.filter(
+      (candidate) =>
+        !candidates.some(
+          (other) =>
+            other !== candidate && this.sourceExtends(other, candidate),
+        ),
+    );
+
+    return retained.sort((left, right) =>
+      this.canonicalString(left).localeCompare(this.canonicalString(right)),
+    );
+  }
+
+  private sourceExtends(
+    candidate: OrbitDBDeviceAuthorizationSource,
+    prefix: OrbitDBDeviceAuthorizationSource,
+  ): boolean {
+    if (
+      candidate.history.length <= prefix.history.length ||
+      !isDeepStrictEqual(candidate.checkpoint, prefix.checkpoint)
+    ) {
+      return false;
+    }
+
+    return prefix.history.every((record, index) =>
+      isDeepStrictEqual(record, candidate.history[index]),
+    );
+  }
+
+  private hasBoundedSourcesShape(
+    sources: OrbitDBDeviceAuthorizationSource[],
+  ): boolean {
+    const recordCount = sources.reduce(
+      (count, source) => count + source.history.length,
+      0,
+    );
+
+    return (
+      sources.length > 0 &&
+      recordCount <=
+        OrbitDBDeviceAuthorizationRepository.MAX_TRANSITION_RECORDS &&
+      Buffer.byteLength(JSON.stringify(sources), 'utf8') <=
+        OrbitDBDeviceAuthorizationRepository.MAX_TRANSITION_HISTORY_BYTES
+    );
+  }
+
+  private hasBoundedOverflowSourcesShape(
+    sources: OrbitDBDeviceAuthorizationSource[],
+  ): boolean {
+    const recordCount = sources.reduce(
+      (count, source) => count + source.history.length,
+      0,
+    );
+
+    return (
+      recordCount <=
+        OrbitDBDeviceAuthorizationRepository.MAX_OVERFLOW_SOURCE_RECORDS &&
+      Buffer.byteLength(JSON.stringify(sources), 'utf8') <=
+        OrbitDBDeviceAuthorizationRepository.MAX_OVERFLOW_SOURCE_BYTES
+    );
+  }
+
+  private hasCheckpointShape(checkpoint: unknown): boolean {
+    return (
+      checkpoint === undefined ||
+      (this.isRecord(checkpoint) &&
+        this.hasExactKeys(checkpoint, [
+          'authorization',
+          'lineage',
+          'transition',
+        ]) &&
+        this.isRecord(checkpoint.authorization) &&
+        Array.isArray(checkpoint.lineage) &&
+        checkpoint.lineage.length <= 1024 &&
+        checkpoint.lineage.every((record) =>
+          this.isBoundedTransitionRecord(record),
+        ) &&
+        this.isBoundedTransitionRecord(checkpoint.transition))
+    );
+  }
+
+  private hasOverflowShape(overflow: unknown, checkpoint: unknown): boolean {
+    return (
+      overflow === undefined ||
+      (checkpoint === undefined &&
+        this.isRecord(overflow) &&
+        this.hasOverflowFields(overflow))
+    );
+  }
+
+  private hasOverflowFields(overflow: Record<string, unknown>): boolean {
+    return (
+      this.hasExactKeys(overflow, ['frontier', 'sources']) &&
+      Array.isArray(overflow.sources) &&
+      this.isRecord(overflow.frontier)
+    );
+  }
+
+  private hasDocumentCoreShape(value: Record<string, unknown>): boolean {
+    return (
+      value.kind === 'device_authorization' &&
+      typeof value.id === 'string' &&
+      typeof value.identityId === 'string' &&
+      Array.isArray(value.history) &&
+      (value.sources === undefined || Array.isArray(value.sources)) &&
+      this.isRecord(value.genesis) &&
+      this.isRecord(value.authorization)
+    );
+  }
+
   private hasDocumentShape(value: Record<string, unknown>): boolean {
     const checkpoint = value.checkpoint;
+    const overflow = value.overflow;
 
-    return [
+    return (
       this.hasExactKeys(value, [
         'authorization',
         'genesis',
@@ -545,35 +744,32 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
         'id',
         'identityId',
         'kind',
+        ...(value.sources === undefined ? [] : ['sources']),
         ...(checkpoint === undefined ? [] : ['checkpoint']),
-      ]),
-      value.kind === 'device_authorization',
-      typeof value.id === 'string',
-      typeof value.identityId === 'string',
-      Array.isArray(value.history),
-      typeof value.genesis === 'object' && value.genesis !== null,
-      typeof value.authorization === 'object' && value.authorization !== null,
-      checkpoint === undefined ||
-        (this.isRecord(checkpoint) &&
-          this.hasExactKeys(checkpoint, ['authorization', 'transition']) &&
-          this.isRecord(checkpoint.authorization) &&
-          this.isBoundedTransitionRecord(checkpoint.transition)),
-    ].every(Boolean);
+        ...(overflow === undefined ? [] : ['overflow']),
+      ]) &&
+      this.hasDocumentCoreShape(value) &&
+      this.hasCheckpointShape(checkpoint) &&
+      this.hasOverflowShape(overflow, checkpoint)
+    );
   }
 
   private authorizationFromCheckpoint(
     genesis: DeviceAuthorization,
     checkpoint: NonNullable<OrbitDBDeviceAuthorizationDocument['checkpoint']>,
   ): DeviceAuthorization {
-    const transition = this.transitionFromRecord(checkpoint.transition);
+    const authorization = [...checkpoint.lineage, checkpoint.transition].reduce(
+      (current, record) => {
+        const transition = this.transitionFromRecord(record);
 
-    assert(
-      transition !== undefined && transition.isRecovery(),
-      new InvalidDeviceAuthorizationTransitionError(),
-    );
-    const authorization = this.policy.applyRecoveryCheckpoint(
+        assert(
+          transition !== undefined && transition.isRecovery(),
+          new InvalidDeviceAuthorizationTransitionError(),
+        );
+
+        return this.policy.applyRecoveryCheckpoint(current, transition);
+      },
       genesis,
-      transition,
     );
 
     assert(
@@ -610,9 +806,289 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     );
   }
 
+  private hasSourceShape(
+    source: unknown,
+  ): source is OrbitDBDeviceAuthorizationSource {
+    if (!this.isRecord(source)) {
+      return false;
+    }
+
+    const checkpoint = source.checkpoint;
+
+    return (
+      this.hasExactKeys(source, [
+        'history',
+        ...(checkpoint === undefined ? [] : ['checkpoint']),
+      ]) &&
+      Array.isArray(source.history) &&
+      this.hasCheckpointShape(checkpoint)
+    );
+  }
+
+  private sourceReplay(
+    genesis: DeviceAuthorization,
+    source: OrbitDBDeviceAuthorizationSource,
+  ): DeviceAuthorizationReplay {
+    return this.rebuild(
+      source.checkpoint
+        ? this.authorizationFromCheckpoint(genesis, source.checkpoint)
+        : genesis,
+      source.history,
+    );
+  }
+
+  private isValidSource(
+    genesis: DeviceAuthorization,
+    source: OrbitDBDeviceAuthorizationSource,
+  ): boolean {
+    if (!this.hasBoundedHistoryShape(source.history)) {
+      return false;
+    }
+
+    return isDeepStrictEqual(
+      this.sourceReplay(genesis, source).history,
+      source.history,
+    );
+  }
+
+  private preferredSourceCheckpoint(
+    sources: OrbitDBDeviceAuthorizationSource[],
+  ): OrbitDBDeviceAuthorizationDocument['checkpoint'] {
+    return sources
+      .map((source) => source.checkpoint)
+      .filter(
+        (
+          checkpoint,
+        ): checkpoint is NonNullable<
+          OrbitDBDeviceAuthorizationDocument['checkpoint']
+        > => checkpoint !== undefined,
+      )
+      .sort(
+        (left, right) =>
+          right.authorization.revision - left.authorization.revision ||
+          this.canonicalString(left).localeCompare(this.canonicalString(right)),
+      )[0];
+  }
+
+  private replaySources(
+    genesis: DeviceAuthorization,
+    sources: OrbitDBDeviceAuthorizationSource[],
+  ): {
+    checkpoint?: OrbitDBDeviceAuthorizationDocument['checkpoint'];
+    replay: DeviceAuthorizationReplay;
+  } {
+    const checkpoint = this.preferredSourceCheckpoint(sources);
+    const checkpointRevision = checkpoint?.authorization.revision ?? 0;
+    const history = this.uniqueTransitionRecords(
+      sources.map((source) => source.history),
+    ).filter(
+      (record) => record.transition.previousRevision >= checkpointRevision,
+    );
+
+    return {
+      ...(checkpoint ? { checkpoint } : {}),
+      replay: this.rebuild(
+        checkpoint
+          ? this.authorizationFromCheckpoint(genesis, checkpoint)
+          : genesis,
+        history,
+      ),
+    };
+  }
+
+  private sourcesAtPreferredCheckpoint(
+    genesis: DeviceAuthorization,
+    sources: OrbitDBDeviceAuthorizationSource[],
+  ): OrbitDBDeviceAuthorizationSource[] {
+    const checkpoint = this.preferredSourceCheckpoint(sources);
+
+    if (!checkpoint) {
+      return this.canonicalSources(sources);
+    }
+
+    const authorization = this.authorizationFromCheckpoint(genesis, checkpoint);
+
+    return this.canonicalSources(
+      sources.map((source) => ({
+        checkpoint,
+        history: isDeepStrictEqual(source.checkpoint, checkpoint)
+          ? this.rebuild(authorization, source.history).history
+          : [],
+      })),
+    );
+  }
+
+  private hasBoundedProjection(
+    replay: DeviceAuthorizationReplay,
+    sources: OrbitDBDeviceAuthorizationSource[],
+  ): boolean {
+    return (
+      this.hasBoundedSourcesShape(sources) &&
+      this.hasBoundedHistoryShape(replay.history)
+    );
+  }
+
+  private hasValidSources(
+    document: OrbitDBDeviceAuthorizationDocument,
+    genesis: DeviceAuthorization,
+  ): boolean {
+    const sources = this.documentSources(document);
+
+    if (
+      !this.hasBoundedSourcesShape(sources) ||
+      !isDeepStrictEqual(sources, this.canonicalSources(sources)) ||
+      !sources.every(
+        (source) =>
+          this.hasSourceShape(source) && this.isValidSource(genesis, source),
+      )
+    ) {
+      return false;
+    }
+
+    const normalizedSources = this.sourcesAtPreferredCheckpoint(
+      genesis,
+      sources,
+    );
+    const { checkpoint, replay } = this.replaySources(
+      genesis,
+      normalizedSources,
+    );
+
+    return (
+      isDeepStrictEqual(sources, normalizedSources) &&
+      isDeepStrictEqual(document.checkpoint, checkpoint) &&
+      this.matchesReplay(document, replay)
+    );
+  }
+
   private isDocument(
     value: Record<string, unknown>,
   ): value is OrbitDBDeviceAuthorizationDocument {
+    if (!this.hasDocumentAdmissionShape(value)) {
+      return false;
+    }
+
+    let fingerprint: string;
+
+    try {
+      const serialized = JSON.stringify(value);
+
+      if (
+        Buffer.byteLength(serialized, 'utf8') >
+        OrbitDBDeviceAuthorizationRepository.MAX_DOCUMENT_ADMISSION_BYTES
+      ) {
+        return false;
+      }
+
+      fingerprint = createHash('sha256')
+        .update(this.canonicalString(value))
+        .digest('base64url');
+    } catch {
+      return false;
+    }
+    const cached = this.documentValidationCache.get(fingerprint);
+
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const valid = this.validateDocument(value);
+
+    this.documentValidationCache.set(fingerprint, valid);
+
+    if (this.documentValidationCache.size > 128) {
+      const [oldest] = this.documentValidationCache.keys();
+
+      if (oldest) {
+        this.documentValidationCache.delete(oldest);
+      }
+    }
+
+    return valid;
+  }
+
+  private hasDocumentAdmissionShape(value: unknown): boolean {
+    const stack: Array<{ depth: number; value: unknown }> = [
+      { depth: 0, value },
+    ];
+    let bytes = 0;
+    let nodes = 0;
+
+    while (stack.length > 0) {
+      const current = stack.pop();
+
+      if (!current) {
+        continue;
+      }
+
+      nodes += 1;
+
+      if (this.exceedsAdmissionTraversal(nodes, current.depth)) {
+        return false;
+      }
+
+      const admitted = this.admitDocumentNode(current.value);
+
+      if (!admitted) {
+        return false;
+      }
+
+      bytes += admitted.bytes;
+      stack.push(
+        ...admitted.children.map((item) => ({
+          depth: current.depth + 1,
+          value: item,
+        })),
+      );
+
+      if (
+        bytes >
+        OrbitDBDeviceAuthorizationRepository.MAX_DOCUMENT_ADMISSION_BYTES
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private exceedsAdmissionTraversal(nodes: number, depth: number): boolean {
+    return (
+      nodes >
+        OrbitDBDeviceAuthorizationRepository.MAX_DOCUMENT_ADMISSION_NODES ||
+      depth > OrbitDBDeviceAuthorizationRepository.MAX_DOCUMENT_ADMISSION_DEPTH
+    );
+  }
+
+  private admitDocumentNode(
+    value: unknown,
+  ): { bytes: number; children: unknown[] } | undefined {
+    if (typeof value === 'string') {
+      return { bytes: Buffer.byteLength(value, 'utf8'), children: [] };
+    }
+
+    if (Array.isArray(value)) {
+      return value.length <= 1024 ? { bytes: 0, children: value } : undefined;
+    }
+
+    if (!this.isRecord(value)) {
+      return { bytes: 8, children: [] };
+    }
+
+    const entries = Object.entries(value);
+
+    return entries.length <= 32
+      ? {
+          bytes: entries.reduce(
+            (total, [key]) => total + Buffer.byteLength(key, 'utf8'),
+            0,
+          ),
+          children: entries.map(([, item]) => item),
+        }
+      : undefined;
+  }
+
+  private validateDocument(value: Record<string, unknown>): boolean {
     try {
       if (!this.hasDocumentShape(value)) {
         return false;
@@ -620,24 +1096,162 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
 
       const document = value as unknown as OrbitDBDeviceAuthorizationDocument;
 
+      if (document.overflow) {
+        return this.isOverflowDocument(document);
+      }
+
       if (!this.hasBoundedHistoryShape(document.history)) {
         return false;
       }
 
       const genesis = DeviceAuthorization.fromPrimitives(document.genesis);
-      const baseAuthorization = document.checkpoint
-        ? this.authorizationFromCheckpoint(genesis, document.checkpoint)
-        : genesis;
-      const replay = this.rebuild(baseAuthorization, document.history);
 
       return (
         this.hasValidGenesis(document, genesis) &&
         isDeepStrictEqual(document.genesis, genesis.toPrimitives()) &&
-        this.matchesReplay(document, replay)
+        this.hasValidSources(document, genesis)
       );
     } catch {
       return false;
     }
+  }
+
+  private isOverflowDocument(
+    document: OrbitDBDeviceAuthorizationDocument,
+  ): boolean {
+    const overflow = document.overflow;
+
+    if (!overflow || !this.hasValidOverflowEvidence(document, overflow)) {
+      return false;
+    }
+
+    const genesis = DeviceAuthorization.fromPrimitives(document.genesis);
+    const replay = this.replaySources(genesis, overflow.sources).replay;
+    const authorization = replay.authorization.requireRecoveryAt(
+      this.overflowRevision(replay, overflow.frontier),
+    );
+
+    return (
+      this.hasValidGenesis(document, genesis) &&
+      isDeepStrictEqual(document.genesis, genesis.toPrimitives()) &&
+      isDeepStrictEqual(document.authorization, authorization.toPrimitives())
+    );
+  }
+
+  private hasValidOverflowEvidence(
+    document: OrbitDBDeviceAuthorizationDocument,
+    overflow: NonNullable<OrbitDBDeviceAuthorizationDocument['overflow']>,
+  ): boolean {
+    if (!this.hasEmptyOverflowProjection(document)) {
+      return false;
+    }
+
+    const genesis = DeviceAuthorization.fromPrimitives(document.genesis);
+
+    return (
+      this.hasDominantOverflowFrontier(document, genesis, overflow) &&
+      this.isMinimalOverflowSources(genesis, overflow.sources)
+    );
+  }
+
+  private hasDominantOverflowFrontier(
+    document: OrbitDBDeviceAuthorizationDocument,
+    genesis: DeviceAuthorization,
+    overflow: NonNullable<OrbitDBDeviceAuthorizationDocument['overflow']>,
+  ): boolean {
+    if (
+      overflow.frontier.overflow !== undefined ||
+      !this.isDocument(overflow.frontier) ||
+      this.documentSources(overflow.frontier).length !== 1 ||
+      !this.sameGenesis(document, overflow.frontier)
+    ) {
+      return false;
+    }
+
+    const sources = this.sourcesAtPreferredCheckpoint(
+      genesis,
+      this.canonicalSources([
+        ...overflow.sources,
+        ...this.documentSources(overflow.frontier),
+      ]),
+    );
+
+    return isDeepStrictEqual(
+      overflow.frontier,
+      this.frontierFromSources(genesis, sources),
+    );
+  }
+
+  private hasEmptyOverflowProjection(
+    document: OrbitDBDeviceAuthorizationDocument,
+  ): boolean {
+    return (
+      document.checkpoint === undefined &&
+      document.history.length === 0 &&
+      (document.sources?.length ?? 0) === 0
+    );
+  }
+
+  private isMinimalOverflowSources(
+    genesis: DeviceAuthorization,
+    sources: OrbitDBDeviceAuthorizationSource[],
+  ): boolean {
+    const replay = this.replaySources(genesis, sources).replay;
+    const hasBoundedHistory = this.hasBoundedHistoryShape(replay.history);
+    const hasBoundedSources = this.hasBoundedSourcesShape(sources);
+
+    if (
+      sources.length === 0 ||
+      (hasBoundedHistory && hasBoundedSources) ||
+      !this.hasBoundedOverflowSourcesShape(sources) ||
+      !isDeepStrictEqual(sources, this.canonicalSources(sources)) ||
+      !isDeepStrictEqual(
+        sources,
+        this.sourcesAtPreferredCheckpoint(genesis, sources),
+      ) ||
+      !sources.every(
+        (source) =>
+          this.hasSourceShape(source) && this.isValidSource(genesis, source),
+      )
+    ) {
+      return false;
+    }
+
+    return this.hasBoundedOverflowPrefix(
+      genesis,
+      sources.slice(0, -1),
+      hasBoundedHistory,
+    );
+  }
+
+  private hasBoundedOverflowPrefix(
+    genesis: DeviceAuthorization,
+    sources: OrbitDBDeviceAuthorizationSource[],
+    completeHistoryIsBounded: boolean,
+  ): boolean {
+    if (completeHistoryIsBounded) {
+      return this.hasBoundedSourcesShape(sources);
+    }
+
+    return this.hasBoundedProjection(
+      this.replaySources(genesis, sources).replay,
+      sources,
+    );
+  }
+
+  private overflowRevision(
+    replay: DeviceAuthorizationReplay,
+    frontier: OrbitDBDeviceAuthorizationDocument,
+  ): DeviceAuthorizationRevision {
+    const replayRevision = replay.authorization.getRevision();
+    const frontierRevision = new DeviceAuthorizationRevision(
+      frontier.authorization.revision,
+    );
+    const latestRevision = replayRevision.isGreaterThan(frontierRevision)
+      ? replayRevision
+      : frontierRevision;
+
+    return latestRevision.next();
   }
 
   private conflictsWithTrustedGenesis(
@@ -649,6 +1263,197 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       trusted &&
       !this.sameAuthorizationGenesis(document.genesis, trusted.toPrimitives()),
     );
+  }
+
+  private mergedReplay(
+    left: OrbitDBDeviceAuthorizationDocument,
+    right: OrbitDBDeviceAuthorizationDocument,
+  ): {
+    checkpoint?: OrbitDBDeviceAuthorizationDocument['checkpoint'];
+    genesis: DeviceAuthorization;
+    replay: DeviceAuthorizationReplay;
+    sources: OrbitDBDeviceAuthorizationSource[];
+  } {
+    const genesis = DeviceAuthorization.fromPrimitives(left.genesis);
+    const sources = this.sourcesAtPreferredCheckpoint(
+      genesis,
+      this.canonicalSources([
+        ...this.mergeSourceEvidence(left),
+        ...this.mergeSourceEvidence(right),
+      ]),
+    );
+    const { checkpoint, replay } = this.replaySources(genesis, sources);
+
+    return {
+      ...(checkpoint ? { checkpoint } : {}),
+      genesis,
+      replay,
+      sources,
+    };
+  }
+
+  private mergeSourceEvidence(
+    document: OrbitDBDeviceAuthorizationDocument,
+  ): OrbitDBDeviceAuthorizationSource[] {
+    return [
+      ...this.documentSources(document),
+      ...(document.overflow
+        ? this.documentSources(document.overflow.frontier)
+        : []),
+    ];
+  }
+
+  private frontierFromSources(
+    genesis: DeviceAuthorization,
+    sources: OrbitDBDeviceAuthorizationSource[],
+  ): OrbitDBDeviceAuthorizationDocument {
+    const ordered = sources
+      .map((source) => ({
+        replay: this.sourceReplay(genesis, source),
+        source,
+      }))
+      .sort(
+        (left, right) =>
+          right.replay.authorization.getRevision().valueOf() -
+            left.replay.authorization.getRevision().valueOf() ||
+          this.canonicalString(left.source).localeCompare(
+            this.canonicalString(right.source),
+          ),
+      );
+    const [frontier] = ordered;
+
+    assert(
+      frontier !== undefined,
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return this.toDocument(
+      genesis,
+      frontier.source.history,
+      frontier.source.checkpoint,
+      [frontier.source],
+    );
+  }
+
+  private minimalOverflowSources(
+    genesis: DeviceAuthorization,
+    sources: OrbitDBDeviceAuthorizationSource[],
+  ): OrbitDBDeviceAuthorizationSource[] {
+    const hasBoundedHistory = this.hasBoundedHistoryShape(
+      this.replaySources(genesis, sources).replay.history,
+    );
+
+    for (let length = 1; length <= sources.length; length += 1) {
+      const candidate = sources.slice(0, length);
+
+      if (
+        hasBoundedHistory
+          ? !this.hasBoundedSourcesShape(candidate)
+          : !this.hasBoundedProjection(
+              this.replaySources(genesis, candidate).replay,
+              candidate,
+            )
+      ) {
+        return candidate;
+      }
+    }
+
+    assert(false, new InvalidDeviceAuthorizationTransitionError());
+  }
+
+  private overflowDocument(
+    genesis: DeviceAuthorization,
+    sources: OrbitDBDeviceAuthorizationSource[],
+    frontier: OrbitDBDeviceAuthorizationDocument,
+  ): OrbitDBDeviceAuthorizationDocument {
+    const witness = this.minimalOverflowSources(genesis, sources);
+    const replay = this.replaySources(genesis, witness).replay;
+    const authorization = replay.authorization.requireRecoveryAt(
+      this.overflowRevision(replay, frontier),
+    );
+
+    return {
+      authorization: authorization.toPrimitives(),
+      genesis: genesis.toPrimitives(),
+      history: [],
+      id: this.documentId(genesis.getIdentityId()),
+      identityId: genesis.getIdentityId().valueOf(),
+      kind: 'device_authorization',
+      overflow: {
+        frontier,
+        sources: witness,
+      },
+      sources: [],
+    };
+  }
+
+  private recoverySupersedesOverflow(
+    candidate: OrbitDBDeviceAuthorizationDocument,
+    overflow: OrbitDBDeviceAuthorizationDocument,
+  ): boolean {
+    const checkpoint = candidate.checkpoint;
+
+    if (!checkpoint) {
+      return false;
+    }
+
+    const checkpointRevision = new DeviceAuthorizationRevision(
+      checkpoint.authorization.revision,
+    );
+    const overflowRevision = new DeviceAuthorizationRevision(
+      overflow.authorization.revision,
+    );
+
+    return (
+      checkpointRevision.isGreaterThan(overflowRevision) ||
+      checkpointRevision.isEqual(overflowRevision)
+    );
+  }
+
+  private mergeOverflow(
+    left: OrbitDBDeviceAuthorizationDocument,
+    right: OrbitDBDeviceAuthorizationDocument,
+  ): OrbitDBDeviceAuthorizationDocument | undefined {
+    if (!left.overflow && !right.overflow) {
+      return undefined;
+    }
+
+    const recovery = this.supersedingRecovery(left, right);
+
+    if (recovery) {
+      return recovery;
+    }
+
+    const merged = this.mergedReplay(left, right);
+
+    return this.overflowDocument(
+      merged.genesis,
+      merged.sources,
+      this.frontierFromSources(merged.genesis, merged.sources),
+    );
+  }
+
+  private supersedingRecovery(
+    left: OrbitDBDeviceAuthorizationDocument,
+    right: OrbitDBDeviceAuthorizationDocument,
+  ): OrbitDBDeviceAuthorizationDocument | undefined {
+    if (
+      left.overflow &&
+      !right.overflow &&
+      this.recoverySupersedesOverflow(right, left)
+    ) {
+      return right;
+    }
+
+    if (
+      right.overflow &&
+      !left.overflow &&
+      this.recoverySupersedesOverflow(left, right)
+    ) {
+      return left;
+    }
+
+    return undefined;
   }
 
   private mergeRecords(
@@ -671,27 +1476,22 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       return acceptedCurrent;
     }
 
-    const checkpoint = this.preferredCheckpoint(
-      acceptedCurrent,
-      acceptedCandidate,
-    );
-    const checkpointRevision = checkpoint?.authorization.revision ?? 0;
-    const history = this.transitionRecords(
-      acceptedCurrent,
-      acceptedCandidate,
-    ).filter(
-      (record) => record.transition.previousRevision >= checkpointRevision,
-    );
+    const overflow = this.mergeOverflow(acceptedCurrent, acceptedCandidate);
 
-    if (!this.hasBoundedHistoryShape(history)) {
-      return this.preferredBoundedDocument(acceptedCurrent, acceptedCandidate);
+    if (overflow) {
+      return overflow;
     }
 
-    return this.toDocument(
-      DeviceAuthorization.fromPrimitives(acceptedCurrent.genesis),
-      history,
-      checkpoint,
-    );
+    const merged = this.mergedReplay(acceptedCurrent, acceptedCandidate);
+    const { checkpoint, genesis, replay, sources } = merged;
+
+    return this.hasBoundedProjection(replay, sources)
+      ? this.documentFromReplay(genesis, replay, sources, checkpoint)
+      : this.overflowDocument(
+          genesis,
+          sources,
+          this.frontierFromSources(genesis, sources),
+        );
   }
 
   private trustedDocument(
@@ -702,46 +1502,6 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     }
 
     return this.conflictsWithTrustedGenesis(value) ? undefined : value;
-  }
-
-  private preferredBoundedDocument(
-    left: OrbitDBDeviceAuthorizationDocument,
-    right: OrbitDBDeviceAuthorizationDocument,
-  ): OrbitDBDeviceAuthorizationDocument {
-    const documents: [
-      OrbitDBDeviceAuthorizationDocument,
-      OrbitDBDeviceAuthorizationDocument,
-    ] = [left, right];
-
-    documents.sort(
-      (first, second) =>
-        (second.checkpoint?.authorization.revision ?? 0) -
-          (first.checkpoint?.authorization.revision ?? 0) ||
-        first.authorization.credentials.length -
-          second.authorization.credentials.length ||
-        this.canonicalString(first).localeCompare(this.canonicalString(second)),
-    );
-
-    return documents[0];
-  }
-
-  private preferredCheckpoint(
-    left: OrbitDBDeviceAuthorizationDocument,
-    right: OrbitDBDeviceAuthorizationDocument,
-  ): OrbitDBDeviceAuthorizationDocument['checkpoint'] {
-    const checkpoints = [left.checkpoint, right.checkpoint].filter(
-      (
-        checkpoint,
-      ): checkpoint is NonNullable<
-        OrbitDBDeviceAuthorizationDocument['checkpoint']
-      > => checkpoint !== undefined,
-    );
-
-    return checkpoints.sort(
-      (first, second) =>
-        second.authorization.revision - first.authorization.revision ||
-        this.canonicalString(first).localeCompare(this.canonicalString(second)),
-    )[0];
   }
 
   private async withIdentityLock<T>(
@@ -778,15 +1538,15 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     const pairingId = transition.isEnrollment()
       ? transition.getPairingId().valueOf()
       : undefined;
+    const checkpoint = this.effectiveCheckpoint(document);
 
-    return (
-      document.history.some(
+    return Boolean(
+      this.effectiveHistory(document).some(
         (record) =>
           record.transition.operationId === operationId ||
           (pairingId !== undefined &&
             record.transition.pairingId === pairingId),
-      ) ||
-      document.checkpoint?.transition.transition.operationId === operationId
+      ) || checkpoint?.transition.transition.operationId === operationId,
     );
   }
 
@@ -845,6 +1605,65 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     return saved;
   }
 
+  private applyOverflowRecovery(
+    suspended: DeviceAuthorization,
+    transition: DeviceAuthorizationTransition,
+  ): DeviceAuthorization {
+    assert(
+      transition.isRecovery() &&
+        suspended.getEpoch().isEqual(transition.getEpoch()) &&
+        suspended.getRevision().isEqual(transition.getPreviousRevision()) &&
+        transition.getRevision().immediatelyFollows(suspended.getRevision()),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return this.policy.applyRecoveryCheckpoint(suspended, transition);
+  }
+
+  private documentAfterTransition(
+    stored: OrbitDBDeviceAuthorizationDocument,
+    genesis: DeviceAuthorization,
+    authorization: DeviceAuthorization,
+    transition: DeviceAuthorizationTransition,
+  ): OrbitDBDeviceAuthorizationDocument {
+    const transitionRecord = { transition: transition.toPrimitives() };
+
+    if (transition.isRecovery()) {
+      const checkpoint = this.effectiveCheckpoint(stored);
+
+      return this.toDocument(genesis, [], {
+        authorization: authorization.toPrimitives(),
+        lineage: checkpoint
+          ? [...checkpoint.lineage, checkpoint.transition]
+          : [],
+        transition: transitionRecord,
+      });
+    }
+
+    const source: OrbitDBDeviceAuthorizationSource = {
+      ...(stored.checkpoint ? { checkpoint: stored.checkpoint } : {}),
+      history: [...stored.history, transitionRecord],
+    };
+    const sources = this.sourcesAtPreferredCheckpoint(
+      genesis,
+      this.canonicalSources([...this.documentSources(stored), source]),
+    );
+    const projection = this.replaySources(genesis, sources);
+
+    return this.hasBoundedProjection(projection.replay, sources)
+      ? this.documentFromReplay(
+          genesis,
+          projection.replay,
+          sources,
+          projection.checkpoint,
+        )
+      : this.overflowDocument(
+          genesis,
+          sources,
+          this.toDocument(genesis, source.history, source.checkpoint),
+        );
+  }
+
   public compareAndApply(
     transition: DeviceAuthorizationTransition,
   ): Promise<DeviceAuthorization> {
@@ -877,25 +1696,26 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       this.policy.verifyFirstAcceptance(transition, new Timestamp(Date.now()));
 
       const genesis = DeviceAuthorization.fromPrimitives(stored.genesis);
-      const baseAuthorization = stored.checkpoint
-        ? this.authorizationFromCheckpoint(genesis, stored.checkpoint)
-        : genesis;
-      const current = this.rebuild(
-        baseAuthorization,
-        stored.history,
-      ).authorization;
-      const authorization = this.policy.apply(current, transition);
-      const transitionRecord = { transition: transition.toPrimitives() };
-      const document = transition.isRecovery()
-        ? this.toDocument(genesis, [], {
-            authorization: authorization.toPrimitives(),
-            transition: transitionRecord,
-          })
-        : this.toDocument(
-            genesis,
-            [...stored.history, transitionRecord],
-            stored.checkpoint,
+      const authorization = stored.overflow
+        ? this.applyOverflowRecovery(
+            DeviceAuthorization.fromPrimitives(stored.authorization),
+            transition,
+          )
+        : this.policy.apply(
+            this.rebuild(
+              stored.checkpoint
+                ? this.authorizationFromCheckpoint(genesis, stored.checkpoint)
+                : genesis,
+              stored.history,
+            ).authorization,
+            transition,
           );
+      const document = this.documentAfterTransition(
+        stored,
+        genesis,
+        authorization,
+        transition,
+      );
 
       const saved = await this.save(document);
 

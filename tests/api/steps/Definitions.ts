@@ -571,6 +571,7 @@ export default class Definitions {
 
     this.privateAuthorizationScopeId = scopeId;
     this.body = JSON.stringify({
+      identityAuthorizationEpoch: 'genesis',
       identityAuthorizationRevision: 0,
       ownerDeviceKey,
       projection: {

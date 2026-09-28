@@ -1,3 +1,4 @@
+import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
@@ -8,6 +9,7 @@ import { PrivateProtectedMlsState } from '../../../domain/value-objects/PrivateP
 
 export class PrivateAuthorizationScopeProvisionMessage {
   public readonly authenticatedIdentityId: IdentityId;
+  public readonly identityAuthorizationEpoch: DeviceAuthorizationEpoch;
   public readonly identityAuthorizationRevision: DeviceAuthorizationRevision;
   public readonly ownerDeviceKey: PrivateAuthorizationDeviceKey;
   public readonly signedGenesisJson: PrivateGenesisJson;
@@ -16,6 +18,7 @@ export class PrivateAuthorizationScopeProvisionMessage {
 
   public constructor(
     authenticatedIdentityId: string,
+    identityAuthorizationEpoch: string,
     identityAuthorizationRevision: number,
     ownerDeviceKey: string,
     signedGenesisJson: string,
@@ -23,6 +26,9 @@ export class PrivateAuthorizationScopeProvisionMessage {
     projection: Record<string, unknown>,
   ) {
     this.authenticatedIdentityId = new IdentityId(authenticatedIdentityId);
+    this.identityAuthorizationEpoch = new DeviceAuthorizationEpoch(
+      identityAuthorizationEpoch,
+    );
     this.identityAuthorizationRevision = new DeviceAuthorizationRevision(
       identityAuthorizationRevision,
     );

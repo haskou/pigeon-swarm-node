@@ -1,3 +1,4 @@
+import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
@@ -37,6 +38,12 @@ export class PrivateControlOperation {
   public getIdentityAuthorizationRevision(): DeviceAuthorizationRevision {
     return new DeviceAuthorizationRevision(
       this.primitives.identityAuthorizationRevision,
+    );
+  }
+
+  public getIdentityAuthorizationEpoch(): DeviceAuthorizationEpoch {
+    return new DeviceAuthorizationEpoch(
+      this.primitives.identityAuthorizationEpoch,
     );
   }
 

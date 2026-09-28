@@ -6,6 +6,7 @@ export interface PrivateControlOperationPrimitives {
   control?: Record<string, unknown>;
   digest: string;
   id: string;
+  identityAuthorizationEpoch: string;
   identityAuthorizationRevision: number;
   kind: 'membership.propose' | 'membership.commit' | 'device.revoke' | string;
   mutation:
@@ -14,6 +15,7 @@ export interface PrivateControlOperationPrimitives {
     | {
         deviceKey: string;
         identityId: string;
+        identityAuthorizationEpoch: string;
         identityAuthorizationRevision: number;
         mlsCredentialHash: string;
         type: 'member.admit';

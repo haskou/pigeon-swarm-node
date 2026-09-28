@@ -72,6 +72,7 @@ describe('PrivateOperationAcceptor', () => {
       ...changes,
       payload: {
         authorIdentityId,
+        identityAuthorizationEpoch: 'genesis',
         identityAuthorizationRevision: 0,
         ...payload,
       },
@@ -229,6 +230,7 @@ describe('PrivateOperationAcceptor', () => {
             payload: {
               authorIdentityId: claimedIdentityId,
               change: { targetIdentityId: 'member', type: 'member.ban' },
+              identityAuthorizationEpoch: 'genesis',
               identityAuthorizationRevision: 0,
               parentHeadHash: headHash,
               proposalId,
@@ -644,6 +646,7 @@ describe('PrivateOperationAcceptor', () => {
       payload: {
         authorIdentityId: competingIdentityId,
         change: { targetIdentityId: 'different-member', type: 'member.ban' },
+        identityAuthorizationEpoch: 'genesis',
         identityAuthorizationRevision: 0,
         parentHeadHash: headHash,
         proposalId,
@@ -698,6 +701,79 @@ describe('PrivateOperationAcceptor', () => {
     ).rejects.toThrow('Private authorization conflict');
     expect(verifier.verify).toHaveBeenCalledWith(conflictingJson, authorKey);
     expect(unitOfWork.quarantine).toHaveBeenCalledWith(scopeId);
+  });
+
+  it('does not quarantine a receipt conflict signed by a revoked device', async () => {
+    const receipt = new PrivateControlOperationContract()
+      .decode(signed())
+      .toPrimitives();
+    const conflicting = JSON.parse(signed());
+    conflicting.payload.change.targetIdentityId = 'different-member';
+    const conflictingJson = JSON.stringify(conflicting);
+    repository.findReceipt.mockResolvedValue(receipt);
+    deviceAuthorization.assertAuthorized.mockRejectedValue(
+      new Error('revoked device'),
+    );
+
+    await expect(
+      acceptor.accept(
+        new PrivateOperationAcceptMessage(conflictingJson, 'proof'),
+      ),
+    ).rejects.toThrow('revoked device');
+    expect(deviceAuthorization.assertAuthorized).toHaveBeenCalled();
+    expect(verifier.verify).not.toHaveBeenCalled();
+    expect(unitOfWork.quarantine).not.toHaveBeenCalled();
+  });
+
+  it('does not quarantine a concurrently committed conflict from a revoked device', async () => {
+    const receipt = new PrivateControlOperationContract()
+      .decode(signed())
+      .toPrimitives();
+    const conflicting = JSON.parse(signed());
+    conflicting.payload.change.targetIdentityId = 'different-member';
+    const conflictingJson = JSON.stringify(conflicting);
+    repository.findReceipt
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(receipt);
+    deviceAuthorization.assertAuthorized.mockRejectedValue(
+      new Error('revoked device'),
+    );
+
+    await expect(
+      acceptor.accept(
+        new PrivateOperationAcceptMessage(conflictingJson, 'proof'),
+      ),
+    ).rejects.toThrow('revoked device');
+    expect(deviceAuthorization.assertAuthorized).toHaveBeenCalledTimes(2);
+    expect(verifier.verify).not.toHaveBeenCalled();
+    expect(unitOfWork.quarantine).not.toHaveBeenCalled();
+  });
+
+  it('does not quarantine a receipt conflict claiming another author identity', async () => {
+    const receipt = new PrivateControlOperationContract()
+      .decode(signed())
+      .toPrimitives();
+    const claimedIdentityId = identityIdFor(encoded(32, 9));
+    const conflictingJson = signed({
+      payload: {
+        authorIdentityId: claimedIdentityId,
+        change: { targetIdentityId: 'different-member', type: 'member.ban' },
+        identityAuthorizationEpoch: 'genesis',
+        identityAuthorizationRevision: 0,
+        parentHeadHash: headHash,
+        proposalId,
+      },
+    });
+    repository.findReceipt.mockResolvedValue(receipt);
+
+    await expect(
+      acceptor.accept(
+        new PrivateOperationAcceptMessage(conflictingJson, 'proof'),
+      ),
+    ).rejects.toThrow(InvalidPrivateAuthorizationError);
+    expect(deviceAuthorization.assertAuthorized).not.toHaveBeenCalled();
+    expect(verifier.verify).not.toHaveBeenCalled();
+    expect(unitOfWork.quarantine).not.toHaveBeenCalled();
   });
 
   it('does not freeze a receipt conflict claimed by an unknown author', async () => {

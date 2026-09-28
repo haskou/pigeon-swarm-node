@@ -38,6 +38,7 @@ describe('InMemoryPrivateFreshnessGate', () => {
     byteSize: 1,
     digest,
     id: Buffer.alloc(16, 5).toString('base64url'),
+    identityAuthorizationEpoch: 'genesis',
     identityAuthorizationRevision: 0,
     kind: 'membership.propose',
     mutation: { targetIdentityId: publicSpki, type: 'member.remove' },

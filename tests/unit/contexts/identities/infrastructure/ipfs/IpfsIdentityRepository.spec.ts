@@ -79,6 +79,25 @@ describe('IpfsIdentityRepository', () => {
   }
 
   describe('save', () => {
+    it('calculates the content identifier without publishing the identity', async () => {
+      const identity = await createSignedIdentityForNetwork(
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
+      const expectedCid = new IPFSId('bafyresultcid');
+      ipfsManager.calculateJSONId.mockResolvedValue(expectedCid);
+
+      const externalIdentifier =
+        await repository.calculateExternalIdentifier(identity);
+
+      expect(ipfsManager.calculateJSONId).toHaveBeenCalledWith(
+        mapper.toDocument(identity),
+      );
+      expect(externalIdentifier.valueOf()).toBe(expectedCid.valueOf());
+      expect(ipfsManager.addJSONToNetworks).not.toHaveBeenCalled();
+      expect(ipfsManager.putRecordToNetworks).not.toHaveBeenCalled();
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
     it('should save identity document to all networks and put record', async () => {
       const identity = await createSignedIdentityForNetwork(
         '550e8400-e29b-41d4-a716-446655440000',

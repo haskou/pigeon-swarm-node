@@ -3,6 +3,9 @@ import { IsInt, IsObject, IsString, MaxLength, Min } from 'class-validator';
 import { PrivateAuthorizationBodyFieldLimits } from './PrivateAuthorizationBodyFieldLimits';
 
 export class PostPrivateAuthorizationScopeBody {
+  @IsString()
+  public readonly identityAuthorizationEpoch: string;
+
   @IsInt()
   @Min(0)
   public readonly identityAuthorizationRevision: number;

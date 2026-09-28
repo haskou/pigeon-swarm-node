@@ -669,6 +669,16 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     return candidates.map((candidate) => candidate.getIdentity());
   }
 
+  public async calculateExternalIdentifier(
+    identity: Identity,
+  ): Promise<IdentityExternalIdentifier> {
+    const cid = await this.ipfsManager.calculateJSONId(
+      this.mapper.toDocument(identity),
+    );
+
+    return new IdentityExternalIdentifier(cid.valueOf());
+  }
+
   public async save(identity: Identity): Promise<IdentityExternalIdentifier> {
     const document = this.mapper.toDocument(identity);
     const networks: string[] = document.networks;

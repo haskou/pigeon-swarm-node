@@ -7,6 +7,7 @@ import { Timestamp, assert } from '@haskou/value-objects';
 import { DeviceAuthorizationTransitionPrimitives } from './DeviceAuthorizationTransitionPrimitives';
 import { DeviceAuthorizationTransitionState } from './DeviceAuthorizationTransitionState';
 import { InvalidDeviceAuthorizationTransitionError } from './errors/InvalidDeviceAuthorizationTransitionError';
+import { DeviceAuthorizationEpoch } from './value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperation } from './value-objects/DeviceAuthorizationOperation';
 import { DeviceAuthorizationOperationId } from './value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationPayload } from './value-objects/DeviceAuthorizationPayload';
@@ -17,10 +18,10 @@ import { PairingId } from './value-objects/PairingId';
 
 export class DeviceAuthorizationTransition {
   private static readonly SIGNATURE_DOMAIN =
-    'pigeon:device-authorization:transition:v2';
+    'pigeon:device-authorization:transition:v3';
 
   private static readonly PROOF_DOMAIN =
-    'pigeon:device-authorization:proof-of-possession:v1';
+    'pigeon:device-authorization:proof-of-possession:v2';
 
   public static enrollment(
     identityId: IdentityId,
@@ -29,9 +30,11 @@ export class DeviceAuthorizationTransition {
     authorCredential: DeviceCredential,
     targetCredential: DeviceCredential,
     pairing: PairingAuthorization,
+    epoch = DeviceAuthorizationEpoch.genesis(),
   ): DeviceAuthorizationTransition {
     return new DeviceAuthorizationTransition({
       authorCredential,
+      epoch,
       identityId,
       operation: DeviceAuthorizationOperation.enrollment(),
       operationId,
@@ -49,6 +52,7 @@ export class DeviceAuthorizationTransition {
       authorCredential: primitives.authorCredential
         ? DeviceCredential.fromString(primitives.authorCredential)
         : undefined,
+      epoch: new DeviceAuthorizationEpoch(primitives.epoch),
       identityId: new IdentityId(primitives.identityId),
       operation,
       operationId: new DeviceAuthorizationOperationId(primitives.operationId),
@@ -92,9 +96,11 @@ export class DeviceAuthorizationTransition {
     previousRevision: DeviceAuthorizationRevision,
     authorCredential: DeviceCredential,
     targetCredential: DeviceCredential,
+    epoch = DeviceAuthorizationEpoch.genesis(),
   ): DeviceAuthorizationTransition {
     return new DeviceAuthorizationTransition({
       authorCredential,
+      epoch,
       identityId,
       operation: DeviceAuthorizationOperation.revocation(),
       operationId,
@@ -108,8 +114,10 @@ export class DeviceAuthorizationTransition {
     operationId: DeviceAuthorizationOperationId,
     previousRevision: DeviceAuthorizationRevision,
     targetCredential: DeviceCredential,
+    epoch = DeviceAuthorizationEpoch.genesis(),
   ): DeviceAuthorizationTransition {
     return new DeviceAuthorizationTransition({
+      epoch,
       identityId,
       operation: DeviceAuthorizationOperation.recovery(),
       operationId,
@@ -153,6 +161,7 @@ export class DeviceAuthorizationTransition {
     return {
       authorCredential: this.state.authorCredential?.valueOf(),
       authorizedAt: this.state.pairing?.getAuthorizedAt().valueOf(),
+      epoch: this.state.epoch.valueOf(),
       identityId: this.state.identityId.valueOf(),
       operation: this.state.operation.valueOf(),
       operationId: this.state.operationId.valueOf(),
@@ -206,6 +215,10 @@ export class DeviceAuthorizationTransition {
 
   public getIdentityId(): IdentityId {
     return this.state.identityId;
+  }
+
+  public getEpoch(): DeviceAuthorizationEpoch {
+    return this.state.epoch;
   }
 
   public getOperationId(): DeviceAuthorizationOperationId {
@@ -312,6 +325,7 @@ export class DeviceAuthorizationTransition {
     return {
       authorCredential: this.state.authorCredential?.valueOf(),
       authorizedAt: this.state.pairing?.getAuthorizedAt().valueOf(),
+      epoch: this.state.epoch.valueOf(),
       identityId: this.state.identityId.valueOf(),
       operation: this.state.operation.valueOf(),
       operationId: this.state.operationId.valueOf(),

@@ -73,11 +73,13 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
     const change = this.exact(value, [
       'type',
       'identityId',
+      'identityAuthorizationEpoch',
       'identityAuthorizationRevision',
       'deviceKey',
       'mlsCredentialHash',
     ]);
     this.text(change.identityId);
+    this.text(change.identityAuthorizationEpoch);
     this.revision(change.identityAuthorizationRevision);
     this.encoded(change.deviceKey, 32);
     this.encoded(change.mlsCredentialHash, 32);
@@ -118,6 +120,7 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
       'parentHeadHash',
       'change',
       'authorIdentityId',
+      'identityAuthorizationEpoch',
       'identityAuthorizationRevision',
     ]);
 
@@ -141,6 +144,7 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
       'mlsMessageHash',
       'change',
       'authorIdentityId',
+      'identityAuthorizationEpoch',
       'identityAuthorizationRevision',
     ]);
 
@@ -162,6 +166,7 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
       'deviceKey',
       'resultingHeadHash',
       'authorIdentityId',
+      'identityAuthorizationEpoch',
       'identityAuthorizationRevision',
     ]);
 
@@ -250,6 +255,9 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
           .update(canonical, 'utf8')
           .digest('base64url'),
         id: this.encoded(value.operationId, 16),
+        identityAuthorizationEpoch: this.text(
+          payload.identityAuthorizationEpoch,
+        ),
         identityAuthorizationRevision: this.revision(
           payload.identityAuthorizationRevision,
         ),

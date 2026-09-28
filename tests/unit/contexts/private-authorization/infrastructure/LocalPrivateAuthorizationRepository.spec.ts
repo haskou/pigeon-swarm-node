@@ -38,6 +38,7 @@ describe('LocalPrivateAuthorizationRepository', () => {
       control: { parentHeadHash: 'head-0' },
       digest: `digest-${id}`,
       id,
+      identityAuthorizationEpoch: 'genesis',
       identityAuthorizationRevision: 0,
       kind: 'membership.propose',
       mutation: { targetIdentityId: 'member', type: 'member.ban' },

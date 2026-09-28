@@ -4,6 +4,7 @@ import { assert } from '@haskou/value-objects';
 
 import { InvalidDeviceAuthorizationTransitionError } from '../errors/InvalidDeviceAuthorizationTransitionError';
 import { DeviceAuthorizationRepository } from '../repositories/DeviceAuthorizationRepository';
+import { DeviceAuthorizationEpoch } from '../value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from '../value-objects/DeviceAuthorizationRevision';
 
 export default class DeviceAuthorizationAccessPolicy {
@@ -14,12 +15,14 @@ export default class DeviceAuthorizationAccessPolicy {
   public async assertAuthorized(
     identityId: IdentityId,
     credential: DeviceCredential,
+    epoch: DeviceAuthorizationEpoch,
     revision: DeviceAuthorizationRevision,
   ): Promise<void> {
     const authorization = await this.repository.find(identityId);
 
     assert(
-      authorization?.isAtRevision(revision) === true &&
+      authorization?.getEpoch().isEqual(epoch) === true &&
+        authorization.isAtRevision(revision) &&
         authorization.isAuthorized(credential),
       new InvalidDeviceAuthorizationTransitionError(),
     );

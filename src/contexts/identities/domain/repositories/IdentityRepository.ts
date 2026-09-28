@@ -6,6 +6,10 @@ import { IdentityExternalIdentifier } from '../value-objects/IdentityExternalIde
 import { ProfileHandle } from '../value-objects/ProfileHandle';
 
 export default abstract class IdentityRepository {
+  public abstract calculateExternalIdentifier(
+    identity: Identity,
+  ): Promise<IdentityExternalIdentifier>;
+
   public abstract save(identity: Identity): Promise<IdentityExternalIdentifier>;
 
   public abstract findById(id: IdentityId): Promise<Identity>;

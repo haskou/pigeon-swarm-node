@@ -52,6 +52,7 @@ interface UnsignedPrivateOperation {
   authorDeviceKey: string;
   authorIdentityId: string;
   authorizationRevision: number;
+  identityAuthorizationEpoch: string;
   identityAuthorizationRevision: number;
   kind: string;
   operationId: string;
@@ -214,6 +215,7 @@ const identityId = (key: PrivateKey): string =>
 const wireOperation = (value: UnsignedPrivateOperation) => {
   const {
     authorIdentityId,
+    identityAuthorizationEpoch,
     identityAuthorizationRevision,
     payload,
     ...envelope
@@ -223,6 +225,7 @@ const wireOperation = (value: UnsignedPrivateOperation) => {
     ...envelope,
     payload: {
       authorIdentityId,
+      identityAuthorizationEpoch,
       identityAuthorizationRevision,
       ...payload,
     },
@@ -371,6 +374,7 @@ async function main(): Promise<void> {
       authorDeviceKey: ownerDeviceKey,
       authorIdentityId: ownerIdentityId,
       authorizationRevision: 0,
+      identityAuthorizationEpoch: 'genesis',
       identityAuthorizationRevision: 0,
       kind: 'membership.propose',
       operationId: proposalId,
@@ -395,6 +399,7 @@ async function main(): Promise<void> {
       authorDeviceKey: ownerDeviceKey,
       authorIdentityId: ownerIdentityId,
       authorizationRevision: 0,
+      identityAuthorizationEpoch: 'genesis',
       identityAuthorizationRevision: 0,
       kind: 'membership.commit',
       operationId: encoded(16, 21),
@@ -452,6 +457,7 @@ async function main(): Promise<void> {
       authorDeviceKey: ownerDeviceKey,
       authorIdentityId: ownerIdentityId,
       authorizationRevision: 1,
+      identityAuthorizationEpoch: 'genesis',
       identityAuthorizationRevision: 0,
       kind: 'device.revoke',
       operationId: revocationId,
@@ -530,6 +536,7 @@ async function main(): Promise<void> {
       authorDeviceKey: targetDeviceKey,
       authorIdentityId: targetIdentityId,
       authorizationRevision: 1,
+      identityAuthorizationEpoch: 'genesis',
       identityAuthorizationRevision: 0,
       kind: 'membership.propose',
       operationId: encoded(16, 22),
@@ -548,6 +555,7 @@ async function main(): Promise<void> {
       authorDeviceKey: spareDeviceKey,
       authorIdentityId: ownerIdentityId,
       authorizationRevision: 2,
+      identityAuthorizationEpoch: 'genesis',
       identityAuthorizationRevision: 0,
       kind: 'membership.propose',
       operationId: encoded(16, 25),
@@ -568,6 +576,7 @@ async function main(): Promise<void> {
       authorDeviceKey: ownerDeviceKey,
       authorIdentityId: ownerIdentityId,
       authorizationRevision: 2,
+      identityAuthorizationEpoch: 'genesis',
       identityAuthorizationRevision: 0,
       kind: 'membership.propose',
       operationId: encoded(16, 23),
@@ -588,6 +597,7 @@ async function main(): Promise<void> {
       authorDeviceKey: ownerDeviceKey,
       authorIdentityId: ownerIdentityId,
       authorizationRevision: 0,
+      identityAuthorizationEpoch: 'genesis',
       identityAuthorizationRevision: 0,
       kind: 'membership.commit',
       operationId: encoded(16, 26),
@@ -639,6 +649,7 @@ async function main(): Promise<void> {
       authorDeviceKey: ownerDeviceKey,
       authorIdentityId: ownerIdentityId,
       authorizationRevision: 1,
+      identityAuthorizationEpoch: 'genesis',
       identityAuthorizationRevision: 0,
       kind: 'device.revoke',
       operationId: revocationId,

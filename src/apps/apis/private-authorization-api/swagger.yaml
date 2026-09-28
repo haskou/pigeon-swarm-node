@@ -138,8 +138,10 @@ components:
   schemas:
     PostPrivateAuthorizationScopeBody:
       type: object
-      required: [identityAuthorizationRevision, ownerDeviceKey, projection, protectedMlsState, signedGenesisJson]
+      required: [identityAuthorizationEpoch, identityAuthorizationRevision, ownerDeviceKey, projection, protectedMlsState, signedGenesisJson]
       properties:
+        identityAuthorizationEpoch:
+          type: string
         identityAuthorizationRevision:
           type: integer
           minimum: 0

@@ -15,6 +15,7 @@ describe('PrivateControlOperationContract', () => {
       operationId: encoded(16, 1),
       payload: {
         authorIdentityId: 'identity',
+        identityAuthorizationEpoch: 'genesis',
         identityAuthorizationRevision: 2,
         ...payload,
       },
@@ -61,6 +62,7 @@ describe('PrivateControlOperationContract', () => {
     expect(operation.toPrimitives()).toMatchObject({
       authorizationRevision: 4,
       authorIdentityId: 'identity',
+      identityAuthorizationEpoch: 'genesis',
       identityAuthorizationRevision: 2,
       kind,
       proposalOperationId: proposalId,

@@ -7,6 +7,8 @@ import { PrivateAuthorizationScopeProvisionMessage } from '@app/contexts/private
 import { PrivateOperationUnitOfWork } from '@app/contexts/private-authorization/application/PrivateOperationUnitOfWork';
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import DeviceAuthorizationAccessPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationAccessPolicy';
+import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
+import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { PrivateDeviceCredentialCodec } from '@app/contexts/private-authorization/domain/services/PrivateDeviceCredentialCodec';
 import { PrivateGenesisJson } from '@app/contexts/private-authorization/domain/value-objects/PrivateGenesisJson';
@@ -74,6 +76,7 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
   it('verifies, authorizes and atomically commits an authenticated genesis', async () => {
     const message = new PrivateAuthorizationScopeProvisionMessage(
       ownerIdentityId,
+      'genesis',
       0,
       'owner-device',
       'signed-genesis',
@@ -96,7 +99,8 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
     expect(deviceAuthorization.assertAuthorized).toHaveBeenCalledWith(
       new IdentityId(ownerIdentityId),
       DeviceCredential.fromIdentityId(new IdentityId(ownerIdentityId)),
-      expect.objectContaining({}),
+      DeviceAuthorizationEpoch.genesis(),
+      DeviceAuthorizationRevision.initial(),
     );
     expect(projectionAuthorizer.authorize).toHaveBeenCalledWith(
       checkpoint.getScopeId(),
@@ -118,6 +122,7 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
       provisioner.provision(
         new PrivateAuthorizationScopeProvisionMessage(
           ownerIdentityId,
+          'genesis',
           0,
           'owner-device',
           'signed-genesis',
@@ -137,6 +142,7 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
       provisioner.provision(
         new PrivateAuthorizationScopeProvisionMessage(
           ownerIdentityId,
+          'genesis',
           0,
           'owner-device',
           'signed-genesis',

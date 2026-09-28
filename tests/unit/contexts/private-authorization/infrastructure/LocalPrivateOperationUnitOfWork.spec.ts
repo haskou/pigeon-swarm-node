@@ -74,6 +74,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       control: { parentHeadHash: 'head-0' },
       digest: 'digest-operation',
       id: 'operation',
+      identityAuthorizationEpoch: 'genesis',
       identityAuthorizationRevision: 0,
       kind,
       mutation:

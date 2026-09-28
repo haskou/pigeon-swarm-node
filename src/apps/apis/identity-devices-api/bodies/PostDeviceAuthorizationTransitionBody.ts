@@ -18,6 +18,9 @@ export class PostDeviceAuthorizationTransitionBody {
   public readonly authorizedAt?: number;
 
   @IsString()
+  public readonly epoch: string;
+
+  @IsString()
   public readonly identityId: string;
 
   @IsEnum(DeviceAuthorizationOperationValue)

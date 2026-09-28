@@ -74,6 +74,7 @@ export default class PrivateOperationAuthorizer {
     return this.deviceAuthorization.assertAuthorized(
       operation.getAuthorIdentityId(),
       this.credentialCodec.toCredential(operation.getAuthorDeviceKey()),
+      operation.getIdentityAuthorizationEpoch(),
       operation.getIdentityAuthorizationRevision(),
     );
   }
@@ -151,9 +152,11 @@ export default class PrivateOperationAuthorizer {
 
     assert(
       receipt.hasSameIdentityAs(routed) &&
-        receipt.isAuthoredBy(routed.getAuthorDeviceKey()),
+        receipt.isAuthoredBy(routed.getAuthorDeviceKey()) &&
+        receipt.isAuthoredByIdentity(routed.getAuthorIdentityId()),
       new InvalidPrivateAuthorizationError(),
     );
+    await this.assertAuthorizedDevice(routed);
 
     this.verify(
       signedOperationJson,

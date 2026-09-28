@@ -3,6 +3,7 @@ import { Timestamp, assert } from '@haskou/value-objects';
 import { DeviceAuthorization } from '../DeviceAuthorization';
 import { DeviceAuthorizationTransition } from '../DeviceAuthorizationTransition';
 import { InvalidDeviceAuthorizationTransitionError } from '../errors/InvalidDeviceAuthorizationTransitionError';
+import { DeviceAuthorizationEpoch } from '../value-objects/DeviceAuthorizationEpoch';
 
 export default class DeviceAuthorizationPolicy {
   private verifyCommon(
@@ -10,7 +11,8 @@ export default class DeviceAuthorizationPolicy {
     transition: DeviceAuthorizationTransition,
   ): void {
     assert(
-      authorization.getIdentityId().isEqual(transition.getIdentityId()),
+      authorization.getIdentityId().isEqual(transition.getIdentityId()) &&
+        authorization.getEpoch().isEqual(transition.getEpoch()),
       new InvalidDeviceAuthorizationTransitionError(),
     );
     assert(
@@ -86,7 +88,10 @@ export default class DeviceAuthorizationPolicy {
       new InvalidDeviceAuthorizationTransitionError(),
     );
 
-    return authorization.recover(transition.getTargetCredential());
+    return authorization.recover(
+      transition.getTargetCredential(),
+      DeviceAuthorizationEpoch.fromRecovery(transition.getOperationId()),
+    );
   }
 
   public verifyFirstAcceptance(
@@ -104,17 +109,21 @@ export default class DeviceAuthorizationPolicy {
   }
 
   public applyRecoveryCheckpoint(
-    genesis: DeviceAuthorization,
+    authorization: DeviceAuthorization,
     transition: DeviceAuthorizationTransition,
   ): DeviceAuthorization {
     assert(
       transition.isRecovery() &&
-        genesis.getIdentityId().isEqual(transition.getIdentityId()),
+        authorization.getIdentityId().isEqual(transition.getIdentityId()) &&
+        authorization.getEpoch().isEqual(transition.getEpoch()) &&
+        transition
+          .getPreviousRevision()
+          .isGreaterOrEqualThan(authorization.getRevision()),
       new InvalidDeviceAuthorizationTransitionError(),
     );
     this.verifyTargetProof(transition);
     assert(
-      genesis
+      authorization
         .getRecoveryAuthority()
         .isValidSignature(
           transition.getSigningPayload(),
@@ -123,9 +132,10 @@ export default class DeviceAuthorizationPolicy {
       new InvalidDeviceAuthorizationTransitionError(),
     );
 
-    return genesis.recoverAt(
+    return authorization.recoverAt(
       transition.getRevision(),
       transition.getTargetCredential(),
+      DeviceAuthorizationEpoch.fromRecovery(transition.getOperationId()),
     );
   }
 

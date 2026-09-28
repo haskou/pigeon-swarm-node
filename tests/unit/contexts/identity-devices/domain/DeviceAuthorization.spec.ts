@@ -1,6 +1,7 @@
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
+import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationValue } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperation';
 import { DeviceAuthorizationOperationId } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
@@ -42,6 +43,7 @@ describe(DeviceAuthorization.name, () => {
   async function enrollment(
     overrides: {
       author?: KeyPair;
+      epoch?: DeviceAuthorizationEpoch;
       identityId?: IdentityId;
       operationId?: DeviceAuthorizationOperationId;
       pairingExpiration?: PairingExpiration;
@@ -64,6 +66,7 @@ describe(DeviceAuthorization.name, () => {
           new PairingExpiration(now.valueOf() + 60_000),
         now,
       ),
+      overrides.epoch,
     );
 
     const proven = unsigned.provePossession(
@@ -101,6 +104,16 @@ describe(DeviceAuthorization.name, () => {
         ),
       }),
     ).toThrow();
+  });
+
+  it('requires recovery after a replicated authorization conflict', () => {
+    const suspended = authorization.requireRecoveryAt(
+      new DeviceAuthorizationRevision(7),
+    );
+
+    expect(suspended.getCredentials()).toEqual([]);
+    expect(suspended.getRevision().valueOf()).toBe(7);
+    expect(suspended.getIdentityId().isEqual(identityId)).toBe(true);
   });
 
   it('rejects a substituted target credential', async () => {
@@ -184,6 +197,7 @@ describe(DeviceAuthorization.name, () => {
     const transition = JSON.stringify({
       authorCredential: authorCredential.valueOf(),
       authorizedAt: now.valueOf(),
+      epoch: 'genesis',
       identityId: identityId.valueOf(),
       operation: 'enroll',
       operationId: operationId.valueOf(),
@@ -196,7 +210,7 @@ describe(DeviceAuthorization.name, () => {
     });
 
     expect(unsigned.getProofOfPossessionPayload().valueOf()).toBe(
-      `{"domain":"pigeon:device-authorization:proof-of-possession:v1","transition":${transition}}`,
+      `{"domain":"pigeon:device-authorization:proof-of-possession:v2","transition":${transition}}`,
     );
     const proofOfPossession = candidate.sign(
       unsigned.getProofOfPossessionPayload(),
@@ -204,7 +218,7 @@ describe(DeviceAuthorization.name, () => {
     const proven = unsigned.provePossession(proofOfPossession);
 
     expect(proven.getSigningPayload().valueOf()).toBe(
-      `{"domain":"pigeon:device-authorization:transition:v2","proofOfPossession":${JSON.stringify(proofOfPossession.valueOf())},"transition":${transition}}`,
+      `{"domain":"pigeon:device-authorization:transition:v3","proofOfPossession":${JSON.stringify(proofOfPossession.valueOf())},"transition":${transition}}`,
     );
   });
 
@@ -280,6 +294,77 @@ describe(DeviceAuthorization.name, () => {
         DeviceCredential.fromString(owner.toPrimitives().publicKey),
       ),
     ).toBe(false);
+  });
+
+  it('rejects a transition signed for the epoch before recovery', async () => {
+    const target = DeviceCredential.fromString(
+      candidate.toPrimitives().publicKey,
+    );
+    const unsignedRecovery = DeviceAuthorizationTransition.recovery(
+      identityId,
+      DeviceAuthorizationOperationId.generate(),
+      DeviceAuthorizationRevision.initial(),
+      target,
+    );
+    const provenRecovery = unsignedRecovery.provePossession(
+      candidate.sign(unsignedRecovery.getProofOfPossessionPayload()),
+    );
+    const recovered = policy.apply(
+      authorization,
+      provenRecovery.authorizeRecovery(
+        recovery.sign(provenRecovery.getSigningPayload()),
+      ),
+    );
+    const stale = await enrollment({
+      author: candidate,
+      previousRevision: recovered.getRevision(),
+      target: await KeyPair.generate(),
+    });
+    const current = await enrollment({
+      author: candidate,
+      epoch: recovered.getEpoch(),
+      previousRevision: recovered.getRevision(),
+      target: await KeyPair.generate(),
+    });
+
+    expect(() => policy.apply(recovered, stale)).toThrow();
+    expect(() => policy.apply(recovered, current)).not.toThrow();
+  });
+
+  it('rejects a compacted recovery signed for an earlier epoch', async () => {
+    const firstTarget = DeviceCredential.fromString(
+      candidate.toPrimitives().publicKey,
+    );
+    const firstUnsigned = DeviceAuthorizationTransition.recovery(
+      identityId,
+      DeviceAuthorizationOperationId.generate(),
+      DeviceAuthorizationRevision.initial(),
+      firstTarget,
+    );
+    const firstProven = firstUnsigned.provePossession(
+      candidate.sign(firstUnsigned.getProofOfPossessionPayload()),
+    );
+    const recovered = policy.applyRecoveryCheckpoint(
+      authorization,
+      firstProven.authorizeRecovery(
+        recovery.sign(firstProven.getSigningPayload()),
+      ),
+    );
+    const nextTarget = await KeyPair.generate();
+    const staleUnsigned = DeviceAuthorizationTransition.recovery(
+      identityId,
+      DeviceAuthorizationOperationId.generate(),
+      recovered.getRevision(),
+      DeviceCredential.fromString(nextTarget.toPrimitives().publicKey),
+    );
+    const staleProven = staleUnsigned.provePossession(
+      nextTarget.sign(staleUnsigned.getProofOfPossessionPayload()),
+    );
+    const stale = staleProven.authorizeRecovery(
+      recovery.sign(staleProven.getSigningPayload()),
+    );
+
+    expect(() => policy.applyRecoveryCheckpoint(recovered, stale)).toThrow();
   });
 
   it('rejects a serialized target commitment that does not match its credential', async () => {

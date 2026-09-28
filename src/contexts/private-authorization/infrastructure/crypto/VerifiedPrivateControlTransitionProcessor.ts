@@ -1,4 +1,5 @@
 import DeviceAuthorizationAccessPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationAccessPolicy';
+import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { PrivateControlFrame } from '@app/contexts/private-authorization/application/accept-operation/messages/PrivateControlFrame';
 import { PrivateControlTransitionProcessor } from '@app/contexts/private-authorization/application/accept-operation/PrivateControlTransitionProcessor';
@@ -156,6 +157,9 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
       await this.deviceAuthorization.assertAuthorized(
         new IdentityId(mutation.identityId as string),
         this.credentialCodec.toCredential(deviceKey),
+        new DeviceAuthorizationEpoch(
+          mutation.identityAuthorizationEpoch as string,
+        ),
         new DeviceAuthorizationRevision(
           mutation.identityAuthorizationRevision as number,
         ),

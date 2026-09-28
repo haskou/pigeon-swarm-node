@@ -48,6 +48,7 @@ components:
       type: object
       additionalProperties: false
       required:
+        - epoch
         - identityId
         - operation
         - operationId
@@ -64,6 +65,9 @@ components:
           type: integer
           format: int64
           description: Time accepted by both device signatures; required for enrollment and no later than pairingExpiration.
+        epoch:
+          type: string
+          description: Signed recovery epoch. Use genesis before the first recovery and the recovery operation ID afterwards.
         identityId:
           type: string
         operation:
@@ -99,9 +103,12 @@ components:
     DeviceAuthorization:
       type: object
       required:
+        - epoch
         - identityId
         - revision
       properties:
+        epoch:
+          type: string
         identityId:
           type: string
         revision:

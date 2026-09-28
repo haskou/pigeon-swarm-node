@@ -37,6 +37,7 @@ describe('PrivateAuthorizationScope', () => {
       control: { parentHeadHash: 'head-0' },
       digest: 'digest-proposal',
       id: 'proposal',
+      identityAuthorizationEpoch: 'genesis',
       identityAuthorizationRevision: 0,
       kind: 'membership.propose',
       mutation: { targetIdentityId: 'member', type: 'member.ban' },

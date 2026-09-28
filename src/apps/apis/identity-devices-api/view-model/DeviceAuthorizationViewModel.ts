@@ -7,6 +7,7 @@ export class DeviceAuthorizationViewModel {
 
   public toResource(): DeviceAuthorizationResource {
     return {
+      epoch: this.authorization.getEpoch().valueOf(),
       identityId: this.authorization.getIdentityId().valueOf(),
       revision: this.authorization.getRevision().valueOf(),
     };

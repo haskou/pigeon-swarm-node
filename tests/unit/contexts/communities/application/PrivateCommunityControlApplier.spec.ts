@@ -28,6 +28,7 @@ describe('PrivateCommunityControlApplier', () => {
       byteSize: 1,
       digest: 'digest',
       id: 'operation',
+      identityAuthorizationEpoch: 'genesis',
       identityAuthorizationRevision: 0,
       kind: 'membership.propose',
       mutation,

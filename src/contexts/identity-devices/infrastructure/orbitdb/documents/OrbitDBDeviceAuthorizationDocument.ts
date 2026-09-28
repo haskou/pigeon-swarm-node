@@ -1,4 +1,5 @@
 import { DeviceAuthorizationPrimitives } from '../../../domain/DeviceAuthorizationPrimitives';
+import { OrbitDBDeviceAuthorizationSource } from './OrbitDBDeviceAuthorizationSource';
 import { OrbitDBDeviceAuthorizationTransitionRecord } from './OrbitDBDeviceAuthorizationTransitionRecord';
 
 export interface OrbitDBDeviceAuthorizationDocument extends Record<
@@ -8,6 +9,7 @@ export interface OrbitDBDeviceAuthorizationDocument extends Record<
   authorization: DeviceAuthorizationPrimitives;
   checkpoint?: {
     authorization: DeviceAuthorizationPrimitives;
+    lineage: OrbitDBDeviceAuthorizationTransitionRecord[];
     transition: OrbitDBDeviceAuthorizationTransitionRecord;
   };
   genesis: DeviceAuthorizationPrimitives;
@@ -15,4 +17,9 @@ export interface OrbitDBDeviceAuthorizationDocument extends Record<
   id: string;
   identityId: string;
   kind: 'device_authorization';
+  overflow?: {
+    frontier: OrbitDBDeviceAuthorizationDocument;
+    sources: OrbitDBDeviceAuthorizationSource[];
+  };
+  sources?: OrbitDBDeviceAuthorizationSource[];
 }

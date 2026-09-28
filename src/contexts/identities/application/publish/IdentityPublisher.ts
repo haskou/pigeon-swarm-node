@@ -2,6 +2,7 @@ import DeviceAuthorizationProvisioner from '@app/contexts/identity-devices/appli
 import { DeviceAuthorizationProvisionMessage } from '@app/contexts/identity-devices/application/provision/messages/DeviceAuthorizationProvisionMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
+import { assert } from '@haskou/value-objects';
 
 import { InvalidIdentityCandidateError } from '../../domain/errors/InvalidIdentityCandidateError';
 import { IdentityCandidate } from '../../domain/IdentityCandidate';
@@ -35,7 +36,8 @@ export default class IdentityPublisher {
       throw new InvalidIdentityCandidateError();
     }
 
-    const externalIdentifier = await this.saver.save(identity);
+    const externalIdentifier =
+      await this.saver.calculateExternalIdentifier(identity);
 
     await this.deviceAuthorizationProvisioner.provision(
       new DeviceAuthorizationProvisionMessage(
@@ -46,6 +48,12 @@ export default class IdentityPublisher {
         identity.getInitialDeviceCredential(),
         identity.getRecoveryAuthority(),
       ),
+    );
+    const savedExternalIdentifier = await this.saver.save(identity);
+
+    assert(
+      externalIdentifier.isEqual(savedExternalIdentifier),
+      new InvalidIdentityCandidateError(),
     );
 
     const events = identity.pullDomainEvents();

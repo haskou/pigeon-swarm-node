@@ -7,6 +7,7 @@ import { UniqueObjectArray, assert } from '@haskou/value-objects';
 
 import { DeviceAuthorizationPrimitives } from './DeviceAuthorizationPrimitives';
 import { InvalidDeviceAuthorizationTransitionError } from './errors/InvalidDeviceAuthorizationTransitionError';
+import { DeviceAuthorizationEpoch } from './value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
 
 export class DeviceAuthorization extends AggregateRoot {
@@ -22,6 +23,7 @@ export class DeviceAuthorization extends AggregateRoot {
       ),
       RecoveryAuthority.fromString(primitives.recoveryAuthority),
       new DeviceAuthorizationRevision(primitives.revision),
+      new DeviceAuthorizationEpoch(primitives.epoch),
       UniqueObjectArray.fromArray(
         primitives.credentials.map((credential) =>
           DeviceCredential.fromString(credential),
@@ -41,6 +43,7 @@ export class DeviceAuthorization extends AggregateRoot {
       UniqueObjectArray.fromArray(networkIds),
       recoveryAuthority,
       DeviceAuthorizationRevision.initial(),
+      DeviceAuthorizationEpoch.genesis(),
       UniqueObjectArray.fromArray([credential]),
     );
   }
@@ -50,6 +53,7 @@ export class DeviceAuthorization extends AggregateRoot {
     private readonly networkIds: UniqueObjectArray<NetworkId>,
     private readonly recoveryAuthority: RecoveryAuthority,
     private readonly revision: DeviceAuthorizationRevision,
+    private readonly epoch: DeviceAuthorizationEpoch,
     private readonly credentials: UniqueObjectArray<DeviceCredential>,
   ) {
     super();
@@ -79,6 +83,10 @@ export class DeviceAuthorization extends AggregateRoot {
     return this.revision;
   }
 
+  public getEpoch(): DeviceAuthorizationEpoch {
+    return this.epoch;
+  }
+
   public getCredentials(): DeviceCredential[] {
     return this.credentials.toArray();
   }
@@ -104,6 +112,7 @@ export class DeviceAuthorization extends AggregateRoot {
       this.networkIds,
       this.recoveryAuthority,
       this.revision.next(),
+      this.epoch,
       UniqueObjectArray.fromArray([...this.credentials.toArray(), credential]),
     );
   }
@@ -132,6 +141,7 @@ export class DeviceAuthorization extends AggregateRoot {
       this.networkIds,
       this.recoveryAuthority,
       this.revision.next(),
+      this.epoch,
       UniqueObjectArray.fromArray([
         ...this.credentials.toArray(),
         ...newCredentials,
@@ -150,6 +160,7 @@ export class DeviceAuthorization extends AggregateRoot {
       this.networkIds,
       this.recoveryAuthority,
       this.revision.next(),
+      this.epoch,
       UniqueObjectArray.fromArray(
         this.credentials
           .toArray()
@@ -175,6 +186,7 @@ export class DeviceAuthorization extends AggregateRoot {
       this.networkIds,
       this.recoveryAuthority,
       this.revision.next(),
+      this.epoch,
       UniqueObjectArray.fromArray(
         this.credentials
           .toArray()
@@ -185,12 +197,16 @@ export class DeviceAuthorization extends AggregateRoot {
     );
   }
 
-  public recover(credential: DeviceCredential): DeviceAuthorization {
+  public recover(
+    credential: DeviceCredential,
+    epoch: DeviceAuthorizationEpoch,
+  ): DeviceAuthorization {
     return new DeviceAuthorization(
       this.identityId,
       this.networkIds,
       this.recoveryAuthority,
       this.revision.next(),
+      epoch,
       UniqueObjectArray.fromArray([credential]),
     );
   }
@@ -198,6 +214,7 @@ export class DeviceAuthorization extends AggregateRoot {
   public recoverAt(
     revision: DeviceAuthorizationRevision,
     credential: DeviceCredential,
+    epoch: DeviceAuthorizationEpoch,
   ): DeviceAuthorization {
     assert(
       revision.valueOf() > this.revision.valueOf(),
@@ -209,7 +226,26 @@ export class DeviceAuthorization extends AggregateRoot {
       this.networkIds,
       this.recoveryAuthority,
       revision,
+      epoch,
       UniqueObjectArray.fromArray([credential]),
+    );
+  }
+
+  public requireRecoveryAt(
+    revision: DeviceAuthorizationRevision,
+  ): DeviceAuthorization {
+    assert(
+      revision.isGreaterThan(this.revision),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return new DeviceAuthorization(
+      this.identityId,
+      this.networkIds,
+      this.recoveryAuthority,
+      revision,
+      this.epoch,
+      UniqueObjectArray.fromArray<DeviceCredential>([]),
     );
   }
 
@@ -218,6 +254,7 @@ export class DeviceAuthorization extends AggregateRoot {
       credentials: this.credentials
         .toArray()
         .map((credential) => credential.valueOf()),
+      epoch: this.epoch.valueOf(),
       identityId: this.identityId.valueOf(),
       networkIds: this.networkIds
         .toArray()
