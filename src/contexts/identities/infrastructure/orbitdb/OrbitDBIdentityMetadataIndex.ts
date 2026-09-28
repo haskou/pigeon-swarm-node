@@ -192,9 +192,9 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     return `identity-handle:${handle}`;
   }
 
-  private findCachedCandidateRecords(
+  private async findCachedCandidateRecords(
     identityId?: string,
-  ): IdentityMetadataRecord[] {
+  ): Promise<IdentityMetadataRecord[]> {
     if (identityId) {
       return [...(this.candidatesByIdentityId.get(identityId)?.values() ?? [])];
     }
@@ -202,15 +202,31 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     const retained = [...this.candidatesByIdentityId.values()].flatMap(
       (candidates) => [...candidates.values()],
     );
-    const projected = this.registry
-      .findCachedHeadsByPrefix('identity:')
-      .map((document) => this.toRecord(document))
-      .filter(
-        (document): document is IdentityMetadataRecord =>
-          document !== undefined,
-      );
+    const projected = (
+      await Promise.all(
+        this.registry
+          .findCachedHeadsByPrefix('identity:')
+          .map((document) => this.verifiedRecord(document)),
+      )
+    ).filter(
+      (document): document is IdentityMetadataRecord => document !== undefined,
+    );
 
     return [...retained, ...projected];
+  }
+
+  private async verifiedRecord(
+    document: Record<string, unknown>,
+  ): Promise<IdentityMetadataRecord | undefined> {
+    const record = this.toRecord(document);
+
+    if (!record?.identity) {
+      return record;
+    }
+
+    return (await this.hasCanonicalEmbeddedIdentity(record))
+      ? this.deriveSignedMetadata(record)
+      : undefined;
   }
 
   private async findHead(
@@ -218,7 +234,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   ): Promise<IdentityMetadataRecord | undefined> {
     const document = await this.registry.findHead(key);
 
-    return document ? this.toRecord(document) : undefined;
+    return document ? this.verifiedRecord(document) : undefined;
   }
 
   private async hasCanonicalEmbeddedIdentity(
@@ -237,6 +253,26 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     } catch {
       return false;
     }
+  }
+
+  private deriveSignedMetadata(
+    record: IdentityMetadataRecord,
+  ): IdentityMetadataRecord {
+    if (!record.identity) {
+      return record;
+    }
+
+    const primitives = record.identity.toPrimitives();
+
+    return {
+      ...record,
+      handle: primitives.profile.handle,
+      identityId: primitives.id,
+      networkId: undefined,
+      networkIds: primitives.networks,
+      previousCid: primitives.previousIdentityExternalIdentifier,
+      version: primitives.version,
+    };
   }
 
   private retainCandidates(
@@ -278,10 +314,14 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       return false;
     }
 
-    candidates.set(record.cid, record);
+    const acceptedRecord = canonical
+      ? this.deriveSignedMetadata(record)
+      : record;
+
+    candidates.set(acceptedRecord.cid, acceptedRecord);
 
     if (canonical) {
-      canonicalCandidates.set(record.cid, record);
+      canonicalCandidates.set(acceptedRecord.cid, acceptedRecord);
     }
 
     return true;
@@ -342,19 +382,27 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     if (!accepted) return;
 
     this.retainCandidates(candidates, canonicalCandidates);
-    this.registry.cacheHeadLocally(this.identityHeadKey(identityId), document);
+    const acceptedRecord = candidates.get(cid);
+    const projectedDocument = acceptedRecord
+      ? this.toStorageDocument(acceptedRecord)
+      : document;
+
+    this.registry.cacheHeadLocally(
+      this.identityHeadKey(identityId),
+      projectedDocument,
+    );
   }
 
-  private findCachedRecordsByHandle(handle: string): IdentityMetadataRecord[] {
-    return this.findCachedCandidateRecords().filter(
+  private async findCachedRecordsByHandle(
+    handle: string,
+  ): Promise<IdentityMetadataRecord[]> {
+    return (await this.findCachedCandidateRecords()).filter(
       (document) => document.handle === handle,
     );
   }
 
-  public findAll(): Promise<IdentityMetadataRecord[]> {
-    return Promise.resolve(
-      this.deduplicateDocuments(this.findCachedCandidateRecords()),
-    );
+  public async findAll(): Promise<IdentityMetadataRecord[]> {
+    return this.deduplicateDocuments(await this.findCachedCandidateRecords());
   }
 
   public findAllCanonical(): Promise<IdentityMetadataRecord[]> {
@@ -370,10 +418,11 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   ): Promise<IdentityMetadataRecord[]> {
     const key = this.handleHeadKey(handle.valueOf());
     const head = await this.findHead(key);
+    const matchingHead = head?.handle === handle.valueOf() ? head : undefined;
 
     return this.deduplicateDocuments([
-      ...(head ? [head] : []),
-      ...this.findCachedRecordsByHandle(handle.valueOf()),
+      ...(matchingHead ? [matchingHead] : []),
+      ...(await this.findCachedRecordsByHandle(handle.valueOf())),
     ]);
   }
 
@@ -383,27 +432,26 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     const head = await this.findHead(
       this.identityHeadKey(identityId.valueOf()),
     );
+    const matchingHead =
+      head?.identityId === identityId.valueOf() ? head : undefined;
 
     return this.deduplicateDocuments([
-      ...(head ? [head] : []),
-      ...this.findCachedCandidateRecords(identityId.valueOf()),
+      ...(matchingHead ? [matchingHead] : []),
+      ...(await this.findCachedCandidateRecords(identityId.valueOf())),
     ]);
   }
 
-  public findLatestByNetworkId(
+  public async findLatestByNetworkId(
     networkId: NetworkId,
   ): Promise<IdentityMetadataRecord[]> {
-    const documents = this.sortByFreshness([
-      ...this.registry
-        .findCachedHeadsByPrefix('identity:')
-        .map((document) => this.toRecord(document))
-        .filter(
-          (document): document is IdentityMetadataRecord =>
-            document !== undefined &&
-            (document.networkIds?.includes(networkId.valueOf()) ||
-              document.networkId === networkId.valueOf()),
-        ),
-    ]);
+    const documents = this.sortByFreshness(
+      (await this.findCachedCandidateRecords()).filter(
+        (document): document is IdentityMetadataRecord =>
+          document.identity !== undefined &&
+          (document.networkIds?.includes(networkId.valueOf()) ||
+            document.networkId === networkId.valueOf()),
+      ),
+    );
     const latestDocuments = new Map<string, IdentityMetadataRecord>();
 
     for (const document of documents) {
@@ -412,7 +460,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       }
     }
 
-    return Promise.resolve([...latestDocuments.values()]);
+    return [...latestDocuments.values()];
   }
 
   public async save(
