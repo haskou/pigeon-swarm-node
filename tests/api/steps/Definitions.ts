@@ -748,6 +748,33 @@ export default class Definitions {
     );
   }
 
+  @given('I sign the current device authorization checkpoint request')
+  public async iSignTheCurrentDeviceAuthorizationCheckpointRequest(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/identity-devices/${encodeURIComponent(identityId.valueOf())}`,
+    );
+  }
+
+  @given(
+    'another identity signs the current device authorization checkpoint request',
+  )
+  public async anotherIdentitySignsTheCurrentDeviceAuthorizationCheckpointRequest(): Promise<void> {
+    const targetIdentityId = this.ownerIdentityId as IdentityId;
+    const signer = await this.ensureOtherIdentityKeyPair();
+    const signerIdentityId = this.otherIdentityId as IdentityId;
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/identity-devices/${encodeURIComponent(targetIdentityId.valueOf())}`,
+      String(Date.now()),
+      signer,
+      signerIdentityId,
+    );
+  }
+
   @then('the genesis device authorization checkpoint exists')
   public async theGenesisDeviceAuthorizationCheckpointExists(): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;
@@ -756,6 +783,15 @@ export default class Definitions {
       .find(identityId);
 
     expect(authorization?.getRevision().valueOf()).to.equal(0);
+  }
+
+  @then('response is the current device authorization checkpoint')
+  public responseIsTheCurrentDeviceAuthorizationCheckpoint(): void {
+    expect(this.response?.data).to.deep.equal({
+      epoch: 'genesis',
+      identityId: this.ownerIdentityId?.valueOf(),
+      revision: 0,
+    });
   }
 
   @given('I add legacy identity unlock fields')
@@ -4030,6 +4066,15 @@ export default class Definitions {
 
     this.response = await this.restClient.get(
       `/keychains/${encodeURIComponent(this.ownerIdentityId.valueOf())}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the current device authorization checkpoint')
+  public async iGetTheCurrentDeviceAuthorizationCheckpoint(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.response = await this.restClient.get(
+      `/identity-devices/${encodeURIComponent(identityId.valueOf())}`,
       this.headers,
     );
   }

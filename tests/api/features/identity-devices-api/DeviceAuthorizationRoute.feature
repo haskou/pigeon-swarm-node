@@ -29,3 +29,33 @@ Feature: Device authorization route
     And I add undeclared identity field "recoverySecret"
     When I POST to "/identity-devices/transitions"
     Then response code is equal to 400
+
+  Scenario: Read the authenticated identity authorization checkpoint
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "checkpoint owner" and handle "checkpoint-owner"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I sign the current device authorization checkpoint request
+    When I GET the current device authorization checkpoint
+    Then response code is equal to 200
+    And response is the current device authorization checkpoint
+
+  Scenario: Require authentication to read a device authorization checkpoint
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "private owner" and handle "private-owner"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    When I GET the current device authorization checkpoint
+    Then response code is equal to 401
+
+  Scenario: Reject a different identity reading a device authorization checkpoint
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "isolated owner" and handle "isolated-owner"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given another identity signs the current device authorization checkpoint request
+    When I GET the current device authorization checkpoint
+    Then response code is equal to 401

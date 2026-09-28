@@ -4366,34 +4366,51 @@ public recovery authority and authorization revision zero. Passwords, password
 KDF parameters, protected device roots, recovery secrets and encrypted private
 keys are client-local data and are rejected by the identity API.
 
+Read the current checkpoint with:
+
+```http
+GET /identity-devices/{percent-encoded identityId}
+```
+
+This endpoint requires the normal signed HTTP headers, and the stable identity
+signing key must match the requested identity. A client performing total device
+recovery can therefore read the checkpoint after recovering that key, before it
+has an authorized device credential. Missing or invalid authentication and a
+different signer all return the same generic `401`. The response contains only
+`epoch`, `identityId` and `revision`; it does not expose a device catalog or
+credential commitments. Restricting the endpoint to the identity owner avoids
+creating a public identity-target lookup or cross-identity access relationship.
+
 Submit an enrollment, revocation or recovery operation to:
 
 ```http
 POST /identity-devices/transitions
 ```
 
-Every transition binds the identity, operation UUID, exact predecessor and next
-revision, operation kind, target public credential and its commitment. Device
-enrollment additionally binds a single-use pairing UUID, a short expiry, the
-authorization time and a proof signed by the target credential. Both device
-signatures cover that time, and the domain rejects an authorization time after
-the pairing expiry. Enrollment and revocation are signed by an authorized
-device credential; recovery is signed by the identity's pinned recovery
-authority and replaces the authorized device set.
+Every transition binds the identity, recovery epoch, operation UUID, exact
+predecessor and next revision, operation kind, target public credential and its
+commitment. The epoch is `genesis` before the first recovery and the recovery
+operation UUID afterwards. Device enrollment additionally binds a single-use
+pairing UUID, a short expiry, the authorization time and a proof signed by the
+target credential. Both device signatures cover that time, and the domain
+rejects an authorization time after the pairing expiry. Enrollment and
+revocation are signed by an authorized device credential; recovery is signed by
+the identity's pinned recovery authority and replaces the authorized device
+set.
 
 Signatures cover the UTF-8 bytes of compact JSON with no whitespace. Keys are
 written in the order shown below and properties whose value is `undefined` are
 omitted. The target proof preimage is:
 
 ```json
-{"domain":"pigeon:device-authorization:proof-of-possession:v1","transition":{"authorCredential":"<public credential>","authorizedAt":1770000000000,"identityId":"<identity id>","operation":"enroll","operationId":"<uuid>","pairingExpiration":1770000060000,"pairingId":"<uuid>","previousRevision":0,"revision":1,"targetCredential":"<public credential>","targetCredentialCommitment":"<lowercase SHA-256 hex>"}}
+{"domain":"pigeon:device-authorization:proof-of-possession:v2","transition":{"authorCredential":"<public credential>","authorizedAt":1770000000000,"epoch":"genesis","identityId":"<identity id>","operation":"enroll","operationId":"<uuid>","pairingExpiration":1770000060000,"pairingId":"<uuid>","previousRevision":0,"revision":1,"targetCredential":"<public credential>","targetCredentialCommitment":"<lowercase SHA-256 hex>"}}
 ```
 
 After inserting the resulting target signature, the author signature preimage
 is:
 
 ```json
-{"domain":"pigeon:device-authorization:transition:v2","proofOfPossession":"<target signature>","transition":{"authorCredential":"<public credential>","authorizedAt":1770000000000,"identityId":"<identity id>","operation":"enroll","operationId":"<uuid>","pairingExpiration":1770000060000,"pairingId":"<uuid>","previousRevision":0,"revision":1,"targetCredential":"<public credential>","targetCredentialCommitment":"<lowercase SHA-256 hex>"}}
+{"domain":"pigeon:device-authorization:transition:v3","proofOfPossession":"<target signature>","transition":{"authorCredential":"<public credential>","authorizedAt":1770000000000,"epoch":"genesis","identityId":"<identity id>","operation":"enroll","operationId":"<uuid>","pairingExpiration":1770000060000,"pairingId":"<uuid>","previousRevision":0,"revision":1,"targetCredential":"<public credential>","targetCredentialCommitment":"<lowercase SHA-256 hex>"}}
 ```
 
 Revocation omits `authorizedAt`, `pairingExpiration`, `pairingId` and
@@ -4402,16 +4419,17 @@ uses the proof envelope above, and the recovery authority signs the transition
 envelope. Credentials and signatures use their API string representation
 without decoding or normalization.
 
-The response contains only the identity identifier and deterministic current
-revision; it does not return an authorized-device catalog. Replayed operation or
-pairing identifiers, stale predecessors, pairing authorizations signed after
-their declared expiry, substituted identities or credentials, revoked authors
-and unrelated recovery authorities return `409`. Replicas accept an otherwise
-valid fully signed enrollment after an offline partition. A complete artifact
-signed by both devices is authorization, rather than an unsigned bearer offer;
-transport delay does not invalidate it. The author must refuse to create that
-final signature after the pairing deadline. The endpoint never returns local
-vault envelopes or secret recovery material.
+The response contains only the identity identifier, current recovery epoch and
+deterministic current revision; it does not return an authorized-device catalog.
+Replayed operation or pairing identifiers, stale predecessors, wrong recovery
+epochs, pairing authorizations signed after their declared expiry, substituted
+identities or credentials, revoked authors and unrelated recovery authorities
+return `409`. Replicas accept an otherwise valid fully signed enrollment after
+an offline partition. A complete artifact signed by both devices is
+authorization, rather than an unsigned bearer offer; transport delay does not
+invalidate it. The author must refuse to create that final signature after the
+pairing deadline. The endpoint never returns local vault envelopes or secret
+recovery material.
 
 ## Planned API
 

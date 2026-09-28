@@ -21,6 +21,8 @@ tags:
   - name: push
   - name: realtime
 paths:
+  /identity-devices/{identityId}:
+    $ref: './identity-devices-api/swagger.yaml#/paths/~1identity-devices~1{identityId}'
   /identity-devices/transitions:
     $ref: './identity-devices-api/swagger.yaml#/paths/~1identity-devices~1transitions'
   /private-authorization/scopes:

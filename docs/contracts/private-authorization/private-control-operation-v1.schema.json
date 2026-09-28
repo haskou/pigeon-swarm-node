@@ -23,10 +23,11 @@
     "admission": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "identityId", "identityAuthorizationRevision", "deviceKey", "mlsCredentialHash"],
+      "required": ["type", "identityId", "identityAuthorizationEpoch", "identityAuthorizationRevision", "deviceKey", "mlsCredentialHash"],
       "properties": {
         "type": { "const": "member.admit" },
         "identityId": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "identityAuthorizationEpoch": { "type": "string", "minLength": 1, "maxLength": 1024 },
         "identityAuthorizationRevision": {
           "type": "integer",
           "minimum": 0,
@@ -102,9 +103,10 @@
             "payload": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["proposalId", "parentHeadHash", "change", "authorIdentityId", "identityAuthorizationRevision"],
+              "required": ["proposalId", "parentHeadHash", "change", "authorIdentityId", "identityAuthorizationEpoch", "identityAuthorizationRevision"],
               "properties": {
                 "authorIdentityId": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                "identityAuthorizationEpoch": { "type": "string", "minLength": 1, "maxLength": 1024 },
                 "identityAuthorizationRevision": {
                   "type": "integer",
                   "minimum": 0,
@@ -128,9 +130,10 @@
             "payload": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["proposalOperationId", "resultingHeadHash", "mlsMessageHash", "change", "authorIdentityId", "identityAuthorizationRevision"],
+              "required": ["proposalOperationId", "resultingHeadHash", "mlsMessageHash", "change", "authorIdentityId", "identityAuthorizationEpoch", "identityAuthorizationRevision"],
               "properties": {
                 "authorIdentityId": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                "identityAuthorizationEpoch": { "type": "string", "minLength": 1, "maxLength": 1024 },
                 "identityAuthorizationRevision": {
                   "type": "integer",
                   "minimum": 0,
@@ -155,9 +158,10 @@
             "payload": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["deviceKey", "resultingHeadHash", "authorIdentityId", "identityAuthorizationRevision"],
+              "required": ["deviceKey", "resultingHeadHash", "authorIdentityId", "identityAuthorizationEpoch", "identityAuthorizationRevision"],
               "properties": {
                 "authorIdentityId": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                "identityAuthorizationEpoch": { "type": "string", "minLength": 1, "maxLength": 1024 },
                 "identityAuthorizationRevision": {
                   "type": "integer",
                   "minimum": 0,

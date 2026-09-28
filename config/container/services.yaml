@@ -700,6 +700,13 @@ services:
         @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2lkZW50aXR5LWRldmljZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19EZXZpY2VBdXRob3JpemF0aW9uUmVwb3NpdG9yeV9fRGV2aWNlQXV0aG9yaXphdGlvblJlcG9zaXRvcnk=
     abstract: false
     parent: null
+  X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2lkZW50aXR5LWRldmljZXNfX2FwcGxpY2F0aW9uX19maW5kX19EZXZpY2VBdXRob3JpemF0aW9uRmluZGVyX19EZXZpY2VBdXRob3JpemF0aW9uRmluZGVy:
+    class: /contexts/identity-devices/application/find/DeviceAuthorizationFinder
+    arguments:
+      - >-
+        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2lkZW50aXR5LWRldmljZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19EZXZpY2VBdXRob3JpemF0aW9uUmVwb3NpdG9yeV9fRGV2aWNlQXV0aG9yaXphdGlvblJlcG9zaXRvcnk=
+    abstract: false
+    parent: null
   X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2lkZW50aXR5LWRldmljZXNfX2FwcGxpY2F0aW9uX19wcm92aXNpb25fX0RldmljZUF1dGhvcml6YXRpb25Qcm92aXNpb25lcl9fRGV2aWNlQXV0aG9yaXphdGlvblByb3Zpc2lvbmVy:
     class: >-
       /contexts/identity-devices/application/provision/DeviceAuthorizationProvisioner
@@ -2282,6 +2289,18 @@ services:
   X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fYXBwc19fY29uc3VtZXJzX19wdWJzdWJfX2lkZW50aXR5LWRldmljZXNfX1Byb3Zpc2lvbkRldmljZUF1dGhvcml6YXRpb25XaGVuSWRlbnRpdHlDcmVhdGVkX19Qcm92aXNpb25EZXZpY2VBdXRob3JpemF0aW9uV2hlbklkZW50aXR5Q3JlYXRlZA==:
     class: >-
       /apps/consumers/pubsub/identity-devices/ProvisionDeviceAuthorizationWhenIdentityCreated
+    arguments:
+      - >-
+        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9fbWVzc2FnZUJ1c19fRG9tYWluRXZlbnRDb25zdW1lcl9fRG9tYWluRXZlbnRDb25zdW1lcg==
+      - >-
+        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2lkZW50aXR5LWRldmljZXNfX2FwcGxpY2F0aW9uX19wcm92aXNpb25fX0RldmljZUF1dGhvcml6YXRpb25Qcm92aXNpb25lcl9fRGV2aWNlQXV0aG9yaXphdGlvblByb3Zpc2lvbmVy
+      - >-
+        @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fY29udGV4dHNfX2lkZW50aXRpZXNfX2RvbWFpbl9fcmVwb3NpdG9yaWVzX19JZGVudGl0eVJlcG9zaXRvcnlfX0lkZW50aXR5UmVwb3NpdG9yeQ==
+    abstract: false
+    parent: null
+  X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fYXBwc19fY29uc3VtZXJzX19wdWJzdWJfX2lkZW50aXR5LWRldmljZXNfX1Byb3Zpc2lvbkRldmljZUF1dGhvcml6YXRpb25XaGVuSWRlbnRpdHlVcGRhdGVkX19Qcm92aXNpb25EZXZpY2VBdXRob3JpemF0aW9uV2hlbklkZW50aXR5VXBkYXRlZA==:
+    class: >-
+      /apps/consumers/pubsub/identity-devices/ProvisionDeviceAuthorizationWhenIdentityUpdated
     arguments:
       - >-
         @X19Vc2Vyc19faGFza29fX1Byb2plY3RzX18ud29ya3RyZWVzX19waWdlb24tY2FsbC1wcml2YWN5LW5vZGVfX3NyY19fc2hhcmVkX19pbmZyYXN0cnVjdHVyZV9fbWVzc2FnZUJ1c19fRG9tYWluRXZlbnRDb25zdW1lcl9fRG9tYWluRXZlbnRDb25zdW1lcg==
