@@ -368,16 +368,16 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     });
   });
 
-  it('converges when valid histories exceed the replay limit after merging', async () => {
+  it('converges when exactly 128 sibling enrollments reach the credential limit', async () => {
     const { genesis, identityId, owner } = await fixture();
     const first = repositoryFixture();
     const second = repositoryFixture();
     const targets = await Promise.all(
-      Array.from({ length: 257 }, () => KeyPair.generate()),
+      Array.from({ length: 130 }, () => KeyPair.generate()),
     );
     const transitions = await Promise.all(
       targets
-        .slice(0, 256)
+        .slice(0, 128)
         .map((target, index) =>
           enrollment(
             identityId,
@@ -388,45 +388,62 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
           ),
         ),
     );
-    const descendant = await enrollment(
+    const firstTransitions = transitions.slice(0, 64);
+    const secondTransitions = transitions.slice(64);
+    const firstDescendant = await enrollment(
       identityId,
       owner,
-      targets[256],
+      targets[128],
       '20000000-0000-4000-8000-000000000001',
       '30000000-0000-4000-8000-000000000001',
       new DeviceAuthorizationRevision(1),
     );
-    const firstTransitions = transitions.slice(0, 128);
-    const secondTransitions = transitions.slice(128);
+    const secondDescendant = await enrollment(
+      identityId,
+      owner,
+      targets[129],
+      '20000000-0000-4000-8000-000000000002',
+      '30000000-0000-4000-8000-000000000002',
+      new DeviceAuthorizationRevision(1),
+    );
     const policy = new DeviceAuthorizationPolicy();
     const firstAuthorization = genesis.enrollConcurrently(
       firstTransitions.map((transition) => transition.getTargetCredential()),
     );
-    const secondRevision = genesis.enrollConcurrently(
+    const secondAuthorization = genesis.enrollConcurrently(
       secondTransitions.map((transition) => transition.getTargetCredential()),
     );
-    const secondAuthorization = policy.apply(secondRevision, descendant);
+    const firstHeadAuthorization = policy.apply(
+      firstAuthorization,
+      firstDescendant,
+    );
+    const secondHeadAuthorization = policy.apply(
+      secondAuthorization,
+      secondDescendant,
+    );
 
     await provisionAuthorization(first.repository, genesis);
     await provisionAuthorization(second.repository, genesis);
     first.setHead({
-      authorization: firstAuthorization.toPrimitives(),
+      authorization: firstHeadAuthorization.toPrimitives(),
       genesis: genesis.toPrimitives(),
-      history: firstTransitions.map((transition) => ({
-        transition: transition.toPrimitives(),
-      })),
+      history: firstTransitions
+        .map((transition) => ({
+          transition: transition.toPrimitives(),
+        }))
+        .concat([{ transition: firstDescendant.toPrimitives() }]),
       id: `device-authorization:${identityId.valueOf()}`,
       identityId: identityId.valueOf(),
       kind: 'device_authorization',
     });
     second.setHead({
-      authorization: secondAuthorization.toPrimitives(),
+      authorization: secondHeadAuthorization.toPrimitives(),
       genesis: genesis.toPrimitives(),
       history: [
         ...secondTransitions.map((transition) => ({
           transition: transition.toPrimitives(),
         })),
-        { transition: descendant.toPrimitives() },
+        { transition: secondDescendant.toPrimitives() },
       ],
       id: `device-authorization:${identityId.valueOf()}`,
       identityId: identityId.valueOf(),
@@ -443,7 +460,14 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     );
 
     expect(mergedFromFirst).toEqual(mergedFromSecond);
-    expect(mergedFromFirst).toEqual(first.getHead());
+    expect(
+      (mergedFromFirst as { authorization?: { credentials?: string[] } })
+        .authorization?.credentials,
+    ).toHaveLength(128);
+    expect(
+      (mergedFromFirst as { authorization?: { revision?: number } })
+        .authorization?.revision,
+    ).toBe(1);
   }, 30_000);
 
   it('keeps the branch with a valid descendant revocation', async () => {
@@ -627,6 +651,207 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
     expect(merged.authorization?.revision).toBe(2);
     expect(merged.authorization?.credentials).toEqual([]);
+  });
+
+  it('preserves every distinct revocation when equivalent siblings exceed the bound', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const attacker = await KeyPair.generate();
+    const survivor = await KeyPair.generate();
+    const aggregate = repositoryFixture();
+    await provisionAuthorization(aggregate.repository, genesis);
+    await aggregate.repository.compareAndApply(
+      await enrollment(
+        identityId,
+        owner,
+        attacker,
+        '00000000-0000-4000-8000-000000000001',
+        '10000000-0000-4000-8000-000000000001',
+      ),
+    );
+    await aggregate.repository.compareAndApply(
+      await enrollment(
+        identityId,
+        owner,
+        survivor,
+        '00000000-0000-4000-8000-000000000002',
+        '10000000-0000-4000-8000-000000000002',
+        new DeviceAuthorizationRevision(1),
+      ),
+    );
+    const base = aggregate.getHead();
+
+    expect(base).toBeDefined();
+    let malicious = base as Record<string, unknown>;
+
+    for (let index = 0; index < 128; index += 1) {
+      const branch = repositoryFixture();
+      const target = index % 2 === 0 ? owner : survivor;
+      const unsigned = DeviceAuthorizationTransition.revocation(
+        identityId,
+        new DeviceAuthorizationOperationId(
+          `00000000-0000-4000-8000-${String(index + 100).padStart(12, '0')}`,
+        ),
+        new DeviceAuthorizationRevision(2),
+        DeviceCredential.fromString(attacker.toPrimitives().publicKey),
+        DeviceCredential.fromString(target.toPrimitives().publicKey),
+      );
+      await provisionAuthorization(branch.repository, genesis);
+      branch.setHead(base as Record<string, unknown>);
+      await branch.repository.compareAndApply(
+        unsigned.authorize(attacker.sign(unsigned.getSigningPayload())),
+      );
+      malicious = aggregate.getMerger()?.(
+        malicious,
+        branch.getHead() ?? {},
+      ) as Record<string, unknown>;
+    }
+
+    const honest = repositoryFixture();
+    const unsignedHonest = DeviceAuthorizationTransition.revocation(
+      identityId,
+      new DeviceAuthorizationOperationId(
+        '00000000-0000-4000-8000-999999999999',
+      ),
+      new DeviceAuthorizationRevision(2),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+      DeviceCredential.fromString(attacker.toPrimitives().publicKey),
+    );
+    await provisionAuthorization(honest.repository, genesis);
+    honest.setHead(base as Record<string, unknown>);
+    await honest.repository.compareAndApply(
+      unsignedHonest.authorize(owner.sign(unsignedHonest.getSigningPayload())),
+    );
+
+    const merged = aggregate.getMerger()?.(
+      malicious,
+      honest.getHead() ?? {},
+    ) as {
+      authorization?: { credentials?: string[] };
+      history?: Array<{ transition: { previousRevision: number } }>;
+    };
+
+    expect(merged.authorization?.credentials).toEqual([]);
+    expect(
+      merged.history?.filter(
+        ({ transition }) => transition.previousRevision === 2,
+      ),
+    ).toHaveLength(3);
+  });
+
+  it('retains a valid equivalent revocation when another branch invalidates its author', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const compromised = await KeyPair.generate();
+    const equivalentAuthors = await Promise.all([
+      KeyPair.generate(),
+      KeyPair.generate(),
+    ]);
+    equivalentAuthors.sort((left, right) =>
+      left
+        .toPrimitives()
+        .publicKey.localeCompare(right.toPrimitives().publicKey),
+    );
+    const [invalidAuthor, validAuthor] = equivalentAuthors;
+    const target = await KeyPair.generate();
+    const baseRepository = repositoryFixture();
+    await provisionAuthorization(baseRepository.repository, genesis);
+    await baseRepository.repository.compareAndApply(
+      await enrollment(
+        identityId,
+        owner,
+        compromised,
+        '00000000-0000-4000-8000-000000000010',
+        '10000000-0000-4000-8000-000000000010',
+      ),
+    );
+    await baseRepository.repository.compareAndApply(
+      await enrollment(
+        identityId,
+        owner,
+        validAuthor,
+        '00000000-0000-4000-8000-000000000011',
+        '10000000-0000-4000-8000-000000000011',
+        new DeviceAuthorizationRevision(1),
+      ),
+    );
+    await baseRepository.repository.compareAndApply(
+      await enrollment(
+        identityId,
+        owner,
+        target,
+        '00000000-0000-4000-8000-000000000012',
+        '10000000-0000-4000-8000-000000000012',
+        new DeviceAuthorizationRevision(2),
+      ),
+    );
+    const base = baseRepository.getHead() as Record<string, unknown>;
+    const attacker = repositoryFixture();
+    await provisionAuthorization(attacker.repository, genesis);
+    attacker.setHead(base);
+    await attacker.repository.compareAndApply(
+      await enrollment(
+        identityId,
+        compromised,
+        invalidAuthor,
+        '00000000-0000-4000-8000-000000000013',
+        '10000000-0000-4000-8000-000000000013',
+        new DeviceAuthorizationRevision(3),
+      ),
+    );
+    const invalidRevocation = DeviceAuthorizationTransition.revocation(
+      identityId,
+      new DeviceAuthorizationOperationId(
+        '00000000-0000-4000-8000-000000000014',
+      ),
+      new DeviceAuthorizationRevision(4),
+      DeviceCredential.fromString(invalidAuthor.toPrimitives().publicKey),
+      DeviceCredential.fromString(target.toPrimitives().publicKey),
+    );
+    await attacker.repository.compareAndApply(
+      invalidRevocation.authorize(
+        invalidAuthor.sign(invalidRevocation.getSigningPayload()),
+      ),
+    );
+
+    const honest = repositoryFixture();
+    await provisionAuthorization(honest.repository, genesis);
+    honest.setHead(base);
+    const revokeCompromised = DeviceAuthorizationTransition.revocation(
+      identityId,
+      new DeviceAuthorizationOperationId(
+        '00000000-0000-4000-8000-000000000015',
+      ),
+      new DeviceAuthorizationRevision(3),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+      DeviceCredential.fromString(compromised.toPrimitives().publicKey),
+    );
+    await honest.repository.compareAndApply(
+      revokeCompromised.authorize(
+        owner.sign(revokeCompromised.getSigningPayload()),
+      ),
+    );
+    const validRevocation = DeviceAuthorizationTransition.revocation(
+      identityId,
+      new DeviceAuthorizationOperationId(
+        '00000000-0000-4000-8000-000000000016',
+      ),
+      new DeviceAuthorizationRevision(4),
+      DeviceCredential.fromString(validAuthor.toPrimitives().publicKey),
+      DeviceCredential.fromString(target.toPrimitives().publicKey),
+    );
+    await honest.repository.compareAndApply(
+      validRevocation.authorize(
+        validAuthor.sign(validRevocation.getSigningPayload()),
+      ),
+    );
+
+    const merged = baseRepository.getMerger()?.(
+      attacker.getHead(),
+      honest.getHead() ?? {},
+    ) as { authorization?: { credentials?: string[] } };
+
+    expect(merged.authorization?.credentials).not.toContain(
+      target.toPrimitives().publicKey,
+    );
   });
 
   it('preserves a revocation when a sibling enrollment reuses its operation identifier', async () => {

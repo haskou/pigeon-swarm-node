@@ -225,16 +225,16 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     left: OrbitDBDeviceAuthorizationDocument,
     right: OrbitDBDeviceAuthorizationDocument,
   ): OrbitDBDeviceAuthorizationTransitionRecord[] {
-    const records = new Map<
+    const uniqueRecords = new Map<
       string,
       OrbitDBDeviceAuthorizationTransitionRecord
     >();
 
     for (const record of [...left.history, ...right.history]) {
-      records.set(this.canonicalString(record), record);
+      uniqueRecords.set(this.canonicalString(record), record);
     }
 
-    return [...records.values()].sort((left, right) => {
+    return [...uniqueRecords.values()].sort((left, right) => {
       const operationOrder = left.transition.operationId.localeCompare(
         right.transition.operationId,
       );
@@ -312,6 +312,39 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     ];
   }
 
+  private compactEquivalentCandidates(
+    candidates: Array<{
+      authorization: DeviceAuthorization;
+      record: OrbitDBDeviceAuthorizationTransitionRecord;
+      transition: DeviceAuthorizationTransition;
+    }>,
+  ): Array<{
+    authorization: DeviceAuthorization;
+    record: OrbitDBDeviceAuthorizationTransitionRecord;
+    transition: DeviceAuthorizationTransition;
+  }> {
+    const candidatesByEffect = new Map<string, (typeof candidates)[number]>();
+
+    for (const candidate of candidates) {
+      const effect = this.canonicalString({
+        operation: candidate.transition.getOperation().valueOf(),
+        previousRevision: candidate.transition.getPreviousRevision().valueOf(),
+        targetCredential: candidate.transition.getTargetCredential().valueOf(),
+      });
+      const current = candidatesByEffect.get(effect);
+
+      if (
+        !current ||
+        this.canonicalString(candidate.record) <
+          this.canonicalString(current.record)
+      ) {
+        candidatesByEffect.set(effect, candidate);
+      }
+    }
+
+    return [...candidatesByEffect.values()];
+  }
+
   private transitionFromRecord(
     record: OrbitDBDeviceAuthorizationTransitionRecord,
   ): DeviceAuthorizationTransition | undefined {
@@ -356,13 +389,15 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       }
     }
 
-    if (candidates.length === 0) {
+    const compactedCandidates = this.compactEquivalentCandidates(candidates);
+
+    if (compactedCandidates.length === 0) {
       return { authorization, history: [] };
     }
 
     const [checkpoint] = this.concurrentAuthorizations(
       authorization,
-      candidates,
+      compactedCandidates,
     );
 
     assert(
@@ -373,7 +408,10 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
 
     return {
       authorization: replay.authorization,
-      history: [...candidates.map(({ record }) => record), ...replay.history],
+      history: [
+        ...compactedCandidates.map(({ record }) => record),
+        ...replay.history,
+      ],
     };
   }
 

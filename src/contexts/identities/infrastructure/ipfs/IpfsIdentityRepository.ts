@@ -31,10 +31,15 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
   private async findValidMetadata(
     id: IdentityId,
+    requireEmbeddedIdentity: boolean = false,
   ): Promise<IdentityMetadataRecord[]> {
     try {
+      const metadata = await this.metadataIndex.findByIdentityId(id);
+
       return this.deduplicateMetadata(
-        await this.metadataIndex.findByIdentityId(id),
+        requireEmbeddedIdentity
+          ? metadata.filter(({ identity }) => identity !== undefined)
+          : metadata,
       );
     } catch {
       return [];
@@ -546,7 +551,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     id: IdentityId,
     awaitRemoteCandidates: boolean,
   ): Promise<IdentityCandidate[]> {
-    const metadata = await this.findValidMetadata(id);
+    const metadata = await this.findValidMetadata(id, awaitRemoteCandidates);
     const localCandidates =
       await this.findCandidateReferencesFromMetadata(metadata);
     const knownCids = new Set(

@@ -88,6 +88,21 @@ describe(DeviceAuthorization.name, () => {
     expect(next.getRevision().valueOf()).toBe(1);
   });
 
+  it('rejects authorization states with more credentials than can converge safely', async () => {
+    const credentials = await Promise.all(
+      Array.from({ length: 129 }, () => KeyPair.generate()),
+    );
+
+    expect(() =>
+      DeviceAuthorization.fromPrimitives({
+        ...authorization.toPrimitives(),
+        credentials: credentials.map(
+          (credential) => credential.toPrimitives().publicKey,
+        ),
+      }),
+    ).toThrow();
+  });
+
   it('rejects a substituted target credential', async () => {
     const attacker = await KeyPair.generate();
     const transition = await enrollment();
@@ -150,9 +165,7 @@ describe(DeviceAuthorization.name, () => {
     const operationId = new DeviceAuthorizationOperationId(
       '00000000-0000-4000-8000-000000000001',
     );
-    const pairingId = new PairingId(
-      '10000000-0000-4000-8000-000000000001',
-    );
+    const pairingId = new PairingId('10000000-0000-4000-8000-000000000001');
     const expiration = new PairingExpiration(now.valueOf() + 60_000);
     const authorCredential = DeviceCredential.fromString(
       owner.toPrimitives().publicKey,

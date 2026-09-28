@@ -215,13 +215,39 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     return [...retained, ...projected];
   }
 
+  private async findCachedCanonicalCandidateRecords(
+    identityId?: string,
+  ): Promise<IdentityMetadataRecord[]> {
+    const retained = identityId
+      ? [
+          ...(this.canonicalCandidatesByIdentityId.get(identityId)?.values() ??
+            []),
+        ]
+      : [...this.canonicalCandidatesByIdentityId.values()].flatMap(
+          (candidates) => [...candidates.values()],
+        );
+    const projected = (
+      await Promise.all(
+        this.registry
+          .findCachedHeadsByPrefix('identity:')
+          .map((document) => this.verifiedRecord(document)),
+      )
+    ).filter(
+      (document): document is IdentityMetadataRecord =>
+        document !== undefined &&
+        (!identityId || document.identityId === identityId),
+    );
+
+    return [...retained, ...projected];
+  }
+
   private async verifiedRecord(
     document: Record<string, unknown>,
   ): Promise<IdentityMetadataRecord | undefined> {
     const record = this.toRecord(document);
 
     if (!record?.identity) {
-      return record;
+      return undefined;
     }
 
     return (await this.hasCanonicalEmbeddedIdentity(record))
@@ -396,13 +422,15 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   private async findCachedRecordsByHandle(
     handle: string,
   ): Promise<IdentityMetadataRecord[]> {
-    return (await this.findCachedCandidateRecords()).filter(
+    return (await this.findCachedCanonicalCandidateRecords()).filter(
       (document) => document.handle === handle,
     );
   }
 
   public async findAll(): Promise<IdentityMetadataRecord[]> {
-    return this.deduplicateDocuments(await this.findCachedCandidateRecords());
+    return this.deduplicateDocuments(
+      await this.findCachedCanonicalCandidateRecords(),
+    );
   }
 
   public findAllCanonical(): Promise<IdentityMetadataRecord[]> {
@@ -437,7 +465,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
 
     return this.deduplicateDocuments([
       ...(matchingHead ? [matchingHead] : []),
-      ...(await this.findCachedCandidateRecords(identityId.valueOf())),
+      ...(await this.findCachedCanonicalCandidateRecords(identityId.valueOf())),
     ]);
   }
 

@@ -834,6 +834,38 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getRecordCandidates).toHaveBeenCalled();
     });
 
+    it('should reject unsigned metadata fallbacks during a fresh security-sensitive lookup', async () => {
+      const previousIdentity = await mother.build();
+      const primitives = previousIdentity.toPrimitives();
+      const forgedCurrentCid = new IPFSId('bafy-forged-current');
+      const previousCid = new IPFSId('bafy-forged-previous');
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          cid: forgedCurrentCid.valueOf(),
+          identityId: primitives.id,
+          networkIds: ['550e8400-e29b-41d4-a716-446655440999'],
+          previousCid: previousCid.valueOf(),
+          receivedAt: Date.now(),
+          version: primitives.version + 1,
+        },
+      ]);
+      ipfsManager.hasConnectedPeers.mockResolvedValue(true);
+      ipfsManager.getJSONFromNetworks.mockImplementation(
+        <T>(cid: IPFSId): Promise<T> =>
+          cid.isEqual(previousCid)
+            ? Promise.resolve(mapper.toDocument(previousIdentity) as T)
+            : Promise.reject(new Error('missing current identity')),
+      );
+
+      await expect(
+        repository.findFreshCandidateReferencesById(
+          new IdentityId(primitives.id),
+        ),
+      ).rejects.toThrow(IdentityNotFoundError);
+      expect(ipfsManager.getJSONFromNetworks).not.toHaveBeenCalled();
+    });
+
     it('should fallback to DHT and cache metadata when mongo has no candidates', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();

@@ -10,6 +10,8 @@ import { InvalidDeviceAuthorizationTransitionError } from './errors/InvalidDevic
 import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
 
 export class DeviceAuthorization extends AggregateRoot {
+  private static readonly MAX_CREDENTIALS = 128;
+
   public static fromPrimitives(
     primitives: DeviceAuthorizationPrimitives,
   ): DeviceAuthorization {
@@ -53,6 +55,10 @@ export class DeviceAuthorization extends AggregateRoot {
     super();
     assert(
       this.networkIds.length() > 0,
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+    assert(
+      this.credentials.length() <= DeviceAuthorization.MAX_CREDENTIALS,
       new InvalidDeviceAuthorizationTransitionError(),
     );
   }
@@ -105,9 +111,16 @@ export class DeviceAuthorization extends AggregateRoot {
   public enrollConcurrently(
     credentials: DeviceCredential[],
   ): DeviceAuthorization {
-    const newCredentials = credentials.filter(
-      (credential) => !this.isAuthorized(credential),
-    );
+    const availableCredentials =
+      DeviceAuthorization.MAX_CREDENTIALS - this.credentials.length();
+    const newCredentials = [
+      ...new Map(
+        credentials.map((credential) => [credential.valueOf(), credential]),
+      ).values(),
+    ]
+      .filter((credential) => !this.isAuthorized(credential))
+      .sort((left, right) => left.valueOf().localeCompare(right.valueOf()))
+      .slice(0, availableCredentials);
 
     assert(
       newCredentials.length > 0,
