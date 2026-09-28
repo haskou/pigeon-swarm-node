@@ -41,6 +41,17 @@ Feature: Device authorization route
     Then response code is equal to 200
     And response is the current device authorization checkpoint
 
+  Scenario: Read the authorization checkpoint during total device recovery
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-recovery-network"
+    And I set a client-signed identity body with name "recovery owner" and handle "recovery-owner"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I sign the current device authorization checkpoint recovery request
+    When I GET the current device authorization checkpoint
+    Then response code is equal to 200
+    And response is the current device authorization checkpoint
+
   Scenario: Require authentication to read a device authorization checkpoint
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"

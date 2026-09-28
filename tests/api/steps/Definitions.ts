@@ -752,10 +752,41 @@ export default class Definitions {
   public async iSignTheCurrentDeviceAuthorizationCheckpointRequest(): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;
     this.body = undefined;
-    await this.signCurrentRequest(
+    const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}`;
+    await this.signCurrentRequest('GET', path);
+    const timestamp = this.headers['x-timestamp'] as string;
+    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
       'GET',
-      `/identity-devices/${encodeURIComponent(identityId.valueOf())}`,
+      path,
+      timestamp,
+      this.getCurrentRequestBody(),
     );
+    const device = await this.ensureIdentityDeviceOwnerKeyPair();
+    this.headers['x-device-credential'] = new IdentityId(
+      device.toPrimitives().publicKey,
+    ).valueOf();
+    this.headers['x-device-signature'] = device
+      .sign(JSON.stringify(payload))
+      .valueOf();
+  }
+
+  @given('I sign the current device authorization checkpoint recovery request')
+  public async iSignTheCurrentDeviceAuthorizationCheckpointRecoveryRequest(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.body = undefined;
+    const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}`;
+    await this.signCurrentRequest('GET', path);
+    const timestamp = this.headers['x-timestamp'] as string;
+    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
+      'GET',
+      path,
+      timestamp,
+      this.getCurrentRequestBody(),
+    );
+    const recoveryAuthority = await this.ensureIdentityRecoveryKeyPair();
+    this.headers['x-recovery-signature'] = recoveryAuthority
+      .sign(JSON.stringify(payload))
+      .valueOf();
   }
 
   @given(

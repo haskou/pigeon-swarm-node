@@ -4381,6 +4381,17 @@ different signer all return the same generic `401`. The response contains only
 credential commitments. Restricting the endpoint to the identity owner avoids
 creating a public identity-target lookup or cross-identity access relationship.
 
+An existing device additionally sends `X-Device-Credential` and
+`X-Device-Signature`. The credential uses the normalized public-key form used by
+identity identifiers, without PEM delimiters or whitespace. The device signature
+covers the same canonical method, path, timestamp and body hash as the stable
+identity signature. Total recovery sends `X-Recovery-Signature` over that same
+canonical payload instead. Exactly one complete proof is required. The node
+verifies the device against the current authorization checkpoint or the recovery
+signature against its recovery authority before returning the checkpoint. A
+missing, mixed, malformed, invalid, revoked or unrelated proof returns the same
+generic `401` without revealing which check failed.
+
 Submit an enrollment, revocation or recovery operation to:
 
 ```http

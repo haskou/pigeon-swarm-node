@@ -12,10 +12,16 @@ paths:
         Returns only the current recovery epoch and deterministic revision for
         the authenticated identity. The path identity must equal the identity
         that signed the HTTP request. A client performing total device recovery
-        can authenticate with the recovered stable identity signing key.
+        authenticates with the recovered stable identity signing key and the
+        separate recovery authority.
 
         The response never exposes an authorized-device catalog, credential
         commitments, password material, recovery secrets or private keys.
+
+        Existing devices send X-Device-Credential and X-Device-Signature
+        together. The device signature covers the same canonical request as
+        X-Signature, and the credential must belong to the current checkpoint.
+        Total recovery omits both device headers and sends X-Recovery-Signature.
       parameters:
         - in: path
           name: identityId
@@ -26,6 +32,9 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XDeviceCredential'
+        - $ref: '#/components/parameters/XDeviceSignature'
+        - $ref: '#/components/parameters/XRecoverySignature'
       responses:
         '200':
           description: Current deterministic authorization checkpoint.
@@ -34,7 +43,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DeviceAuthorization'
         '401':
-          description: The signature is missing or invalid, or the signer does not own the requested identity.
+          description: The signature is missing or invalid, the signer does not own the requested identity, or the supplied device credential is not currently authorized.
         '409':
           description: The authorization checkpoint is unavailable on this node.
   /identity-devices/transitions:
@@ -96,6 +105,27 @@ components:
       required: true
       schema:
         type: string
+    XDeviceCredential:
+      in: header
+      name: X-Device-Credential
+      required: false
+      schema:
+        type: string
+      description: Current authorized device credential in normalized public-key form. It must be supplied together with X-Device-Signature.
+    XDeviceSignature:
+      in: header
+      name: X-Device-Signature
+      required: false
+      schema:
+        type: string
+      description: Device signature over the same canonical request payload as X-Signature. It must be supplied together with X-Device-Credential.
+    XRecoverySignature:
+      in: header
+      name: X-Recovery-Signature
+      required: false
+      schema:
+        type: string
+      description: Recovery-authority signature over the same canonical request payload as X-Signature. It is accepted only when both device-proof headers are absent.
   schemas:
     DeviceAuthorizationTransition:
       type: object

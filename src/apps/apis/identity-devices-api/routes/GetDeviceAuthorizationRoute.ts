@@ -9,10 +9,14 @@ import { assert } from '@haskou/value-objects';
 import { Request, Response } from 'express';
 import { Get, JsonController, Param, Req, Res } from 'routing-controllers';
 
+import { DeviceAuthorizationRequestAuthenticator } from '../DeviceAuthorizationRequestAuthenticator';
 import { DeviceAuthorizationViewModel } from '../view-model/DeviceAuthorizationViewModel';
 
 @JsonController('/identity-devices')
 export class GetDeviceAuthorizationRoute extends Route {
+  private readonly deviceAuthenticator =
+    new DeviceAuthorizationRequestAuthenticator();
+
   private readonly authenticator = this.get<SignedHttpRequestAuthenticator>(
     SignedHttpRequestAuthenticator,
   );
@@ -38,6 +42,7 @@ export class GetDeviceAuthorizationRoute extends Route {
     const authorization = await this.finder.find(
       new DeviceAuthorizationFindMessage(targetIdentityId),
     );
+    this.deviceAuthenticator.authenticate(request, authorization);
 
     return response
       .status(HttpRouteStatusEnum.OK)
