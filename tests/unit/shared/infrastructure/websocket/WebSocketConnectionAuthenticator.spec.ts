@@ -57,12 +57,13 @@ function signWebSocketRequest(
   path: string,
   timestamp: string,
 ): string {
-  const signedRequestPayload = new SignedHttpRequestVerifier().getCanonicalPayload(
-    'GET',
-    path,
-    timestamp,
-    {},
-  );
+  const signedRequestPayload =
+    new SignedHttpRequestVerifier().getCanonicalPayload(
+      'GET',
+      path,
+      timestamp,
+      {},
+    );
 
   return keyPair.sign(JSON.stringify(signedRequestPayload)).valueOf();
 }

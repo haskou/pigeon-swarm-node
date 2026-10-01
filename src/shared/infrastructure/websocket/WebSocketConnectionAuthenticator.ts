@@ -1,5 +1,9 @@
 import { InvalidSignedRequestError } from '@app/apps/apis/shared/errors/InvalidSignedRequestError';
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
+import {
+  SignedRequestReplayGuard,
+  signedRequestReplayGuard,
+} from '@app/apps/apis/shared/SignedRequestReplayGuard';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
 import { IncomingMessage } from 'http';
@@ -7,15 +11,13 @@ import { IncomingMessage } from 'http';
 import { WebSocketCredentials } from './WebSocketCredentials';
 
 export class WebSocketConnectionAuthenticator {
-  private static readonly maximumClockSkewInMilliseconds = 30 * 1000;
-
   private ensureTimestampIsFresh(timestamp: string): void {
     const timestampAsNumber = Number(timestamp);
 
     if (
       !Number.isInteger(timestampAsNumber) ||
       Math.abs(Date.now() - timestampAsNumber) >
-        WebSocketConnectionAuthenticator.maximumClockSkewInMilliseconds
+        SignedRequestReplayGuard.MAX_CLOCK_SKEW_MS
     ) {
       throw new InvalidSignedRequestError();
     }
@@ -88,6 +90,15 @@ export class WebSocketConnectionAuthenticator {
     }
 
     this.ensureTimestampIsFresh(credentials.timestamp);
+
+    if (
+      !signedRequestReplayGuard.accept(
+        identityId.toString(),
+        credentials.signature,
+      )
+    ) {
+      throw new InvalidSignedRequestError();
+    }
 
     return identityId;
   }

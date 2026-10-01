@@ -3,9 +3,13 @@ import { Request } from 'express';
 
 import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';
 import { SignedHttpRequestVerifier } from './SignedHttpRequestVerifier';
+import {
+  SignedRequestReplayGuard,
+  signedRequestReplayGuard,
+} from './SignedRequestReplayGuard';
 
 export default class SignedHttpRequestAuthenticator {
-  private static readonly MAX_CLOCK_SKEW_MS = 30 * 1000;
+  private static readonly SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
   private readonly verifier = new SignedHttpRequestVerifier();
 
   private assertTimestampIsFresh(timestamp: string): void {
@@ -15,8 +19,24 @@ export default class SignedHttpRequestAuthenticator {
     if (
       !Number.isInteger(parsedTimestamp) ||
       Math.abs(now - parsedTimestamp) >
-        SignedHttpRequestAuthenticator.MAX_CLOCK_SKEW_MS
+        SignedRequestReplayGuard.MAX_CLOCK_SKEW_MS
     ) {
+      throw new InvalidSignedRequestError();
+    }
+  }
+
+  private assertIsNotReplayed(request: Request, identityId: IdentityId): void {
+    if (
+      SignedHttpRequestAuthenticator.SAFE_METHODS.has(
+        request.method.toUpperCase(),
+      )
+    ) {
+      return;
+    }
+
+    const signature = this.verifier.getRequiredHeader(request, 'x-signature');
+
+    if (!signedRequestReplayGuard.accept(identityId.toString(), signature)) {
       throw new InvalidSignedRequestError();
     }
   }
@@ -25,6 +45,7 @@ export default class SignedHttpRequestAuthenticator {
     const { identityId, timestamp } = this.verifier.verifySignature(request);
 
     this.assertTimestampIsFresh(timestamp);
+    this.assertIsNotReplayed(request, identityId);
 
     return identityId;
   }
