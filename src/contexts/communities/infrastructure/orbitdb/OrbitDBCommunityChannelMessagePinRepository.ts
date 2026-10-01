@@ -1,3 +1,5 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
@@ -26,7 +28,7 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
       recordId: (record) =>
         typeof record.id === 'string' ? record.id : undefined,
       shouldReplace: (current, candidate) =>
-        this.freshness(current) <= this.freshness(candidate),
+        PublicMutationRecord.replaces(current, candidate) ?? true,
     });
   }
 
@@ -55,11 +57,26 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
     return `community-channel-pin-index:${communityId}:${channelId}`;
   }
 
-  private freshness(document: Record<string, unknown>): number {
-    return Math.max(
-      typeof document.updatedAt === 'number' ? document.updatedAt : 0,
-      typeof document.createdAt === 'number' ? document.createdAt : 0,
-    );
+  private async write(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+    payload: Record<string, unknown>,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    const document = PublicMutationRecord.withProof(payload, proof);
+
+    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      PublicMutationRecord.assertNotStale(
+        (
+          await this.pinIndex.findRecords(
+            this.indexHeadKey(communityId, channelId),
+          )
+        ).filter((stored) => stored.id === payload.id),
+        document,
+      );
+      await this.registry.putDocument('pins', document);
+      await this.putIndexDocument(communityId, channelId, document);
+    });
   }
 
   private hasRequiredFields(document: Record<string, unknown>): boolean {
@@ -137,43 +154,46 @@ export default class OrbitDBCommunityChannelMessagePinRepository extends Communi
     channelId: CommunityChannelId,
     messageId: CommunityChannelMessageId,
     pinnedByIdentityId: IdentityId,
-    createdAt: Timestamp = Timestamp.now(),
+    createdAt: Timestamp,
+    proof: PublicMutationProof,
   ): Promise<void> {
-    const document = {
-      channelId: channelId.valueOf(),
-      communityId: communityId.valueOf(),
-      createdAt: createdAt.valueOf(),
-      id: this.pinId(communityId, channelId, messageId),
-      messageId: messageId.valueOf(),
-      pinnedByIdentityId: pinnedByIdentityId.valueOf(),
-      scopeType: 'community_channel',
-    };
-
-    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      await this.registry.putDocument('pins', document);
-      await this.putIndexDocument(communityId, channelId, document);
-    });
+    await this.write(
+      communityId,
+      channelId,
+      {
+        channelId: channelId.valueOf(),
+        communityId: communityId.valueOf(),
+        createdAt: createdAt.valueOf(),
+        id: this.pinId(communityId, channelId, messageId),
+        messageId: messageId.valueOf(),
+        pinnedByIdentityId: pinnedByIdentityId.valueOf(),
+        scopeType: 'community_channel',
+      },
+      proof,
+    );
   }
 
   public async unpin(
     communityId: CommunityId,
     channelId: CommunityChannelId,
     messageId: CommunityChannelMessageId,
+    unpinnedByIdentityId: IdentityId,
+    proof: PublicMutationProof,
   ): Promise<void> {
-    const document = {
-      channelId: channelId.valueOf(),
-      communityId: communityId.valueOf(),
-      id: this.pinId(communityId, channelId, messageId),
-      messageId: messageId.valueOf(),
-      removed: true,
-      scopeType: 'community_channel',
-      updatedAt: Date.now(),
-    };
-
-    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      await this.registry.putDocument('pins', document);
-      await this.putIndexDocument(communityId, channelId, document);
-    });
+    await this.write(
+      communityId,
+      channelId,
+      {
+        channelId: channelId.valueOf(),
+        communityId: communityId.valueOf(),
+        id: this.pinId(communityId, channelId, messageId),
+        messageId: messageId.valueOf(),
+        pinnedByIdentityId: unpinnedByIdentityId.valueOf(),
+        removed: true,
+        scopeType: 'community_channel',
+      },
+      proof,
+    );
   }
 
   public async findByChannel(

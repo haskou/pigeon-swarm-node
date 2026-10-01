@@ -8,6 +8,8 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
+import { signedMutation } from '../../../public-mutations/support/signedMutation';
+
 type Entry = {
   key?: string;
   value: Record<string, unknown>;
@@ -86,6 +88,15 @@ const publicStorageGuard = () =>
   );
 
 describe('OrbitDBCommunityChannelMessagePinRepository', () => {
+  const proof = (kind: 'put' | 'delete', sequence: number) =>
+    signedMutation({
+      identityId:
+        'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=',
+      kind,
+      recordId: 'community:community-1:channel-1:message-1',
+      sequence,
+      store: 'pins',
+    });
   const communityId = new CommunityId('community-1');
   const channelId = new CommunityChannelId('channel-1');
   const messageId = new CommunityChannelMessageId('message-1');
@@ -122,6 +133,7 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
       messageId,
       identityId,
       new Timestamp(1780000000000),
+      await proof('put', 1),
     );
     pins.query.mockClear();
 
@@ -141,8 +153,15 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
       messageId,
       identityId,
       new Timestamp(1780000000000),
+      await proof('put', 1),
     );
-    await repository.unpin(communityId, channelId, messageId);
+    await repository.unpin(
+      communityId,
+      channelId,
+      messageId,
+      identityId,
+      await proof('delete', 2),
+    );
     pins.query.mockClear();
 
     await expect(
@@ -160,6 +179,7 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
       messageId,
       identityId,
       new Timestamp(1780000000000),
+      await proof('put', 1),
     );
     await expect(
       Promise.race([
@@ -188,11 +208,18 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
       messageId,
       identityId,
       new Timestamp(1780000000000),
+      await proof('put', 1),
     );
     await flushBackgroundTasks();
     heads.stopWrites();
 
-    const unpin = repository.unpin(communityId, channelId, messageId);
+    const unpin = repository.unpin(
+      communityId,
+      channelId,
+      messageId,
+      identityId,
+      await proof('delete', 2),
+    );
     await expect(
       Promise.race([
         unpin.then(() => 'saved'),
@@ -223,6 +250,7 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
         messageId,
         identityId,
         new Timestamp(1780000000000),
+        await proof('put', 1),
       ),
     ).rejects.toThrow('document write failed');
     expect(heads.put).not.toHaveBeenCalled();
@@ -238,12 +266,19 @@ describe('OrbitDBCommunityChannelMessagePinRepository', () => {
       messageId,
       identityId,
       new Timestamp(1780000000000),
+      await proof('put', 1),
     );
     heads.put.mockClear();
     pins.put.mockRejectedValueOnce(new Error('document write failed'));
 
     await expect(
-      repository.unpin(communityId, channelId, messageId),
+      repository.unpin(
+        communityId,
+        channelId,
+        messageId,
+        identityId,
+        await proof('delete', 2),
+      ),
     ).rejects.toThrow('document write failed');
     expect(heads.put).not.toHaveBeenCalled();
     await expect(

@@ -12,6 +12,7 @@ import { PrimitiveOf } from '@haskou/value-objects';
 import { expect } from 'chai';
 import { before, binding, then, when } from 'cucumber-tsflow';
 
+import { signedMutation } from '../../unit/contexts/public-mutations/support/signedMutation';
 import { PubSubConsumerTestContext } from './PubSubConsumerTestHelpers';
 
 class FakeCommunityReactionRepository {
@@ -118,9 +119,9 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   private canonicalCommunityRepository(): FakeCommunityRepository {
     const community = Community.fromPrimitives({
       ...this.communityPrimitives(),
-      name: 'Updated community profile',
       description: 'A newer description than the event snapshot',
       discoverable: false,
+      name: 'Updated community profile',
     });
     this.expectedCommunity = community.toPrimitives();
     this.communityRepository = new FakeCommunityRepository(community);
@@ -133,6 +134,18 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
     expect(this.communityRepository?.saved[0].toPrimitives()).to.deep.equal(
       this.expectedCommunity,
     );
+  }
+
+  private async mutationProof(): Promise<unknown> {
+    const proof = await signedMutation({
+      identityId: this.ownerIdentityId(),
+      kind: 'put',
+      recordId: 'reaction',
+      sequence: 1,
+      store: 'reactions',
+    });
+
+    return proof.toPrimitives();
   }
 
   private reactionAttributes() {
@@ -161,6 +174,7 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
       new CommunityChannelMessageReactionWasAddedEvent(this.communityId, {
         ...this.reactionAttributes(),
         community: this.communityPrimitives(),
+        mutationProof: await this.mutationProof(),
       }),
     );
   }
@@ -180,6 +194,7 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
       new CommunityChannelMessageReactionRemovedEvent(this.communityId, {
         ...this.reactionAttributes(),
         community: this.communityPrimitives(),
+        mutationProof: await this.mutationProof(),
       }),
     );
   }

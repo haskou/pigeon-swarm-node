@@ -3,8 +3,6 @@ export type PublicMutationKind = 'put' | 'delete';
 export interface PublicMutationAuthorPrimitives {
   identityId: string;
   deviceCredential: string;
-  epoch: string;
-  revision: number;
 }
 
 export interface PublicMutationBodyPrimitives {

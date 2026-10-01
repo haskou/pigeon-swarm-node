@@ -1,3 +1,5 @@
+import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
+import DeviceAuthorizationPublicMutationAuthorization from '@app/contexts/public-mutations/infrastructure/DeviceAuthorizationPublicMutationAuthorization';
 import { Kernel } from '@haskou/ddd-kernel';
 import { IdempotencyConsumerMiddleware } from '@haskou/ddd-kernel/adapters/pubsub';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
@@ -192,6 +194,10 @@ export default class PigeonApplication {
         {
           token: IdentityPresenceRepository,
           useClass: InMemoryIdentityPresenceRepository,
+        },
+        {
+          token: PublicMutationAuthorAuthorization,
+          useClass: DeviceAuthorizationPublicMutationAuthorization,
         },
         {
           token: DeviceAuthorizationRepository,

@@ -1,3 +1,4 @@
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import Kernel from '@haskou/ddd-kernel';
 
 import { OrbitDBDocumentDeduplicator } from './OrbitDBDocumentDeduplicator';
@@ -150,6 +151,10 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     current: Record<string, unknown>,
     candidate: Record<string, unknown>,
   ): boolean {
+    const byProof = PublicMutationRecord.replaces(current, candidate);
+
+    if (byProof !== undefined) return byProof;
+
     const currentFreshness = this.recordFreshness(current);
     const candidateFreshness = this.recordFreshness(candidate);
 
@@ -294,6 +299,21 @@ export class OrbitDBHeadIndex<TDocument extends object> {
     return this.recordsFromHead(head)
       .map((record) => this.options.documentFromRecord(record))
       .filter((document): document is TDocument => document !== undefined);
+  }
+
+  /** Raw indexed records, tombstones included, pending writes applied. */
+  public async findRecords(key: string): Promise<Record<string, unknown>[]> {
+    const pendingRecords = this.pendingRecords.get(key) ?? [];
+    const head = await this.registry.findHead(key);
+
+    return this.recordsFromHead(
+      pendingRecords.length === 0
+        ? head
+        : this.pendingRecordsHead(
+            head ?? (await this.registry.findPersistedHead(key)),
+            pendingRecords,
+          ),
+    );
   }
 
   public async find(key: string): Promise<TDocument[] | undefined> {

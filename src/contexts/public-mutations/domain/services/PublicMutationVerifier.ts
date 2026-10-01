@@ -1,4 +1,4 @@
-import { PublicKey } from '@haskou/pigeon-swarm-crypto';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { InvalidPublicMutationError } from '../errors/InvalidPublicMutationError';
 import { PublicMutationProof } from '../PublicMutationProof';
@@ -42,10 +42,9 @@ export default class PublicMutationVerifier {
 
   private isSignedByDevice(proof: PublicMutationProof): boolean {
     try {
-      return new PublicKey(proof.getAuthor().deviceCredential).isValidSignature(
-        proof.signingContent(),
-        proof.getSignature(),
-      );
+      return new IdentityId(
+        proof.getAuthor().deviceCredential,
+      ).isValidSignature(proof.signingContent(), proof.getSignature());
     } catch {
       return false;
     }

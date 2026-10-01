@@ -7,11 +7,14 @@ const communityChannelMessageReactionPrimitiveKeys = [
   'createdAt',
   'emoji',
   'messageId',
+  'mutationProof',
 ];
 
 export function isCommunityChannelMessageReactionPrimitive(
   reaction: unknown,
-): reaction is ReturnType<CommunityChannelMessageReaction['toPrimitives']> {
+): reaction is ReturnType<CommunityChannelMessageReaction['toPrimitives']> & {
+  mutationProof: unknown;
+} {
   return (
     typeof reaction === 'object' &&
     reaction !== null &&

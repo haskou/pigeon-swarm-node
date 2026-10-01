@@ -1005,9 +1005,17 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommunityChannelMessagePinBody'
       responses:
         '200':
           description: Message pinned.
+        '409':
+          description: Missing manage_messages, unknown channel or message, an invalid or unauthorized mutation proof, or a stale mutation (StalePublicMutationError, details carry the current sequence and digest).
     delete:
       tags:
         - communities
@@ -1028,9 +1036,17 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommunityChannelMessageUnpinBody'
       responses:
         '200':
           description: Message unpinned.
+        '409':
+          description: Same as pin.
   /communities/{communityId}/channels/{channelId}/messages/{messageId}/thread:
     get:
       tags:
@@ -2058,11 +2074,79 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommunityMessageMentionResource'
+    SignedPublicMutation:
+      type: object
+      description: Client-signed intent for a replicated public record. The node holds no user private keys, so the UI signs it. payloadDigest commits to the record without its proof; author.deviceCredential must be an authorized device of author.identityId in its current device authorization head. The winner of concurrent mutations is the higher sequence, then the lower digest; no wall clock is used.
+      required:
+        - version
+        - operationId
+        - kind
+        - store
+        - recordId
+        - payloadDigest
+        - predecessor
+        - sequence
+        - author
+        - signature
+      properties:
+        version:
+          type: integer
+          enum: [1]
+        operationId:
+          type: string
+        kind:
+          type: string
+          enum: [put, delete]
+        store:
+          type: string
+        recordId:
+          type: string
+        payloadDigest:
+          type: string
+        predecessor:
+          type: string
+          nullable: true
+          description: Digest of the previous mutation. Null if and only if sequence is 0.
+        sequence:
+          type: integer
+          minimum: 0
+        author:
+          type: object
+          required: [identityId, deviceCredential]
+          properties:
+            identityId:
+              type: string
+            deviceCredential:
+              type: string
+        signature:
+          type: string
+    CommunityChannelMessagePinBody:
+      type: object
+      required: [createdAt, mutation]
+      properties:
+        createdAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    CommunityChannelMessageUnpinBody:
+      type: object
+      required: [mutation]
+      properties:
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
     CommunityChannelMessageReactionBody:
       type: object
       required:
         - emoji
+        - mutation
       properties:
+        createdAt:
+          type: integer
+          minimum: 0
+          description: Creation time committed by the mutation proof. Ignored on removal.
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
         emoji:
           type: string
           description: Emoji reaction to add or remove. Unique by community, channel, message, author and emoji.

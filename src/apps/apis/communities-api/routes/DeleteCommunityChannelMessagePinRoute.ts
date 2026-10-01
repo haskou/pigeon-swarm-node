@@ -2,8 +2,16 @@ import CommunityChannelMessageUnpinner from '@app/contexts/communities/applicati
 import { CommunityChannelMessagePinDeleteMessage } from '@app/contexts/communities/application/manage-channel-message-pin/messages/CommunityChannelMessagePinDeleteMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  Delete,
+  JsonController,
+  Param,
+  Req,
+  Res,
+} from 'routing-controllers';
 
+import { DeleteCommunityChannelMessagePinBody } from '../bodies/DeleteCommunityChannelMessagePinBody';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
@@ -17,6 +25,7 @@ export class DeleteCommunityChannelMessagePinRoute extends CommunityRouteSupport
     @Param('communityId') communityId: string,
     @Param('channelId') channelId: string,
     @Param('messageId') messageId: string,
+    @Body() body: DeleteCommunityChannelMessagePinBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
@@ -27,6 +36,7 @@ export class DeleteCommunityChannelMessagePinRoute extends CommunityRouteSupport
         communityId,
         channelId,
         messageId,
+        body.mutation,
       ),
     );
 

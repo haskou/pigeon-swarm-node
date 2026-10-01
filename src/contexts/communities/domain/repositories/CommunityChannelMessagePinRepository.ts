@@ -1,3 +1,4 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -17,12 +18,15 @@ export default abstract class CommunityChannelMessagePinRepository {
     channelId: CommunityChannelId,
     messageId: CommunityChannelMessageId,
     pinnedByIdentityId: IdentityId,
-    createdAt?: Timestamp,
+    createdAt: Timestamp,
+    proof: PublicMutationProof,
   ): Promise<void>;
 
   public abstract unpin(
     communityId: CommunityId,
     channelId: CommunityChannelId,
     messageId: CommunityChannelMessageId,
+    unpinnedByIdentityId: IdentityId,
+    proof: PublicMutationProof,
   ): Promise<void>;
 }

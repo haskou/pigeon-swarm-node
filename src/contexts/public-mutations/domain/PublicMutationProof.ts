@@ -77,15 +77,11 @@ export class PublicMutationProof {
     const author = PublicMutationProof.exact(value, [
       'identityId',
       'deviceCredential',
-      'epoch',
-      'revision',
     ]);
 
     return {
       deviceCredential: PublicMutationProof.text(author.deviceCredential),
-      epoch: PublicMutationProof.text(author.epoch),
       identityId: PublicMutationProof.text(author.identityId),
-      revision: PublicMutationProof.counter(author.revision),
     };
   }
 

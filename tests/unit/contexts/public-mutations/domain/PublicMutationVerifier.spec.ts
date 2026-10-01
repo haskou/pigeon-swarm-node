@@ -17,9 +17,7 @@ describe('PublicMutationVerifier', () => {
   ): PublicMutationBodyPrimitives => ({
     author: {
       deviceCredential: device.toPrimitives().publicKey,
-      epoch: 'genesis',
       identityId: 'author',
-      revision: 0,
     },
     kind: 'delete',
     operationId: 'AAAAAAAAAAAAAAAAAAAAAA',

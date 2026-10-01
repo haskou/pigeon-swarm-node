@@ -3,6 +3,8 @@ import CommunityMessageReactionRepository from '@app/contexts/communities/domain
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
@@ -26,7 +28,7 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
       recordId: (record) =>
         typeof record.id === 'string' ? record.id : undefined,
       shouldReplace: (current, candidate) =>
-        this.freshness(current) <= this.freshness(candidate),
+        PublicMutationRecord.replaces(current, candidate) ?? true,
     });
   }
 
@@ -86,11 +88,23 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     return `community-reaction-index:${communityId}`;
   }
 
-  private freshness(document: Record<string, unknown>): number {
-    return Math.max(
-      typeof document.updatedAt === 'number' ? document.updatedAt : 0,
-      typeof document.createdAt === 'number' ? document.createdAt : 0,
-    );
+  private async write(
+    payload: Record<string, unknown>,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    const communityId = new CommunityId(payload.communityId as string);
+    const document = PublicMutationRecord.withProof(payload, proof);
+
+    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      PublicMutationRecord.assertNotStale(
+        (
+          await this.reactionIndex.findRecords(this.indexHeadKey(communityId))
+        ).filter((stored) => stored.id === payload.id),
+        document,
+      );
+      await this.registry.putDocument('reactions', document);
+      await this.putIndexDocument(communityId, document);
+    });
   }
 
   private putIndexDocument(
@@ -114,31 +128,27 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
     );
   }
 
-  public async save(reaction: CommunityChannelMessageReaction): Promise<void> {
-    const document = this.mapper.toDocument(
-      reaction,
-      this.documentId(reaction),
+  public async save(
+    reaction: CommunityChannelMessageReaction,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    await this.write(
+      this.mapper.toDocument(reaction, this.documentId(reaction)),
+      proof,
     );
-    const communityId = new CommunityId(document.communityId);
-    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      await this.registry.putDocument('reactions', document);
-      await this.putIndexDocument(communityId, document);
-    });
   }
 
   public async delete(
     reaction: CommunityChannelMessageReaction,
+    proof: PublicMutationProof,
   ): Promise<void> {
-    const document = {
-      ...this.mapper.toDocument(reaction, this.documentId(reaction)),
-      removed: true,
-      updatedAt: Date.now(),
-    };
-    const communityId = new CommunityId(document.communityId);
-    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      await this.registry.putDocument('reactions', document);
-      await this.putIndexDocument(communityId, document);
-    });
+    const document = Object.fromEntries(
+      Object.entries(
+        this.mapper.toDocument(reaction, this.documentId(reaction)),
+      ).filter(([key]) => key !== 'createdAt'),
+    );
+
+    await this.write({ ...document, removed: true }, proof);
   }
 
   public async findByMessageIds(
@@ -213,64 +223,6 @@ export default class OrbitDBCommunityMessageReactionRepository extends Community
         .sort((left, right) => left.createdAt - right.createdAt)
         .slice(-limit)
         .map((document) => this.mapper.toDomain(document));
-    });
-  }
-
-  public async deleteByChannel(
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-  ): Promise<void> {
-    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      const documents =
-        (await this.reactionIndex.find(this.indexHeadKey(communityId)))?.filter(
-          (
-            document,
-          ): document is OrbitDBCommunityChannelMessageReactionDocument =>
-            this.isDocument(document) &&
-            document.communityId === communityId.valueOf() &&
-            new CommunityChannelId(document.channelId).isEqual(channelId),
-        ) ?? [];
-
-      await Promise.all(
-        documents.map(async (document) => {
-          const tombstone = {
-            ...document,
-            removed: true,
-            updatedAt: Date.now(),
-          };
-
-          await this.registry.putDocument('reactions', tombstone);
-          await this.putIndexDocument(communityId, tombstone);
-        }),
-      );
-    });
-  }
-
-  public async deleteByCommunity(communityId: CommunityId): Promise<void> {
-    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      const documents =
-        (await this.reactionIndex.find(this.indexHeadKey(communityId))) ?? [];
-
-      await Promise.all(
-        documents
-          .filter(
-            (
-              document,
-            ): document is OrbitDBCommunityChannelMessageReactionDocument =>
-              this.isDocument(document) &&
-              document.communityId === communityId.valueOf(),
-          )
-          .map(async (document) => {
-            const tombstone = {
-              ...document,
-              removed: true,
-              updatedAt: Date.now(),
-            };
-
-            await this.registry.putDocument('reactions', tombstone);
-            await this.putIndexDocument(communityId, tombstone);
-          }),
-      );
     });
   }
 }

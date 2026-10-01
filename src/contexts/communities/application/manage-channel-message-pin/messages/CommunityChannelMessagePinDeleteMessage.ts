@@ -1,3 +1,4 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { CommunityChannelId } from '../../../domain/value-objects/CommunityChannelId';
@@ -9,16 +10,19 @@ export class CommunityChannelMessagePinDeleteMessage {
   public readonly channelId: CommunityChannelId;
   public readonly communityId: CommunityId;
   public readonly messageId: CommunityChannelMessageId;
+  public readonly proof: PublicMutationProof;
 
   constructor(
     actorIdentityId: string,
     communityId: string,
     channelId: string,
     messageId: string,
+    proof: unknown,
   ) {
     this.actorIdentityId = new IdentityId(actorIdentityId);
     this.communityId = new CommunityId(communityId);
     this.channelId = new CommunityChannelId(channelId);
     this.messageId = new CommunityChannelMessageId(messageId);
+    this.proof = PublicMutationProof.fromPrimitives(proof);
   }
 }
