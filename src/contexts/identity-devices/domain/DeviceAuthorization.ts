@@ -65,6 +65,13 @@ export class DeviceAuthorization extends AggregateRoot {
       this.credentials.length() <= DeviceAuthorization.MAX_CREDENTIALS,
       new InvalidDeviceAuthorizationTransitionError(),
     );
+    assert(
+      this.recoveryAuthority.isIndependentFrom([
+        DeviceCredential.fromIdentityId(this.identityId),
+        ...this.credentials.toArray(),
+      ]),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
   }
 
   public getIdentityId(): IdentityId {

@@ -7,4 +7,8 @@ export class RecoveryAuthority extends PublicKey {
   ): RecoveryAuthority {
     return new RecoveryAuthority(value);
   }
+
+  public isIndependentFrom(publicKeys: PublicKey[]): boolean {
+    return publicKeys.every((publicKey) => !this.hasValue(publicKey));
+  }
 }

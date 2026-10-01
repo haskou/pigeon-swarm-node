@@ -106,6 +106,28 @@ describe(DeviceAuthorization.name, () => {
     ).toThrow();
   });
 
+  it('rejects a recovery authority reused as the stable identity key', () => {
+    expect(() =>
+      DeviceAuthorization.genesis(
+        identityId,
+        authorization.getNetworkIds(),
+        DeviceCredential.fromString(owner.toPrimitives().publicKey),
+        RecoveryAuthority.fromString(identity.toPrimitives().publicKey),
+      ),
+    ).toThrow();
+  });
+
+  it('rejects a recovery authority reused as a device credential', () => {
+    expect(() =>
+      DeviceAuthorization.genesis(
+        identityId,
+        authorization.getNetworkIds(),
+        DeviceCredential.fromString(owner.toPrimitives().publicKey),
+        RecoveryAuthority.fromString(owner.toPrimitives().publicKey),
+      ),
+    ).toThrow();
+  });
+
   it('requires recovery after a replicated authorization conflict', () => {
     const suspended = authorization.requireRecoveryAt(
       new DeviceAuthorizationRevision(7),

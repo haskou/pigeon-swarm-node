@@ -5,6 +5,7 @@ import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrim
 import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
+import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { InvalidProfileBannerError } from '@app/contexts/identities/domain/errors/InvalidProfileBannerError';
 import { InvalidProfileImageError } from '@app/contexts/identities/domain/errors/InvalidProfileImageError';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
@@ -133,6 +134,44 @@ describe(Identity.name, () => {
       }),
     ).toThrow(InvalidIdentitySignatureError);
   });
+
+  it.each(['identity', 'device'] as const)(
+    'rejects a recovery authority reused as the %s signing key',
+    async (role) => {
+      const identity = await KeyPair.generate();
+      const device = await KeyPair.generate();
+      const deviceCredential = DeviceCredential.fromString(
+        device.toPrimitives().publicKey,
+      );
+      const id = new IdentityId(identity.toPrimitives().publicKey);
+      const recoveryAuthority = RecoveryAuthority.fromString(
+        role === 'identity'
+          ? identity.toPrimitives().publicKey
+          : device.toPrimitives().publicKey,
+      );
+      const unsigned: Omit<IdentityPrimitives, 'signature'> = {
+        ...mother.build().toPrimitives(),
+        deviceCredential: deviceCredential.valueOf(),
+        deviceCredentialCommitment: deviceCredential
+          .getCommitment()
+          .valueOf(),
+        id: id.valueOf(),
+        recoveryAuthority: recoveryAuthority.valueOf(),
+      };
+      const signature = identity.sign(
+        new IdentitySignatureDomainService().getCanonicalSigningContent(
+          IdentitySignaturePayload.fromPrimitives(unsigned),
+        ),
+      );
+
+      expect(() =>
+        Identity.fromPrimitives({
+          ...unsigned,
+          signature: signature.valueOf(),
+        }),
+      ).toThrow(InvalidIdentitySignatureError);
+    },
+  );
 
   it('rejects embedded data URL profile images', () => {
     expect(() =>

@@ -70,6 +70,13 @@ export class Identity extends AggregateRoot {
       new InvalidIdentitySignatureError(),
     );
     assert(
+      this.recoveryAuthority.isIndependentFrom([
+        DeviceCredential.fromIdentityId(this.id),
+        this.deviceCredential,
+      ]),
+      new InvalidIdentitySignatureError(),
+    );
+    assert(
       new IdentitySignatureDomainService().isValidSignature(
         DeviceCredential.fromIdentityId(this.id),
         IdentitySignaturePayload.fromPrimitives(this.toPrimitives()),

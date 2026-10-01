@@ -19,4 +19,10 @@ export abstract class DeviceAuthorizationRepository {
     identityVersion: IdentityVersion,
     identityExternalIdentifier: IdentityExternalIdentifier,
   ): Promise<void>;
+
+  public abstract withdrawProvision(
+    identityId: IdentityId,
+    identityVersion: IdentityVersion,
+    identityExternalIdentifier: IdentityExternalIdentifier,
+  ): Promise<void>;
 }
