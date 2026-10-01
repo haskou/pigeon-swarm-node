@@ -27,9 +27,12 @@ export class DeviceAuthorizationRequestAuthenticator {
     const credential = DeviceCredential.fromIdentityId(
       new IdentityId(credentialValue),
     );
+    const hasValidSignature = credential.isValidSignature(
+      payload,
+      new Signature(signatureValue),
+    );
     assert(
-      authorization.isAuthorized(credential) &&
-        credential.isValidSignature(payload, new Signature(signatureValue)),
+      hasValidSignature && authorization.isAuthorized(credential),
       new InvalidSignedRequestError(),
     );
   }
