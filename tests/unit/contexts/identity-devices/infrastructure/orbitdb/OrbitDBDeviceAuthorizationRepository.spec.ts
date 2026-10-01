@@ -1044,7 +1044,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     ) as { authorization?: { credentials?: string[]; revision?: number } };
 
     expect(merged.authorization?.revision).toBe(2);
-    expect(merged.authorization?.credentials).toEqual([]);
+    expect(merged.authorization?.credentials).toHaveLength(1);
   });
 
   it('discards branches that did not observe the recovery checkpoint', async () => {

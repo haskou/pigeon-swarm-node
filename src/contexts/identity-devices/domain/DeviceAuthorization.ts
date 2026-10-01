@@ -188,19 +188,29 @@ export class DeviceAuthorization extends AggregateRoot {
       new InvalidDeviceAuthorizationTransitionError(),
     );
 
+    const remaining = this.credentials
+      .toArray()
+      .filter((authorized) =>
+        revokedCredentials.every((revoked) => !authorized.isEqual(revoked)),
+      );
+    const survivors =
+      remaining.length > 0
+        ? remaining
+        : [
+            this.credentials
+              .toArray()
+              .sort((left, right) =>
+                left.valueOf().localeCompare(right.valueOf()),
+              )[0],
+          ];
+
     return new DeviceAuthorization(
       this.identityId,
       this.networkIds,
       this.recoveryAuthority,
       this.revision.next(),
       this.epoch,
-      UniqueObjectArray.fromArray(
-        this.credentials
-          .toArray()
-          .filter((authorized) =>
-            revokedCredentials.every((revoked) => !authorized.isEqual(revoked)),
-          ),
-      ),
+      UniqueObjectArray.fromArray(survivors),
     );
   }
 

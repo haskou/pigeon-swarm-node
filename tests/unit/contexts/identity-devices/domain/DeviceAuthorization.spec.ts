@@ -91,6 +91,22 @@ describe(DeviceAuthorization.name, () => {
     expect(next.getRevision().valueOf()).toBe(1);
   });
 
+  it('never empties the credential set when concurrent revocations cross', () => {
+    const first = DeviceCredential.fromString(owner.toPrimitives().publicKey);
+    const second = DeviceCredential.fromString(
+      candidate.toPrimitives().publicKey,
+    );
+    const both = authorization.enrollConcurrently([second]);
+
+    const merged = both.revokeConcurrently([first, second]);
+    const reversed = both.revokeConcurrently([second, first]);
+
+    expect(merged.isAuthorized(first) || merged.isAuthorized(second)).toBe(
+      true,
+    );
+    expect(reversed.isAuthorized(first)).toBe(merged.isAuthorized(first));
+  });
+
   it('rejects authorization states with more credentials than can converge safely', async () => {
     const credentials = await Promise.all(
       Array.from({ length: 129 }, () => KeyPair.generate()),
