@@ -5,7 +5,7 @@ import { PublicMutationProof } from '@app/contexts/public-mutations/domain/Publi
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
 import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
-import PublicMutationGate from '@app/contexts/public-mutations/infrastructure/PublicMutationGate';
+import { PublicMutationGate } from '@app/contexts/public-mutations/infrastructure/PublicMutationGate';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';

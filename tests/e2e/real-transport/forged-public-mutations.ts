@@ -11,7 +11,7 @@ import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-author
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
 import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
-import PublicMutationGate from '@app/contexts/public-mutations/infrastructure/PublicMutationGate';
+import { PublicMutationGate } from '@app/contexts/public-mutations/infrastructure/PublicMutationGate';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import {
   heliaRuntimeAdapter,

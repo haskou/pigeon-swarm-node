@@ -6,7 +6,7 @@ import { PublicMutationPolicy } from '../domain/services/PublicMutationPolicy';
 import PublicMutationVerifier from '../domain/services/PublicMutationVerifier';
 
 /** Admits a replicated record only with a valid, authorized, scoped proof. */
-export default class PublicMutationGate extends OrbitDBMutationGate {
+export class PublicMutationGate extends OrbitDBMutationGate {
   private readonly policies: Map<string, PublicMutationPolicy>;
 
   constructor(
