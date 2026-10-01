@@ -10,7 +10,11 @@ its previous-version chain. They must not resolve the event through a DHT
 routing record: OrbitDB metadata is the canonical discovery index.
 
 The remaining attributes describe the published identity metadata:
-`handle`, `networkIds`, `previousExternalIdentifier`, and `version`.
+`deviceCredentialCommitment`, `handle`, `networkIds`,
+`previousExternalIdentifier`, `recoveryAuthority`, and `version`. Consumers use
+the commitment and recovery authority only after validating the exact signed
+identity candidate referenced by `externalIdentifier`; event attributes do not
+replace that signature-chain validation.
 
 Identity and keychain metadata documents are the canonical replicated state.
 They are not duplicated in the optimized `heads` store. Each node projects the
@@ -253,7 +257,6 @@ Acknowledgements are internal node-to-node events and are not forwarded to
 frontend WebSockets. If an acknowledgement is lost, the next signal retry
 causes the frontend to acknowledge the same `signalId` again.
 
-
 ## Community replica convergence
 
 Community documents carry optional `replicaState: { version: 1, entries }` metadata.
@@ -369,6 +372,54 @@ checkpoint or the public replication path.
 Version 1 accepts only `membership.propose`, `membership.commit` and
 `device.revoke`. There is no legacy private-format fallback or dual write.
 Public communities continue to use their public replication path.
+
+## Identity device authorization convergence
+
+Device authorization transitions are not published on shared PubSub. OrbitDB
+replicates their signed history only through the identity's configured private
+networks. Every replica rebuilds the checkpoint from the identity-pinned genesis
+and runs the same credential, proof-of-possession, causal revision and recovery
+authority checks before accepting a transition. Invalid and duplicate records
+cannot change the materialized checkpoint.
+
+OrbitDB stores the verified genesis checkpoint, signed public transition history
+and current materialized checkpoint in the identity's private networks. It never
+stores passwords, password derivation metadata, protected device roots, device
+unlock factors or recovery secrets. Operation and pairing UUIDs remain as replay
+tombstones. Their retention is required for replay safety and reveals that a
+control transition occurred to readers of the private network; it does not expose
+the paired device's local root or unlock material. Replicas reject non-canonical
+records, unknown unsigned fields, transition records above 16 KiB and more than
+128 concurrent siblings from one predecessor, 256 post-checkpoint records and
+1 MiB of aggregate post-checkpoint history before parsing or verifying them.
+An authority-signed recovery becomes a new verified checkpoint and discards the
+older transition history, so those limits bound replay work without imposing a
+lifetime operation limit. Public-network heads are rejected. An identity whose
+networks are all public keeps its authorization only in the node's local
+database: nothing is published or replicated, so a device catalog never reaches
+a public network, and such an identity does not converge across nodes.
+
+The public identity publication binds an independent genesis device credential
+and its commitment under the identity signature. The node does not derive that
+credential from the identity key.
+
+Concurrent valid transitions from the same predecessor are resolved independently
+of arrival time. Recovery transitions form the highest-precedence class; without
+recovery, all sibling revocations are applied together before any enrollment;
+otherwise every valid sibling enrollment is folded into one checkpoint. Branch
+length never grants precedence, so a compromised credential cannot restore itself
+by appending enrollment descendants after another device revokes it. Concurrent
+recovery equivocation uses the lowest operation UUID, with the canonical signed
+record as the final tie-break. Each replica replays the same signed candidates
+from the pinned genesis checkpoint and therefore selects the same authorization
+state after exchanging heads. Both devices sign the pairing
+identifier, authorization time and expiration, and the target client must refuse
+to complete an offer after that expiration. Replicas validate that signed interval but do not
+compare it with their receipt clock: a fully signed enrollment may arrive after an
+offline partition and must replay identically everywhere. Pairing and operation
+identifiers remain permanent replay tombstones. Signed time never grants authority
+or wins a conflict. A transition authored from a losing branch is rechecked against
+the selected checkpoint before it can affect later revisions.
 
 ## Live call projection boundary
 

@@ -1,10 +1,6 @@
-import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
-import { Identity } from '@app/contexts/identities/domain/Identity';
-import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import IdentityCandidateValidationDomainService from '@app/contexts/identities/domain/services/IdentityCandidateValidationDomainService';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
-import { IdentitySigningKey } from '@app/contexts/identities/domain/value-objects/IdentitySigningKey';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { faker } from '@faker-js/faker';
@@ -25,16 +21,13 @@ describe('IdentityCandidateValidationDomainService', () => {
     const previousReference = new IdentityExternalIdentifier(
       'bafypreviousidentity',
     );
-    const candidate = await previousIdentity.updateProfile(
-      new Profile(new ProfileName('Jane')),
-      mother.password,
-      previousReference,
-    );
+    const candidate = await mother.buildNext({
+      previousIdentityExternalIdentifier: previousReference.valueOf(),
+      profile: new Profile(new ProfileName('Jane')).toPrimitives(),
+    });
 
-    const result = await service.isValidChainFor(
-      mother.id,
-      candidate,
-      () => Promise.resolve(previousIdentity),
+    const result = await service.isValidChainFor(mother.id, candidate, () =>
+      Promise.resolve(previousIdentity),
     );
 
     expect(result).toBe(true);
@@ -42,11 +35,38 @@ describe('IdentityCandidateValidationDomainService', () => {
 
   it('should reject a versioned candidate without its previous identity', async () => {
     const previousIdentity = mother.build();
-    const candidate = await previousIdentity.updateProfile(
-      new Profile(new ProfileName('Jane')),
-      mother.password,
-      new IdentityExternalIdentifier('bafyunknownidentity'),
+    const candidate = await mother.buildNext({
+      previousIdentityExternalIdentifier: 'bafyunknownidentity',
+      profile: new Profile(new ProfileName('Jane')).toPrimitives(),
+    });
+
+    const result = await service.isValidChainFor(mother.id, candidate, () =>
+      Promise.resolve(undefined),
     );
+
+    expect(result).toBe(false);
+  });
+
+  it('should reject a versioned candidate that removes a previous network', async () => {
+    const previousIdentity = mother.build();
+    const candidate = await mother.buildNext({
+      networks: [new NetworkId(faker.string.uuid()).valueOf()],
+      previousIdentityExternalIdentifier: 'bafypreviousidentity',
+    });
+
+    const result = await service.isValidChainFor(mother.id, candidate, () =>
+      Promise.resolve(previousIdentity),
+    );
+
+    expect(result).toBe(false);
+  });
+
+  it('rejects a genesis publication above authorization revision zero', async () => {
+    const candidate = await mother.buildNext({
+      authorizationRevision: 1,
+      previousIdentityExternalIdentifier: undefined,
+      version: 1,
+    });
 
     const result = await service.isValidChainFor(
       mother.id,
@@ -57,32 +77,20 @@ describe('IdentityCandidateValidationDomainService', () => {
     expect(result).toBe(false);
   });
 
-  it('should reject a versioned candidate that removes a previous network', async () => {
-    const previousIdentity = mother.build();
-    const previousPrimitives = previousIdentity.toPrimitives();
-    const { signature: _, ...candidatePrimitives } = {
-      ...previousPrimitives,
-      networks: [new NetworkId(faker.string.uuid()).valueOf()],
+  it('rejects an authorization revision rollback', async () => {
+    const previousIdentity = await mother.buildNext({
+      authorizationRevision: 5,
+      previousIdentityExternalIdentifier: undefined,
+      version: 1,
+    });
+    const candidate = await mother.buildNext({
+      authorizationRevision: 4,
       previousIdentityExternalIdentifier: 'bafypreviousidentity',
-      signature: '',
-      timestamp: previousPrimitives.timestamp + 1,
-      version: previousPrimitives.version + 1,
-    };
-    const signature =
-      await new IdentitySignatureDomainService().generateSignature(
-        IdentitySignaturePayload.fromPrimitives(candidatePrimitives),
-        IdentitySigningKey.fromPrimitives(previousPrimitives.encryptedKeyPair),
-        mother.password,
-      );
-    const candidate = Identity.fromPrimitives({
-      ...candidatePrimitives,
-      signature: signature.valueOf(),
+      version: 2,
     });
 
-    const result = await service.isValidChainFor(
-      mother.id,
-      candidate,
-      () => Promise.resolve(previousIdentity),
+    const result = await service.isValidChainFor(mother.id, candidate, () =>
+      Promise.resolve(previousIdentity),
     );
 
     expect(result).toBe(false);

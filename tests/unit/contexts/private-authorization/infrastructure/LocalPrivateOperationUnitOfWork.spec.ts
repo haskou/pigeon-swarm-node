@@ -54,6 +54,10 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       admittedDeviceKeys: ['owner', 'device'],
       authorityKeys: ['owner'],
       controlCheckpointJson: '{}',
+      deviceIdentities: [
+        { deviceKey: 'owner', identityId: ownerIdentityId.valueOf() },
+        { deviceKey: 'device', identityId: attackerIdentityId.valueOf() },
+      ],
       freshnessAuthorityKey: 'owner',
       headHash,
       parentHeadHash: revision === 0 ? null : 'head-0',
@@ -64,11 +68,14 @@ describe('LocalPrivateOperationUnitOfWork', () => {
   const operation = (kind = 'device.revoke') =>
     PrivateControlOperation.fromPrimitives({
       authorDeviceKey: 'owner',
+      authorIdentityId: ownerIdentityId.valueOf(),
       authorizationRevision: 0,
       byteSize: 10,
       control: { parentHeadHash: 'head-0' },
       digest: 'digest-operation',
       id: 'operation',
+      identityAuthorizationEpoch: 'genesis',
+      identityAuthorizationRevision: 0,
       kind,
       mutation:
         kind === 'device.revoke'
@@ -134,6 +141,9 @@ describe('LocalPrivateOperationUnitOfWork', () => {
         ...checkpoint().toPrimitives(),
         admittedDeviceKeys: [ownerDeviceKey],
         authorityKeys: [ownerDeviceKey],
+        deviceIdentities: [
+          { deviceKey: ownerDeviceKey, identityId: identityId.valueOf() },
+        ],
         freshnessAuthorityKey: ownerDeviceKey,
         scopeId,
       }),

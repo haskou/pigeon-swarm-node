@@ -34,7 +34,7 @@ describe('Client contract route', () => {
     expect(response.headers.get('content-type')).toContain('application/json');
     expect(await response.json()).toEqual({
       protocol: 'pigeon-swarm',
-      apiVersion: 1,
+      apiVersion: 2,
     });
     expect((await fetch(`${baseUrl}/client-contract`)).status).toBe(404);
   });

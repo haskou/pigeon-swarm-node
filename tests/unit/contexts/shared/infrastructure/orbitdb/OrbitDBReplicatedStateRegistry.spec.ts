@@ -1,13 +1,13 @@
-import OrbitDBCommunityReplicaProjection from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaProjection';
 import OrbitDBCommunityReplicaMerger from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaMerger';
+import OrbitDBCommunityReplicaProjection from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaProjection';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
+import { OrbitDBEntry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBEntry';
+import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import OrbitDBReplicatedHeadCache, {
   OrbitDBReplicatedHeadCacheEntry,
 } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCache';
-import { OrbitDBEntry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBEntry';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 
 type Entry = {
   key?: string;
@@ -18,6 +18,7 @@ class InMemoryOrbitDBReplicatedHeadCache extends OrbitDBReplicatedHeadCache {
   private readonly entries: Array<
     OrbitDBReplicatedHeadCacheEntry & { networkId: string }
   > = [];
+
   private readonly reconciledHeadSignatures = new Map<string, string>();
   private readonly warmNetworkIds = new Set<string>();
 
@@ -57,10 +58,7 @@ class InMemoryOrbitDBReplicatedHeadCache extends OrbitDBReplicatedHeadCache {
     this.warmNetworkIds.add(networkId);
 
     if (reconciledHeadSignature) {
-      this.reconciledHeadSignatures.set(
-        networkId,
-        reconciledHeadSignature,
-      );
+      this.reconciledHeadSignatures.set(networkId, reconciledHeadSignature);
     }
   }
 
@@ -95,8 +93,7 @@ type Store = {
         'join' | 'update',
         (
           entryOrPeerId:
-            | string
-            | { payload?: { key?: string; value?: unknown } },
+            string | { payload?: { key?: string; value?: unknown } },
           heads?: OrbitDBEntry[],
         ) => void,
       ]
@@ -116,9 +113,8 @@ type Store = {
 
 function createStore(): Store {
   const entries: Entry[] = [];
-  const joinHandlers: Array<
-    (peerId: string, heads?: OrbitDBEntry[]) => void
-  > = [];
+  const joinHandlers: Array<(peerId: string, heads?: OrbitDBEntry[]) => void> =
+    [];
   const updateHandlers: Array<
     (entry: { payload?: { key?: string; value?: unknown } }) => void
   > = [];
@@ -197,10 +193,10 @@ function createStores(): {
   const storeSet = {
     calls,
     communities,
+    contentReplication,
     conversations: createStore(),
     heads,
     identities,
-    contentReplication,
     keychains,
     messages,
     notifications,
@@ -212,9 +208,9 @@ function createStores(): {
     calls,
     communities,
     contentReplication,
+    heads,
     identities,
     keychains,
-    heads,
     messages,
     notifications,
     stores: storeSet as unknown as OrbitDBPrivateNetworkStores,
@@ -330,19 +326,51 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     const first = createStores();
     const second = createStores();
     const key = 'community-member-index:member';
-    const community = (networkId: string) => ({ id: `community-${networkId}`, networkId, ownerIdentityId: 'owner', createdAt: 1, name: networkId, description: 'private', visibility: 'private', memberIds: ['member'], textChannels: [] as unknown[] });
-    const head = (networkId: string) => ({ id: key, identityId: 'member', memberId: 'member', networkId, communities: [community(networkId)], updatedAt: 1 });
+    const community = (networkId: string) => ({
+      createdAt: 1,
+      description: 'private',
+      id: `community-${networkId}`,
+      memberIds: ['member'],
+      name: networkId,
+      networkId,
+      ownerIdentityId: 'owner',
+      textChannels: [] as unknown[],
+      visibility: 'private',
+    });
+    const head = (networkId: string) => ({
+      communities: [community(networkId)],
+      id: key,
+      identityId: 'member',
+      memberId: 'member',
+      networkId,
+      updatedAt: 1,
+    });
     first.heads.all.mockResolvedValue([{ key, value: head('first') }]);
     second.heads.all.mockResolvedValue([{ key, value: head('second') }]);
     await registry.register('first', first.stores);
     await registry.register('second', second.stores);
     await flushPromises();
-    await registry.putHead(key, { ...head('second'), updatedAt: 2 }, ['second'], true);
-    const stored = second.heads.put.mock.calls.map(([, value]) => value as { communities: Array<{ networkId: string }> });
+    await registry.putHead(
+      key,
+      { ...head('second'), updatedAt: 2 },
+      ['second'],
+      true,
+    );
+    const stored = second.heads.put.mock.calls.map(
+      ([, value]) => value as { communities: Array<{ networkId: string }> },
+    );
     expect(stored.length).toBeGreaterThan(0);
-    for (const value of stored) expect(value.communities.map(entry => entry.networkId)).toEqual(['second']);
-    const local = registry.findCachedHead(key) as { communities: Array<{ networkId: string }> };
-    expect(local.communities.map(entry => entry.networkId).sort()).toEqual(['first', 'second']);
+    for (const value of stored)
+      expect(value.communities.map((entry) => entry.networkId)).toEqual([
+        'second',
+      ]);
+    const local = registry.findCachedHead(key) as {
+      communities: Array<{ networkId: string }>;
+    };
+    expect(local.communities.map((entry) => entry.networkId).sort()).toEqual([
+      'first',
+      'second',
+    ]);
     registry.clear();
   });
 
@@ -355,8 +383,11 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     await registry.register('network-1', stores);
     const key = 'community:migration';
     registry.cacheHeadLocally(key, { updatedAt: 10000 });
-    registry.cacheHeadLocally(key, { versioned: true, updatedAt: 1 });
-    expect(registry.findCachedHead(key)).toEqual({ versioned: true, updatedAt: 1 });
+    registry.cacheHeadLocally(key, { updatedAt: 1, versioned: true });
+    expect(registry.findCachedHead(key)).toEqual({
+      updatedAt: 1,
+      versioned: true,
+    });
     registry.clear();
   });
 
@@ -366,7 +397,30 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     registry.registerHeadRecordMerger('community:', () => undefined);
     await registry.register('network-1', stores);
     heads.get.mockResolvedValue({ invalid: true });
-    await expect(registry.findPersistedHead('community:invalid')).resolves.toBeUndefined();
+    await expect(
+      registry.findPersistedHead('community:invalid'),
+    ).resolves.toBeUndefined();
+    registry.clear();
+  });
+
+  it('removes cached heads rejected by a scope registered after hydration', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { heads, stores } = createStores();
+    const key = 'device-authorization:identity';
+    const document = { id: key, revision: 1 };
+
+    heads.all.mockResolvedValue([{ key, value: document }]);
+    await registry.register('public-network', stores);
+    await expect(registry.findHead(key)).resolves.toEqual(document);
+
+    registry.registerHeadRecordMerger(
+      'device-authorization:',
+      (_current, candidate) => candidate,
+      (networkId, candidate) =>
+        networkId === 'private-network' ? candidate : undefined,
+    );
+
+    await expect(registry.findHead(key)).resolves.toBeUndefined();
     registry.clear();
   });
 
@@ -388,8 +442,8 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     };
     heads.all.mockResolvedValue([{ key, value: second }]);
     heads.log = {
-      heads: jest.fn(async () => [latest]),
       get: async (hash) => (hash === 'first' ? ancestor : undefined),
+      heads: jest.fn(async () => [latest]),
     };
     registry.registerHeadRecordMerger('community:', (current, candidate) => ({
       members: [
@@ -732,16 +786,13 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
     await registry.register('network-1', network.stores);
 
-    registry.cacheHeadLocally(
-      'presence:identity-1',
-      {
-        id: 'identity-1',
-        identityId: 'identity-1',
-        networkIds: ['network-1'],
-        status: 'available',
-        updatedAt: 1780000000000,
-      },
-    );
+    registry.cacheHeadLocally('presence:identity-1', {
+      id: 'identity-1',
+      identityId: 'identity-1',
+      networkIds: ['network-1'],
+      status: 'available',
+      updatedAt: 1780000000000,
+    });
 
     await expect(registry.findHead('presence:identity-1')).resolves.toEqual(
       expect.objectContaining({
@@ -1280,22 +1331,19 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       },
       ['network-1'],
     );
-    registry.cacheHeadLocally(
-      key,
-      {
-        id: key,
-        messages: [
-          {
-            deleted: true,
-            deletedAt: 30,
-            encryptedPayload: 'encrypted-community-channel-message-payload',
-            id: 'message-1',
-            receivedAt: 10,
-          },
-        ],
-        updatedAt: 31,
-      },
-    );
+    registry.cacheHeadLocally(key, {
+      id: key,
+      messages: [
+        {
+          deleted: true,
+          deletedAt: 30,
+          encryptedPayload: 'encrypted-community-channel-message-payload',
+          id: 'message-1',
+          receivedAt: 10,
+        },
+      ],
+      updatedAt: 31,
+    });
     firstNetwork.heads.emitUpdate({
       payload: {
         key,
@@ -1346,38 +1394,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       const key = `conversation-${collectionName}-index:conversation-1`;
 
       await registry.register('network-1', firstNetwork.stores);
-      registry.cacheHeadLocally(
-        key,
-        {
-          id: key,
-          [collectionName]: [
-            {
-              id: `${collectionName}-1`,
-              removed: true,
-              updatedAt: 30,
-            },
-          ],
-          updatedAt: 31,
-        },
-      );
-      firstNetwork.heads.emitUpdate({
-        payload: {
-          key,
-          value: {
-            id: key,
-            [collectionName]: [
-              {
-                createdAt: 10,
-                id: `${collectionName}-1`,
-              },
-            ],
-            updatedAt: 40,
-          },
-        },
-      });
-
-      await expect(registry.findHead(key)).resolves.toEqual({
-        id: key,
+      registry.cacheHeadLocally(key, {
         [collectionName]: [
           {
             id: `${collectionName}-1`,
@@ -1385,6 +1402,34 @@ describe('OrbitDBReplicatedStateRegistry', () => {
             updatedAt: 30,
           },
         ],
+        id: key,
+        updatedAt: 31,
+      });
+      firstNetwork.heads.emitUpdate({
+        payload: {
+          key,
+          value: {
+            [collectionName]: [
+              {
+                createdAt: 10,
+                id: `${collectionName}-1`,
+              },
+            ],
+            id: key,
+            updatedAt: 40,
+          },
+        },
+      });
+
+      await expect(registry.findHead(key)).resolves.toEqual({
+        [collectionName]: [
+          {
+            id: `${collectionName}-1`,
+            removed: true,
+            updatedAt: 30,
+          },
+        ],
+        id: key,
         updatedAt: 40,
       });
     },
@@ -1685,7 +1730,9 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     await registry.register('network-1', firstNetwork.stores);
     await registry.register('network-2', secondNetwork.stores);
 
-    expect(registry.findCachedHead('identity-handle:old-handle')).toBeUndefined();
+    expect(
+      registry.findCachedHead('identity-handle:old-handle'),
+    ).toBeUndefined();
     expect(registry.findCachedHead('identity-handle:other-handle')).toEqual(
       expect.objectContaining({
         identityId: 'identity-2',
@@ -1929,17 +1976,22 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     const firstNetwork = createStores();
     const key = 'replacement-test:conversation-1';
     let finishWrite!: () => void;
-    const pendingWrite = new Promise<void>(resolve => {
+    const pendingWrite = new Promise<void>((resolve) => {
       finishWrite = resolve;
     });
 
-    registry.registerHeadRecordMerger('replacement-test:', (current, candidate) => ({
-      ...candidate,
-      reactions: [
-        ...((current?.reactions as Record<string, unknown>[] | undefined) ?? []),
-        ...((candidate.reactions as Record<string, unknown>[] | undefined) ?? []),
-      ],
-    }));
+    registry.registerHeadRecordMerger(
+      'replacement-test:',
+      (current, candidate) => ({
+        ...candidate,
+        reactions: [
+          ...((current?.reactions as Record<string, unknown>[] | undefined) ??
+            []),
+          ...((candidate.reactions as Record<string, unknown>[] | undefined) ??
+            []),
+        ],
+      }),
+    );
     await registry.register('network-1', firstNetwork.stores);
     await registry.putHead(
       key,
@@ -1975,7 +2027,9 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       reactions: [],
       updatedAt: 2,
     });
-    await expect(headCache.findByNetworkId('network-1')).resolves.toContainEqual({
+    await expect(
+      headCache.findByNetworkId('network-1'),
+    ).resolves.toContainEqual({
       key,
       value: { id: key, reactions: [], updatedAt: 2 },
     });
@@ -1995,11 +2049,9 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     firstNetwork.heads.put.mockRejectedValueOnce(new Error('write failed'));
 
     await expect(
-      registry.putHeadExactly(
-        key,
-        { id: key, reactions: [], updatedAt: 2 },
-        ['network-1'],
-      ),
+      registry.putHeadExactly(key, { id: key, reactions: [], updatedAt: 2 }, [
+        'network-1',
+      ]),
     ).rejects.toThrow('write failed');
     expect(registry.findCachedHead(key)).toEqual({
       id: key,
@@ -2039,23 +2091,22 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       });
     const olderReplacement = registry.putHeadExactly(
       key,
-      { id: key, generation: 1 },
+      { generation: 1, id: key },
       ['network-1'],
     );
-    const olderFailure = expect(olderReplacement).rejects.toThrow(
-      'older write failed',
-    );
+    const olderFailure =
+      expect(olderReplacement).rejects.toThrow('older write failed');
     const newerReplacement = registry.putHeadExactly(
       key,
-      { id: key, generation: 2 },
+      { generation: 2, id: key },
       ['network-1'],
     );
 
-    expect(registry.findCachedHead(key)).toEqual({ id: key, generation: 2 });
+    expect(registry.findCachedHead(key)).toEqual({ generation: 2, id: key });
     failOlderWrite();
     await olderFailure;
     await newerWriteEntered;
-    expect(registry.findCachedHead(key)).toEqual({ id: key, generation: 2 });
+    expect(registry.findCachedHead(key)).toEqual({ generation: 2, id: key });
     finishNewerWrite();
     await newerReplacement;
   });
@@ -2333,7 +2384,6 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     expect(setImmediateSpy).toHaveBeenCalled();
     setImmediateSpy.mockRestore();
   });
-
 });
 
 function deferred<T>(): {

@@ -1,41 +1,57 @@
+import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsDefined,
+  IsInt,
+  IsEmpty,
   IsNumber,
-  IsObject,
   IsOptional,
   IsString,
+  Min,
+  ValidateNested,
 } from 'class-validator';
 
+import { IdentityProfileBody } from './IdentityProfileBody';
+
 export class PostIdentityBody {
+  @IsEmpty()
+  public readonly encryptedKeyPair?: never;
+
+  @IsEmpty()
+  public readonly encryptedMasterKey?: never;
+
+  @IsEmpty()
+  public readonly encryptedPrivateKey?: never;
+
+  @IsEmpty()
+  public readonly masterKeyDerivation?: never;
+
   @IsString()
   public readonly id: string;
 
-  @IsObject()
-  public readonly encryptedKeyPair: {
-    encryptedPrivateKey: string;
-    publicKey: string;
-  };
+  @IsInt()
+  @Min(0)
+  public readonly authorizationRevision: number;
 
   @IsString()
-  public readonly encryptedMasterKey: string;
+  public readonly deviceCredential: string;
 
-  @IsObject()
-  public readonly masterKeyDerivation: Record<string, unknown>;
+  @IsString()
+  public readonly deviceCredentialCommitment: string;
+
+  @IsString()
+  public readonly recoveryAuthority: string;
 
   @IsArray()
   @IsString({ each: true })
   @ArrayMinSize(1)
   public readonly networks: string[];
 
-  @IsObject()
-  public readonly profile: {
-    banner?: string;
-    biography?: string;
-    handle?: string;
-    name: string;
-    picture?: string;
-  };
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => IdentityProfileBody)
+  public readonly profile: IdentityProfileBody;
 
   @IsNumber()
   public readonly timestamp: number;

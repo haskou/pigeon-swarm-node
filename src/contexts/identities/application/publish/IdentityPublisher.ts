@@ -1,5 +1,8 @@
+import DeviceAuthorizationProvisioner from '@app/contexts/identity-devices/application/provision/DeviceAuthorizationProvisioner';
+import { DeviceAuthorizationProvisionMessage } from '@app/contexts/identity-devices/application/provision/messages/DeviceAuthorizationProvisionMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
+import { assert } from '@haskou/value-objects';
 
 import { InvalidIdentityCandidateError } from '../../domain/errors/InvalidIdentityCandidateError';
 import { IdentityCandidate } from '../../domain/IdentityCandidate';
@@ -14,6 +17,7 @@ export default class IdentityPublisher {
     private readonly repository: IdentityRepository,
     private readonly validator: IdentityCandidateValidationDomainService,
     private readonly eventPublisher: DomainEventPublisher,
+    private readonly deviceAuthorizationProvisioner: DeviceAuthorizationProvisioner,
   ) {}
 
   public async publish(
@@ -32,15 +36,44 @@ export default class IdentityPublisher {
       throw new InvalidIdentityCandidateError();
     }
 
-    const externalIdentifier = await this.saver.save(identity);
+    const externalIdentifier =
+      await this.saver.calculateExternalIdentifier(identity);
+
+    const provisionMessage = new DeviceAuthorizationProvisionMessage(
+      new IdentityId(primitives.id),
+      identity.getVersion(),
+      externalIdentifier,
+      identity.getNetworkIds(),
+      identity.getInitialDeviceCredential(),
+      identity.getRecoveryAuthority(),
+    );
+
+    await this.deviceAuthorizationProvisioner.provision(provisionMessage);
+
+    try {
+      const savedExternalIdentifier = await this.saver.save(identity);
+
+      assert(
+        externalIdentifier.isEqual(savedExternalIdentifier),
+        new InvalidIdentityCandidateError(),
+      );
+    } catch (error) {
+      await this.deviceAuthorizationProvisioner.withdraw(provisionMessage);
+
+      throw error;
+    }
+
     const events = identity.pullDomainEvents();
 
     for (const event of events) {
       event.attributes.externalIdentifier = externalIdentifier.valueOf();
+      event.attributes.deviceCredentialCommitment =
+        primitives.deviceCredentialCommitment;
       event.attributes.handle = primitives.profile.handle;
       event.attributes.networkIds = primitives.networks;
       event.attributes.previousExternalIdentifier =
         primitives.previousIdentityExternalIdentifier;
+      event.attributes.recoveryAuthority = primitives.recoveryAuthority;
       event.attributes.version = primitives.version;
     }
 

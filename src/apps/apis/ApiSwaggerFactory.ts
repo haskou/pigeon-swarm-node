@@ -8,6 +8,7 @@ const swaggerFileByApi: Record<string, string> = {
   'communities-api': 'communities-api/swagger.yaml',
   'conversations-api': 'conversations-api/swagger.yaml',
   'identities-api': 'identities-api/swagger.yaml',
+  'identity-devices-api': 'identity-devices-api/swagger.yaml',
   'ipfs-api': 'ipfs-api/swagger.yaml',
   'keychains-api': 'keychains-api/swagger.yaml',
   'link-previews-api': 'link-previews-api/swagger.yaml',

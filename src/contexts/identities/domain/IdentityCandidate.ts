@@ -29,4 +29,15 @@ export class IdentityCandidate {
   public isNewerThan(other: IdentityCandidate): boolean {
     return this.identity.isNewerThan(other.identity);
   }
+
+  public takesPrecedenceOver(other: IdentityCandidate): boolean {
+    if (this.isNewerThan(other)) {
+      return true;
+    }
+
+    return (
+      !other.isNewerThan(this) &&
+      this.externalIdentifier.valueOf() < other.externalIdentifier.valueOf()
+    );
+  }
 }

@@ -10,8 +10,25 @@ export default class IdentityCandidateValidationDomainService {
   ): boolean {
     return (
       candidate.isNextVersionAfter(previousIdentity) &&
-      candidate.usesSameSigningKeyAs(previousIdentity) &&
+      candidate.usesSameGenesisAuthorizationAs(previousIdentity) &&
+      candidate.doesNotRollbackAuthorizationFrom(previousIdentity) &&
       candidate.keepsNetworksFrom(previousIdentity)
+    );
+  }
+
+  private isValidGenesis(candidate: Identity): boolean {
+    return (
+      candidate.hasNoPreviousReference() &&
+      candidate.hasInitialAuthorizationRevision()
+    );
+  }
+
+  private hasVisited(
+    externalIdentifier: IdentityExternalIdentifier,
+    visitedExternalIdentifiers: IdentityExternalIdentifier[],
+  ): boolean {
+    return visitedExternalIdentifiers.some((visited) =>
+      visited.isEqual(externalIdentifier),
     );
   }
 
@@ -32,7 +49,7 @@ export default class IdentityCandidateValidationDomainService {
     }
 
     if (candidate.isFirstVersion()) {
-      return candidate.hasNoPreviousReference();
+      return this.isValidGenesis(candidate);
     }
 
     const previousReference = candidate.getPreviousReference();
@@ -41,11 +58,7 @@ export default class IdentityCandidateValidationDomainService {
       return false;
     }
 
-    if (
-      visitedExternalIdentifiers.some((externalIdentifier) =>
-        externalIdentifier.isEqual(previousReference),
-      )
-    ) {
+    if (this.hasVisited(previousReference, visitedExternalIdentifiers)) {
       return false;
     }
 

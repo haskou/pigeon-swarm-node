@@ -1,0 +1,201 @@
+openapi: 3.0.3
+info:
+  title: Pigeon Swarm identity device authorization API
+  version: 1.0.0
+paths:
+  /identity-devices/{identityId}:
+    get:
+      tags:
+        - identity-devices
+      summary: Read the authenticated identity authorization checkpoint
+      description: |
+        Returns only the current recovery epoch and deterministic revision for
+        the authenticated identity. The path identity must equal the identity
+        that signed the HTTP request. A client performing total device recovery
+        authenticates with the recovered stable identity signing key and the
+        separate recovery authority.
+
+        The response never exposes an authorized-device catalog, credential
+        commitments, password material, recovery secrets or private keys.
+
+        Existing devices send X-Device-Credential and X-Device-Signature
+        together. The device signature covers the same canonical request as
+        X-Signature, and the credential must belong to the current checkpoint.
+        Total recovery omits both device headers and sends X-Recovery-Signature.
+      parameters:
+        - in: path
+          name: identityId
+          required: true
+          schema:
+            type: string
+          description: Percent-encoded identity id. It must equal X-Identity-Id.
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XDeviceCredential'
+        - $ref: '#/components/parameters/XDeviceSignature'
+        - $ref: '#/components/parameters/XRecoverySignature'
+      responses:
+        '200':
+          description: Current deterministic authorization checkpoint.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceAuthorization'
+        '401':
+          description: The signature is missing or invalid, the signer does not own the requested identity, or the supplied device credential is not currently authorized.
+        '409':
+          description: The authorization checkpoint is unavailable on this node.
+  /identity-devices/transitions:
+    post:
+      tags:
+        - identity-devices
+      summary: Apply a signed device authorization transition
+      description: |
+        Applies an enrollment, revocation or recovery transition after checking
+        its causal revision, author authority, target proof of possession and
+        replay identifiers. The request never contains passwords, protected
+        device roots, password KDF metadata or recovery secrets.
+
+        Signatures cover UTF-8 compact JSON with no whitespace. Keys use the
+        order shown by the request schema and undefined properties are omitted.
+        The target proof envelope is
+        {"domain":"pigeon:device-authorization:proof-of-possession:v2",
+        "transition":<unsigned transition>}. The author envelope is
+        {"domain":"pigeon:device-authorization:transition:v3",
+        "proofOfPossession":"<target signature>",
+        "transition":<unsigned transition>}. The unsigned transition key order
+        is authorCredential, authorizedAt, epoch, identityId, operation,
+        operationId, pairingExpiration, pairingId, previousRevision, revision,
+        targetCredential, targetCredentialCommitment.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceAuthorizationTransition'
+      responses:
+        '200':
+          description: Current deterministic authorization checkpoint.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceAuthorization'
+        '400':
+          description: Malformed transition.
+        '409':
+          description: Expired, replayed, causally stale or unauthorized transition.
+        '429':
+          description: Per-identity or per-node transition rate limit exceeded.
+components:
+  parameters:
+    XIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      in: header
+      name: X-Timestamp
+      required: true
+      schema:
+        type: string
+    XSignature:
+      in: header
+      name: X-Signature
+      required: true
+      schema:
+        type: string
+    XDeviceCredential:
+      in: header
+      name: X-Device-Credential
+      required: false
+      schema:
+        type: string
+      description: Current authorized device credential in normalized public-key form. It must be supplied together with X-Device-Signature.
+    XDeviceSignature:
+      in: header
+      name: X-Device-Signature
+      required: false
+      schema:
+        type: string
+      description: Device signature over the same canonical request payload as X-Signature. It must be supplied together with X-Device-Credential.
+    XRecoverySignature:
+      in: header
+      name: X-Recovery-Signature
+      required: false
+      schema:
+        type: string
+      description: Recovery-authority signature over the same canonical request payload as X-Signature. It is accepted only when both device-proof headers are absent.
+  schemas:
+    DeviceAuthorizationTransition:
+      type: object
+      additionalProperties: false
+      required:
+        - epoch
+        - identityId
+        - operation
+        - operationId
+        - previousRevision
+        - revision
+        - signature
+        - targetCredential
+        - targetCredentialCommitment
+      properties:
+        authorCredential:
+          type: string
+          description: Public credential of the currently authorized device.
+        authorizedAt:
+          type: integer
+          format: int64
+          description: Time accepted by both device signatures; required for enrollment and no later than pairingExpiration.
+        epoch:
+          type: string
+          description: Signed recovery epoch. Use genesis before the first recovery and the recovery operation ID afterwards.
+        identityId:
+          type: string
+        operation:
+          type: string
+          enum: [enroll, revoke, recover]
+        operationId:
+          type: string
+          format: uuid
+        pairingExpiration:
+          type: integer
+          format: int64
+          description: Enrollment authorization deadline covered by both device signatures. A completely signed transition remains replayable across offline replicas.
+        pairingId:
+          type: string
+          format: uuid
+        previousRevision:
+          type: integer
+          minimum: 0
+        proofOfPossession:
+          type: string
+          description: Signature made by the target device credential before the author signs the enrollment.
+        revision:
+          type: integer
+          minimum: 1
+        signature:
+          type: string
+          description: Signature made by an authorized device or the recovery authority over the transition and target proof of possession.
+        targetCredential:
+          type: string
+        targetCredentialCommitment:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+    DeviceAuthorization:
+      type: object
+      required:
+        - epoch
+        - identityId
+        - revision
+      properties:
+        epoch:
+          type: string
+        identityId:
+          type: string
+        revision:
+          type: integer
+          minimum: 0

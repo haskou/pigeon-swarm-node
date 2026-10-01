@@ -3,6 +3,7 @@ import { PrivateGenesisAuthenticator } from '@app/contexts/private-authorization
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateProtectedMlsState } from '@app/contexts/private-authorization/domain/value-objects/PrivateProtectedMlsState';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrivateGenesisSignature } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
 import { createHash } from 'crypto';
@@ -45,6 +46,7 @@ export default class PrivateGenesisVerifier extends PrivateGenesisAuthenticator 
     signedJson: string,
     expectedOwnerDeviceKey: string,
     protectedMlsState: string,
+    expectedOwnerIdentityId: IdentityId,
   ): PrivateAuthorizationGenesis {
     try {
       const untrusted = this.parse(signedJson);
@@ -82,6 +84,12 @@ export default class PrivateGenesisVerifier extends PrivateGenesisAuthenticator 
           ),
           authorityKeys: verified.policy.authorityKeys,
           controlCheckpointJson,
+          deviceIdentities: [
+            {
+              deviceKey: expectedOwnerDeviceKey,
+              identityId: expectedOwnerIdentityId.valueOf(),
+            },
+          ],
           freshnessAuthorityKey: verified.policy.freshnessAuthorityKey,
           headHash: verified.headHash,
           scopeId: verified.scopeId,

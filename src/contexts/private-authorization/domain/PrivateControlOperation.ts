@@ -1,3 +1,7 @@
+import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
+import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+
 import { PrivateAuthorizationCheckpoint } from './PrivateAuthorizationCheckpoint';
 import { PrivateControlOperationPrimitives } from './PrivateControlOperationPrimitives';
 import { PrivateAuthorizationDeviceKey } from './value-objects/PrivateAuthorizationDeviceKey';
@@ -19,8 +23,28 @@ export class PrivateControlOperation {
     return this.primitives.authorDeviceKey === deviceKey.valueOf();
   }
 
+  public isAuthoredByIdentity(identityId: IdentityId): boolean {
+    return this.primitives.authorIdentityId === identityId.valueOf();
+  }
+
   public getAuthorDeviceKey(): PrivateAuthorizationDeviceKey {
     return new PrivateAuthorizationDeviceKey(this.primitives.authorDeviceKey);
+  }
+
+  public getAuthorIdentityId(): IdentityId {
+    return new IdentityId(this.primitives.authorIdentityId);
+  }
+
+  public getIdentityAuthorizationRevision(): DeviceAuthorizationRevision {
+    return new DeviceAuthorizationRevision(
+      this.primitives.identityAuthorizationRevision,
+    );
+  }
+
+  public getIdentityAuthorizationEpoch(): DeviceAuthorizationEpoch {
+    return new DeviceAuthorizationEpoch(
+      this.primitives.identityAuthorizationEpoch,
+    );
   }
 
   public getAuthorizationRevision(): PrivateAuthorizationRevision {

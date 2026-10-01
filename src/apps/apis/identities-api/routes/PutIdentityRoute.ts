@@ -29,7 +29,11 @@ export class PutIdentityRoute extends Route {
   @Put('/:identityId')
   public async updateIdentity(
     @Param('identityId') identityId: string,
-    @Body({ options: { limit: '10mb' } }) body: PutIdentityBody,
+    @Body({
+      options: { limit: '10mb' },
+      validate: { forbidNonWhitelisted: true, whitelist: true },
+    })
+    body: PutIdentityBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {

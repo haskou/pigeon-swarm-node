@@ -36,4 +36,22 @@ describe('IdentitySaverService', () => {
       await expect(service.save(identity)).rejects.toThrow('save failed');
     });
   });
+
+  describe('calculateExternalIdentifier', () => {
+    it('calculates the identity identifier without saving it', async () => {
+      const identity = mother.build();
+      const externalIdentifier = new IdentityExternalIdentifier('bafkidentity');
+      repository.calculateExternalIdentifier.mockResolvedValue(
+        externalIdentifier,
+      );
+
+      const result = await service.calculateExternalIdentifier(identity);
+
+      expect(repository.calculateExternalIdentifier).toHaveBeenCalledWith(
+        identity,
+      );
+      expect(repository.save).not.toHaveBeenCalled();
+      expect(result.isEqual(externalIdentifier)).toBe(true);
+    });
+  });
 });

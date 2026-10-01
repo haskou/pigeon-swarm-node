@@ -1,4 +1,5 @@
-import { UniqueObjectArray } from '@haskou/value-objects';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { UniqueObjectArray, assert } from '@haskou/value-objects';
 
 import { InvalidPrivateAuthorizationError } from './errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationCheckpointPrimitives } from './PrivateAuthorizationCheckpointPrimitives';
@@ -40,6 +41,7 @@ export class PrivateAuthorizationCheckpoint {
       admittedDeviceKeys,
       authorityKeys,
       controlCheckpointJson,
+      deviceIdentities,
       freshnessAuthorityKey,
       headHash,
       parentHeadHash,
@@ -64,10 +66,47 @@ export class PrivateAuthorizationCheckpoint {
       unique,
       freshnessAuthorityKey,
     );
+    const invalidDeviceIdentities = this.invalidDeviceIdentities(
+      admittedDeviceKeys,
+      revokedDeviceKeys,
+      deviceIdentities,
+    );
 
-    if (invalidIdentity || invalidRevision || invalidKeys) {
+    if (
+      invalidIdentity ||
+      invalidRevision ||
+      invalidKeys ||
+      invalidDeviceIdentities
+    ) {
       throw new InvalidPrivateAuthorizationError();
     }
+  }
+
+  private invalidDeviceIdentities(
+    admittedDeviceKeys: string[],
+    revokedDeviceKeys: string[],
+    deviceIdentities: Array<{ deviceKey: string; identityId: string }>,
+  ): boolean {
+    const mappedDeviceKeys = deviceIdentities.map(
+      (identity) => identity.deviceKey,
+    );
+    const recognizedDeviceKeys = new Set([
+      ...admittedDeviceKeys,
+      ...revokedDeviceKeys,
+    ]);
+    const hasDuplicate =
+      new Set(mappedDeviceKeys).size !== mappedDeviceKeys.length;
+    const hasUnknown = mappedDeviceKeys.some(
+      (key) => !recognizedDeviceKeys.has(key),
+    );
+    const hasUnmappedAdmission = admittedDeviceKeys.some(
+      (key) => !mappedDeviceKeys.includes(key),
+    );
+    const hasEmptyValue = deviceIdentities.some(
+      (identity) => !identity.deviceKey || !identity.identityId,
+    );
+
+    return hasDuplicate || hasUnknown || hasUnmappedAdmission || hasEmptyValue;
   }
 
   private invalidRevision(
@@ -137,6 +176,33 @@ export class PrivateAuthorizationCheckpoint {
     );
   }
 
+  public identityFor(deviceKey: PrivateAuthorizationDeviceKey): IdentityId {
+    const device = this.primitives.deviceIdentities.find(
+      (candidate) => candidate.deviceKey === deviceKey.valueOf(),
+    );
+
+    assert(device, new InvalidPrivateAuthorizationError());
+
+    return new IdentityId(device.identityId);
+  }
+
+  public deviceKeysFor(
+    identityId: IdentityId,
+  ): PrivateAuthorizationDeviceKey[] {
+    return this.primitives.deviceIdentities
+      .filter((device) => device.identityId === identityId.valueOf())
+      .map((device) => new PrivateAuthorizationDeviceKey(device.deviceKey));
+  }
+
+  public admitsIdentityDevice(
+    identityId: IdentityId,
+    deviceKey: PrivateAuthorizationDeviceKey,
+  ): boolean {
+    return (
+      this.admits(deviceKey) && this.identityFor(deviceKey).isEqual(identityId)
+    );
+  }
+
   public revocationHistoryAfter(
     admittedDeviceKeys: PrivateAuthorizationDeviceKey[],
   ): PrivateAuthorizationDeviceKey[] {
@@ -162,6 +228,9 @@ export class PrivateAuthorizationCheckpoint {
       ...this.primitives,
       admittedDeviceKeys: [...this.primitives.admittedDeviceKeys],
       authorityKeys: [...this.primitives.authorityKeys],
+      deviceIdentities: this.primitives.deviceIdentities.map((identity) => ({
+        ...identity,
+      })),
       revokedDeviceKeys: [...this.primitives.revokedDeviceKeys],
     };
   }

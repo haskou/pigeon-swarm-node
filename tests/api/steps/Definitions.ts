@@ -1,18 +1,31 @@
-import CallParticipantLeaseExpirationRegistrar from '@app/contexts/calls/application/expire-participant-leases/CallParticipantLeaseExpirationRegistrar';
 import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
+import { PrivateAuthorizationRequestBodyLimit } from '@app/apps/apis/private-authorization-api/routes/PrivateAuthorizationRequestBodyLimit';
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import PigeonApplication from '@app/apps/PigeonApplication';
 import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime';
-import { PrivateAuthorizationRequestBodyLimit } from '@app/apps/apis/private-authorization-api/routes/PrivateAuthorizationRequestBodyLimit';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
+import CallParticipantLeaseExpirationRegistrar from '@app/contexts/calls/application/expire-participant-leases/CallParticipantLeaseExpirationRegistrar';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
-import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
+import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
+import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
+import { DeviceAuthorizationOperationId } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperationId';
+import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
+import { PairingAuthorization } from '@app/contexts/identity-devices/domain/value-objects/PairingAuthorization';
+import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
+import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/PairingId';
+import { NodeNetworkAdderMessage } from '@app/contexts/nodes/application/add-network/messages/NodeNetworkAdderMessage';
+import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNetworkAdder';
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
+import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
-import LegacyIdentityDeviceBinding from '@app/contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
+import Ed25519PrivateDeviceCredentialCodec from '@app/contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { Kernel } from '@haskou/ddd-kernel';
@@ -21,6 +34,7 @@ import {
   PrivateGenesisSignature,
   PrivateKey,
 } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp, assert } from '@haskou/value-objects';
 import canonicalize from 'canonicalize';
 import { expect } from 'chai';
 import * as chai from 'chai';
@@ -60,6 +74,9 @@ export default class Definitions {
   private formData: FormData | undefined;
   private headers: Record<string, string> = {};
   private identityKeyPair: KeyPair | undefined;
+  private identityDeviceOwnerKeyPair: KeyPair | undefined;
+  private identityRecoveryKeyPair: KeyPair | undefined;
+  private identityDeviceTargetKeyPair: KeyPair | undefined;
 
   private conversationId: string | undefined;
   private currentNetworkId: string | undefined;
@@ -100,16 +117,58 @@ export default class Definitions {
     return this.otherIdentityKeyPair;
   }
 
+  private async ensureIdentityDeviceOwnerKeyPair(): Promise<KeyPair> {
+    this.identityDeviceOwnerKeyPair ??= await KeyPair.generate();
+
+    return this.identityDeviceOwnerKeyPair;
+  }
+
+  private async ensureIdentityRecoveryKeyPair(): Promise<KeyPair> {
+    this.identityRecoveryKeyPair ??= await KeyPair.generate();
+
+    return this.identityRecoveryKeyPair;
+  }
+
+  private async waitForReplicatedState(): Promise<void> {
+    const registry = Kernel.di.getService<OrbitDBReplicatedStateRegistry>(
+      OrbitDBReplicatedStateRegistry,
+    );
+    const deadline = Date.now() + 5_000;
+
+    while (Date.now() < deadline) {
+      try {
+        await registry.findHead('api-test-readiness');
+
+        return;
+      } catch (error: unknown) {
+        const code =
+          typeof error === 'object' && error !== null && 'code' in error
+            ? error.code
+            : undefined;
+
+        if (code !== ReplicatedStateNotReadyError.CODE) {
+          throw error;
+        }
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+
+    throw new Error('Replicated state did not become ready for the API test.');
+  }
+
   private async buildClientSignedIdentityBody(
     name: string,
     handle: string,
-    password: string,
     version: number = 1,
     previousIdentityExternalIdentifier: string | undefined = undefined,
   ): Promise<void> {
     const keyPair = await this.ensureIdentityKeyPair();
+    const recoveryKeyPair = await this.ensureIdentityRecoveryKeyPair();
     const ownerIdentityId = this.ownerIdentityId as IdentityId;
-    const encryptedKeyPair = await keyPair.encryptKeyPair(password);
+    const deviceCredential = DeviceCredential.fromString(
+      (await this.ensureIdentityDeviceOwnerKeyPair()).toPrimitives().publicKey,
+    );
     const networks = [
       this.currentNetworkId ?? '123e4567-e89b-12d3-a456-426614174000',
     ];
@@ -128,20 +187,14 @@ export default class Definitions {
       picture: undefined,
     };
     const signaturePayload = {
-      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
-      encryptedMasterKey: 'v1.test.encrypted-master-key',
+      authorizationRevision: 0,
+      deviceCredential: deviceCredential.valueOf(),
+      deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),
       id: ownerIdentityId.valueOf(),
-      masterKeyDerivation: {
-        passkeyPrf: {
-          algorithm: 'webauthn-prf',
-          credentialId: 'test-credential-id',
-          salt: 'test-salt',
-          version: 1,
-        },
-      },
       networks,
       previousIdentityExternalIdentifier,
       profile,
+      recoveryAuthority: recoveryKeyPair.toPrimitives().publicKey,
       timestamp: 1773848829055 + version,
       version,
     };
@@ -174,7 +227,6 @@ export default class Definitions {
       await this.buildClientSignedIdentityBody(
         'Test Identity',
         'test-identity',
-        'Client-secret1!',
       );
       await this.signCurrentRequest('POST', '/identities/');
 
@@ -319,6 +371,7 @@ export default class Definitions {
     this.formData = undefined;
     this.headers = {};
     this.identityKeyPair = undefined;
+    this.identityDeviceOwnerKeyPair = undefined;
     this.conversationId = undefined;
     this.currentNetworkId = undefined;
     this.createdIdentityId = undefined;
@@ -463,28 +516,25 @@ export default class Definitions {
 
   @given('I sign the current private authorization challenge request')
   public async iSignTheCurrentPrivateAuthorizationChallengeRequest(): Promise<void> {
-    await this.signCurrentRequest(
-      'POST',
-      '/private-authorization/challenges',
-    );
+    await this.signCurrentRequest('POST', '/private-authorization/challenges');
   }
 
   @given('I set a valid private authorization genesis body')
   public async iSetAValidPrivateAuthorizationGenesisBody(): Promise<void> {
-    const keyPair = await this.ensureIdentityKeyPair();
+    const keyPair = await this.ensureIdentityDeviceOwnerKeyPair();
     const identityId = this.ownerIdentityId as IdentityId;
-    const ownerDeviceKey = new LegacyIdentityDeviceBinding().bind(
-      identityId.valueOf(),
-    );
+    const ownerDeviceKey = new Ed25519PrivateDeviceCredentialCodec()
+      .toDeviceKey(
+        DeviceCredential.fromString(keyPair.toPrimitives().publicKey),
+      )
+      .valueOf();
     const scopeId = randomBytes(32).toString('base64url');
     const protectedState = Buffer.from('private-genesis-state');
     const mlsContextHash = createHash('sha256')
       .update(protectedState)
       .digest('base64url');
     const hash = (value: unknown) =>
-      createHash('sha256')
-        .update(canonicalize(value)!)
-        .digest('base64url');
+      createHash('sha256').update(canonicalize(value)!).digest('base64url');
     const policy = {
       authorityKeys: [ownerDeviceKey],
       devices: [
@@ -521,6 +571,9 @@ export default class Definitions {
 
     this.privateAuthorizationScopeId = scopeId;
     this.body = JSON.stringify({
+      identityAuthorizationEpoch: 'genesis',
+      identityAuthorizationRevision: 0,
+      ownerDeviceKey,
       projection: {
         autoJoinEnabled: false,
         bannedMemberIds: [],
@@ -572,7 +625,9 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/private-authorization/scopes');
   }
 
-  @given('another identity signs the current private authorization scope request')
+  @given(
+    'another identity signs the current private authorization scope request',
+  )
   public async anotherIdentitySignsTheCurrentPrivateAuthorizationScopeRequest(): Promise<void> {
     const keyPair = await this.ensureOtherIdentityKeyPair();
 
@@ -587,13 +642,20 @@ export default class Definitions {
 
   @given('the current identity owns the node')
   public async theCurrentIdentityOwnsTheNode(): Promise<void> {
-    await this.ensureIdentityKeyPair();
-    const identityId = this.ownerIdentityId as IdentityId;
+    const identityId = new IdentityId(
+      (await this.ensureIdentityKeyPair()).toPrimitives().publicKey,
+    );
     const assigner = Kernel.di.getService<NodeOwnerAssigner>(NodeOwnerAssigner);
 
     await assigner.assignOwner(
       new NodeOwnerAssignerMessage(identityId.valueOf(), identityId.valueOf()),
     );
+    await Kernel.di.getService<NodeLoaderService>(NodeLoaderService).loadNode();
+  }
+
+  @given('the current identity is published')
+  public async theCurrentIdentityIsPublished(): Promise<void> {
+    await this.ensureAuthenticatedIdentityIsPublished();
   }
 
   @then('the private authorization scope is durably provisioned')
@@ -655,11 +717,159 @@ export default class Definitions {
     name: string,
     handle: string,
   ): Promise<void> {
-    await this.buildClientSignedIdentityBody(
-      name,
-      handle,
-      'client-secret-password',
+    await this.buildClientSignedIdentityBody(name, handle);
+  }
+
+  @given('I set a signed device enrollment transition body')
+  public async iSetASignedDeviceEnrollmentTransitionBody(): Promise<void> {
+    const owner = await this.ensureIdentityDeviceOwnerKeyPair();
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.identityDeviceTargetKeyPair = await KeyPair.generate();
+    const target = this.identityDeviceTargetKeyPair;
+    const unsigned = DeviceAuthorizationTransition.enrollment(
+      identityId,
+      DeviceAuthorizationOperationId.generate(),
+      DeviceAuthorizationRevision.initial(),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+      DeviceCredential.fromString(target.toPrimitives().publicKey),
+      new PairingAuthorization(
+        PairingId.generate(),
+        new PairingExpiration(Timestamp.now().valueOf() + 60_000),
+        Timestamp.now(),
+      ),
     );
+
+    const proven = unsigned.provePossession(
+      target.sign(unsigned.getProofOfPossessionPayload()),
+    );
+
+    this.body = JSON.stringify(
+      proven.authorize(owner.sign(proven.getSigningPayload())).toPrimitives(),
+    );
+  }
+
+  @given('I sign the current device authorization checkpoint request')
+  public async iSignTheCurrentDeviceAuthorizationCheckpointRequest(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.body = undefined;
+    const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}`;
+    await this.signCurrentRequest('GET', path);
+    const timestamp = this.headers['x-timestamp'] as string;
+    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
+      'GET',
+      path,
+      timestamp,
+      this.getCurrentRequestBody(),
+    );
+    const device = await this.ensureIdentityDeviceOwnerKeyPair();
+    this.headers['x-device-credential'] = new IdentityId(
+      device.toPrimitives().publicKey,
+    ).valueOf();
+    this.headers['x-device-signature'] = device
+      .sign(JSON.stringify(payload))
+      .valueOf();
+  }
+
+  @given('I sign the current device authorization checkpoint recovery request')
+  public async iSignTheCurrentDeviceAuthorizationCheckpointRecoveryRequest(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.body = undefined;
+    const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}`;
+    await this.signCurrentRequest('GET', path);
+    const timestamp = this.headers['x-timestamp'] as string;
+    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
+      'GET',
+      path,
+      timestamp,
+      this.getCurrentRequestBody(),
+    );
+    const recoveryAuthority = await this.ensureIdentityRecoveryKeyPair();
+    this.headers['x-recovery-signature'] = recoveryAuthority
+      .sign(JSON.stringify(payload))
+      .valueOf();
+  }
+
+  @given(
+    'another identity signs the current device authorization checkpoint request',
+  )
+  public async anotherIdentitySignsTheCurrentDeviceAuthorizationCheckpointRequest(): Promise<void> {
+    const targetIdentityId = this.ownerIdentityId as IdentityId;
+    const signer = await this.ensureOtherIdentityKeyPair();
+    const signerIdentityId = this.otherIdentityId as IdentityId;
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/identity-devices/${encodeURIComponent(targetIdentityId.valueOf())}`,
+      String(Date.now()),
+      signer,
+      signerIdentityId,
+    );
+  }
+
+  @then('the genesis device authorization checkpoint exists')
+  public async theGenesisDeviceAuthorizationCheckpointExists(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    const authorization = await Kernel.di
+      .getService<DeviceAuthorizationRepository>(DeviceAuthorizationRepository)
+      .find(identityId);
+
+    expect(authorization?.getRevision().valueOf()).to.equal(0);
+  }
+
+  @then('response is the current device authorization checkpoint')
+  public responseIsTheCurrentDeviceAuthorizationCheckpoint(): void {
+    expect(this.response?.data).to.deep.equal({
+      epoch: 'genesis',
+      identityId: this.ownerIdentityId?.valueOf(),
+      revision: 0,
+    });
+  }
+
+  @given('I add legacy identity unlock fields')
+  public iAddLegacyIdentityUnlockFields(): void {
+    const body = JSON.parse(this.body ?? '{}') as Record<string, unknown>;
+
+    body.encryptedKeyPair = {
+      encryptedPrivateKey: 'legacy-encrypted-private-key',
+      publicKey: 'legacy-public-key',
+    };
+    body.encryptedMasterKey = 'legacy-encrypted-master-key';
+    body.masterKeyDerivation = {
+      algorithm: 'scrypt',
+      salt: 'legacy-salt',
+      version: 1,
+    };
+    this.body = JSON.stringify(body);
+  }
+
+  @given('I add undeclared identity field {string}')
+  public iAddUndeclaredIdentityField(field: string): void {
+    const body = JSON.parse(this.body ?? '{}') as Record<string, unknown>;
+
+    body[field] = 'must-not-be-accepted';
+    this.body = JSON.stringify(body);
+  }
+
+  @given('I add undeclared identity profile field {string}')
+  public iAddUndeclaredIdentityProfileField(field: string): void {
+    const body = JSON.parse(this.body ?? '{}') as {
+      profile?: Record<string, unknown>;
+    };
+
+    assert(
+      body.profile !== undefined,
+      new Error('Identity profile must be configured first.'),
+    );
+    body.profile[field] = 'must-not-be-accepted';
+    this.body = JSON.stringify(body);
+  }
+
+  @given('I remove the identity profile')
+  public iRemoveTheIdentityProfile(): void {
+    const body = JSON.parse(this.body ?? '{}') as Record<string, unknown>;
+
+    delete body.profile;
+    this.body = JSON.stringify(body);
   }
 
   @given(
@@ -668,7 +878,7 @@ export default class Definitions {
   public async iSetAClientSignedIdentityUpdateBody(
     name: string,
     handle: string,
-    password: string,
+    _password: string,
   ): Promise<void> {
     const previousIdentityExternalIdentifier =
       await this.findCreatedIdentityExternalIdentifier();
@@ -676,7 +886,6 @@ export default class Definitions {
     await this.buildClientSignedIdentityBody(
       name,
       handle,
-      password,
       2,
       previousIdentityExternalIdentifier,
     );
@@ -1803,7 +2012,9 @@ export default class Definitions {
     await this.createGroupConversation(2);
   }
 
-  private async createGroupConversation(participantCount: number): Promise<void> {
+  private async createGroupConversation(
+    participantCount: number,
+  ): Promise<void> {
     await this.iHavePublishedAKeychainForTheAuthenticatedIdentity();
     await this.iSetAGroupConversationBodyForNewParticipants();
     const body = JSON.parse(this.body || '{}');
@@ -1953,9 +2164,11 @@ export default class Definitions {
   @when('the current call heartbeat expires')
   public async theCurrentCallHeartbeatExpires(): Promise<void> {
     await new Promise((resolve) => setTimeout(resolve, 5500));
-    await Kernel.di.getService<CallParticipantLeaseExpirationRegistrar>(
-      CallParticipantLeaseExpirationRegistrar,
-    ).expire();
+    await Kernel.di
+      .getService<CallParticipantLeaseExpirationRegistrar>(
+        CallParticipantLeaseExpirationRegistrar,
+      )
+      .expire();
   }
 
   @then('the current call has no live participants')
@@ -1967,13 +2180,16 @@ export default class Definitions {
   @then('the current voice channel has {int} connected identities')
   public theCurrentVoiceChannelHasConnectedIdentities(count: number): void {
     const channels = this.response.data.channels;
+
     if (!Array.isArray(channels)) {
       throw new Error('Response must contain a channels array.');
     }
     const channel = channels.find(
       (candidate: { id: string }) => candidate.id === this.communityChannelId,
     );
-    expect(channel).to.have.property('connectedIdentityIds').with.lengthOf(count);
+    expect(channel)
+      .to.have.property('connectedIdentityIds')
+      .with.lengthOf(count);
   }
 
   @given('I sign the current calls request')
@@ -3194,6 +3410,29 @@ export default class Definitions {
     );
   }
 
+  @given(
+    'the current node has a test network with id {string} and name {string}',
+  )
+  public async theCurrentNodeHasATestNetworkWithIdAndName(
+    networkId: string,
+    networkName: string,
+  ): Promise<void> {
+    const { privateKey } = generateKeyPairSync('ed25519');
+
+    await Kernel.di
+      .getService<NodeNetworkAdder>(NodeNetworkAdder)
+      .addNetwork(
+        new NodeNetworkAdderMessage(
+          networkId,
+          networkName,
+          privateKey.export({ format: 'pem', type: 'pkcs8' }).toString(),
+        ),
+      );
+    await Kernel.di.getService<NodeLoaderService>(NodeLoaderService).loadNode();
+    await this.waitForReplicatedState();
+    this.currentNetworkId = networkId;
+  }
+
   @given('I store the following json in IPFS network {string}')
   public async iStoreTheFollowingJsonInIPFSNetwork(
     networkName: string,
@@ -3858,6 +4097,15 @@ export default class Definitions {
 
     this.response = await this.restClient.get(
       `/keychains/${encodeURIComponent(this.ownerIdentityId.valueOf())}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the current device authorization checkpoint')
+  public async iGetTheCurrentDeviceAuthorizationCheckpoint(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.response = await this.restClient.get(
+      `/identity-devices/${encodeURIComponent(identityId.valueOf())}`,
       this.headers,
     );
   }

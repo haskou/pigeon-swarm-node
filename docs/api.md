@@ -30,7 +30,7 @@ It returns HTTP 200 with `Content-Type: application/json`,
 `Cache-Control: no-store`, and exactly:
 
 ```json
-{"protocol":"pigeon-swarm","apiVersion":1}
+{ "protocol": "pigeon-swarm", "apiVersion": 2 }
 ```
 
 `apiVersion` identifies the breaking-major client API contract implemented by
@@ -309,53 +309,53 @@ Implemented:
 
 Event contracts used by frontend:
 
-| Event type                                            | Aggregate id      | Attributes used by clients/routing                                                                                   |
-| ----------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `conversations.v1.conversation.was_created`           | conversation id   | `networkId`, `participantIds`                                                                                        |
-| `conversations.v1.message.was_sent`                   | conversation id   | `messageId`, `authorId`, `networkId`, `participantIds`                                                               |
-| `conversations.v1.message.was_edited`                 | conversation id   | `messageId`, `targetMessageId`, `networkId`, `participantIds`                                                        |
-| `conversations.v1.message.was_deleted`                | conversation id   | `messageId`, `targetMessageId`, `networkId`, `participantIds`                                                        |
-| `conversations.v1.message.was_pinned`                 | conversation id   | `messageId`, `pinnedByIdentityId`, `networkId`, `participantIds`                                                     |
-| `conversations.v1.message.was_unpinned`               | conversation id   | `messageId`, `unpinnedByIdentityId`, `networkId`, `participantIds`                                                   |
-| `conversations.v1.messages.were_read`                 | conversation id   | `messageId`, `readerIdentityId`, `networkId`, `participantIds`                                                       |
-| `conversations.v1.message.reaction.was_added`         | conversation id   | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds`                                         |
-| `conversations.v1.message.reaction.was_removed`       | conversation id   | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds`                                         |
-| `calls.v1.call.snapshot_changed`                     | call id           | `callId`, `liveCallRevision`, `liveCall` |
-| `calls.v1.call.started`                               | call id           | `callId`, `liveCallRevision`, `liveCall` |
-| `calls.v1.participant.joined`                         | call id           | `callId`, `liveCallRevision`, `liveCall` |
-| `calls.v1.participant.left`                           | call id           | `callId`, `liveCallRevision`, `liveCall` |
-| `calls.v1.participant.declined`                       | call id           | `callId`, `liveCallRevision`, `liveCall` |
-| `calls.v1.participant.missed`                         | call id           | `callId`, `liveCallRevision`, `liveCall` |
-| `calls.v1.call.ended`                                 | call id           | `callId`, `liveCallRevision`, `liveCall` |
-| `calls.v1.call.missed`                                | call id           | `callId`, `liveCallRevision`, `liveCall` |
+| Event type                                            | Aggregate id      | Attributes used by clients/routing                                                                                         |
+| ----------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `conversations.v1.conversation.was_created`           | conversation id   | `networkId`, `participantIds`                                                                                              |
+| `conversations.v1.message.was_sent`                   | conversation id   | `messageId`, `authorId`, `networkId`, `participantIds`                                                                     |
+| `conversations.v1.message.was_edited`                 | conversation id   | `messageId`, `targetMessageId`, `networkId`, `participantIds`                                                              |
+| `conversations.v1.message.was_deleted`                | conversation id   | `messageId`, `targetMessageId`, `networkId`, `participantIds`                                                              |
+| `conversations.v1.message.was_pinned`                 | conversation id   | `messageId`, `pinnedByIdentityId`, `networkId`, `participantIds`                                                           |
+| `conversations.v1.message.was_unpinned`               | conversation id   | `messageId`, `unpinnedByIdentityId`, `networkId`, `participantIds`                                                         |
+| `conversations.v1.messages.were_read`                 | conversation id   | `messageId`, `readerIdentityId`, `networkId`, `participantIds`                                                             |
+| `conversations.v1.message.reaction.was_added`         | conversation id   | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds`                                               |
+| `conversations.v1.message.reaction.was_removed`       | conversation id   | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds`                                               |
+| `calls.v1.call.snapshot_changed`                      | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `calls.v1.call.started`                               | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `calls.v1.participant.joined`                         | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `calls.v1.participant.left`                           | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `calls.v1.participant.declined`                       | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `calls.v1.participant.missed`                         | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `calls.v1.call.ended`                                 | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `calls.v1.call.missed`                                | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
 | `calls.v1.signal.sent`                                | call id           | `signalId`, `callId`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload`, `attempt`, `sentAt`, `expiresAt` |
-| `calls.v1.participant_lease.was_updated`              | call id     | `callId`, `liveCallRevision`, `liveCall` |
-| `communities.v1.community.was_created`                | community id      | `communityId`, `networkId`, `ownerIdentityId`, `memberIds`, `community`                                              |
-| `communities.v1.channel.was_created`                  | community id      | `communityId`, `networkId`, `memberIds`, `channel`                                                                   |
-| `communities.v1.channel.was_renamed`                  | community id      | `communityId`, `networkId`, `memberIds`, `channelId`, `name`                                                         |
-| `communities.v1.channel.was_deleted`                  | community id      | `communityId`, `networkId`, `memberIds`, `channelId`                                                                 |
-| `communities.v1.community.was_updated`                | community id      | `communityId`, `networkId`, `memberIds`, `community`                                                                 |
-| `communities.v1.member.was_added`                     | community id      | `communityId`, `networkId`, `memberIds`, `identityId`, `community`                                                   |
-| `communities.v1.member.was_left`                      | community id      | `communityId`, `networkId`, `memberIds`, `identityId`, `community`                                                   |
-| `communities.v1.channel.message.was_sent`             | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds`                                |
-| `communities.v1.channel.message.was_deleted`          | community id      | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds`          |
-| `communities.v1.channel.message.was_pinned`           | community id      | `communityId`, `channelId`, `messageId`, `pinnedByIdentityId`, `networkId`, `memberIds`                              |
-| `communities.v1.channel.message.was_unpinned`         | community id      | `communityId`, `channelId`, `messageId`, `unpinnedByIdentityId`, `networkId`, `memberIds`                            |
-| `communities.v1.channel.message.reaction.was_added`   | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`          |
-| `communities.v1.channel.message.reaction.was_removed` | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`          |
-| `polls.v1.poll.was_created`                           | poll scope id     | `pollId`, `poll`, `participantIds` for group conversations                                                            |
-| `stickers.v1.pack.was_created`                        | sticker pack id   | `packId`, `ownerIdentityId`, `pack`                                                                                   |
-| `stickers.v1.user_library.was_created`                | identity id       | `identityId`, `library`                                                                                               |
-| `notifications.v1.notification.was_created`           | notification id   | `recipientIdentityId`, `type`                                                                                        |
-| `notifications.v1.notification.was_accepted`          | notification id   | `recipientIdentityId`                                                                                                |
-| `notifications.v1.notification.was_declined`          | notification id   | `recipientIdentityId`                                                                                                |
-| `identities.v1.identity.was_created`                  | identity id       | `externalIdentifier`, `handle`, `networkIds`, `previousExternalIdentifier`, `version`                                |
-| `identities.v1.identity.was_updated`                  | identity id       | `externalIdentifier`, `handle`, `networkIds`, `previousExternalIdentifier`, `version`                                |
-| `keychains.v1.keychain.was_published`                 | owner identity id | owner is the aggregate id                                                                                            |
-| `nodes.v1.node.heartbeat.was_sent`                    | node id           | `owner`, `networks` with `id`, `name` and `type`                                                                      |
-| `nodes.v1.node.network.was_added`                     | node id           | node/network metadata                                                                                                |
-| `nodes.v1.node.network.was_removed`                   | node id           | `networkId`                                                                                                          |
-| `nodes.v1.node.relay_configuration.was_updated`       | node id           | `relayConfiguration`                                                                                                 |
+| `calls.v1.participant_lease.was_updated`              | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
+| `communities.v1.community.was_created`                | community id      | `communityId`, `networkId`, `ownerIdentityId`, `memberIds`, `community`                                                    |
+| `communities.v1.channel.was_created`                  | community id      | `communityId`, `networkId`, `memberIds`, `channel`                                                                         |
+| `communities.v1.channel.was_renamed`                  | community id      | `communityId`, `networkId`, `memberIds`, `channelId`, `name`                                                               |
+| `communities.v1.channel.was_deleted`                  | community id      | `communityId`, `networkId`, `memberIds`, `channelId`                                                                       |
+| `communities.v1.community.was_updated`                | community id      | `communityId`, `networkId`, `memberIds`, `community`                                                                       |
+| `communities.v1.member.was_added`                     | community id      | `communityId`, `networkId`, `memberIds`, `identityId`, `community`                                                         |
+| `communities.v1.member.was_left`                      | community id      | `communityId`, `networkId`, `memberIds`, `identityId`, `community`                                                         |
+| `communities.v1.channel.message.was_sent`             | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds`                                      |
+| `communities.v1.channel.message.was_deleted`          | community id      | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds`                |
+| `communities.v1.channel.message.was_pinned`           | community id      | `communityId`, `channelId`, `messageId`, `pinnedByIdentityId`, `networkId`, `memberIds`                                    |
+| `communities.v1.channel.message.was_unpinned`         | community id      | `communityId`, `channelId`, `messageId`, `unpinnedByIdentityId`, `networkId`, `memberIds`                                  |
+| `communities.v1.channel.message.reaction.was_added`   | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`                |
+| `communities.v1.channel.message.reaction.was_removed` | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`                |
+| `polls.v1.poll.was_created`                           | poll scope id     | `pollId`, `poll`, `participantIds` for group conversations                                                                 |
+| `stickers.v1.pack.was_created`                        | sticker pack id   | `packId`, `ownerIdentityId`, `pack`                                                                                        |
+| `stickers.v1.user_library.was_created`                | identity id       | `identityId`, `library`                                                                                                    |
+| `notifications.v1.notification.was_created`           | notification id   | `recipientIdentityId`, `type`                                                                                              |
+| `notifications.v1.notification.was_accepted`          | notification id   | `recipientIdentityId`                                                                                                      |
+| `notifications.v1.notification.was_declined`          | notification id   | `recipientIdentityId`                                                                                                      |
+| `identities.v1.identity.was_created`                  | identity id       | `externalIdentifier`, `handle`, `networkIds`, `previousExternalIdentifier`, `version`                                      |
+| `identities.v1.identity.was_updated`                  | identity id       | `externalIdentifier`, `handle`, `networkIds`, `previousExternalIdentifier`, `version`                                      |
+| `keychains.v1.keychain.was_published`                 | owner identity id | owner is the aggregate id                                                                                                  |
+| `nodes.v1.node.heartbeat.was_sent`                    | node id           | `owner`, `networks` with `id`, `name` and `type`                                                                           |
+| `nodes.v1.node.network.was_added`                     | node id           | node/network metadata                                                                                                      |
+| `nodes.v1.node.network.was_removed`                   | node id           | `networkId`                                                                                                                |
+| `nodes.v1.node.relay_configuration.was_updated`       | node id           | `relayConfiguration`                                                                                                       |
 
 For `conversations.v1.message.*`, use `event.aggregate_id` as
 `conversationId` and `event.attributes.messageId` as the message id to fetch.
@@ -1404,56 +1404,35 @@ refreshed, backend emits:
 
 ## Identity HTTP API
 
+Identity publications contain only public profile data and public authorization
+material. They never contain encrypted private keys, protected root-key
+envelopes, password KDF parameters, device unlock secrets or recovery secrets.
+Legacy identity payloads containing those fields are rejected.
+
 ### Get identity
 
 ```http
 GET /identities/{reference}
 ```
 
-Path parameters:
-
-- `reference`: either a percent-encoded identity id or a profile handle.
-- Identity ids must use `encodeURIComponent(identityId)`.
-- Handles are stored lowercase and must be passed without `@`.
-
-Implemented:
-
-- resolve the latest valid known identity candidate
-- resolve by identity id or profile handle
-- return profile, networks, version, current identity reference, previous
-  identity reference and signature
+`reference` is a percent-encoded identity id or a lowercase profile handle
+without `@`. Identity ids must use `encodeURIComponent(identityId)`.
 
 Response:
 
 ```json
 {
   "id": "<identityId>",
+  "authorizationRevision": 0,
+  "deviceCredential": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
+  "deviceCredentialCommitment": "<64 lowercase hexadecimal characters>",
+  "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
   "identityExternalIdentifier": "<currentIdentityCid>",
-  "encryptedKeyPair": {
-    "publicKey": "<publicKeyPem>",
-    "encryptedPrivateKey": "<opaqueEncryptedPrivateKey>"
-  },
-  "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
-  "masterKeyDerivation": {
-    "algorithm": "scrypt",
-    "N": 262144,
-    "r": 8,
-    "p": 1,
-    "salt": "<base64urlSalt>",
-    "version": 1,
-    "recoveryKey": {
-      "algorithm": "pigeon-recovery-key",
-      "version": 1
-    }
-  },
   "networks": ["<networkId>"],
   "profile": {
-    "name": "Alice",
     "handle": "alice",
-    "picture": "<publicImageCid>",
-    "banner": "<publicBannerCid>"
+    "name": "Alice"
   },
-  "previousIdentityExternalIdentifier": null,
   "timestamp": 1773848829055,
   "signature": "<identitySignature>",
   "version": 1
@@ -1474,23 +1453,10 @@ Request:
 ```json
 {
   "id": "<identityId>",
-  "encryptedKeyPair": {
-    "publicKey": "<publicKeyPem>",
-    "encryptedPrivateKey": "<opaqueEncryptedPrivateKey>"
-  },
-  "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
-  "masterKeyDerivation": {
-    "algorithm": "scrypt",
-    "N": 262144,
-    "r": 8,
-    "p": 1,
-    "salt": "<base64urlSalt>",
-    "version": 1,
-    "recoveryKey": {
-      "algorithm": "pigeon-recovery-key",
-      "version": 1
-    }
-  },
+  "authorizationRevision": 0,
+  "deviceCredential": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
+  "deviceCredentialCommitment": "<64 lowercase hexadecimal characters>",
+  "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
   "networks": ["<networkId>"],
   "profile": {
     "name": "Alice",
@@ -1502,65 +1468,35 @@ Request:
 }
 ```
 
-Implemented:
+The identity id and genesis device signing credential are independent public
+keys. `deviceCredentialCommitment` is the SHA-256 digest of `deviceCredential`'s
+canonical PEM representation, and both are covered by the identity signature.
+`recoveryAuthority` is a separate public key; its private
+recovery material remains exclusively with the client. The initial
+`authorizationRevision` is `0`.
 
-- require client-generated encrypted keypairs and signed identity candidates
-- accept client-generated encrypted master keys and client-controlled master key
-  derivation metadata as signed opaque identity fields
-- keep client passwords, recovery keys, passkey PRF envelopes, KEKs, MasterKey
-  material, keychain plaintext and identity decryption secrets out of the
-  backend
-- accept identities without `passkeyPrf`; local WebAuthn PRF envelopes may
-  remain only on the client
-- store `profile.handle` as part of the signed identity profile
-- normalize handles to lowercase
-- reject handles containing spaces, `@` or any character outside letters,
-  numbers, dots, hyphens and underscores
-- return `identityExternalIdentifier`, which is the current published identity
-  CID to send as `previousIdentityExternalIdentifier` in the next update
-- store `profile.picture` and `profile.banner` as public IPFS image CIDs, not as
-  base64 or data URLs
-
-Client-signed identity signatures must cover the canonical identity payload:
+The signature covers this canonical property order:
 
 ```json
 {
-  "encryptedKeyPair": {
-    "publicKey": "<publicKeyPem>",
-    "encryptedPrivateKey": "<opaqueEncryptedPrivateKey>"
-  },
-  "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
+  "authorizationRevision": 0,
+  "deviceCredential": "<genesisDeviceCredential>",
+  "deviceCredentialCommitment": "<commitment>",
   "id": "<identityId>",
-  "masterKeyDerivation": {
-    "algorithm": "scrypt",
-    "N": 262144,
-    "r": 8,
-    "p": 1,
-    "salt": "<base64urlSalt>",
-    "version": 1,
-    "recoveryKey": {
-      "algorithm": "pigeon-recovery-key",
-      "version": 1
-    }
-  },
   "networks": ["<networkId>"],
-  "previousIdentityExternalIdentifier": null,
   "profile": {
-    "picture": "<publicImageCid>",
-    "banner": "<publicBannerCid>",
-    "biography": null,
     "handle": "alice",
     "name": "Alice"
   },
+  "recoveryAuthority": "<publicRecoveryAuthorityPem>",
   "timestamp": 1773848829055,
   "version": 1
 }
 ```
 
-The actual JSON signature payload should omit undefined optional fields; handles
-must already be normalized before signing. The backend preserves
-`masterKeyDerivation` as sent and does not sort nested metadata keys, so clients
-must sign the exact `masterKeyDerivation` object order they send.
+Undefined optional properties are omitted before signing. Handles must already
+be normalized. Current requests reject `encryptedKeyPair`,
+`encryptedPrivateKey`, `encryptedMasterKey` and `masterKeyDerivation`.
 
 ### Update identity
 
@@ -1568,58 +1504,11 @@ must sign the exact `masterKeyDerivation` object order they send.
 PUT /identities/{identityId}
 ```
 
-Request:
-
-```json
-{
-  "id": "<identityId>",
-  "encryptedKeyPair": {
-    "publicKey": "<publicKeyPem>",
-    "encryptedPrivateKey": "<opaqueEncryptedPrivateKey>"
-  },
-  "encryptedMasterKey": "<opaqueEncryptedMasterKey>",
-  "masterKeyDerivation": {
-    "algorithm": "scrypt",
-    "N": 262144,
-    "r": 8,
-    "p": 1,
-    "salt": "<base64urlSalt>",
-    "version": 1,
-    "recoveryKey": {
-      "algorithm": "pigeon-recovery-key",
-      "version": 1
-    }
-  },
-  "networks": ["<networkId>"],
-  "previousIdentityExternalIdentifier": "<previousIdentityCid>",
-  "profile": {
-    "name": "Alice Updated",
-    "handle": "alice_new",
-    "picture": "<newPublicImageCid>",
-    "banner": "<newPublicBannerCid>"
-  },
-  "timestamp": 1773848829056,
-  "signature": "<identitySignature>",
-  "version": 2
-}
-```
-
-Implemented:
-
-- require signed request auth from the identity owner
-- accept profile changes, profile image/banner removal and handle changes as signed
-  identity updates
-- accept encrypted master key and derivation metadata changes for client-side
-  password/passkey changes; `encryptedKeyPair.encryptedPrivateKey` is stored and
-  signed as an opaque client-encrypted blob
-- allow adding networks, but reject signed identity updates that remove any
-  previously joined network
-- validate the signed identity candidate and previous identity chain before
-  publishing
-- return the new `identityExternalIdentifier` for the just-published identity
-  version
-- store `profile.picture` and `profile.banner` as public IPFS image CIDs; omit
-  them or send `null` in the signed profile to remove the media
+Updates use the same signed public shape and add
+`previousIdentityExternalIdentifier`. They may update public profile data and
+add networks, but cannot remove a previously joined network or replace the
+pinned genesis credential commitment or recovery authority. The node validates
+the complete previous-publication chain before publishing the new CID.
 
 ## Keychain HTTP API
 
@@ -4438,9 +4327,11 @@ polls reject new votes.
 
 Create a protected scope with `POST /private-authorization/scopes`. The signed
 request identity must own the submitted private community projection. The body
-contains the owner-signed genesis, its protected MLS state and an owner-only,
-non-discoverable private community projection. The node verifies and commits
-all three atomically. An identical retry returns `duplicate`; conflicting
+contains an independently authorized owner device key, the exact identity
+authorization revision, the device-signed genesis, its protected MLS state and
+an owner-only, non-discoverable private community projection. The node verifies
+the identity-to-device authorization and commits the initial state atomically.
+An identical retry returns `duplicate`; conflicting
 genesis data is rejected. A node admits at most 16 scopes and 32 MiB of initial
 scope data per owner, and 64 scopes and 256 MiB across all owners.
 
@@ -4449,9 +4340,10 @@ submits the complete signed operation and, for control operations, the same
 participant-encrypted control frame used for acceptance to
 `POST /private-authorization/challenges`. The node verifies the operation
 signature against its local checkpoint and authenticates a control transition
-before durably reserving its child head and returning the exact one-use freshness
-request. The request expires after ten seconds of local monotonic time and is
-consumed only after a valid proof is successfully verified.
+only after the author credential is authorized at the exact current identity
+authorization revision. It then durably reserves the child head and returns the
+exact one-use freshness request. The request expires after ten seconds of local
+monotonic time and is consumed only after a valid proof is successfully verified.
 
 Submit the signed operation, signed freshness proof and, for commits or device
 revocation, the participant-encrypted control frame to
@@ -4466,6 +4358,93 @@ access to the attached node; operation authorship and permissions come only
 from the private operation signature, local checkpoint and community aggregate.
 Errors are fixed and never include the submitted scope, identity, key, payload
 or nested cryptographic error.
+
+## Identity device authorization
+
+Identity creation publishes only a genesis device credential commitment, a
+public recovery authority and authorization revision zero. Passwords, password
+KDF parameters, protected device roots, recovery secrets and encrypted private
+keys are client-local data and are rejected by the identity API.
+
+Read the current checkpoint with:
+
+```http
+GET /identity-devices/{percent-encoded identityId}
+```
+
+This endpoint requires the normal signed HTTP headers, and the stable identity
+signing key must match the requested identity. A client performing total device
+recovery can therefore read the checkpoint after recovering that key, before it
+has an authorized device credential. Missing or invalid authentication and a
+different signer all return the same generic `401`. The response contains only
+`epoch`, `identityId` and `revision`; it does not expose a device catalog or
+credential commitments. Restricting the endpoint to the identity owner avoids
+creating a public identity-target lookup or cross-identity access relationship.
+
+An existing device additionally sends `X-Device-Credential` and
+`X-Device-Signature`. The credential uses the normalized public-key form used by
+identity identifiers, without PEM delimiters or whitespace. The device signature
+covers the same canonical method, path, timestamp and body hash as the stable
+identity signature. Total recovery sends `X-Recovery-Signature` over that same
+canonical payload instead. Exactly one complete proof is required. The node
+verifies the device against the current authorization checkpoint or the recovery
+signature against its recovery authority before returning the checkpoint. A
+missing, mixed, malformed, invalid, revoked or unrelated proof returns the same
+generic `401` without revealing which check failed.
+
+Submit an enrollment, revocation or recovery operation to:
+
+```http
+POST /identity-devices/transitions
+```
+
+Every transition binds the identity, recovery epoch, operation UUID, exact
+predecessor and next revision, operation kind, target public credential and its
+commitment. The epoch is `genesis` before the first recovery and the recovery
+operation UUID afterwards. Device enrollment additionally binds a single-use
+pairing UUID, a short expiry, the authorization time and a proof signed by the
+target credential. Both device signatures cover that time, and the domain
+rejects an authorization time after the pairing expiry. Enrollment and
+revocation are signed by an authorized device credential; recovery is signed by
+the identity's pinned recovery authority and replaces the authorized device
+set.
+
+Signatures cover the UTF-8 bytes of compact JSON with no whitespace. Keys are
+written in the order shown below and properties whose value is `undefined` are
+omitted. The target proof preimage is:
+
+```json
+{"domain":"pigeon:device-authorization:proof-of-possession:v2","transition":{"authorCredential":"<public credential>","authorizedAt":1770000000000,"epoch":"genesis","identityId":"<identity id>","operation":"enroll","operationId":"<uuid>","pairingExpiration":1770000060000,"pairingId":"<uuid>","previousRevision":0,"revision":1,"targetCredential":"<public credential>","targetCredentialCommitment":"<lowercase SHA-256 hex>"}}
+```
+
+After inserting the resulting target signature, the author signature preimage
+is:
+
+```json
+{"domain":"pigeon:device-authorization:transition:v3","proofOfPossession":"<target signature>","transition":{"authorCredential":"<public credential>","authorizedAt":1770000000000,"epoch":"genesis","identityId":"<identity id>","operation":"enroll","operationId":"<uuid>","pairingExpiration":1770000060000,"pairingId":"<uuid>","previousRevision":0,"revision":1,"targetCredential":"<public credential>","targetCredentialCommitment":"<lowercase SHA-256 hex>"}}
+```
+
+Revocation omits `authorizedAt`, `pairingExpiration`, `pairingId` and
+`proofOfPossession`. Recovery also omits `authorCredential`; its target proof
+uses the proof envelope above, and the recovery authority signs the transition
+envelope. Credentials and signatures use their API string representation
+without decoding or normalization.
+
+The endpoint is unauthenticated until signatures are verified, so each node
+rate limits it before any lookup or lock: 20 submissions per identity and 300
+per node per minute. Excess requests return `429`.
+
+The response contains only the identity identifier, current recovery epoch and
+deterministic current revision; it does not return an authorized-device catalog.
+Replayed operation or pairing identifiers, stale predecessors, wrong recovery
+epochs, pairing authorizations signed after their declared expiry, substituted
+identities or credentials, revoked authors and unrelated recovery authorities
+return `409`. Replicas accept an otherwise valid fully signed enrollment after
+an offline partition. A complete artifact signed by both devices is
+authorization, rather than an unsigned bearer offer; transport delay does not
+invalidate it. The author must refuse to create that final signature after the
+pairing deadline. The endpoint never returns local vault envelopes or secret
+recovery material.
 
 ## Planned API
 

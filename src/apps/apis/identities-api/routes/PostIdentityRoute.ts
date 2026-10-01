@@ -15,7 +15,11 @@ export class PostIdentityRoute extends Route {
 
   @Post('/')
   public async createIdentity(
-    @Body({ options: { limit: '10mb' } }) body: PostIdentityBody,
+    @Body({
+      options: { limit: '10mb' },
+      validate: { forbidNonWhitelisted: true, whitelist: true },
+    })
+    body: PostIdentityBody,
     @Res() response: Response,
   ): Promise<Response> {
     const request = new PostIdentityRequest(body);

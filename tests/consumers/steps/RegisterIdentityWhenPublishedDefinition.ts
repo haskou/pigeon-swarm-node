@@ -5,6 +5,7 @@ import IdentityPublisher from '@app/contexts/identities/application/publish/Iden
 import { IdentityPublishMessage } from '@app/contexts/identities/application/publish/messages/IdentityPublishMessage';
 import { IdentityWasCreatedEvent } from '@app/contexts/identities/domain/events/IdentityWasCreatedEvent';
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import IdentityMetadataIndex from '@app/contexts/identities/infrastructure/metadata/IdentityMetadataIndex';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -12,7 +13,7 @@ import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import { Kernel } from '@haskou/ddd-kernel';
 import { setDefaultTimeout } from '@cucumber/cucumber';
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { KeyPair, PrivateKey } from '@haskou/pigeon-swarm-crypto';
 import { expect } from 'chai';
 import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import * as fsSync from 'fs';
@@ -136,8 +137,11 @@ export default class RegisterIdentityWhenPublishedDefinition {
     const publisher =
       Kernel.di.getService<IdentityPublisher>(IdentityPublisher);
     const keyPair = await KeyPair.generate();
-    const encryptedKeyPair = await keyPair.encryptKeyPair(
-      'Super-secret-password1!',
+    const networkKeyPair = await KeyPair.generate();
+    const deviceKeyPair = await KeyPair.generate();
+    const recoveryKeyPair = await KeyPair.generate();
+    const deviceCredential = DeviceCredential.fromString(
+      deviceKeyPair.toPrimitives().publicKey,
     );
     const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
     const previousIdentityExternalIdentifier: string | undefined = undefined;
@@ -155,25 +159,25 @@ export default class RegisterIdentityWhenPublishedDefinition {
       picture: undefined,
     };
     const signaturePayload = {
-      encryptedKeyPair: encryptedKeyPair.toPrimitives(),
-      encryptedMasterKey: 'v1.test.encrypted-master-key',
+      authorizationRevision: 0,
+      deviceCredential: deviceCredential.valueOf(),
+      deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),
       id: identityId.valueOf(),
-      masterKeyDerivation: {
-        passkeyPrf: {
-          algorithm: 'webauthn-prf',
-          credentialId: 'test-credential-id',
-          salt: 'test-salt',
-          version: 1,
-        },
-      },
       networks: [networkId],
       previousIdentityExternalIdentifier,
       profile,
+      recoveryAuthority: recoveryKeyPair.toPrimitives().publicKey,
       timestamp: 1773848829055,
       version: 1,
     };
 
-    await ipfs.registerNetwork(new IPFSNetworkConfig(networkId, networkName));
+    await ipfs.registerNetwork(
+      new IPFSNetworkConfig(
+        networkId,
+        networkName,
+        new PrivateKey(networkKeyPair.toPrimitives().privateKey),
+      ),
+    );
     const candidate = await publisher.publish(
       new IdentityPublishMessage({
         ...signaturePayload,

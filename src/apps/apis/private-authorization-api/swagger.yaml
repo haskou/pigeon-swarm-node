@@ -7,7 +7,7 @@ paths:
     post:
       tags: [private-authorization]
       summary: Provision a private authorization scope
-      description: Verifies the owner-signed genesis and its protected MLS state, validates the owner-only private community projection, and commits all initial local state atomically. The signed HTTP identity must match the genesis owner key.
+      description: Verifies that the declared owner device credential is authorized for the signed HTTP identity at the exact supplied revision, verifies the device-signed genesis and protected MLS state, validates the owner-only private community projection, and commits all initial local state atomically.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -138,8 +138,15 @@ components:
   schemas:
     PostPrivateAuthorizationScopeBody:
       type: object
-      required: [projection, protectedMlsState, signedGenesisJson]
+      required: [identityAuthorizationEpoch, identityAuthorizationRevision, ownerDeviceKey, projection, protectedMlsState, signedGenesisJson]
       properties:
+        identityAuthorizationEpoch:
+          type: string
+        identityAuthorizationRevision:
+          type: integer
+          minimum: 0
+        ownerDeviceKey:
+          type: string
         projection:
           type: object
           additionalProperties: true

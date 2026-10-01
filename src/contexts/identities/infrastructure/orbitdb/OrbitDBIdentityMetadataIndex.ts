@@ -1,17 +1,36 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
+import IpfsIdentityMapper from '@app/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import IdentityMetadataIndex from '@app/contexts/identities/infrastructure/metadata/IdentityMetadataIndex';
 import { IdentityMetadataRecord } from '@app/contexts/identities/infrastructure/metadata/IdentityMetadataRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { PrimitiveOf } from '@haskou/value-objects';
 
 import { OrbitDBIdentityMetadataDocument } from './documents/OrbitDBIdentityMetadataDocument';
 
 export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex {
-  constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
+  private static readonly MAX_CANDIDATES_PER_IDENTITY = 64;
+
+  private readonly candidatesByIdentityId = new Map<
+    string,
+    Map<string, IdentityMetadataRecord>
+  >();
+
+  private readonly canonicalCandidatesByIdentityId = new Map<
+    string,
+    Map<string, IdentityMetadataRecord>
+  >();
+
+  private readonly mapper = new IpfsIdentityMapper();
+
+  constructor(
+    private readonly registry: OrbitDBReplicatedStateRegistry,
+    private readonly ipfsManager: IPFS,
+  ) {
     super();
   }
 
@@ -92,7 +111,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
 
     try {
       return Identity.fromPrimitives(
-        document.identity as PrimitiveOf<Identity>,
+        document.identity as unknown as IdentityPrimitives,
       );
     } catch {
       return undefined;
@@ -159,7 +178,9 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   ): IdentityMetadataRecord[] {
     return [...documents].sort(
       (left, right) =>
-        right.version - left.version || right.receivedAt - left.receivedAt,
+        right.version - left.version ||
+        left.cid.localeCompare(right.cid) ||
+        right.receivedAt - left.receivedAt,
     );
   }
 
@@ -171,44 +192,253 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     return `identity-handle:${handle}`;
   }
 
+  private async findCachedCandidateRecords(
+    identityId?: string,
+  ): Promise<IdentityMetadataRecord[]> {
+    if (identityId) {
+      return [...(this.candidatesByIdentityId.get(identityId)?.values() ?? [])];
+    }
+
+    const retained = [...this.candidatesByIdentityId.values()].flatMap(
+      (candidates) => [...candidates.values()],
+    );
+    const projected = (
+      await Promise.all(
+        this.registry
+          .findCachedHeadsByPrefix('identity:')
+          .map((document) => this.verifiedRecord(document)),
+      )
+    ).filter(
+      (document): document is IdentityMetadataRecord => document !== undefined,
+    );
+
+    return [...retained, ...projected];
+  }
+
+  private async findCachedCanonicalCandidateRecords(
+    identityId?: string,
+  ): Promise<IdentityMetadataRecord[]> {
+    const retained = identityId
+      ? [
+          ...(this.canonicalCandidatesByIdentityId.get(identityId)?.values() ??
+            []),
+        ]
+      : [...this.canonicalCandidatesByIdentityId.values()].flatMap(
+          (candidates) => [...candidates.values()],
+        );
+    const projected = (
+      await Promise.all(
+        this.registry
+          .findCachedHeadsByPrefix('identity:')
+          .map((document) => this.verifiedRecord(document)),
+      )
+    ).filter(
+      (document): document is IdentityMetadataRecord =>
+        document !== undefined &&
+        (!identityId || document.identityId === identityId),
+    );
+
+    return [...retained, ...projected];
+  }
+
+  private async verifiedRecord(
+    document: Record<string, unknown>,
+  ): Promise<IdentityMetadataRecord | undefined> {
+    const record = this.toRecord(document);
+
+    if (!record?.identity) {
+      return undefined;
+    }
+
+    return (await this.hasCanonicalEmbeddedIdentity(record))
+      ? this.deriveSignedMetadata(record)
+      : undefined;
+  }
+
   private async findHead(
     key: string,
   ): Promise<IdentityMetadataRecord | undefined> {
     const document = await this.registry.findHead(key);
 
-    return document ? this.toRecord(document) : undefined;
+    return document ? this.verifiedRecord(document) : undefined;
   }
 
-  private latestRecordFrom(
-    records: IdentityMetadataRecord[],
-  ): IdentityMetadataRecord | undefined {
-    const [latest] = this.deduplicateDocuments(records);
+  private async hasCanonicalEmbeddedIdentity(
+    record: IdentityMetadataRecord,
+  ): Promise<boolean> {
+    if (!record.identity) {
+      return false;
+    }
 
-    return latest;
-  }
-
-  private findCachedRecordsByHandle(handle: string): IdentityMetadataRecord[] {
-    return this.registry
-      .findCachedHeadsByPrefix('identity:')
-      .map((document) => this.toRecord(document))
-      .filter(
-        (document): document is IdentityMetadataRecord =>
-          document !== undefined && document.handle === handle,
+    try {
+      const calculatedCid = await this.ipfsManager.calculateJSONId(
+        this.mapper.toDocument(record.identity),
       );
+
+      return calculatedCid.valueOf() === record.cid;
+    } catch {
+      return false;
+    }
   }
 
-  public findAll(): Promise<IdentityMetadataRecord[]> {
-    return Promise.resolve(
-      this.sortByFreshness(
-        this.registry
-          .findCachedHeadsByPrefix('identity:')
-          .map((document) => this.toRecord(document))
-          .filter(
-            (document): document is IdentityMetadataRecord =>
-              document !== undefined,
-          ),
-      ),
+  private deriveSignedMetadata(
+    record: IdentityMetadataRecord,
+  ): IdentityMetadataRecord {
+    if (!record.identity) {
+      return record;
+    }
+
+    const primitives = record.identity.toPrimitives();
+
+    return {
+      ...record,
+      handle: primitives.profile.handle,
+      identityId: primitives.id,
+      networkId: undefined,
+      networkIds: primitives.networks,
+      previousCid: primitives.previousIdentityExternalIdentifier,
+      version: primitives.version,
+    };
+  }
+
+  private retainCandidates(
+    candidates: Map<string, IdentityMetadataRecord>,
+    canonicalCandidates: Map<string, IdentityMetadataRecord>,
+  ): void {
+    const ordered = this.sortByFreshness([...candidates.values()]);
+    const canonical = this.sortByFreshness([...canonicalCandidates.values()]);
+    const references = ordered.filter(
+      ({ cid }) => !canonicalCandidates.has(cid),
     );
+    const retained = [...canonical, ...references].slice(
+      0,
+      OrbitDBIdentityMetadataIndex.MAX_CANDIDATES_PER_IDENTITY,
+    );
+    const retainedCids = new Set(retained.map(({ cid }) => cid));
+
+    candidates.clear();
+    retained.forEach((candidate) => candidates.set(candidate.cid, candidate));
+    [...canonicalCandidates.keys()]
+      .filter((cid) => !retainedCids.has(cid))
+      .forEach((cid) => canonicalCandidates.delete(cid));
+  }
+
+  private async addCandidate(
+    candidates: Map<string, IdentityMetadataRecord>,
+    canonicalCandidates: Map<string, IdentityMetadataRecord>,
+    record: IdentityMetadataRecord,
+    locallyVerified: boolean,
+  ): Promise<boolean> {
+    const canonical =
+      locallyVerified || (await this.hasCanonicalEmbeddedIdentity(record));
+
+    if (record.identity && !canonical) {
+      return false;
+    }
+
+    if (!canonical && canonicalCandidates.has(record.cid)) {
+      return false;
+    }
+
+    const acceptedRecord = canonical
+      ? this.deriveSignedMetadata(record)
+      : record;
+
+    candidates.set(acceptedRecord.cid, acceptedRecord);
+
+    if (canonical) {
+      canonicalCandidates.set(acceptedRecord.cid, acceptedRecord);
+    }
+
+    return true;
+  }
+
+  private removeCandidate(
+    candidates: Map<string, IdentityMetadataRecord>,
+    canonicalCandidates: Map<string, IdentityMetadataRecord>,
+    cid: string,
+    locallyVerified: boolean,
+  ): boolean {
+    if (!locallyVerified) {
+      return false;
+    }
+
+    candidates.delete(cid);
+    canonicalCandidates.delete(cid);
+
+    return true;
+  }
+
+  private async projectPersistedDocument(
+    document: Record<string, unknown>,
+    locallyVerified: boolean,
+  ): Promise<void> {
+    const cid = this.stringValue(document, 'cid');
+    const identityId = this.identityIdFrom(document);
+
+    if (!cid || !identityId) {
+      return;
+    }
+
+    const candidates =
+      this.candidatesByIdentityId.get(identityId) ??
+      new Map<string, IdentityMetadataRecord>();
+    const canonicalCandidates =
+      this.canonicalCandidatesByIdentityId.get(identityId) ??
+      new Map<string, IdentityMetadataRecord>();
+
+    this.candidatesByIdentityId.set(identityId, candidates);
+    this.canonicalCandidatesByIdentityId.set(identityId, canonicalCandidates);
+    const record = this.toRecord(document);
+
+    const accepted = record
+      ? await this.addCandidate(
+          candidates,
+          canonicalCandidates,
+          record,
+          locallyVerified,
+        )
+      : this.removeCandidate(
+          candidates,
+          canonicalCandidates,
+          cid,
+          locallyVerified,
+        );
+
+    if (!accepted) return;
+
+    this.retainCandidates(candidates, canonicalCandidates);
+    const acceptedRecord = candidates.get(cid);
+    const projectedDocument = acceptedRecord
+      ? this.toStorageDocument(acceptedRecord)
+      : document;
+
+    this.registry.cacheHeadLocally(
+      this.identityHeadKey(identityId),
+      projectedDocument,
+    );
+  }
+
+  private async findCachedRecordsByHandle(
+    handle: string,
+  ): Promise<IdentityMetadataRecord[]> {
+    return (await this.findCachedCanonicalCandidateRecords()).filter(
+      (document) => document.handle === handle,
+    );
+  }
+
+  public async findAll(): Promise<IdentityMetadataRecord[]> {
+    return this.deduplicateDocuments(
+      await this.findCachedCanonicalCandidateRecords(),
+    );
+  }
+
+  public findAllCanonical(): Promise<IdentityMetadataRecord[]> {
+    const canonical = [
+      ...this.canonicalCandidatesByIdentityId.values(),
+    ].flatMap((candidates) => [...candidates.values()]);
+
+    return Promise.resolve(this.deduplicateDocuments(canonical));
   }
 
   public async findByHandle(
@@ -216,20 +446,12 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   ): Promise<IdentityMetadataRecord[]> {
     const key = this.handleHeadKey(handle.valueOf());
     const head = await this.findHead(key);
+    const matchingHead = head?.handle === handle.valueOf() ? head : undefined;
 
-    if (head) {
-      return [head];
-    }
-
-    const cachedLatest = this.latestRecordFrom(
-      this.findCachedRecordsByHandle(handle.valueOf()),
-    );
-
-    if (cachedLatest) {
-      return [cachedLatest];
-    }
-
-    return [];
+    return this.deduplicateDocuments([
+      ...(matchingHead ? [matchingHead] : []),
+      ...(await this.findCachedRecordsByHandle(handle.valueOf())),
+    ]);
   }
 
   public async findByIdentityId(
@@ -238,28 +460,26 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     const head = await this.findHead(
       this.identityHeadKey(identityId.valueOf()),
     );
+    const matchingHead =
+      head?.identityId === identityId.valueOf() ? head : undefined;
 
-    if (head) {
-      return [head];
-    }
-
-    return [];
+    return this.deduplicateDocuments([
+      ...(matchingHead ? [matchingHead] : []),
+      ...(await this.findCachedCanonicalCandidateRecords(identityId.valueOf())),
+    ]);
   }
 
-  public findLatestByNetworkId(
+  public async findLatestByNetworkId(
     networkId: NetworkId,
   ): Promise<IdentityMetadataRecord[]> {
-    const documents = this.sortByFreshness([
-      ...this.registry
-        .findCachedHeadsByPrefix('identity:')
-        .map((document) => this.toRecord(document))
-        .filter(
-          (document): document is IdentityMetadataRecord =>
-            document !== undefined &&
-            (document.networkIds?.includes(networkId.valueOf()) ||
-              document.networkId === networkId.valueOf()),
-        ),
-    ]);
+    const documents = this.sortByFreshness(
+      (await this.findCachedCandidateRecords()).filter(
+        (document): document is IdentityMetadataRecord =>
+          document.identity !== undefined &&
+          (document.networkIds?.includes(networkId.valueOf()) ||
+            document.networkId === networkId.valueOf()),
+      ),
+    );
     const latestDocuments = new Map<string, IdentityMetadataRecord>();
 
     for (const document of documents) {
@@ -268,7 +488,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       }
     }
 
-    return Promise.resolve([...latestDocuments.values()]);
+    return [...latestDocuments.values()];
   }
 
   public async save(
@@ -290,18 +510,13 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     const document = this.toStorageDocument(record);
 
     await this.registry.putDocument('identities', document);
-    this.projectDocument(document);
+    await this.projectPersistedDocument(document, true);
   }
 
-  public projectDocument(document: Record<string, unknown>): void {
-    const cid = this.stringValue(document, 'cid');
-    const identityId = this.identityIdFrom(document);
-
-    if (!cid || !identityId) {
-      return;
-    }
-
-    this.registry.cacheHeadLocally(this.identityHeadKey(identityId), document);
+  public async projectDocument(
+    document: Record<string, unknown>,
+  ): Promise<void> {
+    await this.projectPersistedDocument(document, false);
   }
 
   public async deleteByExternalIdentifier(
@@ -316,7 +531,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
         const tombstone = this.toStorageDocument(document, true);
 
         await this.registry.putDocument('identities', tombstone);
-        this.projectDocument(tombstone);
+        await this.projectPersistedDocument(tombstone, true);
       }),
     );
   }

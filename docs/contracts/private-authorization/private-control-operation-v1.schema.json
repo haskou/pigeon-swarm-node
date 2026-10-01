@@ -23,10 +23,16 @@
     "admission": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "identityId", "deviceKey", "mlsCredentialHash"],
+      "required": ["type", "identityId", "identityAuthorizationEpoch", "identityAuthorizationRevision", "deviceKey", "mlsCredentialHash"],
       "properties": {
         "type": { "const": "member.admit" },
         "identityId": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "identityAuthorizationEpoch": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "identityAuthorizationRevision": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
         "deviceKey": { "$ref": "#/$defs/base64url32" },
         "mlsCredentialHash": { "$ref": "#/$defs/base64url32" }
       }
@@ -97,8 +103,15 @@
             "payload": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["proposalId", "parentHeadHash", "change"],
+              "required": ["proposalId", "parentHeadHash", "change", "authorIdentityId", "identityAuthorizationEpoch", "identityAuthorizationRevision"],
               "properties": {
+                "authorIdentityId": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                "identityAuthorizationEpoch": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                "identityAuthorizationRevision": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "proposalId": { "$ref": "#/$defs/base64url16" },
                 "parentHeadHash": { "$ref": "#/$defs/base64url32" },
                 "change": { "$ref": "#/$defs/change" }
@@ -117,8 +130,15 @@
             "payload": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["proposalOperationId", "resultingHeadHash", "mlsMessageHash", "change"],
+              "required": ["proposalOperationId", "resultingHeadHash", "mlsMessageHash", "change", "authorIdentityId", "identityAuthorizationEpoch", "identityAuthorizationRevision"],
               "properties": {
+                "authorIdentityId": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                "identityAuthorizationEpoch": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                "identityAuthorizationRevision": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "proposalOperationId": { "$ref": "#/$defs/base64url16" },
                 "resultingHeadHash": { "$ref": "#/$defs/base64url32" },
                 "mlsMessageHash": { "$ref": "#/$defs/base64url32" },
@@ -138,8 +158,15 @@
             "payload": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["deviceKey", "resultingHeadHash"],
+              "required": ["deviceKey", "resultingHeadHash", "authorIdentityId", "identityAuthorizationEpoch", "identityAuthorizationRevision"],
               "properties": {
+                "authorIdentityId": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                "identityAuthorizationEpoch": { "type": "string", "minLength": 1, "maxLength": 1024 },
+                "identityAuthorizationRevision": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "deviceKey": { "$ref": "#/$defs/base64url32" },
                 "resultingHeadHash": { "$ref": "#/$defs/base64url32" }
               }

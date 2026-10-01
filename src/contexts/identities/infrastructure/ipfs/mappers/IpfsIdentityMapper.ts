@@ -5,13 +5,14 @@ import { IpfsIdentityDocument } from '../documents/IpfsIdentityDocument';
 export default class IpfsIdentityMapper {
   public toDomain(document: IpfsIdentityDocument): Identity {
     return Identity.fromPrimitives({
-      encryptedKeyPair: document.encryptedKeyPair,
-      encryptedMasterKey: document.encryptedMasterKey,
+      authorizationRevision: document.authorizationRevision,
+      deviceCredential: document.deviceCredential,
+      deviceCredentialCommitment: document.deviceCredentialCommitment,
       id: document._id,
-      masterKeyDerivation: document.masterKeyDerivation,
       networks: document.networks,
       previousIdentityExternalIdentifier: document.previousCid,
       profile: document.profile,
+      recoveryAuthority: document.recoveryAuthority,
       signature: document.signature,
       timestamp: document.timestamp,
       version: document.version,
@@ -23,12 +24,13 @@ export default class IpfsIdentityMapper {
 
     return {
       _id: primitives.id,
-      encryptedKeyPair: primitives.encryptedKeyPair,
-      encryptedMasterKey: primitives.encryptedMasterKey,
-      masterKeyDerivation: primitives.masterKeyDerivation,
+      authorizationRevision: primitives.authorizationRevision,
+      deviceCredential: primitives.deviceCredential,
+      deviceCredentialCommitment: primitives.deviceCredentialCommitment,
       networks: primitives.networks,
       previousCid: primitives.previousIdentityExternalIdentifier,
       profile: primitives.profile,
+      recoveryAuthority: primitives.recoveryAuthority,
       signature: primitives.signature,
       timestamp: primitives.timestamp,
       version: primitives.version,

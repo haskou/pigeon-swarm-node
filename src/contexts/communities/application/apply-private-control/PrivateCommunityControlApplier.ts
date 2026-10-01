@@ -2,17 +2,12 @@ import { PrivateControlMutationAuthorizer } from '@app/contexts/private-authoriz
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
-import { PrivateIdentityBinding } from '@app/contexts/private-authorization/domain/services/PrivateIdentityBinding';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Community } from '../../domain/Community';
 import { CommunityRoleId } from '../../domain/value-objects/CommunityRoleId';
 
 export default class PrivateCommunityControlApplier extends PrivateControlMutationAuthorizer {
-  public constructor(private readonly identityBinding: PrivateIdentityBinding) {
-    super();
-  }
-
   private community(projection: Record<string, unknown>): Community {
     try {
       return Community.fromPrimitives(
@@ -56,9 +51,7 @@ export default class PrivateCommunityControlApplier extends PrivateControlMutati
     ) {
       throw new InvalidPrivateAuthorizationError();
     }
-    const actor = new IdentityId(
-      this.identityBinding.identityIdFor(value.authorDeviceKey),
-    );
+    const actor = checkpoint.identityFor(operation.getAuthorDeviceKey());
     const community = this.community(projection);
     const mutation = value.mutation;
 

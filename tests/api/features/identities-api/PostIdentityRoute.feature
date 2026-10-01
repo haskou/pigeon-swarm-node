@@ -30,8 +30,13 @@ Feature: Post identity route
 	      | profile.name   | bob                                  |
 	      | profile.handle | bob                                  |
 	      | networks[0]    | 123e4567-e89b-12d3-a456-426614174000 |
-	    And response body should contain "encryptedMasterKey"
-	    And response body should contain "masterKeyDerivation"
+	    And response body should contain "deviceCredentialCommitment"
+	    And response body should contain "deviceCredential"
+	    And response body should contain "recoveryAuthority"
+	    And response body should contain "authorizationRevision"
+	    And response body should not contain "encryptedPrivateKey"
+	    And response body should not contain "encryptedMasterKey"
+	    And response body should not contain "masterKeyDerivation"
 	    And response body should contain "identityExternalIdentifier"
     And it has been pinned in ipfs
     When I GET "/identities/bob"
@@ -40,6 +45,38 @@ Feature: Post identity route
       | profile.name   | bob |
       | profile.handle | bob |
     And response body should contain "identityExternalIdentifier"
+
+  Scenario: Reject legacy unlock material on a signed identity
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
+    And I set a client-signed identity body with name "legacy" and handle "legacy"
+    And I add legacy identity unlock fields
+    When I POST to "/identities/"
+    Then response code is equal to 400
+
+  Scenario: Reject an undeclared secret on a signed identity
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
+    And I set a client-signed identity body with name "secret" and handle "secret"
+    And I add undeclared identity field "recoverySecret"
+    When I POST to "/identities/"
+    Then response code is equal to 400
+
+  Scenario: Reject an undeclared nested profile secret on a signed identity
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
+    And I set a client-signed identity body with name "nested secret" and handle "nested-secret"
+    And I add undeclared identity profile field "recoverySecret"
+    When I POST to "/identities/"
+    Then response code is equal to 400
+
+  Scenario: Reject a signed identity without a profile
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
+    And I set a client-signed identity body with name "missing profile" and handle "missing-profile"
+    And I remove the identity profile
+    When I POST to "/identities/"
+    Then response code is equal to 400
 
   Scenario: Update a client-signed identity profile and encrypted key pair
     Given I am an anonymous user
@@ -56,9 +93,25 @@ Feature: Post identity route
       | profile.handle | carol_new     |
       | version        | 2             |
     And response body should contain "identityExternalIdentifier"
+    And I add undeclared identity field "password"
+    And I sign the current identity update request
+    When I PUT the created identity
+    Then response code is equal to 400
     When I GET "/identities/carol_new"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | profile.name   | carol updated |
       | profile.handle | carol_new     |
     And response body should contain "identityExternalIdentifier"
+
+  Scenario: Reject a signed identity update without a profile
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
+    And I set a client-signed identity body with name "profile owner" and handle "profile-owner"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I set a client-signed identity update body with name "missing profile", handle "missing_profile" and password "New-client-password1!"
+    And I remove the identity profile
+    And I sign the current identity update request
+    When I PUT the created identity
+    Then response code is equal to 400

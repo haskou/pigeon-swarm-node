@@ -1,16 +1,15 @@
-import * as fsSync from 'fs';
-import path from 'path';
-import { generateKeyPairSync } from 'crypto';
-
+import { Kernel } from '@haskou/ddd-kernel';
 import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
 import { UUID } from '@haskou/value-objects';
+import { generateKeyPairSync } from 'crypto';
+import * as fsSync from 'fs';
+import path from 'path';
 
 import { HeliaIPFSParser } from '../../../src/contexts/shared/infrastructure/ipfs/helia/HeliaIPFSParser';
 import { IPFSId } from '../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../src/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import { Kernel } from '@haskou/ddd-kernel';
 
 type IdentityResponseShape = {
   id?: string;
@@ -150,10 +149,6 @@ export default class IPFSDefinition {
     );
   }
 
-  private shouldUseRealPrivateIPFS(): boolean {
-    return process.env.PIGEON_API_TEST_REAL_IPFS === 'true';
-  }
-
   private createNetworkConfig(
     networkId: string,
     networkName: string,
@@ -161,7 +156,7 @@ export default class IPFSDefinition {
     return new IPFSNetworkConfig(
       networkId,
       networkName,
-      this.shouldUseRealPrivateIPFS() ? this.generateNetworkKey() : undefined,
+      this.generateNetworkKey(),
     );
   }
 

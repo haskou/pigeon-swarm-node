@@ -1,11 +1,8 @@
 export interface IdentityResource {
   id: string;
-  encryptedKeyPair: {
-    encryptedPrivateKey: string;
-    publicKey: string;
-  };
-  encryptedMasterKey: string;
-  masterKeyDerivation: Record<string, unknown>;
+  authorizationRevision: number;
+  deviceCredential: string;
+  deviceCredentialCommitment: string;
   networks: string[];
   profile: {
     banner: string | undefined;
@@ -14,6 +11,7 @@ export interface IdentityResource {
     name: string;
     picture: string | undefined;
   };
+  recoveryAuthority: string;
   timestamp: number;
   signature: string;
   version: number;

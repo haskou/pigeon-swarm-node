@@ -6,6 +6,8 @@ import { ProfileName } from '@app/contexts/identities/domain/value-objects/Profi
 import OrbitDBIdentityMetadataIndex from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
@@ -14,6 +16,7 @@ describe('OrbitDBIdentityMetadataIndex', () => {
   const documents: Record<string, unknown>[] = [];
   const heads = new Map<string, Record<string, unknown>>();
   let registry: OrbitDBReplicatedStateRegistry;
+  let ipfsManager: IPFS;
   let repository: OrbitDBIdentityMetadataIndex;
 
   beforeEach(async () => {
@@ -22,7 +25,10 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
     await registry.register('network-1', identityStores(documents, heads));
-    repository = new OrbitDBIdentityMetadataIndex(registry);
+    ipfsManager = {
+      calculateJSONId: jest.fn(),
+    } as unknown as IPFS;
+    repository = new OrbitDBIdentityMetadataIndex(registry, ipfsManager);
   });
 
   afterEach(() => {
@@ -69,7 +75,7 @@ describe('OrbitDBIdentityMetadataIndex', () => {
 
     registry.clear();
     await registry.register(networkId, stores as never);
-    repository = new OrbitDBIdentityMetadataIndex(registry);
+    repository = new OrbitDBIdentityMetadataIndex(registry, ipfsManager);
     stores.identities.put.mockImplementation(
       async (document: Record<string, unknown>) => {
         await delayedDocument.promise;
@@ -132,19 +138,16 @@ describe('OrbitDBIdentityMetadataIndex', () => {
   it('should project identity tombstones without replicating handle heads', async () => {
     const identityMother = new IdentityMother();
     const handle = new ProfileHandle('hasko');
-    const identity = await identityMother
-      .build()
-      .updateProfile(
-        new Profile(
-          new ProfileName('Hasko'),
-          undefined,
-          undefined,
-          undefined,
-          handle,
-        ),
-        identityMother.password,
-        new IdentityExternalIdentifier('bafypreviousidentity'),
-      );
+    const identity = await identityMother.buildNext({
+      previousIdentityExternalIdentifier: 'bafypreviousidentity',
+      profile: new Profile(
+        new ProfileName('Hasko'),
+        undefined,
+        undefined,
+        undefined,
+        handle,
+      ).toPrimitives(),
+    });
     const networkId = identityMother.networks[0];
     await registry.register(
       networkId.valueOf(),
@@ -195,7 +198,7 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     ]);
   });
 
-  it('should not scan stored identity records when identity id head exists', async () => {
+  it('should reject an unsigned identity id head without scanning stored records', async () => {
     const mother = new IdentityMother();
     const networkId = mother.networks[0];
     const identityId = mother.id.valueOf();
@@ -227,12 +230,7 @@ describe('OrbitDBIdentityMetadataIndex', () => {
 
     const records = await repository.findByIdentityId(mother.id);
 
-    expect(records[0]).toEqual(
-      expect.objectContaining({
-        cid: 'bafyidentity-v1',
-        version: 1,
-      }),
-    );
+    expect(records).toEqual([]);
     await flushBackgroundTasks();
     expect(heads.get(`identity:${identityId}`)).toEqual(
       expect.objectContaining({
@@ -255,7 +253,7 @@ describe('OrbitDBIdentityMetadataIndex', () => {
       networkId.valueOf(),
       identityStoresWithIdentityQuery(new Map(), query),
     );
-    repository = new OrbitDBIdentityMetadataIndex(registry);
+    repository = new OrbitDBIdentityMetadataIndex(registry, ipfsManager);
 
     await expect(repository.findByIdentityId(mother.id)).resolves.toEqual([]);
     expect(query).not.toHaveBeenCalled();
@@ -265,19 +263,16 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     const handle = new ProfileHandle('hasko');
     const mother = new IdentityMother();
     const networkId = mother.networks[0];
-    const identity = await mother
-      .build()
-      .updateProfile(
-        new Profile(
-          new ProfileName('Hasko'),
-          undefined,
-          undefined,
-          undefined,
-          handle,
-        ),
-        mother.password,
-        new IdentityExternalIdentifier('bafypreviousidentity'),
-      );
+    const identity = await mother.buildNext({
+      previousIdentityExternalIdentifier: 'bafypreviousidentity',
+      profile: new Profile(
+        new ProfileName('Hasko'),
+        undefined,
+        undefined,
+        undefined,
+        handle,
+      ).toPrimitives(),
+    });
 
     await registry.register(
       networkId.valueOf(),
@@ -303,7 +298,7 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     );
   });
 
-  it('should not scan stored identity records when handle head exists', async () => {
+  it('should reject an unsigned handle head without scanning stored records', async () => {
     const handle = new ProfileHandle('hasko');
     const mother = new IdentityMother().withVersion(new IdentityVersion(2));
     const networkId = mother.networks[0];
@@ -338,12 +333,7 @@ describe('OrbitDBIdentityMetadataIndex', () => {
 
     const records = await repository.findByHandle(handle);
 
-    expect(records[0]).toEqual(
-      expect.objectContaining({
-        cid: 'bafyidentity-handle-v1',
-        version: 1,
-      }),
-    );
+    expect(records).toEqual([]);
     await flushBackgroundTasks();
     expect(heads.get(`identity-handle:${handle.valueOf()}`)).toEqual(
       expect.objectContaining({
@@ -364,7 +354,7 @@ describe('OrbitDBIdentityMetadataIndex', () => {
       'network-lookup',
       identityStoresWithIdentityQuery(new Map(), query),
     );
-    repository = new OrbitDBIdentityMetadataIndex(registry);
+    repository = new OrbitDBIdentityMetadataIndex(registry, ipfsManager);
 
     await expect(
       repository.findByHandle(new ProfileHandle('202020')),
@@ -372,7 +362,7 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it('should read persisted handle heads on cache misses', async () => {
+  it('should reject persisted unsigned handle heads on cache misses', async () => {
     const mother = new IdentityMother();
     const identity = mother.build();
     const primitives = identity.toPrimitives();
@@ -409,21 +399,15 @@ describe('OrbitDBIdentityMetadataIndex', () => {
       'network-lookup',
       identityStoresWithIdentityQuery(cachedHeads, query),
     );
-    repository = new OrbitDBIdentityMetadataIndex(registry);
+    repository = new OrbitDBIdentityMetadataIndex(registry, ipfsManager);
 
     const records = await repository.findByHandle(new ProfileHandle('hasko'));
 
-    expect(records).toEqual([
-      expect.objectContaining({
-        cid: 'bafyidentity-http-head',
-        handle: 'hasko',
-        identityId: primitives.id,
-      }),
-    ]);
+    expect(records).toEqual([]);
     expect(query).not.toHaveBeenCalled();
   });
 
-  it('should use cached identity records by handle without scanning stores', async () => {
+  it('should reject cached unsigned identity records by handle without scanning stores', async () => {
     const query = jest.fn(() =>
       Promise.reject(new Error('HTTP identity lookup should not scan stores')),
     );
@@ -445,17 +429,11 @@ describe('OrbitDBIdentityMetadataIndex', () => {
       'network-lookup',
       identityStoresWithIdentityQuery(cachedHeads, query),
     );
-    repository = new OrbitDBIdentityMetadataIndex(registry);
+    repository = new OrbitDBIdentityMetadataIndex(registry, ipfsManager);
 
     const records = await repository.findByHandle(new ProfileHandle('hasko'));
 
-    expect(records).toEqual([
-      expect.objectContaining({
-        cid: 'bafyidentity-cached',
-        handle: 'hasko',
-        identityId,
-      }),
-    ]);
+    expect(records).toEqual([]);
     await flushBackgroundTasks();
     expect(query).not.toHaveBeenCalled();
   });
@@ -489,17 +467,12 @@ describe('OrbitDBIdentityMetadataIndex', () => {
       'network-lookup',
       identityStoresWithIdentityQuery(cachedHeads, jest.fn()),
     );
-    repository = new OrbitDBIdentityMetadataIndex(registry);
+    repository = new OrbitDBIdentityMetadataIndex(registry, ipfsManager);
 
-    await expect(repository.findAll()).resolves.toEqual([
-      expect.objectContaining({
-        cid: 'bafyidentity-cached',
-        identityId,
-      }),
-    ]);
+    await expect(repository.findAll()).resolves.toEqual([]);
   });
 
-  it('should read projected identity heads without explicit identityId', async () => {
+  it('should reject unsigned projected identity heads', async () => {
     const cachedHeads = new Map<string, Record<string, unknown>>();
     const mother = new IdentityMother();
     const identityId = mother.id.valueOf();
@@ -519,20 +492,15 @@ describe('OrbitDBIdentityMetadataIndex', () => {
       'network-lookup',
       identityStoresWithIdentityQuery(cachedHeads, jest.fn()),
     );
-    repository = new OrbitDBIdentityMetadataIndex(registry);
+    repository = new OrbitDBIdentityMetadataIndex(registry, ipfsManager);
 
-    await expect(repository.findAll()).resolves.toEqual([
-      expect.objectContaining({
-        cid: 'bafyidentity-projected',
-        identityId,
-      }),
-    ]);
+    await expect(repository.findAll()).resolves.toEqual([]);
   });
 
-  it('should project the freshest replicated identity into id and handle heads', async () => {
+  it('should not expose unsigned replicated identities through id or handle lookups', async () => {
     const identityId = new IdentityMother().id.valueOf();
 
-    repository.projectDocument({
+    await repository.projectDocument({
       cid: 'bafyidentity-v1',
       handle: 'hasko',
       id: identityId,
@@ -541,7 +509,7 @@ describe('OrbitDBIdentityMetadataIndex', () => {
       receivedAt: 1,
       version: 1,
     });
-    repository.projectDocument({
+    await repository.projectDocument({
       cid: 'bafyidentity-v2',
       handle: 'hasko',
       id: identityId,
@@ -553,28 +521,389 @@ describe('OrbitDBIdentityMetadataIndex', () => {
 
     await expect(
       repository.findByIdentityId(new IdentityId(identityId)),
+    ).resolves.toEqual([]);
+    const handleCandidates = await repository.findByHandle(
+      new ProfileHandle('hasko'),
+    );
+
+    expect(handleCandidates).toEqual([]);
+  });
+
+  it('should not expose unsigned equal-version forks', async () => {
+    const identityId = new IdentityMother().id.valueOf();
+
+    await repository.projectDocument({
+      cid: 'bafy-b-fork',
+      id: identityId,
+      identityId,
+      networkIds: ['network-1'],
+      receivedAt: 2,
+      version: 2,
+    });
+    await repository.projectDocument({
+      cid: 'bafy-a-fork',
+      id: identityId,
+      identityId,
+      networkIds: ['network-2'],
+      receivedAt: 1,
+      version: 2,
+    });
+
+    const candidates = await repository.findByIdentityId(
+      new IdentityId(identityId),
+    );
+
+    expect(candidates).toEqual([]);
+  });
+
+  it('should not expose bounded unsigned metadata candidates', async () => {
+    const identityId = new IdentityMother().id.valueOf();
+
+    for (let index = 64; index >= 0; index -= 1) {
+      await repository.projectDocument({
+        cid: `bafy-${String(index).padStart(3, '0')}`,
+        id: identityId,
+        identityId,
+        networkIds: ['network-1'],
+        receivedAt: 65 - index,
+        version: 1,
+      });
+    }
+
+    const candidates = await repository.findByIdentityId(
+      new IdentityId(identityId),
+    );
+
+    expect(candidates).toEqual([]);
+  });
+
+  it('should retain a canonical embedded candidate when forged references fill the bound', async () => {
+    const identity = new IdentityMother().build();
+    const identityId = identity.toPrimitives().id;
+    const cid = 'bafy-canonical-identity';
+
+    jest
+      .spyOn(ipfsManager, 'calculateJSONId')
+      .mockResolvedValue(new IPFSId(cid));
+
+    await repository.projectDocument({
+      cid,
+      identity: identity.toPrimitives(),
+      identityId,
+      networkIds: identity.toPrimitives().networks,
+      version: identity.toPrimitives().version,
+    });
+
+    for (let index = 0; index < 64; index += 1) {
+      await repository.projectDocument({
+        cid: `bafy-forged-${String(index).padStart(3, '0')}`,
+        identityId,
+        version: 10_000 + index,
+      });
+    }
+
+    const candidates = await repository.findByIdentityId(
+      new IdentityId(identityId),
+    );
+
+    expect(candidates).toEqual([expect.objectContaining({ cid, identity })]);
+    await expect(repository.findAllCanonical()).resolves.toEqual([
+      expect.objectContaining({ cid, identity }),
+    ]);
+  });
+
+  it('should return a canonical handle candidate alongside a forged handle head', async () => {
+    const mother = new IdentityMother();
+    const current = mother.build().toPrimitives();
+    const identity = await mother.buildNext({
+      profile: {
+        ...current.profile,
+        handle: 'hasko',
+      },
+    });
+    const primitives = identity.toPrimitives();
+    const cid = 'bafy-canonical-handle';
+
+    jest
+      .spyOn(ipfsManager, 'calculateJSONId')
+      .mockResolvedValue(new IPFSId(cid));
+    await repository.projectDocument({
+      cid,
+      handle: 'hasko',
+      identity: primitives,
+      identityId: primitives.id,
+      networkIds: primitives.networks,
+      version: primitives.version,
+    });
+    registry.cacheHeadLocally('identity-handle:hasko', {
+      cid: 'bafy-forged-handle',
+      handle: 'hasko',
+      identityId: primitives.id,
+      networkIds: ['attacker-network'],
+      version: 10_000,
+    });
+
+    const candidates = await repository.findByHandle(
+      new ProfileHandle('hasko'),
+    );
+
+    expect(candidates.map(({ cid: candidateCid }) => candidateCid)).toEqual([
+      cid,
+    ]);
+  });
+
+  it('should reject forged reference and tombstone replacements for a canonical candidate', async () => {
+    const identity = new IdentityMother().build();
+    const primitives = identity.toPrimitives();
+    const cid = 'bafy-protected-identity';
+
+    jest
+      .spyOn(ipfsManager, 'calculateJSONId')
+      .mockResolvedValue(new IPFSId(cid));
+    await repository.projectDocument({
+      cid,
+      identity: primitives,
+      identityId: primitives.id,
+      networkIds: primitives.networks,
+      version: primitives.version,
+    });
+    await repository.projectDocument({
+      cid,
+      identityId: primitives.id,
+      networkIds: ['attacker-network'],
+      version: 10_000,
+    });
+    await repository.projectDocument({
+      cid,
+      deleted: true,
+      identityId: primitives.id,
+      version: 10_001,
+    });
+
+    await expect(
+      repository.findByIdentityId(new IdentityId(primitives.id)),
     ).resolves.toEqual([
       expect.objectContaining({
-        cid: 'bafyidentity-v2',
-        identityId,
-        version: 2,
+        cid,
+        identity,
+        networkIds: primitives.networks,
+        version: primitives.version,
+      }),
+    ]);
+  });
+
+  it('should derive canonical metadata from the embedded signed identity', async () => {
+    const identity = new IdentityMother().build();
+    const primitives = identity.toPrimitives();
+    const cid = 'bafy-protected-embedded-identity';
+    const attackerNetworkId = '123e4567-e89b-12d3-a456-426614174999';
+
+    jest
+      .spyOn(ipfsManager, 'calculateJSONId')
+      .mockResolvedValue(new IPFSId(cid));
+    await repository.projectDocument({
+      cid,
+      handle: primitives.profile.handle,
+      identity: primitives,
+      identityId: primitives.id,
+      networkIds: primitives.networks,
+      previousCid: primitives.previousIdentityExternalIdentifier,
+      version: primitives.version,
+    });
+    await repository.projectDocument({
+      cid,
+      handle: 'attacker',
+      identity: primitives,
+      identityId: primitives.id,
+      networkIds: [attackerNetworkId],
+      previousCid: 'bafy-attacker-previous',
+      version: 10_000,
+    });
+
+    await expect(
+      repository.findByIdentityId(new IdentityId(primitives.id)),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        cid,
+        handle: primitives.profile.handle,
+        networkIds: primitives.networks,
+        previousCid: primitives.previousIdentityExternalIdentifier,
+        version: primitives.version,
       }),
     ]);
     await expect(
-      repository.findByHandle(new ProfileHandle('hasko')),
+      repository.findLatestByNetworkId(new NetworkId(attackerNetworkId)),
+    ).resolves.toEqual([]);
+    await expect(
+      repository.findLatestByNetworkId(new NetworkId(primitives.networks[0])),
     ).resolves.toEqual([
       expect.objectContaining({
-        cid: 'bafyidentity-v2',
-        identityId,
-        version: 2,
+        cid,
+        networkIds: primitives.networks,
+        version: primitives.version,
       }),
+    ]);
+  });
+
+  it('should verify and derive signed metadata from replicated heads after restart', async () => {
+    const mother = new IdentityMother();
+    const current = mother.build().toPrimitives();
+    const identity = await mother.buildNext({
+      profile: {
+        ...current.profile,
+        handle: 'signed-handle',
+      },
+    });
+    const primitives = identity.toPrimitives();
+    const cid = 'bafy-replicated-embedded-identity';
+    const attackerNetworkId = '123e4567-e89b-12d3-a456-426614174999';
+    const cachedHeads = new Map<string, Record<string, unknown>>();
+
+    cachedHeads.set(`identity:${primitives.id}`, {
+      cid,
+      handle: 'attacker',
+      identity: primitives,
+      identityId: primitives.id,
+      networkIds: [attackerNetworkId],
+      previousCid: 'bafy-attacker-previous',
+      version: 10_000,
+    });
+    registry.clear();
+    await registry.register(
+      'network-lookup',
+      identityStoresWithIdentityQuery(cachedHeads, jest.fn()),
+    );
+    jest
+      .spyOn(ipfsManager, 'calculateJSONId')
+      .mockResolvedValue(new IPFSId(cid));
+    repository = new OrbitDBIdentityMetadataIndex(registry, ipfsManager);
+
+    await expect(
+      repository.findLatestByNetworkId(new NetworkId(attackerNetworkId)),
+    ).resolves.toEqual([]);
+    await expect(
+      repository.findLatestByNetworkId(new NetworkId(primitives.networks[0])),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        cid,
+        handle: primitives.profile.handle,
+        networkIds: primitives.networks,
+        previousCid: primitives.previousIdentityExternalIdentifier,
+        version: primitives.version,
+      }),
+    ]);
+    await expect(
+      repository.findByHandle(new ProfileHandle('attacker')),
+    ).resolves.toEqual([]);
+    await expect(
+      repository.findByHandle(new ProfileHandle('signed-handle')),
+    ).resolves.toEqual([expect.objectContaining({ cid })]);
+  });
+
+  it('should not route device authorization from unsigned replicated references', async () => {
+    const victimIdentityId = new IdentityMother().id.valueOf();
+    const attackerNetworkId = '123e4567-e89b-12d3-a456-426614174999';
+    const cachedHeads = new Map<string, Record<string, unknown>>();
+
+    cachedHeads.set(`identity:${victimIdentityId}`, {
+      cid: 'bafy-unsigned-reference',
+      identityId: victimIdentityId,
+      networkIds: [attackerNetworkId],
+      version: 10_000,
+    });
+    registry.clear();
+    await registry.register(
+      'network-lookup',
+      identityStoresWithIdentityQuery(cachedHeads, jest.fn()),
+    );
+    repository = new OrbitDBIdentityMetadataIndex(registry, ipfsManager);
+
+    await expect(
+      repository.findLatestByNetworkId(new NetworkId(attackerNetworkId)),
+    ).resolves.toEqual([]);
+    await expect(
+      repository.findByIdentityId(new IdentityId(victimIdentityId)),
+    ).resolves.toEqual([]);
+  });
+
+  it('should bind a verified replicated head to the requested identity id', async () => {
+    const attacker = new IdentityMother().build();
+    const attackerPrimitives = attacker.toPrimitives();
+    const victimIdentityId = new IdentityId(
+      'MCowBQYDK2VwAyEA+n7g5mYrSv5WVp+HrWddapvm+7mWpZmglXEcAcXAfTs=',
+    );
+    const cid = 'bafy-attacker-identity';
+    const cachedHeads = new Map<string, Record<string, unknown>>();
+
+    cachedHeads.set(`identity:${victimIdentityId.valueOf()}`, {
+      cid,
+      identity: attackerPrimitives,
+    });
+    registry.clear();
+    await registry.register(
+      'network-lookup',
+      identityStoresWithIdentityQuery(cachedHeads, jest.fn()),
+    );
+    jest
+      .spyOn(ipfsManager, 'calculateJSONId')
+      .mockResolvedValue(new IPFSId(cid));
+    repository = new OrbitDBIdentityMetadataIndex(registry, ipfsManager);
+
+    await expect(
+      repository.findByIdentityId(victimIdentityId),
+    ).resolves.toEqual([]);
+    await expect(
+      repository.findByIdentityId(new IdentityId(attackerPrimitives.id)),
+    ).resolves.toEqual([expect.objectContaining({ cid, identity: attacker })]);
+  });
+
+  it('should retain concurrent canonical projections for the same identity', async () => {
+    const mother = new IdentityMother();
+    const firstIdentity = mother.build();
+    const secondIdentity = await mother.buildNext();
+    const firstCid = new IPFSId('bafy-concurrent-first');
+    const secondCid = new IPFSId('bafy-concurrent-second');
+    const firstCalculation = deferred<IPFSId>();
+    const secondCalculation = deferred<IPFSId>();
+
+    jest
+      .spyOn(ipfsManager, 'calculateJSONId')
+      .mockImplementation(async (document: { version: number }) =>
+        document.version === 1
+          ? firstCalculation.promise
+          : secondCalculation.promise,
+      );
+
+    const firstProjection = repository.projectDocument({
+      cid: firstCid.valueOf(),
+      identity: firstIdentity.toPrimitives(),
+      identityId: mother.id.valueOf(),
+      version: 1,
+    });
+    const secondProjection = repository.projectDocument({
+      cid: secondCid.valueOf(),
+      identity: secondIdentity.toPrimitives(),
+      identityId: mother.id.valueOf(),
+      version: 2,
+    });
+
+    secondCalculation.resolve(secondCid);
+    await secondProjection;
+    firstCalculation.resolve(firstCid);
+    await firstProjection;
+
+    const candidates = await repository.findByIdentityId(mother.id);
+
+    expect(candidates.map(({ cid }) => cid)).toEqual([
+      secondCid.valueOf(),
+      firstCid.valueOf(),
     ]);
   });
 
   it('should not project identity metadata with conflicting identity ids', async () => {
     const identityId = new IdentityMother().id.valueOf();
 
-    repository.projectDocument({
+    await repository.projectDocument({
       cid: 'bafyidentity-tampered',
       identity: {
         id: 'MCowBQYDK2VwAyEA+n7g5mYrSv5WVp+HrWddapvm+7mWpZmglXEcAcXAfTs=',
@@ -586,7 +915,7 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     await expect(repository.findAll()).resolves.toEqual([]);
   });
 
-  it('should read persisted identity id heads on cache misses', async () => {
+  it('should reject persisted unsigned identity id heads on cache misses', async () => {
     const mother = new IdentityMother();
     const identity = mother.build();
     const primitives = identity.toPrimitives();
@@ -624,16 +953,11 @@ describe('OrbitDBIdentityMetadataIndex', () => {
       'network-lookup',
       identityStoresWithIdentityQuery(cachedHeads, query),
     );
-    repository = new OrbitDBIdentityMetadataIndex(registry);
+    repository = new OrbitDBIdentityMetadataIndex(registry, ipfsManager);
 
     const records = await repository.findByIdentityId(mother.id);
 
-    expect(records).toEqual([
-      expect.objectContaining({
-        cid: 'bafyidentity-id-http-head',
-        identityId: primitives.id,
-      }),
-    ]);
+    expect(records).toEqual([]);
     expect(query).not.toHaveBeenCalled();
   });
 });

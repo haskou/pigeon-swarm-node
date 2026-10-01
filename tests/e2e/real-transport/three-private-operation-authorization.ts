@@ -1,5 +1,6 @@
 import PrivateCommunityControlApplier from '@app/contexts/communities/application/apply-private-control/PrivateCommunityControlApplier';
 import { Community } from '@app/contexts/communities/domain/Community';
+import DeviceAuthorizationAccessPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationAccessPolicy';
 import { PrivateOperationAcceptMessage } from '@app/contexts/private-authorization/application/accept-operation/messages/PrivateOperationAcceptMessage';
 import { PrivateOperationChallengeMessage } from '@app/contexts/private-authorization/application/accept-operation/messages/PrivateOperationChallengeMessage';
 import PrivateOperationAcceptor from '@app/contexts/private-authorization/application/accept-operation/PrivateOperationAcceptor';
@@ -7,7 +8,7 @@ import PrivateOperationAuthorizer from '@app/contexts/private-authorization/appl
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
 import PrivateControlOperationContract from '@app/contexts/private-authorization/infrastructure/contracts/PrivateControlOperationContract';
-import LegacyIdentityDeviceBinding from '@app/contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
+import Ed25519PrivateDeviceCredentialCodec from '@app/contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec';
 import PrivateControlTransitionVerifier from '@app/contexts/private-authorization/infrastructure/crypto/PrivateControlTransitionVerifier';
 import PrivateFreshnessVerifier from '@app/contexts/private-authorization/infrastructure/crypto/PrivateFreshnessVerifier';
 import PrivateMlsPolicyVerifier from '@app/contexts/private-authorization/infrastructure/crypto/PrivateMlsPolicyVerifier';
@@ -49,7 +50,10 @@ interface ControlPolicy {
 
 interface UnsignedPrivateOperation {
   authorDeviceKey: string;
+  authorIdentityId: string;
   authorizationRevision: number;
+  identityAuthorizationEpoch: string;
+  identityAuthorizationRevision: number;
   kind: string;
   operationId: string;
   payload: Record<string, unknown>;
@@ -59,7 +63,10 @@ interface UnsignedPrivateOperation {
 }
 
 class AuthorizationNode {
-  private readonly identityBinding = new LegacyIdentityDeviceBinding();
+  private readonly credentialCodec = new Ed25519PrivateDeviceCredentialCodec();
+  private readonly deviceAuthorization = {
+    assertAuthorized: () => Promise.resolve(),
+  } as unknown as DeviceAuthorizationAccessPolicy;
   private readonly unitOfWork: LocalPrivateOperationUnitOfWork;
   public readonly acceptor: PrivateOperationAcceptor;
   public readonly database: EmbeddedLocalDatabase;
@@ -85,15 +92,17 @@ class AuthorizationNode {
         this.repository,
         new PrivateOperationVerifier(),
         new PrivateControlOperationContract(),
-        this.identityBinding,
+        this.deviceAuthorization,
+        this.credentialCodec,
       ),
       new InMemoryPrivateFreshnessGate(new PrivateFreshnessVerifier()),
       new VerifiedPrivateControlTransitionProcessor(
         new PrivateControlTransitionVerifier(),
         new PrivateMlsPolicyVerifier(),
-        this.identityBinding,
+        this.deviceAuthorization,
+        this.credentialCodec,
       ),
-      new PrivateCommunityControlApplier(this.identityBinding),
+      new PrivateCommunityControlApplier(),
     );
   }
 
@@ -105,9 +114,7 @@ class AuthorizationNode {
     const ownerDeviceKey = checkpoint.getFreshnessAuthorityKey();
 
     await this.unitOfWork.commitGenesis({
-      ownerIdentityId: new IdentityId(
-        this.identityBinding.identityIdFor(ownerDeviceKey.valueOf()),
-      ),
+      ownerIdentityId: checkpoint.identityFor(ownerDeviceKey),
       projection,
       protectedMlsState: protectedState,
       scope: PrivateAuthorizationScope.pin(
@@ -129,7 +136,11 @@ class AuthorizationNode {
   ): Promise<'accepted' | 'duplicate' | 'pending'> {
     const requestJson = await this.acceptor.challenge(
       new PrivateOperationChallengeMessage(
-        this.identityBinding.identityIdFor(rawDeviceKey(signer)),
+        (
+          JSON.parse(signedOperationJson) as {
+            payload: { authorIdentityId: string };
+          }
+        ).payload.authorIdentityId,
         signedOperationJson,
         controlFrame,
       ),
@@ -201,6 +212,26 @@ const identityId = (key: PrivateKey): string =>
     .export({ format: 'der', type: 'spki' })
     .toString('base64');
 
+const wireOperation = (value: UnsignedPrivateOperation) => {
+  const {
+    authorIdentityId,
+    identityAuthorizationEpoch,
+    identityAuthorizationRevision,
+    payload,
+    ...envelope
+  } = value;
+
+  return {
+    ...envelope,
+    payload: {
+      authorIdentityId,
+      identityAuthorizationEpoch,
+      identityAuthorizationRevision,
+      ...payload,
+    },
+  };
+};
+
 const signedControlTransition = (
   ownerFill: number,
   current: { headHash: string; mlsEpoch: number; revision: number },
@@ -216,7 +247,7 @@ const signedControlTransition = (
       .digest('base64url'),
     mlsEpoch: current.mlsEpoch + 1,
     operationBindingHash: PrivateOperationSignature.bindingHash(
-      JSON.stringify(operation),
+      JSON.stringify(wireOperation(operation)),
     ),
     parentHeadHash: current.headHash,
     policyHash: hash(policy),
@@ -252,8 +283,9 @@ const signedControlTransition = (
 
 const signedOperation = (
   owner: PrivateKey,
-  value: Record<string, unknown>,
-): string => PrivateOperationSignature.sign(JSON.stringify(value), owner);
+  value: UnsignedPrivateOperation,
+): string =>
+  PrivateOperationSignature.sign(JSON.stringify(wireOperation(value)), owner);
 
 async function main(): Promise<void> {
   const root = await fs.mkdtemp(
@@ -294,6 +326,11 @@ async function main(): Promise<void> {
     admittedDeviceKeys: [ownerDeviceKey, targetDeviceKey, spareDeviceKey],
     authorityKeys: [ownerDeviceKey],
     controlCheckpointJson: JSON.stringify(initialControl),
+    deviceIdentities: [
+      { deviceKey: ownerDeviceKey, identityId: ownerIdentityId },
+      { deviceKey: targetDeviceKey, identityId: targetIdentityId },
+      { deviceKey: spareDeviceKey, identityId: ownerIdentityId },
+    ],
     freshnessAuthorityKey: ownerDeviceKey,
     headHash: initialControl.headHash,
     scopeId,
@@ -335,7 +372,10 @@ async function main(): Promise<void> {
     const mutation = { targetIdentityId, type: 'member.ban' };
     const proposal = signedOperation(owner, {
       authorDeviceKey: ownerDeviceKey,
+      authorIdentityId: ownerIdentityId,
       authorizationRevision: 0,
+      identityAuthorizationEpoch: 'genesis',
+      identityAuthorizationRevision: 0,
       kind: 'membership.propose',
       operationId: proposalId,
       payload: {
@@ -357,7 +397,10 @@ async function main(): Promise<void> {
     };
     const commitWithoutHead: UnsignedPrivateOperation = {
       authorDeviceKey: ownerDeviceKey,
+      authorIdentityId: ownerIdentityId,
       authorizationRevision: 0,
+      identityAuthorizationEpoch: 'genesis',
+      identityAuthorizationRevision: 0,
       kind: 'membership.commit',
       operationId: encoded(16, 21),
       payload: {
@@ -412,7 +455,10 @@ async function main(): Promise<void> {
     const revocationId = encoded(16, 24);
     const revocationWithoutHead: UnsignedPrivateOperation = {
       authorDeviceKey: ownerDeviceKey,
+      authorIdentityId: ownerIdentityId,
       authorizationRevision: 1,
+      identityAuthorizationEpoch: 'genesis',
+      identityAuthorizationRevision: 0,
       kind: 'device.revoke',
       operationId: revocationId,
       payload: { deviceKey: spareDeviceKey },
@@ -488,7 +534,10 @@ async function main(): Promise<void> {
 
     const removedOperation = signedOperation(target, {
       authorDeviceKey: targetDeviceKey,
+      authorIdentityId: targetIdentityId,
       authorizationRevision: 1,
+      identityAuthorizationEpoch: 'genesis',
+      identityAuthorizationRevision: 0,
       kind: 'membership.propose',
       operationId: encoded(16, 22),
       payload: {
@@ -504,7 +553,10 @@ async function main(): Promise<void> {
 
     const revokedDeviceOperation = signedOperation(spare, {
       authorDeviceKey: spareDeviceKey,
+      authorIdentityId: ownerIdentityId,
       authorizationRevision: 2,
+      identityAuthorizationEpoch: 'genesis',
+      identityAuthorizationRevision: 0,
       kind: 'membership.propose',
       operationId: encoded(16, 25),
       payload: {
@@ -522,7 +574,10 @@ async function main(): Promise<void> {
 
     const wrongScope = signedOperation(owner, {
       authorDeviceKey: ownerDeviceKey,
+      authorIdentityId: ownerIdentityId,
       authorizationRevision: 2,
+      identityAuthorizationEpoch: 'genesis',
+      identityAuthorizationRevision: 0,
       kind: 'membership.propose',
       operationId: encoded(16, 23),
       payload: {
@@ -540,7 +595,10 @@ async function main(): Promise<void> {
     const historicalForkState = Buffer.from('historical-fork-state');
     const historicalForkOperation: UnsignedPrivateOperation = {
       authorDeviceKey: ownerDeviceKey,
+      authorIdentityId: ownerIdentityId,
       authorizationRevision: 0,
+      identityAuthorizationEpoch: 'genesis',
+      identityAuthorizationRevision: 0,
       kind: 'membership.commit',
       operationId: encoded(16, 26),
       payload: {
@@ -589,7 +647,10 @@ async function main(): Promise<void> {
 
     const equivocation = signedOperation(owner, {
       authorDeviceKey: ownerDeviceKey,
+      authorIdentityId: ownerIdentityId,
       authorizationRevision: 1,
+      identityAuthorizationEpoch: 'genesis',
+      identityAuthorizationRevision: 0,
       kind: 'device.revoke',
       operationId: revocationId,
       payload: {

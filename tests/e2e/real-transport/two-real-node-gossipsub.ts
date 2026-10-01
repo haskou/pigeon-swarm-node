@@ -3,6 +3,7 @@ import 'module-alias/register';
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
@@ -12,9 +13,13 @@ import path from 'path';
 import WebSocket from 'ws';
 
 type IdentityFixture = {
+  authorizationRevision: number;
+  deviceCredential: string;
+  deviceCredentialCommitment: string;
   externalIdentifier?: string;
   id: string;
   keyPair: KeyPair;
+  recoveryAuthority: string;
 };
 
 type NodeRuntime = {
@@ -72,11 +77,15 @@ type CallSignalReceiverContext = {
 };
 
 type IdentityResponse = {
+  authorizationRevision: number;
+  deviceCredential: string;
+  deviceCredentialCommitment: string;
   identityExternalIdentifier: string;
   id: string;
   profile?: {
     handle?: string;
   };
+  recoveryAuthority: string;
   version?: number;
 };
 
@@ -127,7 +136,6 @@ const NODE_ARGS = [
 ];
 const NETWORK_ID = '550e8400-e29b-41d4-a716-446655449999';
 const NETWORK_NAME = 'two-real-node-e2e';
-const PASSWORD = 'NodeE2ESecret1!';
 const REQUEST_TIMEOUT_MS = 15000;
 const WAIT_TIMEOUT_MS = 60000;
 
@@ -439,22 +447,19 @@ async function publishIdentity(
   handle: string,
 ): Promise<IdentityFixture> {
   const keyPair = await KeyPair.generate();
+  const deviceKeyPair = await KeyPair.generate();
+  const recoveryKeyPair = await KeyPair.generate();
+  const deviceCredential = DeviceCredential.fromString(
+    deviceKeyPair.toPrimitives().publicKey,
+  );
   const id = new IdentityId(keyPair.toPrimitives().publicKey).valueOf();
-  const encryptedKeyPair = await keyPair.encryptKeyPair(PASSWORD);
   const timestamp = Date.now();
   const version = 1;
   const signaturePayload = {
-    encryptedKeyPair: encryptedKeyPair.toPrimitives(),
-    encryptedMasterKey: 'v1.e2e.encrypted-master-key',
+    authorizationRevision: 0,
+    deviceCredential: deviceCredential.valueOf(),
+    deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),
     id,
-    masterKeyDerivation: {
-      passkeyPrf: {
-        algorithm: 'webauthn-prf',
-        credentialId: `${handle}-credential-id`,
-        salt: `${handle}-salt`,
-        version: 1,
-      },
-    },
     networks: [NETWORK_ID],
     previousIdentityExternalIdentifier: undefined as string | undefined,
     profile: {
@@ -464,6 +469,7 @@ async function publishIdentity(
       name,
       picture: undefined as string | undefined,
     },
+    recoveryAuthority: recoveryKeyPair.toPrimitives().publicKey,
     timestamp,
     version,
   };
@@ -479,9 +485,13 @@ async function publishIdentity(
   );
 
   return {
+    authorizationRevision: response.authorizationRevision,
+    deviceCredential: response.deviceCredential,
+    deviceCredentialCommitment: response.deviceCredentialCommitment,
     externalIdentifier: response.identityExternalIdentifier,
     id: response.id,
     keyPair,
+    recoveryAuthority: response.recoveryAuthority,
   };
 }
 
@@ -492,19 +502,11 @@ async function updateIdentity(
   name: string,
   handle: string,
 ): Promise<IdentityFixture> {
-  const encryptedKeyPair = await identity.keyPair.encryptKeyPair(PASSWORD);
   const signaturePayload = {
-    encryptedKeyPair: encryptedKeyPair.toPrimitives(),
-    encryptedMasterKey: 'v1.test.encrypted-master-key',
+    authorizationRevision: identity.authorizationRevision,
+    deviceCredential: identity.deviceCredential,
+    deviceCredentialCommitment: identity.deviceCredentialCommitment,
     id: identity.id,
-    masterKeyDerivation: {
-      passkeyPrf: {
-        algorithm: 'webauthn-prf',
-        credentialId: 'test-credential-id',
-        salt: 'test-salt',
-        version: 1,
-      },
-    },
     networks: [NETWORK_ID],
     previousIdentityExternalIdentifier: identity.externalIdentifier,
     profile: {
@@ -514,6 +516,7 @@ async function updateIdentity(
       name,
       picture: undefined as string | undefined,
     },
+    recoveryAuthority: identity.recoveryAuthority,
     timestamp: Date.now(),
     version,
   };
@@ -532,9 +535,13 @@ async function updateIdentity(
   );
 
   return {
+    authorizationRevision: response.authorizationRevision,
+    deviceCredential: response.deviceCredential,
+    deviceCredentialCommitment: response.deviceCredentialCommitment,
     externalIdentifier: response.identityExternalIdentifier,
     id: response.id,
     keyPair: identity.keyPair,
+    recoveryAuthority: response.recoveryAuthority,
   };
 }
 

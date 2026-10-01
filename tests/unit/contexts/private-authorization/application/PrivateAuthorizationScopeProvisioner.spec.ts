@@ -6,8 +6,16 @@ import { PrivateAuthorizationScopeProvisionStatus } from '@app/contexts/private-
 import { PrivateAuthorizationScopeProvisionMessage } from '@app/contexts/private-authorization/application/provision-scope/messages/PrivateAuthorizationScopeProvisionMessage';
 import { PrivateOperationUnitOfWork } from '@app/contexts/private-authorization/application/PrivateOperationUnitOfWork';
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
-import { PrivateIdentityBinding } from '@app/contexts/private-authorization/domain/services/PrivateIdentityBinding';
+import DeviceAuthorizationAccessPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationAccessPolicy';
+import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
+import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
+import { PrivateDeviceCredentialCodec } from '@app/contexts/private-authorization/domain/services/PrivateDeviceCredentialCodec';
+import { PrivateGenesisJson } from '@app/contexts/private-authorization/domain/value-objects/PrivateGenesisJson';
+import { PrivateGenesisProjection } from '@app/contexts/private-authorization/domain/value-objects/PrivateGenesisProjection';
+import { PrivateProtectedMlsState } from '@app/contexts/private-authorization/domain/value-objects/PrivateProtectedMlsState';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { Buffer } from 'buffer';
 import { generateKeyPairSync } from 'crypto';
 import { mock } from 'jest-mock-extended';
 
@@ -18,7 +26,20 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
   const checkpoint = PrivateAuthorizationCheckpoint.genesis({
     admittedDeviceKeys: ['owner-device'],
     authorityKeys: ['owner-device'],
-    controlCheckpointJson: '{}',
+    controlCheckpointJson: JSON.stringify({
+      policy: {
+        devices: [
+          {
+            deviceKey: 'owner-device',
+            identityId: ownerIdentityId,
+            mlsCredentialHash: 'credential',
+          },
+        ],
+      },
+    }),
+    deviceIdentities: [
+      { deviceKey: 'owner-device', identityId: ownerIdentityId },
+    ],
     freshnessAuthorityKey: 'owner-device',
     headHash: 'head',
     scopeId: 'scope',
@@ -28,40 +49,58 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
     genesisHash: 'genesis-hash',
   };
   const projection = { id: 'scope', ownerIdentityId };
+  const protectedMlsState = Buffer.from('protected-state').toString('base64url');
   const authenticator = mock<PrivateGenesisAuthenticator>();
   const projectionAuthorizer = mock<PrivateGenesisProjectionAuthorizer>();
-  const identityBinding = mock<PrivateIdentityBinding>();
+  const deviceAuthorization = mock<DeviceAuthorizationAccessPolicy>();
+  const credentialCodec = mock<PrivateDeviceCredentialCodec>();
   const unitOfWork = mock<PrivateOperationUnitOfWork>();
   const provisioner = new PrivateAuthorizationScopeProvisioner(
     authenticator,
     projectionAuthorizer,
-    identityBinding,
+    deviceAuthorization,
+    credentialCodec,
     unitOfWork,
   );
 
   beforeEach(() => {
     jest.clearAllMocks();
-    identityBinding.bind.mockReturnValue('owner-device');
+    credentialCodec.toCredential.mockReturnValue(
+      DeviceCredential.fromIdentityId(new IdentityId(ownerIdentityId)),
+    );
     authenticator.verify.mockReturnValue(verifiedGenesis);
     projectionAuthorizer.authorize.mockReturnValue(projection);
     unitOfWork.commitGenesis.mockResolvedValue('committed');
   });
 
   it('verifies, authorizes and atomically commits an authenticated genesis', async () => {
+    const message = new PrivateAuthorizationScopeProvisionMessage(
+      ownerIdentityId,
+      'genesis',
+      0,
+      'owner-device',
+      'signed-genesis',
+      protectedMlsState,
+      projection,
+    );
+
+    expect(message.signedGenesisJson).toBeInstanceOf(PrivateGenesisJson);
+    expect(message.protectedMlsState).toBeInstanceOf(PrivateProtectedMlsState);
+    expect(message.projection).toBeInstanceOf(PrivateGenesisProjection);
     await expect(
-      provisioner.provision(
-        new PrivateAuthorizationScopeProvisionMessage(
-          ownerIdentityId,
-          'signed-genesis',
-          'protected-state',
-          projection,
-        ),
-      ),
+      provisioner.provision(message),
     ).resolves.toEqual(PrivateAuthorizationScopeProvisionStatus.ACCEPTED);
     expect(authenticator.verify).toHaveBeenCalledWith(
       'signed-genesis',
       'owner-device',
-      'protected-state',
+      protectedMlsState,
+      new IdentityId(ownerIdentityId),
+    );
+    expect(deviceAuthorization.assertAuthorized).toHaveBeenCalledWith(
+      new IdentityId(ownerIdentityId),
+      DeviceCredential.fromIdentityId(new IdentityId(ownerIdentityId)),
+      DeviceAuthorizationEpoch.genesis(),
+      DeviceAuthorizationRevision.initial(),
     );
     expect(projectionAuthorizer.authorize).toHaveBeenCalledWith(
       checkpoint.getScopeId(),
@@ -71,7 +110,7 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
     expect(unitOfWork.commitGenesis).toHaveBeenCalledWith({
       ownerIdentityId: new IdentityId(ownerIdentityId),
       projection,
-      protectedMlsState: 'protected-state',
+      protectedMlsState,
       scope: expect.objectContaining({}),
     });
   });
@@ -83,8 +122,11 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
       provisioner.provision(
         new PrivateAuthorizationScopeProvisionMessage(
           ownerIdentityId,
+          'genesis',
+          0,
+          'owner-device',
           'signed-genesis',
-          'protected-state',
+          protectedMlsState,
           projection,
         ),
       ),
@@ -100,8 +142,11 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
       provisioner.provision(
         new PrivateAuthorizationScopeProvisionMessage(
           ownerIdentityId,
+          'genesis',
+          0,
+          'owner-device',
           'signed-genesis',
-          'protected-state',
+          protectedMlsState,
           projection,
         ),
       ),

@@ -785,6 +785,17 @@ export class HeliaRuntimeAdapter {
     );
   }
 
+  public async createJsonSha256Cid(data: unknown): Promise<MultiformatsCid> {
+    const [cidModule, jsonCodecModule, sha2Module] = await Promise.all([
+      this.loadCidModule(),
+      this.loadJsonCodecModule(),
+      this.loadSha2Module(),
+    ]);
+    const hash = await sha2Module.sha256.digest(jsonCodecModule.encode(data));
+
+    return cidModule.CID.createV1(jsonCodecModule.code, hash);
+  }
+
   public async createPreSharedKey(
     config: Parameters<typeof preSharedKey>[0],
   ): Promise<ReturnType<typeof preSharedKey>> {

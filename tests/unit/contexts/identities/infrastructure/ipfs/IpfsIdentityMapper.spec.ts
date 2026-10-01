@@ -18,10 +18,22 @@ describe('IpfsIdentityMapper', () => {
 
       const document = mapper.toDocument(identity);
 
+      expect(document).toEqual(
+        expect.objectContaining({
+          authorizationRevision: 0,
+          deviceCredential: expect.any(String),
+          deviceCredentialCommitment: expect.any(String),
+          recoveryAuthority: expect.any(String),
+        }),
+      );
+      expect(document).not.toHaveProperty('encryptedKeyPair');
+      expect(document).not.toHaveProperty('encryptedMasterKey');
+      expect(document).not.toHaveProperty('masterKeyDerivation');
       expect(document._id).toBe(primitives.id);
-      expect(document.encryptedKeyPair).toEqual(primitives.encryptedKeyPair);
       expect(document.networks).toEqual(primitives.networks);
-      expect(document.previousCid).toBe(primitives.previousIdentityExternalIdentifier);
+      expect(document.previousCid).toBe(
+        primitives.previousIdentityExternalIdentifier,
+      );
       expect(document.profile).toEqual(primitives.profile);
       expect(document.signature).toBe(primitives.signature);
       expect(document.timestamp).toBe(primitives.timestamp);
@@ -35,12 +47,13 @@ describe('IpfsIdentityMapper', () => {
       const primitives = identity.toPrimitives();
       const document: IpfsIdentityDocument = {
         _id: primitives.id,
-        encryptedKeyPair: primitives.encryptedKeyPair,
-        encryptedMasterKey: primitives.encryptedMasterKey,
-        masterKeyDerivation: primitives.masterKeyDerivation,
+        authorizationRevision: primitives.authorizationRevision,
+        deviceCredential: primitives.deviceCredential,
+        deviceCredentialCommitment: primitives.deviceCredentialCommitment,
         networks: primitives.networks,
         previousCid: primitives.previousIdentityExternalIdentifier,
         profile: primitives.profile,
+        recoveryAuthority: primitives.recoveryAuthority,
         signature: primitives.signature,
         timestamp: primitives.timestamp,
         version: primitives.version,

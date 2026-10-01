@@ -1,14 +1,10 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
-import { PrimitiveOf } from '@haskou/value-objects';
+import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
 
 export class IdentityPublishMessage {
   public readonly identity: Identity;
 
-  constructor(
-    primitives: Omit<PrimitiveOf<Identity>, 'masterKeyDerivation'> & {
-      masterKeyDerivation: Record<string, unknown>;
-    },
-  ) {
+  constructor(primitives: IdentityPrimitives) {
     this.identity = Identity.fromSignedPublication(primitives);
   }
 }

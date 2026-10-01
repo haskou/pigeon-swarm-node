@@ -13,6 +13,8 @@ export default abstract class IdentityMetadataIndex {
 
   public abstract findAll(): Promise<IdentityMetadataRecord[]>;
 
+  public abstract findAllCanonical(): Promise<IdentityMetadataRecord[]>;
+
   public abstract findByHandle(
     handle: ProfileHandle,
   ): Promise<IdentityMetadataRecord[]>;

@@ -1,343 +1,199 @@
-import { IdentityCannotLeaveNetworkError } from '@app/contexts/identities/domain/errors/IdentityCannotLeaveNetworkError';
 import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
 import { InvalidIdentitySignatureError } from '@app/contexts/identities/domain/errors/InvalidIdentitySignatureError';
-import { InvalidProfileBannerError } from '@app/contexts/identities/domain/errors/InvalidProfileBannerError';
-import { InvalidProfileImageError } from '@app/contexts/identities/domain/errors/InvalidProfileImageError';
-import { IdentityWasUpdatedEvent } from '@app/contexts/identities/domain/events/IdentityWasUpdatedEvent';
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
 import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { Profile } from '@app/contexts/identities/domain/Profile';
-import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
-import { IdentitySigningKey } from '@app/contexts/identities/domain/value-objects/IdentitySigningKey';
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
+import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
+import { InvalidProfileBannerError } from '@app/contexts/identities/domain/errors/InvalidProfileBannerError';
+import { InvalidProfileImageError } from '@app/contexts/identities/domain/errors/InvalidProfileImageError';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import { faker } from '@faker-js/faker';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
-import { PrimitiveOf } from '@haskou/value-objects';
 
 import { IdentityMother } from '../../../mothers/IdentityMother';
 
-describe('Identity', () => {
+describe(Identity.name, () => {
   let mother: IdentityMother;
-  const validPassword = 'Valid-password11!';
 
   beforeEach(() => {
     mother = new IdentityMother();
   });
 
-  describe('build from mother', () => {
-    it('should create an identity with a valid signature', () => {
-      const identity = mother.build();
-      const primitives = identity.toPrimitives();
+  it('publishes only public genesis authorization material', () => {
+    const primitives = mother.build().toPrimitives();
 
-      expect(primitives.id).toBeDefined();
-      expect(primitives.id).toBe(mother.id.valueOf());
-      expect(primitives.profile).toEqual(mother.profile.toPrimitives());
-      expect(primitives.networks).toEqual(
-        mother.networks.map((network) => network.valueOf()),
-      );
-      expect(primitives.previousIdentityExternalIdentifier).toBeUndefined();
-      expect(primitives.signature).toBeDefined();
-      expect(primitives.timestamp).toBe(mother.timestamp.valueOf());
-      expect(primitives.version).toBe(mother.version.valueOf());
-      expect(primitives.encryptedKeyPair).toEqual(
-        mother.encryptedKeyPair.toPrimitives(),
-      );
-      expect(primitives.encryptedMasterKey).toBe(
-        mother.encryptedMasterKey.valueOf(),
-      );
-      expect(primitives.masterKeyDerivation).toEqual(
-        mother.masterKeyDerivation.toPrimitives(),
-      );
+    expect(primitives).toEqual({
+      authorizationRevision: mother.authorizationRevision.valueOf(),
+      deviceCredential: mother.deviceCredential.valueOf(),
+      deviceCredentialCommitment: mother.deviceCredentialCommitment.valueOf(),
+      id: mother.id.valueOf(),
+      networks: mother.networks.map((network) => network.valueOf()),
+      previousIdentityExternalIdentifier: undefined,
+      profile: mother.profile.toPrimitives(),
+      recoveryAuthority: mother.recoveryAuthority.valueOf(),
+      signature: mother.signature.valueOf(),
+      timestamp: mother.timestamp.valueOf(),
+      version: mother.version.valueOf(),
     });
+    expect(primitives).not.toHaveProperty('encryptedKeyPair');
+    expect(primitives).not.toHaveProperty('encryptedMasterKey');
+    expect(primitives).not.toHaveProperty('masterKeyDerivation');
+    expect(primitives.deviceCredential).not.toBe(primitives.id);
+  });
 
-    it('should create an identity from valid primitives', () => {
-      const identity = mother.build();
-      const primitives = identity.toPrimitives();
+  it('restores a valid signed publication', () => {
+    const primitives = mother.build().toPrimitives();
 
-      const restored = Identity.fromPrimitives(primitives);
+    expect(Identity.fromPrimitives(primitives).toPrimitives()).toEqual(
+      primitives,
+    );
+  });
 
-      expect(restored.toPrimitives()).toEqual(primitives);
-    });
+  it.each([
+    [
+      'timestamp',
+      (value: Omit<IdentityPrimitives, 'signature'>) => ({
+        ...value,
+        timestamp: value.timestamp + 1,
+      }),
+    ],
+    [
+      'version',
+      (value: Omit<IdentityPrimitives, 'signature'>) => ({
+        ...value,
+        version: value.version + 1,
+      }),
+    ],
+    [
+      'authorization revision',
+      (value: Omit<IdentityPrimitives, 'signature'>) => ({
+        ...value,
+        authorizationRevision: value.authorizationRevision + 1,
+      }),
+    ],
+    [
+      'recovery authority',
+      (value: Omit<IdentityPrimitives, 'signature'>) => ({
+        ...value,
+        recoveryAuthority:
+          '-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAPW21iqKutjL6ohU77RAPxYEsgrH6RPDhawLJC+DHmZw=\n-----END PUBLIC KEY-----\n',
+      }),
+    ],
+  ])('rejects a tampered %s', (_, tamper) => {
+    const primitives = mother.build().toPrimitives();
 
-    it('should throw InvalidIdentitySignatureError with tampered primitives', () => {
-      const identity = mother.build();
-      const primitives = identity.toPrimitives();
-      const tampered: PrimitiveOf<Identity> = {
+    expect(() =>
+      Identity.fromPrimitives({
+        ...tamper(primitives),
+        signature: primitives.signature,
+      }),
+    ).toThrow(InvalidIdentitySignatureError);
+  });
+
+  it('rejects a credential commitment that does not identify the genesis key', () => {
+    const primitives = mother.build().toPrimitives();
+
+    expect(() =>
+      Identity.fromPrimitives({
         ...primitives,
-        timestamp: primitives.timestamp + 1,
-      };
+        deviceCredentialCommitment: '0'.repeat(64),
+      }),
+    ).toThrow(InvalidIdentitySignatureError);
+  });
 
-      expect(() => Identity.fromPrimitives(tampered)).toThrow(
-        InvalidIdentitySignatureError,
-      );
-    });
+  it('rejects a publication signed by another device credential', async () => {
+    const attacker = await KeyPair.generate();
+    const victim = await KeyPair.generate();
+    const victimCredential = DeviceCredential.fromString(
+      victim.toPrimitives().publicKey,
+    );
+    const unsigned: Omit<IdentityPrimitives, 'signature'> = {
+      authorizationRevision: 0,
+      deviceCredential: victimCredential.valueOf(),
+      deviceCredentialCommitment: victimCredential.getCommitment().valueOf(),
+      id: new IdentityId(victim.toPrimitives().publicKey).valueOf(),
+      networks: mother.networks.map((network) => network.valueOf()),
+      previousIdentityExternalIdentifier: undefined,
+      profile: new Profile(new ProfileName('Mallory')).toPrimitives(),
+      recoveryAuthority: mother.recoveryAuthority.valueOf(),
+      timestamp: mother.timestamp.valueOf(),
+      version: 1,
+    };
+    const signature = attacker.sign(
+      new IdentitySignatureDomainService().getCanonicalSigningContent(
+        IdentitySignaturePayload.fromPrimitives(unsigned),
+      ),
+    );
 
-    it('should throw InvalidIdentitySignatureError when version is tampered', () => {
-      const identity = mother.build();
-      const primitives = identity.toPrimitives();
-      const tampered: PrimitiveOf<Identity> = {
-        ...primitives,
-        version: primitives.version + 1,
-      };
-
-      expect(() => Identity.fromPrimitives(tampered)).toThrow(
-        InvalidIdentitySignatureError,
-      );
-    });
-
-    it('should throw InvalidIdentitySignatureError when encrypted master key is tampered', () => {
-      const identity = mother.build();
-      const primitives = identity.toPrimitives();
-      const tampered: PrimitiveOf<Identity> = {
-        ...primitives,
-        encryptedMasterKey: 'tampered-encrypted-master-key',
-      };
-
-      expect(() => Identity.fromPrimitives(tampered)).toThrow(
-        InvalidIdentitySignatureError,
-      );
-    });
-
-    it('should throw InvalidIdentitySignatureError when master key derivation is tampered', () => {
-      const identity = mother.build();
-      const primitives = identity.toPrimitives();
-      const tampered: PrimitiveOf<Identity> = {
-        ...primitives,
-        masterKeyDerivation: {
-          ...primitives.masterKeyDerivation,
-          version: 2,
-        },
-      };
-
-      expect(() => Identity.fromPrimitives(tampered)).toThrow(
-        InvalidIdentitySignatureError,
-      );
-    });
-
-    it('should preserve recovery key metadata without requiring passkey PRF metadata', async () => {
-      const masterKeyDerivation = {
-        algorithm: 'scrypt',
-        N: 262144,
-        r: 8,
-        p: 1,
-        salt: 'fixture-recovery-salt',
-        version: 1,
-        recoveryKey: {
-          algorithm: 'pigeon-recovery-key',
-          version: 1,
-        },
-      };
-      const signaturePayload: Omit<PrimitiveOf<Identity>, 'signature'> = {
-        encryptedKeyPair: mother.encryptedKeyPair.toPrimitives(),
-        encryptedMasterKey: mother.encryptedMasterKey.valueOf(),
-        id: mother.id.valueOf(),
-        masterKeyDerivation,
-        networks: mother.networks.map((network) => network.valueOf()),
-        previousIdentityExternalIdentifier:
-          mother.previousIdentityExternalIdentifier?.valueOf(),
-        profile: mother.profile.toPrimitives(),
-        timestamp: mother.timestamp.valueOf(),
-        version: mother.version.valueOf(),
-      };
-      const signature =
-        await new IdentitySignatureDomainService().generateSignature(
-          IdentitySignaturePayload.fromPrimitives(signaturePayload),
-          new IdentitySigningKey(mother.encryptedKeyPair),
-          mother.password,
-        );
-
-      const identity = Identity.fromPrimitives({
-        ...signaturePayload,
+    expect(() =>
+      Identity.fromPrimitives({
+        ...unsigned,
         signature: signature.valueOf(),
-      });
+      }),
+    ).toThrow(InvalidIdentitySignatureError);
+  });
 
-      expect(identity.toPrimitives().masterKeyDerivation).toEqual(
-        masterKeyDerivation,
+  it.each(['identity', 'device'] as const)(
+    'rejects a recovery authority reused as the %s signing key',
+    async (role) => {
+      const identity = await KeyPair.generate();
+      const device = await KeyPair.generate();
+      const deviceCredential = DeviceCredential.fromString(
+        device.toPrimitives().publicKey,
       );
-    });
-
-    it('should throw InvalidIdentitySignatureError when previousIdentityExternalIdentifier is tampered', () => {
-      const identity = mother.build();
-      const primitives = identity.toPrimitives();
-      const tampered: PrimitiveOf<Identity> = {
-        ...primitives,
-        previousIdentityExternalIdentifier: 'bafytamperedidentity',
+      const id = new IdentityId(identity.toPrimitives().publicKey);
+      const recoveryAuthority = RecoveryAuthority.fromString(
+        role === 'identity'
+          ? identity.toPrimitives().publicKey
+          : device.toPrimitives().publicKey,
+      );
+      const unsigned: Omit<IdentityPrimitives, 'signature'> = {
+        ...mother.build().toPrimitives(),
+        deviceCredential: deviceCredential.valueOf(),
+        deviceCredentialCommitment: deviceCredential
+          .getCommitment()
+          .valueOf(),
+        id: id.valueOf(),
+        recoveryAuthority: recoveryAuthority.valueOf(),
       };
-
-      expect(() => Identity.fromPrimitives(tampered)).toThrow(
-        InvalidIdentitySignatureError,
-      );
-    });
-
-    it('should reject a payload signed by a different key than the identity id', async () => {
-      const attackerKeyPair = await KeyPair.generate();
-      const victimKeyPair = await KeyPair.generate();
-      const encryptedKeyPair = await attackerKeyPair.encryptKeyPair(
-        validPassword,
-      );
-      const victimIdentityId = new IdentityId(
-        victimKeyPair.toPrimitives().publicKey,
-      );
-      const previousIdentityExternalIdentifier: string | undefined = undefined;
-      const signaturePayload = {
-        encryptedKeyPair: encryptedKeyPair.toPrimitives(),
-        encryptedMasterKey: 'v1.test.encrypted-master-key',
-        id: victimIdentityId.valueOf(),
-        masterKeyDerivation: {
-          passkeyPrf: {
-            algorithm: 'webauthn-prf',
-            credentialId: 'test-credential-id',
-            salt: 'test-salt',
-            version: 1,
-          },
-        },
-        networks: [new NetworkId(faker.string.uuid()).valueOf()],
-        previousIdentityExternalIdentifier,
-        profile: new Profile(new ProfileName('Mallory')).toPrimitives(),
-        timestamp: 1773848829055,
-        version: 1,
-      };
-      const spoofedPrimitives: PrimitiveOf<Identity> = {
-        ...signaturePayload,
-        signature: '',
-      };
-      const spoofedSignature = attackerKeyPair.sign(
+      const signature = identity.sign(
         new IdentitySignatureDomainService().getCanonicalSigningContent(
-          IdentitySignaturePayload.fromPrimitives(spoofedPrimitives),
+          IdentitySignaturePayload.fromPrimitives(unsigned),
         ),
       );
 
       expect(() =>
         Identity.fromPrimitives({
-          ...spoofedPrimitives,
-          signature: spoofedSignature.valueOf(),
+          ...unsigned,
+          signature: signature.valueOf(),
         }),
       ).toThrow(InvalidIdentitySignatureError);
-    });
+    },
+  );
 
-    it('should return correct primitives', () => {
-      const identity = mother.build();
-
-      expect(identity.toPrimitives()).toEqual({
-        encryptedKeyPair: mother.encryptedKeyPair.toPrimitives(),
-        encryptedMasterKey: mother.encryptedMasterKey.valueOf(),
-        id: mother.id.valueOf(),
-        masterKeyDerivation: mother.masterKeyDerivation.toPrimitives(),
-        networks: mother.networks.map((network) => network.valueOf()),
-        previousIdentityExternalIdentifier:
-          mother.previousIdentityExternalIdentifier?.valueOf(),
-        profile: mother.profile.toPrimitives(),
-        signature: mother.signature.valueOf(),
-        timestamp: mother.timestamp.valueOf(),
-        version: mother.version.valueOf(),
-      });
-    });
+  it('rejects embedded data URL profile images', () => {
+    expect(() =>
+      Profile.fromPrimitives({
+        banner: undefined,
+        biography: undefined,
+        handle: undefined,
+        name: 'Jane',
+        picture: 'data:image/png;base64,aGVsbG8=',
+      }),
+    ).toThrow(InvalidProfileImageError);
   });
 
-  describe('updateProfile', () => {
-    it('should create the next signed identity version', async () => {
-      const identity = mother.build();
-      const previousIdentityExternalIdentifier = new IdentityExternalIdentifier(
-        'bafycurrentidentity',
-      );
-      const profile = new Profile(new ProfileName('Jane'));
-
-      const updatedIdentity = await identity.updateProfile(
-        profile,
-        mother.password,
-        previousIdentityExternalIdentifier,
-      );
-      const primitives = updatedIdentity.toPrimitives();
-
-      expect(primitives.id).toBe(identity.toPrimitives().id);
-      expect(primitives.profile).toEqual(profile.toPrimitives());
-      expect(primitives.previousIdentityExternalIdentifier).toBe(
-        previousIdentityExternalIdentifier.valueOf(),
-      );
-      expect(primitives.version).toBe(2);
-      expect(updatedIdentity.usesSameSigningKeyAs(identity)).toBe(true);
-      expect(updatedIdentity.pullDomainEvents()[0]).toBeInstanceOf(
-        IdentityWasUpdatedEvent,
-      );
-    });
-  });
-
-  describe('profile image', () => {
-    it('should reject embedded data URL profile images', () => {
-      expect(() =>
-        Profile.fromPrimitives({
-          banner: undefined,
-          biography: undefined,
-          handle: undefined,
-          name: 'Jane',
-          picture: 'data:image/png;base64,aGVsbG8=',
-        }),
-      ).toThrow(InvalidProfileImageError);
-    });
-
-    it('should reject embedded data URL banners', () => {
-      expect(() =>
-        Profile.fromPrimitives({
-          banner: 'data:image/png;base64,aGVsbG8=',
-          biography: undefined,
-          handle: undefined,
-          name: 'Jane',
-          picture: undefined,
-        }),
-      ).toThrow(InvalidProfileBannerError);
-    });
-  });
-
-  describe('updateNetworks', () => {
-    it('should create the next signed identity with new networks', async () => {
-      const identity = mother.build();
-      const previousIdentityExternalIdentifier = new IdentityExternalIdentifier(
-        'bafycurrentidentity',
-      );
-      const networks = [
-        ...mother.networks,
-        new NetworkId(faker.string.uuid()),
-        new NetworkId(faker.string.uuid()),
-      ];
-
-      const updatedIdentity = await identity.updateNetworks(
-        networks,
-        mother.password,
-        previousIdentityExternalIdentifier,
-      );
-      const primitives = updatedIdentity.toPrimitives();
-
-      expect(primitives.networks).toEqual(
-        networks.map((network) => network.valueOf()),
-      );
-      expect(primitives.previousIdentityExternalIdentifier).toBe(
-        previousIdentityExternalIdentifier.valueOf(),
-      );
-      expect(primitives.version).toBe(2);
-      expect(updatedIdentity.pullDomainEvents()[0]).toBeInstanceOf(
-        IdentityWasUpdatedEvent,
-      );
-    });
-
-    it('should throw IdentityCannotLeaveNetworkError when a network is removed', async () => {
-      const firstAdditionalNetwork = new NetworkId(faker.string.uuid());
-      const secondAdditionalNetwork = new NetworkId(faker.string.uuid());
-      const identity = mother.build();
-      const identityWithAdditionalNetworks = await identity.updateNetworks(
-        [...mother.networks, firstAdditionalNetwork, secondAdditionalNetwork],
-        mother.password,
-        new IdentityExternalIdentifier('bafycurrentidentity'),
-      );
-
-      await expect(
-        identityWithAdditionalNetworks.updateNetworks(
-          [firstAdditionalNetwork, secondAdditionalNetwork],
-          mother.password,
-          new IdentityExternalIdentifier('bafynextidentity'),
-        ),
-      ).rejects.toThrow(IdentityCannotLeaveNetworkError);
-    });
+  it('rejects embedded data URL banners', () => {
+    expect(() =>
+      Profile.fromPrimitives({
+        banner: 'data:image/png;base64,aGVsbG8=',
+        biography: undefined,
+        handle: undefined,
+        name: 'Jane',
+        picture: undefined,
+      }),
+    ).toThrow(InvalidProfileBannerError);
   });
 });

@@ -3,15 +3,21 @@ import PrivateControlTransitionVerifier from '@app/contexts/private-authorizatio
 import PrivateFreshnessVerifier from '@app/contexts/private-authorization/infrastructure/crypto/PrivateFreshnessVerifier';
 import PrivateGenesisVerifier from '@app/contexts/private-authorization/infrastructure/crypto/PrivateGenesisVerifier';
 import PrivateOperationVerifier from '@app/contexts/private-authorization/infrastructure/crypto/PrivateOperationVerifier';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import {
   PrivateControlSignature,
   PrivateFreshnessProof,
   PrivateGenesisSignature,
   PrivateOperationSignature,
 } from '@haskou/pigeon-swarm-crypto';
-import { createHash } from 'crypto';
+import { createHash, generateKeyPairSync } from 'crypto';
 
 describe('private authorization cryptography adapters', () => {
+  const ownerIdentityId = new IdentityId(
+    generateKeyPairSync('ed25519')
+      .publicKey.export({ format: 'der', type: 'spki' })
+      .toString('base64'),
+  );
   afterEach(() => jest.restoreAllMocks());
 
   it('verifies an operation only against the independently expected key', () => {
@@ -53,6 +59,7 @@ describe('private authorization cryptography adapters', () => {
         JSON.stringify({ mlsContextHash, scopeId: 'scope' }),
         'owner',
         protectedState.toString('base64url'),
+        ownerIdentityId,
       ),
     ).toMatchObject({
       checkpoint: expect.any(Object),
@@ -135,6 +142,7 @@ describe('private authorization cryptography adapters', () => {
           JSON.stringify({ mlsContextHash: 'context', scopeId: 'scope' }),
           'owner',
           Buffer.from('state').toString('base64url'),
+          ownerIdentityId,
         ),
     ],
   ])('redacts underlying cryptographic failures', (target, invoke) => {

@@ -30,6 +30,17 @@ class TestNodeDomainEvent extends DomainEvent {
 }
 
 describe('WebSocketEventHub', () => {
+  it('terminates the oldest socket once an identity exceeds its connection cap', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const clients = Array.from({ length: 17 }, () => buildClient());
+
+    clients.forEach((client) => hub.register(identityId, client));
+
+    expect(clients[0].terminate).toHaveBeenCalledTimes(1);
+    expect(clients[1].terminate).not.toHaveBeenCalled();
+  });
+
   it('sends an ack when registering a websocket client', async () => {
     const hub = new WebSocketEventHub();
     const identityId = await generateIdentityId();
@@ -893,6 +904,7 @@ function buildClient(readyState: number = WebSocket.OPEN): WebSocket {
     on: jest.fn(),
     readyState,
     send: jest.fn(),
+    terminate: jest.fn(),
   } as unknown as WebSocket;
 }
 

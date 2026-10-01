@@ -73,10 +73,14 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
     const change = this.exact(value, [
       'type',
       'identityId',
+      'identityAuthorizationEpoch',
+      'identityAuthorizationRevision',
       'deviceKey',
       'mlsCredentialHash',
     ]);
     this.text(change.identityId);
+    this.text(change.identityAuthorizationEpoch);
+    this.revision(change.identityAuthorizationRevision);
     this.encoded(change.deviceKey, 32);
     this.encoded(change.mlsCredentialHash, 32);
 
@@ -115,6 +119,9 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
       'proposalId',
       'parentHeadHash',
       'change',
+      'authorIdentityId',
+      'identityAuthorizationEpoch',
+      'identityAuthorizationRevision',
     ]);
 
     return {
@@ -136,6 +143,9 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
       'resultingHeadHash',
       'mlsMessageHash',
       'change',
+      'authorIdentityId',
+      'identityAuthorizationEpoch',
+      'identityAuthorizationRevision',
     ]);
 
     return {
@@ -152,7 +162,13 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
     control: Record<string, unknown>;
     mutation: Record<string, unknown>;
   } {
-    const value = this.exact(payload, ['deviceKey', 'resultingHeadHash']);
+    const value = this.exact(payload, [
+      'deviceKey',
+      'resultingHeadHash',
+      'authorIdentityId',
+      'identityAuthorizationEpoch',
+      'identityAuthorizationRevision',
+    ]);
 
     return {
       control: {
@@ -228,8 +244,10 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
       const canonical = canonicalize(value);
       assert(canonical, new InvalidPrivateAuthorizationError());
       const mapped = this.controlPayload(value.kind, value.payload);
+      const payload = value.payload as Record<string, unknown>;
       const primitives: PrivateControlOperationPrimitives = {
         authorDeviceKey: this.encoded(value.authorDeviceKey, 32),
+        authorIdentityId: this.text(payload.authorIdentityId),
         authorizationRevision: this.revision(value.authorizationRevision),
         byteSize: Buffer.byteLength(boundedJson, 'utf8'),
         control: mapped.control,
@@ -237,6 +255,12 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
           .update(canonical, 'utf8')
           .digest('base64url'),
         id: this.encoded(value.operationId, 16),
+        identityAuthorizationEpoch: this.text(
+          payload.identityAuthorizationEpoch,
+        ),
+        identityAuthorizationRevision: this.revision(
+          payload.identityAuthorizationRevision,
+        ),
         kind: value.kind as string,
         mutation: mapped.mutation,
         previousOperationIds: this.causalIds(value.previousOperationIds),

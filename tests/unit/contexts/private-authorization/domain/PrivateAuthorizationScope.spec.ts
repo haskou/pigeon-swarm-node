@@ -18,6 +18,10 @@ describe('PrivateAuthorizationScope', () => {
       admittedDeviceKeys: [ownerKey, memberKey],
       authorityKeys: [ownerKey],
       controlCheckpointJson: '{}',
+      deviceIdentities: [
+        { deviceKey: ownerKey, identityId: 'owner' },
+        { deviceKey: memberKey, identityId: 'member' },
+      ],
       freshnessAuthorityKey: ownerKey,
       headHash: 'head-0',
       scopeId,
@@ -27,11 +31,14 @@ describe('PrivateAuthorizationScope', () => {
   ): PrivateControlOperation =>
     PrivateControlOperation.fromPrimitives({
       authorDeviceKey: ownerKey,
+      authorIdentityId: 'identity',
       authorizationRevision: 0,
       byteSize: 512,
       control: { parentHeadHash: 'head-0' },
       digest: 'digest-proposal',
       id: 'proposal',
+      identityAuthorizationEpoch: 'genesis',
+      identityAuthorizationRevision: 0,
       kind: 'membership.propose',
       mutation: { targetIdentityId: 'member', type: 'member.ban' },
       previousOperationIds: [],
@@ -48,6 +55,7 @@ describe('PrivateAuthorizationScope', () => {
       admittedDeviceKeys: [ownerKey],
       authorityKeys: [ownerKey],
       controlCheckpointJson: '{}',
+      deviceIdentities: [{ deviceKey: ownerKey, identityId: 'owner' }],
       freshnessAuthorityKey: ownerKey,
       headHash: 'head-1',
       parentHeadHash: 'head-0',

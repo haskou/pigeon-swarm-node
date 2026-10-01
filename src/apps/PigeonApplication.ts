@@ -18,6 +18,8 @@ import PrivateCommunityControlApplier from '../contexts/communities/application/
 import PrivateCommunityGenesisAuthorizer from '../contexts/communities/application/apply-private-control/PrivateCommunityGenesisAuthorizer';
 import CommunityRepository from '../contexts/communities/domain/repositories/CommunityRepository';
 import CommunityRepositoryRouter from '../contexts/communities/infrastructure/CommunityRepositoryRouter';
+import { DeviceAuthorizationRepository } from '../contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
+import OrbitDBDeviceAuthorizationRepository from '../contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationRepository';
 import NodeNetworkSynchronizationMonitor from '../contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
 import NotificationScopeSettingsRepository from '../contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
@@ -33,9 +35,9 @@ import { PrivateOperationUnitOfWork } from '../contexts/private-authorization/ap
 import { PrivateGenesisAuthenticator } from '../contexts/private-authorization/application/provision-scope/PrivateGenesisAuthenticator';
 import { PrivateGenesisProjectionAuthorizer } from '../contexts/private-authorization/application/provision-scope/PrivateGenesisProjectionAuthorizer';
 import { PrivateAuthorizationRepository } from '../contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
-import { PrivateIdentityBinding } from '../contexts/private-authorization/domain/services/PrivateIdentityBinding';
+import { PrivateDeviceCredentialCodec } from '../contexts/private-authorization/domain/services/PrivateDeviceCredentialCodec';
 import PrivateControlOperationContract from '../contexts/private-authorization/infrastructure/contracts/PrivateControlOperationContract';
-import LegacyIdentityDeviceBinding from '../contexts/private-authorization/infrastructure/crypto/LegacyIdentityDeviceBinding';
+import Ed25519PrivateDeviceCredentialCodec from '../contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec';
 import PrivateGenesisVerifier from '../contexts/private-authorization/infrastructure/crypto/PrivateGenesisVerifier';
 import PrivateOperationVerifier from '../contexts/private-authorization/infrastructure/crypto/PrivateOperationVerifier';
 import VerifiedPrivateControlTransitionProcessor from '../contexts/private-authorization/infrastructure/crypto/VerifiedPrivateControlTransitionProcessor';
@@ -192,6 +194,10 @@ export default class PigeonApplication {
           useClass: InMemoryIdentityPresenceRepository,
         },
         {
+          token: DeviceAuthorizationRepository,
+          useClass: OrbitDBDeviceAuthorizationRepository,
+        },
+        {
           token: PrivateAuthorizationRepository,
           useClass: LocalPrivateAuthorizationRepository,
         },
@@ -216,8 +222,8 @@ export default class PigeonApplication {
           useClass: VerifiedPrivateControlTransitionProcessor,
         },
         {
-          token: PrivateIdentityBinding,
-          useClass: LegacyIdentityDeviceBinding,
+          token: PrivateDeviceCredentialCodec,
+          useClass: Ed25519PrivateDeviceCredentialCodec,
         },
         {
           token: PrivateControlMutationAuthorizer,

@@ -6,7 +6,7 @@ Feature: Client compatibility contract
     Then response code is equal to 200
     And response data should match exactly
       """
-      {"protocol":"pigeon-swarm","apiVersion":1}
+      {"protocol":"pigeon-swarm","apiVersion":2}
       """
     And response header "Cache-Control" should be "no-store"
     And response header "Access-Control-Allow-Origin" should be "*"

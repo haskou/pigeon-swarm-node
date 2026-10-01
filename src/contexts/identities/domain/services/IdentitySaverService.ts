@@ -5,6 +5,12 @@ import { IdentityExternalIdentifier } from '../value-objects/IdentityExternalIde
 export default class IdentitySaverService {
   constructor(private readonly repository: IdentityRepository) {}
 
+  public calculateExternalIdentifier(
+    identity: Identity,
+  ): Promise<IdentityExternalIdentifier> {
+    return this.repository.calculateExternalIdentifier(identity);
+  }
+
   public async save(identity: Identity): Promise<IdentityExternalIdentifier> {
     return this.repository.save(identity);
   }

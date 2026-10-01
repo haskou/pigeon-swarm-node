@@ -40,6 +40,11 @@ type Frame = {
     };
   };
 };
+type Peers = {
+  networkSynchronization: {
+    networks: Array<{ id: string; state: string }>;
+  };
+};
 const pause = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -174,6 +179,20 @@ async function startIsolatedNodes(
     await stopNode(node);
     await startNode(node);
   }
+  await waitFor(
+    async () =>
+      (
+        await Promise.all(
+          nodes.map((node) => request<Peers>(node, 'GET', '/peers/')),
+        )
+      ).every((peers) =>
+        peers.networkSynchronization.networks.some(
+          (network) =>
+            network.id === NETWORK_ID && network.state === 'converged',
+        ),
+      ),
+    'private network synchronization',
+  );
   console.log('Fixture ready: two isolated private nodes');
 }
 

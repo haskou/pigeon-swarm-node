@@ -1,12 +1,13 @@
 import { assert } from '@haskou/value-objects';
 
+import DeviceAuthorizationAccessPolicy from '../../../identity-devices/domain/services/DeviceAuthorizationAccessPolicy';
 import { IdentityId } from '../../../shared/domain/value-objects/IdentityId';
 import { InvalidPrivateAuthorizationError } from '../../domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationCheckpoint } from '../../domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '../../domain/PrivateAuthorizationScope';
 import { PrivateControlOperation } from '../../domain/PrivateControlOperation';
 import { PrivateAuthorizationRepository } from '../../domain/repositories/PrivateAuthorizationRepository';
-import { PrivateIdentityBinding } from '../../domain/services/PrivateIdentityBinding';
+import { PrivateDeviceCredentialCodec } from '../../domain/services/PrivateDeviceCredentialCodec';
 import { AuthenticatedPrivateOperationJson } from '../../domain/value-objects/AuthenticatedPrivateOperationJson';
 import { PrivateAuthorizationDeviceKey } from '../../domain/value-objects/PrivateAuthorizationDeviceKey';
 import { PrivateOperationAuthenticator } from './PrivateOperationAuthenticator';
@@ -17,7 +18,8 @@ export default class PrivateOperationAuthorizer {
     private readonly repository: PrivateAuthorizationRepository,
     private readonly operationVerifier: PrivateOperationAuthenticator,
     private readonly contract: PrivateOperationDecoder,
-    private readonly identityBinding: PrivateIdentityBinding,
+    private readonly deviceAuthorization: DeviceAuthorizationAccessPolicy,
+    private readonly credentialCodec: PrivateDeviceCredentialCodec,
   ) {}
 
   private async scopeFor(
@@ -66,6 +68,17 @@ export default class PrivateOperationAuthorizer {
     }
   }
 
+  private assertAuthorizedDevice(
+    operation: PrivateControlOperation,
+  ): Promise<void> {
+    return this.deviceAuthorization.assertAuthorized(
+      operation.getAuthorIdentityId(),
+      this.credentialCodec.toCredential(operation.getAuthorDeviceKey()),
+      operation.getIdentityAuthorizationEpoch(),
+      operation.getIdentityAuthorizationRevision(),
+    );
+  }
+
   public decode(signedOperationJson: string): PrivateControlOperation {
     return this.contract.decode(signedOperationJson);
   }
@@ -82,9 +95,13 @@ export default class PrivateOperationAuthorizer {
     const checkpoint = scope.getCheckpoint();
 
     assert(
-      checkpoint.admits(routed.getAuthorDeviceKey()),
+      checkpoint.admitsIdentityDevice(
+        routed.getAuthorIdentityId(),
+        routed.getAuthorDeviceKey(),
+      ),
       new InvalidPrivateAuthorizationError(),
     );
+    await this.assertAuthorizedDevice(routed);
 
     return this.verify(
       signedOperationJson,
@@ -110,9 +127,13 @@ export default class PrivateOperationAuthorizer {
         parentCheckpoint
           .getRevision()
           .isEqual(routed.getAuthorizationRevision()) &&
-        parentCheckpoint.admits(routed.getAuthorDeviceKey()),
+        parentCheckpoint.admitsIdentityDevice(
+          routed.getAuthorIdentityId(),
+          routed.getAuthorDeviceKey(),
+        ),
       new InvalidPrivateAuthorizationError(),
     );
+    await this.assertAuthorizedDevice(routed);
 
     return this.verify(
       signedOperationJson,
@@ -127,12 +148,15 @@ export default class PrivateOperationAuthorizer {
     routed: PrivateControlOperation,
     receipt: PrivateControlOperation,
   ): Promise<void> {
+    const scope = await this.scopeFor(routed);
+
     assert(
       receipt.hasSameIdentityAs(routed) &&
-        receipt.isAuthoredBy(routed.getAuthorDeviceKey()),
+        receipt.isAuthoredBy(routed.getAuthorDeviceKey()) &&
+        receipt.isAuthoredByIdentity(routed.getAuthorIdentityId()),
       new InvalidPrivateAuthorizationError(),
     );
-    const scope = await this.scopeFor(routed);
+    await this.assertAuthorizedDevice(routed);
 
     this.verify(
       signedOperationJson,
@@ -146,12 +170,8 @@ export default class PrivateOperationAuthorizer {
     operation: PrivateControlOperation,
     identityId: IdentityId,
   ): void {
-    const callerDeviceKey = new PrivateAuthorizationDeviceKey(
-      this.identityBinding.bind(identityId.valueOf()),
-    );
-
     assert(
-      operation.isAuthoredBy(callerDeviceKey),
+      operation.isAuthoredByIdentity(identityId),
       new InvalidPrivateAuthorizationError(),
     );
   }
