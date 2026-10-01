@@ -93,6 +93,9 @@ async function open(replica: Replica): Promise<void> {
   for (const store of Object.values(replica.stores))
     store.events.on('error', () => undefined);
   replica.registry = new OrbitDBReplicatedStateRegistry();
+  process.env.PIGEON_LOCAL_DB_PATH = path.join(root, replica.name, 'local');
+  const localDatabase = new EmbeddedLocalDatabase();
+
   replica.repository = new OrbitDBDeviceAuthorizationRepository(
     replica.registry,
     new DeviceAuthorizationPolicy(),
@@ -105,7 +108,7 @@ async function open(replica: Replica): Promise<void> {
         },
       ],
     } as IPFSNetworkRegistry,
-    {} as EmbeddedLocalDatabase,
+    localDatabase,
   );
   await replica.registry.register(
     networkId,
