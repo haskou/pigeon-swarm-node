@@ -502,7 +502,16 @@ export abstract class HeliaIPFS implements IPFSConnection {
     options: ContentRetrievalOptions,
     blockstore: Pick<HeliaInstance['blockstore'], 'get'> = this.heliaCore
       .blockstore,
+    limit?: { cid: string; maxBytes: number },
   ): Promise<Uint8Array[]> {
+    let receivedBytes = 0;
+    const assertWithinLimit = (chunk: Uint8Array): void => {
+      receivedBytes += chunk.byteLength;
+
+      if (limit && receivedBytes > limit.maxBytes) {
+        throw new IPFSContentTooLargeError(limit.cid, limit.maxBytes);
+      }
+    };
     const rawBlocks = blockstore.get(
       parsedCid,
       options as NonNullable<Parameters<HeliaInstance['blockstore']['get']>[1]>,
@@ -512,13 +521,18 @@ export abstract class HeliaIPFS implements IPFSConnection {
       const chunks: Uint8Array[] = [];
 
       for await (const rawBlock of rawBlocks) {
+        assertWithinLimit(rawBlock);
         chunks.push(rawBlock);
       }
 
       return chunks;
     }
 
-    return [await (rawBlocks as Promise<Uint8Array> | Uint8Array)];
+    const block = await (rawBlocks as Promise<Uint8Array> | Uint8Array);
+
+    assertWithinLimit(block);
+
+    return [block];
   }
 
   private async getBoundedJSON<T>(
@@ -532,14 +546,11 @@ export abstract class HeliaIPFS implements IPFSConnection {
     const chunks = await this.collectRawBlockBytes(
       parsedCid,
       await this.createContentRetrievalOptions(cid, signal),
+      this.heliaCore.blockstore,
+      { cid: cid.valueOf(), maxBytes },
     );
-    const bytes = Buffer.concat(chunks);
 
-    if (bytes.byteLength > maxBytes) {
-      throw new IPFSContentTooLargeError(cid.valueOf(), maxBytes);
-    }
-
-    return JSON.parse(bytes.toString('utf8')) as T;
+    return JSON.parse(Buffer.concat(chunks).toString('utf8')) as T;
   }
 
   private async localBlockBytes(
@@ -1016,13 +1027,14 @@ export abstract class HeliaIPFS implements IPFSConnection {
     };
 
     if (IPFSCidCodec.isRaw(parsedCid)) {
-      const rawChunks = await this.collectRawBlockBytes(
-        parsedCid,
-        retrievalOptions,
+      chunks.push(
+        ...(await this.collectRawBlockBytes(
+          parsedCid,
+          retrievalOptions,
+          this.heliaCore.blockstore,
+          maxBytes === undefined ? undefined : { cid: cid.valueOf(), maxBytes },
+        )),
       );
-
-      rawChunks.forEach(assertWithinLimit);
-      chunks.push(...rawChunks);
 
       return Buffer.concat(chunks);
     }

@@ -12,24 +12,14 @@ export class SignedRequestReplayGuard {
 
       this.expirationBySignature.delete(key);
     }
-
-    while (
-      this.expirationBySignature.size >= SignedRequestReplayGuard.MAX_ENTRIES
-    ) {
-      const oldest = this.expirationBySignature.keys().next();
-
-      if (oldest.done) {
-        return;
-      }
-
-      this.expirationBySignature.delete(oldest.value);
-    }
   }
 
   /**
    * Records a signature that already passed signature and freshness checks.
    * Returns false when the same signature was accepted before inside its
-   * validity window, i.e. the request is a replay.
+   * validity window, i.e. the request is a replay. At capacity it fails closed
+   * and rejects new signatures: live entries are never evicted, so an attacker
+   * cannot flush an intercepted signature out of the guard to replay it.
    */
   public accept(identityId: string, signature: string): boolean {
     const now = Date.now();
@@ -38,6 +28,12 @@ export class SignedRequestReplayGuard {
     this.prune(now);
 
     if (this.expirationBySignature.has(key)) {
+      return false;
+    }
+
+    if (
+      this.expirationBySignature.size >= SignedRequestReplayGuard.MAX_ENTRIES
+    ) {
       return false;
     }
 
