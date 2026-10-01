@@ -9,6 +9,7 @@ import * as fs from 'fs/promises';
 
 import { IPFSBlockNotFoundOfflineError } from '../errors/IPFSBlockNotFoundOfflineError';
 import { IPFSBlockNotFoundPublicError } from '../errors/IPFSBlockNotFoundPublicError';
+import { IPFSContentTooLargeError } from '../errors/IPFSContentTooLargeError';
 import { Libp2pPrivateKeyLike } from '../networks/adapters/types/Libp2pPrivateKeyLike';
 import {
   heliaRuntimeAdapter,
@@ -501,7 +502,16 @@ export abstract class HeliaIPFS implements IPFSConnection {
     options: ContentRetrievalOptions,
     blockstore: Pick<HeliaInstance['blockstore'], 'get'> = this.heliaCore
       .blockstore,
+    limit?: { cid: string; maxBytes: number },
   ): Promise<Uint8Array[]> {
+    let receivedBytes = 0;
+    const assertWithinLimit = (chunk: Uint8Array): void => {
+      receivedBytes += chunk.byteLength;
+
+      if (limit && receivedBytes > limit.maxBytes) {
+        throw new IPFSContentTooLargeError(limit.cid, limit.maxBytes);
+      }
+    };
     const rawBlocks = blockstore.get(
       parsedCid,
       options as NonNullable<Parameters<HeliaInstance['blockstore']['get']>[1]>,
@@ -511,13 +521,36 @@ export abstract class HeliaIPFS implements IPFSConnection {
       const chunks: Uint8Array[] = [];
 
       for await (const rawBlock of rawBlocks) {
+        assertWithinLimit(rawBlock);
         chunks.push(rawBlock);
       }
 
       return chunks;
     }
 
-    return [await (rawBlocks as Promise<Uint8Array> | Uint8Array)];
+    const block = await (rawBlocks as Promise<Uint8Array> | Uint8Array);
+
+    assertWithinLimit(block);
+
+    return [block];
+  }
+
+  private async getBoundedJSON<T>(
+    cid: IPFSId,
+    maxBytes: number,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
+      cid.valueOf(),
+    );
+    const chunks = await this.collectRawBlockBytes(
+      parsedCid,
+      await this.createContentRetrievalOptions(cid, signal),
+      this.heliaCore.blockstore,
+      { cid: cid.valueOf(), maxBytes },
+    );
+
+    return JSON.parse(Buffer.concat(chunks).toString('utf8')) as T;
   }
 
   private async localBlockBytes(
@@ -971,7 +1004,11 @@ export abstract class HeliaIPFS implements IPFSConnection {
     ]);
   }
 
-  public async getBytes(cid: IPFSId, signal?: AbortSignal): Promise<Buffer> {
+  public async getBytes(
+    cid: IPFSId,
+    signal?: AbortSignal,
+    maxBytes?: number,
+  ): Promise<Buffer> {
     const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
       cid.valueOf(),
     );
@@ -980,10 +1017,23 @@ export abstract class HeliaIPFS implements IPFSConnection {
       signal,
     );
     const chunks: Uint8Array[] = [];
+    let receivedBytes = 0;
+    const assertWithinLimit = (chunk: Uint8Array): void => {
+      receivedBytes += chunk.byteLength;
+
+      if (maxBytes !== undefined && receivedBytes > maxBytes) {
+        throw new IPFSContentTooLargeError(cid.valueOf(), maxBytes);
+      }
+    };
 
     if (IPFSCidCodec.isRaw(parsedCid)) {
       chunks.push(
-        ...(await this.collectRawBlockBytes(parsedCid, retrievalOptions)),
+        ...(await this.collectRawBlockBytes(
+          parsedCid,
+          retrievalOptions,
+          this.heliaCore.blockstore,
+          maxBytes === undefined ? undefined : { cid: cid.valueOf(), maxBytes },
+        )),
       );
 
       return Buffer.concat(chunks);
@@ -1001,6 +1051,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       parsedCid,
       catOptions as never,
     )) {
+      assertWithinLimit(chunk);
       chunks.push(chunk);
     }
 
@@ -1067,7 +1118,15 @@ export abstract class HeliaIPFS implements IPFSConnection {
     }
   }
 
-  public async getJSON<T>(cid: IPFSId, signal?: AbortSignal): Promise<T> {
+  public async getJSON<T>(
+    cid: IPFSId,
+    signal?: AbortSignal,
+    maxBytes?: number,
+  ): Promise<T> {
+    if (maxBytes !== undefined) {
+      return this.getBoundedJSON<T>(cid, maxBytes, signal);
+    }
+
     const heliaJSONClient = await heliaRuntimeAdapter.createJSONClient(
       this.heliaCore,
     );

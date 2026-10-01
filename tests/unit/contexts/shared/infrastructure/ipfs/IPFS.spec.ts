@@ -38,7 +38,11 @@ describe('IPFS', () => {
       const result = await ipfs.getJSON(cid);
 
       expect(registry.initialize).toHaveBeenCalled();
-      expect(racer.raceGetJSON).toHaveBeenCalledWith([mockNetwork], cid);
+      expect(racer.raceGetJSON).toHaveBeenCalledWith(
+        [mockNetwork],
+        cid,
+        undefined,
+      );
       expect(result).toEqual(expected);
     });
   });
@@ -165,7 +169,11 @@ describe('IPFS', () => {
       const result = await ipfs.getJSONFromNetworks(cid, ['network-2']);
 
       expect(result).toEqual(expected);
-      expect(racer.raceGetJSON).toHaveBeenCalledWith([secondNetwork], cid);
+      expect(racer.raceGetJSON).toHaveBeenCalledWith(
+        [secondNetwork],
+        cid,
+        undefined,
+      );
     });
   });
 
@@ -184,7 +192,11 @@ describe('IPFS', () => {
       const result = await ipfs.getBytesFromNetworks(cid, ['network-2']);
 
       expect(result).toEqual(expected);
-      expect(racer.raceGetBytes).toHaveBeenCalledWith([secondNetwork], cid);
+      expect(racer.raceGetBytes).toHaveBeenCalledWith(
+        [secondNetwork],
+        cid,
+        undefined,
+      );
     });
   });
 

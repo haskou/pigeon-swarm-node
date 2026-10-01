@@ -15,6 +15,9 @@ import { IpfsIdentityDocument } from './documents/IpfsIdentityDocument';
 import IpfsIdentityMapper from './mappers/IpfsIdentityMapper';
 
 export default class IpfsIdentityRepository extends IdentityRepository {
+  private static readonly MAX_CACHED_IDENTITIES = 1024;
+  private static readonly MAX_DOCUMENT_BYTES = 64 * 1024;
+  private static readonly MAX_REMOTE_CANDIDATES = 32;
   private readonly HANDLE_ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-handle-';
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-';
   private readonly validator = new IdentityCandidateValidationDomainService();
@@ -123,6 +126,18 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     }
   }
 
+  private rememberIdentity(cid: IPFSId, identity: Identity): void {
+    if (
+      this.identityByCid.size >= IpfsIdentityRepository.MAX_CACHED_IDENTITIES
+    ) {
+      const [oldest] = this.identityByCid.keys();
+
+      this.identityByCid.delete(oldest);
+    }
+
+    this.identityByCid.set(cid.valueOf(), identity);
+  }
+
   private async getDocumentFromCid(
     cid: IPFSId,
     networkIds?: string[],
@@ -132,13 +147,24 @@ export default class IpfsIdentityRepository extends IdentityRepository {
         ? await this.ipfsManager.getJSONFromNetworks<IpfsIdentityDocument>(
             cid,
             networkIds,
+            IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
           )
-        : await this.ipfsManager.getJSON<IpfsIdentityDocument>(cid);
+        : await this.ipfsManager.getJSON<IpfsIdentityDocument>(
+            cid,
+            IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
+          );
     } catch {
       const bytes =
         networkIds && networkIds.length > 0
-          ? await this.ipfsManager.getBytesFromNetworks(cid, networkIds)
-          : await this.ipfsManager.getBytes(cid);
+          ? await this.ipfsManager.getBytesFromNetworks(
+              cid,
+              networkIds,
+              IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
+            )
+          : await this.ipfsManager.getBytes(
+              cid,
+              IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
+            );
 
       return JSON.parse(
         Buffer.from(bytes).toString('utf8'),
@@ -159,7 +185,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     const document = await this.getDocumentFromCid(cid, networkIds);
     const identity = this.mapper.toDomain(document);
 
-    this.identityByCid.set(cid.valueOf(), identity);
+    this.rememberIdentity(cid, identity);
 
     return identity;
   }
@@ -436,6 +462,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     const candidates = await Promise.all(
       cidStrings
         .filter((cidString) => !knownCids.has(cidString))
+        .slice(0, IpfsIdentityRepository.MAX_REMOTE_CANDIDATES)
         .map(async (cidString) => {
           const candidate = await this.findCandidateFromCid(
             id,
@@ -500,6 +527,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     const candidates = await Promise.all(
       cidStrings
         .filter((cidString) => !knownCids.has(cidString))
+        .slice(0, IpfsIdentityRepository.MAX_REMOTE_CANDIDATES)
         .map(async (cidString) => {
           const candidate = await this.findHandleCandidateFromCid(
             handle,
@@ -685,7 +713,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     const cid = await this.ipfsManager.addJSONToNetworks(document, networks);
 
     await this.saveMetadata(identity, cid);
-    this.identityByCid.set(cid.valueOf(), identity);
+    this.rememberIdentity(cid, identity);
 
     await this.ipfsManager.putRecordToNetworks(
       this.ROUTING_KEY_PREFIX + document._id,

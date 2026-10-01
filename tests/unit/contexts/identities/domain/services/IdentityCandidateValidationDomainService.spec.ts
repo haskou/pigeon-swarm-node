@@ -33,6 +33,26 @@ describe('IdentityCandidateValidationDomainService', () => {
     expect(result).toBe(true);
   });
 
+  it('rejects a previous chain deeper than the allowed depth', async () => {
+    const previousIdentity = mother.build();
+    const candidate = await mother.buildNext({
+      previousIdentityExternalIdentifier: 'bafypreviousidentity',
+    });
+    const visited = Array.from(
+      { length: 256 },
+      (_, index) => new IdentityExternalIdentifier(`bafyvisited${index}`),
+    );
+
+    const result = await service.isValidChainFor(
+      mother.id,
+      candidate,
+      () => Promise.resolve(previousIdentity),
+      visited,
+    );
+
+    expect(result).toBe(false);
+  });
+
   it('should reject a versioned candidate without its previous identity', async () => {
     const previousIdentity = mother.build();
     const candidate = await mother.buildNext({
@@ -68,10 +88,8 @@ describe('IdentityCandidateValidationDomainService', () => {
       version: 1,
     });
 
-    const result = await service.isValidChainFor(
-      mother.id,
-      candidate,
-      () => Promise.resolve(undefined),
+    const result = await service.isValidChainFor(mother.id, candidate, () =>
+      Promise.resolve(undefined),
     );
 
     expect(result).toBe(false);

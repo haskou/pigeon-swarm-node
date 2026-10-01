@@ -58,12 +58,20 @@ export class IPFSNetwork {
     return this.config.isPrivate();
   }
 
-  public async getJSON<T>(cid: IPFSId, signal?: AbortSignal): Promise<T> {
-    return this.connection.getJSON<T>(cid, signal);
+  public async getJSON<T>(
+    cid: IPFSId,
+    signal?: AbortSignal,
+    maxBytes?: number,
+  ): Promise<T> {
+    return this.connection.getJSON<T>(cid, signal, maxBytes);
   }
 
-  public async getBytes(cid: IPFSId, signal?: AbortSignal): Promise<Buffer> {
-    return this.connection.getBytes(cid, signal);
+  public async getBytes(
+    cid: IPFSId,
+    signal?: AbortSignal,
+    maxBytes?: number,
+  ): Promise<Buffer> {
+    return this.connection.getBytes(cid, signal, maxBytes);
   }
 
   public async provideContent(

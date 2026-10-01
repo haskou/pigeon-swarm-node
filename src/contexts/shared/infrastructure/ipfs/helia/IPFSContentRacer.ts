@@ -46,6 +46,7 @@ export default class IPFSContentRacer {
   public async raceGetJSON<T>(
     networks: IPFSNetwork[],
     cid: IPFSId,
+    maxBytes?: number,
   ): Promise<T> {
     const controller = new AbortController();
 
@@ -53,7 +54,9 @@ export default class IPFSContentRacer {
       const result = await this.withTimeout(
         controller,
         Promise.any(
-          networks.map((network) => network.getJSON<T>(cid, controller.signal)),
+          networks.map((network) =>
+            network.getJSON<T>(cid, controller.signal, maxBytes),
+          ),
         ),
       );
 
@@ -70,6 +73,7 @@ export default class IPFSContentRacer {
   public async raceGetBytes(
     networks: IPFSNetwork[],
     cid: IPFSId,
+    maxBytes?: number,
   ): Promise<Buffer> {
     const controller = new AbortController();
 
@@ -77,7 +81,9 @@ export default class IPFSContentRacer {
       const result = await this.withTimeout(
         controller,
         Promise.any(
-          networks.map((network) => network.getBytes(cid, controller.signal)),
+          networks.map((network) =>
+            network.getBytes(cid, controller.signal, maxBytes),
+          ),
         ),
       );
 

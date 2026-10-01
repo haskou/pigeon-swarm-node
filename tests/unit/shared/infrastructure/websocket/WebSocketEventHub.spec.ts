@@ -30,6 +30,20 @@ class TestNodeDomainEvent extends DomainEvent {
 }
 
 describe('WebSocketEventHub', () => {
+  it('closes a socket that floods client messages and counts open sockets', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+
+    hub.register(identityId, client);
+    const handler = getClientMessageHandler(client);
+
+    Array.from({ length: 201 }).forEach(() => handler(Buffer.from('{}')));
+
+    expect(client.close).toHaveBeenCalledWith(1008, 'Message rate exceeded');
+    expect(hub.getOpenSocketCount()).toBe(1);
+  });
+
   it('terminates the oldest socket once an identity exceeds its connection cap', async () => {
     const hub = new WebSocketEventHub();
     const identityId = await generateIdentityId();
@@ -905,6 +919,7 @@ function buildClient(readyState: number = WebSocket.OPEN): WebSocket {
     readyState,
     send: jest.fn(),
     terminate: jest.fn(),
+    close: jest.fn(),
   } as unknown as WebSocket;
 }
 

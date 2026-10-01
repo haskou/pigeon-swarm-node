@@ -542,7 +542,10 @@ describe('IpfsIdentityRepository', () => {
       const result = await repository.findById(identityId);
 
       expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
-      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+        new IPFSId(cidString),
+        64 * 1024,
+      );
       expect(ipfsManager.getBytes).not.toHaveBeenCalled();
       expect(metadataRepository.save).toHaveBeenCalledWith(
         identity,
@@ -605,6 +608,32 @@ describe('IpfsIdentityRepository', () => {
       ).not.toHaveBeenCalled();
     });
 
+    it('should bound the number and size of remotely routed identity documents', async () => {
+      const identity = await mother.build();
+      const primitives = identity.toPrimitives();
+
+      metadataRepository.findByIdentityId.mockResolvedValue([]);
+      ipfsManager.getRecordCandidates.mockResolvedValue(
+        Array.from({ length: 100 }, (_, index) => `bafyremote${index}`),
+      );
+      ipfsManager.getJSON.mockRejectedValue(new Error('too large'));
+      ipfsManager.getBytes.mockRejectedValue(new Error('too large'));
+
+      await expect(
+        repository.findById(new IdentityId(primitives.id)),
+      ).rejects.toThrow(IdentityNotFoundError);
+
+      expect(ipfsManager.getJSON).toHaveBeenCalledTimes(32);
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+        expect.anything(),
+        64 * 1024,
+      );
+      expect(ipfsManager.getBytes).toHaveBeenCalledWith(
+        expect.anything(),
+        64 * 1024,
+      );
+    });
+
     it('should recover a valid routed CID after rejecting forged embedded metadata', async () => {
       const validIdentity = await mother.build();
       const forgedIdentity = await createSignedIdentityForNetwork(
@@ -636,7 +665,7 @@ describe('IpfsIdentityRepository', () => {
       );
 
       expect(result[0].getIdentity().toPrimitives()).toEqual(primitives);
-      expect(ipfsManager.getJSON).toHaveBeenCalledWith(cid);
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(cid, 64 * 1024);
       expect(
         metadataRepository.deleteByExternalIdentifier,
       ).not.toHaveBeenCalled();
@@ -761,6 +790,7 @@ describe('IpfsIdentityRepository', () => {
 
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(
         new IPFSId(mongoCidString),
+        64 * 1024,
       );
       expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
       expect(ipfsManager.getJSON).not.toHaveBeenCalledWith(
@@ -925,7 +955,10 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
         'pigeon-swarm_identity-' + primitives.id,
       );
-      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+        new IPFSId(cidString),
+        64 * 1024,
+      );
       expect(metadataRepository.save).toHaveBeenCalledWith(
         identity,
         new IPFSId(cidString),
@@ -1053,6 +1086,7 @@ describe('IpfsIdentityRepository', () => {
 
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(
         new IPFSId(previousCidString),
+        64 * 1024,
       );
       expect(metadataRepository.save.mock.calls[0][0].toPrimitives()).toEqual(
         candidate.toPrimitives(),
@@ -1097,9 +1131,11 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getJSON).toHaveBeenCalledTimes(2);
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(
         new IPFSId(currentCidString),
+        64 * 1024,
       );
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(
         new IPFSId(previousCidString),
+        64 * 1024,
       );
       expect(result.toPrimitives()).toEqual(candidate.toPrimitives());
     });
@@ -1123,7 +1159,10 @@ describe('IpfsIdentityRepository', () => {
 
       const result = await repository.findById(identityId);
 
-      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+        new IPFSId(cidString),
+        64 * 1024,
+      );
       expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
       expect(result.toPrimitives()).toEqual(primitives);
     });
@@ -1174,7 +1213,7 @@ describe('IpfsIdentityRepository', () => {
       );
 
       expect(ipfsManager.getRecordCandidates).not.toHaveBeenCalled();
-      expect(ipfsManager.getJSON).toHaveBeenCalledWith(cid);
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(cid, 64 * 1024);
       expect(
         metadataRepository.deleteByExternalIdentifier,
       ).not.toHaveBeenCalled();
@@ -1237,7 +1276,10 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getRecordCandidates).toHaveBeenCalledWith(
         'pigeon-swarm_identity-handle-test',
       );
-      expect(ipfsManager.getJSON).toHaveBeenCalledWith(new IPFSId(cidString));
+      expect(ipfsManager.getJSON).toHaveBeenCalledWith(
+        new IPFSId(cidString),
+        64 * 1024,
+      );
       expect(metadataRepository.save).toHaveBeenCalledWith(
         identity,
         new IPFSId(cidString),
@@ -1353,10 +1395,12 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getJSONFromNetworks).toHaveBeenCalledWith(
         new IPFSId(latestCidString),
         [networkId],
+        64 * 1024,
       );
       expect(ipfsManager.getJSONFromNetworks).toHaveBeenCalledWith(
         new IPFSId(previousCidString),
         [networkId],
+        64 * 1024,
       );
       expect(ipfsManager.getJSON).not.toHaveBeenCalled();
       expect(metadataRepository.save).toHaveBeenCalledWith(

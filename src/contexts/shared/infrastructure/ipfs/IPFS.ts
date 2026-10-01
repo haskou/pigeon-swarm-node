@@ -69,10 +69,10 @@ export default class IPFS {
     await this.registry.removeNetwork(id);
   }
 
-  public async getJSON<T>(cid: IPFSId): Promise<T> {
+  public async getJSON<T>(cid: IPFSId, maxBytes?: number): Promise<T> {
     await this.initialize();
 
-    return this.racer.raceGetJSON<T>(this.registry.getAll(), cid);
+    return this.racer.raceGetJSON<T>(this.registry.getAll(), cid, maxBytes);
   }
 
   public async calculateJSONId(data: unknown): Promise<IPFSId> {
@@ -81,10 +81,10 @@ export default class IPFS {
     return new IPFSId(cid.toString());
   }
 
-  public async getBytes(cid: IPFSId): Promise<Buffer> {
+  public async getBytes(cid: IPFSId, maxBytes?: number): Promise<Buffer> {
     await this.initialize();
 
-    return this.racer.raceGetBytes(this.registry.getAll(), cid);
+    return this.racer.raceGetBytes(this.registry.getAll(), cid, maxBytes);
   }
 
   public async isRawCid(cid: IPFSId): Promise<boolean> {
@@ -181,10 +181,15 @@ export default class IPFS {
   public async getJSONFromNetworks<T>(
     cid: IPFSId,
     networkIds: string[],
+    maxBytes?: number,
   ): Promise<T> {
     await this.initialize();
 
-    return this.racer.raceGetJSON<T>(this.getNetworksByIds(networkIds), cid);
+    return this.racer.raceGetJSON<T>(
+      this.getNetworksByIds(networkIds),
+      cid,
+      maxBytes,
+    );
   }
 
   public async getBytesFromNetwork(
@@ -201,10 +206,15 @@ export default class IPFS {
   public async getBytesFromNetworks(
     cid: IPFSId,
     networkIds: string[],
+    maxBytes?: number,
   ): Promise<Buffer> {
     await this.initialize();
 
-    return this.racer.raceGetBytes(this.getNetworksByIds(networkIds), cid);
+    return this.racer.raceGetBytes(
+      this.getNetworksByIds(networkIds),
+      cid,
+      maxBytes,
+    );
   }
 
   public async provideContentFromNetwork(
