@@ -26,6 +26,7 @@ import { OrbitDBInstance } from '@app/contexts/shared/infrastructure/orbitdb/Orb
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { orbitDBRuntimeAdapter } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBRuntimeAdapter';
+import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import Kernel from '@haskou/ddd-kernel';
 import { KeyPair, PrivateKey } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
@@ -104,6 +105,7 @@ async function open(replica: Replica): Promise<void> {
         },
       ],
     } as IPFSNetworkRegistry,
+    {} as EmbeddedLocalDatabase,
   );
   await replica.registry.register(
     networkId,

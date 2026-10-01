@@ -22,6 +22,7 @@ import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networ
 import { OrbitDBHeadRecordMerger } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadRecordMerger';
 import { OrbitDBHeadRecordScope } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadRecordScope';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -74,8 +75,19 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
       return Promise.resolve();
     });
+    const stored = new Map<string, Record<string, unknown>>();
+    const database = mock<EmbeddedLocalDatabase>();
+    database.save.mockImplementation((_namespace, id, document) => {
+      stored.set(id, { ...document, _id: id });
+
+      return Promise.resolve();
+    });
+    database.findOne.mockImplementation((_namespace, id) =>
+      Promise.resolve(stored.get(id)),
+    );
 
     return {
+      database,
       getHead: () => head,
       getMerger: () => merger,
       getScope: () => scope,
@@ -87,6 +99,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         new DeviceAuthorizationPolicy(),
         identityRepository,
         networkRegistry,
+        database,
       ),
       setHead: (value: Record<string, unknown>): void => {
         head = value;
@@ -232,8 +245,9 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     ).toEqual({ trusted: true });
   });
 
-  it('fails closed when authorization has no registered private network', async () => {
-    const { genesis, identityId } = await fixture();
+  it('keeps authorization local and usable when the identity only uses public networks', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const target = await KeyPair.generate();
     const publicNetworkId = '550e8400-e29b-41d4-a716-446655440099';
     const publicNetwork = mock<IPFSNetwork>();
     const { networkRegistry, registry, repository } = repositoryFixture();
@@ -246,10 +260,22 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       genesis.getCredentials()[0],
       genesis.getRecoveryAuthority(),
     );
+    const transition = await enrollment(
+      identityId,
+      owner,
+      target,
+      '00000000-0000-4000-8000-000000000001',
+      '10000000-0000-4000-8000-000000000001',
+    );
 
-    await expect(
-      provisionAuthorization(repository, authorization),
-    ).rejects.toThrow();
+    await provisionAuthorization(repository, authorization);
+    const applied = await repository.compareAndApply(transition);
+    const found = await repository.find(identityId);
+
+    expect(applied.getRevision().valueOf()).toBe(1);
+    expect(found?.getRevision().valueOf()).toBe(1);
+    expect(found?.getCredentials()).toHaveLength(2);
+    await expect(repository.compareAndApply(transition)).rejects.toThrow();
     expect(registry.putDocument).not.toHaveBeenCalled();
     expect(registry.putHead).not.toHaveBeenCalled();
   });

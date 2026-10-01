@@ -10,6 +10,7 @@ import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/doma
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { Timestamp, assert } from '@haskou/value-objects';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
@@ -25,6 +26,8 @@ interface DeviceAuthorizationReplay {
 
 export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthorizationRepository {
   private static readonly HEAD_PREFIX = 'device-authorization:';
+
+  private static readonly LOCAL_NAMESPACE = 'identity_device_authorizations';
 
   private static readonly MAX_CONCURRENT_TRANSITIONS = 128;
 
@@ -70,6 +73,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     private readonly policy: DeviceAuthorizationPolicy,
     private readonly identityRepository: IdentityRepository,
     private readonly networkRegistry: IPFSNetworkRegistry,
+    private readonly database: EmbeddedLocalDatabase,
   ) {
     super();
     this.registry.registerHeadRecordMerger(
@@ -1570,6 +1574,23 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       .sort();
   }
 
+  private async readHead(
+    identityId: IdentityId,
+  ): Promise<Record<string, unknown> | undefined> {
+    const replicated = await this.registry.findHead(this.headKey(identityId));
+
+    if (replicated) {
+      return replicated;
+    }
+
+    const local = await this.database.findOne(
+      OrbitDBDeviceAuthorizationRepository.LOCAL_NAMESPACE,
+      identityId.valueOf(),
+    );
+
+    return this.isRecord(local?.document) ? local.document : undefined;
+  }
+
   private async save(
     document: OrbitDBDeviceAuthorizationDocument,
   ): Promise<OrbitDBDeviceAuthorizationDocument> {
@@ -1582,10 +1603,15 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       ) ?? this.networkIds(authorization);
     const networkIds = this.privateNetworkIds(routableNetworkIds);
 
-    assert(
-      networkIds.length > 0,
-      new InvalidDeviceAuthorizationTransitionError(),
-    );
+    if (networkIds.length === 0) {
+      await this.database.save(
+        OrbitDBDeviceAuthorizationRepository.LOCAL_NAMESPACE,
+        authorization.getIdentityId().valueOf(),
+        { document },
+      );
+
+      return document;
+    }
 
     await this.registry.putDocument('identities', document, networkIds);
     await this.registry.putHead(
@@ -1671,9 +1697,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       const trustedGenesis = await this.resolveTrustedGenesis(
         transition.getIdentityId(),
       );
-      const candidate = await this.registry.findHead(
-        this.headKey(transition.getIdentityId()),
-      );
+      const candidate = await this.readHead(transition.getIdentityId());
 
       assert(
         trustedGenesis !== undefined,
@@ -1730,7 +1754,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
         return undefined;
       }
 
-      const candidate = await this.registry.findHead(this.headKey(identityId));
+      const candidate = await this.readHead(identityId);
       const document =
         candidate &&
         this.isDocument(candidate) &&
@@ -1751,13 +1775,12 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     identityExternalIdentifier: IdentityExternalIdentifier,
   ): Promise<void> {
     return this.withIdentityLock(authorization.getIdentityId(), async () => {
-      const key = this.headKey(authorization.getIdentityId());
       this.rememberRoutingNetworks(
         authorization,
         identityVersion,
         identityExternalIdentifier,
       );
-      const existing = await this.registry.findHead(key);
+      const existing = await this.readHead(authorization.getIdentityId());
 
       if (existing) {
         if (
