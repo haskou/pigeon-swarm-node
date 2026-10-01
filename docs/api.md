@@ -4430,6 +4430,10 @@ uses the proof envelope above, and the recovery authority signs the transition
 envelope. Credentials and signatures use their API string representation
 without decoding or normalization.
 
+The endpoint is unauthenticated until signatures are verified, so each node
+rate limits it before any lookup or lock: 20 submissions per identity and 300
+per node per minute. Excess requests return `429`.
+
 The response contains only the identity identifier, current recovery epoch and
 deterministic current revision; it does not return an authorized-device catalog.
 Replayed operation or pairing identifiers, stale predecessors, wrong recovery

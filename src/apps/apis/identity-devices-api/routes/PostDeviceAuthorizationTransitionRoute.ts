@@ -5,6 +5,7 @@ import { Response } from 'express';
 import { Body, JsonController, Post, Res } from 'routing-controllers';
 
 import { PostDeviceAuthorizationTransitionBody } from '../bodies/PostDeviceAuthorizationTransitionBody';
+import DeviceAuthorizationTransitionRateLimiter from '../DeviceAuthorizationTransitionRateLimiter';
 import { PostDeviceAuthorizationTransitionRequest } from '../requests/PostDeviceAuthorizationTransitionRequest';
 import { DeviceAuthorizationViewModel } from '../view-model/DeviceAuthorizationViewModel';
 
@@ -13,6 +14,11 @@ export class PostDeviceAuthorizationTransitionRoute extends Route {
   private readonly applier = this.get<DeviceAuthorizationTransitionApplier>(
     DeviceAuthorizationTransitionApplier,
   );
+
+  private readonly rateLimiter =
+    this.get<DeviceAuthorizationTransitionRateLimiter>(
+      DeviceAuthorizationTransitionRateLimiter,
+    );
 
   @Post('/transitions')
   public async apply(
@@ -23,9 +29,12 @@ export class PostDeviceAuthorizationTransitionRoute extends Route {
     body: PostDeviceAuthorizationTransitionBody,
     @Res() response: Response,
   ): Promise<Response> {
-    const authorization = await this.applier.apply(
-      new PostDeviceAuthorizationTransitionRequest(body).getMessage(),
-    );
+    const message = new PostDeviceAuthorizationTransitionRequest(
+      body,
+    ).getMessage();
+
+    this.rateLimiter.consume(message.transition.getIdentityId());
+    const authorization = await this.applier.apply(message);
 
     return response
       .status(HttpRouteStatusEnum.OK)

@@ -85,6 +85,8 @@ paths:
           description: Malformed transition.
         '409':
           description: Expired, replayed, causally stale or unauthorized transition.
+        '429':
+          description: Per-identity or per-node transition rate limit exceeded.
 components:
   parameters:
     XIdentityId:
