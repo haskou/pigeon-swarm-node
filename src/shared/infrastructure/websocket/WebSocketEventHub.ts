@@ -41,6 +41,8 @@ const identityAttributeKeys = [
 ];
 
 const MAX_CLIENTS_PER_IDENTITY = 16;
+const MAX_CLIENT_MESSAGES_PER_WINDOW = 200;
+const CLIENT_MESSAGE_WINDOW_MS = 10_000;
 
 export class WebSocketEventHub {
   private readonly conversationCallEventMapper =
@@ -53,6 +55,10 @@ export class WebSocketEventHub {
   private readonly pendingCalls = new Map<string, Promise<void>>();
 
   private readonly clients = new Map<string, Set<WebSocket>>();
+  private readonly messageWindows = new WeakMap<
+    WebSocket,
+    { count: number; resetAt: number }
+  >();
 
   private networkSynchronizationStatusProvider?: () => unknown;
 
@@ -173,11 +179,30 @@ export class WebSocketEventHub {
     client.send(JSON.stringify(message));
   }
 
+  private isOverMessageRate(client: WebSocket): boolean {
+    const now = Date.now();
+    const current = this.messageWindows.get(client);
+    const window =
+      current && current.resetAt > now
+        ? { count: current.count + 1, resetAt: current.resetAt }
+        : { count: 1, resetAt: now + CLIENT_MESSAGE_WINDOW_MS };
+
+    this.messageWindows.set(client, window);
+
+    return window.count > MAX_CLIENT_MESSAGES_PER_WINDOW;
+  }
+
   private handleClientMessage(
     identityId: string,
     client: WebSocket,
     rawMessage: RawData,
   ): void {
+    if (this.isOverMessageRate(client)) {
+      client.close(1008, 'Message rate exceeded');
+
+      return;
+    }
+
     const message = this.parseClientMessage(rawMessage);
 
     if (!message) {
@@ -752,6 +777,16 @@ export class WebSocketEventHub {
         });
       }
     }
+  }
+
+  public getOpenSocketCount(): number {
+    let total = 0;
+
+    this.clients.forEach((identityClients) => {
+      total += identityClients.size;
+    });
+
+    return total;
   }
 
   public register(identityId: IdentityId, client: WebSocket): void {

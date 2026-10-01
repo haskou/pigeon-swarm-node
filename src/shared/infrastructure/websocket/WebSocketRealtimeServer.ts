@@ -2,12 +2,14 @@ import { IncomingMessage, Server as HttpServer } from 'http';
 import { Duplex } from 'stream';
 import { WebSocketServer } from 'ws';
 
+import { WebSocketAdmissionLimiter } from './WebSocketAdmissionLimiter';
 import { WebSocketConnectionAuthenticator } from './WebSocketConnectionAuthenticator';
 import { webSocketEventHub } from './WebSocketEventHub';
 
 const MAX_CLIENT_FRAME_BYTES = 16 * 1024;
 
 export class WebSocketRealtimeServer {
+  private readonly admissionLimiter = new WebSocketAdmissionLimiter();
   private readonly authenticator = new WebSocketConnectionAuthenticator();
   private readonly server = new WebSocketServer({
     maxPayload: MAX_CLIENT_FRAME_BYTES,
@@ -23,6 +25,18 @@ export class WebSocketRealtimeServer {
     const url = new URL(request.url || '/', 'http://localhost');
 
     if (url.pathname !== websocketPath) {
+      return;
+    }
+
+    if (
+      !this.admissionLimiter.admit(
+        request.socket.remoteAddress || 'unknown',
+        webSocketEventHub.getOpenSocketCount(),
+      )
+    ) {
+      socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n');
+      socket.destroy();
+
       return;
     }
 
