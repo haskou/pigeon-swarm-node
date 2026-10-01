@@ -149,4 +149,36 @@ describe('PublicMutationGate over pins', () => {
     ]);
     registry.clear();
   });
+
+  it('re-admits a demoted head once the permission data replicates', async () => {
+    jest.useFakeTimers();
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const signed = await sign(pin, 'put', 1);
+    let onUpdate: (entry: unknown) => void = () => undefined;
+
+    communityRepository.findById.mockResolvedValue(undefined);
+    await registry.register('n', {
+      heads: {
+        events: {
+          on: jest.fn((event: string, handler: (entry: unknown) => void) => {
+            if (event === 'update') onUpdate = handler;
+          }),
+        },
+      },
+    } as never);
+    registry.useMutationGate(gate);
+
+    onUpdate({ payload: { key: 'pins-head', value: { pins: [signed] } } });
+    await jest.advanceTimersByTimeAsync(10);
+    expect(registry.findCachedHead('pins-head')?.pins).toEqual([]);
+
+    communityRepository.findById.mockResolvedValue(
+      mock<Community>({ manageChannelMessages: jest.fn() }),
+    );
+    await jest.advanceTimersByTimeAsync(2_500);
+
+    expect(registry.findCachedHead('pins-head')?.pins).toEqual([signed]);
+    registry.clear();
+    jest.useRealTimers();
+  });
 });

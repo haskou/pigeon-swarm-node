@@ -60,6 +60,8 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private static readonly HYDRATION_BATCH_SIZE = 16;
 
+  private static readonly READMISSION_DELAYS_MS = [2_000, 10_000, 60_000];
+
   private readonly storesByNetworkId = new Map<
     string,
     OrbitDBPrivateNetworkStores
@@ -249,12 +251,43 @@ export default class OrbitDBReplicatedStateRegistry {
    * Drops records of gated collections that carry no valid proof. Index heads
    * are unsigned wrappers, so a head that lost records, or that claims an
    * empty gated collection, is demoted to the oldest possible timestamp: it
-   * can never replace a head built from admitted records.
+   * can never replace a head built from admitted records. Rejection can be
+   * transient (the community that grants the permission may replicate after
+   * the head), so a demoted head is re-admitted a few times with backoff.
    */
   private async admitHead(
     value: Record<string, unknown>,
+    onReadmitted?: (admitted: Record<string, unknown>) => void,
+    attempt: number = 0,
   ): Promise<Record<string, unknown>> {
     if (!this.mutationGate) return value;
+    const { admitted, degraded } = await this.admitGatedCollections(value);
+
+    if (degraded && onReadmitted) {
+      this.scheduleReadmission(value, onReadmitted, attempt);
+    }
+
+    return degraded ? { ...admitted, updatedAt: 0 } : admitted;
+  }
+
+  private cacheReadmittedHead(
+    networkId: string,
+    headKey: string,
+    value: Record<string, unknown>,
+    persist: boolean = true,
+  ): void {
+    for (const key of this.headKeyDeriver.cachedKeys(headKey, value)) {
+      const cachedHead = this.cacheReplicatedHead(networkId, key, value);
+
+      if (cachedHead && persist) {
+        void this.persistHeadCache(networkId, key, cachedHead);
+      }
+    }
+  }
+
+  private async admitGatedCollections(
+    value: Record<string, unknown>,
+  ): Promise<{ admitted: Record<string, unknown>; degraded: boolean }> {
     const admitted = { ...value };
     let degraded = false;
 
@@ -270,7 +303,26 @@ export default class OrbitDBReplicatedStateRegistry {
       admitted[collection] = kept;
     }
 
-    return degraded ? { ...admitted, updatedAt: 0 } : admitted;
+    return { admitted, degraded };
+  }
+
+  private scheduleReadmission(
+    value: Record<string, unknown>,
+    onReadmitted: (admitted: Record<string, unknown>) => void,
+    attempt: number,
+  ): void {
+    const delay = OrbitDBReplicatedStateRegistry.READMISSION_DELAYS_MS[attempt];
+
+    if (delay === undefined) return;
+    const timer = setTimeout(() => {
+      void this.admitHead(value, onReadmitted, attempt + 1)
+        .then(onReadmitted)
+        .catch(() => {
+          Kernel.logger.warn?.('OrbitDB head re-admission failed');
+        });
+    }, delay);
+
+    timer.unref();
   }
 
   private isGatedHeadCollection(
@@ -628,7 +680,10 @@ export default class OrbitDBReplicatedStateRegistry {
     this.markPersistedHeadKey(networkId, record.key);
 
     let persisted = true;
-    const value = await this.admitHead(record.value);
+    const recordKey = record.key;
+    const value = await this.admitHead(record.value, (readmitted) =>
+      this.cacheReadmittedHead(networkId, recordKey, readmitted),
+    );
 
     for (const key of this.headKeyDeriver.cachedKeys(record.key, value)) {
       const cachedHead = this.cacheReplicatedHead(networkId, key, value);
@@ -982,19 +1037,18 @@ export default class OrbitDBReplicatedStateRegistry {
       return;
     }
 
-    const record = this.mutationGate
-      ? await this.admitHead(received)
-      : received;
-    const keys = this.headKeysFromUpdate(networkId, entry, record);
+    const apply = (record: Record<string, unknown>): void => {
+      for (const key of this.headKeysFromUpdate(networkId, entry, record)) {
+        const cachedHead = this.cacheReplicatedHead(networkId, key, record);
 
-    for (const key of keys) {
-      const cachedHead = this.cacheReplicatedHead(networkId, key, record);
-
-      if (cachedHead) {
-        void this.persistHeadCache(networkId, key, cachedHead);
-        this.persistMergedHead(networkId, key, record, cachedHead);
+        if (cachedHead) {
+          void this.persistHeadCache(networkId, key, cachedHead);
+          this.persistMergedHead(networkId, key, record, cachedHead);
+        }
       }
-    }
+    };
+
+    apply(this.mutationGate ? await this.admitHead(received, apply) : received);
   }
 
   private isMergeableHeadKey(key: unknown): key is string {
@@ -1130,11 +1184,12 @@ export default class OrbitDBReplicatedStateRegistry {
 
       for (const head of heads) {
         this.markPersistedHeadKey(networkId, head.key);
-        const value = await this.admitHead(head.value);
+        const headKey = head.key;
+        const value = await this.admitHead(head.value, (readmitted) =>
+          this.cacheReadmittedHead(networkId, headKey, readmitted),
+        );
 
-        for (const key of this.headKeyDeriver.cachedKeys(head.key, value)) {
-          this.cacheReplicatedHead(networkId, key, value);
-        }
+        this.cacheReadmittedHead(networkId, headKey, value, false);
       }
 
       if (heads.length > 0) {

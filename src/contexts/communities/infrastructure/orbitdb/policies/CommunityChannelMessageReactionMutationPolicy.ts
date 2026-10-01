@@ -2,8 +2,10 @@ import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domai
 import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain/PublicMutationRecordShape';
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
 import { PublicMutationExpectation } from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
+import { ShortLivedLookup } from '@app/contexts/public-mutations/infrastructure/ShortLivedLookup';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
+import { Community } from '../../../domain/Community';
 import CommunityRepository from '../../../domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '../../../domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../../../domain/value-objects/CommunityChannelMessageId';
@@ -23,6 +25,8 @@ export default class CommunityChannelMessageReactionMutationPolicy extends Publi
     ['createdAt'],
     'community_channel',
   );
+
+  private readonly communities = new ShortLivedLookup<Community | undefined>();
 
   public readonly collection = 'reactions';
 
@@ -59,8 +63,12 @@ export default class CommunityChannelMessageReactionMutationPolicy extends Publi
     record: Record<string, unknown>,
     authorIdentityId: string,
   ): Promise<void> {
-    const community = await this.communityRepository.findById(
-      new CommunityId(record.communityId as string),
+    const community = await this.communities.get(
+      record.communityId as string,
+      () =>
+        this.communityRepository.findById(
+          new CommunityId(record.communityId as string),
+        ),
     );
 
     if (!community) throw new InvalidPublicMutationError();

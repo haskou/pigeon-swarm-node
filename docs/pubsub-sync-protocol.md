@@ -304,7 +304,11 @@ Signed public mutations (pins and reactions):
 - The unsigned reaction cascade tombstones on channel/community deletion are gone;
   the node cannot sign on behalf of users.
 - Limits: device authorization is checked against the current head (historical
-  revisions are not evaluated); other record types (#316) are still unsigned.
+  revisions are not evaluated), and so are community permissions, so records of
+  a member who later lost the permission stop being admitted. A head rejected
+  because the community has not replicated yet is re-admitted after 2 s, 10 s
+  and 60 s. Authorization lookups are coalesced for 1 s per batch. Other record
+  types (#316) are still unsigned.
 
 Conflict rules:
 
