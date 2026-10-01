@@ -281,6 +281,35 @@ an absent community and does not replace an existing one. Authenticating histori
 membership and permissions requires the operation authorization work in #288; an
 event snapshot alone is not evidence of authority.
 
+Signed public mutations (pins and reactions):
+
+- Each `pins`/`reactions` document carries a `proof` (`PublicMutationProof`): version,
+  `operationId`, `kind` (`put`|`delete`), `store`, `recordId`, `payloadDigest`,
+  `predecessor`, `sequence`, `author { identityId, deviceCredential }` and an
+  Ed25519 signature by the device. `payloadDigest` covers the document without
+  `proof`, so ids, scope (community/channel/message) and author are bound.
+- Community reaction events carry the proof as `mutationProof`; consumers pass it
+  to the repository, which re-verifies it.
+- Every node verifies on write, on replicated read, on head hydration and on the
+  persisted head cache: signature, scope binding, the device in the identity's
+  current device authorization head, and the community permission (pin needs
+  manage messages; reaction needs channel access). Records that fail are ignored
+  and logged by collection only.
+- Winner rule, independent of wall clocks: higher `sequence`, then lower proof
+  digest. A tombstone (`removed: true`) must be a signed `delete`; a `put` must not
+  be removed. `removed`, `deletedAt` or `updatedAt` alone never win. A signed record
+  outranks an unsigned one; unsigned legacy records are rejected.
+- Index heads are unsigned wrappers: a head that lost records after admission is
+  demoted to `updatedAt: 0` and cannot replace an admitted head.
+- The unsigned reaction cascade tombstones on channel/community deletion are gone;
+  the node cannot sign on behalf of users.
+- Limits: device authorization is checked against the current head (historical
+  revisions are not evaluated), and so are community permissions, so records of
+  a member who later lost the permission stop being admitted. A head rejected
+  because the community has not replicated yet is re-admitted after 2 s, 10 s
+  and 60 s. Authorization lookups are coalesced for 1 s per batch. Other record
+  types (#316) are still unsigned.
+
 Conflict rules:
 
 - Different profile fields and different collection elements combine independently.

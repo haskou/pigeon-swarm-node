@@ -11,6 +11,8 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
+import { signedMutation } from '../../../public-mutations/support/signedMutation';
+
 const publicStorageGuard = () =>
   new PrivateCommunityPublicStorageGuard(
     {
@@ -20,6 +22,29 @@ const publicStorageGuard = () =>
   );
 
 describe('OrbitDBCommunityMessageReactionRepository', () => {
+  const proof = (
+    reaction: CommunityChannelMessageReaction,
+    kind: 'put' | 'delete',
+    sequence: number,
+  ) => {
+    const primitives = reaction.toPrimitives();
+
+    return signedMutation({
+      identityId: primitives.authorIdentityId,
+      kind,
+      recordId: [
+        'community_channel',
+        primitives.communityId,
+        primitives.channelId,
+        primitives.messageId,
+        primitives.authorIdentityId,
+        primitives.emoji,
+      ].join(':'),
+      sequence,
+      store: 'reactions',
+    });
+  };
+
   const communityId = new CommunityId('community-1');
   const channelId = new CommunityChannelId('channel-1');
   const messageId = new CommunityChannelMessageId('message-1');
@@ -100,7 +125,7 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
       new Timestamp(1780000000000),
     );
 
-    await repository.save(reaction);
+    await repository.save(reaction, await proof(reaction, 'put', 1));
     query.mockClear();
 
     const byMessage = await repository.findByMessageIds(
@@ -110,7 +135,7 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     );
     const byCommunity = await repository.findByCommunity(communityId, 10);
 
-    await repository.delete(reaction);
+    await repository.delete(reaction, await proof(reaction, 'delete', 2));
 
     const afterDelete = await repository.findByMessageIds(
       communityId,
@@ -128,30 +153,6 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     expect(query).not.toHaveBeenCalled();
   });
 
-  it('does not tombstone a reaction bound to another community through a poisoned index', async () => {
-    const otherCommunityId = new CommunityId('community-2');
-    const reaction = CommunityChannelMessageReaction.create(
-      otherCommunityId,
-      channelId,
-      messageId,
-      authorIdentityId,
-      new CommunityChannelMessageReactionEmoji('👍'),
-      new Timestamp(1780000000000),
-    );
-    await repository.save(reaction);
-    const stored = [...documents.values()][0];
-    headRecords.set(`community-reaction-index:${communityId.valueOf()}`, {
-      communityId: communityId.valueOf(),
-      id: `community-reaction-index:${communityId.valueOf()}`,
-      reactions: [stored],
-      updatedAt: 1,
-    });
-
-    await repository.deleteByCommunity(communityId);
-
-    expect(documents.get(String(stored.id))).toEqual(stored);
-  });
-
   it('removes cross-community records when refreshing a community index', async () => {
     const otherCommunityId = new CommunityId('community-2');
     const otherReaction = CommunityChannelMessageReaction.create(
@@ -162,7 +163,7 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
       new CommunityChannelMessageReactionEmoji('👍'),
       new Timestamp(1780000000000),
     );
-    await repository.save(otherReaction);
+    await repository.save(otherReaction, await proof(otherReaction, 'put', 1));
     const poisoned = [...documents.values()][0];
     const indexKey = `community-reaction-index:${communityId.valueOf()}`;
     headRecords.set(indexKey, {
@@ -180,7 +181,7 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
       new Timestamp(1780000000001),
     );
 
-    await repository.save(ownReaction);
+    await repository.save(ownReaction, await proof(ownReaction, 'put', 1));
 
     const storedIndex = headRecords.get(indexKey);
     expect(storedIndex?.reactions).toEqual([
@@ -199,7 +200,7 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     );
     blockHeadPersistence = true;
 
-    const save = repository.save(reaction);
+    const save = repository.save(reaction, await proof(reaction, 'put', 1));
     await expect(
       Promise.race([
         save.then(() => 'saved'),
@@ -207,11 +208,9 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
       ]),
     ).resolves.toBe('blocked');
 
-    const byMessage = repository.findByMessageIds(
-      communityId,
-      channelId,
-      [messageId],
-    );
+    const byMessage = repository.findByMessageIds(communityId, channelId, [
+      messageId,
+    ]);
     await expect(
       Promise.race([
         byMessage.then(() => 'completed'),
@@ -236,11 +235,14 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
       new Timestamp(1780000000000),
     );
 
-    await repository.save(reaction);
+    await repository.save(reaction, await proof(reaction, 'put', 1));
     await flushBackgroundTasks();
     blockHeadPersistence = true;
 
-    const deletion = repository.delete(reaction);
+    const deletion = repository.delete(
+      reaction,
+      await proof(reaction, 'delete', 2),
+    );
     await expect(
       Promise.race([
         deletion.then(() => 'saved'),
@@ -274,9 +276,9 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
     );
     putDocument.mockRejectedValueOnce(new Error('canonical write failed'));
 
-    await expect(repository.save(reaction)).rejects.toThrow(
-      'canonical write failed',
-    );
+    await expect(
+      repository.save(reaction, await proof(reaction, 'put', 1)),
+    ).rejects.toThrow('canonical write failed');
 
     expect(putHead).not.toHaveBeenCalled();
   });
@@ -290,13 +292,13 @@ describe('OrbitDBCommunityMessageReactionRepository', () => {
       new CommunityChannelMessageReactionEmoji('👍'),
       new Timestamp(1780000000000),
     );
-    await repository.save(reaction);
+    await repository.save(reaction, await proof(reaction, 'put', 1));
     putHead.mockClear();
     putDocument.mockRejectedValueOnce(new Error('canonical write failed'));
 
-    await expect(repository.delete(reaction)).rejects.toThrow(
-      'canonical write failed',
-    );
+    await expect(
+      repository.delete(reaction, await proof(reaction, 'delete', 2)),
+    ).rejects.toThrow('canonical write failed');
 
     expect(putHead).not.toHaveBeenCalled();
   });

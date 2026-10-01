@@ -8,6 +8,9 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityChannelMessageReactionEmoji } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageReactionEmoji';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { StalePublicMutationError } from '@app/contexts/public-mutations/domain/errors/StalePublicMutationError';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
@@ -82,7 +85,19 @@ export default class RegisterCommunityReactionWhenRemoved extends Consumer {
       new Timestamp(event.attributes.createdAt),
     );
 
-    await this.reactionRepository.delete(reaction);
+    try {
+      await this.reactionRepository.delete(
+        reaction,
+        PublicMutationProof.fromPrimitives(event.attributes.mutationProof),
+      );
+    } catch (error) {
+      if (error instanceof InvalidPublicMutationError) return;
+
+      if (error instanceof StalePublicMutationError) return;
+
+      throw error;
+    }
+
     await this.communityRepository.save(canonical ?? community);
   }
 }

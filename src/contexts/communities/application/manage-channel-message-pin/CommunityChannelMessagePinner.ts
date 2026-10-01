@@ -44,6 +44,8 @@ export default class CommunityChannelMessagePinner {
       message.channelId,
       message.messageId,
       message.actorIdentityId,
+      message.createdAt,
+      message.proof,
     );
     const communityPrimitives = community.toPrimitives();
 

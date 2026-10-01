@@ -2054,7 +2054,9 @@ Request:
 
 ```json
 {
-  "emoji": "👍"
+  "emoji": "👍",
+  "createdAt": 1773848829055,
+  "mutation": { "...": "SignedPublicMutation" }
 }
 ```
 
@@ -3319,6 +3321,18 @@ POST /communities/{communityId}/channels/{channelId}/messages/{messageId}/pin
 DELETE /communities/{communityId}/channels/{channelId}/messages/{messageId}/pin
 ```
 
+Pin, unpin, reaction add and reaction removal require a client-signed `mutation`
+in the body (schema `SignedPublicMutation` in the communities swagger). Pin also
+requires `createdAt`; reaction accepts an optional `createdAt`. The node holds no
+user private keys, so the UI builds the proof: `payloadDigest` is the digest of the
+record without its `proof`, `sequence` starts at 0 and `predecessor` is null only at
+0, and the signature is made by an authorized device of `author.identityId`. Removals
+must be `kind: "delete"` proofs. Missing, forged, copied-scope, revoked-device or
+insufficient-permission proofs fail with 409; a proof that does not beat the stored
+one (higher `sequence`, then lower digest) fails with 409 `StalePublicMutationError`
+and `details: { sequence, digest }`. Replicated records without a valid proof are
+ignored by every node.
+
 List response:
 
 ```json
@@ -3466,6 +3480,8 @@ Implemented:
   emoji
 - publish `communities.v1.channel.message.reaction.was_added` to community
   members
+
+Reaction requests carry the same signed `mutation` as pins (see Community channel pins).
 
 ### Remove channel message reaction
 

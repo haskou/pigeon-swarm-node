@@ -1,3 +1,5 @@
+import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import Kernel from '@haskou/ddd-kernel';
@@ -11,6 +13,7 @@ import { OrbitDBHeadRecordMerger } from './OrbitDBHeadRecordMerger';
 import { OrbitDBHeadRecordScope } from './OrbitDBHeadRecordScope';
 import { OrbitDBHeadRepairPublisher } from './OrbitDBHeadRepairPublisher';
 import { OrbitDBHistoryReplayObserver } from './OrbitDBHistoryReplayObserver';
+import { OrbitDBMutationGate } from './OrbitDBMutationGate';
 import { OrbitDBPendingHeadReconciliation } from './OrbitDBPendingHeadReconciliation';
 import { OrbitDBPrivateNetworkStores } from './OrbitDBPrivateNetworkStores';
 import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
@@ -56,6 +59,8 @@ export default class OrbitDBReplicatedStateRegistry {
   ]);
 
   private static readonly HYDRATION_BATCH_SIZE = 16;
+
+  private static readonly READMISSION_DELAYS_MS = [2_000, 10_000, 60_000];
 
   private readonly storesByNetworkId = new Map<
     string,
@@ -135,6 +140,8 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private headCache?: OrbitDBReplicatedHeadCache;
 
+  private mutationGate?: OrbitDBMutationGate;
+
   private readonly headKeyDeriver = new OrbitDBReplicatedHeadKeyDeriver();
 
   private static defaultHeadCache(): OrbitDBReplicatedHeadCache | undefined {
@@ -173,7 +180,7 @@ export default class OrbitDBReplicatedStateRegistry {
         async (value, scope) => {
           const document = this.recordValue(value);
 
-          if (document) {
+          if (document && (await this.admitRecord(storeName, document))) {
             await this.notifyBootstrappedDocument(
               this.documentUpdateListeners.get(storeName) ?? new Set(),
               document,
@@ -208,6 +215,144 @@ export default class OrbitDBReplicatedStateRegistry {
     return stores[storeName];
   }
 
+  private async admitRecord(
+    collection: string,
+    record: Record<string, unknown>,
+  ): Promise<boolean> {
+    const gate = this.mutationGate;
+
+    if (!gate?.governs(collection)) return true;
+
+    try {
+      return await gate.accepts(collection, record);
+    } catch {
+      Kernel.logger.warn?.(
+        `Rejected unauthenticated replicated record: collection=${collection}`,
+      );
+
+      return false;
+    }
+  }
+
+  private async admittedRecords(
+    collection: string,
+    records: Record<string, unknown>[],
+  ): Promise<Record<string, unknown>[]> {
+    const admitted: Record<string, unknown>[] = [];
+
+    for (const record of records) {
+      if (await this.admitRecord(collection, record)) admitted.push(record);
+    }
+
+    return admitted;
+  }
+
+  /**
+   * Drops records of gated collections that carry no valid proof. Index heads
+   * are unsigned wrappers, so a head that lost records, or that claims an
+   * empty gated collection, is demoted to the oldest possible timestamp: it
+   * can never replace a head built from admitted records. Rejection can be
+   * transient (the community that grants the permission may replicate after
+   * the head), so a demoted head is re-admitted a few times with backoff.
+   */
+  private async admitHead(
+    value: Record<string, unknown>,
+    onReadmitted?: (admitted: Record<string, unknown>) => void,
+    attempt: number = 0,
+  ): Promise<Record<string, unknown>> {
+    if (!this.mutationGate) return value;
+    const { admitted, degraded } = await this.admitGatedCollections(value);
+
+    if (degraded && onReadmitted) {
+      this.scheduleReadmission(value, onReadmitted, attempt);
+    }
+
+    return degraded ? { ...admitted, updatedAt: 0 } : admitted;
+  }
+
+  private cacheReadmittedHead(
+    networkId: string,
+    headKey: string,
+    value: Record<string, unknown>,
+    persist: boolean = true,
+  ): void {
+    for (const key of this.headKeyDeriver.cachedKeys(headKey, value)) {
+      const cachedHead = this.cacheReplicatedHead(networkId, key, value);
+
+      if (cachedHead && persist) {
+        void this.persistHeadCache(networkId, key, cachedHead);
+      }
+    }
+  }
+
+  private async admitGatedCollections(
+    value: Record<string, unknown>,
+  ): Promise<{ admitted: Record<string, unknown>; degraded: boolean }> {
+    const admitted = { ...value };
+    let degraded = false;
+
+    for (const [collection, records] of Object.entries(value)) {
+      if (!this.isGatedHeadCollection(collection, records)) continue;
+
+      const kept = await this.admittedRecords(
+        collection,
+        records.filter((record) => this.isRecord(record)),
+      );
+
+      degraded ||= kept.length === 0 || kept.length !== records.length;
+      admitted[collection] = kept;
+    }
+
+    return { admitted, degraded };
+  }
+
+  private scheduleReadmission(
+    value: Record<string, unknown>,
+    onReadmitted: (admitted: Record<string, unknown>) => void,
+    attempt: number,
+  ): void {
+    const delay = OrbitDBReplicatedStateRegistry.READMISSION_DELAYS_MS[attempt];
+
+    if (delay === undefined) return;
+    const timer = setTimeout(() => {
+      void this.admitHead(value, onReadmitted, attempt + 1)
+        .then(onReadmitted)
+        .catch(() => {
+          Kernel.logger.warn?.('OrbitDB head re-admission failed');
+        });
+    }, delay);
+
+    timer.unref();
+  }
+
+  private isGatedHeadCollection(
+    collection: string,
+    records: unknown,
+  ): records is unknown[] {
+    return (
+      Array.isArray(records) &&
+      OrbitDBReplicatedStateRegistry.INDEX_HEAD_COLLECTION_NAMES.has(
+        collection,
+      ) &&
+      this.mutationGate?.governs(collection) === true
+    );
+  }
+
+  private async admittedStoreRecords(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    store: OrbitDBDatabase,
+  ): Promise<Array<{ key?: string; value: Record<string, unknown> }>> {
+    const admitted: Array<{ key?: string; value: Record<string, unknown> }> =
+      [];
+
+    for (const record of await this.allRecords(store)) {
+      if (await this.admitRecord(storeName, record.value))
+        admitted.push(record);
+    }
+
+    return admitted;
+  }
+
   private async allRecords(store: OrbitDBDatabase): Promise<
     Array<{
       key?: string;
@@ -234,13 +379,13 @@ export default class OrbitDBReplicatedStateRegistry {
       }));
   }
 
-  private notifyDocumentUpdated(
+  private async notifyDocumentUpdated(
     storeName: OrbitDBReplicatedDocumentStoreName,
     value: unknown,
-  ): void {
+  ): Promise<void> {
     const document = this.recordValue(value);
 
-    if (!document) {
+    if (!document || !(await this.admitRecord(storeName, document))) {
       return;
     }
 
@@ -370,6 +515,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
     const startedAt = process.hrtime.bigint();
     const projectedDocuments = await this.bootstrapDocumentUpdateListener(
+      storeName,
       store,
       listeners,
     );
@@ -398,7 +544,7 @@ export default class OrbitDBReplicatedStateRegistry {
       const history = this.documentHistory(storeName, store);
 
       if (history) this.refreshDocumentHistory(history);
-      else this.notifyDocumentUpdated(storeName, entry.payload?.value);
+      else void this.notifyDocumentUpdated(storeName, entry.payload?.value);
     });
     store.events?.on?.('join', (_peerId, heads) => {
       const history = this.documentHistory(storeName, store);
@@ -450,6 +596,7 @@ export default class OrbitDBReplicatedStateRegistry {
   }
 
   private async bootstrapDocumentUpdateListener(
+    storeName: OrbitDBReplicatedDocumentStoreName,
     store: OrbitDBDatabase,
     listeners: Set<
       (
@@ -458,7 +605,7 @@ export default class OrbitDBReplicatedStateRegistry {
       ) => void | Promise<void>
     >,
   ): Promise<number> {
-    const records = await this.allRecords(store);
+    const records = await this.admittedStoreRecords(storeName, store);
 
     for (let index = 0; index < records.length; index++) {
       await this.notifyBootstrappedDocument(listeners, records[index].value);
@@ -486,14 +633,20 @@ export default class OrbitDBReplicatedStateRegistry {
         async (value, scope) => {
           const document = this.recordValue(value);
 
-          if (document) await listener(document, scope);
+          if (document && (await this.admitRecord(storeName, document))) {
+            await listener(document, scope);
+          }
         },
         () => (observer ? [observer] : []),
       ).refresh();
     } else if (history) {
       await history.refresh();
     } else {
-      await this.bootstrapDocumentUpdateListener(store, new Set([listener]));
+      await this.bootstrapDocumentUpdateListener(
+        storeName,
+        store,
+        new Set([listener]),
+      );
     }
   }
 
@@ -510,7 +663,9 @@ export default class OrbitDBReplicatedStateRegistry {
       const history = this.documentHistory(storeName, store);
 
       if (history) await history.refresh();
-      else await this.bootstrapDocumentUpdateListener(store, listeners);
+      else {
+        await this.bootstrapDocumentUpdateListener(storeName, store, listeners);
+      }
     }
   }
 
@@ -525,12 +680,13 @@ export default class OrbitDBReplicatedStateRegistry {
     this.markPersistedHeadKey(networkId, record.key);
 
     let persisted = true;
+    const recordKey = record.key;
+    const value = await this.admitHead(record.value, (readmitted) =>
+      this.cacheReadmittedHead(networkId, recordKey, readmitted),
+    );
 
-    for (const key of this.headKeyDeriver.cachedKeys(
-      record.key,
-      record.value,
-    )) {
-      const cachedHead = this.cacheReplicatedHead(networkId, key, record.value);
+    for (const key of this.headKeyDeriver.cachedKeys(record.key, value)) {
+      const cachedHead = this.cacheReplicatedHead(networkId, key, value);
 
       if (cachedHead) {
         persisted =
@@ -865,32 +1021,34 @@ export default class OrbitDBReplicatedStateRegistry {
     this.replicateHeadInBackground(key, merged, [networkId], true);
   }
 
-  private cacheHeadUpdate(
+  private async cacheHeadUpdate(
     networkId: string,
     entry: { payload?: { key?: string; value?: unknown } },
-  ): void {
+  ): Promise<void> {
     const payloadValue = entry.payload?.value;
 
     if (!this.isRecord(payloadValue)) {
       return;
     }
 
-    const record = this.recordValue(payloadValue);
+    const received = this.recordValue(payloadValue);
 
-    if (!record) {
+    if (!received) {
       return;
     }
 
-    const keys = this.headKeysFromUpdate(networkId, entry, record);
+    const apply = (record: Record<string, unknown>): void => {
+      for (const key of this.headKeysFromUpdate(networkId, entry, record)) {
+        const cachedHead = this.cacheReplicatedHead(networkId, key, record);
 
-    for (const key of keys) {
-      const cachedHead = this.cacheReplicatedHead(networkId, key, record);
-
-      if (cachedHead) {
-        void this.persistHeadCache(networkId, key, cachedHead);
-        this.persistMergedHead(networkId, key, record, cachedHead);
+        if (cachedHead) {
+          void this.persistHeadCache(networkId, key, cachedHead);
+          this.persistMergedHead(networkId, key, record, cachedHead);
+        }
       }
-    }
+    };
+
+    apply(this.mutationGate ? await this.admitHead(received, apply) : received);
   }
 
   private isMergeableHeadKey(key: unknown): key is string {
@@ -1024,16 +1182,15 @@ export default class OrbitDBReplicatedStateRegistry {
         this.headCache.isWarm(networkId),
       ]);
 
-      heads.forEach((head) => {
+      for (const head of heads) {
         this.markPersistedHeadKey(networkId, head.key);
+        const headKey = head.key;
+        const value = await this.admitHead(head.value, (readmitted) =>
+          this.cacheReadmittedHead(networkId, headKey, readmitted),
+        );
 
-        for (const key of this.headKeyDeriver.cachedKeys(
-          head.key,
-          head.value,
-        )) {
-          this.cacheReplicatedHead(networkId, key, head.value);
-        }
-      });
+        this.cacheReadmittedHead(networkId, headKey, value, false);
+      }
 
       if (heads.length > 0) {
         Kernel.logger.debug?.(
@@ -1310,6 +1467,10 @@ export default class OrbitDBReplicatedStateRegistry {
     current: Record<string, unknown>,
     candidate: Record<string, unknown>,
   ): boolean {
+    const byProof = PublicMutationRecord.replaces(current, candidate);
+
+    if (byProof !== undefined) return byProof;
+
     const currentVersion = this.documentVersion(current);
     const candidateVersion = this.documentVersion(candidate);
 
@@ -1540,7 +1701,8 @@ export default class OrbitDBReplicatedStateRegistry {
     key: string,
   ): Promise<Record<string, unknown> | undefined> {
     for (const [networkId, stores] of this.storesByNetworkId) {
-      const directRecord = this.recordValue(await stores.heads.get?.(key));
+      const stored = this.recordValue(await stores.heads.get?.(key));
+      const directRecord = stored && (await this.admitHead(stored));
 
       if (directRecord) {
         const cachedHead = this.cacheReplicatedHead(
@@ -1560,9 +1722,9 @@ export default class OrbitDBReplicatedStateRegistry {
     networkId: string,
     stores: OrbitDBPrivateNetworkStores,
   ): void {
-    stores.heads.events?.on?.('update', (entry) =>
-      this.cacheHeadUpdate(networkId, entry),
-    );
+    stores.heads.events?.on?.('update', (entry) => {
+      void this.cacheHeadUpdate(networkId, entry);
+    });
     stores.heads.events?.on?.('join', (_peerId, heads) =>
       this.reconcileStoreAfterHeadExchange(
         stores.heads,
@@ -1734,6 +1896,10 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
+  public useMutationGate(gate: OrbitDBMutationGate): void {
+    this.mutationGate = gate;
+  }
+
   public async putDocument(
     storeName: OrbitDBReplicatedDocumentStoreName,
     document: Record<string, unknown>,
@@ -1741,6 +1907,11 @@ export default class OrbitDBReplicatedStateRegistry {
   ): Promise<void> {
     this.assertReady();
     const cleanDocument = this.cleanDocument(document);
+
+    if (!(await this.admitRecord(storeName, cleanDocument))) {
+      throw new InvalidPublicMutationError();
+    }
+
     const targetNetworkIds = await this.targetNetworkIdsForDocument(
       cleanDocument,
       networkIds,
@@ -1771,13 +1942,13 @@ export default class OrbitDBReplicatedStateRegistry {
             return [];
           }
 
-          if (store.query) {
-            return store.query(matcher);
-          }
+          const matched = store.query
+            ? await store.query(matcher)
+            : (await this.allRecords(store))
+                .map((record) => record.value)
+                .filter(matcher);
 
-          return (await this.allRecords(store))
-            .map((record) => record.value)
-            .filter(matcher);
+          return this.admittedRecords(storeName, matched);
         },
       ),
     );
@@ -1792,6 +1963,11 @@ export default class OrbitDBReplicatedStateRegistry {
   ): Promise<void> {
     this.assertReady();
     const cleanDocument = this.cleanDocument(document);
+
+    if (!(await this.admitRecord(storeName, cleanDocument))) {
+      throw new InvalidPublicMutationError();
+    }
+
     const targetNetworkIds = await this.targetNetworkIdsForDocument(
       cleanDocument,
       networkIds,

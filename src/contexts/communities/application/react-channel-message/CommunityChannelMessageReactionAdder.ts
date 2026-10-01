@@ -35,10 +35,11 @@ export default class CommunityChannelMessageReactionAdder {
       message.channelId,
       message.messageId,
       message.emoji,
+      message.createdAt,
     );
     const communityPrimitives = community.toPrimitives();
 
-    await this.reactionRepository.save(reaction);
+    await this.reactionRepository.save(reaction, message.proof);
     await this.eventPublisher.publish([
       new CommunityChannelMessageReactionWasAddedEvent(
         message.communityId.valueOf(),
@@ -46,6 +47,7 @@ export default class CommunityChannelMessageReactionAdder {
           ...reaction.toPrimitives(),
           community: communityPrimitives,
           memberIds: communityPrimitives.memberIds,
+          mutationProof: message.proof.toPrimitives(),
           networkId: communityPrimitives.networkId,
         },
       ),

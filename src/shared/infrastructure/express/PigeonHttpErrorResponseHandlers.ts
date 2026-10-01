@@ -11,6 +11,7 @@ export const handleDomainError: ErrorResponseHandler = (error, response) => {
 
   response.status(HttpRouteStatusEnum.CONFLICT).json({
     code: error.constructor.name,
+    ...('details' in error ? { details: error.details } : {}),
     message: error.message,
   });
 

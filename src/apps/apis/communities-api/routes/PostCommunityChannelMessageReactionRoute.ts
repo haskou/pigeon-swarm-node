@@ -38,6 +38,8 @@ export class PostCommunityChannelMessageReactionRoute extends CommunityRouteSupp
         messageId,
         actorIdentityId.valueOf(),
         body.emoji,
+        body.mutation,
+        body.createdAt,
       ),
     );
 

@@ -2,8 +2,16 @@ import CommunityChannelMessagePinner from '@app/contexts/communities/application
 import { CommunityChannelMessagePinCreateMessage } from '@app/contexts/communities/application/manage-channel-message-pin/messages/CommunityChannelMessagePinCreateMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  JsonController,
+  Param,
+  Post,
+  Req,
+  Res,
+} from 'routing-controllers';
 
+import { PostCommunityChannelMessagePinBody } from '../bodies/PostCommunityChannelMessagePinBody';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
@@ -17,6 +25,7 @@ export class PostCommunityChannelMessagePinRoute extends CommunityRouteSupport {
     @Param('communityId') communityId: string,
     @Param('channelId') channelId: string,
     @Param('messageId') messageId: string,
+    @Body() body: PostCommunityChannelMessagePinBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
@@ -27,6 +36,8 @@ export class PostCommunityChannelMessagePinRoute extends CommunityRouteSupport {
         communityId,
         channelId,
         messageId,
+        body.createdAt,
+        body.mutation,
       ),
     );
 

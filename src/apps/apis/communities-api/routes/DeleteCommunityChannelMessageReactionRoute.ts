@@ -38,6 +38,8 @@ export class DeleteCommunityChannelMessageReactionRoute extends CommunityRouteSu
         messageId,
         actorIdentityId.valueOf(),
         body.emoji,
+        body.mutation,
+        body.createdAt,
       ),
     );
 

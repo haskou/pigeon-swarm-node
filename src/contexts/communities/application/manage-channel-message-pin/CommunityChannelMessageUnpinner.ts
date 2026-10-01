@@ -29,6 +29,8 @@ export default class CommunityChannelMessageUnpinner {
       message.communityId,
       message.channelId,
       message.messageId,
+      message.actorIdentityId,
+      message.proof,
     );
     const communityPrimitives = community.toPrimitives();
 

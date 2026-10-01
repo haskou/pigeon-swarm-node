@@ -22,6 +22,7 @@ import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/Node
 import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import Ed25519PrivateDeviceCredentialCodec from '@app/contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
@@ -1935,11 +1936,62 @@ export default class Definitions {
     );
   }
 
-  @given('I set a community channel message reaction body')
-  public iSetACommunityChannelMessageReactionBody(): void {
-    this.body = JSON.stringify({
-      emoji: '👍',
+  private async communityReactionMutationBody(
+    kind: 'put' | 'delete',
+  ): Promise<string> {
+    const keyPair = await this.ensureIdentityKeyPair();
+    const identityId = keyPair.toPrimitives().publicKey;
+    const emoji = '👍';
+    const createdAt = 1_780_000_000_000;
+    const recordId = [
+      'community_channel',
+      this.communityId,
+      this.communityChannelId,
+      this.communityChannelMessageId,
+      identityId,
+      emoji,
+    ].join(':');
+    const document = {
+      authorIdentityId: identityId,
+      channelId: this.communityChannelId,
+      communityId: this.communityId,
+      emoji,
+      id: recordId,
+      messageId: this.communityChannelMessageId,
+      scopeType: 'community_channel',
+    };
+    const payload =
+      kind === 'put'
+        ? { ...document, createdAt }
+        : { ...document, removed: true };
+    const sequence = kind === 'put' ? 0 : 1;
+    const proofBody = {
+      author: { deviceCredential: identityId, identityId },
+      kind,
+      operationId: `api-reaction-${sequence}`.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor:
+        sequence === 0 ? null : PublicMutationProof.digestOf({ previous: 0 }),
+      recordId,
+      sequence,
+      store: 'reactions',
+      version: 1,
+    } as const;
+    const proof = PublicMutationProof.signed(
+      proofBody,
+      keyPair.sign(PublicMutationProof.signingContentOf(proofBody)),
+    );
+
+    return JSON.stringify({
+      ...(kind === 'put' ? { createdAt } : {}),
+      emoji,
+      mutation: proof.toPrimitives(),
     });
+  }
+
+  @given('I set a community channel message reaction body')
+  public async iSetACommunityChannelMessageReactionBody(): Promise<void> {
+    this.body = await this.communityReactionMutationBody('put');
   }
 
   @given('I sign the current community channel message reaction request')
@@ -1970,6 +2022,7 @@ export default class Definitions {
       throw new Error('Community, channel and message must be created first.');
     }
 
+    this.body = await this.communityReactionMutationBody('delete');
     await this.signCurrentRequest(
       'DELETE',
       `/communities/${this.communityId}/channels/${this.communityChannelId}/messages/${this.communityChannelMessageId}/reactions`,

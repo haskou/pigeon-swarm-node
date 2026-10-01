@@ -35,10 +35,11 @@ export default class CommunityChannelMessageReactionRemover {
       message.channelId,
       message.messageId,
       message.emoji,
+      message.createdAt,
     );
     const communityPrimitives = community.toPrimitives();
 
-    await this.reactionRepository.delete(reaction);
+    await this.reactionRepository.delete(reaction, message.proof);
     await this.eventPublisher.publish([
       new CommunityChannelMessageReactionRemovedEvent(
         message.communityId.valueOf(),
@@ -46,6 +47,7 @@ export default class CommunityChannelMessageReactionRemover {
           ...reaction.toPrimitives(),
           community: communityPrimitives,
           memberIds: communityPrimitives.memberIds,
+          mutationProof: message.proof.toPrimitives(),
           networkId: communityPrimitives.networkId,
         },
       ),
