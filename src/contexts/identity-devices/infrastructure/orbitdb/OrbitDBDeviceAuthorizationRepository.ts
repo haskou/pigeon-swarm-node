@@ -1684,11 +1684,8 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
         this.isDocument(candidate) &&
         this.hasTrustedGenesis(candidate, trustedGenesis)
           ? candidate
-          : this.toDocument(trustedGenesis, []);
+          : await this.save(this.toDocument(trustedGenesis, []));
 
-      if (stored !== candidate) {
-        await this.save(stored);
-      }
       assert(
         !this.hasReplay(stored, transition),
         new InvalidDeviceAuthorizationTransitionError(),
@@ -1779,6 +1776,31 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       }
 
       await this.save(this.toDocument(authorization, []));
+    });
+  }
+
+  public withdrawProvision(
+    identityId: IdentityId,
+    identityVersion: IdentityVersion,
+    identityExternalIdentifier: IdentityExternalIdentifier,
+  ): Promise<void> {
+    return this.withIdentityLock(identityId, () => {
+      const key = identityId.valueOf();
+      const currentVersion = this.routingVersionByIdentity.get(key);
+      const currentExternalIdentifier =
+        this.routingExternalIdentifierByIdentity.get(key);
+
+      if (
+        currentVersion?.isEqual(identityVersion) &&
+        currentExternalIdentifier?.isEqual(identityExternalIdentifier)
+      ) {
+        this.routingNetworkIdsByIdentity.delete(key);
+        this.routingVersionByIdentity.delete(key);
+        this.routingExternalIdentifierByIdentity.delete(key);
+        this.trustedGenesisByIdentity.delete(key);
+      }
+
+      return Promise.resolve();
     });
   }
 }

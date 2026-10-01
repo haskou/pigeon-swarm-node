@@ -39,22 +39,29 @@ export default class IdentityPublisher {
     const externalIdentifier =
       await this.saver.calculateExternalIdentifier(identity);
 
-    await this.deviceAuthorizationProvisioner.provision(
-      new DeviceAuthorizationProvisionMessage(
-        new IdentityId(primitives.id),
-        identity.getVersion(),
-        externalIdentifier,
-        identity.getNetworkIds(),
-        identity.getInitialDeviceCredential(),
-        identity.getRecoveryAuthority(),
-      ),
+    const provisionMessage = new DeviceAuthorizationProvisionMessage(
+      new IdentityId(primitives.id),
+      identity.getVersion(),
+      externalIdentifier,
+      identity.getNetworkIds(),
+      identity.getInitialDeviceCredential(),
+      identity.getRecoveryAuthority(),
     );
-    const savedExternalIdentifier = await this.saver.save(identity);
 
-    assert(
-      externalIdentifier.isEqual(savedExternalIdentifier),
-      new InvalidIdentityCandidateError(),
-    );
+    await this.deviceAuthorizationProvisioner.provision(provisionMessage);
+
+    try {
+      const savedExternalIdentifier = await this.saver.save(identity);
+
+      assert(
+        externalIdentifier.isEqual(savedExternalIdentifier),
+        new InvalidIdentityCandidateError(),
+      );
+    } catch (error) {
+      await this.deviceAuthorizationProvisioner.withdraw(provisionMessage);
+
+      throw error;
+    }
 
     const events = identity.pullDomainEvents();
 

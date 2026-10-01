@@ -65,4 +65,18 @@ describe('IdentityPublisher', () => {
     expect(provisionCall).toBeLessThan(saveCall);
     expect(saveCall).toBeLessThan(eventCall);
   });
+
+  it('withdraws the provisional authorization when saving the identity fails', async () => {
+    const identity = new IdentityMother().build();
+    saver.save.mockRejectedValue(new Error('routing publication failed'));
+
+    await expect(
+      publisher.publish(new IdentityPublishMessage(identity.toPrimitives())),
+    ).rejects.toThrow('routing publication failed');
+    expect(provisioner.withdraw).toHaveBeenCalledTimes(1);
+    expect(provisioner.withdraw).toHaveBeenCalledWith(
+      provisioner.provision.mock.calls[0][0],
+    );
+    expect(eventPublisher.publish).not.toHaveBeenCalled();
+  });
 });

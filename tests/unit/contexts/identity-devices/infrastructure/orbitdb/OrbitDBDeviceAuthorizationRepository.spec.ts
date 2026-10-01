@@ -594,14 +594,8 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       ),
     );
     const recoveryHead = recovered.getHead();
-    const onceMerged = first.getMerger()?.(
-      recoveryHead,
-      mergedFromFirst ?? {},
-    );
-    const staleFlood = first.getMerger()?.(
-      onceMerged,
-      alternateMerged ?? {},
-    );
+    const onceMerged = first.getMerger()?.(recoveryHead, mergedFromFirst ?? {});
+    const staleFlood = first.getMerger()?.(onceMerged, alternateMerged ?? {});
     const staleOverflow = first.getMerger()?.(
       mergedFromFirst,
       alternateMerged ?? {},
@@ -613,9 +607,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
     expect(onceMerged).toEqual(recoveryHead);
     expect(staleFlood).toEqual(recoveryHead);
-    expect(
-      (staleOverflow as { overflow?: unknown }).overflow,
-    ).toBeDefined();
+    expect((staleOverflow as { overflow?: unknown }).overflow).toBeDefined();
     expect(recoveredAfterOverflow).toEqual(recoveryHead);
   }, 60_000);
 
@@ -893,10 +885,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       malicious,
       competingRevocation,
     );
-    const repeatedOverflow = aggregate.getMerger()?.(
-      overflow,
-      overflow,
-    );
+    const repeatedOverflow = aggregate.getMerger()?.(overflow, overflow);
     const merged = aggregate.getMerger()?.(honest, malicious) as {
       authorization?: { credentials?: string[] };
       history?: Array<{
@@ -905,10 +894,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       overflow?: unknown;
     };
     const reversed = aggregate.getMerger()?.(malicious, honest);
-    const leftAssociated = aggregate.getMerger()?.(
-      merged,
-      competingRevocation,
-    );
+    const leftAssociated = aggregate.getMerger()?.(merged, competingRevocation);
     const rightAssociated = aggregate.getMerger()?.(overflow, honest);
 
     expect(overflow).toEqual(reversedOverflow);
@@ -1176,9 +1162,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       ) as Record<string, unknown>;
     }
 
-    expect(
-      (malicious as { overflow?: unknown }).overflow,
-    ).toBeDefined();
+    expect((malicious as { overflow?: unknown }).overflow).toBeDefined();
 
     const honest = repositoryFixture();
     const unsignedHonest = DeviceAuthorizationTransition.revocation(
@@ -1723,14 +1707,10 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const trusted = getHead() as {
       checkpoint: {
         lineage: Array<{
-          transition: ReturnType<
-            DeviceAuthorizationTransition['toPrimitives']
-          >;
+          transition: ReturnType<DeviceAuthorizationTransition['toPrimitives']>;
         }>;
         transition: {
-          transition: ReturnType<
-            DeviceAuthorizationTransition['toPrimitives']
-          >;
+          transition: ReturnType<DeviceAuthorizationTransition['toPrimitives']>;
         };
       };
     } & Record<string, unknown>;
@@ -2157,6 +2137,58 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       expect.any(String),
       expect.any(Object),
       expectedNetworks,
+    );
+  });
+
+  it('discards the routing of a provisional identity candidate that failed to publish', async () => {
+    const { genesis, identityId } = await fixture();
+    const failedNetworkId = '550e8400-e29b-41d4-a716-446655440002';
+    const publishedNetworkId = '550e8400-e29b-41d4-a716-446655440001';
+    const failed = DeviceAuthorization.genesis(
+      identityId,
+      [...genesis.getNetworkIds(), new NetworkId(failedNetworkId)],
+      genesis.getCredentials()[0],
+      genesis.getRecoveryAuthority(),
+    );
+    const published = DeviceAuthorization.genesis(
+      identityId,
+      [...genesis.getNetworkIds(), new NetworkId(publishedNetworkId)],
+      genesis.getCredentials()[0],
+      genesis.getRecoveryAuthority(),
+    );
+    const current = repositoryFixture();
+    current.networkRegistry.getAll.mockReturnValue([
+      ...current.networkRegistry.getAll(),
+      privateNetwork(failedNetworkId),
+      privateNetwork(publishedNetworkId),
+    ]);
+    const failedIdentifier = new IdentityExternalIdentifier('bafy-a-failed');
+    const publishedIdentifier = new IdentityExternalIdentifier(
+      'bafy-b-published',
+    );
+
+    await provisionAuthorization(
+      current.repository,
+      failed,
+      2,
+      failedIdentifier,
+    );
+    await current.repository.withdrawProvision(
+      identityId,
+      new IdentityVersion(2),
+      failedIdentifier,
+    );
+    await provisionAuthorization(
+      current.repository,
+      published,
+      2,
+      publishedIdentifier,
+    );
+
+    expect(current.registry.putHead).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      ['550e8400-e29b-41d4-a716-446655440000', publishedNetworkId],
     );
   });
 });

@@ -21,4 +21,12 @@ export default class DeviceAuthorizationProvisioner {
       message.identityExternalIdentifier,
     );
   }
+
+  public withdraw(message: DeviceAuthorizationProvisionMessage): Promise<void> {
+    return this.repository.withdrawProvision(
+      message.identityId,
+      message.identityVersion,
+      message.identityExternalIdentifier,
+    );
+  }
 }
