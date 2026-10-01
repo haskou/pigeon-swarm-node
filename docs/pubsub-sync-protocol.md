@@ -394,8 +394,10 @@ records, unknown unsigned fields, transition records above 16 KiB and more than
 1 MiB of aggregate post-checkpoint history before parsing or verifying them.
 An authority-signed recovery becomes a new verified checkpoint and discards the
 older transition history, so those limits bound replay work without imposing a
-lifetime operation limit. Public-network heads are rejected and writes fail
-closed when no configured private network is available.
+lifetime operation limit. Public-network heads are rejected. An identity whose
+networks are all public keeps its authorization only in the node's local
+database: nothing is published or replicated, so a device catalog never reaches
+a public network, and such an identity does not converge across nodes.
 
 The public identity publication binds an independent genesis device credential
 and its commitment under the identity signature. The node does not derive that
