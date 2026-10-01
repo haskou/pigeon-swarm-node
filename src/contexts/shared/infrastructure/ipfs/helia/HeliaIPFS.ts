@@ -9,6 +9,7 @@ import * as fs from 'fs/promises';
 
 import { IPFSBlockNotFoundOfflineError } from '../errors/IPFSBlockNotFoundOfflineError';
 import { IPFSBlockNotFoundPublicError } from '../errors/IPFSBlockNotFoundPublicError';
+import { IPFSContentTooLargeError } from '../errors/IPFSContentTooLargeError';
 import { Libp2pPrivateKeyLike } from '../networks/adapters/types/Libp2pPrivateKeyLike';
 import {
   heliaRuntimeAdapter,
@@ -520,6 +521,27 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return [await (rawBlocks as Promise<Uint8Array> | Uint8Array)];
   }
 
+  private async getBoundedJSON<T>(
+    cid: IPFSId,
+    maxBytes: number,
+    signal?: AbortSignal,
+  ): Promise<T> {
+    const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
+      cid.valueOf(),
+    );
+    const chunks = await this.collectRawBlockBytes(
+      parsedCid,
+      await this.createContentRetrievalOptions(cid, signal),
+    );
+    const bytes = Buffer.concat(chunks);
+
+    if (bytes.byteLength > maxBytes) {
+      throw new IPFSContentTooLargeError(cid.valueOf(), maxBytes);
+    }
+
+    return JSON.parse(bytes.toString('utf8')) as T;
+  }
+
   private async localBlockBytes(
     parsedCid: ParsedCidLike,
     signal?: AbortSignal,
@@ -971,7 +993,11 @@ export abstract class HeliaIPFS implements IPFSConnection {
     ]);
   }
 
-  public async getBytes(cid: IPFSId, signal?: AbortSignal): Promise<Buffer> {
+  public async getBytes(
+    cid: IPFSId,
+    signal?: AbortSignal,
+    maxBytes?: number,
+  ): Promise<Buffer> {
     const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
       cid.valueOf(),
     );
@@ -980,11 +1006,23 @@ export abstract class HeliaIPFS implements IPFSConnection {
       signal,
     );
     const chunks: Uint8Array[] = [];
+    let receivedBytes = 0;
+    const assertWithinLimit = (chunk: Uint8Array): void => {
+      receivedBytes += chunk.byteLength;
+
+      if (maxBytes !== undefined && receivedBytes > maxBytes) {
+        throw new IPFSContentTooLargeError(cid.valueOf(), maxBytes);
+      }
+    };
 
     if (IPFSCidCodec.isRaw(parsedCid)) {
-      chunks.push(
-        ...(await this.collectRawBlockBytes(parsedCid, retrievalOptions)),
+      const rawChunks = await this.collectRawBlockBytes(
+        parsedCid,
+        retrievalOptions,
       );
+
+      rawChunks.forEach(assertWithinLimit);
+      chunks.push(...rawChunks);
 
       return Buffer.concat(chunks);
     }
@@ -1001,6 +1039,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       parsedCid,
       catOptions as never,
     )) {
+      assertWithinLimit(chunk);
       chunks.push(chunk);
     }
 
@@ -1067,7 +1106,15 @@ export abstract class HeliaIPFS implements IPFSConnection {
     }
   }
 
-  public async getJSON<T>(cid: IPFSId, signal?: AbortSignal): Promise<T> {
+  public async getJSON<T>(
+    cid: IPFSId,
+    signal?: AbortSignal,
+    maxBytes?: number,
+  ): Promise<T> {
+    if (maxBytes !== undefined) {
+      return this.getBoundedJSON<T>(cid, maxBytes, signal);
+    }
+
     const heliaJSONClient = await heliaRuntimeAdapter.createJSONClient(
       this.heliaCore,
     );

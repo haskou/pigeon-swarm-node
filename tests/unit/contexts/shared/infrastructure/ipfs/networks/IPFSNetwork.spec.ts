@@ -94,7 +94,11 @@ describe('IPFSNetwork', () => {
 
       const result = await network.getJSON(cid);
 
-      expect(connection.getJSON).toHaveBeenCalledWith(cid, undefined);
+      expect(connection.getJSON).toHaveBeenCalledWith(
+        cid,
+        undefined,
+        undefined,
+      );
       expect(result).toEqual(expected);
     });
   });

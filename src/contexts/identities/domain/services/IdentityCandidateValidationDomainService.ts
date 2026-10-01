@@ -4,6 +4,8 @@ import { Identity } from '../Identity';
 import { IdentityExternalIdentifier } from '../value-objects/IdentityExternalIdentifier';
 
 export default class IdentityCandidateValidationDomainService {
+  private static readonly MAX_CHAIN_DEPTH = 256;
+
   private isValidPreviousLink(
     candidate: Identity,
     previousIdentity: Identity,
@@ -23,10 +25,17 @@ export default class IdentityCandidateValidationDomainService {
     );
   }
 
-  private hasVisited(
+  private hasVisitedOrExceededDepth(
     externalIdentifier: IdentityExternalIdentifier,
     visitedExternalIdentifiers: IdentityExternalIdentifier[],
   ): boolean {
+    if (
+      visitedExternalIdentifiers.length >=
+      IdentityCandidateValidationDomainService.MAX_CHAIN_DEPTH
+    ) {
+      return true;
+    }
+
     return visitedExternalIdentifiers.some((visited) =>
       visited.isEqual(externalIdentifier),
     );
@@ -58,7 +67,12 @@ export default class IdentityCandidateValidationDomainService {
       return false;
     }
 
-    if (this.hasVisited(previousReference, visitedExternalIdentifiers)) {
+    if (
+      this.hasVisitedOrExceededDepth(
+        previousReference,
+        visitedExternalIdentifiers,
+      )
+    ) {
       return false;
     }
 

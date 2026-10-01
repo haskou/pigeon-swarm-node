@@ -64,6 +64,10 @@ Implemented:
 - canonical payload `timestamp` is a JSON number; HTTP headers and WebSocket
   query parameters still carry it as text
 - timestamp freshness validation with a 30 second maximum clock skew
+- replay rejection: a mutating (non-GET/HEAD/OPTIONS) signed request or
+  WebSocket upgrade whose identity and signature were already accepted inside
+  the freshness window is rejected with `401`; the guard is in-memory and per
+  node
 - Cucumber scenarios for invalid and stale signed requests
 
 ## Path Parameters
@@ -132,7 +136,12 @@ X-Signature: <signature>
 ```
 
 The signed path is the WebSocket path without query string. If `ROUTE_PREFIX`
-is configured, sign `<ROUTE_PREFIX>/ws`.
+is configured, sign `<ROUTE_PREFIX>/ws`. Each signed upgrade URL is single-use.
+
+Per node, upgrades are rate limited per remote address and total open sockets
+are capped; excess upgrades receive `429 Too Many Requests` before signature
+verification. A socket sending more than 200 client messages in 10 seconds is
+closed with code `1008`.
 
 Connection acknowledgement:
 

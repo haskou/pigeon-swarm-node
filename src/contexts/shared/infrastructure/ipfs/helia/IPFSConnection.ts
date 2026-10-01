@@ -7,10 +7,14 @@ export interface IPFSConnection {
   addBytes(bytes: Uint8Array, signal?: AbortSignal): Promise<IPFSId>;
   dial(multiaddr: string, signal?: AbortSignal): Promise<void>;
   listen(multiaddr: string): Promise<void>;
-  getBytes(cid: IPFSId, signal?: AbortSignal): Promise<Buffer>;
+  getBytes(
+    cid: IPFSId,
+    signal?: AbortSignal,
+    maxBytes?: number,
+  ): Promise<Buffer>;
   addJSON(data: unknown, signal?: AbortSignal): Promise<IPFSId>;
   removeJSON(cid: IPFSId, signal?: AbortSignal): Promise<void>;
-  getJSON<T>(cid: IPFSId, signal?: AbortSignal): Promise<T>;
+  getJSON<T>(cid: IPFSId, signal?: AbortSignal, maxBytes?: number): Promise<T>;
   putRecord(key: string, value: string, signal?: AbortSignal): Promise<void>;
   getRecord(key: string, signal?: AbortSignal): Promise<string | undefined>;
   provideContent(cid: IPFSId, signal?: AbortSignal): Promise<void>;
