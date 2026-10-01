@@ -94,7 +94,6 @@ export default class WebPushNotificationDelivery extends PushNotificationDeliver
   private logFailedDelivery(result: PushNotificationDeliveryResult): void {
     Kernel.logger?.warn(
       JSON.stringify({
-        endpoint: result.endpoint,
         endpointHost: result.endpointHost,
         error: result.error,
         message: 'Web Push delivery failed.',

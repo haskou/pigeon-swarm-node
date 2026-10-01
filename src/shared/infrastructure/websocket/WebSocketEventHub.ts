@@ -40,6 +40,8 @@ const identityAttributeKeys = [
   'sender_id',
 ];
 
+const MAX_CLIENTS_PER_IDENTITY = 16;
+
 export class WebSocketEventHub {
   private readonly conversationCallEventMapper =
     new ConversationCallEventRealtimeMapper();
@@ -755,6 +757,13 @@ export class WebSocketEventHub {
   public register(identityId: IdentityId, client: WebSocket): void {
     const identityIdValue = identityId.valueOf();
     const identityClients = this.clients.get(identityIdValue) || new Set();
+
+    if (identityClients.size >= MAX_CLIENTS_PER_IDENTITY) {
+      const [oldest] = identityClients;
+
+      identityClients.delete(oldest);
+      oldest.terminate();
+    }
 
     identityClients.add(client);
     this.clients.set(identityIdValue, identityClients);

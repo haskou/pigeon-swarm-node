@@ -5,9 +5,14 @@ import { WebSocketServer } from 'ws';
 import { WebSocketConnectionAuthenticator } from './WebSocketConnectionAuthenticator';
 import { webSocketEventHub } from './WebSocketEventHub';
 
+const MAX_CLIENT_FRAME_BYTES = 16 * 1024;
+
 export class WebSocketRealtimeServer {
   private readonly authenticator = new WebSocketConnectionAuthenticator();
-  private readonly server = new WebSocketServer({ noServer: true });
+  private readonly server = new WebSocketServer({
+    maxPayload: MAX_CLIENT_FRAME_BYTES,
+    noServer: true,
+  });
 
   private handleUpgrade(
     request: IncomingMessage,
