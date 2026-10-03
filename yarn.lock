@@ -762,15 +762,15 @@
   resolved "https://registry.yarnpkg.com/@hapi/bourne/-/bourne-3.0.0.tgz#f11fdf7dda62fe8e336fa7c6642d9041f30356d7"
   integrity sha512-Waj1cwPXJDucOib4a3bAISsKJVb15MKi9IvmTI/7ssVEm6sywXGjVJDhl6/umt1pK1ZS7PacXU3A1PmFKHEZ2w==
 
-"@haskou/ddd-kernel@2.0.7":
-  version "2.0.7"
-  resolved "https://registry.yarnpkg.com/@haskou/ddd-kernel/-/ddd-kernel-2.0.7.tgz#f0732887d31374a65be59a75b331e3d136009856"
-  integrity sha512-DAAmbb2hcW+rABtxbHnsRFJLWMSf57E4Ct6bXdghBasWwEGWAJaz/di8iuzBnzcNpPxeQ4aOULlLt2EsrBSwqg==
+"@haskou/ddd-kernel@2.0.13":
+  version "2.0.13"
+  resolved "https://registry.yarnpkg.com/@haskou/ddd-kernel/-/ddd-kernel-2.0.13.tgz#b5143c7eee5a1c6ac8bfba7867c93a27cd940467"
+  integrity sha512-zIxIxxx2NrS92b/yzaC3omdeUBSFBZlM1OqFhykJ4MP/jqUaJ2EE5t0OvdEDNOQc0x+5XY2XHsb6tzNuF2+Uew==
   dependencies:
-    "@haskou/flow" "2.0.1"
+    "@haskou/flow" "3.0.0"
     dotenv "^17.4.2"
-    fs-extra "^11.4.0"
-    node-dependency-injection "3.8.0"
+    fs-extra "^11.4.1"
+    node-dependency-injection "4.3.0"
 
 "@haskou/eslint-config@^0.2.1":
   version "0.2.1"
@@ -787,12 +787,12 @@
     eslint-plugin-unused-imports "^4.4.1"
     globals "^17.7.0"
 
-"@haskou/flow@2.0.1":
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/@haskou/flow/-/flow-2.0.1.tgz#751a4a5ad7ef49de8dcffb26ba057889f02e59bf"
-  integrity sha512-s9bDL6sRJd6PYmnrqlv/nzghuZ9MWx3VilqZ/m/1WO20XXvPsA/Q2naFZ9AgKzqj96gQgC0xLSIMPiR005b93g==
+"@haskou/flow@3.0.0":
+  version "3.0.0"
+  resolved "https://registry.yarnpkg.com/@haskou/flow/-/flow-3.0.0.tgz#bf8e247f59eadaa9d162d0b5d4624f51995a3e24"
+  integrity sha512-hjTT1W2oJo6cVR6kGgk3TBiKU5YhUOpU20rZHQAUPYfxYXqB58m8aqV5i/MuQnt6LfJsyr3iEidiTgARrgIjzA==
   dependencies:
-    "@haskou/value-objects" "^2.13.1"
+    "@haskou/value-objects" "^7.0.2"
 
 "@haskou/pigeon-swarm-crypto@3.0.0":
   version "3.0.0"
@@ -808,33 +808,19 @@
     ts-mls "1.6.4"
     tslib "^2.8.1"
 
-"@haskou/value-objects@7.0.0":
-  version "7.0.0"
-  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-7.0.0.tgz#b7028a082b4f71bd8c3708c0450d0a54b8edbbbb"
-  integrity sha512-wcZlTGZvNmsVUpZciPJ05ugoEpfn6/uwVEduRtanxVGpvT+Su8kYWFfemOYjosqyLsuB9/AR+auss3l/NEyU/w==
-  dependencies:
-    buffer "^6.0.3"
-    uuid "^11.1.1"
+"@haskou/value-objects@7.2.0", "@haskou/value-objects@^7.0.2":
+  version "7.2.0"
+  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-7.2.0.tgz#41310168766463171a2bec509598fdf8b06a5d12"
+  integrity sha512-8cSAA+JnAE1V1IGGL9CFrMo5uEVAkYTdMxCyJotHcaatLayPqn0JJgbmcjc6j5D8p1kLfVYwd6dTjLkervCAdw==
 
-"@haskou/value-objects@^2.13.1":
-  version "2.13.1"
-  resolved "https://registry.yarnpkg.com/@haskou/value-objects/-/value-objects-2.13.1.tgz#7ceaa3fbea5adf36c161b0b243467abe29ebfb45"
-  integrity sha512-stGgWXh3l0Xoj+xyf2wPmEuezc3pS1BxIMH3fl/6p9jx3Asc4KABwHN0eqmQ0o5mpNgaFmER758I4GFf0leLfQ==
+"@helia/bitswap@^4.0.20":
+  version "4.0.20"
+  resolved "https://registry.yarnpkg.com/@helia/bitswap/-/bitswap-4.0.20.tgz#9ca312f3deef9d210dd659df57ccb9f6ee0cd522"
+  integrity sha512-spJhbrfpgeBzkweULgimtdQv3xPMkKiZmShmtQ36lFYh0NbuegBkb1Dv7zFyQOtUdK0LJJKEBeBDLcb5StJZag==
   dependencies:
-    "@noble/ciphers" "^2.2.0"
-    "@noble/curves" "^2.2.0"
-    "@noble/hashes" "^2.0.1"
-    buffer "^6.0.3"
-    tslib "^2.8.1"
-
-"@helia/bitswap@^4.0.8":
-  version "4.0.8"
-  resolved "https://registry.yarnpkg.com/@helia/bitswap/-/bitswap-4.0.8.tgz#bfc782672825f8c6ff43fc469e81995eb1afa726"
-  integrity sha512-YMzhRe7xxnCs2sEzb71/yUyzpeUT0SM22m2kW74XCisBuz5OMbEnShjBbFVHo1roXhNYEKkDWQirypLlroHuow==
-  dependencies:
-    "@helia/interface" "^7.1.1"
-    "@helia/libp2p" "^1.0.8"
-    "@helia/utils" "^3.0.5"
+    "@helia/interface" "^7.1.2"
+    "@helia/libp2p" "^2.1.5"
+    "@helia/utils" "^3.0.6"
     "@libp2p/interface" "^3.2.3"
     "@libp2p/logger" "^6.2.8"
     "@libp2p/peer-collections" "^7.0.21"
@@ -843,6 +829,7 @@
     "@multiformats/multiaddr" "^13.0.3"
     any-signal "^4.2.0"
     interface-blockstore "^7.0.1"
+    interface-store "^8.0.0"
     it-drain "^3.0.12"
     it-length-prefixed "^11.0.1"
     it-map "^3.1.6"
@@ -852,7 +839,7 @@
     multiformats "^14.0.0"
     p-defer "^4.0.1"
     progress-events "^1.1.0"
-    protons-runtime "^7.0.0"
+    protons-runtime "^8.0.1"
     race-event "^1.6.1"
     uint8-varint "^3.0.0"
     uint8arraylist "^3.0.2"
@@ -865,6 +852,19 @@
   dependencies:
     "@helia/delegated-routing-v1-http-api-client" "^9.0.0"
     "@helia/interface" "^7.1.1"
+    "@libp2p/interface" "^3.2.3"
+    it-first "^3.0.11"
+    it-map "^3.1.6"
+    multiformats "^14.0.0"
+    uint8arrays "^6.1.1"
+
+"@helia/delegated-routing-client@^1.0.7":
+  version "1.0.7"
+  resolved "https://registry.yarnpkg.com/@helia/delegated-routing-client/-/delegated-routing-client-1.0.7.tgz#5bbab2dedae2c8361c6815ca21729a297556b5f5"
+  integrity sha512-AqhPwY8libDs4VLVibLGIz0J3MPmTi8Mx0ljEiWdYLhziU82T3AjW10qBQ3oGSDrMd6tA9lEOoviAbPL88y0OQ==
+  dependencies:
+    "@helia/delegated-routing-v1-http-api-client" "^9.0.0"
+    "@helia/interface" "^7.1.2"
     "@libp2p/interface" "^3.2.3"
     it-first "^3.0.11"
     it-map "^3.1.6"
@@ -888,25 +888,25 @@
     multiformats "^14.0.0"
     uint8arrays "^6.1.1"
 
-"@helia/fallback-router@^1.1.1":
-  version "1.1.1"
-  resolved "https://registry.yarnpkg.com/@helia/fallback-router/-/fallback-router-1.1.1.tgz#c7a57c12dc9ce080333db9741df839be3a5dec01"
-  integrity sha512-dfkS7TzvCHOoiKafht7VIrXlESHLiWjbgsg3tEszK06UVG+C6sWhuSN+gD13VMHiyhPSKjAzupyoTFgglZ6FuA==
+"@helia/fallback-router@^1.1.2":
+  version "1.1.2"
+  resolved "https://registry.yarnpkg.com/@helia/fallback-router/-/fallback-router-1.1.2.tgz#585966855a4fe0c6961762c87bfd447ad6d755e1"
+  integrity sha512-BBXyfkLI+HPSKAxjQ/zIdWGNtB8o2C47Obm/48WjBsz24DSt+hA+wQYLLqa8BH1vW061gIleBWmHTWSqB2RyBA==
   dependencies:
-    "@helia/interface" "^7.1.1"
+    "@helia/interface" "^7.1.2"
     "@multiformats/uri-to-multiaddr" "^10.0.0"
     multiformats "^14.0.0"
     uint8arrays "^6.1.1"
 
-"@helia/http@^4.0.6":
-  version "4.0.6"
-  resolved "https://registry.yarnpkg.com/@helia/http/-/http-4.0.6.tgz#db2c1121077447fab340a2a6e7262c63d27a8b58"
-  integrity sha512-jtpV0BuhPEnIAkBv/QKpsh9I6f3MDhDzLChJsgCi/wtN2ztQls/Xc2n4Qipr92Ytfmq0R4hai6ragxhq5O87Cg==
+"@helia/http@^4.0.8":
+  version "4.0.8"
+  resolved "https://registry.yarnpkg.com/@helia/http/-/http-4.0.8.tgz#09513024be91b56563ec052f4fc24966cfecc2b9"
+  integrity sha512-7XVzYzcW+ODokU21KduXmTsTZKuWEdx0hVOmLadmrB3JNm5inyI7GxEXygFFDR/2wpaBfqM42iCfDV2I+dr/Wg==
   dependencies:
-    "@helia/delegated-routing-client" "^1.0.6"
-    "@helia/fallback-router" "^1.1.1"
-    "@helia/interface" "^7.1.1"
-    "@helia/trustless-gateway-client" "^1.0.5"
+    "@helia/delegated-routing-client" "^1.0.7"
+    "@helia/fallback-router" "^1.1.2"
+    "@helia/interface" "^7.1.2"
+    "@helia/trustless-gateway-client" "^1.0.7"
 
 "@helia/interface@^7.1.1":
   version "7.1.1"
@@ -926,12 +926,30 @@
     multiformats "^14.0.0"
     progress-events "^1.1.0"
 
-"@helia/json@^6.0.5":
-  version "6.0.5"
-  resolved "https://registry.yarnpkg.com/@helia/json/-/json-6.0.5.tgz#931ffc2ae96df11be68937bef769c879a4733158"
-  integrity sha512-o3gnceoWV3voplpaJNoEHKXI5UWztDeArHhfuUGIOzgcEFVlnYcAxey7ocyJdXHA/y+2vA0ztLIZcaIGfPd0HQ==
+"@helia/interface@^7.1.2":
+  version "7.1.2"
+  resolved "https://registry.yarnpkg.com/@helia/interface/-/interface-7.1.2.tgz#4491e5980af9dff3747ea4590a7f7aa9df962cf9"
+  integrity sha512-wzbtRy+HbEP4Rn78Uks42U5PwioO12H2y7qiYfTkYM73qGvmmZe4JB34cQqm60fTbWOOBUB09a4coy8o7/x9Uw==
   dependencies:
-    "@helia/interface" "^7.1.1"
+    "@ipshipyard/crypto" "^1.1.0"
+    "@ipshipyard/keychain" "^1.0.2"
+    "@libp2p/interface" "^3.2.3"
+    "@multiformats/dns" "^1.0.13"
+    "@multiformats/multiaddr" "^13.0.3"
+    abort-error "^1.0.2"
+    birnam "^1.0.0"
+    interface-blockstore "^7.0.1"
+    interface-datastore "^10.0.1"
+    main-event "^1.0.4"
+    multiformats "^14.0.0"
+    progress-events "^1.1.0"
+
+"@helia/json@^6.0.6":
+  version "6.0.6"
+  resolved "https://registry.yarnpkg.com/@helia/json/-/json-6.0.6.tgz#fb92acc3cbd525fa94fc0d49b9fb03ff1fa8c575"
+  integrity sha512-RT+aSZ6p3XWPncOUBuh3nIwVAGJ+O9qxwAwWi+CCIoh1CKbyLZrzJxChzHhmLmYL8gVV5DiqvY/OXICcoAwT5w==
+  dependencies:
+    "@helia/interface" "^7.1.2"
     "@libp2p/interface" "^3.2.3"
     interface-blockstore "^7.0.1"
     it-to-buffer "^5.0.0"
@@ -976,13 +994,50 @@
     multiformats "^14.0.0"
     uint8arrays "^6.1.1"
 
-"@helia/trustless-gateway-client@^1.0.5":
-  version "1.0.5"
-  resolved "https://registry.yarnpkg.com/@helia/trustless-gateway-client/-/trustless-gateway-client-1.0.5.tgz#d6674d09beb2fc779243f533812e034487df76eb"
-  integrity sha512-7hmipIMOEK9x1pnCsA06gMxijDHn/0KjILQ6f9qy/Yfqg7aaUQfrC9OGpM59DTayGlo29QknoShsDY1LdrAEVg==
+"@helia/libp2p@^2.1.5":
+  version "2.1.5"
+  resolved "https://registry.yarnpkg.com/@helia/libp2p/-/libp2p-2.1.5.tgz#6149cc3c25266e86f5e6fdbaeaa92bd0055fb842"
+  integrity sha512-DvzNxXes/WoOseUdGKH/lynpWEVr750X0+Dp6ZMr7KW4GyVtcacfnctyFCFLHXcZDSGra8OFcW375t62uXcm5Q==
   dependencies:
-    "@helia/interface" "^7.1.1"
-    "@helia/utils" "^3.0.5"
+    "@helia/delegated-routing-client" "^1.0.7"
+    "@helia/delegated-routing-v1-http-api-client" "^9.0.0"
+    "@helia/interface" "^7.1.2"
+    "@ipshipyard/libp2p-auto-tls" "^2.0.1"
+    "@libp2p/autonat" "^3.0.21"
+    "@libp2p/bootstrap" "^12.0.24"
+    "@libp2p/circuit-relay-v2" "^4.2.6"
+    "@libp2p/config" "^1.1.32"
+    "@libp2p/dcutr" "^3.0.21"
+    "@libp2p/http" "^2.0.2"
+    "@libp2p/identify" "^4.1.7"
+    "@libp2p/interface" "^3.2.3"
+    "@libp2p/kad-dht" "^16.3.2"
+    "@libp2p/keychain" "^6.1.2"
+    "@libp2p/mdns" "^12.0.24"
+    "@libp2p/mplex" "^12.0.24"
+    "@libp2p/noise" "^17.0.2"
+    "@libp2p/peer-id" "^6.0.10"
+    "@libp2p/ping" "^3.1.6"
+    "@libp2p/tcp" "^11.0.21"
+    "@libp2p/tls" "^3.1.3"
+    "@libp2p/upnp-nat" "^4.0.21"
+    "@libp2p/webrtc" "^6.0.24"
+    "@libp2p/websockets" "^10.1.14"
+    "@libp2p/yamux" "^8.0.3"
+    "@multiformats/multiaddr" "^13.0.3"
+    it-foreach "^2.1.7"
+    it-map "^3.1.6"
+    libp2p "^3.3.3"
+    multiformats "^14.0.0"
+    uint8arrays "^6.1.1"
+
+"@helia/trustless-gateway-client@^1.0.7":
+  version "1.0.7"
+  resolved "https://registry.yarnpkg.com/@helia/trustless-gateway-client/-/trustless-gateway-client-1.0.7.tgz#7c0d599773ccf5ab0331b9211258538ffd85a210"
+  integrity sha512-xmPrGUCqxQ3Fhvy3lFcFsuyixbPA9WDvYJfa8MjQ0NZuQRpL5ogMfSUnr9ey9NYYQTjY36cTM4L7bqPBwxngVw==
+  dependencies:
+    "@helia/interface" "^7.1.2"
+    "@helia/utils" "^3.0.6"
     "@libp2p/utils" "^7.2.2"
     "@multiformats/multiaddr" "^13.0.3"
     "@multiformats/multiaddr-matcher" "^3.0.2"
@@ -995,21 +1050,21 @@
     uint8arraylist "^3.0.2"
     uint8arrays "^6.1.1"
 
-"@helia/unixfs@^8.0.5":
-  version "8.0.5"
-  resolved "https://registry.yarnpkg.com/@helia/unixfs/-/unixfs-8.0.5.tgz#e10bb1e4155dc828a2c2998599a47b69dc25c507"
-  integrity sha512-fXloT3Wi045JyHEYBfyaulrDjEKzdFkdXSgxKRVlqd0aBaC6txAq4Io1ZAeoByNZ6sjI0wgo8loD1QA/QNQtsA==
+"@helia/unixfs@^8.0.9":
+  version "8.0.9"
+  resolved "https://registry.yarnpkg.com/@helia/unixfs/-/unixfs-8.0.9.tgz#2917a9e39e0b4a590e1146019c6fa4dde58d6766"
+  integrity sha512-LKKfjZMWiIuKM8XEU7rcwG9ht9fnaJe24puzcnfaREW8lR1cFVuuphyxvBm68sRMfZv/rkBXPLJdEdTTAtepPA==
   dependencies:
-    "@helia/interface" "^7.1.1"
+    "@helia/interface" "^7.1.2"
     "@ipld/dag-pb" "^4.1.7"
     "@libp2p/interface" "^3.2.3"
     "@libp2p/logger" "^6.2.8"
     "@libp2p/utils" "^7.2.2"
     "@multiformats/murmur3" "^2.2.5"
     interface-blockstore "^7.0.1"
-    ipfs-unixfs "^13.0.0"
-    ipfs-unixfs-exporter "^16.0.2"
-    ipfs-unixfs-importer "^17.0.1"
+    ipfs-unixfs "^13.1.1"
+    ipfs-unixfs-exporter "^16.2.2"
+    ipfs-unixfs-importer "^17.1.1"
     it-all "^3.0.11"
     it-first "^3.0.11"
     it-glob "^3.0.6"
@@ -1021,12 +1076,12 @@
     sparse-array "^1.3.2"
     uint8arrays "^6.1.1"
 
-"@helia/utils@^3.0.5":
-  version "3.0.5"
-  resolved "https://registry.yarnpkg.com/@helia/utils/-/utils-3.0.5.tgz#14f9ca1f7f6c6d3c2eeb2d0055d2cae191d1f6fc"
-  integrity sha512-vcJ8FltQ5vNHiULhx3WO/0nm4/ljWDpZdwIS9cwibF6hfDYna5w2IZXFMu1czI6wHt26fR+EtyUOCFIoS51xcA==
+"@helia/utils@^3.0.6":
+  version "3.0.6"
+  resolved "https://registry.yarnpkg.com/@helia/utils/-/utils-3.0.6.tgz#a59ede1b91fc0060e54721dd2f19d120c56ef4e5"
+  integrity sha512-QEMVKSVc7NnosXmcM1opdw81cLakLJinpr3FTYCylHid+7MmP3/lHs2MSlTAvW6Tff5y/QLMKG+929qDA0zfFA==
   dependencies:
-    "@helia/interface" "^7.1.1"
+    "@helia/interface" "^7.1.2"
     "@libp2p/interface" "^3.2.3"
     "@libp2p/utils" "^7.2.2"
     "@multiformats/multiaddr" "^13.0.3"
@@ -1108,6 +1163,13 @@
   version "4.1.7"
   resolved "https://registry.yarnpkg.com/@ipld/dag-pb/-/dag-pb-4.1.7.tgz#8133f099cf0172d41238b23a30355db565d19413"
   integrity sha512-/i/13trFihjWfDyXlylRwhuYjtzYjvOFw0vlRjYGnZuv7d7MOgA2lV/vRuL5RfeUajM03aZfFLdq4S7cTbbTRg==
+  dependencies:
+    multiformats "^14.0.0"
+
+"@ipld/dag-pb@^4.2.0":
+  version "4.2.0"
+  resolved "https://registry.yarnpkg.com/@ipld/dag-pb/-/dag-pb-4.2.0.tgz#39413b09ab98f6a5e03d4586a3a6a2e9e39d6c5b"
+  integrity sha512-T2hsy18NNAUkIiQgvtrhKJXIkTjKcGHPJzp6mYp/tx4x0X9wedUTrCNADEP4hAS7Vy4/bJtc37eX4GSDFiKLhw==
   dependencies:
     multiformats "^14.0.0"
 
@@ -1527,14 +1589,14 @@
     protons-runtime "^7.0.0"
     uint8arraylist "^3.0.2"
 
-"@libp2p/bootstrap@12.0.29":
-  version "12.0.29"
-  resolved "https://registry.yarnpkg.com/@libp2p/bootstrap/-/bootstrap-12.0.29.tgz#dde25a9cb7a5ff5c0c41985a56d3eb0f9d5b6180"
-  integrity sha512-HJqRyr75io10F/zaJCMGhrdOi7an4bJmgw12DLrBR/hPteeFAIZ4bXeiV+GNxw5vmRJoEpfUTVzIwPTsRJMViw==
+"@libp2p/bootstrap@12.0.32":
+  version "12.0.32"
+  resolved "https://registry.yarnpkg.com/@libp2p/bootstrap/-/bootstrap-12.0.32.tgz#2c2c822caecf8d8064d46f1c3120f8927c50a475"
+  integrity sha512-MpGPeijiYP7a//EsbcrWAuWjHNoGhIqv4ONcGXkuTgSCJbJVWpZrR2uA+I/UW7wW0UB4a3PmHJWAd4klMgZqlA==
   dependencies:
-    "@libp2p/interface" "^3.2.5"
-    "@libp2p/interface-internal" "^3.1.11"
-    "@libp2p/peer-id" "^6.0.14"
+    "@libp2p/interface" "^3.3.0"
+    "@libp2p/interface-internal" "^3.1.13"
+    "@libp2p/peer-id" "^6.0.15"
     "@multiformats/multiaddr" "^13.0.3"
     "@multiformats/multiaddr-matcher" "^3.0.2"
     main-event "^1.0.1"
@@ -1551,18 +1613,18 @@
     "@multiformats/multiaddr-matcher" "^3.0.2"
     main-event "^1.0.1"
 
-"@libp2p/circuit-relay-v2@^4.2.11":
-  version "4.2.11"
-  resolved "https://registry.yarnpkg.com/@libp2p/circuit-relay-v2/-/circuit-relay-v2-4.2.11.tgz#aacd601d01f23f370ca19ac10175296eb417597c"
-  integrity sha512-q47qWuJxmNocAX4oRAUWpp2d56aiymsih9ORCkBdQGUkBzynPyBsucvCX5bnF8tb80Ji5wBHl4jCa1DmrW1T1A==
+"@libp2p/circuit-relay-v2@^4.2.13":
+  version "4.2.13"
+  resolved "https://registry.yarnpkg.com/@libp2p/circuit-relay-v2/-/circuit-relay-v2-4.2.13.tgz#cbb92d28d3b004816fd5fc3945c5d2776de4bb70"
+  integrity sha512-AGEzj72W7Ae5eizaM+HeDzJBR28zK4yYp4BYvUOHQViT62W97FIITo/9Gc5rlkKti+gJJAurBm3cHV4A8Wcoxw==
   dependencies:
-    "@libp2p/crypto" "^5.1.22"
-    "@libp2p/interface" "^3.2.5"
-    "@libp2p/interface-internal" "^3.1.11"
-    "@libp2p/peer-collections" "^7.0.26"
-    "@libp2p/peer-id" "^6.0.14"
-    "@libp2p/peer-record" "^9.0.15"
-    "@libp2p/utils" "^7.3.2"
+    "@libp2p/crypto" "^5.1.23"
+    "@libp2p/interface" "^3.3.0"
+    "@libp2p/interface-internal" "^3.1.13"
+    "@libp2p/peer-collections" "^7.0.28"
+    "@libp2p/peer-id" "^6.0.15"
+    "@libp2p/peer-record" "^9.0.16"
+    "@libp2p/utils" "^7.4.1"
     "@multiformats/multiaddr" "^13.0.3"
     "@multiformats/multiaddr-matcher" "^3.0.2"
     any-signal "^4.1.1"
@@ -1653,19 +1715,6 @@
   version "5.1.21"
   resolved "https://registry.yarnpkg.com/@libp2p/crypto/-/crypto-5.1.21.tgz#292984af6d825834f7fd1e504f70c0e43e5580f3"
   integrity sha512-GipsBinthJuk7DpwthTUixZHSaKogcxm2glPCP0VkYkEpzZrfEvBEekRvlP5+1Ak8pReaHcz4gPKFA9X6MG0WQ==
-  dependencies:
-    "@libp2p/interface" "^3.2.5"
-    "@noble/curves" "^2.0.1"
-    "@noble/hashes" "^2.0.1"
-    multiformats "^14.0.0"
-    protons-runtime "^7.0.0"
-    uint8arraylist "^3.0.2"
-    uint8arrays "^6.1.1"
-
-"@libp2p/crypto@^5.1.22":
-  version "5.1.22"
-  resolved "https://registry.yarnpkg.com/@libp2p/crypto/-/crypto-5.1.22.tgz#319eca0f013c36f557e0a44f7a12589795b268da"
-  integrity sha512-yVk4BefSiEz044kjsiLSEoJTbhRoyamqx4kFI9LnX8/asr4wnqDWKTXcn6mSx/RVNEzmDO70l3vOvcMCl4aLCQ==
   dependencies:
     "@libp2p/interface" "^3.2.5"
     "@noble/curves" "^2.0.1"
@@ -1848,16 +1897,6 @@
     "@multiformats/multiaddr" "^13.0.3"
     progress-events "^1.0.1"
 
-"@libp2p/interface-internal@^3.1.11":
-  version "3.1.11"
-  resolved "https://registry.yarnpkg.com/@libp2p/interface-internal/-/interface-internal-3.1.11.tgz#399aff686adc771924a1683ee8b294bf6d7e362d"
-  integrity sha512-lHJueWKdfkf/nrbVkGNUWrqDvF3T9Brn4hyONQmhTqG2mWyWKntRR/CkPjVgMRDSF2fuyzDJGg+n9tC0Gphk8g==
-  dependencies:
-    "@libp2p/interface" "^3.2.5"
-    "@libp2p/peer-collections" "^7.0.26"
-    "@multiformats/multiaddr" "^13.0.3"
-    progress-events "^1.0.1"
-
 "@libp2p/interface-internal@^3.1.13":
   version "3.1.13"
   resolved "https://registry.yarnpkg.com/@libp2p/interface-internal/-/interface-internal-3.1.13.tgz#8c6f103c580dd1c278ee453e6523da5b666b1b1d"
@@ -1977,17 +2016,6 @@
     multiformats "^14.0.0"
     weald "^1.1.0"
 
-"@libp2p/logger@^6.2.12":
-  version "6.2.12"
-  resolved "https://registry.yarnpkg.com/@libp2p/logger/-/logger-6.2.12.tgz#7c60c785b2556d3feb4eba3e755e37046fc46a51"
-  integrity sha512-FwCdJ5hGFDvWI/SULZ4Iez+k+JtdMAj4/EK6bWmkh08ORIztwKpt0IXCOe8nIfKhBKwLYJu00BnZDRsedX7+7Q==
-  dependencies:
-    "@libp2p/interface" "^3.2.5"
-    "@multiformats/multiaddr" "^13.0.3"
-    interface-datastore "^10.0.1"
-    multiformats "^14.0.0"
-    weald "^1.1.0"
-
 "@libp2p/logger@^6.2.13":
   version "6.2.13"
   resolved "https://registry.yarnpkg.com/@libp2p/logger/-/logger-6.2.13.tgz#c36e593a93c05620e752004cc5f2c490a00d36b1"
@@ -2048,6 +2076,25 @@
     uint8arraylist "^3.0.2"
     uint8arrays "^6.1.1"
 
+"@libp2p/noise@^17.0.2":
+  version "17.0.3"
+  resolved "https://registry.yarnpkg.com/@libp2p/noise/-/noise-17.0.3.tgz#8a8aa3d76ecde64c1e26eb98a5392288130f2854"
+  integrity sha512-dUmOjqkkeyUm9NCaFiSEqif1vsLsRFmlZXEfIeREerKXB7sLBvRLbpGiglsLNu7BlA6mrnsQk4BMjZ8aEDqzdA==
+  dependencies:
+    "@chainsafe/as-chacha20poly1305" "^0.1.0"
+    "@chainsafe/as-sha256" "^1.2.0"
+    "@libp2p/crypto" "^5.1.23"
+    "@libp2p/interface" "^3.3.0"
+    "@libp2p/peer-id" "^6.0.15"
+    "@libp2p/utils" "^7.4.1"
+    "@noble/ciphers" "^2.0.1"
+    "@noble/curves" "^2.0.1"
+    "@noble/hashes" "^2.0.1"
+    protons-runtime "^7.0.0"
+    uint8arraylist "^3.0.2"
+    uint8arrays "^6.1.1"
+    wherearewe "^2.0.1"
+
 "@libp2p/peer-collections@^7.0.12":
   version "7.0.12"
   resolved "https://registry.yarnpkg.com/@libp2p/peer-collections/-/peer-collections-7.0.12.tgz#f8b130e37e7bef815630e807744fafd8c9e9b15a"
@@ -2076,16 +2123,6 @@
     "@libp2p/interface" "^3.2.4"
     "@libp2p/peer-id" "^6.0.11"
     "@libp2p/utils" "^7.2.3"
-    multiformats "^14.0.0"
-
-"@libp2p/peer-collections@^7.0.26":
-  version "7.0.26"
-  resolved "https://registry.yarnpkg.com/@libp2p/peer-collections/-/peer-collections-7.0.26.tgz#7aaa30aeebd9d921d654cb3326c15e93af6dba3f"
-  integrity sha512-hjJbC/Jo1TjxqaKph2W6ARRnrNoBCEbSQMUsGT17JXQktJc7ImVGLoFy2VsZoJGMX4RLN+gKp6f8McFGb5Vi1w==
-  dependencies:
-    "@libp2p/interface" "^3.2.5"
-    "@libp2p/peer-id" "^6.0.14"
-    "@libp2p/utils" "^7.3.2"
     multiformats "^14.0.0"
 
 "@libp2p/peer-collections@^7.0.28":
@@ -2128,16 +2165,6 @@
     multiformats "^14.0.0"
     uint8arrays "^6.1.1"
 
-"@libp2p/peer-id@^6.0.14":
-  version "6.0.14"
-  resolved "https://registry.yarnpkg.com/@libp2p/peer-id/-/peer-id-6.0.14.tgz#eb5a56100138d7c8c129db860e10e238a2bc2863"
-  integrity sha512-tquBouwbUXgntPtT5q4vfaXbNWmSzh2zo4p2u8IzclVvggXOpmyBlAUNPXDiFqZvQpsxVBrTTemmn0+AwDwecg==
-  dependencies:
-    "@libp2p/crypto" "^5.1.22"
-    "@libp2p/interface" "^3.2.5"
-    multiformats "^14.0.0"
-    uint8arrays "^6.1.1"
-
 "@libp2p/peer-id@^6.0.15":
   version "6.0.15"
   resolved "https://registry.yarnpkg.com/@libp2p/peer-id/-/peer-id-6.0.15.tgz#19a5802a08b0a330832997c5f3abf09ca9681856"
@@ -2163,14 +2190,14 @@
     uint8arraylist "^3.0.2"
     uint8arrays "^6.1.1"
 
-"@libp2p/peer-record@^9.0.15":
-  version "9.0.15"
-  resolved "https://registry.yarnpkg.com/@libp2p/peer-record/-/peer-record-9.0.15.tgz#e7a47165a490bd2e1e4cda1d4d2b7a4c79660d2a"
-  integrity sha512-WZH9Xkdvpr6TlM6eDdE/KZJmk558jrAC/ufNHnbWXdEUxF/GTzx7RsrBgaC6cPGBTNTjzICfO6vZKR2US0Fl9Q==
+"@libp2p/peer-record@^9.0.16":
+  version "9.0.16"
+  resolved "https://registry.yarnpkg.com/@libp2p/peer-record/-/peer-record-9.0.16.tgz#e5e3c1c17bb412a620857d9b86d6cd8f737fd865"
+  integrity sha512-J4QoPr0F1v6xqjHjAJ9KPbg4jdDlGutDk2K3Km6+o0nWzZCgCGeSEIDOO2UvPa2bFoZTL62cD73fn8tm5K06cg==
   dependencies:
-    "@libp2p/crypto" "^5.1.22"
-    "@libp2p/interface" "^3.2.5"
-    "@libp2p/peer-id" "^6.0.14"
+    "@libp2p/crypto" "^5.1.23"
+    "@libp2p/interface" "^3.3.0"
+    "@libp2p/peer-id" "^6.0.15"
     "@multiformats/multiaddr" "^13.0.3"
     multiformats "^14.0.0"
     protons-runtime "^7.0.0"
@@ -2210,13 +2237,13 @@
     uint8arraylist "^3.0.2"
     uint8arrays "^6.1.1"
 
-"@libp2p/pnet@^3.0.27":
-  version "3.0.27"
-  resolved "https://registry.yarnpkg.com/@libp2p/pnet/-/pnet-3.0.27.tgz#137fcd64de02fb38b298bf31329def140da08573"
-  integrity sha512-69ObuUDvIriPZ8hfX46z/7tFZrQ8YsjVSHZrCDp29nHKWYISLbyqwdI1tz4sJtw5TeZKIQY0pZ0gb0vEfpJ7zg==
+"@libp2p/pnet@^3.0.29":
+  version "3.0.29"
+  resolved "https://registry.yarnpkg.com/@libp2p/pnet/-/pnet-3.0.29.tgz#8ee8ee983c75b46daa05d0d2f00effbea5897f95"
+  integrity sha512-ixxay8B9PuJ/OWiNaZSvlvv3Ax97YZ0S5Tx/bTPcY+gzGRLyLXWUAYWKn5hQBXX2xot5plH4kNfn9fRd8MdbOg==
   dependencies:
-    "@libp2p/interface" "^3.2.5"
-    "@libp2p/utils" "^7.3.2"
+    "@libp2p/interface" "^3.3.0"
+    "@libp2p/utils" "^7.4.1"
     uint8arraylist "^3.0.2"
     uint8arrays "^6.1.1"
     xsalsa20 "^1.2.0"
@@ -2369,37 +2396,6 @@
     uint8arraylist "^3.0.2"
     uint8arrays "^6.1.1"
 
-"@libp2p/utils@^7.3.2":
-  version "7.3.2"
-  resolved "https://registry.yarnpkg.com/@libp2p/utils/-/utils-7.3.2.tgz#db35041b27436c8a146704247a11550be3c3f442"
-  integrity sha512-nVfJkTE3QMa/LVKVD5sKDB8birKua0BR0oKoqnLSXsX1ez89PvhR1zZjBfARSGVZdv5qUmblcdcvjJ76HD0CWA==
-  dependencies:
-    "@chainsafe/is-ip" "^2.1.0"
-    "@chainsafe/netmask" "^2.0.0"
-    "@libp2p/interface" "^3.2.5"
-    "@libp2p/logger" "^6.2.12"
-    "@multiformats/multiaddr" "^13.0.3"
-    "@multiformats/multiaddr-matcher" "^3.0.2"
-    "@sindresorhus/fnv1a" "^3.1.0"
-    any-signal "^4.1.1"
-    cborg "^6.0.0"
-    delay "^7.0.0"
-    is-loopback-addr "^2.0.2"
-    it-length-prefixed "^11.0.1"
-    it-pipe "^3.0.1"
-    it-pushable "^3.2.3"
-    it-stream-types "^2.0.2"
-    main-event "^1.0.1"
-    netmask "^2.0.2"
-    p-defer "^4.0.1"
-    p-event "^7.0.0"
-    progress-events "^1.1.0"
-    protons-runtime "^7.0.0"
-    race-signal "^2.0.0"
-    uint8-varint "^3.0.0"
-    uint8arraylist "^3.0.2"
-    uint8arrays "^6.1.1"
-
 "@libp2p/utils@^7.4.1":
   version "7.4.1"
   resolved "https://registry.yarnpkg.com/@libp2p/utils/-/utils-7.4.1.tgz#7a11725ce2f6ef7615b3e7bf58a37368512664ad"
@@ -2486,6 +2482,16 @@
     uint8arraylist "^3.0.2"
     uint8arrays "^6.1.1"
     ws "^8.18.3"
+
+"@libp2p/yamux@^8.0.3":
+  version "8.0.3"
+  resolved "https://registry.yarnpkg.com/@libp2p/yamux/-/yamux-8.0.3.tgz#062b4b9c2b1a5e5f278e24516bf6d855ec1b2b90"
+  integrity sha512-iYe9YTdkPM6BRaQWpFb/tpHZcUcxdOGH0zlHUV00XBd+FvCQXrSWsy2+NMNcflT/QL7pOI6+U2i3obhQqFq/BA==
+  dependencies:
+    "@libp2p/interface" "^3.3.0"
+    "@libp2p/utils" "^7.4.1"
+    race-signal "^2.0.0"
+    uint8arraylist "^3.0.2"
 
 "@multiformats/dns@^1.0.13", "@multiformats/dns@^1.0.15":
   version "1.0.15"
@@ -2581,11 +2587,6 @@
   resolved "https://registry.yarnpkg.com/@noble/ciphers/-/ciphers-2.1.1.tgz#c8c74fcda8c3d1f88797d0ecda24f9fc8b92b052"
   integrity sha512-bysYuiVfhxNJuldNXlFEitTVdNnYUc+XNJZd7Qm2a5j1vZHgY+fazadNFWFaMK/2vye0JVlxV3gHmC0WDfAOQw==
 
-"@noble/ciphers@^2.2.0":
-  version "2.2.0"
-  resolved "https://registry.yarnpkg.com/@noble/ciphers/-/ciphers-2.2.0.tgz#84fb45ac9332925d643b80f89ceb0ea2f21dba95"
-  integrity sha512-Z6pjIZ/8IJcCGzb2S/0Px5J81yij85xASuk1teLNeg75bfT07MV3a/O2Mtn1I2se43k3lkVEcFaR10N4cgQcZA==
-
 "@noble/curves@2.0.1", "@noble/curves@^2.0.1":
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/@noble/curves/-/curves-2.0.1.tgz#64ba8bd5e8564a02942655602515646df1cdb3ad"
@@ -2593,36 +2594,19 @@
   dependencies:
     "@noble/hashes" "2.0.1"
 
-"@noble/curves@2.3.0":
-  version "2.3.0"
-  resolved "https://registry.yarnpkg.com/@noble/curves/-/curves-2.3.0.tgz#0ac09b0c0fc3ceffbbe599c2e5685b5f59ab005d"
-  integrity sha512-v7cY+4oWYPQszRj6ZFGzTVL7uP2TaLo1xMhWHzYC5wj0ZhOXQ5x+sBre8rF3hi8cAoi0bh1qXoovoOkdFtvqEg==
+"@noble/curves@2.4.0":
+  version "2.4.0"
+  resolved "https://registry.yarnpkg.com/@noble/curves/-/curves-2.4.0.tgz#367c869bfd790c3a2248152562f255b5f8898b74"
+  integrity sha512-P4/62zrgfH33CneE3Dn4WhJVA22YUU0eR51wKIan4NVRvwsA0YnPTwWGpNbpuacSujmSFLvyzpyuR30+fbq2Ew==
   dependencies:
-    "@noble/hashes" "2.3.0"
-
-"@noble/curves@^2.2.0":
-  version "2.2.0"
-  resolved "https://registry.yarnpkg.com/@noble/curves/-/curves-2.2.0.tgz#981be3aadc3bbfbcdb245e78cc97aa6f759246c2"
-  integrity sha512-T/BoHgFXirb0ENSPBquzX0rcjXeM6Lo892a2jlYJkqk83LqZx0l1Of7DzlKJ6jkpvMrkHSnAcgb5JegL8SeIkQ==
-  dependencies:
-    "@noble/hashes" "2.2.0"
+    "@noble/hashes" "2.4.0"
 
 "@noble/hashes@2.0.1", "@noble/hashes@^2.0.1":
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/@noble/hashes/-/hashes-2.0.1.tgz#fc1a928061d1232b0a52bb754393c37a5216c89e"
   integrity sha512-XlOlEbQcE9fmuXxrVTXCTlG2nlRXa9Rj3rr5Ue/+tX+nmkgbX720YHh0VR3hBF9xDvwnb8D2shVGOwNx+ulArw==
 
-"@noble/hashes@2.2.0":
-  version "2.2.0"
-  resolved "https://registry.yarnpkg.com/@noble/hashes/-/hashes-2.2.0.tgz#22da1d16a469954fce877055d559900a6c73b63b"
-  integrity sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg==
-
-"@noble/hashes@2.3.0":
-  version "2.3.0"
-  resolved "https://registry.yarnpkg.com/@noble/hashes/-/hashes-2.3.0.tgz#505fd39c3134a37e67c8c4e6c6049a496154879c"
-  integrity sha512-oN+QwyX7VSHotibwubG3kpzbwKrfnyR6OOO+3Nk/53ADL7FmgHHz4TgrbaYKvvOw09u6QTx0oiH1cNCIOuN0CQ==
-
-"@noble/hashes@^2.2.0":
+"@noble/hashes@2.4.0", "@noble/hashes@^2.2.0":
   version "2.4.0"
   resolved "https://registry.yarnpkg.com/@noble/hashes/-/hashes-2.4.0.tgz#e6a3e98edbed3c8659b28bb8f9b18ca02ec8ea4b"
   integrity sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA==
@@ -3472,10 +3456,10 @@ ajv@^6.14.0:
     json-schema-traverse "^0.4.1"
     uri-js "^4.2.2"
 
-amqplib@2.0.1:
-  version "2.0.1"
-  resolved "https://registry.yarnpkg.com/amqplib/-/amqplib-2.0.1.tgz#7f14517c1d5f6e8608cf0abf4df817e923eb59b6"
-  integrity sha512-a3P2MgfCf9nzVis12VxWEn0dS6hcqve7dlEAhXDtIWR27BlhtMkILOc+H9aeHjDi6i6r94dYKc2Kx2OFe3avvg==
+amqplib@2.2.0:
+  version "2.2.0"
+  resolved "https://registry.yarnpkg.com/amqplib/-/amqplib-2.2.0.tgz#9d70d20d4d04306abb22cadf2431259b3b5e68a9"
+  integrity sha512-VifzN9aHs/Q3zTruVHXh2yCisQyXexBN91CQ2E5iSyUKyNjH6ilYhJGte5AXZH/Bj1PaH7SwPhyuSf6Msd2udw==
 
 ansi-escapes@^4.3.2:
   version "4.3.2"
@@ -5245,10 +5229,10 @@ fs-constants@^1.0.0:
   resolved "https://registry.yarnpkg.com/fs-constants/-/fs-constants-1.0.0.tgz#6be0de9be998ce16af8afc24497b9ee9b7ccd9ad"
   integrity sha512-y6OAwoSIf7FyjMIv94u+b5rdheZEjzR63GTyZJm5qh4Bi+2YgwLCcI/fPFZkL5PSixOt6ZNKm+w+Hfp/Bciwow==
 
-fs-extra@^11.4.0:
-  version "11.4.0"
-  resolved "https://registry.yarnpkg.com/fs-extra/-/fs-extra-11.4.0.tgz#f88ed6d180ac9e14b61b08e679468f0b1b6b4730"
-  integrity sha512-EQsFzMUJkCKGr1ePqlYADkIUmHW1s3ZXr5Yqy6wbGrfUCphpl2maM/kyOIRA2HpP3AaFQTZXD4ldjek+nccddA==
+fs-extra@^11.4.1:
+  version "11.4.1"
+  resolved "https://registry.yarnpkg.com/fs-extra/-/fs-extra-11.4.1.tgz#6a01ca80008eacf3ca1ffde5ef79088f68203a5a"
+  integrity sha512-KYAb4c9BJQI6QqGKthV68OHe0badztdXJWKo0WtBA9IuCFPTKvE5ZdUBglP833aMjhaSPNO4A5j/EkzZtGlKjA==
   dependencies:
     graceful-fs "^4.2.0"
     jsonfile "^6.0.1"
@@ -5518,16 +5502,16 @@ hasown@^2.0.2:
   dependencies:
     function-bind "^1.1.2"
 
-helia@^7.1.3:
-  version "7.1.3"
-  resolved "https://registry.yarnpkg.com/helia/-/helia-7.1.3.tgz#5493c1bab4a8fc6eb2dc3d244c8f73085ca66464"
-  integrity sha512-Y8tRvOGDu2Z9n0GaCAwjNuYYxQ4esB1VqN99vFKeiZ2NuQnzIsfSJPaHpEd2gfxyIueaV9ifLxI0UCbtIUh0tg==
+helia@^7.1.16:
+  version "7.1.16"
+  resolved "https://registry.yarnpkg.com/helia/-/helia-7.1.16.tgz#5281413ebfb1d94ab6248d6bf01e25466e0ed35a"
+  integrity sha512-tWqr7DC0soL0Mvi93bPGgIWeSNZYvs5ZIZjTRkuTepRufoFmvd1OOtjixRgR3dSk1x4Z1SvYtfc2fUyO3S0FCA==
   dependencies:
-    "@helia/bitswap" "^4.0.8"
-    "@helia/http" "^4.0.6"
-    "@helia/interface" "^7.1.1"
-    "@helia/libp2p" "^1.0.8"
-    "@helia/utils" "^3.0.5"
+    "@helia/bitswap" "^4.0.20"
+    "@helia/http" "^4.0.8"
+    "@helia/interface" "^7.1.2"
+    "@helia/libp2p" "^2.1.5"
+    "@helia/utils" "^3.0.6"
     "@ipld/dag-cbor" "^10.0.1"
     "@ipld/dag-json" "^11.0.0"
     "@ipld/dag-pb" "^4.1.7"
@@ -5744,14 +5728,14 @@ ipaddr.js@1.9.1:
   resolved "https://registry.yarnpkg.com/ipaddr.js/-/ipaddr.js-1.9.1.tgz#bff38543eeb8984825079ff3a2a8e6cbd46781b3"
   integrity sha512-0KI/607xoxSToH7GjN1FfSbLoU0+btTicjsQSWQlh/hZykN8KpmMf7uYwPW3R+akZ6R/w18ZlXSHBYXiYUPO3g==
 
-ipfs-unixfs-exporter@^16.0.2:
-  version "16.0.2"
-  resolved "https://registry.yarnpkg.com/ipfs-unixfs-exporter/-/ipfs-unixfs-exporter-16.0.2.tgz#466e8b6eab55202ca865c23f133ba6aeba991006"
-  integrity sha512-VK0G/fwy9VOwV4o7WyAaKhPl1iBLyUzugHRWHsgD4kmuJzQtWuNV0EwYJFdWmyXkal0NYMn6nnCoeG52XslbRg==
+ipfs-unixfs-exporter@^16.2.2:
+  version "16.2.3"
+  resolved "https://registry.yarnpkg.com/ipfs-unixfs-exporter/-/ipfs-unixfs-exporter-16.2.3.tgz#4f34ae4f9b0fb3438b40bf2a27888505323ec347"
+  integrity sha512-U+YXqw9TnWpx8F+/qLZ/1E/hFsDTs4BSQ9i+ifdctwmLZ5wH65X/zVHSUBkpLvbUedCWbXGIH2om6sgWOH7nsg==
   dependencies:
     "@ipld/dag-cbor" "^10.0.0"
     "@ipld/dag-json" "^11.0.0"
-    "@ipld/dag-pb" "^4.1.7"
+    "@ipld/dag-pb" "^4.2.0"
     "@multiformats/murmur3" "^2.2.5"
     hamt-sharding "^3.0.8"
     interface-blockstore "^7.0.1"
@@ -5766,12 +5750,12 @@ ipfs-unixfs-exporter@^16.0.2:
     p-queue "^9.2.0"
     progress-events "^1.1.0"
 
-ipfs-unixfs-importer@^17.0.1:
-  version "17.0.1"
-  resolved "https://registry.yarnpkg.com/ipfs-unixfs-importer/-/ipfs-unixfs-importer-17.0.1.tgz#90353d4bfff135f75a3a15c802c4371d03c5ad3b"
-  integrity sha512-4MC1itlM3OOAQDgyr/htPJ13p9FulXEc+pe0yw4Gx3hCYxyQibTd6EZfefglkzcCURsYoqm5neMFdVrTMQL4tQ==
+ipfs-unixfs-importer@^17.1.1:
+  version "17.1.1"
+  resolved "https://registry.yarnpkg.com/ipfs-unixfs-importer/-/ipfs-unixfs-importer-17.1.1.tgz#30ace2ab983fb6d95f43206659a870bacd896368"
+  integrity sha512-Yw91sINTxlImpXc7/D6S9SZ/SwDr/kCiy4vE6VIdbOhnbS9EsXeLnJl8TDywFP/U0bwKfWC6LuJwP8dKDQ//OA==
   dependencies:
-    "@ipld/dag-pb" "^4.1.7"
+    "@ipld/dag-pb" "^4.2.0"
     "@multiformats/murmur3" "^2.2.5"
     blockstore-core "^7.0.1"
     hamt-sharding "^3.0.8"
@@ -5794,6 +5778,15 @@ ipfs-unixfs@^13.0.0:
   dependencies:
     protons-runtime "^7.0.0"
     uint8arraylist "^3.0.2"
+
+ipfs-unixfs@^13.1.1:
+  version "13.1.2"
+  resolved "https://registry.yarnpkg.com/ipfs-unixfs/-/ipfs-unixfs-13.1.2.tgz#2ac02a4d212aa18d17d262617161eabb75abebd2"
+  integrity sha512-N8LDphmWAEQbRXu35l4iOXrFbBGmYl0o1PKw9kxsp1dcOHG+CCLdF68gt6jREObFsC48VXm4fbgNXIfoNUIcuA==
+  dependencies:
+    protons-runtime "^8.0.1"
+    uint8arraylist "^3.0.2"
+    uint8arrays "^6.1.1"
 
 ipns@11.0.1:
   version "11.0.1"
@@ -6779,10 +6772,10 @@ js-yaml@^3.13.1:
     argparse "^1.0.7"
     esprima "^4.0.0"
 
-js-yaml@^4.1.1:
-  version "4.2.0"
-  resolved "https://registry.yarnpkg.com/js-yaml/-/js-yaml-4.2.0.tgz#2bd9e85682dd91bd469afb809d816043b3d49524"
-  integrity sha512-ePWsvanv0DWuDRsW8dnt+R4jQ31SCRCQ7hhNcPXZPsoBZiemuZNYGf7adZdqX2D86j6rvKp3RpCxVTSb8WQlOw==
+js-yaml@^4.3.2:
+  version "4.3.2"
+  resolved "https://registry.yarnpkg.com/js-yaml/-/js-yaml-4.3.2.tgz#8e44fb14a2643c59726bb15787b5f1512cb3d3fb"
+  integrity sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==
   dependencies:
     argparse "^2.0.1"
 
@@ -7461,10 +7454,10 @@ node-datachannel@^0.32.3:
   dependencies:
     prebuild-install "^7.1.3"
 
-node-dependency-injection@3.8.0:
-  version "3.8.0"
-  resolved "https://registry.yarnpkg.com/node-dependency-injection/-/node-dependency-injection-3.8.0.tgz#ddd48b404dff0aae6b2e235077798b44d20dafbe"
-  integrity sha512-uktk6PCTu0fGq/ISnwYdXVb3RHzIOGZIkUagcRjVtQ2W7vvLUlyZfd6CZC27NjIWxybiTL95Ji+LAAvVzpCcPQ==
+node-dependency-injection@4.3.0:
+  version "4.3.0"
+  resolved "https://registry.yarnpkg.com/node-dependency-injection/-/node-dependency-injection-4.3.0.tgz#4db4050ef46f99845c820f39ca6d81df387a4044"
+  integrity sha512-lYVH619HP2OmXOmY4ondjhN/OmBDtZfHUZY4vE9+o9QxNFFAupi1fKflGEsq11Bt+iIiyfjwZ+dWgmk3HVONtg==
   dependencies:
     "@babel/runtime" "^7.26.10"
     "@typescript-eslint/typescript-estree" "^5.23.0"
@@ -7472,7 +7465,7 @@ node-dependency-injection@3.8.0:
     commander "^8.3.0"
     console.table "^0.10.0"
     fast-xml-parser "^5.7.3"
-    js-yaml "^4.1.1"
+    js-yaml "^4.3.2"
     json5 "^2.2.2"
     validate-npm-package-name "^3.0.0"
 
@@ -7994,6 +7987,15 @@ protons-runtime@^7.0.0:
   version "7.0.0"
   resolved "https://registry.yarnpkg.com/protons-runtime/-/protons-runtime-7.0.0.tgz#4d4a851f873ed91620965661642aa75b88f04a4b"
   integrity sha512-r/e72006xoVND4Uvf1aIs4OQOkJaASBU3ip4DzOWAktoKAkTiOYqKoS3TYMBm8HnnYU8+h0uEzr5gIRwk/pmTg==
+  dependencies:
+    uint8-varint "^3.0.0"
+    uint8arraylist "^3.0.0"
+    uint8arrays "^6.0.0"
+
+protons-runtime@^8.0.1:
+  version "8.0.1"
+  resolved "https://registry.yarnpkg.com/protons-runtime/-/protons-runtime-8.0.1.tgz#acfb95c1785e8896ef692cb0606d580a99563458"
+  integrity sha512-du8V7RuI8QLmRVXJWmZKc2xRngbbeedtP5Hf6+m1YKRKLMyld+ITIkqXyocyBpkzUUkeh/l6mN3zcP2z5RsT9Q==
   dependencies:
     uint8-varint "^3.0.0"
     uint8arraylist "^3.0.0"
@@ -9353,11 +9355,6 @@ utils-merge@1.0.1:
   resolved "https://registry.yarnpkg.com/utils-merge/-/utils-merge-1.0.1.tgz#9f95710f50a267947b2ccc124741c1028427e713"
   integrity sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==
 
-uuid@^11.1.1:
-  version "11.1.1"
-  resolved "https://registry.yarnpkg.com/uuid/-/uuid-11.1.1.tgz#f6d81d2e1c65d00762e5e29b16c5d2d995e208ad"
-  integrity sha512-vIYxrBCC/N/K+Js3qSN88go7kIfNPssr/hHCesKCQNAjmgvYS2oqr69kIufEG+O4+PfezOH4EbIeHCfFov8ZgQ==
-
 uuid@^8.3.2:
   version "8.3.2"
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-8.3.2.tgz#80d5b5ced271bb9af6c445f21a1a04c606cefbe2"
@@ -9581,10 +9578,10 @@ ws@^8.18.3:
   resolved "https://registry.yarnpkg.com/ws/-/ws-8.19.0.tgz#ddc2bdfa5b9ad860204f5a72a4863a8895fd8c8b"
   integrity sha512-blAT2mjOEIi0ZzruJfIhb3nps74PRWTCz1IjglWEEpQl5XS/UNama6u2/rjFkDDouqr4L67ry+1aGIALViWjDg==
 
-ws@^8.21.3:
-  version "8.21.3"
-  resolved "https://registry.yarnpkg.com/ws/-/ws-8.21.3.tgz#660b4faddb6a3e575c86e078126919961f4de4fc"
-  integrity sha512-201TZ/kPWxoPr/OKWjquZR1SWKXcvxdH+e1xrx89b3YbmzLMFCLfnaG1HFIgWzJOEWZ7MvpK++odZufgYR50Rw==
+ws@^8.22.0:
+  version "8.22.0"
+  resolved "https://registry.yarnpkg.com/ws/-/ws-8.22.0.tgz#40f16e1d7588ac0575041be5c49b8eb261c28e73"
+  integrity sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg==
 
 xml-naming@^0.1.0:
   version "0.1.0"
