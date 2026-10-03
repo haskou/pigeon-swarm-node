@@ -85,7 +85,7 @@ export class Identity extends AggregateRoot {
       new InvalidIdentitySignatureError(),
     );
     assert(
-      this.networks.length() > 0,
+      this.networks.length > 0,
       new IdentityMustHaveAtLeastOneNetworkError(),
     );
   }

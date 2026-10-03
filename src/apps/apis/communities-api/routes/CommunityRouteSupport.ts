@@ -7,10 +7,10 @@ import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { Request } from 'express';
 
 export abstract class CommunityRouteSupport extends Route {
+  private readonly communityFinder = this.get<CommunityFinder>(CommunityFinder);
+
   protected readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
-
-  private readonly communityFinder = this.get<CommunityFinder>(CommunityFinder);
 
   protected authenticate(request: Request): IdentityId {
     return this.signedRequestAuthenticator.authenticate(request);

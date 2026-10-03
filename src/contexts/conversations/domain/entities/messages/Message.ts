@@ -11,6 +11,8 @@ import { MessageSignaturePayload } from './MessageSignaturePayload';
 export abstract class Message {
   protected constructor(private readonly metadata: MessageMetadata) {}
 
+  public abstract getType(): MessageType;
+
   protected basePrimitives(): {
     authorId: string;
     conversationId: string;
@@ -59,8 +61,6 @@ export abstract class Message {
   public getSignature(): Signature {
     return this.metadata.getSignature();
   }
-
-  public abstract getType(): MessageType;
 
   public getTargetMessageId(): MessageId | undefined {
     return undefined;
