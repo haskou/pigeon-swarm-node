@@ -9,10 +9,10 @@ import { Request } from 'express';
 import { AuthenticatedIdentityIsNotNodeOwnerError } from '../errors/AuthenticatedIdentityIsNotNodeOwnerError';
 
 export abstract class NodeOwnerRouteSupport extends Route {
-  protected readonly nodeLoader: NodeLoader = this.get<NodeLoader>(NodeLoader);
-
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
+
+  protected readonly nodeLoader: NodeLoader = this.get<NodeLoader>(NodeLoader);
 
   private async assertAuthenticatedOwner(
     request: Request,

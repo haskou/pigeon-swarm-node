@@ -10,11 +10,11 @@ import { StickerUserLibraryResource } from '../resources/StickerUserLibraryResou
 import { StickerUserLibraryViewModel } from '../view-model/StickerUserLibraryViewModel';
 
 export abstract class StickerRouteSupport extends Route {
-  protected readonly signedRequestAuthenticator =
-    this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
-
   private readonly packsFinder =
     this.get<StickerPacksFinder>(StickerPacksFinder);
+
+  protected readonly signedRequestAuthenticator =
+    this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
   protected authenticate(request: Request): IdentityId {
     return this.signedRequestAuthenticator.authenticate(request);

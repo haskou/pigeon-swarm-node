@@ -11,13 +11,13 @@ import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { Request } from 'express';
 
 export abstract class PollRouteSupport extends Route {
-  protected readonly signedRequestAuthenticator =
-    this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
-
   private readonly finder = this.get<PollFinder>(PollFinder);
 
   private readonly scopeAuthorizer =
     this.get<PollScopeAuthorizer>(PollScopeAuthorizer);
+
+  protected readonly signedRequestAuthenticator =
+    this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
   protected authenticate(request: Request): IdentityId {
     return this.signedRequestAuthenticator.authenticate(request);
