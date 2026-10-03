@@ -54,7 +54,7 @@
   "dependencies": {
     "@haskou/ddd-kernel": "2.0.7",
     "@haskou/pigeon-swarm-crypto": "3.0.0",
-    "@haskou/value-objects": "7.0.0",
+    "@haskou/value-objects": "8.3.3",
     "@helia/bitswap": "^4.0.8",
     "@helia/http": "^4.0.6",
     "@helia/json": "^6.0.5",
