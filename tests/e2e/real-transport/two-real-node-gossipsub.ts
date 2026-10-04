@@ -1040,6 +1040,15 @@ async function request<T = unknown>(
     }
 
     return responseData as T;
+  } catch (error) {
+    if (abortController.signal.aborted) {
+      throw new Error(
+        `${method} ${canonicalPath} on ${node.baseUrl} got no response within ${REQUEST_TIMEOUT_MS} ms`,
+        { cause: error },
+      );
+    }
+
+    throw error;
   } finally {
     clearTimeout(timeout);
   }

@@ -13,6 +13,8 @@
     "postinstall": "node scripts/patch-helia-bitswap-limited-connections.js && node scripts/patch-orbitdb-limited-connections.js && node scripts/patch-libp2p-kad-dht-routing-table.js && node scripts/patch-libp2p-progress-dispatch.js",
     "test": "npm-run-all lint test:unit test:api test:consumer test:scheduler",
     "test:unit": "jest --passWithNoTests",
+    "test:unit:device-authorization-repository": "jest --passWithNoTests tests/unit/contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationRepository.spec.ts",
+    "test:unit:rest": "jest --passWithNoTests --testPathIgnorePatterns '<rootDir>/node_modules/' '<rootDir>/src/Shared/' '/apps/migrations' 'OrbitDBDeviceAuthorizationRepository.spec.ts'",
     "test:api": "NODE_ENV=test cucumber-js -p api",
     "test:api:real-ipfs": "NODE_ENV=test PIGEON_API_TEST_REAL_IPFS=true IPFS_STORAGE_PATH=./memory/ipfs cucumber-js -p api_support tests/api/features/ipfs-api/PostNetworkIPFSContentRoute.feature tests/api/features/communities-api/PostCommunityInviteRoute.feature tests/api/features/identities-api/PostIdentityRoute.feature tests/api/features/keychains-api/PostKeychainRoute.feature",
     "test:api:only": "NODE_ENV=test cucumber-js -p api --tags @Only",

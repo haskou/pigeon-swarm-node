@@ -28,9 +28,10 @@ import { KeyPair, PrivateKey } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { teardownAndExit } from './RealTransportTeardown';
 
 type Replica = {
   name: string;
@@ -290,24 +291,4 @@ main()
     console.error(`FAIL forged public mutations during ${stage}`);
     process.exitCode = 1;
   })
-  .finally(async () => {
-    try {
-      const results = await Promise.allSettled(
-        nodes.map(async (node) => {
-          node.registry?.clear();
-          try {
-            await node.orbitdb?.stop();
-          } finally {
-            await node.helia.stop();
-          }
-        }),
-      );
-
-      if (results.some((result) => result.status === 'rejected'))
-        process.exitCode = 1;
-
-      if (root) await rm(root, { force: true, recursive: true });
-    } finally {
-      clearTimeout(watchdog);
-    }
-  });
+  .finally(() => teardownAndExit(nodes, root));

@@ -45,4 +45,5 @@ These local conventions take precedence over generic examples in the skills.
 - Gossip/pubsub changes update `docs/pubsub-sync-protocol.md` with recipients, payload and synchronization behavior.
 - Use `jest-mock-extended` where mocks are needed. Exercise production behavior rather than adding APIs only for tests.
 - Run targeted regressions first, then relevant integration/acceptance tests and `yarn lint` / `yarn typecheck`. Broaden testing when the change justifies it.
+- CI (`.github/workflows/ci.yaml`, `real-transport-e2e.yaml`) runs independent jobs, one step per script with its own `timeout-minutes`; `yarn test:ci` is the local aggregate of the same scripts. New test scripts must be added to both. Real-transport scripts end through `tests/e2e/real-transport/RealTransportTeardown.ts` (bounded stops, explicit exit) so a leaked node can never hang a job.
 - Do not claim completion with failing checks. Report exact failures, what was verified and any limits of the environment.
