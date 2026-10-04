@@ -10,44 +10,126 @@ permissions:
   contents: read
   packages: read
 
+# Every job installs from the shared yarn cache and runs independently. Every
+# script runs in its own step with a timeout, so a hang fails fast and names the
+# script instead of consuming the job limit. `yarn test:ci` remains the local
+# equivalent of the test jobs below.
 jobs:
-  Checks:
+  static:
+    name: Static checks
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24.21.0
-          cache: 'yarn'
-          registry-url: 'https://npm.pkg.github.com'
-
-      - name: Cache MongoDB Memory Server binaries
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/mongodb-binaries
-          key: mongodb-memory-server-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-          restore-keys: |
-            mongodb-memory-server-${{ runner.os }}-
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile --ignore-engines
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
 
       - name: Lint
         run: yarn lint
+        timeout-minutes: 5
 
       - name: Typecheck
         run: yarn typecheck
+        timeout-minutes: 5
 
       - name: Build
         run: yarn build
+        timeout-minutes: 5
 
-      - name: Test
-        run: yarn test:ci
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Unit tests (all but the device authorization repository spec)
+        run: yarn test:unit:rest
+        timeout-minutes: 10
+
+  unit-device-authorization:
+    name: Device authorization repository spec
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Unit tests (device authorization repository spec)
+        run: yarn test:unit:device-authorization-repository
+        timeout-minutes: 15
+
+  cucumber:
+    name: Cucumber suites
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: API
+        run: yarn test:api
+        timeout-minutes: 8
+
+      - name: API with real IPFS
+        run: yarn test:api:real-ipfs
+        timeout-minutes: 5
+
+      - name: Consumer
+        run: yarn test:consumer
+        timeout-minutes: 5
+
+      - name: Scheduler
+        run: yarn test:scheduler
+        timeout-minutes: 5
+
+  integration:
+    name: In-process integration scripts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Community convergence
+        run: yarn test:integration:community-convergence
+        timeout-minutes: 4
+
+      - name: Forged public mutations
+        run: yarn test:integration:forged-public-mutations
+        timeout-minutes: 4
+
+      - name: Call history
+        run: yarn test:integration:call-history
+        timeout-minutes: 4
+
+      - name: Call privacy
+        run: yarn test:integration:call-privacy
+        timeout-minutes: 4
+
+      - name: Network reconfiguration
+        run: yarn test:integration:network-reconfiguration
+        timeout-minutes: 4

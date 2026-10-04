@@ -13,48 +13,74 @@ permissions:
   contents: read
   packages: read
 
+# One step per script, each with a timeout, so a hang names the script.
+# `workflow_dispatch` additionally runs the conversation script, which is not
+# part of the deterministic pull request set (`yarn test:e2e:real-transport`
+# is the local equivalent of all of it).
 jobs:
-  RealTransport:
+  real-transport:
+    name: Real transport scripts
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24.21.0
-          cache: 'yarn'
-          registry-url: 'https://npm.pkg.github.com'
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
 
-      - name: Cache MongoDB Memory Server binaries
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/mongodb-binaries
-          key: mongodb-memory-server-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
-          restore-keys: |
-            mongodb-memory-server-${{ runner.os }}-
-
-      - name: Install dependencies
-        run: yarn install --frozen-lockfile --ignore-engines
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Run deterministic real transport E2E
-        if: github.event_name == 'pull_request'
-        run: yarn test:e2e:real-transport:ci
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
-
-      - name: Validate backend credentials against coturn
-        run: |
-          docker pull coturn/coturn:4.11.0-r0-alpine
-          yarn test:e2e:turn-credentials
-          yarn test:e2e:turn-federation
-
-      - name: Run all real transport E2E
+      - name: Conversation
         if: github.event_name == 'workflow_dispatch'
-        run: yarn test:e2e:real-transport
-        env:
-          NODE_OPTIONS: --max-old-space-size=4096
+        run: yarn test:e2e:real-transport:conversation
+        timeout-minutes: 5
+
+      - name: Device authorization
+        run: yarn test:e2e:real-transport:device-authorization
+        timeout-minutes: 4
+
+      - name: Private authorization
+        run: yarn test:e2e:real-transport:private-authorization
+        timeout-minutes: 4
+
+      - name: Private IPFS relay
+        run: yarn test:e2e:real-transport:private-ipfs-relay
+        timeout-minutes: 4
+
+      - name: Private relay discovery
+        run: yarn test:e2e:real-transport:private-relay-discovery
+        timeout-minutes: 4
+
+      - name: Private relay mesh
+        run: yarn test:e2e:real-transport:private-relay-mesh
+        timeout-minutes: 5
+
+      - name: Private OrbitDB spike
+        run: yarn test:e2e:real-transport:orbitdb-spike
+        timeout-minutes: 4
+
+  turn:
+    name: Backend credentials against coturn
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Pull coturn image
+        run: docker pull coturn/coturn:4.11.0-r0-alpine
+        timeout-minutes: 5
+
+      - name: TURN credentials
+        run: yarn test:e2e:turn-credentials
+        timeout-minutes: 4
+
+      - name: TURN federation
+        run: yarn test:e2e:turn-federation
+        timeout-minutes: 4
