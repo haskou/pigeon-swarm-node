@@ -794,10 +794,10 @@
   dependencies:
     "@haskou/value-objects" "^8.3.3"
 
-"@haskou/pigeon-swarm-crypto@4.0.0":
-  version "4.0.0"
-  resolved "https://registry.yarnpkg.com/@haskou/pigeon-swarm-crypto/-/pigeon-swarm-crypto-4.0.0.tgz#710e0afcb7ccf2d43e3699fff16b8aa941526f7f"
-  integrity sha512-ONuYDqSUQOCF0gNEmmCEYd5rCx3aSpkPpnDPF5H7kou0qgvtZE0yVzBwFh8SdvunZdJfm9bEXpNwhGSTIPuhfQ==
+"@haskou/pigeon-swarm-crypto@5.0.0":
+  version "5.0.0"
+  resolved "https://registry.yarnpkg.com/@haskou/pigeon-swarm-crypto/-/pigeon-swarm-crypto-5.0.0.tgz#130d21ea38d76da57c3232392ae4c00992ab38c5"
+  integrity sha512-5Up60RVvJaDmKipVthFU9uLkwFBFBdZBwC/691v25hxK8yqM6Enq/BvLtLVGZke7aOe4uIa80PMx5Tp73dGgTg==
   dependencies:
     "@noble/ciphers" "2.1.1"
     "@noble/curves" "2.0.1"
