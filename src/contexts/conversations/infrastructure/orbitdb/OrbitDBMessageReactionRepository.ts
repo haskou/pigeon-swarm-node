@@ -2,6 +2,8 @@ import { MessageReaction } from '@app/contexts/conversations/domain/entities/mes
 import MessageReactionRepository from '@app/contexts/conversations/domain/repositories/MessageReactionRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
@@ -23,7 +25,7 @@ export default class OrbitDBMessageReactionRepository extends MessageReactionRep
       recordId: (record) =>
         typeof record.id === 'string' ? record.id : undefined,
       shouldReplace: (current, candidate) =>
-        this.freshness(current) <= this.freshness(candidate),
+        PublicMutationRecord.replaces(current, candidate) ?? true,
     });
   }
 
@@ -69,13 +71,6 @@ export default class OrbitDBMessageReactionRepository extends MessageReactionRep
     return `conversation-reaction-index:${conversationId}`;
   }
 
-  private freshness(document: Record<string, unknown>): number {
-    return Math.max(
-      typeof document.updatedAt === 'number' ? document.updatedAt : 0,
-      typeof document.createdAt === 'number' ? document.createdAt : 0,
-    );
-  }
-
   private putIndexDocument(
     conversationId: ConversationId,
     document: Record<string, unknown>,
@@ -92,28 +87,41 @@ export default class OrbitDBMessageReactionRepository extends MessageReactionRep
     );
   }
 
-  public async save(reaction: MessageReaction): Promise<void> {
-    const document = this.mapper.toDocument(reaction);
+  private async write(
+    payload: OrbitDBMessageReactionDocument | Record<string, unknown>,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    const conversationId = new ConversationId(String(payload.conversationId));
+    const document = PublicMutationRecord.withProof(payload, proof);
 
-    await this.registry.putDocument('reactions', document);
-    this.putIndexDocument(
-      new ConversationId(document.conversationId),
+    PublicMutationRecord.assertNotStale(
+      (
+        await this.reactionIndex.findRecords(this.indexHeadKey(conversationId))
+      ).filter((stored) => stored.id === payload.id),
       document,
     );
+    await this.registry.putDocument('reactions', document);
+    this.putIndexDocument(conversationId, document);
   }
 
-  public async delete(reaction: MessageReaction): Promise<void> {
-    const document = {
-      ...this.mapper.toDocument(reaction),
-      removed: true,
-      updatedAt: Date.now(),
-    };
+  public async save(
+    reaction: MessageReaction,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    await this.write(this.mapper.toDocument(reaction), proof);
+  }
 
-    await this.registry.putDocument('reactions', document);
-    this.putIndexDocument(
-      new ConversationId(document.conversationId),
-      document,
+  public async delete(
+    reaction: MessageReaction,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    const document = Object.fromEntries(
+      Object.entries(this.mapper.toDocument(reaction)).filter(
+        ([key]) => key !== 'createdAt',
+      ),
     );
+
+    await this.write({ ...document, removed: true }, proof);
   }
 
   public async findByMessageIds(

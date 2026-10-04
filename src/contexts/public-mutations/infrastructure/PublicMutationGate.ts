@@ -8,6 +8,11 @@ import PublicMutationVerifier from '../domain/services/PublicMutationVerifier';
 /** Admits a replicated record only with a valid, authorized, scoped proof. */
 export class PublicMutationGate extends OrbitDBMutationGate {
   private readonly policies: Map<string, PublicMutationPolicy>;
+  private readonly collections: Set<string>;
+
+  private static key(collection: string, scopeType: unknown): string {
+    return `${collection}\n${String(scopeType)}`;
+  }
 
   constructor(
     private readonly verifier: PublicMutationVerifier,
@@ -15,23 +20,30 @@ export class PublicMutationGate extends OrbitDBMutationGate {
   ) {
     super();
     this.policies = new Map(
-      policies.map((policy) => [policy.collection, policy]),
+      policies.map((policy) => [
+        PublicMutationGate.key(policy.collection, policy.scopeType),
+        policy,
+      ]),
     );
+    this.collections = new Set(policies.map((policy) => policy.collection));
   }
 
   public governs(collection: string): boolean {
-    return this.policies.has(collection);
+    return this.collections.has(collection);
   }
 
   public async accepts(
     collection: string,
     record: Record<string, unknown>,
   ): Promise<boolean> {
-    const policy = this.policies.get(collection);
-
-    if (!policy) return true;
+    if (!this.governs(collection)) return true;
 
     try {
+      const policy = this.policies.get(
+        PublicMutationGate.key(collection, record.scopeType),
+      );
+
+      if (!policy) return false;
       await this.assertAccepted(policy, record);
 
       return true;

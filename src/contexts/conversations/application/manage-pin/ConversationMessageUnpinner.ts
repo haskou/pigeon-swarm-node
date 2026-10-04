@@ -19,7 +19,12 @@ export default class ConversationMessageUnpinner {
       message.identityId,
     );
 
-    await this.pinRepository.unpin(message.conversationId, message.messageId);
+    await this.pinRepository.unpin(
+      message.conversationId,
+      message.messageId,
+      message.identityId,
+      message.proof,
+    );
 
     conversation.unpinMessage(message.identityId, message.messageId);
 

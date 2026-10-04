@@ -22,6 +22,8 @@ export default class CommunityChannelMessagePinMutationPolicy extends PublicMuta
 
   public readonly collection = 'pins';
 
+  public readonly scopeType = 'community_channel';
+
   constructor(private readonly communityRepository: CommunityRepository) {
     super();
   }

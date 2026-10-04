@@ -1,9 +1,12 @@
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import OrbitDBConversationMessagePinRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationMessagePinRepository';
+import { StalePublicMutationError } from '@app/contexts/public-mutations/domain/errors/StalePublicMutationError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
+
+import { signedMutation } from '../../../public-mutations/support/signedMutation';
 
 type Entry = {
   key?: string;
@@ -80,6 +83,14 @@ describe('OrbitDBConversationMessagePinRepository', () => {
   const identityId = new IdentityId(
     'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=',
   );
+  const proof = (kind: 'put' | 'delete', sequence: number) =>
+    signedMutation({
+      identityId: identityId.valueOf(),
+      kind,
+      recordId: `conversation:${conversationId.valueOf()}:${messageId.valueOf()}`,
+      sequence,
+      store: 'pins',
+    });
   let registry: OrbitDBReplicatedStateRegistry;
   let heads: ReturnType<typeof createStore>;
   let pins: ReturnType<typeof createStore>;
@@ -106,6 +117,7 @@ describe('OrbitDBConversationMessagePinRepository', () => {
       messageId,
       identityId,
       new Timestamp(1780000000000),
+      await proof('put', 1),
     );
     pins.query.mockClear();
 
@@ -124,8 +136,14 @@ describe('OrbitDBConversationMessagePinRepository', () => {
       messageId,
       identityId,
       new Timestamp(1780000000000),
+      await proof('put', 1),
     );
-    await repository.unpin(conversationId, messageId);
+    await repository.unpin(
+      conversationId,
+      messageId,
+      identityId,
+      await proof('delete', 2),
+    );
     pins.query.mockClear();
 
     await expect(
@@ -143,6 +161,7 @@ describe('OrbitDBConversationMessagePinRepository', () => {
         messageId,
         identityId,
         new Timestamp(1780000000000),
+        await proof('put', 1),
       ),
     ).resolves.toBeUndefined();
 
@@ -160,12 +179,18 @@ describe('OrbitDBConversationMessagePinRepository', () => {
       messageId,
       identityId,
       new Timestamp(1780000000000),
+      await proof('put', 1),
     );
     await flushBackgroundTasks();
     heads.stopWrites();
 
     await expect(
-      repository.unpin(conversationId, messageId),
+      repository.unpin(
+        conversationId,
+        messageId,
+        identityId,
+        await proof('delete', 2),
+      ),
     ).resolves.toBeUndefined();
 
     await expect(
@@ -174,6 +199,35 @@ describe('OrbitDBConversationMessagePinRepository', () => {
 
     heads.releaseWrites();
     await flushBackgroundTasks();
+  });
+
+  it('rejects a replayed older pin after the unpin', async () => {
+    await repository.pin(
+      conversationId,
+      messageId,
+      identityId,
+      new Timestamp(1780000000000),
+      await proof('put', 1),
+    );
+    await repository.unpin(
+      conversationId,
+      messageId,
+      identityId,
+      await proof('delete', 2),
+    );
+
+    await expect(
+      repository.pin(
+        conversationId,
+        messageId,
+        identityId,
+        new Timestamp(1780000000000),
+        await proof('put', 1),
+      ),
+    ).rejects.toBeInstanceOf(StalePublicMutationError);
+    await expect(
+      repository.findByConversation(conversationId),
+    ).resolves.toEqual([]);
   });
 
   it('ignores canonical pins with malformed identities', async () => {

@@ -1,5 +1,5 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
-import { assert, Timestamp } from '@haskou/value-objects';
+import { assert } from '@haskou/value-objects';
 
 import { MessageReaction } from '../../domain/entities/messages/MessageReaction';
 import { ConversationNotFoundError } from '../../domain/errors/ConversationNotFoundError';
@@ -42,15 +42,16 @@ export default class MessageReactionRemover {
       message.messageId,
       message.authorId,
       message.emoji,
-      Timestamp.now(),
+      message.createdAt,
     );
 
-    await this.reactionRepository.delete(reaction);
+    await this.reactionRepository.delete(reaction, message.proof);
     await this.eventPublisher.publish([
       new ConversationMessageReactionWasRemovedEvent(
         message.conversationId.valueOf(),
         {
           ...reaction.toPrimitives(),
+          mutationProof: message.proof.toPrimitives(),
           networkId: conversation.getNetworkId().valueOf(),
           participantIds: conversation
             .getParticipantIds()

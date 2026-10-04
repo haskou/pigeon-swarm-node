@@ -34,6 +34,8 @@ export default class ConversationMessagePinner {
       message.conversationId,
       message.messageId,
       message.identityId,
+      message.createdAt,
+      message.proof,
     );
 
     conversation.pinMessage(message.identityId, message.messageId);

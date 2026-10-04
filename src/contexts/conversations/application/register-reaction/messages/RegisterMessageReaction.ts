@@ -1,3 +1,4 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -11,6 +12,7 @@ export class RegisterMessageReaction {
   public readonly createdAt: Timestamp;
   public readonly emoji: MessageReactionEmoji;
   public readonly messageId: MessageId;
+  public readonly proof: PublicMutationProof;
 
   constructor(
     conversationId: string,
@@ -18,11 +20,13 @@ export class RegisterMessageReaction {
     authorId: string,
     emoji: string,
     createdAt: number,
+    proof: unknown,
   ) {
     this.authorId = new IdentityId(authorId);
     this.conversationId = new ConversationId(conversationId);
     this.createdAt = new Timestamp(createdAt);
     this.emoji = new MessageReactionEmoji(emoji);
     this.messageId = new MessageId(messageId);
+    this.proof = PublicMutationProof.fromPrimitives(proof);
   }
 }

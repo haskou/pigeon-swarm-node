@@ -1,6 +1,9 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy';
+import { Conversation } from '@app/contexts/conversations/domain/Conversation';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import ConversationMessagePinMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
@@ -180,5 +183,98 @@ describe('PublicMutationGate over pins', () => {
     expect(registry.findCachedHead('pins-head')?.pins).toEqual([signed]);
     registry.clear();
     jest.useRealTimers();
+  });
+});
+
+describe('PublicMutationGate over conversation pins', () => {
+  const author = 'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=';
+  const conversationId = 'one-to-one:c1';
+  const id = `conversation:${conversationId}:m1`;
+  const pin = {
+    conversationId,
+    createdAt: 1780000000000,
+    id,
+    messageId: 'm1',
+    pinnedByIdentityId: author,
+    scopeType: 'conversation',
+  };
+  const authorization = mock<PublicMutationAuthorAuthorization>();
+  const conversationRepository = mock<ConversationRepository>();
+  const communityRepository = mock<CommunityRepository>();
+  let gate: PublicMutationGate;
+
+  const sign = async (
+    payload: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> => {
+    const device = await KeyPair.generate();
+    const body = {
+      author: {
+        deviceCredential: device.toPrimitives().publicKey,
+        identityId: author,
+      },
+      kind: 'put',
+      operationId: 'operation-1'.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor: null as string | null,
+      recordId: payload.id as string,
+      sequence: 0,
+      store: 'pins',
+      version: 1,
+    } as const;
+
+    return PublicMutationRecord.withProof(
+      payload,
+      PublicMutationProof.signed(
+        body,
+        device.sign(PublicMutationProof.signingContentOf(body)),
+      ),
+    );
+  };
+
+  beforeEach(() => {
+    authorization.isAuthorized.mockResolvedValue(true);
+    conversationRepository.findMetadataById.mockResolvedValue(
+      mock<Conversation>({ hasParticipant: jest.fn(() => true) }),
+    );
+    gate = new PublicMutationGate(new PublicMutationVerifier(authorization), [
+      new CommunityChannelMessagePinMutationPolicy(communityRepository),
+      new ConversationMessagePinMutationPolicy(conversationRepository),
+    ]);
+  });
+
+  it('admits a signed conversation pin from a participant', async () => {
+    await expect(gate.accepts('pins', await sign(pin))).resolves.toBe(true);
+  });
+
+  it('rejects a pin from someone who is not a participant', async () => {
+    conversationRepository.findMetadataById.mockResolvedValue(
+      mock<Conversation>({ hasParticipant: jest.fn(() => false) }),
+    );
+
+    await expect(gate.accepts('pins', await sign(pin))).resolves.toBe(false);
+  });
+
+  it('rejects a conversation proof copied onto another conversation', async () => {
+    const signed = await sign(pin);
+
+    await expect(
+      gate.accepts('pins', {
+        ...signed,
+        conversationId: 'one-to-one:c2',
+        id: 'conversation:one-to-one:c2:m1',
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a record whose scope type has no policy in the collection', async () => {
+    const unknownScope = { ...pin, scopeType: 'mystery' };
+
+    await expect(gate.accepts('pins', await sign(unknownScope))).resolves.toBe(
+      false,
+    );
+  });
+
+  it('rejects an unsigned conversation pin', async () => {
+    await expect(gate.accepts('pins', pin)).resolves.toBe(false);
   });
 });

@@ -42,14 +42,16 @@ export default class MessageReactionAdder {
       message.messageId,
       message.authorId,
       message.emoji,
+      message.createdAt,
     );
 
-    await this.reactionRepository.save(reaction);
+    await this.reactionRepository.save(reaction, message.proof);
     await this.eventPublisher.publish([
       new ConversationMessageReactionWasAddedEvent(
         message.conversationId.valueOf(),
         {
           ...reaction.toPrimitives(),
+          mutationProof: message.proof.toPrimitives(),
           networkId: conversation.getNetworkId().valueOf(),
           participantIds: conversation
             .getParticipantIds()

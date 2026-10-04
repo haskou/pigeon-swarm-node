@@ -4,6 +4,9 @@ import { PublicMutationExpectation } from './PublicMutationVerifier';
 export abstract class PublicMutationPolicy {
   public abstract readonly collection: string;
 
+  /** Value of the record's `scopeType` that this policy governs. */
+  public abstract readonly scopeType: string;
+
   /** Throws when the record is malformed or its scope/author is inconsistent. */
   public abstract expectationOf(
     record: Record<string, unknown>,

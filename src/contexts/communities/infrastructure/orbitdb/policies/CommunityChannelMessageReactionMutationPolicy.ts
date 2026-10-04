@@ -30,6 +30,8 @@ export default class CommunityChannelMessageReactionMutationPolicy extends Publi
 
   public readonly collection = 'reactions';
 
+  public readonly scopeType = 'community_channel';
+
   constructor(private readonly communityRepository: CommunityRepository) {
     super();
   }

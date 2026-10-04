@@ -4,7 +4,16 @@ import { ConversationMessagePinCreateMessage } from '@app/contexts/conversations
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  Post,
+  JsonController,
+  Param,
+  Req,
+  Res,
+} from 'routing-controllers';
+
+import { PostConversationMessagePinBody } from '../bodies/PostConversationMessagePinBody';
 
 @JsonController('/conversations')
 export class PostConversationMessagePinRoute extends Route {
@@ -20,6 +29,7 @@ export class PostConversationMessagePinRoute extends Route {
   public async pinMessage(
     @Param('conversationId') conversationId: string,
     @Param('messageId') messageId: string,
+    @Body() body: PostConversationMessagePinBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
@@ -30,6 +40,8 @@ export class PostConversationMessagePinRoute extends Route {
         identityId.valueOf(),
         conversationId,
         messageId,
+        body.createdAt,
+        body.mutation,
       ),
     );
 

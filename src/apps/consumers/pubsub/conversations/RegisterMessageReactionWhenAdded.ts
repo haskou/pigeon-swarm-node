@@ -1,6 +1,8 @@
 import MessageReactionRegistrar from '@app/contexts/conversations/application/register-reaction/MessageReactionRegistrar';
 import { RegisterMessageReaction } from '@app/contexts/conversations/application/register-reaction/messages/RegisterMessageReaction';
 import { ConversationMessageReactionWasAddedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageReactionWasAddedEvent';
+import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { StalePublicMutationError } from '@app/contexts/public-mutations/domain/errors/StalePublicMutationError';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
@@ -34,14 +36,23 @@ export default class RegisterMessageReactionWhenAdded extends Consumer {
   }
 
   public async handler(event: DomainEvent): Promise<void> {
-    await this.registrar.register(
-      new RegisterMessageReaction(
-        event.aggregateId,
-        String(event.attributes.messageId),
-        String(event.attributes.authorId),
-        String(event.attributes.emoji),
-        Number(event.attributes.createdAt),
-      ),
-    );
+    try {
+      await this.registrar.register(
+        new RegisterMessageReaction(
+          event.aggregateId,
+          String(event.attributes.messageId),
+          String(event.attributes.authorId),
+          String(event.attributes.emoji),
+          Number(event.attributes.createdAt),
+          event.attributes.mutationProof,
+        ),
+      );
+    } catch (error) {
+      if (error instanceof InvalidPublicMutationError) return;
+
+      if (error instanceof StalePublicMutationError) return;
+
+      throw error;
+    }
   }
 }
