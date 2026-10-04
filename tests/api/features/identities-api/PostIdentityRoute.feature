@@ -3,7 +3,7 @@ Feature: Post identity route
   I want to publish a signed identity
   So that I can use it in the system
 
-  Scenario: Reject legacy backend-generated identity creation
+  Scenario: Reject backend-generated identity creation with a password
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
     And I set json body
@@ -46,11 +46,11 @@ Feature: Post identity route
       | profile.handle | bob |
     And response body should contain "identityExternalIdentifier"
 
-  Scenario: Reject legacy unlock material on a signed identity
+  Scenario: Reject unlock material on a signed identity
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
-    And I set a client-signed identity body with name "legacy" and handle "legacy"
-    And I add legacy identity unlock fields
+    And I set a client-signed identity body with name "unlock" and handle "unlock"
+    And I add identity unlock fields
     When I POST to "/identities/"
     Then response code is equal to 400
 

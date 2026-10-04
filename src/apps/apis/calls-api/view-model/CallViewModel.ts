@@ -38,7 +38,6 @@ export class CallViewModel {
           {
             connected,
             identityId: participant.getIdentityId().valueOf(),
-            mediaConnections: [] as never[],
             status: connected ? 'joined' : 'ringing',
           },
         ];

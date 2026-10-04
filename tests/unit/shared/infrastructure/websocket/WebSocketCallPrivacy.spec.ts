@@ -101,7 +101,6 @@ describe('live call privacy', () => {
           identityId: other.valueOf(),
           connected: true,
           status: 'joined',
-          mediaConnections: [],
         },
       ],
     });

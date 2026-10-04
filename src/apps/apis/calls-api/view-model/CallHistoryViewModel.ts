@@ -12,7 +12,6 @@ export class CallHistoryViewModel {
         participants: call.toPrimitives().participants.map((participant) => ({
           ...participant,
           connected: false,
-          mediaConnections: [] as never[],
         })),
       })),
     };

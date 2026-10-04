@@ -261,9 +261,9 @@ describe('LocalNodeMetadataRepository', () => {
       const obsoleteNetworkId = '550e8400-e29b-41d4-a716-446655440002';
 
       obsoleteNetwork.getId.mockReturnValue(obsoleteNetworkId);
-      obsoleteNetwork.getName.mockReturnValue('private_legacy');
+      obsoleteNetwork.getName.mockReturnValue('private_obsolete');
       obsoleteNetwork.getConfig.mockReturnValue(
-        new IPFSNetworkConfig(obsoleteNetworkId, 'private_legacy'),
+        new IPFSNetworkConfig(obsoleteNetworkId, 'private_obsolete'),
       );
       networkRegistry.getAll.mockReturnValue([obsoleteNetwork]);
 

@@ -176,12 +176,12 @@ async function main(): Promise<void> {
     assertBothJoined(persisted);
 
     const communityCallId = '550e8400-e29b-41d4-a716-446655440099';
-    const legacyCommunity: OrbitDBCallDocument = {
+    const attributedCommunity: OrbitDBCallDocument = {
       ...first,
       id: communityCallId,
       scope: { type: 'community_channel', communityId: 'community-1', channelId: 'channel-1', conversationId: undefined },
     };
-    await stores.calls.put!(JSON.parse(JSON.stringify(legacyCommunity)));
+    await stores.calls.put!(JSON.parse(JSON.stringify(attributedCommunity)));
     const communityProjection = await project(stores);
     const projectedCommunity = await communityProjection.findById(new CallId(communityCallId));
     assert.ok(projectedCommunity);

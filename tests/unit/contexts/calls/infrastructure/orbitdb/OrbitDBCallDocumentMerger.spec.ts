@@ -64,9 +64,9 @@ describe('OrbitDBCallDocumentMerger', () => {
 
   it('preserves the session epoch when a newer update omits it', () => {
     const current = { ...document([], 10), sessionEpoch: 3 };
-    const legacy = document([], 20);
-    expect(merger.merge(current, legacy).sessionEpoch).toBe(3);
-    expect(merger.merge(legacy, current).sessionEpoch).toBe(3);
+    const withoutEpoch = document([], 20);
+    expect(merger.merge(current, withoutEpoch).sessionEpoch).toBe(3);
+    expect(merger.merge(withoutEpoch, current).sessionEpoch).toBe(3);
   });
 
   it('does not merge a call update from a different immutable scope', () => {
@@ -158,17 +158,17 @@ describe('OrbitDBCallDocumentMerger', () => {
       expected.participants.map((participant) => participant.status),
     ).toEqual(['joined', 'joined']);
   });
-  it('strips community participant attribution in both legacy replay orders', () => {
-    const legacy: OrbitDBCallDocument = { ...document([{ identityId: 'a', status: 'joined', joinedAt: 20 }]), scope: { type: 'community_channel', communityId: 'community', channelId: 'voice', conversationId: undefined } };
-    const current = { ...legacy, status: 'ended', endedAt: 40, endedByIdentityId: 'a', sessionEpoch: 2 };
-    for (const order of [[legacy, current], [current, legacy]]) {
+  it('strips community participant attribution in both replay orders', () => {
+    const attributed: OrbitDBCallDocument = { ...document([{ identityId: 'a', status: 'joined', joinedAt: 20 }]), scope: { type: 'community_channel', communityId: 'community', channelId: 'voice', conversationId: undefined } };
+    const current = { ...attributed, status: 'ended', endedAt: 40, endedByIdentityId: 'a', sessionEpoch: 2 };
+    for (const order of [[attributed, current], [current, attributed]]) {
       const merged = merger.merge(order[0], order[1]);
       expect(merged.participantIds).toEqual([]);
       expect(merged.participants).toEqual([]);
       expect(merged).not.toHaveProperty('creatorIdentityId');
       expect(merged).not.toHaveProperty('endedByIdentityId');
       expect(merged).toMatchObject({ status: 'ended', sessionEpoch: 2 });
-      expect(merger.merge(merged, legacy)).toEqual(merged);
+      expect(merger.merge(merged, attributed)).toEqual(merged);
       const stored = JSON.parse(JSON.stringify(merged));
       expect(merger.merge(undefined, stored)).toEqual(stored);
     }

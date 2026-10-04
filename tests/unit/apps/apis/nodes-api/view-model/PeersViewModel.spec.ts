@@ -109,7 +109,7 @@ describe('PeersViewModel', () => {
         },
         {
           id: unknownNetworkId,
-          name: 'legacy-network',
+          name: 'unknown-network',
         },
       ],
       owner: undefined,
@@ -146,7 +146,7 @@ describe('PeersViewModel', () => {
             },
             {
               id: unknownNetworkId,
-              name: 'legacy-network',
+              name: 'unknown-network',
             },
           ],
           nodeType: 'reachable',

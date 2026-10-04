@@ -13,8 +13,6 @@ const config: Config.InitialOptions = {
   },
   testPathIgnorePatterns: [
     '<rootDir>/node_modules/',
-    '<rootDir>/src/Shared/',
-    '/apps/migrations',
   ],
   verbose: true,
   roots: ['<rootDir>/src/', '<rootDir>/tests/'],
@@ -29,7 +27,6 @@ const config: Config.InitialOptions = {
     'src/index.ts',
     'src/Kernel.ts',
     'src/shared/infrastructure/',
-    '/apps/migrations',
   ],
 };
 

@@ -17,7 +17,7 @@ yarn test:integration:call-history
 ```
 
 This uses a real OrbitDB store and reopens its projection. Conversation history
-must retain merged participant transitions. Legacy community records must be
+must retain merged participant transitions. Community call records must be
 repaired without participant attribution and must not restore membership after
 reopen. Unit regressions additionally cover stale lease replay, explicit leave
 racing with heartbeat, and timeout processing after a scheduler pause.
