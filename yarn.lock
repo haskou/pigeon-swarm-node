@@ -762,10 +762,10 @@
   resolved "https://registry.yarnpkg.com/@hapi/bourne/-/bourne-3.0.0.tgz#f11fdf7dda62fe8e336fa7c6642d9041f30356d7"
   integrity sha512-Waj1cwPXJDucOib4a3bAISsKJVb15MKi9IvmTI/7ssVEm6sywXGjVJDhl6/umt1pK1ZS7PacXU3A1PmFKHEZ2w==
 
-"@haskou/ddd-kernel@2.0.15":
-  version "2.0.15"
-  resolved "https://registry.yarnpkg.com/@haskou/ddd-kernel/-/ddd-kernel-2.0.15.tgz#6b94b11ce03d385562dbb1e3ef5348c75f3bd384"
-  integrity sha512-rQOmlFchwUTp8o/+xXid4xhPw3M4pzx1sNBi40yvuWgGLxjv6Qq7g1L6IqhAw/5rheHzRwrvQB0aFpoZ//uIpw==
+"@haskou/ddd-kernel@3.0.1":
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/@haskou/ddd-kernel/-/ddd-kernel-3.0.1.tgz#75e3accceade7f98037590646c5fb4a7165b52d2"
+  integrity sha512-usWpvJbu2FSl2yivMmwqe7sVJYgCTpoqOKg/+aJF0hy08KFzWWfoTMwJDDJI9bwVh7xVQHQ20ul80c5fBzaigA==
   dependencies:
     "@haskou/flow" "3.0.1"
     dotenv "^18.0.5"
