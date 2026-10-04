@@ -256,51 +256,10 @@ describe('IpfsIdentityRepository', () => {
       );
     });
 
-    it('should republish legacy embedded identity metadata using its networks', async () => {
-      const identity = await createSignedIdentityForNetwork(
-        '550e8400-e29b-41d4-a716-446655440000',
-        'mallory',
-      );
-      const primitives = identity.toPrimitives();
-
-      metadataRepository.findAllCanonical.mockResolvedValue([
-        {
-          cid: 'bafy-identity-v2',
-          identity,
-          identityId: primitives.id,
-          previousCid: 'bafy-identity-v1',
-          receivedAt: 2,
-          version: 2,
-        },
-      ]);
-      ipfsManager.putRecordToNetworks.mockResolvedValue(undefined);
-
-      const republished = await repository.republishLocalRoutingRecords();
-
-      expect(republished).toBe(1);
-      expect(ipfsManager.getJSON).not.toHaveBeenCalled();
-      expect(ipfsManager.getBytes).not.toHaveBeenCalled();
-      expect(ipfsManager.addJSONToNetworks).not.toHaveBeenCalled();
-      expect(metadataRepository.save).not.toHaveBeenCalled();
-      expect(ipfsManager.findConnectedNetworkIds).toHaveBeenCalledWith(
-        primitives.networks,
-      );
-      expect(ipfsManager.putRecordToNetworks).toHaveBeenCalledWith(
-        'pigeon-swarm_identity-' + primitives.id,
-        'bafy-identity-v2',
-        primitives.networks,
-      );
-      expect(ipfsManager.putRecordToNetworks).toHaveBeenCalledWith(
-        'pigeon-swarm_identity-handle-' + primitives.profile.handle,
-        'bafy-identity-v2',
-        primitives.networks,
-      );
-    });
-
-    it('should skip legacy identity metadata without known networks', async () => {
+    it('should skip identity metadata without known networks', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
-      const cid = 'bafy-legacy-identity';
+      const cid = 'bafy-identity-without-networks';
 
       metadataRepository.findAllCanonical.mockResolvedValue([
         {

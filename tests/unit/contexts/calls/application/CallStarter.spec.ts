@@ -318,18 +318,7 @@ describe('CallStarter', () => {
     }
   });
 
-  it('starts epoch one after an explicitly ended legacy call without an epoch', async () => {
-    const legacy = endedCommunity();
-    const [first, second] = await Promise.all([
-      isolatedStarter([legacy]).start(communityStart()),
-      isolatedStarter([legacy]).start(communityStart(recipient)),
-    ]);
-    expect(first.toPrimitives()).toHaveProperty('sessionEpoch', 1);
-    expect(first.getId().isEqual(second.getId())).toBe(true);
-    expect(first.getId().isEqual(legacy.getId())).toBe(false);
-  });
-
-  it('preserves an existing active legacy call identifier instead of replacing its session', async () => {
+  it('preserves an existing active call identifier instead of replacing its session', async () => {
     const active = Call.start(
       caller,
       networkId,

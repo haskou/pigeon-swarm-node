@@ -35,6 +35,8 @@ export class CallParticipantLease extends AggregateRoot {
       CallParticipantConnectionStatus.CONNECTED,
       now,
       mediaConnections,
+      undefined,
+      now,
     );
 
     lease.assertMediaConnectionsAreValid(mediaConnections);
@@ -80,7 +82,6 @@ export class CallParticipantLease extends AggregateRoot {
     private lastRenewedAt?: Timestamp,
   ) {
     super();
-    this.lastRenewedAt ??= status.isConnected() ? lastHeartbeatAt : undefined;
   }
 
   private aggregateId(): string {

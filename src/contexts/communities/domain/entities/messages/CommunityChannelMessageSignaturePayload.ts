@@ -44,14 +44,6 @@ export class CommunityChannelMessageSignaturePayload {
       : undefined;
   }
 
-  private isMessagePayload(): boolean {
-    return (
-      this.primitives.type === 'edited' ||
-      this.primitives.type === 'poll' ||
-      this.primitives.type === 'sent'
-    );
-  }
-
   public toPrimitives(): {
     actorIdentityId?: string;
     authorIdentityId?: string;
@@ -90,30 +82,5 @@ export class CommunityChannelMessageSignaturePayload {
       replyToMessageId: this.primitives.replyToMessageId,
       type: this.primitives.type,
     };
-  }
-
-  public toSigningPrimitiveCandidates(): Array<Record<string, unknown>> {
-    const canonicalPayload = this.toPrimitives();
-    const emptyAttachmentExternalIdentifiers: string[] = [];
-    const candidates = [canonicalPayload];
-
-    if (this.primitives.mentions && this.primitives.mentions.length === 0) {
-      candidates.push({
-        ...canonicalPayload,
-        mentions: [],
-      });
-    }
-
-    if (!this.isMessagePayload()) {
-      return candidates;
-    }
-
-    return candidates.flatMap((candidate) => [
-      candidate,
-      {
-        ...candidate,
-        attachmentExternalIdentifiers: emptyAttachmentExternalIdentifiers,
-      },
-    ]);
   }
 }

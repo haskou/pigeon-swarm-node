@@ -180,7 +180,7 @@ describe('OrbitDBCommunityRepository', () => {
     };
     await registry.putHead(
       `community:${protectedId.valueOf()}`,
-      protectedCommunity,
+      versioned(protectedCommunity),
       [networkId],
     );
 
@@ -188,11 +188,11 @@ describe('OrbitDBCommunityRepository', () => {
       const id = `public-${index}`;
       await registry.putHead(
         `community:${id}`,
-        {
+        versioned({
           ...communityPrimitives(),
           createdAt: 1780000000000 - index,
           id,
-        },
+        }),
         [networkId],
       );
     }
@@ -410,7 +410,9 @@ describe('OrbitDBCommunityRepository', () => {
   it('should read communities from heads when indexes exist', async () => {
     const primitives = communityPrimitives();
 
-    await registry.putHead('community:community-1', primitives, [networkId]);
+    await registry.putHead('community:community-1', versioned(primitives), [
+      networkId,
+    ]);
     await registry.putHead(
       `community-member-index:${identityMother.id.valueOf()}:community-1`,
       {
@@ -461,6 +463,17 @@ describe('OrbitDBCommunityRepository', () => {
 
     expect(byMember).toEqual([]);
   });
+
+  function versioned(
+    primitives: PrimitiveOf<Community>,
+  ): Record<string, unknown> {
+    return new OrbitDBCommunityReplicaMerger().nextDocument(
+      primitives as never,
+      undefined,
+      undefined,
+      primitives.createdAt,
+    ) as never;
+  }
 
   function communityPrimitives(): PrimitiveOf<Community> {
     return {

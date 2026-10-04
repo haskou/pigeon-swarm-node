@@ -235,10 +235,10 @@ export default class OrbitDBCommunityReplicaMerger {
   private initialValue(key: string, value: unknown): unknown {
     const [field, id] = JSON.parse(key) as string[];
 
-    if (field === 'memberIds') return { admission: `legacy:${id}`, id };
+    if (field === 'memberIds') return { admission: `initial:${id}`, id };
 
     if (field === 'memberRoles')
-      return { ...(value as object), admission: `legacy:${id}` };
+      return { ...(value as object), admission: `initial:${id}` };
 
     return value;
   }
@@ -413,20 +413,6 @@ export default class OrbitDBCommunityReplicaMerger {
     return result;
   }
 
-  private legacyWinner(
-    current: OrbitDBCommunityDocument,
-    candidate: OrbitDBCommunityDocument,
-  ): OrbitDBCommunityDocument {
-    const a = current.updatedAt ?? current.createdAt;
-    const b = candidate.updatedAt ?? candidate.createdAt;
-
-    if (a !== b) return a > b ? current : candidate;
-
-    return this.canonical(current) <= this.canonical(candidate)
-      ? current
-      : candidate;
-  }
-
   private mergedEntries(
     left: OrbitDBCommunityReplicaState,
     right: OrbitDBCommunityReplicaState,
@@ -569,14 +555,8 @@ export default class OrbitDBCommunityReplicaMerger {
   ): OrbitDBCommunityDocument {
     this.sameScope(current, candidate);
 
-    if (!current.replicaState && !candidate.replicaState)
-      return structuredClone(this.legacyWinner(current, candidate));
-
-    if (!current.replicaState)
-      return this.project(candidate, this.state(candidate));
-
-    if (!candidate.replicaState)
-      return this.project(current, this.state(current));
+    if (!current.replicaState || !candidate.replicaState)
+      throw new Error('Unsupported community replica state');
     const entries = this.mergedEntries(
       this.state(current),
       this.state(candidate),

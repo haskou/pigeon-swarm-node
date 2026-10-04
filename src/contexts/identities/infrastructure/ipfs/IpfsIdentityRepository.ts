@@ -80,27 +80,8 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     return [...latest.values()];
   }
 
-  private networkIdsFrom(document: IdentityMetadataRecord): string[] {
-    return [
-      ...new Set([
-        ...(document.networkIds || []),
-        ...(document.networkId ? [document.networkId] : []),
-      ]),
-    ];
-  }
-
   private routingNetworkIdsFrom(document: IdentityMetadataRecord): string[] {
-    const metadataNetworkIds = this.networkIdsFrom(document);
-
-    if (metadataNetworkIds.length > 0) {
-      return metadataNetworkIds;
-    }
-
-    if (document.identity) {
-      return [...new Set(this.mapper.toDocument(document.identity).networks)];
-    }
-
-    return [];
+    return [...new Set(document.networkIds ?? [])];
   }
 
   private routingHandleFrom(

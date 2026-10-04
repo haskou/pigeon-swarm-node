@@ -16,11 +16,10 @@ export default class CommunityChannelMessageSignatureDomainService {
     payload: CommunityChannelMessageSignaturePayload,
     signature: Signature,
   ): boolean {
-    return payload
-      .toSigningPrimitiveCandidates()
-      .some((candidate) =>
-        publicKey.isValidSignature(JSON.stringify(candidate), signature),
-      );
+    return publicKey.isValidSignature(
+      this.getCanonicalSigningContent(payload),
+      signature,
+    );
   }
 
   public assertValidSignature(

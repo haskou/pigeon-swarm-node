@@ -133,7 +133,7 @@ heartbeat field is introduced by this repair.
 
 Community voice documents retain only session lifecycle and scope. Participant
 arrays are empty, and creator/ender identities are omitted. Runtime participation
-is hydrated from unexpired in-memory leases. Legacy community participant fields
+is hydrated from unexpired in-memory leases. Community participant fields
 are stripped before projection and canonical repair; replaying old history cannot
 restore a participation grant. This rewrites current documents, not immutable
 blocks or copies already held by peers.
@@ -164,9 +164,7 @@ persisted joined state.
 Incoming leases older than sixty seconds or more than five seconds ahead of the
 local clock are rejected, including after tombstone cleanup. Equal-time explicit
 leave wins over timeout and connected updates. Routing participant lists are
-replaced on renewal rather than accumulated. Nodes must keep their clocks in sync. Legacy connected events use their heartbeat
-time as the renewal time; legacy disconnected events without `lastRenewedAt`
-cannot restore a participation grant.
+replaced on renewal rather than accumulated. Nodes must keep their clocks in sync.
 These are retention and freshness checks, not protection against a malicious
 network member forging new lease events.
 
@@ -298,7 +296,7 @@ Signed public mutations (pins and reactions):
 - Winner rule, independent of wall clocks: higher `sequence`, then lower proof
   digest. A tombstone (`removed: true`) must be a signed `delete`; a `put` must not
   be removed. `removed`, `deletedAt` or `updatedAt` alone never win. A signed record
-  outranks an unsigned one; unsigned legacy records are rejected.
+  outranks an unsigned one; unsigned records are rejected.
 - Index heads are unsigned wrappers: a head that lost records after admission is
   demoted to `updatedAt: 0` and cannot replace an admitted head.
 - The unsigned reaction cascade tombstones on channel/community deletion are gone;
@@ -348,13 +346,9 @@ compaction are future work; deleting these markers is unsafe.
 
 ### Upgrade and trust boundaries
 
-Old snapshots remain readable. The first edited snapshot gains version 1 metadata;
-thereafter an unversioned snapshot cannot replace versioned state. Unversioned pairs
-retain deterministic whole-document selection and do not gain concurrency guarantees.
-Upgrade all writers in a private network together before resuming writes. A rolling
-mixed-version deployment is **not** a supported concurrent-write configuration: late
-legacy changes, including legacy deletion, are ignored after migration. Preserve the
-existing stores when upgrading; no destructive migration is performed automatically.
+Every community snapshot carries version 1 replica metadata; a snapshot without it
+is rejected rather than merged. Upgrade all writers in a private network together
+before resuming writes.
 
 Structural validation rejects unsupported versions, malformed paths, invalid revision
 counters and incompatible register values. It is not authentication. A node with write
@@ -379,7 +373,7 @@ log entry for foreign-network content and reconstructs both networks from persis
 stores, preserving combined local queries without cross-network writes. Fixtures own
 and remove their temporary data. The check runs
 in `test:ci`; unit regressions additionally exercise three-write permutations, stale
-grants, role/channel deletion, legacy replay and malformed metadata. Loopback transport
+grants, role/channel deletion, replay and malformed metadata. Loopback transport
 does not validate external NAT traversal or calls.
 
 ## Protected control frame delivery
@@ -399,7 +393,7 @@ elapsed time cannot authorize an operation or cause fallback to an older
 checkpoint or the public replication path.
 
 Version 1 accepts only `membership.propose`, `membership.commit` and
-`device.revoke`. There is no legacy private-format fallback or dual write.
+`device.revoke`. There is no private-format fallback or dual write.
 Public communities continue to use their public replication path.
 
 ## Identity device authorization convergence
@@ -482,8 +476,7 @@ Community call documents carry a positive `sessionEpoch` for new sessions.
 Concurrent starts derive one UUID from the private network, community, channel
 and epoch; they do not select a random ID independently. Start/reuse decisions
 use one scope-history snapshot. After explicit termination the next epoch is
-one greater than the largest known epoch, independent of clock order. Existing
-active legacy IDs remain usable. A replica missing newer history may select an
+one greater than the largest known epoch, independent of clock order. A replica missing newer history may select an
 older epoch, which remains subject to its replicated termination; this is not
-consensus or automatic reconciliation of legacy duplicate sessions. The epoch
+consensus or automatic reconciliation of duplicate sessions. The epoch
 stays in node-to-node records and is not added to the browser live contract.

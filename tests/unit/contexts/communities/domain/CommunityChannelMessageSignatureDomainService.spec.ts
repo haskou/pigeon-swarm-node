@@ -117,34 +117,4 @@ describe('CommunityChannelMessageSignatureDomainService', () => {
       '{"authorIdentityId":"identity-id","channelId":"channel-id","communityId":"community-id","createdAt":1778536870557,"id":"community-message-id","plaintextPayload":"edited-public-community-message-payload","type":"edited"}',
     );
   });
-
-  it('accepts legacy channel message signatures with empty attachment identifiers', () => {
-    const publicKey = mock<PublicKey>();
-    const signature = new Signature(
-      'N19zbyYoEWjEZZ9YlXHiWFV3zDFzgApaAhlX9LtJZdS0OwniOywLmU1hjyfB4IaU45Ka5kSSTUwdCcfSEEWQBQ==',
-    );
-    const payload = CommunityChannelMessageSignaturePayload.fromPrimitives({
-      authorIdentityId: 'identity-id',
-      channelId: 'channel-id',
-      communityId: 'community-id',
-      createdAt: 1778536870557,
-      encryptedPayload: 'encrypted-community-message-payload',
-      id: 'community-message-id',
-      type: 'sent',
-    });
-    const legacySigningContent =
-      '{"authorIdentityId":"identity-id","channelId":"channel-id","communityId":"community-id","createdAt":1778536870557,"encryptedPayload":"encrypted-community-message-payload","id":"community-message-id","type":"sent","attachmentExternalIdentifiers":[]}';
-
-    publicKey.isValidSignature.mockImplementation(
-      (signingContent) => signingContent === legacySigningContent,
-    );
-
-    expect(
-      new CommunityChannelMessageSignatureDomainService().isValidSignature(
-        publicKey,
-        payload,
-        signature,
-      ),
-    ).toBe(true);
-  });
 });
