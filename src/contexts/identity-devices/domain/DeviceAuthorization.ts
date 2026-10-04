@@ -58,11 +58,11 @@ export class DeviceAuthorization extends AggregateRoot {
   ) {
     super();
     assert(
-      this.networkIds.length() > 0,
+      this.networkIds.length > 0,
       new InvalidDeviceAuthorizationTransitionError(),
     );
     assert(
-      this.credentials.length() <= DeviceAuthorization.MAX_CREDENTIALS,
+      this.credentials.length <= DeviceAuthorization.MAX_CREDENTIALS,
       new InvalidDeviceAuthorizationTransitionError(),
     );
     assert(
@@ -128,7 +128,7 @@ export class DeviceAuthorization extends AggregateRoot {
     credentials: DeviceCredential[],
   ): DeviceAuthorization {
     const availableCredentials =
-      DeviceAuthorization.MAX_CREDENTIALS - this.credentials.length();
+      DeviceAuthorization.MAX_CREDENTIALS - this.credentials.length;
     const newCredentials = [
       ...new Map(
         credentials.map((credential) => [credential.valueOf(), credential]),
@@ -158,7 +158,7 @@ export class DeviceAuthorization extends AggregateRoot {
 
   public revoke(credential: DeviceCredential): DeviceAuthorization {
     assert(
-      this.isAuthorized(credential) && this.credentials.length() > 1,
+      this.isAuthorized(credential) && this.credentials.length > 1,
       new InvalidDeviceAuthorizationTransitionError(),
     );
 
