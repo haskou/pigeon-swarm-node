@@ -62,7 +62,7 @@ describe('OrbitDBCallDocumentMerger', () => {
     expect(merger.merge(ended, active).status).toBe(status);
   });
 
-  it('preserves the session epoch when an older node omits it from a newer update', () => {
+  it('preserves the session epoch when a newer update omits it', () => {
     const current = { ...document([], 10), sessionEpoch: 3 };
     const legacy = document([], 20);
     expect(merger.merge(current, legacy).sessionEpoch).toBe(3);

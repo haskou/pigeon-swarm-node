@@ -39,13 +39,6 @@ describe('CallParticipantLease', () => {
     }
   });
 
-  it('does not infer a participation grant from a legacy timeout without a renewal timestamp', () => {
-    const lease = CallParticipantLease.connect(callId, identityId, nodeId, networkId, [identityId]);
-    const { lastRenewedAt: _, ...legacy } = lease.toPrimitives();
-    expect(CallParticipantLease.fromPrimitives(legacy).hasParticipationGrant()).toBe(true);
-    expect(CallParticipantLease.fromPrimitives({ ...legacy, status: 'disconnected' }).hasParticipationGrant()).toBe(false);
-  });
-
   it('publishes every renewal even while connection status is unchanged', () => {
     const lease = CallParticipantLease.connect(
       callId,

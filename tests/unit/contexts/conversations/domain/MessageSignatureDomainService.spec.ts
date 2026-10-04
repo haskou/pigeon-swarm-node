@@ -59,34 +59,4 @@ describe('MessageSignatureDomainService', () => {
       `{"authorId":"${identityId}","conversationId":"one-to-one:conversation-id","createdAt":1778536870557,"id":"deleted-message-id","previousMessageIds":[],"targetMessageId":"message-id","type":"deleted"}`,
     );
   });
-
-  it('accepts legacy sent message signatures with empty attachment identifiers', () => {
-    const publicKey = mock<PublicKey>();
-    const payload = new MessageSignaturePayload(
-      new MessageMetadata(
-        new MessageId('message-id'),
-        new ConversationId('one-to-one:conversation-id'),
-        new IdentityId(identityId),
-        [],
-        new Timestamp(1778536870557),
-        new Signature(signature),
-        new MessageId('reply-message-id'),
-      ),
-      MessageType.SENT,
-      new EncryptedMessagePayload('encrypted-message-payload'),
-    );
-    const legacySigningContent = `{"authorId":"${identityId}","conversationId":"one-to-one:conversation-id","createdAt":1778536870557,"encryptedPayload":"encrypted-message-payload","id":"message-id","previousMessageIds":[],"replyToMessageId":"reply-message-id","type":"sent","attachmentExternalIdentifiers":[]}`;
-
-    publicKey.isValidSignature.mockImplementation(
-      (signingContent) => signingContent === legacySigningContent,
-    );
-
-    expect(
-      new MessageSignatureDomainService().isValidSignature(
-        publicKey,
-        payload,
-        new Signature(signature),
-      ),
-    ).toBe(true);
-  });
 });

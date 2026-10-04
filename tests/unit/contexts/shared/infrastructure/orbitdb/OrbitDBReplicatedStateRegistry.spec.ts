@@ -326,17 +326,24 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     const first = createStores();
     const second = createStores();
     const key = 'community-member-index:member';
-    const community = (networkId: string) => ({
-      createdAt: 1,
-      description: 'private',
-      id: `community-${networkId}`,
-      memberIds: ['member'],
-      name: networkId,
-      networkId,
-      ownerIdentityId: 'owner',
-      textChannels: [] as unknown[],
-      visibility: 'private',
-    });
+    const merger = new OrbitDBCommunityReplicaMerger();
+    const community = (networkId: string) =>
+      merger.nextDocument(
+        {
+          createdAt: 1,
+          description: 'private',
+          id: `community-${networkId}`,
+          memberIds: ['member'],
+          name: networkId,
+          networkId,
+          ownerIdentityId: 'owner',
+          textChannels: [] as unknown[],
+          visibility: 'private',
+        } as never,
+        undefined,
+        undefined,
+        1,
+      );
     const head = (networkId: string) => ({
       communities: [community(networkId)],
       id: key,

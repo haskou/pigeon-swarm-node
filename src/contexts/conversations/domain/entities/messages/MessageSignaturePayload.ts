@@ -11,14 +11,6 @@ export class MessageSignaturePayload {
     private readonly targetMessageId?: MessageId,
   ) {}
 
-  private isMessagePayload(): boolean {
-    return (
-      this.type.isEqual(MessageType.EDITED) ||
-      this.type.isEqual(MessageType.POLL) ||
-      this.type.isEqual(MessageType.SENT)
-    );
-  }
-
   public toPrimitives(): {
     authorId: string;
     conversationId: string;
@@ -43,22 +35,5 @@ export class MessageSignaturePayload {
       targetMessageId: this.targetMessageId?.valueOf(),
       type: this.type.valueOf(),
     };
-  }
-
-  public toSigningPrimitiveCandidates(): Array<Record<string, unknown>> {
-    const canonicalPayload = this.toPrimitives();
-    const emptyAttachmentExternalIdentifiers: string[] = [];
-
-    if (!this.isMessagePayload()) {
-      return [canonicalPayload];
-    }
-
-    return [
-      canonicalPayload,
-      {
-        ...canonicalPayload,
-        attachmentExternalIdentifiers: emptyAttachmentExternalIdentifiers,
-      },
-    ];
   }
 }

@@ -5,7 +5,6 @@ export interface IdentityMetadataRecord {
   handle?: string;
   identity?: Identity;
   identityId: string;
-  networkId?: string;
   networkIds?: string[];
   previousCid: string | undefined;
   receivedAt: number;

@@ -79,7 +79,7 @@ describe('OrbitDBCommunityReplicaMerger', () => {
     ],
     ['name', 'unexpected-id', 'Name'],
   ])(
-    'rejects malformed %s state even when merged with legacy data',
+    'rejects malformed %s state',
     (field, id, value) => {
       const invalid = initial();
       invalid.replicaState!.entries[JSON.stringify([field, id])] = {
@@ -295,14 +295,11 @@ describe('OrbitDBCommunityReplicaMerger', () => {
     });
   });
 
-  it('does not allow a late legacy snapshot to replace versioned state', () => {
-    const base = initial();
-    const versioned = edit(base, { name: 'Versioned', memberIds: ['owner'] });
-    const legacy = { ...fixture(), name: 'Late legacy', updatedAt: 9999999 };
-    expect(merger.merge(versioned, legacy)).toEqual(versioned);
-    expect(merger.merge(legacy, versioned)).toEqual(versioned);
-    const deleted = merger.tombstone(versioned, versioned, 40);
-    expect(merger.merge(deleted, legacy).deleted).toBe(true);
+  it('rejects an unversioned snapshot', () => {
+    const versioned = edit(initial(), { name: 'Versioned', memberIds: ['owner'] });
+    const unversioned = { ...fixture(), name: 'Unversioned', updatedAt: 9999999 };
+    expect(() => merger.merge(versioned, unversioned)).toThrow();
+    expect(() => merger.merge(unversioned, versioned)).toThrow();
   });
 
   it('hides assignments to deleted roles after concurrent grant and deletion', () => {

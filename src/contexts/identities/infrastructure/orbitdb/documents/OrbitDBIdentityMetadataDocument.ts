@@ -10,7 +10,6 @@ export interface OrbitDBIdentityMetadataDocument extends Record<
   id: string;
   identity?: IdentityPrimitives;
   identityId: string;
-  networkId?: string;
   networkIds?: string[];
   previousCid: string | undefined;
   receivedAt: number;

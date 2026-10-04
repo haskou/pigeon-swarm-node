@@ -424,14 +424,11 @@ WebSocket snapshots received while the recovery request was outstanding.
 Recovery makes at most three attempts with one- and two-second delays, deduplicates
 pending requests and discards responses from an earlier connection generation.
 Malformed snapshots trigger bounded per-call recovery; stale revisions do not.
-Legacy notifications without a snapshot use one outstanding fetch per call,
-coalesced and limited to one start per second. Stable heartbeats do not trigger
-full-call GETs. ICE negotiation and actual audio remain separate from presence.
+Stable heartbeats do not trigger full-call GETs. ICE negotiation and actual audio remain separate from presence.
 
 Community starts for the same known session use a shared, scoped identifier
 across nodes. Explicit termination advances a persisted session epoch on the
-next start; clock differences do not determine that epoch. Existing active
-legacy sessions remain usable.
+next start; clock differences do not determine that epoch.
 
 ### Presence retention
 
@@ -676,7 +673,7 @@ Implemented:
 - leaving a one-to-one conversation ends its call; leaving a group (including a two-member group) or community call does not terminate other participants
 - explicit community call termination retires its call ID
 - community session documents do not persist participant identities, creator or
-  ender attribution. Runtime participation expires and legacy rosters cannot
+  ender attribution. Runtime participation expires and persisted rosters cannot
   restore it after restart. Existing immutable history is not erased; see
   [the synchronization contract](pubsub-sync-protocol.md) for retention limits
 - deleting yourself while `ringing` declines the call instead of leaving it

@@ -93,13 +93,9 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   private networkIdsFrom(
     document: Record<string, unknown>,
   ): string[] | undefined {
-    const networkId = this.stringValue(document, 'networkId');
-
-    if (this.isStringArray(document.networkIds)) {
-      return document.networkIds;
-    }
-
-    return networkId ? [networkId] : undefined;
+    return this.isStringArray(document.networkIds)
+      ? document.networkIds
+      : undefined;
   }
 
   private identityFrom(
@@ -134,7 +130,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       handle: this.stringValue(document, 'handle'),
       identity,
       identityId,
-      networkId: this.stringValue(document, 'networkId'),
       networkIds: this.networkIdsFrom(document),
       previousCid: this.stringValue(document, 'previousCid'),
       receivedAt: this.numberValue(document, 'receivedAt') || 0,
@@ -153,7 +148,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       id: record.identityId,
       identity: record.identity?.toPrimitives(),
       identityId: record.identityId,
-      networkId: record.networkId,
       networkIds: record.networkIds,
       previousCid: record.previousCid,
       receivedAt: record.receivedAt,
@@ -294,7 +288,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       ...record,
       handle: primitives.profile.handle,
       identityId: primitives.id,
-      networkId: undefined,
       networkIds: primitives.networks,
       previousCid: primitives.previousIdentityExternalIdentifier,
       version: primitives.version,
@@ -476,8 +469,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       (await this.findCachedCandidateRecords()).filter(
         (document): document is IdentityMetadataRecord =>
           document.identity !== undefined &&
-          (document.networkIds?.includes(networkId.valueOf()) ||
-            document.networkId === networkId.valueOf()),
+          document.networkIds?.includes(networkId.valueOf()),
       ),
     );
     const latestDocuments = new Map<string, IdentityMetadataRecord>();
