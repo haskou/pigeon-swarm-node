@@ -8,6 +8,8 @@ export default class LocalProcessedDomainEventIdempotencyStore implements Idempo
   private static readonly CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
   private static nextCleanupAt = 0;
 
+  private readonly inFlight = new Set<string>();
+
   constructor(private readonly database: EmbeddedLocalDatabase) {}
 
   private async cleanupExpiredRecords(now: number): Promise<void> {
@@ -27,26 +29,52 @@ export default class LocalProcessedDomainEventIdempotencyStore implements Idempo
     );
   }
 
-  public async has(key: string): Promise<boolean> {
-    const document = await this.database.findOne(
-      LocalProcessedDomainEventIdempotencyStore.NAMESPACE,
-      key,
-    );
+  public async claim(key: string): Promise<boolean> {
+    if (this.inFlight.has(key)) {
+      return false;
+    }
 
-    return document !== undefined;
+    this.inFlight.add(key);
+
+    try {
+      const processed = await this.database.findOne(
+        LocalProcessedDomainEventIdempotencyStore.NAMESPACE,
+        key,
+      );
+
+      if (processed !== undefined) {
+        this.inFlight.delete(key);
+
+        return false;
+      }
+    } catch (error) {
+      this.inFlight.delete(key);
+
+      throw error;
+    }
+
+    return true;
   }
 
-  public async mark(key: string): Promise<void> {
+  public async commit(key: string): Promise<void> {
     const now = Date.now();
 
-    await this.cleanupExpiredRecords(now);
+    try {
+      await this.cleanupExpiredRecords(now);
 
-    await this.database.save(
-      LocalProcessedDomainEventIdempotencyStore.NAMESPACE,
-      key,
-      {
-        processedAt: now,
-      },
-    );
+      await this.database.save(
+        LocalProcessedDomainEventIdempotencyStore.NAMESPACE,
+        key,
+        {
+          processedAt: now,
+        },
+      );
+    } finally {
+      this.inFlight.delete(key);
+    }
+  }
+
+  public release(key: string): void {
+    this.inFlight.delete(key);
   }
 }
