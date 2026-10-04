@@ -53,7 +53,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "@haskou/ddd-kernel": "2.0.15",
-    "@haskou/pigeon-swarm-crypto": "4.0.0",
+    "@haskou/pigeon-swarm-crypto": "5.0.0",
     "@haskou/value-objects": "8.3.3",
     "@helia/bitswap": "^4.0.8",
     "@helia/http": "^4.0.6",
