@@ -476,7 +476,7 @@ describe('OrbitDBCallRepository', () => {
   });
 
   it.each(['forward', 'reverse'] as const)(
-    'does not restore community participation from competing legacy snapshots in %s order',
+    'does not restore community participation from competing snapshots in %s order',
     async (order) => {
       const creatorRejoined = {
         identityId: creatorIdentityId,

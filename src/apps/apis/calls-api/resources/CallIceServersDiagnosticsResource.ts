@@ -1,7 +1,7 @@
 export type CallIceServersDiagnosticsResource = {
   /**
    * Whether a private TURN shared secret is configured. Missing secrets and the
-   * former public fallback disable shared-secret credential issuance.
+   * known public secret disable shared-secret credential issuance.
    * Explicit local static credentials may still be used when this is false.
    */
   turnSharedSecretConfigured: boolean;

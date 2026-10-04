@@ -205,12 +205,12 @@ requires 32–256 characters using letters, digits, `+`, `/` or `=`. Provision i
 through your secret manager or a protected environment file; do not commit it,
 print it in logs or pass it in command-line arguments.
 
-Missing, blank and former public shared secrets disable temporary TURN
+Missing, blank and known public shared secrets disable temporary TURN
 credential issuance and local relay-record publication. The deployment also
-rejects the former public secret. Before upgrading an existing installation,
-configure each backend issuer and its advertised coturn server with the same
-private value and restart both. Rotate the secret on coturn itself: a backend
-upgrade alone cannot revoke credentials accepted by a server using the old key.
+rejects the known public secret. Configure each backend issuer and its
+advertised coturn server with the same private value and restart both. Rotate
+the secret on coturn itself: changing only the backend cannot revoke
+credentials accepted by a server using the old key.
 Explicit static credentials remain available for locally configured TURN URLs
 only; they are not reused for discovered relays.
 

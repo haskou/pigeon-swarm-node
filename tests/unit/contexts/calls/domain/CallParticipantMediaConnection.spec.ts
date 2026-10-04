@@ -7,7 +7,7 @@ describe(CallParticipantMediaConnection.name, () => {
     state: 'connected',
   };
 
-  it('keeps omitted media fields compatible with stored reports', () => {
+  it('round-trips a report without optional media fields', () => {
     const connection =
       CallParticipantMediaConnection.fromPrimitives(primitives);
     expect(JSON.parse(JSON.stringify(connection.toPrimitives()))).toEqual(

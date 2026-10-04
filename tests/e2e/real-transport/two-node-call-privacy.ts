@@ -25,7 +25,6 @@ type LiveCall = {
     identityId: string;
     connected: boolean;
     status: string;
-    mediaConnections: unknown[];
   }>;
   participantIds: string[];
 };
@@ -65,7 +64,7 @@ function minimal(call: LiveCall): void {
     ])
       assert.ok(!(field in participant), `Unexpected ${field}`);
     assert.notEqual(participant.status, 'left');
-    assert.deepEqual(participant.mediaConnections, []);
+    assert.ok(!('mediaConnections' in participant), 'Unexpected mediaConnections');
   }
 }
 

@@ -37,7 +37,7 @@ second canonical JSON or signature format.
 - It does not authorize ordinary messages, reactions, receipts, presence or call
   signaling in the node. Version 1 node integration accepts only private control
   operations. Private content remains unavailable through this path rather than
-  falling back to legacy replication.
+  falling back to public replication.
 - It does not preserve existing private OrbitDB data. A protected scope starts
   from a newly verified genesis.
 
@@ -171,7 +171,7 @@ The accept use case performs the following steps in order. A failure stops befor
 any visible or durable acceptance change.
 
 1. Bound the encrypted frame and strict JSON input before expensive work.
-2. Load the locally trusted scope and reject an unknown, frozen or legacy scope.
+2. Load the locally trusted scope and reject an unknown or frozen scope.
 3. Parse the closed version 1 envelope and calculate its digest from the exact
    canonical signed form.
 4. If the operation identifier already exists, return success only when its stored
@@ -345,7 +345,7 @@ Local UI actions first construct and sign the same version 1 envelope, then use 
 same acceptance path. This prevents a local endpoint from bypassing rules that a
 remote operation must satisfy.
 
-## Legacy and public data policy
+## Existing and public data policy
 
 Protected private scopes are created with a new random scope identifier and
 verified genesis. There is no migration of old private OrbitDB documents and no
@@ -404,7 +404,7 @@ failing test at the narrowest owning boundary.
 - tampered JSON, signature, scope, revision, head, MLS bytes, policy, credential
   set, causal links, freshness proof and version fail before mutation;
 - an attacker-supplied checkpoint or author key is ignored;
-- legacy and unsupported operation kinds fail closed;
+- unknown and unsupported operation kinds fail closed;
 - errors and logs remain redacted; and
 - a domain permission rejection leaves no accepted receipt.
 
@@ -436,5 +436,5 @@ remain owned by the mailbox implementation.
 - Targeted domain, application, persistence, API and real-transport tests pass.
 - Lint, type checking and the complete relevant regression suite pass.
 - The API and any transport contract documentation match the implemented shapes.
-- Review confirms that protected private scopes have no legacy or OrbitDB fallback.
+- Review confirms that protected private scopes have no public OrbitDB fallback.
 - Security review is performed against the exact final commit.

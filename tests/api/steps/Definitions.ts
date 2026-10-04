@@ -826,18 +826,18 @@ export default class Definitions {
     });
   }
 
-  @given('I add legacy identity unlock fields')
-  public iAddLegacyIdentityUnlockFields(): void {
+  @given('I add identity unlock fields')
+  public iAddIdentityUnlockFields(): void {
     const body = JSON.parse(this.body ?? '{}') as Record<string, unknown>;
 
     body.encryptedKeyPair = {
-      encryptedPrivateKey: 'legacy-encrypted-private-key',
-      publicKey: 'legacy-public-key',
+      encryptedPrivateKey: 'unlock-encrypted-private-key',
+      publicKey: 'unlock-public-key',
     };
-    body.encryptedMasterKey = 'legacy-encrypted-master-key';
+    body.encryptedMasterKey = 'unlock-encrypted-master-key';
     body.masterKeyDerivation = {
       algorithm: 'scrypt',
-      salt: 'legacy-salt',
+      salt: 'unlock-salt',
       version: 1,
     };
     this.body = JSON.stringify(body);

@@ -408,8 +408,7 @@ GET /calls/{callId}
 Returns a minimal snapshot after checking current scope access. `participantIds`
 and `participants` contain only authorized connected participants and current
 ringing invitees. Departed/expired participants, join/leave timestamps, heartbeat
-timestamps and remote transport diagnostics are omitted. `mediaConnections` is
-an empty compatibility array. Community snapshots omit `creatorIdentityId`,
+timestamps and remote transport diagnostics are omitted. Community snapshots omit `creatorIdentityId`,
 `createdAt`, `endedAt` and `endedByIdentityId`; conversation snapshots retain the
 caller and lifecycle times needed for incoming-call and ended-call UI.
 A community member with current channel access can inspect its live snapshot
@@ -481,7 +480,7 @@ Response:
 The `diagnostics` block describes configuration, not live connectivity:
 
 - `turnSharedSecretConfigured` is false when the secret is missing or equals
-  the rejected public fallback. Locally issued shared-secret credentials are then omitted.
+  the known public secret. Locally issued shared-secret credentials are then omitted.
   Explicit local static credentials and credentials obtained from a private-network relay can still be returned.
 - `turnSource` reports whether the TURN URLs come from this node's local
   configuration, from a signed record of a connected relay, or from neither,
@@ -543,13 +542,13 @@ the server list does not migrate an established media path by itself.
 
 Independent TURN deployments use their own secrets and locally configured URLs.
 Every URL in one returned server entry must accept the same credentials. Nodes
-issuing local credentials for a legacy v1 pool must use the secret configured on
+issuing local credentials for a v1 pool must use the secret configured on
 every server in that pool; v1 records must prove that pool membership. V2 owners
 issue their own credentials over a private encrypted stream and do not share
 master secrets between deployments.
 Static credentials are never applied to a discovered remote server.
 
-Rotate a legacy v1 pool secret by updating its issuers and coturn servers and
+Rotate a v1 pool secret by updating its issuers and coturn servers and
 restarting them together. For v2, coordinate only the owner backend and its own
 coturn; newer owner advertisements invalidate requesting nodes' cached credentials. Environment-based secret rotation is not a hot-reload contract;
 restart also discards the in-memory discovery cache. Existing clients fetch new
@@ -1126,8 +1125,8 @@ The body is the raw byte stream. `Content-Type` and `Content-Disposition` are
 resolved from the replication metadata created during upload or received through
 network sync. If metadata is unknown, the endpoint falls back to
 `application/octet-stream`. If the CID points to existing JSON content, the
-endpoint still returns that JSON document for compatibility with identities,
-keychains and private upload documents. Reading a CID may populate Helia's local
+endpoint still returns that JSON document, because identities, keychains and
+private upload documents are stored as JSON. Reading a CID may populate Helia's local
 block cache, but it does not pin the content or advertise this node as a provider.
 
 ### Publish private content
@@ -1413,7 +1412,7 @@ refreshed, backend emits:
 Identity publications contain only public profile data and public authorization
 material. They never contain encrypted private keys, protected root-key
 envelopes, password KDF parameters, device unlock secrets or recovery secrets.
-Legacy identity payloads containing those fields are rejected.
+Identity payloads containing those fields are rejected.
 
 ### Get identity
 
@@ -4357,7 +4356,7 @@ An identical retry returns `duplicate`; conflicting
 genesis data is rejected. A node admits at most 16 scopes and 32 MiB of initial
 scope data per owner, and 64 scopes and 256 MiB across all owners.
 
-Protected communities reject the legacy mutation routes. A signed client first
+Protected communities reject the ordinary community mutation routes. A signed client first
 submits the complete signed operation and, for control operations, the same
 participant-encrypted control frame used for acceptance to
 `POST /private-authorization/challenges`. The node verifies the operation

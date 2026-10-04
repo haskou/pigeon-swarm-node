@@ -44,7 +44,7 @@ export class PublicMutationRecord {
 
   /**
    * Whether `candidate` may replace `current`. Undefined when neither record is
-   * proof-carrying, so callers keep their legacy rule for ungoverned records.
+   * proof-carrying, so callers apply their own ordering rule to records without proofs.
    * A signed record always outranks an unsigned one.
    */
   public static replaces(

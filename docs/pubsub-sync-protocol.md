@@ -344,11 +344,10 @@ it does not mark an incomplete reconstruction as warm. Historical replay is prop
 reachable log, and tombstones remain stored. Safe checkpointing and coordinated
 compaction are future work; deleting these markers is unsafe.
 
-### Upgrade and trust boundaries
+### Replica metadata and trust boundaries
 
 Every community snapshot carries version 1 replica metadata; a snapshot without it
-is rejected rather than merged. Upgrade all writers in a private network together
-before resuming writes.
+is rejected rather than merged.
 
 Structural validation rejects unsupported versions, malformed paths, invalid revision
 counters and incompatible register values. It is not authentication. A node with write

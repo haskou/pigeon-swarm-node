@@ -9,8 +9,8 @@ contract.
 
 Calls use WebRTC ICE. The backend does not embed a TURN server and does not
 relay media itself. A node that can expose coturn advertises the reachable TURN
-URLs through IPFS pubsub: legacy v1 records on public networks and v2 records
-on shared private networks. Other nodes
+URLs through IPFS pubsub: v1 pool records on public networks and v2 records on
+shared private networks. Other nodes
 validate and cache those records. `GET /calls/ice-servers` uses a discovered
 record only while its publishing peer is also the currently connected circuit
 relay.
@@ -131,7 +131,7 @@ corresponding issues can be closed.
 | `CallRelayRecordSigner` | Signs and verifies call relay records with the shared libp2p peer key. |
 | `CallRelayRecordDiscovery` | Subscribes to the call relay pubsub topic and publishes records. |
 | `CallRelayRecordRegistry` | Keeps active discovered relay records in local memory. |
-| `CallIceServerConfig` | Builds the local or legacy v1 HTTP ICE configuration. |
+| `CallIceServerConfig` | Builds the local or v1 pool HTTP ICE configuration. |
 | `FederatedCallRelayCredentials` | Selects connected private v2 relays and fetches, validates and caches owner-issued credentials. |
 | `CallRelayCredentialIssuer` | Issues ten-minute v2 credentials using the owner secret and enforces request quotas. |
 | `GET /calls/ice-servers` | Authenticated frontend contract for WebRTC ICE configuration. |
@@ -183,8 +183,8 @@ Records are JSON payloads published on:
 pigeon-swarm.call-relays.v1
 ```
 
-The topic name is retained for compatibility; `version` selects the record contract.
-Legacy v1 shape:
+The topic name is shared by both versions; `version` selects the record contract.
+V1 (public pool) shape:
 
 ```json
 {
@@ -320,8 +320,8 @@ declared length without waiting for EOF. Owners allow ten requests per peer and
 one hundred globally per minute. See [the v2 protocol guide](federated-turn.md)
 for admission, renewal and rotation details.
 
-When the local `CALLS_TURN_SHARED_SECRET` is missing, blank or equals the former
-public fallback, local issuance and relay publication are disabled with a warning.
+When the local `CALLS_TURN_SHARED_SECRET` is missing, blank or equals the known
+public secret, local issuance and relay publication are disabled with a warning.
 Explicit static credentials remain supported for local URLs only. This does not
 disable fetching credentials from eligible private v2 owners. Only local/v1
 issuers and the coturn servers they advertise must share a secret. Independent v2
@@ -384,7 +384,7 @@ UDP.
 
 | Variable | Purpose |
 | --- | --- |
-| `CALLS_TURN_SHARED_SECRET` | Local coturn REST secret. Required for local issuance and publication; missing or former public values disable those operations with a warning. Not required to fetch credentials from another v2 owner. |
+| `CALLS_TURN_SHARED_SECRET` | Local coturn REST secret. Required for local issuance and publication; missing or known public values disable those operations with a warning. Not required to fetch credentials from another v2 owner. |
 | `CALLS_TURN_URLS` | Explicit local TURN URLs to advertise and return. Comma-separated. |
 | `CALLS_TURN_TRANSPORTS` | Transports used when deriving URLs. Defaults to `udp,tcp`. |
 | `CALLS_TURN_RECORD_TTL_MS` | Signed record lifetime. Defaults to 10 minutes. |
@@ -441,9 +441,9 @@ records.
 | Required version proof or peer signature invalid | Record is ignored: v1 needs a matching pool HMAC; v2 needs private-network reception and an empty pool signature. |
 | Record expired | Record is filtered out and not returned to frontend. |
 | coturn process down but record still active | Frontend receives the URL. With the default `all` policy, WebRTC rejects the failed TURN candidate and can still select a direct candidate; an explicit `relay` policy makes the call fail. |
-| Different secrets in a legacy v1 pool | Records fail pool verification or credentials fail coturn authentication. V1 issuers and selected servers must agree. Independent v2 owners intentionally use different secrets. |
+| Different secrets in a v1 pool | Records fail pool verification or credentials fail coturn authentication. V1 issuers and selected servers must agree. Independent v2 owners intentionally use different secrets. |
 | V2 credential stream fails or owner is no longer eligible | That owner is omitted from the response; stale cached credentials are not returned for an ineligible peer. |
-| Local secret is missing or uses the public fallback | Local issuance and publication are disabled. Fetching from eligible v2 owners remains possible. Configure a private local secret to advertise a local coturn. |
+| Local secret is missing or uses the known public value | Local issuance and publication are disabled. Fetching from eligible v2 owners remains possible. Configure a private local secret to advertise a local coturn. |
 | Frontend caches ICE servers too long | TURN credentials can expire before or during call setup. Request fresh ICE servers for each new call. |
 
 ## Security Notes
@@ -457,7 +457,7 @@ records.
   should only be enabled after coturn reachability has been verified.
 - The shared coturn REST secret must be treated as infrastructure secret
   material and must not be sent to frontend.
-- The former public shared secret is rejected. Rotate any coturn instance still
+- The known public shared secret is rejected. Rotate any coturn instance still
   using it; changing only the backend cannot revoke credentials on that server.
 - ICE diagnostics describe configuration only. Non-public addresses can work on
   LAN or VPN; public URLs do not prove reachability or credential acceptance.
