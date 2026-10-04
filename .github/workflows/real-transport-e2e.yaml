@@ -20,7 +20,7 @@ permissions:
 jobs:
   real-transport:
     name: Real transport scripts
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -62,7 +62,7 @@ jobs:
 
   turn:
     name: Backend credentials against coturn
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     env:
       NODE_OPTIONS: --max-old-space-size=4096
