@@ -211,12 +211,11 @@ export class PrivateAuthorizationCheckpoint {
       this.primitives.revokedDeviceKeys
         .map((key) => new PrivateAuthorizationDeviceKey(key))
         .filter((key) => !admitted.includes(key)),
+    ).push(
+      ...this.primitives.admittedDeviceKeys
+        .map((key) => new PrivateAuthorizationDeviceKey(key))
+        .filter((key) => !admitted.includes(key)),
     );
-
-    this.primitives.admittedDeviceKeys
-      .map((key) => new PrivateAuthorizationDeviceKey(key))
-      .filter((key) => !admitted.includes(key))
-      .forEach((key) => revoked.push(key));
 
     return revoked
       .toArray()
