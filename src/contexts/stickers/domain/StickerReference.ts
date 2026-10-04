@@ -4,14 +4,6 @@ import { StickerId } from './value-objects/StickerId';
 import { StickerPackId } from './value-objects/StickerPackId';
 
 export class StickerReference {
-  public static create(
-    packId: StickerPackId,
-    stickerId: StickerId,
-    timestamp: Timestamp = Timestamp.now(),
-  ): StickerReference {
-    return new StickerReference(packId, stickerId, timestamp);
-  }
-
   public static fromPrimitives(
     primitives: PrimitiveOf<StickerReference>,
   ): StickerReference {
@@ -25,7 +17,7 @@ export class StickerReference {
   constructor(
     private readonly packId: StickerPackId,
     private readonly stickerId: StickerId,
-    private timestamp: Timestamp,
+    private readonly timestamp: Timestamp,
   ) {}
 
   public getPackId(): StickerPackId {
@@ -36,16 +28,8 @@ export class StickerReference {
     return this.stickerId;
   }
 
-  public isSameSticker(packId: StickerPackId, stickerId: StickerId): boolean {
-    return this.packId.isEqual(packId) && this.stickerId.isEqual(stickerId);
-  }
-
   public isUsedAfter(other: StickerReference): boolean {
     return this.timestamp.isAfter(other.timestamp);
-  }
-
-  public touch(timestamp: Timestamp = Timestamp.now()): void {
-    this.timestamp = timestamp;
   }
 
   public toPrimitives(): {

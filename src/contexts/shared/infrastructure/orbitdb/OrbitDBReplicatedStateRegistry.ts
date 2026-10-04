@@ -56,6 +56,8 @@ export default class OrbitDBReplicatedStateRegistry {
     'notificationSettings',
     'pins',
     'reactions',
+    'stickerPacks',
+    'stickerUserLibraries',
     'summaries',
   ]);
 

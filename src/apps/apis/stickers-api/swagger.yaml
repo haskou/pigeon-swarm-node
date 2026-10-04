@@ -35,7 +35,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/StickerPackBody'
+              $ref: '#/components/schemas/CreateStickerPackBody'
       responses:
         '200':
           description: Sticker pack created.
@@ -91,7 +91,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/StickerPackBody'
+              $ref: '#/components/schemas/UpdateStickerPackBody'
       responses:
         '200':
           description: Sticker pack updated.
@@ -118,7 +118,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/StickerBody'
+              $ref: '#/components/schemas/AddStickerBody'
       responses:
         '200':
           description: Sticker added.
@@ -166,6 +166,12 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PackId'
         - $ref: '#/components/parameters/StickerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteStickerBody'
       responses:
         '200':
           description: Sticker removed.
@@ -186,6 +192,12 @@ paths:
         - signedRequest: []
       parameters:
         - $ref: '#/components/parameters/PackId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutSavedStickerPackBody'
       responses:
         '200':
           description: Sticker library updated.
@@ -201,6 +213,12 @@ paths:
         - signedRequest: []
       parameters:
         - $ref: '#/components/parameters/PackId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignedMutationBody'
       responses:
         '200':
           description: Sticker library updated.
@@ -218,6 +236,12 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PackId'
         - $ref: '#/components/parameters/StickerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutFavoriteStickerBody'
       responses:
         '200':
           description: Sticker library updated.
@@ -234,6 +258,12 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PackId'
         - $ref: '#/components/parameters/StickerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignedMutationBody'
       responses:
         '200':
           description: Sticker library updated.
@@ -252,6 +282,12 @@ paths:
       parameters:
         - $ref: '#/components/parameters/PackId'
         - $ref: '#/components/parameters/StickerId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostUsedStickerBody'
       responses:
         '200':
           description: Sticker library updated.
@@ -279,16 +315,46 @@ components:
       schema:
         type: string
   schemas:
-    StickerPackBody:
+    CreateStickerPackBody:
       type: object
+      description: The client chooses the pack id and the creation time and signs both records. mutation is a put proof (store stickerPacks, recordId packId) over the whole pack document {id, name, ownerIdentityId, createdAt, updatedAt = createdAt, stickers [], scopeType sticker_pack}; savedPackMutation is a put proof (store stickerUserLibraries, recordId saved:<identityId>:<packId>) over {id, identityId, packId, savedAt = createdAt, scopeType sticker_saved_pack}.
       required:
+        - packId
         - name
+        - createdAt
+        - mutation
+        - savedPackMutation
       properties:
+        packId:
+          type: string
         name:
           type: string
           maxLength: 80
           example: Blue archive reactions
-    StickerBody:
+        createdAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+        savedPackMutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    UpdateStickerPackBody:
+      type: object
+      description: mutation is a put proof over the whole resulting pack document (store stickerPacks, recordId packId) with updatedAt as sent.
+      required:
+        - name
+        - updatedAt
+        - mutation
+      properties:
+        name:
+          type: string
+          maxLength: 80
+        updatedAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    StickerDetails:
       type: object
       required:
         - type
@@ -328,9 +394,134 @@ components:
               type: integer
               maximum: 512
               example: 512
-    StickerResource:
+    StickerBody:
+      description: Sticker details plus the signed whole-pack mutation the change produces (put proof, store stickerPacks, recordId packId).
+      allOf:
+        - $ref: '#/components/schemas/StickerDetails'
+        - type: object
+          required:
+            - updatedAt
+            - mutation
+          properties:
+            updatedAt:
+              type: integer
+              minimum: 0
+            mutation:
+              $ref: '#/components/schemas/SignedPublicMutation'
+    AddStickerBody:
       allOf:
         - $ref: '#/components/schemas/StickerBody'
+        - type: object
+          required:
+            - stickerId
+          properties:
+            stickerId:
+              type: string
+              description: Client-chosen id of the new sticker.
+    DeleteStickerBody:
+      type: object
+      required:
+        - updatedAt
+        - mutation
+      properties:
+        updatedAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    SignedMutationBody:
+      type: object
+      description: A delete proof (store stickerUserLibraries) over the tombstone of the saved pack or favorite record.
+      required:
+        - mutation
+      properties:
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    PutSavedStickerPackBody:
+      type: object
+      description: mutation is a put proof (store stickerUserLibraries, recordId saved:<identityId>:<packId>) over {id, identityId, packId, savedAt, scopeType sticker_saved_pack}.
+      required:
+        - savedAt
+        - mutation
+      properties:
+        savedAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    PutFavoriteStickerBody:
+      type: object
+      description: mutation is a put proof (store stickerUserLibraries, recordId favorite:<identityId>:<packId>:<stickerId>) over {id, identityId, packId, stickerId, favoritedAt, scopeType sticker_favorite}.
+      required:
+        - favoritedAt
+        - mutation
+      properties:
+        favoritedAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    PostUsedStickerBody:
+      type: object
+      description: mutation is a put proof (store stickerUserLibraries, recordId recent:<identityId>:<packId>:<stickerId>) over {id, identityId, packId, stickerId, usedAt, scopeType sticker_recent}.
+      required:
+        - usedAt
+        - mutation
+      properties:
+        usedAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    SignedPublicMutation:
+      type: object
+      description: Client-signed intent for a replicated public record. The node holds no user private keys, so the UI signs it. payloadDigest commits to the record without its proof; author.deviceCredential must be an authorized device of author.identityId in its current device authorization head. The winner of concurrent mutations is the higher sequence, then the lower digest; no wall clock is used.
+      required:
+        - version
+        - operationId
+        - kind
+        - store
+        - recordId
+        - payloadDigest
+        - predecessor
+        - sequence
+        - author
+        - signature
+      properties:
+        version:
+          type: integer
+          enum: [1]
+        operationId:
+          type: string
+        kind:
+          type: string
+          enum: [put, delete]
+        store:
+          type: string
+        recordId:
+          type: string
+        payloadDigest:
+          type: string
+        predecessor:
+          type: string
+          nullable: true
+          description: Digest of the previous mutation. Null if and only if sequence is 0.
+        sequence:
+          type: integer
+          minimum: 0
+        author:
+          type: object
+          required: [identityId, deviceCredential]
+          properties:
+            identityId:
+              type: string
+            deviceCredential:
+              type: string
+        signature:
+          type: string
+    StickerResource:
+      allOf:
+        - $ref: '#/components/schemas/StickerDetails'
         - type: object
           required:
             - id

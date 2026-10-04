@@ -1,4 +1,10 @@
-import { IsInt, IsObject, IsString, ValidateNested } from 'class-validator';
+import {
+  IsInt,
+  IsObject,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 import { StickerDimensionsBody } from './StickerDimensionsBody';
 
@@ -13,9 +19,16 @@ export class StickerBody {
   @ValidateNested()
   public readonly dimensions: StickerDimensionsBody;
 
+  @IsObject()
+  public readonly mutation: Record<string, unknown>;
+
   @IsInt()
   public readonly sizeBytes: number;
 
   @IsString()
   public readonly type: string;
+
+  @IsInt()
+  @Min(0)
+  public readonly updatedAt: number;
 }

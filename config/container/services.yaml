@@ -667,6 +667,26 @@ services:
     class: /contexts/stickers/application/update-sticker/StickerUpdater
     arguments:
       - '@contexts/stickers/domain/repositories/StickerPackRepository'
+  contexts/stickers/infrastructure/orbitdb/policies/StickerFavoriteMutationPolicy:
+    class: >-
+      /contexts/stickers/infrastructure/orbitdb/policies/StickerFavoriteMutationPolicy
+    arguments: []
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
+  contexts/stickers/infrastructure/orbitdb/policies/StickerPackMutationPolicy:
+    class: >-
+      /contexts/stickers/infrastructure/orbitdb/policies/StickerPackMutationPolicy
+    arguments: []
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
+  contexts/stickers/infrastructure/orbitdb/policies/StickerRecentMutationPolicy:
+    class: >-
+      /contexts/stickers/infrastructure/orbitdb/policies/StickerRecentMutationPolicy
+    arguments: []
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
+  contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy:
+    class: >-
+      /contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy
+    arguments: []
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   shared/infrastructure/errors/CustomHttpError: '@shared/infrastructure/errors/security/UserHasNotPermissionError'
   shared/infrastructure/errors/security/DomainDoesNotExistError:
     class: /shared/infrastructure/errors/security/DomainDoesNotExistError
@@ -2326,21 +2346,6 @@ services:
         @contexts/private-authorization/application/accept-operation/PrivateControlTransitionProcessor
       - >-
         @contexts/private-authorization/application/accept-operation/PrivateControlMutationAuthorizer
-  apps/initializers/public-mutations/PublicMutationGateInitializer:
-    class: /apps/initializers/public-mutations/PublicMutationGateInitializer
-    arguments:
-      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
-      - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
-      - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy
-      - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageReactionMutationPolicy
-      - >-
-        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy
-      - >-
-        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy
-      - >-
-        @contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy
   contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationDocumentMerger:
     class: >-
       /contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationDocumentMerger
@@ -2370,6 +2375,29 @@ services:
       - '@contexts/calls/domain/repositories/CallRepository'
       - '@contexts/calls/domain/repositories/CallParticipantLeaseRepository'
       - '@contexts/calls/application/authorize-call/CallAccessAuthorizer'
+  apps/initializers/public-mutations/PublicMutationGateInitializer:
+    class: /apps/initializers/public-mutations/PublicMutationGateInitializer
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageReactionMutationPolicy
+      - >-
+        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy
+      - >-
+        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy
+      - >-
+        @contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy
+      - >-
+        @contexts/stickers/infrastructure/orbitdb/policies/StickerPackMutationPolicy
+      - >-
+        @contexts/stickers/infrastructure/orbitdb/policies/StickerFavoriteMutationPolicy
+      - >-
+        @contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy
+      - >-
+        @contexts/stickers/infrastructure/orbitdb/policies/StickerRecentMutationPolicy
   shared/infrastructure/http/HttpClient: '@shared/infrastructure/http/FetchHttpClient'
   shared/infrastructure/logs/Log: '@shared/infrastructure/logs/WinstonLogger'
   shared/infrastructure/messageBus/MessageBusAdapter: '@shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter'

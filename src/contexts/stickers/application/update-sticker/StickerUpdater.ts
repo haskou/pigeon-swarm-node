@@ -17,9 +17,10 @@ export default class StickerUpdater {
       message.actorIdentityId,
       message.stickerId,
       message.details,
+      message.updatedAt,
     );
 
-    await this.repository.save(pack);
+    await this.repository.save(pack, message.proof);
 
     return pack;
   }

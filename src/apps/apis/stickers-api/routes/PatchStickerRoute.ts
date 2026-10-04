@@ -29,7 +29,14 @@ export class PatchStickerRoute extends StickerRouteSupport {
   ): Promise<Response> {
     const actor = await this.authenticate(request);
     const pack = await this.updater.update(
-      new StickerUpdateMessage(packId, stickerId, actor.valueOf(), body),
+      new StickerUpdateMessage(
+        packId,
+        stickerId,
+        actor.valueOf(),
+        body,
+        body.updatedAt,
+        body.mutation,
+      ),
     );
 
     return response

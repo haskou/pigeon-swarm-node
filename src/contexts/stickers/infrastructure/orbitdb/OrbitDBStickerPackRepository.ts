@@ -1,3 +1,5 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 
@@ -8,18 +10,20 @@ import { StickerPackId } from '../../domain/value-objects/StickerPackId';
 import { OrbitDBStickerPackDocument } from './documents/OrbitDBStickerPackDocument';
 
 export default class OrbitDBStickerPackRepository extends StickerPackRepository {
+  private static readonly HEAD_PREFIX = 'sticker-pack:';
+
   private readonly packIndex: OrbitDBHeadIndex<OrbitDBStickerPackDocument>;
 
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
     this.packIndex = new OrbitDBHeadIndex(this.registry, {
-      collectionName: 'packs',
+      collectionName: 'stickerPacks',
       documentFromRecord: (record) =>
         this.isDocument(record) ? record : undefined,
       recordId: (record) =>
         typeof record.id === 'string' ? record.id : undefined,
       shouldReplace: (current, candidate) =>
-        current.updatedAt <= candidate.updatedAt,
+        PublicMutationRecord.replaces(current, candidate) ?? true,
     });
   }
 
@@ -27,6 +31,8 @@ export default class OrbitDBStickerPackRepository extends StickerPackRepository 
     document: Record<string, unknown>,
   ): document is OrbitDBStickerPackDocument {
     return (
+      document.removed !== true &&
+      document.scopeType === 'sticker_pack' &&
       typeof document.id === 'string' &&
       typeof document.createdAt === 'number' &&
       typeof document.name === 'string' &&
@@ -36,105 +42,62 @@ export default class OrbitDBStickerPackRepository extends StickerPackRepository 
     );
   }
 
-  private toDocument(pack: StickerPack): OrbitDBStickerPackDocument {
-    const primitives = pack.toPrimitives();
-
-    return {
-      createdAt: primitives.createdAt,
-      id: primitives.id,
-      name: primitives.name,
-      ownerIdentityId: primitives.ownerIdentityId,
-      stickers: primitives.stickers,
-      updatedAt: primitives.updatedAt,
-    };
-  }
-
-  private toDomain(document: OrbitDBStickerPackDocument): StickerPack {
-    return StickerPack.fromPrimitives(document);
-  }
-
   private headKey(id: StickerPackId | string): string {
-    const value = id instanceof StickerPackId ? id.valueOf() : id;
-
-    return `sticker-pack:${value}`;
+    return `${OrbitDBStickerPackRepository.HEAD_PREFIX}${id.valueOf()}`;
   }
 
-  private ownerIndexHeadKey(ownerIdentityId: IdentityId | string): string {
-    const value =
-      ownerIdentityId instanceof IdentityId
-        ? ownerIdentityId.valueOf()
-        : ownerIdentityId;
-
-    return `sticker-pack-owner-index:${value}`;
-  }
-
-  private sortByUpdatedAtDescending(
-    documents: OrbitDBStickerPackDocument[],
-  ): OrbitDBStickerPackDocument[] {
-    return [...documents].sort(
-      (left, right) => right.updatedAt - left.updatedAt,
-    );
-  }
-
-  private async putHeads(document: OrbitDBStickerPackDocument): Promise<void> {
-    await this.registry.putHead(this.headKey(document.id), { ...document });
-
-    const key = this.ownerIndexHeadKey(document.ownerIdentityId);
-    const packs = this.packIndex.deduplicate([
-      ...((await this.packIndex.find(key)) ?? []),
-      document,
-    ]);
-
-    await this.packIndex.putDocuments(
-      key,
-      {
-        id: key,
-        ownerIdentityId: document.ownerIdentityId,
-      },
-      packs,
-    );
-  }
-
-  public async findAll(): Promise<StickerPack[]> {
-    const documents = this.sortByUpdatedAtDescending(
-      this.packIndex.deduplicate(
-        this.registry
-          .findCachedHeadsByPrefix('sticker-pack:')
-          .map((document) => (this.isDocument(document) ? document : undefined))
-          .filter(
-            (document): document is OrbitDBStickerPackDocument =>
-              document !== undefined,
-          ),
-      ),
-    );
-
+  public findAll(): Promise<StickerPack[]> {
     return Promise.resolve(
-      documents.map((document) => this.toDomain(document)),
+      this.packIndex
+        .deduplicate(
+          this.packIndex.cachedByPrefix(
+            OrbitDBStickerPackRepository.HEAD_PREFIX,
+          ),
+        )
+        .sort((left, right) => right.updatedAt - left.updatedAt)
+        .map((document) => StickerPack.fromPrimitives(document)),
     );
   }
 
   public async findById(id: StickerPackId): Promise<StickerPack | undefined> {
-    const head = await this.registry.findHead(this.headKey(id));
-    const document = head && this.isDocument(head) ? head : undefined;
+    const document = ((await this.packIndex.find(this.headKey(id))) ?? []).find(
+      (candidate) => candidate.id === id.valueOf(),
+    );
 
-    return document ? this.toDomain(document) : undefined;
+    return document ? StickerPack.fromPrimitives(document) : undefined;
   }
 
   public async findByOwner(
     ownerIdentityId: IdentityId,
   ): Promise<StickerPack[]> {
-    const documents = this.sortByUpdatedAtDescending(
-      (await this.packIndex.find(this.ownerIndexHeadKey(ownerIdentityId))) ??
-        [],
+    return (await this.findAll()).filter(
+      (pack) =>
+        pack.toPrimitives().ownerIdentityId === ownerIdentityId.valueOf(),
     );
-
-    return documents.map((document) => this.toDomain(document));
   }
 
-  public async save(pack: StickerPack): Promise<void> {
-    const document = this.toDocument(pack);
+  public async save(
+    pack: StickerPack,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    const primitives = pack.toPrimitives();
+    const document = PublicMutationRecord.withProof(
+      { ...primitives, scopeType: 'sticker_pack' },
+      proof,
+    );
+    const key = this.headKey(primitives.id);
 
+    PublicMutationRecord.assertNotStale(
+      (await this.packIndex.findRecords(key)).filter(
+        (stored) => stored.id === primitives.id,
+      ),
+      document,
+    );
     await this.registry.putDocument('stickerPacks', document);
-    await this.putHeads(document);
+    await this.packIndex.putRecord(
+      key,
+      { id: key, ownerIdentityId: primitives.ownerIdentityId },
+      document,
+    );
   }
 }

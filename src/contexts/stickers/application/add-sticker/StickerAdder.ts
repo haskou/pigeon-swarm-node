@@ -13,9 +13,14 @@ export default class StickerAdder {
       throw new StickerPackNotFoundError();
     }
 
-    pack.addSticker(message.actorIdentityId, message.details);
+    pack.addSticker(
+      message.actorIdentityId,
+      message.stickerId,
+      message.details,
+      message.updatedAt,
+    );
 
-    await this.repository.save(pack);
+    await this.repository.save(pack, message.proof);
 
     return pack;
   }

@@ -15,3 +15,10 @@ Feature: Post sticker pack route
     And response contains a valid resource with the following fields
       | name | API stickers primary |
     And response body should contain "ownerIdentityId"
+
+  Scenario: Reject a sticker pack whose mutation does not prove the pack
+    Given I am an anonymous user
+    And I set a sticker pack body
+    And I sign the current unsigned sticker pack creation request
+    When I POST to "/stickers/packs/"
+    Then response code is equal to 409

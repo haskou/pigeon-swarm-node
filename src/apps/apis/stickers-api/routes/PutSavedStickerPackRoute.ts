@@ -2,8 +2,16 @@ import { StickerPackSaveMessage } from '@app/contexts/stickers/application/save-
 import StickerPackSaver from '@app/contexts/stickers/application/save-pack/StickerPackSaver';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { JsonController, Param, Put, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  JsonController,
+  Param,
+  Put,
+  Req,
+  Res,
+} from 'routing-controllers';
 
+import { PutSavedStickerPackBody } from '../bodies/PutSavedStickerPackBody';
 import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
@@ -13,12 +21,18 @@ export class PutSavedStickerPackRoute extends StickerRouteSupport {
   @Put('/:packId/saved')
   public async savePack(
     @Param('packId') packId: string,
+    @Body() body: PutSavedStickerPackBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
     const library = await this.saver.save(
-      new StickerPackSaveMessage(identityId.valueOf(), packId),
+      new StickerPackSaveMessage(
+        identityId.valueOf(),
+        packId,
+        body.savedAt,
+        body.mutation,
+      ),
     );
 
     return response

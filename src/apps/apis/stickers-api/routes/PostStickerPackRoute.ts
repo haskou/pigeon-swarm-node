@@ -20,7 +20,14 @@ export class PostStickerPackRoute extends StickerRouteSupport {
   ): Promise<Response> {
     const ownerIdentityId = await this.authenticate(request);
     const pack = await this.creator.create(
-      new StickerPackCreateMessage(ownerIdentityId.valueOf(), body.name),
+      new StickerPackCreateMessage(
+        ownerIdentityId.valueOf(),
+        body.packId,
+        body.name,
+        body.createdAt,
+        body.mutation,
+        body.savedPackMutation,
+      ),
     );
 
     return response

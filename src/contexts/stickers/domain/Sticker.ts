@@ -4,8 +4,8 @@ import { StickerDetails } from './StickerDetails';
 import { StickerId } from './value-objects/StickerId';
 
 export class Sticker {
-  public static create(details: StickerDetails): Sticker {
-    return new Sticker(StickerId.generate(), details);
+  public static create(id: StickerId, details: StickerDetails): Sticker {
+    return new Sticker(id, details);
   }
 
   public static fromPrimitives(primitives: PrimitiveOf<Sticker>): Sticker {

@@ -1,5 +1,6 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Integer } from '@haskou/value-objects';
+import { Integer, Timestamp } from '@haskou/value-objects';
 
 import { StickerDetails } from '../../../domain/StickerDetails';
 import { StickerAssetCid } from '../../../domain/value-objects/StickerAssetCid';
@@ -14,7 +15,9 @@ export class StickerUpdateMessage {
   public readonly actorIdentityId: IdentityId;
   public readonly details: StickerDetails;
   public readonly packId: StickerPackId;
+  public readonly proof: PublicMutationProof;
   public readonly stickerId: StickerId;
+  public readonly updatedAt: Timestamp;
 
   constructor(
     packId: string,
@@ -30,10 +33,14 @@ export class StickerUpdateMessage {
       sizeBytes: number;
       type: string;
     },
+    updatedAt: number,
+    mutation: unknown,
   ) {
     this.packId = new StickerPackId(packId);
     this.stickerId = new StickerId(stickerId);
     this.actorIdentityId = new IdentityId(actorIdentityId);
+    this.updatedAt = new Timestamp(updatedAt);
+    this.proof = PublicMutationProof.fromPrimitives(mutation);
     const type = StickerType.fromPrimitives(details.type);
 
     this.details = new StickerDetails(

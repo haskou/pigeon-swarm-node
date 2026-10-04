@@ -11,16 +11,6 @@ export default class StickerFavoriter {
     private readonly libraryRepository: StickerUserLibraryRepository,
   ) {}
 
-  private async findLibrary(
-    message: StickerFavoriteMessage,
-  ): Promise<StickerUserLibrary> {
-    const library = await this.libraryRepository.findByIdentityId(
-      message.identityId,
-    );
-
-    return library ?? StickerUserLibrary.create(message.identityId);
-  }
-
   public async favorite(
     message: StickerFavoriteMessage,
   ): Promise<StickerUserLibrary> {
@@ -34,12 +24,17 @@ export default class StickerFavoriter {
       throw new StickerNotFoundError();
     }
 
-    const library = await this.findLibrary(message);
+    await this.libraryRepository.favorite(
+      message.identityId,
+      message.packId,
+      message.stickerId,
+      message.favoritedAt,
+      message.proof,
+    );
 
-    library.favoriteSticker(message.packId, message.stickerId);
-
-    await this.libraryRepository.save(library);
-
-    return library;
+    return (
+      (await this.libraryRepository.findByIdentityId(message.identityId)) ??
+      StickerUserLibrary.create(message.identityId)
+    );
   }
 }

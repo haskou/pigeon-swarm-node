@@ -1,3 +1,4 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { StickerPack } from '../StickerPack';
@@ -10,5 +11,8 @@ export default abstract class StickerPackRepository {
     ownerIdentityId: IdentityId,
   ): Promise<StickerPack[]>;
 
-  public abstract save(pack: StickerPack): Promise<void>;
+  public abstract save(
+    pack: StickerPack,
+    proof: PublicMutationProof,
+  ): Promise<void>;
 }

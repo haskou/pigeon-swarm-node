@@ -38,15 +38,20 @@ export default class StickerPackSaver {
     }
 
     const lookup = await this.findLibrary(message);
-    const { library } = lookup;
 
-    library.savePack(message.packId);
-
-    await this.libraryRepository.save(library);
+    await this.libraryRepository.savePack(
+      message.identityId,
+      message.packId,
+      message.savedAt,
+      message.proof,
+    );
     await this.eventPublisher.publish(
-      lookup.created ? library.pullDomainEvents() : [],
+      lookup.created ? lookup.library.pullDomainEvents() : [],
     );
 
-    return library;
+    return (
+      (await this.libraryRepository.findByIdentityId(message.identityId)) ??
+      lookup.library
+    );
   }
 }
