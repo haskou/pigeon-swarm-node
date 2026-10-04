@@ -1,17 +1,5 @@
-import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+export default abstract class PushVapidConfigurationReader {
+  public abstract getPublicKey(): string | null;
 
-export default class PushVapidConfigurationReader {
-  private readonly publicKey: string =
-    pigeonEnvironment().PUSH_VAPID_PUBLIC_KEY || '';
-
-  private readonly privateKey: string =
-    pigeonEnvironment().PUSH_VAPID_PRIVATE_KEY || '';
-
-  public getPublicKey(): string | null {
-    return this.publicKey || null;
-  }
-
-  public isConfigured(): boolean {
-    return this.publicKey.length > 0 && this.privateKey.length > 0;
-  }
+  public abstract isConfigured(): boolean;
 }

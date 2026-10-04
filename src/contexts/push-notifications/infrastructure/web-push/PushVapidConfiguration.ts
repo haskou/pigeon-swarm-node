@@ -1,9 +1,23 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 
-import ConfigurationReader from '../../application/find-vapid-public-key/PushVapidConfigurationReader';
+import PushVapidConfigurationReader from '../../application/find-vapid-public-key/PushVapidConfigurationReader';
 
-export default class PushVapidConfiguration extends ConfigurationReader {
+export default class PushVapidConfiguration extends PushVapidConfigurationReader {
+  private readonly privateKey: string =
+    pigeonEnvironment().PUSH_VAPID_PRIVATE_KEY || '';
+
+  private readonly publicKey: string =
+    pigeonEnvironment().PUSH_VAPID_PUBLIC_KEY || '';
+
   private readonly subject: string = pigeonEnvironment().PUSH_VAPID_SUBJECT;
+
+  public getPublicKey(): string | null {
+    return this.publicKey || null;
+  }
+
+  public isConfigured(): boolean {
+    return this.publicKey.length > 0 && this.privateKey.length > 0;
+  }
 
   public setVapidDetailsWith(
     setVapidDetails: (
@@ -16,10 +30,6 @@ export default class PushVapidConfiguration extends ConfigurationReader {
       return;
     }
 
-    setVapidDetails(
-      this.subject,
-      pigeonEnvironment().PUSH_VAPID_PUBLIC_KEY || '',
-      pigeonEnvironment().PUSH_VAPID_PRIVATE_KEY || '',
-    );
+    setVapidDetails(this.subject, this.publicKey, this.privateKey);
   }
 }
