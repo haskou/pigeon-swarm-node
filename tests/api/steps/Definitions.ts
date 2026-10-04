@@ -2535,11 +2535,64 @@ export default class Definitions {
     });
   }
 
-  @given('I set a conversation message reaction body')
-  public iSetAConversationMessageReactionBody(): void {
-    this.body = JSON.stringify({
-      emoji: '👍',
+  private async conversationReactionMutationBody(
+    kind: 'put' | 'delete',
+  ): Promise<string> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    const keyPair = await this.ensureIdentityKeyPair();
+    const identityId = keyPair.toPrimitives().publicKey;
+    const emoji = '👍';
+    const createdAt = 1_780_000_000_000;
+    const recordId = [
+      'conversation',
+      this.conversationId,
+      this.messageId,
+      identityId,
+      emoji,
+    ].join(':');
+    const document = {
+      authorId: identityId,
+      conversationId: this.conversationId,
+      emoji,
+      id: recordId,
+      messageId: this.messageId,
+      scopeType: 'conversation',
+    };
+    const payload =
+      kind === 'put'
+        ? { ...document, createdAt }
+        : { ...document, removed: true };
+    const sequence = kind === 'put' ? 0 : 1;
+    const proofBody = {
+      author: { deviceCredential: identityId, identityId },
+      kind,
+      operationId: `api-conversation-reaction-${sequence}`.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor:
+        sequence === 0 ? null : PublicMutationProof.digestOf({ previous: 0 }),
+      recordId,
+      sequence,
+      store: 'reactions',
+      version: 1,
+    } as const;
+    const proof = PublicMutationProof.signed(
+      proofBody,
+      keyPair.sign(PublicMutationProof.signingContentOf(proofBody)),
+    );
+
+    return JSON.stringify({
+      ...(kind === 'put' ? { createdAt } : {}),
+      emoji,
+      mutation: proof.toPrimitives(),
     });
+  }
+
+  @given('I set a conversation message reaction body')
+  public async iSetAConversationMessageReactionBody(): Promise<void> {
+    this.body = await this.conversationReactionMutationBody('put');
   }
 
   @given('I sign the current conversation message request')
@@ -2596,6 +2649,7 @@ export default class Definitions {
       throw new Error('Conversation and message must be created first.');
     }
 
+    this.body = await this.conversationReactionMutationBody('delete');
     await this.signCurrentRequest(
       'DELETE',
       `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,

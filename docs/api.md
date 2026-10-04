@@ -1895,6 +1895,14 @@ List response:
 }
 ```
 
+Pin requests carry `{ "createdAt": <ms>, "mutation": SignedPublicMutation }`;
+unpin requests carry `{ "mutation": SignedPublicMutation }` with a `delete` proof.
+Conversation pins and reactions use the same proof rules as the community ones
+(see Community channel pins), with `scopeType: "conversation"`: the proof author
+must be a conversation participant, and missing, forged, copied-scope, stale or
+revoked-device proofs fail with 409. Replicated records without a valid proof are
+ignored by every node.
+
 Implemented:
 
 - require signed request auth
@@ -2090,7 +2098,8 @@ Request:
 
 ```json
 {
-  "emoji": "👍"
+  "emoji": "👍",
+  "mutation": { "...": "SignedPublicMutation (kind delete)" }
 }
 ```
 

@@ -286,8 +286,11 @@ Signed public mutations (pins and reactions):
   `predecessor`, `sequence`, `author { identityId, deviceCredential }` and an
   Ed25519 signature by the device. `payloadDigest` covers the document without
   `proof`, so ids, scope (community/channel/message) and author are bound.
-- Community reaction events carry the proof as `mutationProof`; consumers pass it
-  to the repository, which re-verifies it.
+- Community and conversation reaction events carry the proof as `mutationProof`;
+  consumers pass it to the repository, which re-verifies it. Conversation records
+  use `scopeType: "conversation"`; the author must be a conversation participant.
+  Policies are looked up by collection and `scopeType`, so a record whose scope
+  type has no policy in a governed collection is rejected.
 - Every node verifies on write, on replicated read, on head hydration and on the
   persisted head cache: signature, scope binding, the device in the identity's
   current device authorization head, and the community permission (pin needs

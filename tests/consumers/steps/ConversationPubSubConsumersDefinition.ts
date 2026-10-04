@@ -1,21 +1,22 @@
+import MarkMessagesReadWhenAnnounced from '@app/apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced';
 import RegisterMessageDeletionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageDeletionWhenAnnounced';
 import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced';
 import RegisterMessageReactionWhenAdded from '@app/apps/consumers/pubsub/conversations/RegisterMessageReactionWhenAdded';
 import RegisterMessageReactionWhenRemoved from '@app/apps/consumers/pubsub/conversations/RegisterMessageReactionWhenRemoved';
 import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced';
-import MarkMessagesReadWhenAnnounced from '@app/apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced';
 import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import MessageReactionRegistrar from '@app/contexts/conversations/application/register-reaction/MessageReactionRegistrar';
 import { ConversationMessageReactionWasAddedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageReactionWasAddedEvent';
 import { ConversationMessageReactionWasRemovedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageReactionWasRemovedEvent';
+import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
-import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { expect } from 'chai';
 import { before, binding, then, when } from 'cucumber-tsflow';
 
+import { signedMutation } from '../../unit/contexts/public-mutations/support/signedMutation';
 import { PubSubConsumerTestContext } from './PubSubConsumerTestHelpers';
 
 @binding()
@@ -34,6 +35,21 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
   private readonly reactionCreatedAt = 1778513696020;
 
   private readonly reactionEmoji = '👍';
+
+  private async mutationProof(
+    kind: 'put' | 'delete',
+    sequence: number,
+  ): Promise<unknown> {
+    const proof = await signedMutation({
+      identityId: this.reactionAuthorId,
+      kind,
+      recordId: 'reaction',
+      sequence,
+      store: 'reactions',
+    });
+
+    return proof.toPrimitives();
+  }
 
   @before()
   public async reset(): Promise<void> {
@@ -95,13 +111,12 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
         createdAt: this.reactionCreatedAt,
         emoji: this.reactionEmoji,
         messageId: this.messageId,
+        mutationProof: await this.mutationProof('put', 1),
       }),
     );
   }
 
-  @when(
-    'the message reaction removed consumer handles a reaction announcement',
-  )
+  @when('the message reaction removed consumer handles a reaction announcement')
   public async messageReactionRemovedConsumerHandlesAReactionAnnouncement(): Promise<void> {
     const consumer = new RegisterMessageReactionWhenRemoved(
       this.eventConsumer(),
@@ -114,6 +129,7 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
         createdAt: this.reactionCreatedAt,
         emoji: this.reactionEmoji,
         messageId: this.messageId,
+        mutationProof: await this.mutationProof('delete', 2),
       }),
     );
   }
@@ -182,5 +198,4 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
     expect(message.messageId.valueOf()).to.equal(this.messageId);
     expect(message.readerIdentityId.valueOf()).to.equal(this.readerIdentityId);
   }
-
 }

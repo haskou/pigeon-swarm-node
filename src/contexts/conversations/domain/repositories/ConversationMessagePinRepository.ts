@@ -1,3 +1,4 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -14,11 +15,14 @@ export default abstract class ConversationMessagePinRepository {
     conversationId: ConversationId,
     messageId: MessageId,
     pinnedByIdentityId: IdentityId,
-    createdAt?: Timestamp,
+    createdAt: Timestamp,
+    proof: PublicMutationProof,
   ): Promise<void>;
 
   public abstract unpin(
     conversationId: ConversationId,
     messageId: MessageId,
+    unpinnedByIdentityId: IdentityId,
+    proof: PublicMutationProof,
   ): Promise<void>;
 }

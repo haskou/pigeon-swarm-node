@@ -8,7 +8,28 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
+import { signedMutation } from '../../../public-mutations/support/signedMutation';
+
 describe('OrbitDBMessageReactionRepository', () => {
+  const proof = (
+    reaction: MessageReaction,
+    kind: 'put' | 'delete',
+    sequence: number,
+  ) =>
+    signedMutation({
+      identityId: reaction.toPrimitives().authorId,
+      kind,
+      recordId: [
+        'conversation',
+        reaction.toPrimitives().conversationId,
+        reaction.toPrimitives().messageId,
+        reaction.toPrimitives().authorId,
+        reaction.toPrimitives().emoji,
+      ].join(':'),
+      sequence,
+      store: 'reactions',
+    });
+
   const conversationId = new ConversationId('one-to-one:conversation-1');
   const messageId = new MessageId('message-1');
   const authorId = new IdentityId(
@@ -82,7 +103,7 @@ describe('OrbitDBMessageReactionRepository', () => {
       new Timestamp(1780000000000),
     );
 
-    await repository.save(reaction);
+    await repository.save(reaction, await proof(reaction, 'put', 1));
     query.mockClear();
 
     const byMessage = await repository.findByMessageIds(conversationId, [
@@ -90,7 +111,7 @@ describe('OrbitDBMessageReactionRepository', () => {
     ]);
     const candidates = await repository.findCandidates(conversationId);
 
-    await repository.delete(reaction);
+    await repository.delete(reaction, await proof(reaction, 'delete', 2));
 
     const afterDelete = await repository.findByMessageIds(conversationId, [
       messageId,
@@ -116,7 +137,9 @@ describe('OrbitDBMessageReactionRepository', () => {
     );
     blockHeadPersistence = true;
 
-    await expect(repository.save(reaction)).resolves.toBeUndefined();
+    await expect(
+      repository.save(reaction, await proof(reaction, 'put', 1)),
+    ).resolves.toBeUndefined();
 
     const byMessage = await repository.findByMessageIds(conversationId, [
       messageId,
@@ -139,11 +162,13 @@ describe('OrbitDBMessageReactionRepository', () => {
       new Timestamp(1780000000000),
     );
 
-    await repository.save(reaction);
+    await repository.save(reaction, await proof(reaction, 'put', 1));
     await flushBackgroundTasks();
     blockHeadPersistence = true;
 
-    await expect(repository.delete(reaction)).resolves.toBeUndefined();
+    await expect(
+      repository.delete(reaction, await proof(reaction, 'delete', 2)),
+    ).resolves.toBeUndefined();
 
     await expect(
       repository.findByMessageIds(conversationId, [messageId]),

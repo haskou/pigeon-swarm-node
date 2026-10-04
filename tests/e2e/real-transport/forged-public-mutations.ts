@@ -7,6 +7,12 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import OrbitDBCommunityChannelMessagePinRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessagePinRepository';
 import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import { Conversation } from '@app/contexts/conversations/domain/Conversation';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
+import OrbitDBConversationMessagePinRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationMessagePinRepository';
+import ConversationMessagePinMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
@@ -31,6 +37,7 @@ import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+
 import { teardownAndExit } from './RealTransportTeardown';
 
 type Replica = {
@@ -40,6 +47,7 @@ type Replica = {
   stores?: { pins: OrbitDBDatabase; heads: OrbitDBDatabase };
   registry?: OrbitDBReplicatedStateRegistry;
   pins?: OrbitDBCommunityChannelMessagePinRepository;
+  conversationPins?: OrbitDBConversationMessagePinRepository;
 };
 
 const networkId = randomUUID();
@@ -95,6 +103,9 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
       new PrivateAuthorizationStorageCoordinator(),
     ),
   );
+  replica.conversationPins = new OrbitDBConversationMessagePinRepository(
+    replica.registry,
+  );
   await replica.registry.register(
     networkId,
     replica.stores as unknown as OrbitDBPrivateNetworkStores,
@@ -135,9 +146,18 @@ async function main(): Promise<void> {
   const communities = {
     findById: (): Promise<Community> => Promise.resolve(community),
   } as unknown as CommunityRepository;
+  const conversations = {
+    findMetadataById: (): Promise<Conversation> =>
+      Promise.resolve({
+        hasParticipant: () => true,
+      } as unknown as Conversation),
+  } as unknown as ConversationRepository;
   const gate = new PublicMutationGate(
     new PublicMutationVerifier(authorization),
-    [new CommunityChannelMessagePinMutationPolicy(communities)],
+    [
+      new CommunityChannelMessagePinMutationPolicy(communities),
+      new ConversationMessagePinMutationPolicy(conversations),
+    ],
   );
   const device = await KeyPair.generate();
   const author = new IdentityId(device.toPrimitives().publicKey).valueOf();
@@ -279,6 +299,107 @@ async function main(): Promise<void> {
   );
   assert.equal(await listed(honest), 0);
   console.log('PASS replayed older put proof refused after removal');
+
+  stage = 'conversation pins are governed too';
+  const conversationId = new ConversationId(`one-to-one:${randomUUID()}`);
+  const conversationMessageId = new MessageId(randomUUID());
+  const conversationPinId = `conversation:${conversationId.valueOf()}:${conversationMessageId.valueOf()}`;
+  const conversationBase = {
+    conversationId: conversationId.valueOf(),
+    id: conversationPinId,
+    messageId: conversationMessageId.valueOf(),
+    pinnedByIdentityId: author,
+    scopeType: 'conversation',
+  };
+  const conversationProof = (
+    kind: 'put' | 'delete',
+    sequence: number,
+    payload: Record<string, unknown>,
+  ): PublicMutationProof => {
+    const body = {
+      author: { deviceCredential: author, identityId: author },
+      kind,
+      operationId: `forged-conv-${sequence}`.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor:
+        sequence === 0 ? null : PublicMutationProof.digestOf({ previous: 0 }),
+      recordId: conversationPinId,
+      sequence,
+      store: 'pins',
+      version: 1,
+    } as const;
+
+    return PublicMutationProof.signed(
+      body,
+      device.sign(PublicMutationProof.signingContentOf(body)),
+    );
+  };
+  const conversationPinCount = async (replica: Replica): Promise<number> =>
+    (await replica.conversationPins!.findByConversation(conversationId)).length;
+
+  await honest.conversationPins!.pin(
+    conversationId,
+    conversationMessageId,
+    identity,
+    new Timestamp(1780000000000),
+    conversationProof('put', 0, {
+      ...conversationBase,
+      createdAt: 1780000000000,
+    }),
+  );
+  await until('conversation pin visible on the honest replica', async () => {
+    return (await conversationPinCount(honest)) === 1;
+  });
+  await until('conversation pin reached the malicious store', async () => {
+    const stored = await malicious.stores!.pins.query!(
+      (record) => record.id === conversationPinId,
+    );
+
+    return stored.length === 1;
+  });
+  await malicious.stores!.pins.put!({
+    ...conversationBase,
+    removed: true,
+    updatedAt: Date.now() + 10 ** 12,
+  });
+  await until('forged conversation tombstone reached honest', async () => {
+    const stored = await honest.stores!.pins.query!(
+      (record) => record.id === conversationPinId && record.removed === true,
+    );
+
+    return stored.length === 1;
+  });
+  await pause(1500);
+  assert.equal(
+    await conversationPinCount(honest),
+    1,
+    'forged tombstone must not remove the conversation pin',
+  );
+  console.log('PASS forged conversation tombstone rejected by the honest node');
+
+  await honest.conversationPins!.unpin(
+    conversationId,
+    conversationMessageId,
+    identity,
+    conversationProof('delete', 1, { ...conversationBase, removed: true }),
+  );
+  await until('signed conversation removal applied', async () => {
+    return (await conversationPinCount(honest)) === 0;
+  });
+  await assert.rejects(
+    honest.conversationPins!.pin(
+      conversationId,
+      conversationMessageId,
+      identity,
+      new Timestamp(1780000000000),
+      conversationProof('put', 0, {
+        ...conversationBase,
+        createdAt: 1780000000000,
+      }),
+    ),
+    /ublic mutation|tale/i,
+  );
+  console.log('PASS conversation signed removal applied, replay refused');
 }
 
 const watchdog = setTimeout(() => {

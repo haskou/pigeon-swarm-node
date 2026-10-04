@@ -954,6 +954,18 @@ services:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
     parent: >-
       contexts/conversations/domain/repositories/ConversationMessagePinRepository
+  contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy:
+    class: >-
+      /contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy
+    arguments:
+      - '@contexts/conversations/domain/repositories/ConversationRepository'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
+  contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy:
+    class: >-
+      /contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy
+    arguments:
+      - '@contexts/conversations/domain/repositories/ConversationRepository'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/identities/domain/services/IdentityFinderService:
     class: /contexts/identities/domain/services/IdentityFinderService
     arguments:
@@ -1580,15 +1592,6 @@ services:
       - '@apps/apis/calls-api/CallRelayRecordDiscovery'
       - '@apps/apis/calls-api/CallRelayRecordSigner'
       - '@apps/apis/calls-api/FederatedCallRelayCredentials'
-  apps/initializers/public-mutations/PublicMutationGateInitializer:
-    class: /apps/initializers/public-mutations/PublicMutationGateInitializer
-    arguments:
-      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
-      - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
-      - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy
-      - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageReactionMutationPolicy
   apps/runtimes/call-signal-delivery-maintenance-runtime/CallSignalDeliveryMaintenanceRuntime:
     class: >-
       /apps/runtimes/call-signal-delivery-maintenance-runtime/CallSignalDeliveryMaintenanceRuntime
@@ -2255,6 +2258,19 @@ services:
       - '@contexts/push-notifications/application/send/PushNotificationDelivery'
       - >-
         @contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker
+  apps/initializers/public-mutations/PublicMutationGateInitializer:
+    class: /apps/initializers/public-mutations/PublicMutationGateInitializer
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageReactionMutationPolicy
+      - >-
+        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy
+      - >-
+        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy
   contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository:
     class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository
     arguments:
@@ -2365,7 +2381,7 @@ services:
   contexts/private-authorization/application/accept-operation/PrivateOperationAuthenticator: >-
     @contexts/private-authorization/infrastructure/crypto/PrivateOperationVerifier
   contexts/public-mutations/domain/services/PublicMutationPolicy: >-
-    @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageReactionMutationPolicy
+    @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy
   contexts/private-authorization/application/accept-operation/PrivateFreshnessGate: >-
     @contexts/private-authorization/infrastructure/freshness/InMemoryPrivateFreshnessGate
   contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization: >-

@@ -4,7 +4,16 @@ import { ConversationMessagePinDeleteMessage } from '@app/contexts/conversations
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  Delete,
+  JsonController,
+  Param,
+  Req,
+  Res,
+} from 'routing-controllers';
+
+import { DeleteConversationMessagePinBody } from '../bodies/DeleteConversationMessagePinBody';
 
 @JsonController('/conversations')
 export class DeleteConversationMessagePinRoute extends Route {
@@ -20,6 +29,7 @@ export class DeleteConversationMessagePinRoute extends Route {
   public async unpinMessage(
     @Param('conversationId') conversationId: string,
     @Param('messageId') messageId: string,
+    @Body() body: DeleteConversationMessagePinBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
@@ -30,6 +40,7 @@ export class DeleteConversationMessagePinRoute extends Route {
         identityId.valueOf(),
         conversationId,
         messageId,
+        body.mutation,
       ),
     );
 

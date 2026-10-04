@@ -18,6 +18,8 @@ export class ConversationMessageReactionRequest {
       this.messageId,
       this.authorIdentityId.valueOf(),
       this.body.emoji,
+      this.body.mutation,
+      this.body.createdAt,
     );
   }
 
@@ -27,6 +29,8 @@ export class ConversationMessageReactionRequest {
       this.messageId,
       this.authorIdentityId.valueOf(),
       this.body.emoji,
+      this.body.mutation,
+      this.body.createdAt,
     );
   }
 }

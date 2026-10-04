@@ -40,6 +40,7 @@ export default class MessageReactionRegistrar {
         message.emoji,
         message.createdAt,
       ),
+      message.proof,
     );
   }
 
@@ -52,6 +53,7 @@ export default class MessageReactionRegistrar {
         message.emoji,
         message.createdAt,
       ),
+      message.proof,
     );
   }
 }

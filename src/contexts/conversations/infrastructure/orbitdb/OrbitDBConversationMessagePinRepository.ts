@@ -1,5 +1,7 @@
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
@@ -21,7 +23,7 @@ export default class OrbitDBConversationMessagePinRepository extends Conversatio
       recordId: (record) =>
         typeof record.id === 'string' ? record.id : undefined,
       shouldReplace: (current, candidate) =>
-        this.freshness(current) <= this.freshness(candidate),
+        PublicMutationRecord.replaces(current, candidate) ?? true,
     });
   }
 
@@ -35,13 +37,6 @@ export default class OrbitDBConversationMessagePinRepository extends Conversatio
 
   private indexHeadKeyFromValue(conversationId: string): string {
     return `conversation-pin-index:${conversationId}`;
-  }
-
-  private freshness(document: Record<string, unknown>): number {
-    return Math.max(
-      typeof document.updatedAt === 'number' ? document.updatedAt : 0,
-      typeof document.createdAt === 'number' ? document.createdAt : 0,
-    );
   }
 
   private hasRequiredFields(document: Record<string, unknown>): boolean {
@@ -103,40 +98,62 @@ export default class OrbitDBConversationMessagePinRepository extends Conversatio
     );
   }
 
+  private async write(
+    conversationId: ConversationId,
+    payload: Record<string, unknown>,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    const document = PublicMutationRecord.withProof(payload, proof);
+
+    PublicMutationRecord.assertNotStale(
+      (
+        await this.pinIndex.findRecords(this.indexHeadKey(conversationId))
+      ).filter((stored) => stored.id === payload.id),
+      document,
+    );
+    await this.registry.putDocument('pins', document);
+    this.putIndexDocument(conversationId, document);
+  }
+
   public async pin(
     conversationId: ConversationId,
     messageId: MessageId,
     pinnedByIdentityId: IdentityId,
-    createdAt: Timestamp = Timestamp.now(),
+    createdAt: Timestamp,
+    proof: PublicMutationProof,
   ): Promise<void> {
-    const document = {
-      conversationId: conversationId.valueOf(),
-      createdAt: createdAt.valueOf(),
-      id: this.pinId(conversationId, messageId),
-      messageId: messageId.valueOf(),
-      pinnedByIdentityId: pinnedByIdentityId.valueOf(),
-      scopeType: 'conversation',
-    };
-
-    await this.registry.putDocument('pins', document);
-    this.putIndexDocument(conversationId, document);
+    await this.write(
+      conversationId,
+      {
+        conversationId: conversationId.valueOf(),
+        createdAt: createdAt.valueOf(),
+        id: this.pinId(conversationId, messageId),
+        messageId: messageId.valueOf(),
+        pinnedByIdentityId: pinnedByIdentityId.valueOf(),
+        scopeType: 'conversation',
+      },
+      proof,
+    );
   }
 
   public async unpin(
     conversationId: ConversationId,
     messageId: MessageId,
+    unpinnedByIdentityId: IdentityId,
+    proof: PublicMutationProof,
   ): Promise<void> {
-    const document = {
-      conversationId: conversationId.valueOf(),
-      id: this.pinId(conversationId, messageId),
-      messageId: messageId.valueOf(),
-      removed: true,
-      scopeType: 'conversation',
-      updatedAt: Date.now(),
-    };
-
-    await this.registry.putDocument('pins', document);
-    this.putIndexDocument(conversationId, document);
+    await this.write(
+      conversationId,
+      {
+        conversationId: conversationId.valueOf(),
+        id: this.pinId(conversationId, messageId),
+        messageId: messageId.valueOf(),
+        pinnedByIdentityId: unpinnedByIdentityId.valueOf(),
+        removed: true,
+        scopeType: 'conversation',
+      },
+      proof,
+    );
   }
 
   public async findByConversation(
