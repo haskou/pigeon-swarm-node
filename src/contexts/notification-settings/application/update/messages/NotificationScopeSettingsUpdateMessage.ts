@@ -1,8 +1,9 @@
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { PrimitiveOf } from '@haskou/value-objects';
+import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { NotificationScopeSettingsPreferences as Preferences } from '../../../domain/NotificationScopeSettingsPreferences';
 import { NotificationSettingScope } from '../../../domain/value-objects/NotificationSettingScope';
@@ -13,6 +14,8 @@ export class NotificationScopeSettingsUpdateMessage {
     private readonly identityId: string,
     private readonly scope: PrimitiveOf<NotificationSettingScope>,
     private readonly preferences: PrimitiveOf<Preferences>,
+    private readonly updatedAt: number,
+    private readonly mutation: unknown,
   ) {}
 
   private scopeType(): NotificationSettingScopeType {
@@ -33,6 +36,14 @@ export class NotificationScopeSettingsUpdateMessage {
         this.preferences.suppressEveryoneAndHere ?? false,
       suppressRoleMentions: this.preferences.suppressRoleMentions ?? false,
     });
+  }
+
+  public getProof(): PublicMutationProof {
+    return PublicMutationProof.fromPrimitives(this.mutation);
+  }
+
+  public getUpdatedAt(): Timestamp {
+    return new Timestamp(this.updatedAt);
   }
 
   public getScope(): NotificationSettingScope {

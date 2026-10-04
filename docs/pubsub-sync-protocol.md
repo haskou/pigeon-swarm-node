@@ -291,6 +291,9 @@ Signed public mutations (pins and reactions):
   use `scopeType: "conversation"`; the author must be a conversation participant.
   Policies are looked up by collection and `scopeType`, so a record whose scope
   type has no policy in a governed collection is rejected.
+- `notificationSettings` documents (public scopes only) are governed the same way
+  with `scopeType: "notification_settings"`; the author must be the settings
+  owner (`identityId`) and the record id is `<identityId>:<scopeKey>`.
 - Every node verifies on write, on replicated read, on head hydration and on the
   persisted head cache: signature, scope binding, the device in the identity's
   current device authorization head, and the community permission (pin needs

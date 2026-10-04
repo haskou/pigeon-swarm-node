@@ -1,6 +1,7 @@
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { NotificationSettingScope } from '../../../domain/value-objects/NotificationSettingScope';
@@ -15,6 +16,7 @@ export class NotificationScopeSettingsResetMessage {
       conversationId?: string;
       type: string;
     },
+    private readonly mutation: unknown,
   ) {}
 
   private scopeType(): NotificationSettingScopeType {
@@ -23,6 +25,10 @@ export class NotificationScopeSettingsResetMessage {
 
   public getIdentityId(): IdentityId {
     return new IdentityId(this.identityId);
+  }
+
+  public getProof(): PublicMutationProof {
+    return PublicMutationProof.fromPrimitives(this.mutation);
   }
 
   public getScope(): NotificationSettingScope {

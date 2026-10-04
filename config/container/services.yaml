@@ -544,6 +544,11 @@ services:
       /contexts/notification-settings/infrastructure/local-db/LocalNotificationScopeSettingsRepository
     arguments:
       - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+  contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy:
+    class: >-
+      /contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy
+    arguments: []
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/notifications/application/find/NotificationsFinder:
     class: /contexts/notifications/application/find/NotificationsFinder
     arguments:
@@ -2258,19 +2263,6 @@ services:
       - '@contexts/push-notifications/application/send/PushNotificationDelivery'
       - >-
         @contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker
-  apps/initializers/public-mutations/PublicMutationGateInitializer:
-    class: /apps/initializers/public-mutations/PublicMutationGateInitializer
-    arguments:
-      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
-      - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
-      - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy
-      - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageReactionMutationPolicy
-      - >-
-        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy
-      - >-
-        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy
   contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository:
     class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository
     arguments:
@@ -2334,6 +2326,21 @@ services:
         @contexts/private-authorization/application/accept-operation/PrivateControlTransitionProcessor
       - >-
         @contexts/private-authorization/application/accept-operation/PrivateControlMutationAuthorizer
+  apps/initializers/public-mutations/PublicMutationGateInitializer:
+    class: /apps/initializers/public-mutations/PublicMutationGateInitializer
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageReactionMutationPolicy
+      - >-
+        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy
+      - >-
+        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy
+      - >-
+        @contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy
   contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationDocumentMerger:
     class: >-
       /contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationDocumentMerger
@@ -2373,6 +2380,8 @@ services:
     @contexts/communities/application/apply-private-control/PrivateCommunityControlApplier
   contexts/private-authorization/application/provision-scope/PrivateGenesisProjectionAuthorizer: >-
     @contexts/communities/application/apply-private-control/PrivateCommunityGenesisAuthorizer
+  contexts/public-mutations/domain/services/PublicMutationPolicy: >-
+    @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy
   contexts/private-authorization/application/accept-operation/PrivateOperationDecoder: >-
     @contexts/private-authorization/infrastructure/contracts/PrivateControlOperationContract
   contexts/private-authorization/domain/services/PrivateDeviceCredentialCodec: >-
@@ -2380,8 +2389,6 @@ services:
   contexts/private-authorization/application/provision-scope/PrivateGenesisAuthenticator: '@contexts/private-authorization/infrastructure/crypto/PrivateGenesisVerifier'
   contexts/private-authorization/application/accept-operation/PrivateOperationAuthenticator: >-
     @contexts/private-authorization/infrastructure/crypto/PrivateOperationVerifier
-  contexts/public-mutations/domain/services/PublicMutationPolicy: >-
-    @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy
   contexts/private-authorization/application/accept-operation/PrivateFreshnessGate: >-
     @contexts/private-authorization/infrastructure/freshness/InMemoryPrivateFreshnessGate
   contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization: >-

@@ -12,6 +12,7 @@ export class DeleteNotificationScopeSettingsRequest {
     return new NotificationScopeSettingsResetMessage(
       this.identityId,
       this.body.scope,
+      this.body.mutation,
     );
   }
 }

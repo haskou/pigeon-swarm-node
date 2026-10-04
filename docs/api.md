@@ -3828,6 +3828,14 @@ Set a community channel to mentions only:
 }
 ```
 
+Every body also carries `"updatedAt": <ms>` and `"mutation":
+SignedPublicMutation` (a `put` proof whose store is `notificationSettings`, whose
+record id is `<identityId>:<scopeKey>` and whose digest covers the stored
+document without `proof`, with `scopeType: "notification_settings"`). Missing,
+forged, copied-scope, stale or revoked-device proofs fail with 409. Protected
+community scopes stay node-local and never use the signed path; the proof is not
+used for them.
+
 Response is the updated scope resource.
 
 For protected communities, the node accepts the setting only while its local
@@ -3848,7 +3856,8 @@ Signed body:
   "scope": {
     "type": "community",
     "communityId": "6a..."
-  }
+  },
+  "mutation": "SignedPublicMutation (delete proof)"
 }
 ```
 

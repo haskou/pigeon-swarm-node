@@ -8,11 +8,13 @@ import { NotificationSettingScope } from '@app/contexts/notification-settings/do
 import NotificationScopeSettingsRepositoryRouter from '@app/contexts/notification-settings/infrastructure/NotificationScopeSettingsRepositoryRouter';
 import LocalNotificationScopeSettingsRepository from '@app/contexts/notification-settings/infrastructure/local-db/LocalNotificationScopeSettingsRepository';
 import OrbitDBNotificationScopeSettingsRepository from '@app/contexts/notification-settings/infrastructure/orbitdb/OrbitDBNotificationScopeSettingsRepository';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { generateKeyPairSync } from 'node:crypto';
 
 describe('NotificationScopeSettingsRepositoryRouter', () => {
   const identityId = validIdentityId();
+  const proof = {} as PublicMutationProof;
   const privateScope = NotificationSettingScope.community(
     new CommunityId('private-community'),
   );
@@ -86,7 +88,7 @@ describe('NotificationScopeSettingsRepositoryRouter', () => {
       NotificationScopeSettingsPreferences.defaults(),
     );
 
-    await repository.save(settings);
+    await repository.save(settings, proof);
 
     expect(privateScopeAccess.authorize).toHaveBeenCalledWith(
       identityId,
@@ -103,7 +105,7 @@ describe('NotificationScopeSettingsRepositoryRouter', () => {
       NotificationScopeSettingsPreferences.defaults(),
     );
 
-    await repository.save(settings);
+    await repository.save(settings, proof);
 
     expect(privateScopeAccess.authorize).toHaveBeenCalledWith(
       identityId,
@@ -120,7 +122,7 @@ describe('NotificationScopeSettingsRepositoryRouter', () => {
       NotificationScopeSettingsPreferences.defaults(),
     );
 
-    await expect(repository.save(settings)).rejects.toThrow();
+    await expect(repository.save(settings, proof)).rejects.toThrow();
     expect(privateRepository.save).not.toHaveBeenCalled();
   });
 
@@ -131,13 +133,13 @@ describe('NotificationScopeSettingsRepositoryRouter', () => {
       NotificationScopeSettingsPreferences.defaults(),
     );
 
-    await repository.save(settings);
+    await repository.save(settings, proof);
 
     expect(guard.runWhilePublic).toHaveBeenCalledWith(
       new CommunityId('public-community'),
       expect.any(Function),
     );
-    expect(publicRepository.save).toHaveBeenCalledWith(settings);
+    expect(publicRepository.save).toHaveBeenCalledWith(settings, proof);
     expect(privateRepository.save).not.toHaveBeenCalled();
   });
 
@@ -152,7 +154,7 @@ describe('NotificationScopeSettingsRepositoryRouter', () => {
   });
 
   it('deletes private community settings only from local storage', async () => {
-    await repository.delete(identityId, privateScope);
+    await repository.delete(identityId, privateScope, proof);
 
     expect(privateRepository.delete).toHaveBeenCalledWith(
       identityId,
