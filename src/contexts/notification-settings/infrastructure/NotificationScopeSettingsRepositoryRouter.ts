@@ -1,4 +1,5 @@
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { NotificationScopeSettings } from '../domain/NotificationScopeSettings';
@@ -64,6 +65,7 @@ export default class NotificationScopeSettingsRepositoryRouter extends Notificat
   public async delete(
     identityId: IdentityId,
     scope: NotificationSettingScope,
+    proof: PublicMutationProof,
   ): Promise<void> {
     if (await this.isPrivateScope(scope)) {
       await this.privateRepository.delete(identityId, scope);
@@ -72,7 +74,7 @@ export default class NotificationScopeSettingsRepositoryRouter extends Notificat
     }
 
     await this.runWhilePublic(scope, () =>
-      this.publicRepository.delete(identityId, scope),
+      this.publicRepository.delete(identityId, scope, proof),
     );
   }
 
@@ -121,7 +123,10 @@ export default class NotificationScopeSettingsRepositoryRouter extends Notificat
       : false;
   }
 
-  public async save(settings: NotificationScopeSettings): Promise<void> {
+  public async save(
+    settings: NotificationScopeSettings,
+    proof: PublicMutationProof,
+  ): Promise<void> {
     const scope = settings.getScope();
 
     if (await this.isPrivateScope(scope)) {
@@ -132,7 +137,7 @@ export default class NotificationScopeSettingsRepositoryRouter extends Notificat
     }
 
     await this.runWhilePublic(scope, () =>
-      this.publicRepository.save(settings),
+      this.publicRepository.save(settings, proof),
     );
   }
 }

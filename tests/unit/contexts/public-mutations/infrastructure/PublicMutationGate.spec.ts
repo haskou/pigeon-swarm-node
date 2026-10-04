@@ -4,6 +4,7 @@ import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import ConversationMessagePinMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy';
+import NotificationScopeSettingsMutationPolicy from '@app/contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
@@ -276,5 +277,126 @@ describe('PublicMutationGate over conversation pins', () => {
 
   it('rejects an unsigned conversation pin', async () => {
     await expect(gate.accepts('pins', pin)).resolves.toBe(false);
+  });
+});
+
+describe('PublicMutationGate over notification settings', () => {
+  const author = 'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=';
+  const scope = { communityId: 'c1', type: 'community' };
+  const id = `${author}:community:c1`;
+  const settings = {
+    hideMutedChannels: false,
+    id,
+    identityId: author,
+    mobilePushEnabled: true,
+    notificationLevel: 'all',
+    scope,
+    scopeKey: 'community:c1',
+    scopeType: 'notification_settings',
+    suppressEveryoneAndHere: false,
+    suppressRoleMentions: false,
+    updatedAt: 1780000000000,
+  };
+  const authorization = mock<PublicMutationAuthorAuthorization>();
+  let gate: PublicMutationGate;
+
+  const sign = async (
+    payload: Record<string, unknown>,
+    signer: string = author,
+  ): Promise<Record<string, unknown>> => {
+    const device = await KeyPair.generate();
+    const body = {
+      author: {
+        deviceCredential: device.toPrimitives().publicKey,
+        identityId: signer,
+      },
+      kind: payload.removed === true ? 'delete' : 'put',
+      operationId: 'operation-1'.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor: null as string | null,
+      recordId: payload.id as string,
+      sequence: 0,
+      store: 'notificationSettings',
+      version: 1,
+    } as const;
+
+    return PublicMutationRecord.withProof(
+      payload,
+      PublicMutationProof.signed(
+        body,
+        device.sign(PublicMutationProof.signingContentOf(body)),
+      ),
+    );
+  };
+
+  beforeEach(() => {
+    authorization.isAuthorized.mockResolvedValue(true);
+    gate = new PublicMutationGate(new PublicMutationVerifier(authorization), [
+      new NotificationScopeSettingsMutationPolicy(),
+    ]);
+  });
+
+  it('admits signed settings and a signed reset from their owner', async () => {
+    await expect(
+      gate.accepts('notificationSettings', await sign(settings)),
+    ).resolves.toBe(true);
+    await expect(
+      gate.accepts(
+        'notificationSettings',
+        await sign({
+          id,
+          identityId: author,
+          removed: true,
+          scopeKey: 'community:c1',
+          scopeType: 'notification_settings',
+        }),
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it('rejects unsigned settings and a forged future-dated reset', async () => {
+    await expect(gate.accepts('notificationSettings', settings)).resolves.toBe(
+      false,
+    );
+    await expect(
+      gate.accepts('notificationSettings', {
+        id,
+        identityId: author,
+        removed: true,
+        scopeKey: 'community:c1',
+        scopeType: 'notification_settings',
+        updatedAt: Date.now() + 10 ** 12,
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects settings signed by someone other than the owner', async () => {
+    const otherAuthor = 'MCowBQYDK2VwAyEA' + 'A'.repeat(43) + '=';
+
+    await expect(
+      gate.accepts('notificationSettings', await sign(settings, otherAuthor)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a proof copied onto another scope', async () => {
+    const signed = await sign(settings);
+
+    await expect(
+      gate.accepts('notificationSettings', {
+        ...signed,
+        id: `${author}:community:c2`,
+        scope: { communityId: 'c2', type: 'community' },
+        scopeKey: 'community:c2',
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects settings whose key does not match their scope', async () => {
+    await expect(
+      gate.accepts(
+        'notificationSettings',
+        await sign({ ...settings, scopeKey: 'community:c2' }),
+      ),
+    ).resolves.toBe(false);
   });
 });

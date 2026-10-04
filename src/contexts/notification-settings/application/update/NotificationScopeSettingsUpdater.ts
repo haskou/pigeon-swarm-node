@@ -19,9 +19,9 @@ export default class NotificationScopeSettingsUpdater {
       (await this.repository.findByScope(identityId, scope)) ??
       NotificationScopeSettings.defaultForScope(identityId, scope);
 
-    settings.update(message.getPreferences());
+    settings.update(message.getPreferences(), message.getUpdatedAt());
 
-    await this.repository.save(settings);
+    await this.repository.save(settings, message.getProof());
     const events = settings.pullDomainEvents();
 
     if (!(await this.repository.isPrivateScope(scope))) {

@@ -6,10 +6,22 @@ import NotificationScopeSettingsRepository from '@app/contexts/notification-sett
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { generateKeyPairSync } from 'node:crypto';
 
+import { signedMutation } from '../../public-mutations/support/signedMutation';
+
 describe('Notification scope settings privacy', () => {
   const identityId = generateKeyPairSync('ed25519')
     .publicKey.export({ format: 'pem', type: 'spki' })
     .toString();
+  const mutation = async (kind: 'put' | 'delete') =>
+    (
+      await signedMutation({
+        identityId,
+        kind,
+        recordId: 'unused',
+        sequence: 1,
+        store: 'notificationSettings',
+      })
+    ).toPrimitives();
   let repository: jest.Mocked<NotificationScopeSettingsRepository>;
   let publisher: jest.Mocked<DomainEventPublisher>;
 
@@ -40,6 +52,8 @@ describe('Notification scope settings privacy', () => {
           suppressEveryoneAndHere: false,
           suppressRoleMentions: false,
         },
+        1780000000000,
+        await mutation('put'),
       ),
     );
 
@@ -54,11 +68,15 @@ describe('Notification scope settings privacy', () => {
     );
 
     await resetter.reset(
-      new NotificationScopeSettingsResetMessage(identityId, {
-        channelId: 'private-channel',
-        communityId: 'private-community',
-        type: 'community_channel',
-      }),
+      new NotificationScopeSettingsResetMessage(
+        identityId,
+        {
+          channelId: 'private-channel',
+          communityId: 'private-community',
+          type: 'community_channel',
+        },
+        await mutation('delete'),
+      ),
     );
 
     expect(repository.delete).toHaveBeenCalledTimes(1);
@@ -80,6 +98,8 @@ describe('Notification scope settings privacy', () => {
           suppressEveryoneAndHere: false,
           suppressRoleMentions: false,
         },
+        1780000000000,
+        await mutation('put'),
       ),
     );
 

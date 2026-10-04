@@ -15,6 +15,7 @@ import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/doma
 import { PairingAuthorization } from '@app/contexts/identity-devices/domain/value-objects/PairingAuthorization';
 import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
 import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/PairingId';
+import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import { NodeNetworkAdderMessage } from '@app/contexts/nodes/application/add-network/messages/NodeNetworkAdderMessage';
 import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNetworkAdder';
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
@@ -62,6 +63,7 @@ let application: PigeonApplication | null = null;
 @binding()
 export default class Definitions {
   private binaryBody: Buffer | undefined;
+  private readonly notificationSettingsSequences = new Map<string, number>();
   private body: string | undefined;
   private callId: string | undefined;
   private communityChannelId: string | undefined;
@@ -2535,6 +2537,65 @@ export default class Definitions {
     });
   }
 
+  private async withNotificationSettingsMutation(
+    kind: 'put' | 'delete',
+  ): Promise<void> {
+    const keyPair = await this.ensureIdentityKeyPair();
+    const identityId = keyPair.toPrimitives().publicKey;
+    const body = JSON.parse(this.body || '{}');
+    const scope = NotificationSettingScope.fromPrimitives(body.scope);
+    const recordId = `${identityId}:${scope.key()}`;
+    const sequence = this.notificationSettingsSequences.get(recordId) ?? 0;
+    const updatedAt = 1_780_000_000_000 + sequence;
+    const base = {
+      id: recordId,
+      identityId,
+      scopeKey: scope.key(),
+      scopeType: 'notification_settings',
+    };
+    const payload =
+      kind === 'put'
+        ? {
+            ...base,
+            hideMutedChannels: body.hideMutedChannels ?? false,
+            mobilePushEnabled: body.mobilePushEnabled ?? true,
+            ...(body.mutedUntil === undefined
+              ? {}
+              : { mutedUntil: body.mutedUntil }),
+            notificationLevel: body.notificationLevel,
+            scope: scope.toPrimitives(),
+            suppressEveryoneAndHere: body.suppressEveryoneAndHere ?? false,
+            suppressRoleMentions: body.suppressRoleMentions ?? false,
+            updatedAt,
+          }
+        : { ...base, removed: true };
+    const proofBody = {
+      author: { deviceCredential: identityId, identityId },
+      kind,
+      operationId: `api-notification-settings-${sequence}`.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor:
+        sequence === 0
+          ? null
+          : PublicMutationProof.digestOf({ previous: sequence - 1 }),
+      recordId,
+      sequence,
+      store: 'notificationSettings',
+      version: 1,
+    } as const;
+    const proof = PublicMutationProof.signed(
+      proofBody,
+      keyPair.sign(PublicMutationProof.signingContentOf(proofBody)),
+    );
+
+    this.notificationSettingsSequences.set(recordId, sequence + 1);
+    this.body = JSON.stringify({
+      ...body,
+      mutation: proof.toPrimitives(),
+      ...(kind === 'put' ? { updatedAt } : {}),
+    });
+  }
+
   private async conversationReactionMutationBody(
     kind: 'put' | 'delete',
   ): Promise<string> {
@@ -3001,11 +3062,13 @@ export default class Definitions {
 
   @given('I sign the current notification scope settings request')
   public async iSignTheCurrentNotificationScopeSettingsRequest(): Promise<void> {
+    await this.withNotificationSettingsMutation('put');
     await this.signCurrentRequest('PUT', '/notification-settings/scopes');
   }
 
   @given('I sign the current notification scope settings reset request')
   public async iSignTheCurrentNotificationScopeSettingsResetRequest(): Promise<void> {
+    await this.withNotificationSettingsMutation('delete');
     await this.signCurrentRequest('DELETE', '/notification-settings/scopes');
   }
 

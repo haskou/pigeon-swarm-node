@@ -1,3 +1,5 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
@@ -13,13 +15,13 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
     this.settingsIndex = new OrbitDBHeadIndex(this.registry, {
-      collectionName: 'settings',
+      collectionName: 'notificationSettings',
       documentFromRecord: (record) =>
         this.isDocument(record) ? record : undefined,
       recordId: (record) =>
         typeof record.id === 'string' ? record.id : undefined,
       shouldReplace: (current, candidate) =>
-        current.updatedAt <= candidate.updatedAt,
+        PublicMutationRecord.replaces(current, candidate) ?? true,
     });
   }
 
@@ -27,21 +29,14 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
     return `${identityId.valueOf()}:${scope.key()}`;
   }
 
-  private headKey(identityId: IdentityId, scope: NotificationSettingScope) {
-    return `notification-settings:${this.documentId(identityId, scope)}`;
-  }
-
   private identityIndexHeadKey(identityId: IdentityId) {
-    return this.identityIndexHeadKeyFromValue(identityId.valueOf());
-  }
-
-  private identityIndexHeadKeyFromValue(identityId: string): string {
-    return `notification-settings-identity-index:${identityId}`;
+    return `notification-settings-identity-index:${identityId.valueOf()}`;
   }
 
   private hasIdentityFields(document: Record<string, unknown>): boolean {
     return (
       document.removed !== true &&
+      document.scopeType === 'notification_settings' &&
       typeof document.id === 'string' &&
       typeof document.identityId === 'string' &&
       typeof document.scopeKey === 'string' &&
@@ -90,21 +85,11 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
 
   private toDocument(
     settings: NotificationScopeSettings,
-  ): OrbitDBNotificationScopeSettingsDocument {
-    const primitives = settings.toPrimitives();
-
+  ): Record<string, unknown> {
     return {
-      hideMutedChannels: primitives.hideMutedChannels,
+      ...settings.toPrimitives(),
       id: this.documentId(settings.getIdentityId(), settings.getScope()),
-      identityId: primitives.identityId,
-      mobilePushEnabled: primitives.mobilePushEnabled,
-      mutedUntil: primitives.mutedUntil,
-      notificationLevel: primitives.notificationLevel,
-      scope: primitives.scope,
-      scopeKey: primitives.scopeKey,
-      suppressEveryoneAndHere: primitives.suppressEveryoneAndHere,
-      suppressRoleMentions: primitives.suppressRoleMentions,
-      updatedAt: primitives.updatedAt,
+      scopeType: 'notification_settings',
     };
   }
 
@@ -125,98 +110,83 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
     });
   }
 
-  private sortByUpdatedAtDescending(
-    documents: OrbitDBNotificationScopeSettingsDocument[],
-  ): OrbitDBNotificationScopeSettingsDocument[] {
-    return [...documents].sort(
-      (left, right) => right.updatedAt - left.updatedAt,
-    );
-  }
-
-  private async putHeads(
-    document: OrbitDBNotificationScopeSettingsDocument,
+  private async write(
+    identityId: IdentityId,
+    payload: Record<string, unknown>,
+    proof: PublicMutationProof,
   ): Promise<void> {
-    await this.registry.putHead(`notification-settings:${document.id}`, {
-      ...document,
-    });
+    const document = PublicMutationRecord.withProof(payload, proof);
+    const key = this.identityIndexHeadKey(identityId);
 
-    const key = `notification-settings-identity-index:${document.identityId}`;
-    const settings = this.settingsIndex.deduplicate([
-      ...((await this.settingsIndex.find(key)) ?? []),
+    PublicMutationRecord.assertNotStale(
+      (await this.settingsIndex.findRecords(key)).filter(
+        (stored) => stored.id === payload.id,
+      ),
       document,
-    ]);
-
-    await this.settingsIndex.putDocuments(
+    );
+    await this.registry.putDocument('notificationSettings', document);
+    await this.settingsIndex.putRecord(
       key,
-      {
-        id: key,
-        identityId: document.identityId,
-      },
-      settings,
+      { id: key, identityId: identityId.valueOf() },
+      document,
     );
   }
 
   public async delete(
     identityId: IdentityId,
     scope: NotificationSettingScope,
+    proof: PublicMutationProof,
   ): Promise<void> {
-    const document = {
-      id: this.documentId(identityId, scope),
-      identityId: identityId.valueOf(),
-      removed: true,
-      scope: scope.toPrimitives(),
-      scopeKey: scope.key(),
-      updatedAt: Date.now(),
-    };
-
-    await this.registry.putDocument('notificationSettings', document);
-    await this.registry.putHead(this.headKey(identityId, scope), document);
-
-    const key = this.identityIndexHeadKey(identityId);
-    const settings = ((await this.settingsIndex.find(key)) ?? []).filter(
-      (setting) => setting.id !== document.id,
-    );
-
-    await this.settingsIndex.putDocuments(
-      key,
+    await this.write(
+      identityId,
       {
-        id: key,
+        id: this.documentId(identityId, scope),
         identityId: identityId.valueOf(),
+        removed: true,
+        scopeKey: scope.key(),
+        scopeType: 'notification_settings',
       },
-      settings,
+      proof,
     );
   }
 
   public async findByIdentityId(
     identityId: IdentityId,
   ): Promise<NotificationScopeSettings[]> {
-    return this.sortByUpdatedAtDescending(
+    const documents =
       (await this.settingsIndex.find(this.identityIndexHeadKey(identityId))) ??
-        [],
-    ).map((document) => this.toDomain(document));
+      [];
+
+    return documents
+      .sort((left, right) => right.updatedAt - left.updatedAt)
+      .map((document) => this.toDomain(document));
   }
 
   public async findByScope(
     identityId: IdentityId,
     scope: NotificationSettingScope,
   ): Promise<NotificationScopeSettings | undefined> {
-    const document = await this.registry.findHead(
-      this.headKey(identityId, scope),
-    );
+    const id = this.documentId(identityId, scope);
+    const document = (
+      (await this.settingsIndex.find(this.identityIndexHeadKey(identityId))) ??
+      []
+    ).find((candidate) => candidate.id === id);
 
-    return document && this.isDocument(document)
-      ? this.toDomain(document)
-      : undefined;
+    return document ? this.toDomain(document) : undefined;
   }
 
   public isPrivateScope(): Promise<boolean> {
     return Promise.resolve(false);
   }
 
-  public async save(settings: NotificationScopeSettings): Promise<void> {
-    const document = this.toDocument(settings);
-
-    await this.registry.putDocument('notificationSettings', document);
-    await this.putHeads(document);
+  public async save(
+    settings: NotificationScopeSettings,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    await this.write(
+      settings.getIdentityId(),
+      this.toDocument(settings),
+      proof,
+    );
   }
 }

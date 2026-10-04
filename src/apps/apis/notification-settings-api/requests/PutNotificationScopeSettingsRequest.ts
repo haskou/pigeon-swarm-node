@@ -20,6 +20,8 @@ export class PutNotificationScopeSettingsRequest {
         suppressEveryoneAndHere: this.body.suppressEveryoneAndHere,
         suppressRoleMentions: this.body.suppressRoleMentions,
       },
+      this.body.updatedAt,
+      this.body.mutation,
     );
   }
 }

@@ -1,3 +1,4 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { NotificationScopeSettings } from '../NotificationScopeSettings';
@@ -7,6 +8,7 @@ export default abstract class NotificationScopeSettingsRepository {
   public abstract delete(
     identityId: IdentityId,
     scope: NotificationSettingScope,
+    proof: PublicMutationProof,
   ): Promise<void>;
 
   public abstract findByIdentityId(
@@ -22,5 +24,8 @@ export default abstract class NotificationScopeSettingsRepository {
     scope: NotificationSettingScope,
   ): Promise<boolean>;
 
-  public abstract save(settings: NotificationScopeSettings): Promise<void>;
+  public abstract save(
+    settings: NotificationScopeSettings,
+    proof: PublicMutationProof,
+  ): Promise<void>;
 }

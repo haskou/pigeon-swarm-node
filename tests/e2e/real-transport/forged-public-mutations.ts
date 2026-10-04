@@ -7,6 +7,11 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import OrbitDBCommunityChannelMessagePinRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessagePinRepository';
 import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
+import { NotificationScopeSettingsPreferences } from '@app/contexts/notification-settings/domain/NotificationScopeSettingsPreferences';
+import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
+import OrbitDBNotificationScopeSettingsRepository from '@app/contexts/notification-settings/infrastructure/orbitdb/OrbitDBNotificationScopeSettingsRepository';
+import NotificationScopeSettingsMutationPolicy from '@app/contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
@@ -44,10 +49,15 @@ type Replica = {
   name: string;
   helia: HeliaInstance;
   orbitdb?: OrbitDBInstance;
-  stores?: { pins: OrbitDBDatabase; heads: OrbitDBDatabase };
+  stores?: {
+    pins: OrbitDBDatabase;
+    heads: OrbitDBDatabase;
+    notificationSettings: OrbitDBDatabase;
+  };
   registry?: OrbitDBReplicatedStateRegistry;
   pins?: OrbitDBCommunityChannelMessagePinRepository;
   conversationPins?: OrbitDBConversationMessagePinRepository;
+  settings?: OrbitDBNotificationScopeSettingsRepository;
 };
 
 const networkId = randomUUID();
@@ -83,6 +93,15 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
       sync: false,
       type: 'keyvalue',
     }),
+    notificationSettings: await replica.orbitdb.open(
+      `${networkId}/notificationSettings`,
+      {
+        AccessController,
+        Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
+        sync: false,
+        type: 'documents',
+      },
+    ),
     pins: await replica.orbitdb.open(`${networkId}/pins`, {
       AccessController,
       Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
@@ -104,6 +123,9 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
     ),
   );
   replica.conversationPins = new OrbitDBConversationMessagePinRepository(
+    replica.registry,
+  );
+  replica.settings = new OrbitDBNotificationScopeSettingsRepository(
     replica.registry,
   );
   await replica.registry.register(
@@ -157,6 +179,7 @@ async function main(): Promise<void> {
     [
       new CommunityChannelMessagePinMutationPolicy(communities),
       new ConversationMessagePinMutationPolicy(conversations),
+      new NotificationScopeSettingsMutationPolicy(),
     ],
   );
   const device = await KeyPair.generate();
@@ -400,6 +423,94 @@ async function main(): Promise<void> {
     /ublic mutation|tale/i,
   );
   console.log('PASS conversation signed removal applied, replay refused');
+
+  stage = 'notification settings are governed too';
+  const settingsScope = NotificationSettingScope.community(
+    new CommunityId(randomUUID()),
+  );
+  const settingsId = `${author}:${settingsScope.key()}`;
+  const settingsProof = (
+    kind: 'put' | 'delete',
+    sequence: number,
+    payload: Record<string, unknown>,
+  ): PublicMutationProof => {
+    const body = {
+      author: { deviceCredential: author, identityId: author },
+      kind,
+      operationId: `forged-settings-${sequence}`.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor:
+        sequence === 0 ? null : PublicMutationProof.digestOf({ previous: 0 }),
+      recordId: settingsId,
+      sequence,
+      store: 'notificationSettings',
+      version: 1,
+    } as const;
+
+    return PublicMutationProof.signed(
+      body,
+      device.sign(PublicMutationProof.signingContentOf(body)),
+    );
+  };
+  const settings = NotificationScopeSettings.create(
+    identity,
+    settingsScope,
+    NotificationScopeSettingsPreferences.defaults(),
+    new Timestamp(1780000000000),
+  );
+  const settingsTombstone = {
+    id: settingsId,
+    identityId: author,
+    removed: true,
+    scopeKey: settingsScope.key(),
+    scopeType: 'notification_settings',
+  };
+  const settingsCount = async (replica: Replica): Promise<number> =>
+    (await replica.settings!.findByIdentityId(identity)).length;
+
+  await honest.settings!.save(
+    settings,
+    settingsProof('put', 0, {
+      ...settings.toPrimitives(),
+      id: settingsId,
+      scopeType: 'notification_settings',
+    }),
+  );
+  await until('settings reached the malicious store', async () => {
+    const stored = await malicious.stores!.notificationSettings.query!(
+      (record) => record.id === settingsId,
+    );
+
+    return stored.length === 1;
+  });
+  await malicious.stores!.notificationSettings.put!({
+    ...settingsTombstone,
+    updatedAt: Date.now() + 10 ** 12,
+  });
+  await until('forged settings tombstone reached honest', async () => {
+    const stored = await honest.stores!.notificationSettings.query!(
+      (record) => record.id === settingsId && record.removed === true,
+    );
+
+    return stored.length === 1;
+  });
+  await pause(1500);
+  assert.equal(
+    await settingsCount(honest),
+    1,
+    'forged tombstone must not reset the notification settings',
+  );
+  console.log('PASS forged settings tombstone rejected by the honest node');
+
+  await honest.settings!.delete(
+    identity,
+    settingsScope,
+    settingsProof('delete', 1, settingsTombstone),
+  );
+  await until('signed settings reset applied', async () => {
+    return (await settingsCount(honest)) === 0;
+  });
+  console.log('PASS settings signed reset applied');
 }
 
 const watchdog = setTimeout(() => {

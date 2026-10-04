@@ -53,6 +53,7 @@ export default class OrbitDBReplicatedStateRegistry {
   private static readonly INDEX_HEAD_COLLECTION_NAMES = new Set([
     'conversations',
     'messages',
+    'notificationSettings',
     'pins',
     'reactions',
     'summaries',

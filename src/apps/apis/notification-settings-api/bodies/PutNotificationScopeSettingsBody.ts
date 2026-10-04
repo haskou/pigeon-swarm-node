@@ -3,7 +3,9 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
+  Min,
   ValidateNested,
 } from 'class-validator';
 
@@ -24,6 +26,9 @@ export class PutNotificationScopeSettingsBody {
   @IsInt()
   public readonly mutedUntil?: number | null;
 
+  @IsObject()
+  public readonly mutation: Record<string, unknown>;
+
   @IsIn(notificationLevels)
   public readonly notificationLevel: string;
 
@@ -38,4 +43,8 @@ export class PutNotificationScopeSettingsBody {
   @IsOptional()
   @IsBoolean()
   public readonly suppressRoleMentions?: boolean;
+
+  @IsInt()
+  @Min(0)
+  public readonly updatedAt: number;
 }

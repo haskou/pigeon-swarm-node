@@ -134,6 +134,8 @@ components:
       required:
         - scope
         - notificationLevel
+        - updatedAt
+        - mutation
       properties:
         scope:
           $ref: '#/components/schemas/NotificationScope'
@@ -159,13 +161,68 @@ components:
         hideMutedChannels:
           type: boolean
           default: false
+        updatedAt:
+          type: integer
+          minimum: 0
+          description: Update time committed by the mutation proof. Only the signed value is stored.
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
     DeleteNotificationScopeSettingsBody:
       type: object
       required:
         - scope
+        - mutation
       properties:
         scope:
           $ref: '#/components/schemas/NotificationScope'
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    SignedPublicMutation:
+      type: object
+      description: Client-signed intent for a replicated public record. The node holds no user private keys, so the UI signs it. payloadDigest commits to the record without its proof; author.deviceCredential must be an authorized device of author.identityId in its current device authorization head. The winner of concurrent mutations is the higher sequence, then the lower digest; no wall clock is used.
+      required:
+        - version
+        - operationId
+        - kind
+        - store
+        - recordId
+        - payloadDigest
+        - predecessor
+        - sequence
+        - author
+        - signature
+      properties:
+        version:
+          type: integer
+          enum: [1]
+        operationId:
+          type: string
+        kind:
+          type: string
+          enum: [put, delete]
+        store:
+          type: string
+        recordId:
+          type: string
+        payloadDigest:
+          type: string
+        predecessor:
+          type: string
+          nullable: true
+          description: Digest of the previous mutation. Null if and only if sequence is 0.
+        sequence:
+          type: integer
+          minimum: 0
+        author:
+          type: object
+          required: [identityId, deviceCredential]
+          properties:
+            identityId:
+              type: string
+            deviceCredential:
+              type: string
+        signature:
+          type: string
     NotificationScopeSettingsResource:
       type: object
       required:
