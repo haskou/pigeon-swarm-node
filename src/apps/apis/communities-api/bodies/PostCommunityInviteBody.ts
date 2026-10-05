@@ -1,15 +1,9 @@
 import { Type } from 'class-transformer';
-import {
-  IsInt,
-  IsNumber,
-  IsObject,
-  IsString,
-  IsOptional,
-  Min,
-  ValidateNested,
-} from 'class-validator';
+import { IsInt, IsNumber, IsObject, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
 
 import { EncryptedCommunityInviteKeyBody } from './EncryptedCommunityInviteKeyBody';
+
+import { CommunityModerationLogBody } from './CommunityModerationLogBody';
 
 export class PostCommunityInviteBody {
   @IsInt()
@@ -35,4 +29,8 @@ export class PostCommunityInviteBody {
 
   @IsString()
   public readonly nonce: string;
+
+  @Type(() => CommunityModerationLogBody)
+  @ValidateNested()
+  public readonly moderationLog: CommunityModerationLogBody;
 }

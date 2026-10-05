@@ -1,4 +1,7 @@
-import { IsIn, IsInt, IsObject, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsIn, IsInt, IsObject, Min, ValidateNested } from 'class-validator';
+
+import { CommunityModerationLogBody } from './CommunityModerationLogBody';
 
 export class PatchCommunityMembershipRequestBody {
   @IsIn(['accepted', 'declined'])
@@ -10,4 +13,8 @@ export class PatchCommunityMembershipRequestBody {
   @IsInt()
   @Min(0)
   public readonly updatedAt: number;
+
+  @Type(() => CommunityModerationLogBody)
+  @ValidateNested()
+  public readonly moderationLog: CommunityModerationLogBody;
 }

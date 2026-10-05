@@ -2,8 +2,16 @@ import CommunityChannelDeleter from '@app/contexts/communities/application/delet
 import { CommunityChannelDeleteMessage } from '@app/contexts/communities/application/delete-channel/messages/CommunityChannelDeleteMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  Delete,
+  JsonController,
+  Param,
+  Req,
+  Res,
+} from 'routing-controllers';
 
+import { DeleteCommunityChannelBody } from '../bodies/DeleteCommunityChannelBody';
 import { CommunityViewModel } from '../view-model/CommunityViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
@@ -17,6 +25,7 @@ export class DeleteCommunityChannelRoute extends CommunityRouteSupport {
   public async deleteChannel(
     @Param('communityId') communityId: string,
     @Param('channelId') channelId: string,
+    @Body() body: DeleteCommunityChannelBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
@@ -26,6 +35,7 @@ export class DeleteCommunityChannelRoute extends CommunityRouteSupport {
         communityId,
         channelId,
         actorIdentityId.valueOf(),
+        body.moderationLog,
       ),
     );
 

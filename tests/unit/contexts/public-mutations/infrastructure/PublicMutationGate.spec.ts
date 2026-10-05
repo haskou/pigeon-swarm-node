@@ -3,11 +3,13 @@ import { CommunityInvite } from '@app/contexts/communities/domain/entities/invit
 import CommunityInviteRepository from '@app/contexts/communities/domain/repositories/CommunityInviteRepository';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
+import { CommunityModerationLogId } from '@app/contexts/communities/domain/value-objects/CommunityModerationLogId';
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
 import CommunityChannelMessageMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageMutationPolicy';
 import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy';
 import CommunityInviteMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy';
 import CommunityInviteUseMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy';
+import CommunityModerationLogMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityModerationLogMutationPolicy';
 import CommunityMembershipRequestMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
@@ -1188,6 +1190,190 @@ describe('PublicMutationGate over community channel messages', () => {
 
     await expect(
       gate.accepts('messages', await sign(message, 'put', 1)),
+    ).resolves.toBe(false);
+  });
+});
+
+describe('PublicMutationGate over community moderation logs', () => {
+  const moderator =
+    'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=';
+  const member = 'MCowBQYDK2VwAyEACdZwo16pCFQ1jxy5u2ZIOlVxcrx8QTHKDcLqGfWRgFk=';
+  const communityId = '550e8400-e29b-41d4-a716-446655440000';
+  const createdAt = 1780000000000;
+  const target = { id: member, type: 'member' };
+  const id = CommunityModerationLogId.derive(
+    communityId,
+    moderator,
+    'member_banned',
+    target.type,
+    target.id,
+    createdAt,
+  ).valueOf();
+  const log = {
+    action: 'member_banned',
+    actorIdentityId: moderator,
+    communityId,
+    createdAt,
+    details: { reason: 'spam' },
+    id,
+    scopeType: 'community_moderation_log',
+    target,
+  };
+  const authorization = mock<PublicMutationAuthorAuthorization>();
+  const communityRepository = mock<CommunityRepository>();
+  const community = mock<Community>();
+  let gate: PublicMutationGate;
+
+  const sign = async (
+    payload: Record<string, unknown>,
+    author: string,
+    kind: 'put' | 'delete' = 'put',
+  ): Promise<Record<string, unknown>> => {
+    const device = await KeyPair.generate();
+    const body = {
+      author: {
+        deviceCredential: device.toPrimitives().publicKey,
+        identityId: author,
+      },
+      kind,
+      operationId: 'operation-1'.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor: PublicMutationProof.digestOf({ previous: 1 }),
+      recordId: payload.id as string,
+      sequence: 1,
+      store: 'moderationLogs',
+      version: 1,
+    } as const;
+
+    return PublicMutationRecord.withProof(
+      payload,
+      PublicMutationProof.signed(
+        body,
+        device.sign(PublicMutationProof.signingContentOf(body)),
+      ),
+    );
+  };
+
+  beforeEach(() => {
+    authorization.isAuthorized.mockResolvedValue(true);
+    communityRepository.findById.mockResolvedValue(community);
+    community.assertCanRecordModerationAction.mockReset();
+    gate = new PublicMutationGate(new PublicMutationVerifier(authorization), [
+      new CommunityModerationLogMutationPolicy(communityRepository as never),
+    ]);
+  });
+
+  it('admits an entry signed by the permitted actor', async () => {
+    await expect(
+      gate.accepts('moderationLogs', await sign(log, moderator)),
+    ).resolves.toBe(true);
+    const [actor, action, details] =
+      community.assertCanRecordModerationAction.mock.calls[0];
+
+    expect([actor.valueOf(), action.valueOf(), details]).toEqual([
+      expect.stringContaining(moderator),
+      'member_banned',
+      { reason: 'spam' },
+    ]);
+  });
+
+  it('rejects an unsigned entry', async () => {
+    await expect(gate.accepts('moderationLogs', log)).resolves.toBe(false);
+  });
+
+  it('rejects a forged tombstone of an entry, even signed by its actor', async () => {
+    const tombstone = {
+      action: log.action,
+      actorIdentityId: moderator,
+      communityId,
+      id,
+      removed: true,
+      scopeType: 'community_moderation_log',
+    };
+
+    await expect(
+      gate.accepts(
+        'moderationLogs',
+        await sign(tombstone, moderator, 'delete'),
+      ),
+    ).resolves.toBe(false);
+    await expect(
+      gate.accepts(
+        'moderationLogs',
+        await sign({ ...log, removed: true }, moderator, 'delete'),
+      ),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects an entry signed by someone other than its actor', async () => {
+    await expect(
+      gate.accepts('moderationLogs', await sign(log, member)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects an entry whose id is not derived from its signed fields', async () => {
+    await expect(
+      gate.accepts(
+        'moderationLogs',
+        await sign({ ...log, id: '123456789012345678901234' }, moderator),
+      ),
+    ).resolves.toBe(false);
+    await expect(
+      gate.accepts(
+        'moderationLogs',
+        await sign({ ...log, createdAt: createdAt + 1 }, moderator),
+      ),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a proof copied onto another entry', async () => {
+    const signed = await sign(log, moderator);
+    const copied = {
+      ...signed,
+      action: 'member_unbanned',
+      id: CommunityModerationLogId.derive(
+        communityId,
+        moderator,
+        'member_unbanned',
+        target.type,
+        target.id,
+        createdAt,
+      ).valueOf(),
+    };
+
+    await expect(gate.accepts('moderationLogs', copied)).resolves.toBe(false);
+  });
+
+  it('rejects an entry the actor has no permission to record', async () => {
+    community.assertCanRecordModerationAction.mockImplementation(() => {
+      throw new Error('forbidden');
+    });
+
+    await expect(
+      gate.accepts('moderationLogs', await sign(log, moderator)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects an entry with an unknown action or target type', async () => {
+    await expect(
+      gate.accepts(
+        'moderationLogs',
+        await sign({ ...log, action: 'made_up' }, moderator),
+      ),
+    ).resolves.toBe(false);
+    await expect(
+      gate.accepts(
+        'moderationLogs',
+        await sign({ ...log, target: { id: member, type: 'galaxy' } }, moderator),
+      ),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects entries of an unknown community', async () => {
+    communityRepository.findById.mockResolvedValue(undefined);
+
+    await expect(
+      gate.accepts('moderationLogs', await sign(log, moderator)),
     ).resolves.toBe(false);
   });
 });

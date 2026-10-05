@@ -2,7 +2,6 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 
 import { Community } from '../../domain/Community';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
-import EmptyCommunityDeleter from '../delete-empty-community/EmptyCommunityDeleter';
 import CommunityFinder from '../find-community/CommunityFinder';
 import { CommunityLeaveMessage } from './messages/CommunityLeaveMessage';
 
@@ -10,7 +9,6 @@ export default class CommunityLeaver {
   constructor(
     private readonly communityFinder: CommunityFinder,
     private readonly communityRepository: CommunityRepository,
-    private readonly emptyCommunityDeleter: EmptyCommunityDeleter,
     private readonly eventPublisher: DomainEventPublisher,
   ) {}
 
@@ -22,7 +20,7 @@ export default class CommunityLeaver {
     if (community.hasMembers()) {
       await this.communityRepository.save(community);
     } else {
-      await this.emptyCommunityDeleter.delete(community);
+      await this.communityRepository.delete(community);
     }
 
     await this.eventPublisher.publish(community.pullDomainEvents());

@@ -26,8 +26,6 @@ export default class CommunityRoleUpdater {
       message.name,
       message.permissions,
     );
-    await this.communityRepository.save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
     await this.moderationLogRecorder.record(
       community,
       message.actorIdentityId,
@@ -36,8 +34,11 @@ export default class CommunityRoleUpdater {
         CommunityModerationTargetType.ROLE,
         message.roleId,
       ),
+      message.moderationLog,
       { name: message.name.valueOf(), permissions: message.permissionValues },
     );
+    await this.communityRepository.save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;
   }

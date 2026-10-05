@@ -3,6 +3,7 @@ import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/
 import CommunityChannelMessageReactionMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageReactionMutationPolicy';
 import CommunityInviteMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy';
 import CommunityInviteUseMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy';
+import CommunityModerationLogMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityModerationLogMutationPolicy';
 import CommunityMembershipRequestMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy';
 import ConversationMessageMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageMutationPolicy';
 import ConversationMessagePinMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy';
@@ -37,6 +38,7 @@ export default class PublicMutationGateInitializer {
     private readonly communityInvites: CommunityInviteMutationPolicy,
     private readonly communityInviteUses: CommunityInviteUseMutationPolicy,
     private readonly communityMembershipRequests: CommunityMembershipRequestMutationPolicy,
+    private readonly communityModerationLogs: CommunityModerationLogMutationPolicy,
     private readonly polls: PollMutationPolicy,
     private readonly pollVotes: PollVoteMutationPolicy,
     private readonly pollCloses: PollCloseMutationPolicy,
@@ -59,6 +61,7 @@ export default class PublicMutationGateInitializer {
         this.communityInvites,
         this.communityInviteUses,
         this.communityMembershipRequests,
+        this.communityModerationLogs,
         this.polls,
         this.pollVotes,
         this.pollCloses,
