@@ -5,7 +5,9 @@ import PigeonApplication from '@app/apps/PigeonApplication';
 import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import CallParticipantLeaseExpirationRegistrar from '@app/contexts/calls/application/expire-participant-leases/CallParticipantLeaseExpirationRegistrar';
+import CommunityFinder from '@app/contexts/communities/application/find-community/CommunityFinder';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
 import { CommunityModerationLogId } from '@app/contexts/communities/domain/value-objects/CommunityModerationLogId';
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
@@ -57,6 +59,7 @@ import {
 import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import FormData from 'form-data';
 
+import { signCommunityOperation } from '../../support/signCommunityOperation';
 import IPFSDefinition from './IPFSDefinition';
 import RestClient from './RestClient';
 import { RestResponse } from './RestResponse';
@@ -665,10 +668,10 @@ export default class Definitions {
     method: string,
     path: string,
     keyPair: KeyPair,
+    createdAt: number,
   ): void {
     const body = JSON.parse(this.body ?? '{}');
     const actorIdentityId = keyPair.toPrimitives().publicKey;
-    const createdAt = Date.now();
     const entry = this.communityModerationLogFor(
       method,
       path,
@@ -715,6 +718,320 @@ export default class Definitions {
     });
   }
 
+  private communityOperationFor(
+    method: string,
+    path: string,
+    body: Record<string, unknown>,
+    actorIdentityId: string,
+    createdAt: number,
+  ): { action: string; args: Record<string, unknown> } | undefined {
+    type Spec = { action: string; args: Record<string, unknown> };
+    const communityId = String(this.communityId);
+    const decoded = (match: RegExpExecArray, index = 1): string =>
+      decodeURIComponent(match[index]);
+    const optional = (
+      values: Record<string, unknown>,
+    ): Record<string, unknown> =>
+      Object.fromEntries(
+        Object.entries(values).filter(([, value]) => value !== undefined),
+      );
+    const rules: [
+      string,
+      RegExp,
+      (match: RegExpExecArray) => Spec | undefined,
+    ][] = [
+      [
+        'POST',
+        /^\/communities\/[^/]+\/channels\/(text|voice)$/,
+        (match) => ({
+          action: 'channel_created',
+          args: {
+            channelId: CommunityChannelId.derive(
+              communityId,
+              actorIdentityId,
+              createdAt,
+            ).valueOf(),
+            name: body.name,
+            type: match[1],
+          },
+        }),
+      ],
+      [
+        'PATCH',
+        /^\/communities\/[^/]+\/channels\/([^/]+)$/,
+        (match) => ({
+          action: 'channel_renamed',
+          args: { channelId: decoded(match), name: body.name },
+        }),
+      ],
+      [
+        'DELETE',
+        /^\/communities\/[^/]+\/channels\/([^/]+)$/,
+        (match) => ({
+          action: 'channel_deleted',
+          args: { channelId: decoded(match) },
+        }),
+      ],
+      [
+        'PATCH',
+        /^\/communities\/[^/]+\/channels\/([^/]+)\/permissions$/,
+        (match) => ({
+          action: 'channel_permissions_updated',
+          args: {
+            channelId: decoded(match),
+            visibleRoleIds: body.visibleRoleIds,
+          },
+        }),
+      ],
+      [
+        'POST',
+        /^\/communities\/[^/]+\/roles$/,
+        () => ({
+          action: 'role_created',
+          args: {
+            name: body.name,
+            permissions: body.permissions,
+            roleId: CommunityRoleId.derive(
+              communityId,
+              actorIdentityId,
+              createdAt,
+            ).valueOf(),
+          },
+        }),
+      ],
+      [
+        'PATCH',
+        /^\/communities\/[^/]+\/roles\/([^/]+)$/,
+        (match) => ({
+          action: 'role_updated',
+          args: {
+            name: body.name,
+            permissions: body.permissions,
+            roleId: decoded(match),
+          },
+        }),
+      ],
+      [
+        'DELETE',
+        /^\/communities\/[^/]+\/roles\/([^/]+)$/,
+        (match) => ({
+          action: 'role_deleted',
+          args: { roleId: decoded(match) },
+        }),
+      ],
+      [
+        'PUT',
+        /^\/communities\/[^/]+\/members\/([^/]+)\/roles$/,
+        (match) => ({
+          action: 'member_roles_updated',
+          args: { identityId: decoded(match), roleIds: body.roleIds },
+        }),
+      ],
+      [
+        'POST',
+        /^\/communities\/[^/]+\/bans$/,
+        () => ({
+          action: 'member_banned',
+          args: { identityId: body.identityId },
+        }),
+      ],
+      [
+        'DELETE',
+        /^\/communities\/[^/]+\/bans\/([^/]+)$/,
+        (match) => ({
+          action: 'member_unbanned',
+          args: { identityId: decoded(match) },
+        }),
+      ],
+      [
+        'DELETE',
+        /^\/communities\/[^/]+\/members\/([^/]+)\/kick$/,
+        (match) => ({
+          action: 'member_kicked',
+          args: { identityId: decoded(match) },
+        }),
+      ],
+      [
+        'DELETE',
+        /^\/communities\/[^/]+\/members\/me$/,
+        () => ({
+          action: 'member_left',
+          args: { identityId: actorIdentityId },
+        }),
+      ],
+      [
+        'PATCH',
+        /^\/communities\/[^/]+$/,
+        () => ({
+          action: 'community_updated',
+          args: optional({
+            autoJoinEnabled: body.autoJoinEnabled,
+            avatar: body.avatar,
+            banner: body.banner,
+            description: body.description,
+            discoverable: body.discoverable,
+            name: body.name,
+          }),
+        }),
+      ],
+      [
+        'POST',
+        /^\/communities\/invites\/([^/]+)\/accept$/,
+        (match) => ({
+          action: 'member_joined',
+          args: {
+            identityId: actorIdentityId,
+            method: 'invite_link',
+            reference: decoded(match),
+          },
+        }),
+      ],
+      [
+        'POST',
+        /^\/communities\/[^/]+\/join-requests$/,
+        () => ({
+          action: 'member_joined',
+          args: { identityId: actorIdentityId, method: 'automatic' },
+        }),
+      ],
+      [
+        'PATCH',
+        /^\/communities\/membership-requests\/[^/]+$/,
+        () => {
+          const request = this.communityMembershipRequest as Record<
+            string,
+            string
+          >;
+
+          return body.status === 'accepted'
+            ? {
+                action: 'member_joined',
+                args: {
+                  identityId: request.identityId,
+                  method:
+                    request.type === 'request' ? 'approval' : 'invitation',
+                  reference: request.id,
+                },
+              }
+            : undefined;
+        },
+      ],
+    ];
+    const pathname = path.split('?')[0];
+
+    for (const [ruleMethod, pattern, build] of rules) {
+      const match = ruleMethod === method ? pattern.exec(pathname) : null;
+
+      if (match) {
+        return build(match);
+      }
+    }
+
+    return undefined;
+  }
+
+  private async communityFrontier(communityId: string): Promise<string[]> {
+    return Kernel.di
+      .getService<CommunityFinder>(CommunityFinder)
+      .findFrontier(new CommunityId(communityId));
+  }
+
+  /** The `operation` a client attaches to a community creation: the signed genesis. */
+  private signCommunityGenesis(
+    body: Record<string, unknown>,
+    keyPair: KeyPair,
+    createdAt: number,
+  ): Record<string, unknown> {
+    const ownerIdentityId = new IdentityId(
+      keyPair.toPrimitives().publicKey,
+    ).valueOf();
+    const networkId = String(body.networkId);
+    const nonce = randomUUID().replace(/-/g, '');
+    const communityId = CommunityId.derive(
+      networkId,
+      ownerIdentityId,
+      nonce,
+    ).valueOf();
+    const signed = signCommunityOperation({
+      action: 'community_created',
+      args: {
+        autoJoinEnabled: body.autoJoinEnabled ?? false,
+        description: body.description,
+        discoverable: body.discoverable ?? true,
+        name: body.name,
+        nonce,
+        visibility: body.visibility ?? 'private',
+        ...(body.avatar ? { avatar: body.avatar } : {}),
+        ...(body.banner ? { banner: body.banner } : {}),
+      },
+      communityId,
+      createdAt,
+      networkId,
+      parents: [],
+      signer: {
+        deviceCredential: keyPair.toPrimitives().publicKey,
+        deviceKeyPair: keyPair,
+        id: ownerIdentityId,
+      },
+    });
+
+    return { ...body, nonce, operation: signed.body };
+  }
+
+  /** Adds the client-signed community operation to a community mutation body. */
+  private async attachCommunityOperation(
+    method: string,
+    path: string,
+    keyPair: KeyPair,
+    createdAt: number,
+  ): Promise<void> {
+    const body = JSON.parse(this.body ?? '{}');
+    const actorIdentityId = new IdentityId(
+      keyPair.toPrimitives().publicKey,
+    ).valueOf();
+    const pathname = path.split('?')[0];
+
+    if (body.operation) {
+      return;
+    }
+
+    if (method === 'POST' && pathname === '/communities/') {
+      this.body = JSON.stringify(
+        this.signCommunityGenesis(body, keyPair, createdAt),
+      );
+
+      return;
+    }
+
+    const spec = this.communityOperationFor(
+      method,
+      path,
+      body,
+      actorIdentityId,
+      createdAt,
+    );
+
+    if (!spec || !this.communityId) {
+      return;
+    }
+
+    const signed = signCommunityOperation({
+      action: spec.action,
+      args: spec.args,
+      communityId: this.communityId,
+      createdAt,
+      networkId: String(this.currentNetworkId),
+      parents: await this.communityFrontier(this.communityId),
+      signer: {
+        deviceCredential: keyPair.toPrimitives().publicKey,
+        deviceKeyPair: keyPair,
+        id: actorIdentityId,
+      },
+    });
+
+    this.body = JSON.stringify({ ...body, operation: signed.body });
+  }
+
   private async signCurrentRequest(
     method: string,
     path: string,
@@ -724,8 +1041,10 @@ export default class Definitions {
   ): Promise<void> {
     const signerKeyPair = await this.resolveSignerKeyPair(keyPair);
     const signerIdentityId = this.resolveSignerIdentityId(identityId);
+    const createdAt = Date.now();
 
-    this.attachCommunityModerationLog(method, path, signerKeyPair);
+    await this.attachCommunityOperation(method, path, signerKeyPair, createdAt);
+    this.attachCommunityModerationLog(method, path, signerKeyPair, createdAt);
     const verifier = new SignedHttpRequestVerifier();
     const signedRequestPayload = verifier.getCanonicalPayload(
       method,
