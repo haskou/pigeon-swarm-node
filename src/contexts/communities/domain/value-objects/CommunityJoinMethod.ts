@@ -46,4 +46,13 @@ export class CommunityJoinMethod extends Enum<string> {
       this.isEqual(CommunityJoinMethod.INVITE_LINK)
     );
   }
+
+  /** Whether a signed record outside the operation log must allow the join. */
+  public requiresReference(): boolean {
+    return (
+      this.isEqual(CommunityJoinMethod.APPROVAL) ||
+      this.isEqual(CommunityJoinMethod.INVITATION) ||
+      this.isEqual(CommunityJoinMethod.INVITE_LINK)
+    );
+  }
 }

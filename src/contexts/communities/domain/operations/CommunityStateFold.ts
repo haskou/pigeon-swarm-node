@@ -164,39 +164,8 @@ export class CommunityStateFold {
     return {
       community,
       deleted,
-      frontier: CommunityStateFold.frontierOf([...operations]),
+      frontier: CommunityStateFold.frontierOf(ordered),
       skipped,
     };
-  }
-
-  /**
-   * Applies `candidate` to the state of its causal past and returns the
-   * resulting community. Throws when the author is not permitted there, which
-   * is how a forged operation is refused before it is stored.
-   */
-  public static authorize(
-    known: CommunityOperation[],
-    candidate: CommunityOperation,
-  ): Community {
-    const past = CommunityStateFold.fold(
-      CommunityStateFold.closureOf(known, candidate.getParents()),
-    );
-
-    if (candidate.isGenesis()) {
-      assert(known.length === 0, new InvalidCommunityOperationError());
-
-      return CommunityOperationApplier.create(candidate);
-    }
-
-    assert(
-      past.community && !past.deleted,
-      new InvalidCommunityOperationError(),
-    );
-
-    const community = Community.fromPrimitives(past.community.toPrimitives());
-
-    CommunityOperationApplier.apply(community, candidate);
-
-    return community;
   }
 }

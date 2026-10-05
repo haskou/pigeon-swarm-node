@@ -1,88 +1,21 @@
 import { CommunityOperation } from '@app/contexts/communities/domain/operations/CommunityOperation';
 import { CommunityStateFold } from '@app/contexts/communities/domain/operations/CommunityStateFold';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityOperationAction } from '@app/contexts/communities/domain/value-objects/CommunityOperationAction';
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
-const owner = new IdentityId(
-  'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
-);
-const alice = new IdentityId(
-  'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=',
-);
-const mallory = new IdentityId(
-  'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=',
-);
-const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440000');
-const nonce = 'genesis-nonce';
-const communityId = CommunityId.derive(
-  networkId.valueOf(),
-  owner.valueOf(),
+import {
+  alice,
+  ban,
+  communityId,
+  genesis,
+  join,
+  mallory,
+  networkId,
   nonce,
-);
-
-function operation(
-  action: CommunityOperationAction,
-  author: IdentityId,
-  args: Record<string, unknown>,
-  parents: CommunityOperation[],
-  createdAt = 1,
-): CommunityOperation {
-  return CommunityOperation.create({
-    action,
-    args,
-    authorIdentityId: author,
-    communityId,
-    createdAt,
-    networkId,
-    parents: parents.map((parent) => parent.getHash()),
-  });
-}
-
-function genesis(autoJoinEnabled = false): CommunityOperation {
-  return operation(
-    CommunityOperationAction.COMMUNITY_CREATED,
-    owner,
-    {
-      autoJoinEnabled,
-      description: 'A community',
-      discoverable: true,
-      name: 'Community',
-      nonce,
-      visibility: 'public',
-    },
-    [],
-  );
-}
-
-function join(
-  parents: CommunityOperation[],
-  member: IdentityId,
-  author = owner,
-): CommunityOperation {
-  return operation(
-    CommunityOperationAction.MEMBER_JOINED,
-    author,
-    { identityId: member.valueOf(), method: 'added' },
-    parents,
-  );
-}
-
-function ban(
-  parents: CommunityOperation[],
-  member: IdentityId,
-  author = owner,
-): CommunityOperation {
-  return operation(
-    CommunityOperationAction.MEMBER_BANNED,
-    author,
-    { identityId: member.valueOf() },
-    parents,
-  );
-}
+  operation,
+  owner,
+} from './CommunityOperationFixtures';
 
 function stateOf(operations: CommunityOperation[]) {
   const state = CommunityStateFold.fold(operations);
@@ -199,27 +132,17 @@ describe('CommunityStateFold', () => {
     );
   });
 
-  it('refuses to authorize a forged operation against its causal past', () => {
-    const created = genesis();
-    const forgedBan = ban([created], owner, mallory);
+  it('keeps only the lowest-digest genesis when the owner signs two for one id', () => {
+    const first = genesis();
+    const second = genesis(true);
+    const lowest = [first, second].sort((left, right) =>
+      left.getHash() < right.getHash() ? -1 : 1,
+    )[0];
+    const state = CommunityStateFold.fold([first, second]);
 
-    expect(() => CommunityStateFold.authorize([created], forgedBan)).toThrow();
-    expect(
-      CommunityStateFold.authorize([created], ban([created], alice)),
-    ).toBeDefined();
-  });
-
-  it('refuses an operation whose parents are unknown', () => {
-    const created = genesis();
-    const orphan = join([join([created], alice)], mallory);
-
-    expect(() => CommunityStateFold.authorize([created], orphan)).toThrow();
-  });
-
-  it('refuses a second genesis for a known community', () => {
-    expect(() =>
-      CommunityStateFold.authorize([genesis()], genesis(true)),
-    ).toThrow();
+    expect(state.community?.isAutoJoinEnabled()).toBe(lowest === second);
+    expect(state.skipped).toHaveLength(1);
+    expect(state.skipped).not.toContain(lowest.getHash());
   });
 
   it('turns a leave of the last member into a tombstone no later operation can undo', () => {

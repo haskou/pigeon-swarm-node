@@ -31,7 +31,7 @@ export default class OrbitDBReplicatedStateRegistry {
   private static readonly DOCUMENT_STORE_NAMES: OrbitDBReplicatedDocumentStoreName[] =
     [
       'calls',
-      'communities',
+      'communityOperations',
       'conversations',
       'identities',
       'contentReplication',
@@ -51,6 +51,7 @@ export default class OrbitDBReplicatedStateRegistry {
   // TODO: Move indexed head merge policy to OrbitDBHeadIndex before adding
   // per-index record identity or freshness rules here.
   private static readonly INDEX_HEAD_COLLECTION_NAMES = new Set([
+    'communityOperations',
     'conversations',
     'messages',
     'moderationLogs',
@@ -240,14 +241,28 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
+  /**
+   * A record can depend on another record of the same batch (an operation
+   * lists its parents), so rejected records are offered again while the
+   * batch keeps admitting new ones. The order of the batch never matters.
+   */
   private async admittedRecords(
     collection: string,
     records: Record<string, unknown>[],
   ): Promise<Record<string, unknown>[]> {
     const admitted: Record<string, unknown>[] = [];
+    let pending = records;
 
-    for (const record of records) {
-      if (await this.admitRecord(collection, record)) admitted.push(record);
+    while (pending.length > 0) {
+      const rejected: Record<string, unknown>[] = [];
+
+      for (const record of pending) {
+        if (await this.admitRecord(collection, record)) admitted.push(record);
+        else rejected.push(record);
+      }
+
+      if (rejected.length === pending.length) break;
+      pending = rejected;
     }
 
     return admitted;
@@ -1523,8 +1538,8 @@ export default class OrbitDBReplicatedStateRegistry {
     storeName: OrbitDBReplicatedDocumentStoreName;
     value: string;
   }): string | undefined {
-    if (related.storeName === 'communities') {
-      return `community:${related.value}`;
+    if (related.storeName === 'communityOperations') {
+      return `community-operation-index:${related.value}`;
     }
 
     if (related.storeName === 'conversations') {
@@ -1584,7 +1599,7 @@ export default class OrbitDBReplicatedStateRegistry {
     const communityId = this.stringValue(document, 'communityId');
 
     if (communityId) {
-      return { storeName: 'communities', value: communityId };
+      return { storeName: 'communityOperations', value: communityId };
     }
 
     const conversationId = this.stringValue(document, 'conversationId');

@@ -42,7 +42,8 @@ import { CommunityOperationArgumentReader } from './CommunityOperationArgumentRe
  * - role_deleted: roleId
  * - member_roles_updated: identityId, roleIds
  * - member_banned, member_unbanned, member_kicked, member_left: identityId
- * - member_joined: identityId, method, reference? (omitted only for `added`)
+ * - member_joined: identityId, method, reference? (only for `approval`,
+ *   `invitation` and `invite_link`: the id of the signed record that allows it)
  */
 export class CommunityOperationApplier {
   private static readonly HANDLERS: Record<
@@ -314,8 +315,8 @@ export class CommunityOperationApplier {
     const method = new CommunityJoinMethod(reader.string('method'));
 
     assert(
-      (reader.optionalString('reference') === undefined) ===
-        method.isEqual(CommunityJoinMethod.ADDED),
+      (reader.optionalString('reference') !== undefined) ===
+        method.requiresReference(),
       new InvalidCommunityOperationError(),
     );
 
