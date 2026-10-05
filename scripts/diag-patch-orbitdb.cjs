@@ -7,8 +7,11 @@ const root = process.env.ODB_ROOT || path.resolve(__dirname, '../node_modules/@o
 const HELPER =
   "const dg = (m) => process.stdout.write(`DIAG-ODB ${new Date().toISOString().slice(14, 23)} ${m}\\n`);\n";
 
-const patch = (file, edits, prependHelper = true) => {
-  const target = path.join(root, file);
+const bitswapRoot =
+  process.env.BITSWAP_ROOT || path.resolve(__dirname, '../node_modules/@helia/bitswap/dist/src');
+
+const patch = (file, edits, prependHelper = true, base = root) => {
+  const target = path.join(base, file);
   let source = fs.readFileSync(target, 'utf8');
 
   for (const [from, to] of edits) {
@@ -21,6 +24,76 @@ const patch = (file, edits, prependHelper = true) => {
 
   fs.writeFileSync(target, (prependHelper ? HELPER : '') + source);
 };
+
+patch(
+  'want-list.js',
+  [
+    [
+      `        let entry = this.wants.get(cidStr);
+        if (entry == null) {
+            entry = {
+                cid,
+                priority: options.priority ?? 1,`,
+      `        let entry = this.wants.get(cidStr);
+        const ae0 = Date.now();
+        dg(\`bitswap addEntry start cid=\${String(cid).slice(-8)} type=\${options.wantType} existing=\${entry != null} existingCancel=\${entry?.cancel} sendInflight=\${!!this.__sending}\`);
+        if (entry == null) {
+            entry = {
+                cid,
+                priority: options.priority ?? 1,`,
+    ],
+    [
+      `        // broadcast changes
+        await this.sendMessagesDebounced();
+        try {
+            if (options.wantType === WantType.WantBlock) {`,
+      `        // broadcast changes
+        await this.sendMessagesDebounced();
+        dg(\`bitswap addEntry listening cid=\${String(cid).slice(-8)} after=\${Date.now() - ae0}ms\`);
+        try {
+            if (options.wantType === WantType.WantBlock) {`,
+    ],
+    [
+      `        await this.sendingMessages?.promise;`,
+      `        const sd0 = Date.now();
+        await this.sendingMessages?.promise;
+        if (Date.now() - sd0 > 5) dg(\`bitswap sendMessagesDebounced waited \${Date.now() - sd0}ms for in-flight send\`);`,
+    ],
+    [
+      `        this.sendingMessages = pDefer();`,
+      `        this.sendingMessages = pDefer();
+        this.__sending = true;
+        const sm0 = Date.now();
+        dg(\`bitswap sendMessages start peers=\${this.peers.size} wants=\${this.wants.size}\`);`,
+    ],
+    [
+      `                await this.network.sendMessage(peerId, message, {
+                    onProgress: evt => {`,
+      `                const pm0 = Date.now();
+                dg(\`bitswap sendMessage start peer=\${String(peerId).slice(-6)} wants=\${message.wantlist.size}\`);
+                await this.network.sendMessage(peerId, message, {
+                    onProgress: evt => {`,
+    ],
+    [
+      `                // update list of messages sent to remote`,
+      `                dg(\`bitswap sendMessage done peer=\${String(peerId).slice(-6)} took=\${Date.now() - pm0}ms\`);
+                // update list of messages sent to remote`,
+    ],
+    [
+      `        this.sendingMessages.resolve();`,
+      `        this.__sending = false;
+        dg(\`bitswap sendMessages end took=\${Date.now() - sm0}ms\`);
+        this.sendingMessages.resolve();`,
+    ],
+    [
+      `            this.safeDispatchEvent('block', {`,
+      `            dg(\`bitswap block event cid=\${String(cid).slice(-8)} sendInflight=\${!!this.__sending} wantExists=\${this.wants.has(uint8ArrayToString(cid.multihash.bytes, 'base64'))}\`);
+            this.safeDispatchEvent('block', {`,
+    ],
+  ],
+  true,
+  bitswapRoot,
+);
 
 patch('database.js', [
   [
