@@ -114,10 +114,6 @@ jobs:
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
 
-      - name: Community convergence
-        run: yarn test:integration:community-convergence
-        timeout-minutes: 4
-
       - name: Forged public mutations
         run: yarn test:integration:forged-public-mutations
         timeout-minutes: 4

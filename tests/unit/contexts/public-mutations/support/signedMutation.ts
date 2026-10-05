@@ -21,7 +21,10 @@ export async function signedMutation(options: {
     kind: options.kind,
     operationId: `op-${options.store}-${options.sequence}`.padEnd(22, '0'),
     payloadDigest: PublicMutationProof.digestOf(options.payload ?? {}),
-    predecessor: PublicMutationProof.digestOf({ previous: options.sequence }),
+    predecessor:
+      options.sequence === 0
+        ? null
+        : PublicMutationProof.digestOf({ previous: options.sequence }),
     recordId: options.recordId,
     sequence: options.sequence,
     store: options.store,

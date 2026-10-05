@@ -9,9 +9,9 @@ import { InvalidCommunityOperationError } from '../../../domain/errors/InvalidCo
 import { CommunityOperation } from '../../../domain/operations/CommunityOperation';
 import { CommunityOperationArgumentReader } from '../../../domain/operations/CommunityOperationArgumentReader';
 import { CommunityOperationLedger } from '../../../domain/operations/CommunityOperationLedger';
+import { CommunityOperationPrimitives } from '../../../domain/operations/CommunityOperationPrimitives';
 import { CommunityJoinMethod } from '../../../domain/value-objects/CommunityJoinMethod';
 import { CommunityOperationAction } from '../../../domain/value-objects/CommunityOperationAction';
-import { CommunityOperationPrimitives } from '../../../domain/operations/CommunityOperationPrimitives';
 
 /**
  * Admits a signed community operation only when its author was permitted to
@@ -54,7 +54,8 @@ export default class CommunityOperationMutationPolicy extends PublicMutationPoli
   ): Promise<Record<string, unknown>[]> {
     return this.registry.queryDocuments(
       'requests',
-      (document) => typeof document.id === 'string' && ids.includes(document.id),
+      (document) =>
+        typeof document.id === 'string' && ids.includes(document.id),
       [operation.getNetworkId().valueOf()],
     );
   }
@@ -112,7 +113,9 @@ export default class CommunityOperationMutationPolicy extends PublicMutationPoli
   private async assertJoinReference(
     operation: CommunityOperation,
   ): Promise<void> {
-    if (!operation.getAction().isEqual(CommunityOperationAction.MEMBER_JOINED)) {
+    if (
+      !operation.getAction().isEqual(CommunityOperationAction.MEMBER_JOINED)
+    ) {
       return;
     }
 
@@ -146,7 +149,8 @@ export default class CommunityOperationMutationPolicy extends PublicMutationPoli
 
   private ledgerOf(operation: CommunityOperation): CommunityOperationLedger {
     const communityId = operation.getCommunityId().valueOf();
-    const ledger = this.ledgers.get(communityId) ?? new CommunityOperationLedger();
+    const ledger =
+      this.ledgers.get(communityId) ?? new CommunityOperationLedger();
 
     this.ledgers.set(communityId, ledger);
 

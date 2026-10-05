@@ -459,11 +459,63 @@ package "communities/domain" {
   class CommunityModerationAction
   class CommunityModerationTargetType
 
+  class CommunityOperation {
+    - id: string
+    - communityId: CommunityId
+    - networkId: NetworkId
+    - authorIdentityId: IdentityId
+    - action: CommunityOperationAction
+    - args: CommunityOperationArguments
+    - parents: string[]
+    - createdAt: Timestamp
+    + create(attributes): CommunityOperation
+    + fromPrimitives(primitives): CommunityOperation
+    + recordIdOf(communityId, hash): string
+    + isGenesis(): boolean
+  }
+
+  class CommunityOperationApplier {
+    + create(genesis): Community
+    + apply(community, operation): void
+  }
+
+  class CommunityOperationLedger {
+    + admit(operation): void
+    + frontier(): string[]
+    + sorted(): CommunityOperation[]
+  }
+
+  class CommunityStateFold {
+    + fold(operations): CommunityState
+  }
+
+  class CommunityState {
+    + community: Community?
+    + deleted: boolean
+    + frontier: string[]
+    + skipped: string[]
+  }
+
+  note right of CommunityStateFold
+    Total order = topological over parents,
+    ties broken by lower digest. Every operation is
+    re-authorized against its causal past when applied;
+    one that was not allowed then is skipped.
+    The last member leaving is the tombstone.
+  end note
+
+  class CommunityOperationAction
+  class CommunityOperationArguments
+  class CommunityJoinMethod {
+    + requiresReference(): boolean
+  }
+
   interface CommunityRepository {
     + findDiscoverable(options): Community[]
     + findById(id): Community?
     + findByMember(identityId): Community[]
-    + save(community): void
+    + findFrontier(id): string[]
+    + save(operation, proof): void
   }
   interface CommunityChannelMessageRepository {
     + findById(communityId, channelId, messageId): CommunityChannelMessage?
@@ -488,7 +540,7 @@ package "communities/domain" {
     + findByCommunityAndIdentity(communityId, identityId): CommunityMembershipRequest[]
     + findById(id): CommunityMembershipRequest?
     + findByIdentity(identityId): CommunityMembershipRequest[]
-    + findByOwnedCommunities(ownerIdentityId): CommunityMembershipRequest[]
+    + findByCommunities(communityIds): CommunityMembershipRequest[]
     + save(request): void
   }
 
@@ -559,6 +611,13 @@ CommunityChannelMessageReaction --> CommunityId
   CommunityMembershipRequest --> CommunityRequestType
   CommunityMembershipRequest --> CommunityMembershipRequestTimestamps
   CommunityRepository ..> Community
+  CommunityRepository ..> CommunityOperation
+  CommunityOperationApplier ..> CommunityOperation
+  CommunityOperationApplier ..> Community
+  CommunityOperationLedger ..> CommunityOperation
+  CommunityStateFold ..> CommunityOperationLedger
+  CommunityStateFold ..> CommunityOperationApplier
+  CommunityStateFold ..> CommunityState
   CommunityChannelMessageRepository ..> CommunityChannelMessage
   CommunityChannelMessageReactionRepository ..> CommunityChannelMessageReaction
   CommunityInviteRepository ..> CommunityInvite
@@ -583,7 +642,7 @@ package "communities/infrastructure" {
   class LocalPrivateCommunityRepository
   class PrivateCommunityPublicStorageGuard
   class OrbitDBCommunityRepository
-  class OrbitDBCommunityDocument
+  class CommunityOperationMutationPolicy
   class OrbitDBCommunityChannelMessageRepository
   class OrbitDBCommunityChannelMessageDocument
   class OrbitDBCommunityMessageReactionRepository
@@ -604,7 +663,9 @@ package "communities/infrastructure" {
   OrbitDBCommunityRepository --> PrivateCommunityPublicStorageGuard
   PrivateCommunityPublicStorageGuard --> PrivateAuthorizationRepository
   PrivateCommunityPublicStorageGuard --> PrivateAuthorizationStorageCoordinator
-  OrbitDBCommunityRepository --> OrbitDBCommunityDocument
+  OrbitDBCommunityRepository --> CommunityStateFold : read model
+  CommunityOperationMutationPolicy --> CommunityOperationLedger : causal past
+  CommunityOperationMutationPolicy --> CommunityOperationApplier : re-authorize
   OrbitDBCommunityChannelMessageRepository ..|> CommunityChannelMessageRepository
   OrbitDBCommunityChannelMessageRepository --> OrbitDBCommunityChannelMessageDocument
   OrbitDBCommunityMessageReactionRepository ..|> CommunityChannelMessageReactionRepository

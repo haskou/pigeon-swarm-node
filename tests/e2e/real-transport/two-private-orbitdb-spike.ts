@@ -1,6 +1,5 @@
 import 'reflect-metadata';
 import 'module-alias/register';
-
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
 import IpfsIdentityMapper from '@app/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import OrbitDBIdentityMetadataIndex from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex';
@@ -9,7 +8,6 @@ import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value
 import OrbitDBKeychainMetadataIndex from '@app/contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataIndex';
 import OrbitDBKeychainMetadataProjection from '@app/contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataProjection';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import Kernel from '@haskou/ddd-kernel';
 import {
   heliaRuntimeAdapter,
   HeliaInstance,
@@ -20,6 +18,7 @@ import { IPFSOptions } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFS
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import Kernel from '@haskou/ddd-kernel';
 import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
 import { generateKeyPairSync } from 'crypto';
 import fs from 'fs-extra';
@@ -49,10 +48,13 @@ type OrbitDatabase = {
     on(event: 'update', handler: (entry: OrbitEntry) => void): void;
   };
   get?(key: string): Promise<{ key?: string; value: unknown } | unknown>;
-  put?(keyOrDocument: string | Record<string, unknown>, value?: unknown): Promise<string>;
-  query?(matcher: (document: Record<string, unknown>) => boolean): Promise<
-    Array<Record<string, unknown>>
-  >;
+  put?(
+    keyOrDocument: string | Record<string, unknown>,
+    value?: unknown,
+  ): Promise<string>;
+  query?(
+    matcher: (document: Record<string, unknown>) => boolean,
+  ): Promise<Array<Record<string, unknown>>>;
 };
 
 type OrbitDbInstance = {
@@ -109,7 +111,7 @@ type PrivateOrbitNode = {
 };
 
 type StoreAddresses = {
-  communities: string;
+  communityOperations: string;
   heads: string;
   identities: string;
   keychains: string;
@@ -119,7 +121,7 @@ type StoreAddresses = {
 };
 
 type PrivateOrbitDbStores = {
-  communities: OrbitDatabase;
+  communityOperations: OrbitDatabase;
   heads: OrbitDatabase;
   identities: OrbitDatabase;
   keychains: OrbitDatabase;
@@ -193,11 +195,7 @@ async function main(): Promise<void> {
 
     await assertQueryViability(requesterStores, identityCid);
     await assertProjectedMetadataIndexes(requesterStores, identityCid);
-    await assertUnauthorizedWriteIsRejected(
-      orbitdbCore,
-      intruder,
-      writers,
-    );
+    await assertUnauthorizedWriteIsRejected(orbitdbCore, intruder, writers);
 
     const restartedRequester = await restartOrbitDb(
       orbitdbCore,
@@ -214,10 +212,11 @@ async function main(): Promise<void> {
     console.info(
       JSON.stringify(
         {
-          replicatedStoreCount: Object.keys(getAddresses(providerStores)).length,
-          providerPeerId: getPeerId(provider.helia),
-          requesterPeerId: getPeerId(requester.helia),
           projectedMetadataIndexes: ['identities', 'keychains'],
+          providerPeerId: getPeerId(provider.helia),
+          replicatedStoreCount: Object.keys(getAddresses(providerStores))
+            .length,
+          requesterPeerId: getPeerId(requester.helia),
           result: 'PASS',
           stores: Object.keys(getAddresses(providerStores)),
           transportDsn: 'private-ipfs-circuit-relay://orbitdb',
@@ -288,10 +287,10 @@ async function openStores(
   const AccessController = orbitdbCore.IPFSAccessController({ write: writers });
 
   const stores = {
-    communities: await openDocuments(
+    communityOperations: await openDocuments(
       orbitdbCore,
       orbitdb,
-      `${NETWORK_ID}/documents/communities`,
+      `${NETWORK_ID}/documents/community-operations`,
       AccessController,
     ),
     heads: await orbitdb.open(`${NETWORK_ID}/keyvalue/heads`, {
@@ -365,7 +364,9 @@ function assertSameStoreAddresses(
   const providerAddresses = getAddresses(providerStores);
   const requesterAddresses = getAddresses(requesterStores);
 
-  for (const key of Object.keys(providerAddresses) as Array<keyof StoreAddresses>) {
+  for (const key of Object.keys(providerAddresses) as Array<
+    keyof StoreAddresses
+  >) {
     if (providerAddresses[key] !== requesterAddresses[key]) {
       throw new Error(
         `OrbitDB deterministic store address mismatch for ${key}: ` +
@@ -377,7 +378,7 @@ function assertSameStoreAddresses(
 
 function getAddresses(stores: PrivateOrbitDbStores): StoreAddresses {
   return {
-    communities: stores.communities.address,
+    communityOperations: stores.communityOperations.address,
     heads: stores.heads.address,
     identities: stores.identities.address,
     keychains: stores.keychains.address,
@@ -539,8 +540,8 @@ async function writeReplicatedDocuments(
     networks: [NETWORK_ID],
     profile: {
       ...current.profile,
-      name: 'Hasko',
       handle: 'hasko',
+      name: 'Hasko',
     },
   });
   const identityDocument = new IpfsIdentityMapper().toDocument(identity);
@@ -578,7 +579,7 @@ async function writeReplicatedDocuments(
     receivedAt: 5,
     version: 5,
   });
-  await stores.communities.put?.({
+  await stores.communityOperations.put?.({
     channelIds: ['channel-general'],
     id: 'community-alpha',
     memberIds: ['identity-hasko', 'identity-maria'],
@@ -749,10 +750,7 @@ async function assertProjectedMetadataIndexes(
         (await heliaRuntimeAdapter.createJsonSha256Cid(document)).toString(),
       ),
   } as IPFS;
-  const identityIndex = new OrbitDBIdentityMetadataIndex(
-    registry,
-    ipfsManager,
-  );
+  const identityIndex = new OrbitDBIdentityMetadataIndex(registry, ipfsManager);
   const keychainIndex = new OrbitDBKeychainMetadataIndex(registry);
 
   await assertMetadataHeadsAreAbsent(stores);
@@ -858,7 +856,10 @@ async function waitFor<T>(
   throw new Error(`Timed out waiting for ${label}`);
 }
 
-async function waitForPromise<T>(promise: Promise<T>, label: string): Promise<T> {
+async function waitForPromise<T>(
+  promise: Promise<T>,
+  label: string,
+): Promise<T> {
   let timeout: ReturnType<typeof setTimeout> | undefined;
 
   try {

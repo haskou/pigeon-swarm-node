@@ -1,9 +1,11 @@
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Community } from '../domain/Community';
+import { CommunityOperation } from '../domain/operations/CommunityOperation';
 import CommunityRepository from '../domain/repositories/CommunityRepository';
 import { CommunityId } from '../domain/value-objects/CommunityId';
 import LocalPrivateCommunityRepository from './local-db/LocalPrivateCommunityRepository';
@@ -38,14 +40,6 @@ export default class CommunityRepositoryRouter extends CommunityRepository {
         );
       },
     );
-  }
-
-  public async delete(community: Community): Promise<void> {
-    if (await this.isProtected(community.getId())) {
-      throw new InvalidPrivateAuthorizationError();
-    }
-
-    await this.publicRepository.delete(community);
   }
 
   public async findDiscoverable(options: {
@@ -95,15 +89,24 @@ export default class CommunityRepositoryRouter extends CommunityRepository {
     return [...communities.values()];
   }
 
-  public async findSyncable(): Promise<Community[]> {
-    return this.removeProtected(await this.publicRepository.findSyncable());
+  public findFrontier(id: CommunityId): Promise<string[]> {
+    return this.storageCoordinator.exclusively(
+      id.valueOf(),
+      async (): Promise<string[]> =>
+        (await this.isProtected(id))
+          ? []
+          : this.publicRepository.findFrontier(id),
+    );
   }
 
-  public async save(community: Community): Promise<void> {
-    if (await this.isProtected(community.getId())) {
+  public async save(
+    operation: CommunityOperation,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    if (await this.isProtected(operation.getCommunityId())) {
       throw new InvalidPrivateAuthorizationError();
     }
 
-    await this.publicRepository.save(community);
+    await this.publicRepository.save(operation, proof);
   }
 }

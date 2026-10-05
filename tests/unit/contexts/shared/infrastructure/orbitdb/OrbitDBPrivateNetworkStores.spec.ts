@@ -88,7 +88,7 @@ describe('OrbitDBPrivateNetworkStores', () => {
 
     expect(stores.getSynchronizationStores().map(({ name }) => name)).toEqual([
       'calls',
-      'communities',
+      'communityOperations',
       'contentReplication',
       'conversations',
       'heads',
