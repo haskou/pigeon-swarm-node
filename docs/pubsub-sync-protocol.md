@@ -441,8 +441,19 @@ Signed public mutations (pins, reactions and the other governed collections):
   revisions are not evaluated), and so are community permissions, so records of
   a member who later lost the permission stop being admitted. A head rejected
   because the community has not replicated yet is re-admitted after 2 s, 10 s
-  and 60 s. Authorization lookups are coalesced for 1 s per batch. Other record
-  types (#316) are still unsigned.
+  and 60 s. Authorization lookups are coalesced for 1 s per batch.
+
+### Collections that are not signed by users
+
+These collections hold records written by the node itself with no user key to
+sign them, so they are not part of the signed path and are not forced into it:
+`calls` (live call state), `keychains`, `identities` and device authorization
+metadata, `contentReplication` and replica claims, `notifications`, and the
+`conversations` metadata document (rewritten by the node with a node-chosen
+`updatedAt` on every saved message). Protected and private communities stay on
+the local repository and never enter the public path. Making any of these
+user-signed needs its own redesign (for example a signed creation record for
+conversation metadata).
 
 ## Protected control frame delivery
 
