@@ -17,9 +17,10 @@ export class CommunityRole {
   public static create(
     name: CommunityRoleName,
     permissions: CommunityPermission[],
+    id: CommunityRoleId = CommunityRoleId.generate(),
   ): CommunityRole {
     return new CommunityRole(
-      CommunityRoleId.generate(),
+      id,
       name,
       permissions,
       false,

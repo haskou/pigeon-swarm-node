@@ -21,8 +21,6 @@ export default class CommunityMemberBanner {
     const community = await this.communityFinder.findById(message.communityId);
 
     community.banMember(message.actorIdentityId, message.targetIdentityId);
-    await this.communityRepository.save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
     await this.moderationLogRecorder.record(
       community,
       message.actorIdentityId,
@@ -31,8 +29,11 @@ export default class CommunityMemberBanner {
         CommunityModerationTargetType.MEMBER,
         message.targetIdentityId,
       ),
+      message.moderationLog,
       { reason: message.reason },
     );
+    await this.communityRepository.save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;
   }

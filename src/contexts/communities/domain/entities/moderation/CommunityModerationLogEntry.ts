@@ -8,23 +8,32 @@ import { CommunityModerationLogDetails } from './CommunityModerationLogDetails';
 import { CommunityModerationTarget } from './CommunityModerationTarget';
 
 export class CommunityModerationLogEntry {
-  public static record(
+  /** The id derives from the signed fields, so no other author can claim it. */
+  public static create(
     communityId: CommunityId,
     actorIdentityId: IdentityId,
     action: CommunityModerationAction,
     target: CommunityModerationTarget,
-    details: CommunityModerationLogDetails = new CommunityModerationLogDetails(
-      {},
-    ),
+    details: CommunityModerationLogDetails,
+    createdAt: Timestamp,
   ): CommunityModerationLogEntry {
+    const { id, type } = target.toPrimitives();
+
     return new CommunityModerationLogEntry(
-      CommunityModerationLogId.generate(),
+      CommunityModerationLogId.derive(
+        communityId.valueOf(),
+        actorIdentityId.valueOf(),
+        action.valueOf(),
+        type,
+        id,
+        createdAt.valueOf(),
+      ),
       communityId,
       actorIdentityId,
       action,
       target,
       details,
-      Timestamp.now(),
+      createdAt,
     );
   }
 

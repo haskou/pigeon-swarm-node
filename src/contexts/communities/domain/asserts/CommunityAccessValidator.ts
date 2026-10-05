@@ -166,6 +166,19 @@ export class CommunityAccessValidator {
     this.assertHasPermission(actor, CommunityPermission.MANAGE_MESSAGES);
   }
 
+  public assertCanRecordMessageDeletion(
+    actor: IdentityId,
+    targetMessageAuthor: IdentityId,
+  ): void {
+    this.assertIsMember(actor);
+
+    if (actor.isEqual(targetMessageAuthor)) {
+      return;
+    }
+
+    this.assertHasPermission(actor, CommunityPermission.MANAGE_MESSAGES);
+  }
+
   public assertCanManageMessages(
     identityId: IdentityId,
     channelId: CommunityChannelId,

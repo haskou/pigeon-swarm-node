@@ -52,16 +52,22 @@ export class CommunityChannels {
     return channel;
   }
 
-  public addText(name: CommunityChannelName): CommunityTextChannel {
-    const channel = CommunityTextChannel.create(name);
+  public addText(
+    name: CommunityChannelName,
+    id?: CommunityChannelId,
+  ): CommunityTextChannel {
+    const channel = CommunityTextChannel.create(name, id);
 
     this.textChannels.push(channel);
 
     return channel;
   }
 
-  public addVoice(name: CommunityChannelName): CommunityVoiceChannel {
-    const channel = CommunityVoiceChannel.create(name);
+  public addVoice(
+    name: CommunityChannelName,
+    id?: CommunityChannelId,
+  ): CommunityVoiceChannel {
+    const channel = CommunityVoiceChannel.create(name, id);
 
     this.voiceChannels.push(channel);
 

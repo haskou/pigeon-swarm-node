@@ -27,8 +27,6 @@ export default class CommunityMemberRolesAssigner {
       message.targetIdentityId,
       message.roleIds,
     );
-    await this.communityRepository.save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
     await this.moderationLogRecorder.record(
       community,
       message.actorIdentityId,
@@ -37,8 +35,11 @@ export default class CommunityMemberRolesAssigner {
         CommunityModerationTargetType.MEMBER,
         message.targetIdentityId,
       ),
+      message.moderationLog,
       { roleIds: message.roleIdValues },
     );
+    await this.communityRepository.save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;
   }

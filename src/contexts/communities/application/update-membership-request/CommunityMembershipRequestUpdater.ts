@@ -33,9 +33,9 @@ export default class CommunityMembershipRequestUpdater {
       membershipRequest,
       message.updatedAt,
     );
+    await this.recordModerationLog(community, membershipRequest, message);
     await this.communityRepository.save(community);
     await this.eventPublisher.publish(community.pullDomainEvents());
-    await this.recordModerationLog(community, membershipRequest, message);
   }
 
   private async declineRequest(
@@ -69,6 +69,7 @@ export default class CommunityMembershipRequestUpdater {
         CommunityModerationTargetType.MEMBERSHIP_REQUEST,
         membershipRequest.getId(),
       ),
+      message.moderationLog,
       {
         identityId: membershipRequest.getIdentityId().valueOf(),
         type: membershipRequest.getType().valueOf(),

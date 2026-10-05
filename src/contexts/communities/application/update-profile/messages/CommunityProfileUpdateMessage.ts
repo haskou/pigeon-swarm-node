@@ -5,6 +5,10 @@ import { CommunityBanner } from '../../../domain/value-objects/CommunityBanner';
 import { CommunityDescription } from '../../../domain/value-objects/CommunityDescription';
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
 import { CommunityName } from '../../../domain/value-objects/CommunityName';
+import {
+  CommunityModerationLogMutation,
+  CommunityModerationLogMutationPrimitives,
+} from '../../record-moderation-log/CommunityModerationLogMutation';
 
 export class CommunityProfileUpdateMessage {
   public readonly actorIdentityId: IdentityId;
@@ -14,6 +18,7 @@ export class CommunityProfileUpdateMessage {
   public readonly communityId: CommunityId;
   public readonly description: CommunityDescription;
   public readonly discoverable?: boolean;
+  public readonly moderationLog: CommunityModerationLogMutation;
   public readonly name: CommunityName;
 
   constructor(params: {
@@ -24,6 +29,7 @@ export class CommunityProfileUpdateMessage {
     communityId: string;
     description: string;
     discoverable?: boolean;
+    moderationLog: CommunityModerationLogMutationPrimitives;
     name: string;
   }) {
     const {
@@ -34,6 +40,7 @@ export class CommunityProfileUpdateMessage {
       communityId,
       description,
       discoverable,
+      moderationLog,
       name,
     } = params;
 
@@ -45,5 +52,6 @@ export class CommunityProfileUpdateMessage {
     this.avatar = avatar ? new CommunityAvatar(avatar) : undefined;
     this.banner = banner ? new CommunityBanner(banner) : undefined;
     this.discoverable = discoverable;
+    this.moderationLog = new CommunityModerationLogMutation(moderationLog);
   }
 }

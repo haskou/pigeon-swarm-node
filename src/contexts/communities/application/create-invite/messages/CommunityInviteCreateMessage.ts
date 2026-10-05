@@ -6,6 +6,10 @@ import { CommunityId } from '../../../domain/value-objects/CommunityId';
 import { CommunityInviteMaxUses } from '../../../domain/value-objects/CommunityInviteMaxUses';
 import { CommunityInviteNonce } from '../../../domain/value-objects/CommunityInviteNonce';
 import { EncryptedCommunityInviteKey } from '../../../domain/value-objects/EncryptedCommunityInviteKey';
+import {
+  CommunityModerationLogMutation,
+  CommunityModerationLogMutationPrimitives,
+} from '../../record-moderation-log/CommunityModerationLogMutation';
 
 export class CommunityInviteCreateMessage {
   public readonly actorIdentityId: IdentityId;
@@ -14,6 +18,7 @@ export class CommunityInviteCreateMessage {
   public readonly encryptedCommunityKey?: EncryptedCommunityInviteKey;
   public readonly expiresAt?: Timestamp;
   public readonly maxUses?: CommunityInviteMaxUses;
+  public readonly moderationLog: CommunityModerationLogMutation;
   public readonly nonce: CommunityInviteNonce;
   public readonly proof: PublicMutationProof;
 
@@ -23,6 +28,7 @@ export class CommunityInviteCreateMessage {
     nonce: string,
     createdAt: number,
     proof: unknown,
+    moderationLog: CommunityModerationLogMutationPrimitives,
     expiresAt?: number,
     maxUses?: number,
     encryptedCommunityKey?: PrimitiveOf<EncryptedCommunityInviteKey>,
@@ -35,6 +41,7 @@ export class CommunityInviteCreateMessage {
       : undefined;
     this.expiresAt = expiresAt ? new Timestamp(expiresAt) : undefined;
     this.maxUses = maxUses ? new CommunityInviteMaxUses(maxUses) : undefined;
+    this.moderationLog = new CommunityModerationLogMutation(moderationLog);
     this.nonce = new CommunityInviteNonce(nonce);
     this.proof = PublicMutationProof.fromPrimitives(proof);
   }

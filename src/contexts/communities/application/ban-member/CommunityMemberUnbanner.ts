@@ -21,8 +21,6 @@ export default class CommunityMemberUnbanner {
     const community = await this.communityFinder.findById(message.communityId);
 
     community.unbanMember(message.actorIdentityId, message.targetIdentityId);
-    await this.communityRepository.save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
     await this.moderationLogRecorder.record(
       community,
       message.actorIdentityId,
@@ -31,7 +29,10 @@ export default class CommunityMemberUnbanner {
         CommunityModerationTargetType.MEMBER,
         message.targetIdentityId,
       ),
+      message.moderationLog,
     );
+    await this.communityRepository.save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;
   }

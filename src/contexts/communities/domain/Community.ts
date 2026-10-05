@@ -50,6 +50,7 @@ import { CommunityDescription } from './value-objects/CommunityDescription';
 import { CommunityId } from './value-objects/CommunityId';
 import { CommunityInviteMaxUses } from './value-objects/CommunityInviteMaxUses';
 import { CommunityInviteNonce } from './value-objects/CommunityInviteNonce';
+import { CommunityModerationAction } from './value-objects/CommunityModerationAction';
 import { CommunityName } from './value-objects/CommunityName';
 import { CommunityPermission } from './value-objects/CommunityPermission';
 import { CommunityRoleId } from './value-objects/CommunityRoleId';
@@ -500,6 +501,53 @@ export class Community extends AggregateRoot {
     this.createAccessValidator().assertCanViewModerationLog(identityId);
   }
 
+  /** Whether `actor` may author a moderation log entry for `action`. */
+  public assertCanRecordModerationAction(
+    actor: IdentityId,
+    action: CommunityModerationAction,
+    details: Record<string, unknown>,
+  ): void {
+    const validator = this.createAccessValidator();
+
+    switch (action.valueOf()) {
+      case CommunityModerationAction.CHANNEL_CREATED.valueOf():
+      case CommunityModerationAction.CHANNEL_DELETED.valueOf():
+      case CommunityModerationAction.CHANNEL_PERMISSIONS_UPDATED.valueOf():
+      case CommunityModerationAction.CHANNEL_RENAMED.valueOf():
+        validator.assertCanManageChannels(actor);
+        break;
+      case CommunityModerationAction.COMMUNITY_UPDATED.valueOf():
+        CommunityOwnerValidator.assertIsOwner(this.ownerIdentityId, actor);
+        break;
+      case CommunityModerationAction.INVITATION_CREATED.valueOf():
+      case CommunityModerationAction.INVITE_LINK_CREATED.valueOf():
+        validator.assertCanCreateInvite(actor);
+        break;
+      case CommunityModerationAction.MEMBER_BANNED.valueOf():
+      case CommunityModerationAction.MEMBER_UNBANNED.valueOf():
+        validator.assertCanBanMembers(actor);
+        break;
+      case CommunityModerationAction.MEMBER_ROLES_UPDATED.valueOf():
+      case CommunityModerationAction.ROLE_CREATED.valueOf():
+      case CommunityModerationAction.ROLE_DELETED.valueOf():
+      case CommunityModerationAction.ROLE_UPDATED.valueOf():
+        validator.assertCanManageRoles(actor);
+        break;
+      case CommunityModerationAction.MEMBERSHIP_REQUEST_ACCEPTED.valueOf():
+        validator.assertCanApproveMembers(actor);
+        break;
+      case CommunityModerationAction.MEMBERSHIP_REQUEST_DECLINED.valueOf():
+        validator.assertCanRejectMembers(actor);
+        break;
+      case CommunityModerationAction.MESSAGE_DELETED.valueOf():
+        validator.assertCanRecordMessageDeletion(
+          actor,
+          new IdentityId(details.targetMessageAuthorId as string),
+        );
+        break;
+    }
+  }
+
   public leave(member: IdentityId): void {
     this.createAccessValidator().assertIsMember(member);
     assert(
@@ -539,10 +587,11 @@ export class Community extends AggregateRoot {
   public addTextChannel(
     actor: IdentityId,
     name: CommunityChannelName,
+    id?: CommunityChannelId,
   ): CommunityTextChannel {
     this.createAccessValidator().assertCanManageChannels(actor);
 
-    const channel = this.channels.addText(name);
+    const channel = this.channels.addText(name, id);
 
     this.record(
       new CommunityChannelWasCreatedEvent(this.id.valueOf(), {
@@ -557,10 +606,11 @@ export class Community extends AggregateRoot {
   public addVoiceChannel(
     actor: IdentityId,
     name: CommunityChannelName,
+    id?: CommunityChannelId,
   ): CommunityVoiceChannel {
     this.createAccessValidator().assertCanManageChannels(actor);
 
-    const channel = this.channels.addVoice(name);
+    const channel = this.channels.addVoice(name, id);
 
     this.record(
       new CommunityChannelWasCreatedEvent(this.id.valueOf(), {
@@ -625,10 +675,11 @@ export class Community extends AggregateRoot {
     actor: IdentityId,
     name: CommunityRoleName,
     permissions: CommunityPermission[],
+    id?: CommunityRoleId,
   ): CommunityRole {
     this.createAccessValidator().assertCanManageRoles(actor);
 
-    const role = this.membership.addRole(name, permissions);
+    const role = this.membership.addRole(name, permissions, id);
 
     this.record(
       new CommunityWasUpdatedEvent(this.id.valueOf(), {

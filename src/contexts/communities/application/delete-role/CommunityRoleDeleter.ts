@@ -21,8 +21,6 @@ export default class CommunityRoleDeleter {
     const community = await this.communityFinder.findById(message.communityId);
 
     community.deleteRole(message.actorIdentityId, message.roleId);
-    await this.communityRepository.save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
     await this.moderationLogRecorder.record(
       community,
       message.actorIdentityId,
@@ -31,7 +29,10 @@ export default class CommunityRoleDeleter {
         CommunityModerationTargetType.ROLE,
         message.roleId,
       ),
+      message.moderationLog,
     );
+    await this.communityRepository.save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;
   }
