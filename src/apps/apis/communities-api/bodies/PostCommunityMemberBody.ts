@@ -1,5 +1,11 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsObject, IsString, Min, ValidateNested } from 'class-validator';
+import {
+  IsInt,
+  IsObject,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
 
 import { CommunityModerationLogBody } from './CommunityModerationLogBody';
 

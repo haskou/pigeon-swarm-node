@@ -47,7 +47,9 @@ export default class CommunityModerationLogMutationPolicy extends PublicMutation
 
     try {
       const entry = CommunityModerationLogEntry.fromPrimitives(
-        record as Parameters<typeof CommunityModerationLogEntry.fromPrimitives>[0],
+        record as Parameters<
+          typeof CommunityModerationLogEntry.fromPrimitives
+        >[0],
       );
       const { action, actorIdentityId, communityId, createdAt, id, target } =
         entry.toPrimitives();

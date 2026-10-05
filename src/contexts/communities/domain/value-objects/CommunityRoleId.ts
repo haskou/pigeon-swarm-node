@@ -12,7 +12,9 @@ export class CommunityRoleId extends StringValueObject {
   ): CommunityRoleId {
     return new CommunityRoleId(
       createHash('sha256')
-        .update(JSON.stringify(['role', communityId, creatorIdentityId, createdAt]))
+        .update(
+          JSON.stringify(['role', communityId, creatorIdentityId, createdAt]),
+        )
         .digest('hex')
         .slice(0, 24),
     );

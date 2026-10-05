@@ -507,75 +507,11 @@ export class Community extends AggregateRoot {
     action: CommunityModerationAction,
     details: Record<string, unknown>,
   ): void {
-    const validator = this.createAccessValidator();
-
-    switch (action.valueOf()) {
-      case CommunityModerationAction.CHANNEL_CREATED.valueOf():
-      case CommunityModerationAction.CHANNEL_DELETED.valueOf():
-      case CommunityModerationAction.CHANNEL_PERMISSIONS_UPDATED.valueOf():
-      case CommunityModerationAction.CHANNEL_RENAMED.valueOf():
-        validator.assertCanManageChannels(actor);
-        break;
-      case CommunityModerationAction.COMMUNITY_UPDATED.valueOf():
-        CommunityOwnerValidator.assertIsOwner(this.ownerIdentityId, actor);
-        break;
-      case CommunityModerationAction.INVITATION_CREATED.valueOf():
-      case CommunityModerationAction.INVITE_LINK_CREATED.valueOf():
-        validator.assertCanCreateInvite(actor);
-        break;
-      case CommunityModerationAction.MEMBER_BANNED.valueOf():
-      case CommunityModerationAction.MEMBER_UNBANNED.valueOf():
-        validator.assertCanBanMembers(actor);
-        break;
-      case CommunityModerationAction.MEMBER_ROLES_UPDATED.valueOf():
-      case CommunityModerationAction.ROLE_CREATED.valueOf():
-      case CommunityModerationAction.ROLE_DELETED.valueOf():
-      case CommunityModerationAction.ROLE_UPDATED.valueOf():
-        validator.assertCanManageRoles(actor);
-        break;
-      case CommunityModerationAction.MEMBERSHIP_REQUEST_ACCEPTED.valueOf():
-      case CommunityModerationAction.MEMBERSHIP_REQUEST_DECLINED.valueOf():
-        this.assertCanRecordMembershipRequestDecision(actor, action, details);
-        break;
-      case CommunityModerationAction.MESSAGE_DELETED.valueOf():
-        validator.assertCanRecordMessageDeletion(
-          actor,
-          new IdentityId(details.targetMessageAuthorId as string),
-        );
-        break;
-    }
-  }
-
-  /**
-   * Requests are decided by moderators; invitations by the invited identity,
-   * or (declines only) by whoever may create invitations.
-   */
-  private assertCanRecordMembershipRequestDecision(
-    actor: IdentityId,
-    action: CommunityModerationAction,
-    details: Record<string, unknown>,
-  ): void {
-    const validator = this.createAccessValidator();
-    const accepted =
-      action.valueOf() ===
-      CommunityModerationAction.MEMBERSHIP_REQUEST_ACCEPTED.valueOf();
-
-    if (details.type === 'request') {
-      if (accepted) {
-        validator.assertCanApproveMembers(actor);
-      } else {
-        validator.assertCanRejectMembers(actor);
-      }
-
-      return;
-    }
-
-    if (details.identityId === actor.valueOf()) {
-      return;
-    }
-
-    assert(!accepted, new CommunityRequestActorMismatchError());
-    validator.assertCanCreateInvite(actor);
+    this.createAccessValidator().assertCanRecordModerationAction(
+      actor,
+      action,
+      details,
+    );
   }
 
   public leave(member: IdentityId): void {

@@ -11,8 +11,11 @@ import { CommunityChannelMessageAuthorMismatchError } from '../errors/CommunityC
 import { CommunityChannelNotFoundError } from '../errors/CommunityChannelNotFoundError';
 import { CommunityMemberBannedError } from '../errors/CommunityMemberBannedError';
 import { CommunityMemberNotFoundError } from '../errors/CommunityMemberNotFoundError';
+import { CommunityRequestActorMismatchError } from '../errors/CommunityRequestActorMismatchError';
 import { CommunityChannelId } from '../value-objects/CommunityChannelId';
+import { CommunityModerationAction } from '../value-objects/CommunityModerationAction';
 import { CommunityPermission } from '../value-objects/CommunityPermission';
+import { CommunityOwnerValidator } from './CommunityOwnerValidator';
 import { CommunityPermissionValidator } from './CommunityPermissionValidator';
 
 export class CommunityAccessValidator {
@@ -55,6 +58,33 @@ export class CommunityAccessValidator {
       this.channels.hasVoice(channelId),
       new CommunityChannelNotFoundError(),
     );
+  }
+
+  /**
+   * Requests are decided by moderators; invitations by the invited identity,
+   * or (declines only) by whoever may create invitations.
+   */
+  private assertCanRecordMembershipRequestDecision(
+    actor: IdentityId,
+    accepted: boolean,
+    details: Record<string, unknown>,
+  ): void {
+    if (details.type === 'request') {
+      if (accepted) {
+        this.assertCanApproveMembers(actor);
+      } else {
+        this.assertCanRejectMembers(actor);
+      }
+
+      return;
+    }
+
+    if (details.identityId === actor.valueOf()) {
+      return;
+    }
+
+    assert(!accepted, new CommunityRequestActorMismatchError());
+    this.assertCanCreateInvite(actor);
   }
 
   public assertIsMember(identityId: IdentityId): void {
@@ -177,6 +207,45 @@ export class CommunityAccessValidator {
     }
 
     this.assertHasPermission(actor, CommunityPermission.MANAGE_MESSAGES);
+  }
+
+  public assertCanRecordModerationAction(
+    actor: IdentityId,
+    action: CommunityModerationAction,
+    details: Record<string, unknown>,
+  ): void {
+    const manageChannels = (): void => this.assertCanManageChannels(actor);
+    const manageRoles = (): void => this.assertCanManageRoles(actor);
+    const banMembers = (): void => this.assertCanBanMembers(actor);
+    const createInvite = (): void => this.assertCanCreateInvite(actor);
+    const requirements: Record<string, () => void> = {
+      [CommunityModerationAction.CHANNEL_CREATED.valueOf()]: manageChannels,
+      [CommunityModerationAction.CHANNEL_DELETED.valueOf()]: manageChannels,
+      [CommunityModerationAction.CHANNEL_PERMISSIONS_UPDATED.valueOf()]:
+        manageChannels,
+      [CommunityModerationAction.CHANNEL_RENAMED.valueOf()]: manageChannels,
+      [CommunityModerationAction.COMMUNITY_UPDATED.valueOf()]: () =>
+        CommunityOwnerValidator.assertIsOwner(this.ownerIdentityId, actor),
+      [CommunityModerationAction.INVITATION_CREATED.valueOf()]: createInvite,
+      [CommunityModerationAction.INVITE_LINK_CREATED.valueOf()]: createInvite,
+      [CommunityModerationAction.MEMBER_BANNED.valueOf()]: banMembers,
+      [CommunityModerationAction.MEMBER_ROLES_UPDATED.valueOf()]: manageRoles,
+      [CommunityModerationAction.MEMBER_UNBANNED.valueOf()]: banMembers,
+      [CommunityModerationAction.MEMBERSHIP_REQUEST_ACCEPTED.valueOf()]: () =>
+        this.assertCanRecordMembershipRequestDecision(actor, true, details),
+      [CommunityModerationAction.MEMBERSHIP_REQUEST_DECLINED.valueOf()]: () =>
+        this.assertCanRecordMembershipRequestDecision(actor, false, details),
+      [CommunityModerationAction.MESSAGE_DELETED.valueOf()]: () =>
+        this.assertCanRecordMessageDeletion(
+          actor,
+          new IdentityId(details.targetMessageAuthorId as string),
+        ),
+      [CommunityModerationAction.ROLE_CREATED.valueOf()]: manageRoles,
+      [CommunityModerationAction.ROLE_DELETED.valueOf()]: manageRoles,
+      [CommunityModerationAction.ROLE_UPDATED.valueOf()]: manageRoles,
+    };
+
+    requirements[action.valueOf()]?.();
   }
 
   public assertCanManageMessages(

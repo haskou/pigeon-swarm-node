@@ -19,12 +19,7 @@ export class CommunityRole {
     permissions: CommunityPermission[],
     id: CommunityRoleId = CommunityRoleId.generate(),
   ): CommunityRole {
-    return new CommunityRole(
-      id,
-      name,
-      permissions,
-      false,
-    );
+    return new CommunityRole(id, name, permissions, false);
   }
 
   public static fromPrimitives(

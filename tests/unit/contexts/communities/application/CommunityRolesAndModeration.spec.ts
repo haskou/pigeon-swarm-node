@@ -25,8 +25,7 @@ import { signedMutation } from '../../public-mutations/support/signedMutation';
 
 const COMMUNITY_ID = '550e8400-e29b-41d4-a716-446655440000';
 const ROLE_ID = '550e8400-e29b-41d4-a716-446655440001';
-const ACTOR_ID =
-  'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=';
+const ACTOR_ID = 'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=';
 const TARGET_ID =
   'MCowBQYDK2VwAyEACdZwo16pCFQ1jxy5u2ZIOlVxcrx8QTHKDcLqGfWRgFk=';
 
@@ -179,11 +178,7 @@ describe('Community role and moderation use cases', () => {
       message.actorIdentityId,
       message.name,
       message.permissions,
-      CommunityRoleId.derive(
-        COMMUNITY_ID,
-        ACTOR_ID,
-        moderationLog.createdAt,
-      ),
+      CommunityRoleId.derive(COMMUNITY_ID, ACTOR_ID, moderationLog.createdAt),
     );
     expect(moderationLogRecorder.record).toHaveBeenCalledWith(
       community,

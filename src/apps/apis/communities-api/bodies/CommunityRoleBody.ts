@@ -1,5 +1,10 @@
 import { Type } from 'class-transformer';
-import { ArrayUnique, IsArray, IsString, ValidateNested } from 'class-validator';
+import {
+  ArrayUnique,
+  IsArray,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 
 import { CommunityModerationLogBody } from './CommunityModerationLogBody';
 

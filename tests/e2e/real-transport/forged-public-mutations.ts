@@ -2,20 +2,27 @@ import 'reflect-metadata';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
+import { CommunityModerationLogDetails } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationLogDetails';
+import { CommunityModerationLogEntry } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationLogEntry';
+import { CommunityModerationTarget } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationTarget';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
 import { CommunityInviteNonce } from '@app/contexts/communities/domain/value-objects/CommunityInviteNonce';
+import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
+import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import OrbitDBCommunityChannelMessageMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityChannelMessageMapper';
 import OrbitDBCommunityInviteMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityInviteMapper';
 import OrbitDBCommunityChannelMessagePinRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessagePinRepository';
 import OrbitDBCommunityChannelMessageRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessageRepository';
 import OrbitDBCommunityInviteRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInviteRepository';
+import OrbitDBCommunityModerationLogRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityModerationLogRepository';
 import CommunityChannelMessageMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageMutationPolicy';
 import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy';
 import CommunityInviteMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy';
+import CommunityModerationLogMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityModerationLogMutationPolicy';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
@@ -69,7 +76,7 @@ import StickerRecentMutationPolicy from '@app/contexts/stickers/infrastructure/o
 import StickerSavedPackMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy';
 import Kernel from '@haskou/ddd-kernel';
 import { KeyPair, PrivateKey } from '@haskou/pigeon-swarm-crypto';
-import { Timestamp } from '@haskou/value-objects';
+import { StringValueObject, Timestamp } from '@haskou/value-objects';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { mkdtemp } from 'node:fs/promises';
@@ -91,6 +98,7 @@ type Replica = {
     stickerUserLibraries: OrbitDBDatabase;
     polls: OrbitDBDatabase;
     messages: OrbitDBDatabase;
+    moderationLogs: OrbitDBDatabase;
   };
   registry?: OrbitDBReplicatedStateRegistry;
   pins?: OrbitDBCommunityChannelMessagePinRepository;
@@ -101,6 +109,7 @@ type Replica = {
   stickerLibraries?: OrbitDBStickerUserLibraryRepository;
   polls?: OrbitDBPollRepository;
   messages?: OrbitDBCommunityChannelMessageRepository;
+  moderationLogs?: OrbitDBCommunityModerationLogRepository;
 };
 
 const networkId = randomUUID();
@@ -136,6 +145,18 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
       sync: false,
       type: 'keyvalue',
     }),
+    messages: await replica.orbitdb.open(`${networkId}/messages`, {
+      AccessController,
+      Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
+      sync: false,
+      type: 'documents',
+    }),
+    moderationLogs: await replica.orbitdb.open(`${networkId}/moderationLogs`, {
+      AccessController,
+      Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
+      sync: false,
+      type: 'documents',
+    }),
     notificationSettings: await replica.orbitdb.open(
       `${networkId}/notificationSettings`,
       {
@@ -145,6 +166,24 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
         type: 'documents',
       },
     ),
+    pins: await replica.orbitdb.open(`${networkId}/pins`, {
+      AccessController,
+      Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
+      sync: false,
+      type: 'documents',
+    }),
+    polls: await replica.orbitdb.open(`${networkId}/polls`, {
+      AccessController,
+      Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
+      sync: false,
+      type: 'documents',
+    }),
+    requests: await replica.orbitdb.open(`${networkId}/requests`, {
+      AccessController,
+      Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
+      sync: false,
+      type: 'documents',
+    }),
     stickerPacks: await replica.orbitdb.open(`${networkId}/stickerPacks`, {
       AccessController,
       Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
@@ -160,30 +199,6 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
         type: 'documents',
       },
     ),
-    requests: await replica.orbitdb.open(`${networkId}/requests`, {
-      AccessController,
-      Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
-      sync: false,
-      type: 'documents',
-    }),
-    polls: await replica.orbitdb.open(`${networkId}/polls`, {
-      AccessController,
-      Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
-      sync: false,
-      type: 'documents',
-    }),
-    messages: await replica.orbitdb.open(`${networkId}/messages`, {
-      AccessController,
-      Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
-      sync: false,
-      type: 'documents',
-    }),
-    pins: await replica.orbitdb.open(`${networkId}/pins`, {
-      AccessController,
-      Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
-      sync: false,
-      type: 'documents',
-    }),
   };
   for (const store of Object.values(replica.stores))
     store.events.on('error', () => undefined);
@@ -241,6 +256,15 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
       new PrivateAuthorizationStorageCoordinator(),
     ),
   );
+  replica.moderationLogs = new OrbitDBCommunityModerationLogRepository(
+    replica.registry,
+    new PrivateCommunityPublicStorageGuard(
+      {
+        findScope: (): Promise<undefined> => Promise.resolve(undefined),
+      } as never,
+      new PrivateAuthorizationStorageCoordinator(),
+    ),
+  );
   replica.stickerPacks = new OrbitDBStickerPackRepository(replica.registry);
   replica.stickerLibraries = new OrbitDBStickerUserLibraryRepository(
     replica.registry,
@@ -280,10 +304,11 @@ async function main(): Promise<void> {
       ),
   };
   const community = {
+    acceptSentChannelMessage: (): void => undefined,
     assertCanCreateInvite: (): void => undefined,
+    assertCanRecordModerationAction: (): void => undefined,
     authorizeTextChannelPollCreation: (): void => undefined,
     authorizeTextChannelPollVote: (): void => undefined,
-    acceptSentChannelMessage: (): void => undefined,
     manageChannelMessages: (): void => undefined,
     viewTextChannel: (): void => undefined,
   } as unknown as Community;
@@ -305,6 +330,7 @@ async function main(): Promise<void> {
       new ConversationMessagePinMutationPolicy(conversations),
       new NotificationScopeSettingsMutationPolicy(),
       new CommunityInviteMutationPolicy(communities as never),
+      new CommunityModerationLogMutationPolicy(communities as never),
       new PollMutationPolicy(pollAccess),
       new PollVoteMutationPolicy(pollAccess),
       new PollCloseMutationPolicy(pollAccess),
@@ -699,6 +725,73 @@ async function main(): Promise<void> {
     'forged unsigned invite rewrite must be ignored',
   );
   console.log('PASS forged invite rewrite rejected by the honest node');
+
+  stage = 'moderation logs are governed too';
+  const logCommunityId = new CommunityId(randomUUID());
+  const logEntry = CommunityModerationLogEntry.create(
+    logCommunityId,
+    identity,
+    CommunityModerationAction.MEMBER_BANNED,
+    CommunityModerationTarget.create(
+      new CommunityModerationTargetType('member'),
+      new StringValueObject('banned-identity'),
+    ),
+    new CommunityModerationLogDetails({ reason: 'spam' }),
+    new Timestamp(1780000000000),
+  );
+  const logPayload = {
+    ...logEntry.toPrimitives(),
+    scopeType: 'community_moderation_log',
+  };
+  const logBody = {
+    author: { deviceCredential: author, identityId: author },
+    kind: 'put',
+    operationId: 'forged-moderation-log-0'.padEnd(22, '0'),
+    payloadDigest: PublicMutationProof.digestOf(logPayload),
+    predecessor: null as string | null,
+    recordId: logPayload.id,
+    sequence: 0,
+    store: 'moderationLogs',
+    version: 1,
+  } as const;
+  const logProof = PublicMutationProof.signed(
+    logBody,
+    device.sign(PublicMutationProof.signingContentOf(logBody)),
+  );
+  const loggedReason = async (replica: Replica): Promise<unknown[]> =>
+    (await replica.moderationLogs!.findByCommunity(logCommunityId, 10)).map(
+      (entry) => entry.toPrimitives().details.reason,
+    );
+
+  await honest.moderationLogs!.save(logEntry, logProof);
+  await until('moderation log reached the malicious store', async () => {
+    const stored = await malicious.stores!.moderationLogs.query!(
+      (record) => record.id === logPayload.id,
+    );
+
+    return stored.length === 1;
+  });
+  await malicious.stores!.moderationLogs.put!({
+    ...logPayload,
+    details: { reason: 'rewritten history' },
+  });
+  await malicious.stores!.moderationLogs.put!({
+    ...logPayload,
+    removed: true,
+    updatedAt: Date.now() + 10 ** 12,
+  });
+  await malicious.stores!.moderationLogs.put!({
+    ...logPayload,
+    action: 'member_unbanned',
+    id: 'forged-unsigned-entry',
+  });
+  await pause(3000);
+  assert.deepEqual(
+    await loggedReason(honest),
+    ['spam'],
+    'forged unsigned moderation log writes must be ignored',
+  );
+  console.log('PASS forged moderation log writes rejected by the honest node');
 
   stage = 'polls are governed too';
   const pollScope = PollScope.communityChannel(

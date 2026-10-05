@@ -84,8 +84,8 @@ describe('OrbitDBCommunityModerationLogRepository', () => {
     expect(moderationLogs).toEqual([
       expect.objectContaining({
         id: entry.getId().valueOf(),
-        scopeType: 'community_moderation_log',
         proof: expect.objectContaining({ store: 'moderationLogs' }),
+        scopeType: 'community_moderation_log',
       }),
     ]);
     expect(

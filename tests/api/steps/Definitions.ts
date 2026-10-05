@@ -7,9 +7,9 @@ import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/Or
 import CallParticipantLeaseExpirationRegistrar from '@app/contexts/calls/application/expire-participant-leases/CallParticipantLeaseExpirationRegistrar';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
-import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 import { CommunityModerationLogId } from '@app/contexts/communities/domain/value-objects/CommunityModerationLogId';
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
+import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
@@ -435,7 +435,7 @@ export default class Definitions {
   private communityModerationLogFor(
     method: string,
     path: string,
-    body: Record<string, any>,
+    body: Record<string, unknown>,
     actorIdentityId: string,
     createdAt: number,
   ):
@@ -445,7 +445,18 @@ export default class Definitions {
         target: { id: string; type: string };
       }
     | undefined {
+    type Log = {
+      action: string;
+      details: Record<string, unknown>;
+      target: { id: string; type: string };
+    };
     const communityId = String(this.communityId);
+    const text = body as Record<string, string>;
+    const channelId = String(this.communityChannelId);
+    const roleId = String(this.communityRoleId);
+    const channel = (id: string) => ({ id, type: 'channel' });
+    const role = (id: string) => ({ id, type: 'role' });
+    const member = (id: string) => ({ id, type: 'member' });
     const derivedChannelId = CommunityChannelId.derive(
       communityId,
       actorIdentityId,
@@ -456,170 +467,194 @@ export default class Definitions {
       actorIdentityId,
       createdAt,
     ).valueOf();
-    const channel = (id: string) => ({ id, type: 'channel' });
-    const role = (id: string) => ({ id, type: 'role' });
-    const member = (id: string) => ({ id, type: 'member' });
-    const route = (pattern: RegExp) => pattern.exec(path.split('?')[0]);
+    const rules: [string, RegExp, (match: RegExpExecArray) => Log][] = [
+      [
+        'POST',
+        /^\/communities\/[^/]+\/channels\/(text|voice)$/,
+        (match) => ({
+          action: 'channel_created',
+          details: { name: body.name, type: match[1] },
+          target: channel(derivedChannelId),
+        }),
+      ],
+      [
+        'PATCH',
+        /^\/communities\/[^/]+\/channels\/[^/]+$/,
+        () => ({
+          action: 'channel_renamed',
+          details: { name: body.name },
+          target: channel(channelId),
+        }),
+      ],
+      [
+        'DELETE',
+        /^\/communities\/[^/]+\/channels\/[^/]+$/,
+        () => ({
+          action: 'channel_deleted',
+          details: { type: this.communityChannelType },
+          target: channel(channelId),
+        }),
+      ],
+      [
+        'PATCH',
+        /\/channels\/[^/]+\/permissions$/,
+        () => ({
+          action: 'channel_permissions_updated',
+          details: { visibleRoleIds: body.visibleRoleIds },
+          target: channel(channelId),
+        }),
+      ],
+      [
+        'POST',
+        /^\/communities\/[^/]+\/roles$/,
+        () => ({
+          action: 'role_created',
+          details: { name: body.name, permissions: body.permissions },
+          target: role(derivedRoleId),
+        }),
+      ],
+      [
+        'PATCH',
+        /^\/communities\/[^/]+\/roles\/[^/]+$/,
+        () => ({
+          action: 'role_updated',
+          details: { name: body.name, permissions: body.permissions },
+          target: role(roleId),
+        }),
+      ],
+      [
+        'DELETE',
+        /^\/communities\/[^/]+\/roles\/[^/]+$/,
+        () => ({
+          action: 'role_deleted',
+          details: {},
+          target: role(roleId),
+        }),
+      ],
+      [
+        'PUT',
+        /^\/communities\/[^/]+\/members\/([^/]+)\/roles$/,
+        (match) => ({
+          action: 'member_roles_updated',
+          details: { roleIds: body.roleIds },
+          target: member(decodeURIComponent(match[1])),
+        }),
+      ],
+      [
+        'POST',
+        /^\/communities\/[^/]+\/bans$/,
+        () => ({
+          action: 'member_banned',
+          details: { reason: body.reason },
+          target: member(text.identityId),
+        }),
+      ],
+      [
+        'DELETE',
+        /^\/communities\/[^/]+\/bans\/([^/]+)$/,
+        (match) => ({
+          action: 'member_unbanned',
+          details: {},
+          target: member(decodeURIComponent(match[1])),
+        }),
+      ],
+      [
+        'POST',
+        /^\/communities\/[^/]+\/invites$/,
+        () => ({
+          action: 'invite_link_created',
+          details: {
+            encryptedCommunityKeyStored: Boolean(body.encryptedCommunityKey),
+            expiresAt: body.expiresAt,
+            maxUses: body.maxUses,
+          },
+          target: {
+            id: CommunityInviteToken.derive(
+              communityId,
+              actorIdentityId,
+              text.nonce,
+            ).valueOf(),
+            type: 'invite',
+          },
+        }),
+      ],
+      [
+        'POST',
+        /^\/communities\/[^/]+\/members$/,
+        () => ({
+          action: 'invitation_created',
+          details: { identityId: body.identityId },
+          target: {
+            id: CommunityRequestId.derive(
+              communityId,
+              'invitation',
+              actorIdentityId,
+              text.identityId,
+              Number(body.createdAt),
+            ).valueOf(),
+            type: 'membership_request',
+          },
+        }),
+      ],
+      [
+        'PATCH',
+        /^\/communities\/membership-requests\/[^/]+$/,
+        () => {
+          const request = this.communityMembershipRequest as Record<
+            string,
+            string
+          >;
 
-    if (method === 'POST' && route(/^\/communities\/[^/]+\/channels\/(text|voice)$/)) {
-      const type = route(/\/channels\/(text|voice)$/)![1];
-
-      return {
-        action: 'channel_created',
-        details: { name: body.name, type },
-        target: channel(derivedChannelId),
-      };
-    }
-
-    if (method === 'PATCH' && route(/^\/communities\/[^/]+\/channels\/[^/]+$/)) {
-      return {
-        action: 'channel_renamed',
-        details: { name: body.name },
-        target: channel(String(this.communityChannelId)),
-      };
-    }
-
-    if (method === 'DELETE' && route(/^\/communities\/[^/]+\/channels\/[^/]+$/)) {
-      return {
-        action: 'channel_deleted',
-        details: { type: this.communityChannelType },
-        target: channel(String(this.communityChannelId)),
-      };
-    }
-
-    if (method === 'PATCH' && route(/\/channels\/[^/]+\/permissions$/)) {
-      return {
-        action: 'channel_permissions_updated',
-        details: { visibleRoleIds: body.visibleRoleIds },
-        target: channel(String(this.communityChannelId)),
-      };
-    }
-
-    if (method === 'POST' && route(/^\/communities\/[^/]+\/roles$/)) {
-      return {
-        action: 'role_created',
-        details: { name: body.name, permissions: body.permissions },
-        target: role(derivedRoleId),
-      };
-    }
-
-    if (method === 'PATCH' && route(/^\/communities\/[^/]+\/roles\/[^/]+$/)) {
-      return {
-        action: 'role_updated',
-        details: { name: body.name, permissions: body.permissions },
-        target: role(String(this.communityRoleId)),
-      };
-    }
-
-    if (method === 'DELETE' && route(/^\/communities\/[^/]+\/roles\/[^/]+$/)) {
-      return {
-        action: 'role_deleted',
-        details: {},
-        target: role(String(this.communityRoleId)),
-      };
-    }
-
-    const memberRoles = route(/^\/communities\/[^/]+\/members\/([^/]+)\/roles$/);
-
-    if (method === 'PUT' && memberRoles) {
-      return {
-        action: 'member_roles_updated',
-        details: { roleIds: body.roleIds },
-        target: member(decodeURIComponent(memberRoles[1])),
-      };
-    }
-
-    if (method === 'POST' && route(/^\/communities\/[^/]+\/bans$/)) {
-      return {
-        action: 'member_banned',
-        details: { reason: body.reason },
-        target: member(body.identityId),
-      };
-    }
-
-    const unban = route(/^\/communities\/[^/]+\/bans\/([^/]+)$/);
-
-    if (method === 'DELETE' && unban) {
-      return {
-        action: 'member_unbanned',
-        details: {},
-        target: member(decodeURIComponent(unban[1])),
-      };
-    }
-
-    if (method === 'POST' && route(/^\/communities\/[^/]+\/invites$/)) {
-      return {
-        action: 'invite_link_created',
-        details: {
-          encryptedCommunityKeyStored: Boolean(body.encryptedCommunityKey),
-          expiresAt: body.expiresAt,
-          maxUses: body.maxUses,
+          return {
+            action:
+              body.status === 'accepted'
+                ? 'membership_request_accepted'
+                : 'membership_request_declined',
+            details: { identityId: request.identityId, type: request.type },
+            target: { id: request.id, type: 'membership_request' },
+          };
         },
-        target: {
-          id: CommunityInviteToken.derive(
-            communityId,
-            actorIdentityId,
-            body.nonce,
-          ).valueOf(),
-          type: 'invite',
-        },
-      };
-    }
+      ],
+      [
+        'PATCH',
+        /^\/communities\/[^/]+$/,
+        () => ({
+          action: 'community_updated',
+          details: {
+            autoJoinEnabled: body.autoJoinEnabled,
+            avatar: body.avatar,
+            banner: body.banner,
+            description: body.description,
+            discoverable: body.discoverable,
+            name: body.name,
+          },
+          target: { id: communityId, type: 'community' },
+        }),
+      ],
+      [
+        'DELETE',
+        /\/channels\/[^/]+\/messages\/[^/]+$/,
+        () => ({
+          action: 'message_deleted',
+          details: {
+            channelId: this.communityChannelId,
+            targetMessageAuthorId: this.ownerIdentityId?.valueOf(),
+          },
+          target: {
+            id: String(this.communityChannelMessageId),
+            type: 'message',
+          },
+        }),
+      ],
+    ];
+    const pathname = path.split('?')[0];
 
-    if (method === 'POST' && route(/^\/communities\/[^/]+\/members$/)) {
-      return {
-        action: 'invitation_created',
-        details: { identityId: body.identityId },
-        target: {
-          id: CommunityRequestId.derive(
-            communityId,
-            'invitation',
-            actorIdentityId,
-            body.identityId,
-            body.createdAt,
-          ).valueOf(),
-          type: 'membership_request',
-        },
-      };
-    }
+    for (const [ruleMethod, pattern, build] of rules) {
+      const match = ruleMethod === method ? pattern.exec(pathname) : null;
 
-    if (method === 'PATCH' && route(/^\/communities\/membership-requests\/[^/]+$/)) {
-      const request = this.communityMembershipRequest as Record<string, string>;
-
-      return {
-        action:
-          body.status === 'accepted'
-            ? 'membership_request_accepted'
-            : 'membership_request_declined',
-        details: { identityId: request.identityId, type: request.type },
-        target: { id: request.id, type: 'membership_request' },
-      };
-    }
-
-    if (method === 'PATCH' && route(/^\/communities\/[^/]+$/)) {
-      return {
-        action: 'community_updated',
-        details: {
-          autoJoinEnabled: body.autoJoinEnabled,
-          avatar: body.avatar,
-          banner: body.banner,
-          description: body.description,
-          discoverable: body.discoverable,
-          name: body.name,
-        },
-        target: { id: communityId, type: 'community' },
-      };
-    }
-
-    if (method === 'DELETE' && route(/\/channels\/[^/]+\/messages\/[^/]+$/)) {
-      return {
-        action: 'message_deleted',
-        details: {
-          channelId: this.communityChannelId,
-          targetMessageAuthorId: this.ownerIdentityId?.valueOf(),
-        },
-        target: { id: String(this.communityChannelMessageId), type: 'message' },
-      };
+      if (match) {
+        return build(match);
+      }
     }
 
     return undefined;

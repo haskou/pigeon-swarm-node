@@ -4,8 +4,8 @@ import { CommunityModerationTarget } from '@app/contexts/communities/domain/enti
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
-import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { CommunityModerationLogId } from '@app/contexts/communities/domain/value-objects/CommunityModerationLogId';
+import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -30,7 +30,10 @@ describe('CommunityModerationLogEntry', () => {
 
     expect(entry.toPrimitives()).toMatchObject({
       action: 'channel_created',
+      actorIdentityId: actorIdentityId.valueOf(),
+      communityId: communityId.valueOf(),
       createdAt: 1780000000000,
+      details: { name: 'general', type: 'text' },
       id: CommunityModerationLogId.derive(
         communityId.valueOf(),
         actorIdentityId.valueOf(),
@@ -39,9 +42,6 @@ describe('CommunityModerationLogEntry', () => {
         channelId.valueOf(),
         1780000000000,
       ).valueOf(),
-      actorIdentityId: actorIdentityId.valueOf(),
-      communityId: communityId.valueOf(),
-      details: { name: 'general', type: 'text' },
       target: {
         id: channelId.valueOf(),
         type: 'channel',

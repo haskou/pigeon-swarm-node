@@ -32,6 +32,9 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
   private isDocument(
     document: Record<string, unknown>,
   ): document is OrbitDBCommunityModerationLogDocument {
+    const isObject = (value: unknown): boolean =>
+      typeof value === 'object' && value !== null;
+
     if (
       document.scopeType !== 'community_moderation_log' ||
       document.removed === true ||
@@ -39,10 +42,8 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
         (field) => typeof document[field] !== 'string',
       ) ||
       typeof document.createdAt !== 'number' ||
-      typeof document.details !== 'object' ||
-      document.details === null ||
-      typeof document.target !== 'object' ||
-      document.target === null
+      !isObject(document.details) ||
+      !isObject(document.target)
     ) {
       return false;
     }
@@ -134,7 +135,8 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
           document,
           [],
           {
-            recordFilter: (record) => record.communityId === payload.communityId,
+            recordFilter: (record) =>
+              record.communityId === payload.communityId,
             replace: true,
           },
         );

@@ -11,7 +11,12 @@ export class CommunityChannelId extends StringValueObject {
     return new CommunityChannelId(
       createHash('sha256')
         .update(
-          JSON.stringify(['channel', communityId, creatorIdentityId, createdAt]),
+          JSON.stringify([
+            'channel',
+            communityId,
+            creatorIdentityId,
+            createdAt,
+          ]),
         )
         .digest('hex')
         .slice(0, 24),
