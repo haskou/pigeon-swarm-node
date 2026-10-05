@@ -1,5 +1,5 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 
 import { ConversationId } from '../../../domain/value-objects/ConversationId';
 import { EncryptedMessagePayload } from '../../../domain/value-objects/EncryptedMessagePayload';
@@ -42,7 +42,7 @@ export class MessageSendMessage {
     return this.payload.getPreviousMessageIds();
   }
 
-  public getSignature(): Signature {
-    return this.payload.getSignature();
+  public getProof(): PublicMutationProof {
+    return this.payload.getProof();
   }
 }

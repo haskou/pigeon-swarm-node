@@ -1,7 +1,6 @@
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
-import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import CommunityFinder from '../find-community/CommunityFinder';
@@ -11,8 +10,6 @@ export default class CommunityChannelMessageSender {
   constructor(
     private readonly communityFinder: CommunityFinder,
     private readonly messageRepository: CommunityChannelMessageRepository,
-
-    private readonly signatureService: CommunityChannelMessageSignatureDomainService,
     private readonly eventPublisher: DomainEventPublisher,
   ) {}
 
@@ -44,16 +41,11 @@ export default class CommunityChannelMessageSender {
     const channelMessage = community.sendChannelMessage(
       message.metadata,
       message.payload,
-      message.signature,
       message.mentions,
-    );
-    this.signatureService.assertValidSignature(
-      message.authorIdentityId,
-      channelMessage.toSignaturePayload(),
-      message.signature,
+      message.proof,
     );
 
-    await this.messageRepository.save(channelMessage);
+    await this.messageRepository.save(channelMessage, message.proof);
     await this.eventPublisher.publish(community.pullDomainEvents());
 
     return channelMessage;

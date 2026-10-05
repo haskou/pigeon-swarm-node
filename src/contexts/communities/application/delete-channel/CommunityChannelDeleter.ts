@@ -2,7 +2,6 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 
 import { Community } from '../../domain/Community';
 import { CommunityModerationTarget } from '../../domain/entities/moderation/CommunityModerationTarget';
-import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
@@ -14,7 +13,6 @@ export default class CommunityChannelDeleter {
   constructor(
     private readonly communityFinder: CommunityFinder,
     private readonly communityRepository: CommunityRepository,
-    private readonly messageRepository: CommunityChannelMessageRepository,
     private readonly eventPublisher: DomainEventPublisher,
     private readonly moderationLogRecorder: CommunityModerationLogRecorder,
   ) {}
@@ -40,13 +38,6 @@ export default class CommunityChannelDeleter {
       ),
       { type: channelType.valueOf() },
     );
-
-    if (channelType.isText()) {
-      await this.messageRepository.deleteByChannel(
-        message.communityId,
-        message.channelId,
-      );
-    }
 
     return community;
   }

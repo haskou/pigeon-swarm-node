@@ -1,12 +1,9 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 
 import { ConversationId } from '../../value-objects/ConversationId';
-import { EncryptedMessagePayload } from '../../value-objects/EncryptedMessagePayload';
 import { MessageId } from '../../value-objects/MessageId';
 import { MessageType } from '../../value-objects/MessageType';
 import { MessageMetadata } from './MessageMetadata';
-import { MessageSignaturePayload } from './MessageSignaturePayload';
 
 export abstract class Message {
   protected constructor(private readonly metadata: MessageMetadata) {}
@@ -18,7 +15,6 @@ export abstract class Message {
     id: string;
     previousMessageIds: string[];
     replyToMessageId?: string;
-    signature: string;
   } {
     return {
       authorId: this.metadata.getAuthorId().valueOf(),
@@ -29,19 +25,7 @@ export abstract class Message {
         .getPreviousMessageIds()
         .map((messageId) => messageId.valueOf()),
       replyToMessageId: this.metadata.getReplyToMessageId()?.valueOf(),
-      signature: this.metadata.getSignature().valueOf(),
     };
-  }
-
-  protected buildSignaturePayload(
-    encryptedPayload?: EncryptedMessagePayload,
-  ): MessageSignaturePayload {
-    return new MessageSignaturePayload(
-      this.metadata,
-      this.getType(),
-      encryptedPayload,
-      this.getTargetMessageId(),
-    );
   }
 
   public getId(): MessageId {
@@ -54,10 +38,6 @@ export abstract class Message {
 
   public getAuthorId(): IdentityId {
     return this.metadata.getAuthorId();
-  }
-
-  public getSignature(): Signature {
-    return this.metadata.getSignature();
   }
 
   public abstract getType(): MessageType;
@@ -84,10 +64,6 @@ export abstract class Message {
         : {}),
       type: this.getType().valueOf(),
     };
-  }
-
-  public toSignaturePayload(): MessageSignaturePayload {
-    return this.buildSignaturePayload();
   }
 }
 

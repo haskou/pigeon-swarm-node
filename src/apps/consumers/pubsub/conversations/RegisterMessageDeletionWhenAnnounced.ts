@@ -1,6 +1,8 @@
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
+import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { StalePublicMutationError } from '@app/contexts/public-mutations/domain/errors/StalePublicMutationError';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
@@ -34,11 +36,20 @@ export default class RegisterMessageDeletionWhenAnnounced extends Consumer {
   }
 
   public async handler(event: DomainEvent): Promise<void> {
-    await this.registrar.register(
-      new RegisterConversationMessage(
-        event.aggregateId,
-        String(event.attributes.messageId),
-      ),
-    );
+    try {
+      await this.registrar.register(
+        new RegisterConversationMessage(
+          event.aggregateId,
+          String(event.attributes.messageId),
+          event.attributes.mutationProof,
+        ),
+      );
+    } catch (error) {
+      if (error instanceof InvalidPublicMutationError) return;
+
+      if (error instanceof StalePublicMutationError) return;
+
+      throw error;
+    }
   }
 }

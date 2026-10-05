@@ -1,13 +1,11 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
-import { CommunityChannelMessageDeletion } from '../../domain/entities/messages/CommunityChannelMessageDeletion';
 import { CommunityModerationLogDetails } from '../../domain/entities/moderation/CommunityModerationLogDetails';
 import { CommunityModerationLogEntry } from '../../domain/entities/moderation/CommunityModerationLogEntry';
 import { CommunityModerationTarget } from '../../domain/entities/moderation/CommunityModerationTarget';
 import { CommunityChannelMessageNotFoundError } from '../../domain/errors/CommunityChannelMessageNotFoundError';
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import CommunityModerationLogRepository from '../../domain/repositories/CommunityModerationLogRepository';
-import CommunityChannelMessageSignatureDomainService from '../../domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
 import CommunityFinder from '../find-community/CommunityFinder';
@@ -18,14 +16,12 @@ export default class CommunityChannelMessageDeleter {
     private readonly communityFinder: CommunityFinder,
     private readonly messageRepository: CommunityChannelMessageRepository,
     private readonly moderationLogRepository: CommunityModerationLogRepository,
-
-    private readonly signatureService: CommunityChannelMessageSignatureDomainService,
     private readonly eventPublisher: DomainEventPublisher,
   ) {}
 
   public async delete(
     message: CommunityChannelMessageDeleteMessage,
-  ): Promise<CommunityChannelMessageDeletion> {
+  ): Promise<void> {
     const community = await this.communityFinder.findById(message.communityId);
     const targetMessage = await this.messageRepository.findById(
       message.communityId,
@@ -41,19 +37,15 @@ export default class CommunityChannelMessageDeleter {
       message.actorIdentityId,
       targetMessage,
       message.channelId,
-      message.deletion,
-    );
-
-    this.signatureService.assertValidSignature(
-      message.actorIdentityId,
-      message.signaturePayload,
-      message.signature,
+      message.proof,
     );
 
     await this.messageRepository.delete(
       message.communityId,
       message.channelId,
       message.targetMessageId,
+      targetMessage.getAuthorIdentityId(),
+      message.proof,
     );
     await this.eventPublisher.publish(community.pullDomainEvents());
     await this.moderationLogRepository.save(
@@ -71,7 +63,5 @@ export default class CommunityChannelMessageDeleter {
         }),
       ),
     );
-
-    return message.deletion;
   }
 }

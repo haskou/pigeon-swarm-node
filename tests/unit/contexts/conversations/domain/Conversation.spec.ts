@@ -1,3 +1,4 @@
+import { MessageSent } from '@app/contexts/conversations/domain/entities/messages/MessageSent';
 import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
 import { MessageTargetAlreadyDeletedError } from '@app/contexts/conversations/domain/errors/MessageTargetAlreadyDeletedError';
 import { MessageTargetAuthorMismatchError } from '@app/contexts/conversations/domain/errors/MessageTargetAuthorMismatchError';
@@ -6,7 +7,6 @@ import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
 import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
-import { MessageSent } from '@app/contexts/conversations/domain/entities/messages/MessageSent';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageEditOptions } from '@app/contexts/conversations/domain/value-objects/MessageEditOptions';
@@ -15,9 +15,9 @@ import { MessageSendOptions } from '@app/contexts/conversations/domain/value-obj
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 
 import { ConversationMother } from '../../../mothers/ConversationMother';
+import { messageProof } from '../support/messageProof';
 
 describe('Conversation', () => {
   let author: IdentityId;
@@ -41,7 +41,7 @@ describe('Conversation', () => {
       const message = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('encrypted-payload'),
-        signature(),
+        messageProof(),
         new MessageSendOptions(),
       );
 
@@ -63,6 +63,7 @@ describe('Conversation', () => {
         conversationType: 'one-to-one',
         message: message.toPrimitives(),
         messageId: message.getId().valueOf(),
+        mutationProof: messageProof().toPrimitives(),
         networkId: mother.networkId.valueOf(),
         participantIds: [author.valueOf(), recipient.valueOf()],
       });
@@ -73,7 +74,7 @@ describe('Conversation', () => {
         conversation.sendMessage(
           outsider,
           new EncryptedMessagePayload('encrypted-payload'),
-          signature(),
+          messageProof(),
         ),
       ).toThrow(ConversationParticipantNotFoundError);
     });
@@ -82,18 +83,18 @@ describe('Conversation', () => {
       const target = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('target-payload'),
-        signature(),
+        messageProof(),
       );
       const newer = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('newer-payload'),
-        signature(),
+        messageProof(),
       );
 
       const reply = conversation.sendMessage(
         recipient,
         new EncryptedMessagePayload('reply-payload'),
-        signature(),
+        messageProof(),
         new MessageSendOptions(
           undefined,
           undefined,
@@ -120,7 +121,7 @@ describe('Conversation', () => {
         conversation.sendMessage(
           author,
           new EncryptedMessagePayload('reply-payload'),
-          signature(),
+          messageProof(),
           new MessageSendOptions(
             undefined,
             undefined,
@@ -136,12 +137,8 @@ describe('Conversation', () => {
         conversation.sendMessage(
           author,
           new EncryptedMessagePayload('message-payload'),
-          signature(),
-          new MessageSendOptions(
-            undefined,
-            undefined,
-            [MessageId.generate()],
-          ),
+          messageProof(),
+          new MessageSendOptions(undefined, undefined, [MessageId.generate()]),
         ),
       ).toThrow(MessageTargetNotFoundError);
     });
@@ -150,21 +147,16 @@ describe('Conversation', () => {
       const target = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('target-payload'),
-        signature(),
+        messageProof(),
       );
-      conversation.deleteMessage(author, target.getId(), signature());
+      conversation.deleteMessage(author, target.getId(), messageProof());
 
       expect(() =>
         conversation.sendMessage(
           recipient,
           new EncryptedMessagePayload('reply-payload'),
-          signature(),
-          new MessageSendOptions(
-            undefined,
-            undefined,
-            [],
-            target.getId(),
-          ),
+          messageProof(),
+          new MessageSendOptions(undefined, undefined, [], target.getId()),
         ),
       ).toThrow(MessageTargetAlreadyDeletedError);
     });
@@ -183,7 +175,7 @@ describe('Conversation', () => {
       const sent = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('original-payload'),
-        signature(),
+        messageProof(),
       );
       conversation.pullDomainEvents();
 
@@ -191,7 +183,7 @@ describe('Conversation', () => {
         author,
         sent.getId(),
         new EncryptedMessagePayload('edited-payload'),
-        signature(),
+        messageProof(),
       );
 
       expect(edited.getTargetMessageId().valueOf()).toBe(
@@ -204,6 +196,7 @@ describe('Conversation', () => {
       expect(events[0].attributes).toEqual({
         message: edited.toPrimitives(),
         messageId: edited.getId().valueOf(),
+        mutationProof: messageProof().toPrimitives(),
         networkId: mother.networkId.valueOf(),
         participantIds: [author.valueOf(), recipient.valueOf()],
         targetMessageId: sent.getId().valueOf(),
@@ -214,7 +207,7 @@ describe('Conversation', () => {
       const sent = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('original-payload'),
-        signature(),
+        messageProof(),
       );
 
       expect(() =>
@@ -222,7 +215,7 @@ describe('Conversation', () => {
           recipient,
           sent.getId(),
           new EncryptedMessagePayload('edited-payload'),
-          signature(),
+          messageProof(),
         ),
       ).toThrow(MessageTargetAuthorMismatchError);
     });
@@ -233,7 +226,7 @@ describe('Conversation', () => {
           author,
           MessageId.generate(),
           new EncryptedMessagePayload('edited-payload'),
-          signature(),
+          messageProof(),
         ),
       ).toThrow(MessageTargetNotFoundError);
     });
@@ -242,7 +235,7 @@ describe('Conversation', () => {
       const sent = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('original-payload'),
-        signature(),
+        messageProof(),
       );
 
       expect(() =>
@@ -250,12 +243,8 @@ describe('Conversation', () => {
           author,
           sent.getId(),
           new EncryptedMessagePayload('edited-payload'),
-          signature(),
-          new MessageEditOptions(
-            undefined,
-            undefined,
-            [MessageId.generate()],
-          ),
+          messageProof(),
+          new MessageEditOptions(undefined, undefined, [MessageId.generate()]),
         ),
       ).toThrow(MessageTargetNotFoundError);
     });
@@ -263,16 +252,12 @@ describe('Conversation', () => {
 
   describe('addPollMessage', () => {
     it('should add a poll message that can be used as a previous message', () => {
-      const poll = conversation.addPollMessage(
-        author,
-        PollId.generate(),
-        signature(),
-      );
+      const poll = conversation.addPollMessage(author, PollId.generate());
 
       const message = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('message-after-poll'),
-        signature(),
+        messageProof(),
         new MessageSendOptions(undefined, undefined, [poll.getId()]),
       );
 
@@ -294,14 +279,14 @@ describe('Conversation', () => {
       const sent = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('original-payload'),
-        signature(),
+        messageProof(),
       );
       conversation.pullDomainEvents();
 
       const deleted = conversation.deleteMessage(
         author,
         sent.getId(),
-        signature(),
+        messageProof(),
       );
 
       expect(deleted.getTargetMessageId().valueOf()).toBe(
@@ -314,6 +299,7 @@ describe('Conversation', () => {
       expect(events[0].attributes).toEqual({
         message: deleted.toPrimitives(),
         messageId: deleted.getId().valueOf(),
+        mutationProof: messageProof().toPrimitives(),
         networkId: mother.networkId.valueOf(),
         participantIds: [author.valueOf(), recipient.valueOf()],
         targetMessageId: sent.getId().valueOf(),
@@ -324,18 +310,18 @@ describe('Conversation', () => {
       const target = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('target-payload'),
-        signature(),
+        messageProof(),
       );
       conversation.sendMessage(
         author,
         new EncryptedMessagePayload('newer-payload'),
-        signature(),
+        messageProof(),
       );
 
       const deleted = conversation.deleteMessage(
         author,
         target.getId(),
-        signature(),
+        messageProof(),
       );
 
       expect(deleted.toPrimitives().previousMessageIds).toEqual([
@@ -347,20 +333,14 @@ describe('Conversation', () => {
       const sent = conversation.sendMessage(
         author,
         new EncryptedMessagePayload('original-payload'),
-        signature(),
+        messageProof(),
       );
 
-      conversation.deleteMessage(author, sent.getId(), signature());
+      conversation.deleteMessage(author, sent.getId(), messageProof());
 
       expect(() =>
-        conversation.deleteMessage(author, sent.getId(), signature()),
+        conversation.deleteMessage(author, sent.getId(), messageProof()),
       ).toThrow(MessageTargetAlreadyDeletedError);
     });
   });
 });
-
-function signature(): Signature {
-  return new Signature(
-    'lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==',
-  );
-}

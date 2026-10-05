@@ -1,21 +1,21 @@
-import { generateKeyPairSync } from 'node:crypto';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import RegisterCommunityMessageWhenAnnounced from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageWhenAnnounced';
-import RegisterCommunityMessageEdition from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageEditionWhenAnnounced';
-import CommunityChannelMessageCandidateRegistrar from '@app/apps/consumers/pubsub/communities/CommunityChannelMessageCandidateRegistrar';
 import { CommunityChannelMessageCandidate } from '@app/apps/consumers/pubsub/communities/CommunityChannelMessageCandidate';
+import CommunityChannelMessageCandidateRegistrar from '@app/apps/consumers/pubsub/communities/CommunityChannelMessageCandidateRegistrar';
+import RegisterCommunityMessageEdition from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageEditionWhenAnnounced';
+import RegisterCommunityMessageWhenAnnounced from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageWhenAnnounced';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityRole } from '@app/contexts/communities/domain/entities/membership/CommunityRole';
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
-import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageSignaturePayload';
-import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
-import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
+import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
-import { CommunityName } from '@app/contexts/communities/domain/value-objects/CommunityName';
 import { CommunityDescription } from '@app/contexts/communities/domain/value-objects/CommunityDescription';
+import { CommunityName } from '@app/contexts/communities/domain/value-objects/CommunityName';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import { mock } from 'jest-mock-extended';
+import { generateKeyPairSync } from 'node:crypto';
+
+import { signedMutation } from '../../../../contexts/public-mutations/support/signedMutation';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe.each([
@@ -51,12 +51,13 @@ describe.each([
       authorIdentityId: owner.valueOf(),
       createdAt: snapshot.createdAt,
       encryptedPayload: 'encrypted-content',
-      signature: 'signature',
       type: 'sent',
     };
+    const mutationProof = { proof: 'placeholder' };
     const event = new CommunityChannelMessageWasSentEvent(snapshot.id, {
       community: snapshot,
       message,
+      mutationProof,
     });
     const repository = mock<CommunityRepository>();
     const registrar = mock<CommunityChannelMessageCandidateRegistrar>();
@@ -66,6 +67,7 @@ describe.each([
       repository,
       registrar,
     );
+
     return {
       owner,
       community,
@@ -75,6 +77,7 @@ describe.each([
       registrar,
       consumer,
       message,
+      mutationProof,
     };
   }
 
@@ -88,6 +91,7 @@ describe.each([
       registrar,
       consumer,
       message,
+      mutationProof,
     } = fixture();
     const added = new IdentityId(
       generateKeyPairSync('ed25519')
@@ -109,7 +113,11 @@ describe.each([
     const validated = registrar[method].mock.calls[0][0];
     expect(validated.toPrimitives()).toEqual(snapshot);
     expect(validated).not.toBe(community);
-    expect(registrar[method]).toHaveBeenCalledWith(validated, message);
+    expect(registrar[method]).toHaveBeenCalledWith(
+      validated,
+      message,
+      mutationProof,
+    );
     expect(repository.save).toHaveBeenCalledWith(community);
     expect(repository.save.mock.calls[0][0].toPrimitives()).toEqual(current);
     expect(event.attributes.community).toEqual(snapshot);
@@ -117,15 +125,26 @@ describe.each([
   });
 
   it('bootstraps an absent community from the event snapshot', async () => {
-    const { snapshot, event, repository, registrar, consumer, message } =
-      fixture();
+    const {
+      snapshot,
+      event,
+      repository,
+      registrar,
+      consumer,
+      message,
+      mutationProof,
+    } = fixture();
     repository.findById.mockResolvedValue(undefined);
 
     await consumer.handler(event);
 
     const hydrated = repository.save.mock.calls[0][0];
     expect(hydrated.toPrimitives()).toEqual(snapshot);
-    expect(registrar[method]).toHaveBeenCalledWith(hydrated, message);
+    expect(registrar[method]).toHaveBeenCalledWith(
+      hydrated,
+      message,
+      mutationProof,
+    );
   });
 
   it('accepts a signed delayed event after its author leaves without restoring membership', async () => {
@@ -155,8 +174,6 @@ describe.each([
     canonical.kickMember(owner, author.id);
     repository.findById.mockResolvedValue(canonical);
     const current = structuredClone(canonical.toPrimitives());
-    const signatureService =
-      new CommunityChannelMessageSignatureDomainService();
     const messages = mock<CommunityChannelMessageRepository>();
     const candidate: CommunityChannelMessageCandidate = {
       id: 'delayed-message',
@@ -170,37 +187,25 @@ describe.each([
       mentions: [],
       pollId: undefined,
       replyToMessageId: undefined,
-      signature: 'initial-signature',
       type: 'sent' as const,
     };
     messages.findById.mockResolvedValue(
       CommunityChannelMessage.fromPrimitives({
         ...candidate,
         editedAt: undefined,
-        signature: undefined,
       }),
     );
-    const payload = CommunityChannelMessageSignaturePayload.fromPrimitives({
-      authorIdentityId: author.id.valueOf(),
-      channelId,
-      communityId: snapshot.id,
-      id: candidate.id,
-      createdAt: candidate.editedAt ?? candidate.createdAt,
-      encryptedPayload: candidate.encryptedPayload,
-      plaintextPayload: undefined,
-      mentions: [],
-      replyToMessageId: undefined,
-      type: _kind,
-    });
-    candidate.signature = (
-      await author.encryptedKeyPair.sign(
-        signatureService.getCanonicalSigningContent(payload),
-        author.password,
-      )
-    ).valueOf();
+    const mutationProof = (
+      await signedMutation({
+        identityId: author.id.valueOf(),
+        kind: 'put',
+        recordId: `community:${snapshot.id}:${channelId}:${candidate.id}:${author.id.valueOf()}`,
+        sequence: 1,
+        store: 'messages',
+      })
+    ).toPrimitives();
     const realRegistrar = new CommunityChannelMessageCandidateRegistrar(
       messages,
-      signatureService,
     );
     const consumer = new Consumer(
       mock<DomainEventConsumer>(),
@@ -210,9 +215,12 @@ describe.each([
     const event = new CommunityChannelMessageWasSentEvent(snapshot.id, {
       community: snapshot,
       message: candidate,
+      mutationProof,
     });
 
-    await expect(realRegistrar[method](canonical, candidate)).rejects.toThrow();
+    await expect(
+      realRegistrar[method](canonical, candidate, mutationProof),
+    ).rejects.toThrow();
     expect(messages.save).not.toHaveBeenCalled();
     await consumer.handler(event);
 

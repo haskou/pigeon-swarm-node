@@ -1,9 +1,13 @@
+import { CommunityChannelMessageRecordId } from '@app/contexts/communities/domain/CommunityChannelMessageRecordId';
 import { CommunityChannelThreadSummary } from '@app/contexts/communities/domain/CommunityChannelThreadSummary';
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import PrivateCommunityPublicStorageGuard from '../PrivateCommunityPublicStorageGuard';
@@ -29,6 +33,25 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
       this.registry,
       this.messageIndex,
     );
+  }
+
+  private async write(
+    communityId: CommunityId,
+    payload: Record<string, unknown>,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    const document = PublicMutationRecord.withProof(payload, proof);
+
+    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
+      PublicMutationRecord.assertNotStale(
+        await this.registry.queryDocuments(
+          'messages',
+          (stored) => stored.id === payload.id,
+        ),
+        document,
+      );
+      await this.registry.putDocument('messages', document);
+    });
   }
 
   private escapeRegex(value: string): string {
@@ -61,24 +84,6 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     channelId: CommunityChannelId,
   ): Promise<OrbitDBCommunityChannelMessageDocument[]> {
     return this.messageIndex.findByChannel(communityId, channelId);
-  }
-
-  private async tombstone(
-    documents: OrbitDBCommunityChannelMessageDocument[],
-  ): Promise<void> {
-    const deletedDocuments = documents.map((document) => ({
-      ...document,
-      deleted: true,
-      deletedAt: Date.now(),
-    }));
-
-    await Promise.all(
-      deletedDocuments.map((document) =>
-        this.registry.putDocument('messages', document),
-      ),
-    );
-
-    await this.threadSummaryIndex.refreshForDocuments(documents);
   }
 
   public async findById(
@@ -234,54 +239,48 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     });
   }
 
-  public async save(message: CommunityChannelMessage): Promise<void> {
+  public async save(
+    message: CommunityChannelMessage,
+    proof: PublicMutationProof,
+  ): Promise<void> {
     const document = this.mapper.toDocument(message);
     const communityId = new CommunityId(document.communityId);
 
-    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      await this.registry.putDocument('messages', document);
+    await this.write(communityId, document, proof);
 
-      if (document.replyToMessageId) {
-        await this.threadSummaryIndex.refreshForChannel(
-          communityId,
-          new CommunityChannelId(document.channelId),
-        );
-      }
-    });
+    if (document.replyToMessageId) {
+      await this.threadSummaryIndex.refreshForChannel(
+        communityId,
+        new CommunityChannelId(document.channelId),
+      );
+    }
   }
 
   public async delete(
     communityId: CommunityId,
     channelId: CommunityChannelId,
     messageId: CommunityChannelMessageId,
+    authorIdentityId: IdentityId,
+    proof: PublicMutationProof,
   ): Promise<void> {
-    await this.publicStorageGuard.runWhilePublic(communityId, async () =>
-      this.tombstone(
-        (
-          await this.findMessageDocumentsByChannel(communityId, channelId)
-        ).filter((document) =>
-          new CommunityChannelMessageId(
-            this.messageIndex.getMessageId(document),
-          ).isEqual(messageId),
+    await this.write(
+      communityId,
+      {
+        authorIdentityId: authorIdentityId.valueOf(),
+        channelId: channelId.valueOf(),
+        communityId: communityId.valueOf(),
+        id: CommunityChannelMessageRecordId.of(
+          communityId,
+          channelId,
+          messageId,
+          authorIdentityId,
         ),
-      ),
+        messageId: messageId.valueOf(),
+        removed: true,
+        scopeType: 'community_channel',
+      },
+      proof,
     );
-  }
-
-  public async deleteByChannel(
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-  ): Promise<void> {
-    await this.publicStorageGuard.runWhilePublic(communityId, async () =>
-      this.tombstone(
-        await this.findMessageDocumentsByChannel(communityId, channelId),
-      ),
-    );
-  }
-
-  public async deleteByCommunity(communityId: CommunityId): Promise<void> {
-    await this.publicStorageGuard.runWhilePublic(communityId, async () =>
-      this.tombstone(await this.messageIndex.allByCommunity(communityId)),
-    );
+    await this.threadSummaryIndex.refreshForChannel(communityId, channelId);
   }
 }

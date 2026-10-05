@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsString } from 'class-validator';
+import { IsInt, IsNotEmpty, IsObject, IsString } from 'class-validator';
 
 export class DeleteConversationMessageBody {
   @IsString()
@@ -8,7 +8,6 @@ export class DeleteConversationMessageBody {
   @IsInt()
   public readonly createdAt: number;
 
-  @IsString()
-  @IsNotEmpty()
-  public readonly signature: string;
+  @IsObject()
+  public readonly mutation: Record<string, unknown>;
 }

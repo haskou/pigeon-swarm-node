@@ -7,7 +7,6 @@ const communityChannelMessagePrimitiveKeys = [
   'createdAt',
   'encryptedPayload',
   'id',
-  'signature',
   'type',
 ];
 

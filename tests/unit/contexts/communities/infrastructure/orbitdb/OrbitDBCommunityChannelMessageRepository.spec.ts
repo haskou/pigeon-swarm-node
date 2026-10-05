@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await */
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
@@ -9,6 +10,7 @@ import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-author
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
+import { signedMutation } from '../../../public-mutations/support/signedMutation';
 
 const identityMother = new IdentityMother();
 
@@ -51,7 +53,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
     query = jest.fn(async (matcher) => documents.filter(matcher));
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
-    registry.register('network-1', {
+    void registry.register('network-1', {
       heads: {
         get: headsGet,
         put: headsPut,
@@ -78,10 +80,12 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
     for (const newDocument of newDocuments) {
       await repository.save(
         CommunityChannelMessage.fromPrimitives(newDocument as never),
+        await proofFor(String(newDocument.id), 'put', 1),
       );
     }
 
     await flushBackgroundTasks();
+    query.mockClear();
   }
 
   it('should fetch syncable community messages without letting plaintext rows consume the limit', async () => {
@@ -137,9 +141,9 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       document({}) as never,
     );
 
-    await expect(protectedRepository.save(message)).rejects.toThrow(
-      'Invalid private authorization',
-    );
+    await expect(
+      protectedRepository.save(message, await proofFor('message-1', 'put', 1)),
+    ).rejects.toThrow('Invalid private authorization');
     await expect(
       protectedRepository.findByChannel(
         new CommunityId('community-1'),
@@ -243,7 +247,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       }) as never,
     );
 
-    await repository.save(message);
+    await repository.save(message, await proofFor('message-1', 'put', 1));
     await flushBackgroundTasks();
     query.mockClear();
 
@@ -279,7 +283,10 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       return 'ok';
     });
 
-    const save = repository.save(message);
+    const save = repository.save(
+      message,
+      await proofFor('message-1', 'put', 1),
+    );
     await flushBackgroundTasks();
 
     expect(
@@ -312,6 +319,8 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       new CommunityId('community-1'),
       new CommunityChannelId('channel-1'),
       new CommunityChannelMessageId('message-1'),
+      identityMother.id,
+      await proofFor('message-1', 'delete', 2),
     );
     await flushBackgroundTasks();
 
@@ -338,6 +347,8 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       new CommunityId('community-1'),
       new CommunityChannelId('channel-1'),
       new CommunityChannelMessageId('message-1'),
+      identityMother.id,
+      await proofFor('message-1', 'delete', 2),
     );
 
     const messages = await repository.findByChannel(
@@ -359,12 +370,15 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
           id: 'message-1',
         }) as never,
       ),
+      await proofFor('message-1', 'put', 1),
     );
 
     await repository.delete(
       new CommunityId('community-1'),
       new CommunityChannelId('channel-1'),
       new CommunityChannelMessageId('message-1'),
+      identityMother.id,
+      await proofFor('message-1', 'delete', 2),
     );
 
     const messages = await repository.findByChannel(
@@ -403,11 +417,14 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
           id: 'message-1',
         }) as never,
       ),
+      await proofFor('message-1', 'put', 1),
     );
     await deleterRepository.delete(
       new CommunityId('community-1'),
       new CommunityChannelId('channel-1'),
       new CommunityChannelMessageId('message-1'),
+      identityMother.id,
+      await proofFor('message-1', 'delete', 2),
     );
 
     const messages = await finderRepository.findByChannel(
@@ -526,6 +543,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
           replyToMessageId: 'root-1',
         }) as never,
       ),
+      await proofFor('reply-1', 'put', 1),
     );
     await flushBackgroundTasks();
 
@@ -574,6 +592,8 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       new CommunityId('community-1'),
       new CommunityChannelId('channel-1'),
       new CommunityChannelMessageId('root-1'),
+      identityMother.id,
+      await proofFor('root-1', 'delete', 2),
     );
     await flushBackgroundTasks();
 
@@ -592,6 +612,16 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
   });
 });
 
+function proofFor(messageId: string, kind: 'put' | 'delete', sequence: number) {
+  return signedMutation({
+    identityId: identityMother.id.valueOf(),
+    kind,
+    recordId: `community:community-1:channel-1:${messageId}:${identityMother.id.valueOf()}`,
+    sequence,
+    store: 'messages',
+  });
+}
+
 function document(
   overrides: Partial<ReturnType<CommunityChannelMessage['toPrimitives']>>,
 ): Record<string, unknown> {
@@ -604,7 +634,6 @@ function document(
     mentions: [],
     replyToMessageId: undefined,
     scopeType: 'community_channel',
-    signature: identityMother.signature.valueOf(),
     type: 'sent',
     ...overrides,
   };

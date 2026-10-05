@@ -2,6 +2,7 @@ import { PollCreateMessage } from '@app/contexts/polls/application/create/messag
 import { PollCreator } from '@app/contexts/polls/application/create/PollCreator';
 import { PollTimelineMessageRegisterMessage } from '@app/contexts/polls/application/register-timeline-message/messages/PollTimelineMessageRegisterMessage';
 import PollTimelineMessageRegistrar from '@app/contexts/polls/application/register-timeline-message/PollTimelineMessageRegistrar';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
@@ -51,7 +52,7 @@ export class PostPollRoute extends PollRouteSupport {
       new PollTimelineMessageRegisterMessage(
         actor.valueOf(),
         poll,
-        request.header('X-Signature') || '',
+        PublicMutationProof.fromPrimitives(body.timelineMutation),
       ),
     );
 

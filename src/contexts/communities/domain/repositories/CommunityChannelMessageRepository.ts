@@ -1,3 +1,6 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+
 import { CommunityChannelThreadSummary } from '../CommunityChannelThreadSummary';
 import { CommunityChannelMessage } from '../entities/messages/CommunityChannelMessage';
 import { CommunityChannelId } from '../value-objects/CommunityChannelId';
@@ -36,14 +39,10 @@ export default abstract class CommunityChannelMessageRepository {
     communityId: CommunityId,
     channelId: CommunityChannelId,
     messageId: CommunityChannelMessageId,
+    authorIdentityId: IdentityId,
+    proof: PublicMutationProof,
   ): Promise<void>;
 
-  public abstract deleteByChannel(
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-  ): Promise<void>;
-
-  public abstract deleteByCommunity(communityId: CommunityId): Promise<void>;
   public abstract findByCommunity(
     communityId: CommunityId,
     limit: number,
@@ -67,5 +66,8 @@ export default abstract class CommunityChannelMessageRepository {
     limitPerChannel: number,
   ): Promise<Map<string, CommunityChannelThreadSummary[]>>;
 
-  public abstract save(message: CommunityChannelMessage): Promise<void>;
+  public abstract save(
+    message: CommunityChannelMessage,
+    proof: PublicMutationProof,
+  ): Promise<void>;
 }

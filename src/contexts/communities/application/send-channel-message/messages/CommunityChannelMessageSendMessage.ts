@@ -1,5 +1,5 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
 import { CommunityChannelMessageMentions as Mentions } from '../../../domain/CommunityChannelMessageMentions';
@@ -20,7 +20,7 @@ export class CommunityChannelMessageSendMessage {
   public readonly metadata: CommunityChannelMessageMetadata;
   public readonly payload: CommunityChannelMessagePayload;
   public readonly replyToMessageId?: CommunityChannelMessageId;
-  public readonly signature: Signature;
+  public readonly proof: PublicMutationProof;
 
   constructor(input: {
     authorIdentityId: string;
@@ -32,7 +32,7 @@ export class CommunityChannelMessageSendMessage {
     messageId: string;
     plaintextPayload?: string;
     replyToMessageId?: string;
-    signature: string;
+    mutation: unknown;
   }) {
     this.authorIdentityId = new IdentityId(input.authorIdentityId);
     this.communityId = new CommunityId(input.communityId);
@@ -52,7 +52,7 @@ export class CommunityChannelMessageSendMessage {
       encryptedPayload: input.encryptedPayload,
       plaintextPayload: input.plaintextPayload,
     });
-    this.signature = new Signature(input.signature);
+    this.proof = PublicMutationProof.fromPrimitives(input.mutation);
     this.mentions = Mentions.from(
       (input.mentions ?? []).map(
         (mention) =>

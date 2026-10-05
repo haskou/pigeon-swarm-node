@@ -1,4 +1,3 @@
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
 import { CommunityChannelMessageMentions as Mentions } from '../../CommunityChannelMessageMentions';
@@ -8,18 +7,12 @@ import { CommunityChannelMessagePayload } from './CommunityChannelMessagePayload
 export class CommunityChannelMessageEdition {
   constructor(
     private readonly payload: CommunityChannelMessagePayload,
-    private readonly signature: Signature,
     private readonly editedAt: Timestamp,
     private readonly mentions: Mentions,
   ) {}
 
   public applyTo(message: CommunityChannelMessage): CommunityChannelMessage {
-    return message.edit(
-      this.payload,
-      this.signature,
-      this.editedAt,
-      this.mentions,
-    );
+    return message.edit(this.payload, this.editedAt, this.mentions);
   }
 
   public getMentions(): Mentions {

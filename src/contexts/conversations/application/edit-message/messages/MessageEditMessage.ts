@@ -1,5 +1,5 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
 import { ConversationId } from '../../../domain/value-objects/ConversationId';
@@ -13,7 +13,7 @@ export class MessageEditMessage {
   public readonly encryptedPayload: EncryptedMessagePayload;
   public readonly id: MessageId;
   public readonly previousMessageIds: MessageId[];
-  public readonly signature: Signature;
+  public readonly proof: PublicMutationProof;
   public readonly targetMessageId: MessageId;
 
   constructor(
@@ -25,7 +25,7 @@ export class MessageEditMessage {
       encryptedPayload: string;
       id: string;
       previousMessageIds?: string[];
-      signature: string;
+      mutation: unknown;
     },
   ) {
     this.authorIdentityId = new IdentityId(authorIdentityId);
@@ -38,7 +38,7 @@ export class MessageEditMessage {
     this.previousMessageIds = (
       payload.previousMessageIds ?? [targetMessageId]
     ).map((messageId) => new MessageId(messageId));
-    this.signature = new Signature(payload.signature);
+    this.proof = PublicMutationProof.fromPrimitives(payload.mutation);
     this.targetMessageId = new MessageId(targetMessageId);
   }
 }

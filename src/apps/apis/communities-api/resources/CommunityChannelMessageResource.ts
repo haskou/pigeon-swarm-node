@@ -18,6 +18,5 @@ export interface CommunityChannelMessageResource {
   }[];
   pollId?: string;
   replyToMessageId?: string;
-  signature?: string;
   type: 'poll' | 'sent';
 }

@@ -1,5 +1,4 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { ConversationId } from '../../value-objects/ConversationId';
@@ -7,7 +6,6 @@ import { EncryptedMessagePayload } from '../../value-objects/EncryptedMessagePay
 import { MessageId } from '../../value-objects/MessageId';
 import { Message, MessageType } from './Message';
 import { MessageMetadata } from './MessageMetadata';
-import { MessageSignaturePayload } from './MessageSignaturePayload';
 
 export class MessageSent extends Message {
   public static create(
@@ -29,7 +27,6 @@ export class MessageSent extends Message {
           (messageId) => new MessageId(messageId),
         ),
         new Timestamp(primitives.createdAt),
-        new Signature(primitives.signature),
         primitives.replyToMessageId
           ? new MessageId(primitives.replyToMessageId)
           : undefined,
@@ -54,9 +51,5 @@ export class MessageSent extends Message {
       ...super.toPrimitives(),
       encryptedPayload: this.encryptedPayload.valueOf(),
     };
-  }
-
-  public toSignaturePayload(): MessageSignaturePayload {
-    return this.buildSignaturePayload(this.encryptedPayload);
   }
 }

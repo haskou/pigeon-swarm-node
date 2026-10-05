@@ -2,9 +2,9 @@ import { MessageSendMessage } from '@app/contexts/conversations/application/send
 import { MessageSendPayload } from '@app/contexts/conversations/application/send-message/messages/MessageSendPayload';
 
 import { IdentityMother } from '../../../../../mothers/IdentityMother';
+import { messageProof } from '../../../support/messageProof';
 
-const SIGNATURE =
-  'lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==';
+const MUTATION = messageProof('message-1').toPrimitives();
 
 describe('MessageSendMessage', () => {
   it('should convert primitive send input into conversation value objects', () => {
@@ -15,7 +15,7 @@ describe('MessageSendMessage', () => {
       new MessageSendPayload(
         'message-1',
         'encrypted-payload',
-        SIGNATURE,
+        MUTATION,
         1780000000000,
         ['previous-message-1'],
         'reply-message-1',
@@ -26,12 +26,12 @@ describe('MessageSendMessage', () => {
     expect(message.getConversationId().valueOf()).toBe('conversation-1');
     expect(message.getAuthorIdentityId().valueOf()).toBe(authorIdentityId);
     expect(message.getEncryptedPayload().valueOf()).toBe('encrypted-payload');
-    expect(message.getSignature().valueOf()).toBe(SIGNATURE);
+    expect(message.getProof().toPrimitives()).toEqual(MUTATION);
     expect(options.getId().valueOf()).toBe('message-1');
     expect(options.getCreatedAt().valueOf()).toBe(1780000000000);
-    expect(options.getPreviousMessageIds().map((messageId) =>
-      messageId.valueOf(),
-    )).toEqual(['previous-message-1']);
+    expect(
+      options.getPreviousMessageIds().map((messageId) => messageId.valueOf()),
+    ).toEqual(['previous-message-1']);
     expect(options.getReplyToMessageId()?.valueOf()).toBe('reply-message-1');
   });
 });

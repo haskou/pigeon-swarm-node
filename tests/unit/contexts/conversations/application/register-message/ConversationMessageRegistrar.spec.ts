@@ -1,31 +1,27 @@
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
-import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
-import { InvalidMessageSignatureError } from '@app/contexts/conversations/domain/errors/InvalidMessageSignatureError';
-import { RemoteMessageCandidateMismatchError } from '@app/contexts/conversations/domain/errors/RemoteMessageCandidateMismatchError';
 import { MessageMetadata } from '@app/contexts/conversations/domain/entities/messages/MessageMetadata';
 import { MessageSent } from '@app/contexts/conversations/domain/entities/messages/MessageSent';
+import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
+import { RemoteMessageCandidateMismatchError } from '@app/contexts/conversations/domain/errors/RemoteMessageCandidateMismatchError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import MessageSignatureDomainService from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { ConversationMother } from '../../../../mothers/ConversationMother';
+import { messageProof } from '../../support/messageProof';
 
 describe('ConversationMessageRegistrar', () => {
   let repository: MockProxy<ConversationRepository>;
-  let signatureService: MockProxy<MessageSignatureDomainService>;
   let registrar: ConversationMessageRegistrar;
   let mother: ConversationMother;
 
   beforeEach(async () => {
     repository = mock<ConversationRepository>();
-    signatureService = mock<MessageSignatureDomainService>();
-    registrar = new ConversationMessageRegistrar(repository, signatureService);
+    registrar = new ConversationMessageRegistrar(repository);
     mother = await ConversationMother.create();
   });
 
@@ -33,10 +29,6 @@ describe('ConversationMessageRegistrar', () => {
     conversationId: ConversationId,
     messageId: MessageId,
   ): MessageSent {
-    const signature = new Signature(
-      'lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==',
-    );
-
     return MessageSent.create(
       new MessageMetadata(
         messageId,
@@ -44,7 +36,6 @@ describe('ConversationMessageRegistrar', () => {
         mother.author,
         [],
         Timestamp.now(),
-        signature,
       ),
       new EncryptedMessagePayload('encrypted-payload'),
     );
@@ -66,10 +57,7 @@ describe('ConversationMessageRegistrar', () => {
       ),
     );
 
-    expect(signatureService.assertValidMessageSignature).toHaveBeenCalledWith(
-      candidate,
-    );
-    expect(repository.save).toHaveBeenCalledWith(conversation);
+    expect(repository.save).toHaveBeenCalledWith(conversation, undefined);
     expect(conversation.toPrimitives().messages).toHaveLength(1);
   });
 
@@ -90,10 +78,7 @@ describe('ConversationMessageRegistrar', () => {
       ),
     );
 
-    expect(signatureService.assertValidMessageSignature).toHaveBeenCalledWith(
-      candidate,
-    );
-    expect(repository.save).toHaveBeenCalledWith(conversation);
+    expect(repository.save).toHaveBeenCalledWith(conversation, undefined);
     expect(conversation.toPrimitives().messages).toHaveLength(1);
   });
 
@@ -115,7 +100,6 @@ describe('ConversationMessageRegistrar', () => {
       ),
     ).rejects.toThrow(RemoteMessageCandidateMismatchError);
 
-    expect(signatureService.assertValidMessageSignature).not.toHaveBeenCalled();
     expect(repository.save).not.toHaveBeenCalled();
   });
 
@@ -140,32 +124,31 @@ describe('ConversationMessageRegistrar', () => {
       ),
     ).rejects.toThrow(RemoteMessageCandidateMismatchError);
 
-    expect(signatureService.assertValidMessageSignature).not.toHaveBeenCalled();
     expect(repository.save).not.toHaveBeenCalled();
   });
 
-  it('rejects a remote candidate with an invalid signature', async () => {
+  it('persists an announced message with the proof it carried', async () => {
     const conversation = mother.build();
     const conversationId = conversation.getId();
     const messageId = MessageId.generate();
     const candidate = buildCandidate(conversationId, messageId);
+    const proof = messageProof(messageId.valueOf());
 
     repository.findById.mockResolvedValue(conversation);
-    repository.findCandidateMessageById.mockResolvedValue(candidate);
-    signatureService.assertValidMessageSignature.mockImplementation(() => {
-      throw new InvalidMessageSignatureError();
-    });
 
-    await expect(
-      registrar.register(
-        new RegisterConversationMessage(
-          conversationId.valueOf(),
-          messageId.valueOf(),
-        ),
+    await registrar.registerCandidate(
+      new RegisterConversationMessage(
+        conversationId.valueOf(),
+        messageId.valueOf(),
+        proof.toPrimitives(),
       ),
-    ).rejects.toThrow(InvalidMessageSignatureError);
+      candidate,
+    );
 
-    expect(repository.save).not.toHaveBeenCalled();
+    expect(repository.save).toHaveBeenCalledWith(
+      conversation,
+      new Map([[messageId.valueOf(), expect.objectContaining({})]]),
+    );
   });
 
   it('rejects a remote candidate from a non participant', async () => {
@@ -173,9 +156,6 @@ describe('ConversationMessageRegistrar', () => {
     const conversationId = conversation.getId();
     const messageId = MessageId.generate();
     const outsider = await ConversationMother.generateIdentityId();
-    const signature = new Signature(
-      'lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==',
-    );
     const candidate = MessageSent.create(
       new MessageMetadata(
         messageId,
@@ -183,7 +163,6 @@ describe('ConversationMessageRegistrar', () => {
         outsider,
         [],
         Timestamp.now(),
-        signature,
       ),
       new EncryptedMessagePayload('encrypted-payload'),
     );

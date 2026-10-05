@@ -18,13 +18,14 @@ export default class OrbitDBCommunityChannelMessageIndex {
     value: Record<string, unknown>,
   ): value is OrbitDBCommunityChannelMessageDocument {
     return (
-      value.deleted !== true &&
+      value.removed !== true &&
       value.scopeType === 'community_channel' &&
       this.hasStringFields(value, [
         'authorIdentityId',
         'channelId',
         'communityId',
         'id',
+        'messageId',
         'type',
       ]) &&
       typeof value.createdAt === 'number'
@@ -34,7 +35,7 @@ export default class OrbitDBCommunityChannelMessageIndex {
   public getMessageId(
     document: OrbitDBCommunityChannelMessageDocument,
   ): string {
-    return document.messageId || document.id;
+    return document.messageId;
   }
 
   public async findByChannel(

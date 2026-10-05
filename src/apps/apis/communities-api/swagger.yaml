@@ -834,7 +834,7 @@ paths:
       tags:
         - communities
       summary: Send a community text channel message
-      description: Only community members can send channel messages. Private communities require encryptedPayload and public communities require plaintextPayload. The backend validates the message signature.
+      description: Only community members can send channel messages. Private communities require encryptedPayload and public communities require plaintextPayload. The body carries a client-signed `mutation` for store `messages` (record id `community:<communityId>:<channelId>:<messageId>:<authorIdentityId>`).
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path
@@ -859,7 +859,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommunityChannelMessageResource'
         '409':
-          description: Authenticated identity is not a member, the channel does not exist, or the message signature is invalid.
+          description: Authenticated identity is not a member, the channel does not exist, or the public mutation is invalid.
   /communities/{communityId}/messages/search:
     get:
       tags:
@@ -930,7 +930,7 @@ paths:
       tags:
         - communities
       summary: Edit a community text channel message
-      description: Only the original author can edit a channel message. Private communities require encryptedPayload and public communities require plaintextPayload. The backend validates the edition signature and announces the change through realtime and pubsub events.
+      description: Only the original author can edit a channel message. Private communities require encryptedPayload and public communities require plaintextPayload. The edit carries a signed `mutation` (higher sequence on the same record id) and the backend announces the change through realtime and pubsub events.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path
@@ -960,7 +960,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommunityChannelMessageResource'
         '409':
-          description: Authenticated identity is not the author, the channel does not exist, or the edition signature is invalid.
+          description: Authenticated identity is not the author, the channel does not exist, or the public mutation is invalid.
     delete:
       tags:
         - communities
@@ -995,7 +995,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DeletedCommunityChannelMessageResource'
         '409':
-          description: Authenticated identity is not a member, the channel does not exist, or the deletion signature is invalid.
+          description: Authenticated identity is not a member, the channel does not exist, or the public mutation is invalid.
   /communities/{communityId}/channels/{channelId}/messages/{messageId}/pin:
     post:
       tags:
@@ -1669,9 +1669,6 @@ components:
         plaintextPayload:
           type: string
           description: Present for sent public community messages. Omitted for private messages and poll timeline items.
-        signature:
-          type: string
-          description: Present for sent messages. Omitted for poll timeline items.
         mentions:
           type: array
           description: Visible mention metadata used for permission checks and notifications. Content remains encrypted.
@@ -2075,7 +2072,7 @@ components:
       required:
         - id
         - createdAt
-        - signature
+        - mutation
       properties:
         id:
           type: string
@@ -2087,8 +2084,8 @@ components:
         plaintextPayload:
           type: string
           description: Required for public communities. Plain text payload stored for indexing/search.
-        signature:
-          type: string
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
         mentions:
           type: array
           items:
@@ -2114,21 +2111,15 @@ components:
     DeleteCommunityChannelMessageBody:
       type: object
       required:
-        - id
-        - createdAt
-        - signature
+        - mutation
       properties:
-        id:
-          type: string
-        createdAt:
-          type: integer
-        signature:
-          type: string
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
     PutCommunityChannelMessageBody:
       type: object
       required:
         - createdAt
-        - signature
+        - mutation
       properties:
         createdAt:
           type: integer
@@ -2139,8 +2130,8 @@ components:
         plaintextPayload:
           type: string
           description: Required when editing public community messages. Updated plain text payload stored for indexing/search.
-        signature:
-          type: string
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
         mentions:
           type: array
           items:

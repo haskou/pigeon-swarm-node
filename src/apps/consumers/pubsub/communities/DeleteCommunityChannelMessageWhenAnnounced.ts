@@ -1,21 +1,21 @@
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityChannelMessageDeletion } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageDeletion';
-import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageSignaturePayload';
+import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasDeletedEvent';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
-import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { StalePublicMutationError } from '@app/contexts/public-mutations/domain/errors/StalePublicMutationError';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
-import { assert, Timestamp } from '@haskou/value-objects';
+import { assert } from '@haskou/value-objects';
 
 import { isCommunityPrimitive } from './isCommunityPrimitive';
 
@@ -27,8 +27,6 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
     eventConsumer: DomainEventConsumer,
     private readonly communityRepository: CommunityRepository,
     private readonly messageRepository: CommunityChannelMessageRepository,
-
-    private readonly signatureService: CommunityChannelMessageSignatureDomainService,
   ) {
     super(eventConsumer);
   }
@@ -58,16 +56,42 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
     );
   }
 
+  private async deleteStored(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+    targetMessage: CommunityChannelMessage,
+    proof: PublicMutationProof,
+  ): Promise<boolean> {
+    try {
+      await this.messageRepository.delete(
+        communityId,
+        channelId,
+        targetMessage.getId(),
+        targetMessage.getAuthorIdentityId(),
+        proof,
+      );
+    } catch (error) {
+      if (
+        error instanceof InvalidPublicMutationError ||
+        error instanceof StalePublicMutationError
+      ) {
+        return false;
+      }
+
+      throw error;
+    }
+
+    return true;
+  }
+
   public async handler(event: DomainEvent): Promise<void> {
     if (!isCommunityPrimitive(event.attributes.community)) {
       return;
     }
 
     const deletedByIdentityId = String(event.attributes.deletedByIdentityId);
-    const signature = String(event.attributes.signature || '');
-    const createdAt = Number(event.attributes.createdAt);
 
-    if (!deletedByIdentityId || !signature || !createdAt) {
+    if (!deletedByIdentityId || !event.attributes.mutationProof) {
       return;
     }
 
@@ -94,35 +118,28 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
     }
 
     assert(targetMessage, new CommunityChannelMessageNotFoundError());
+    const proof = PublicMutationProof.fromPrimitives(
+      event.attributes.mutationProof,
+    );
+
     community.deleteChannelMessage(
       actorIdentityId,
       targetMessage,
       channelId,
-      new CommunityChannelMessageDeletion(
-        new CommunityChannelMessageId(String(event.attributes.messageId)),
-        new Signature(signature),
-        new Timestamp(createdAt),
-      ),
-    );
-    this.signatureService.assertValidSignature(
-      actorIdentityId,
-      CommunityChannelMessageSignaturePayload.fromPrimitives({
-        actorIdentityId: actorIdentityId.valueOf(),
-        channelId: channelId.valueOf(),
-        communityId: communityId.valueOf(),
-        createdAt,
-        id: String(event.attributes.messageId),
-        targetMessageId: targetMessageId.valueOf(),
-        type: 'deleted',
-      }),
-      new Signature(signature),
+      proof,
     );
 
-    await this.messageRepository.delete(
+    const deleted = await this.deleteStored(
       communityId,
       channelId,
-      targetMessageId,
+      targetMessage,
+      proof,
     );
+
+    if (!deleted) {
+      return;
+    }
+
     await this.communityRepository.save(canonical);
   }
 }

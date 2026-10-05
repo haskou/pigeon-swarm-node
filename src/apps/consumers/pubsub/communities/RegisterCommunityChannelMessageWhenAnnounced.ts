@@ -55,6 +55,7 @@ export default class RegisterCommunityMessageWhenAnnounced extends Consumer {
     const message = await this.messageRegistrar.registerSent(
       community,
       event.attributes.message,
+      event.attributes.mutationProof,
     );
 
     if (message) {

@@ -1,8 +1,8 @@
 import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { Message } from './entities/messages/Message';
@@ -135,7 +135,7 @@ export class Conversation extends AggregateRoot {
   public sendMessage(
     authorId: IdentityId,
     encryptedPayload: EncryptedMessagePayload,
-    signature: Signature,
+    proof: PublicMutationProof,
     options: MessageSendOptions = MessageSendOptions.empty(),
   ): MessageSent {
     this.assertIsParticipant(authorId);
@@ -150,7 +150,6 @@ export class Conversation extends AggregateRoot {
         authorId,
         messagePreviousMessageIds,
         options.getCreatedAt(),
-        signature,
         options.getReplyToMessageId(),
       ),
       encryptedPayload,
@@ -164,6 +163,7 @@ export class Conversation extends AggregateRoot {
         conversationType: this.type.valueOf(),
         message: message.toPrimitives(),
         messageId: message.getId().valueOf(),
+        mutationProof: proof.toPrimitives(),
         networkId: this.networkId.valueOf(),
         participantIds: this.participantIdValues(),
       }),
@@ -197,7 +197,6 @@ export class Conversation extends AggregateRoot {
   public addPollMessage(
     authorId: IdentityId,
     pollId: PollId,
-    signature: Signature,
     options: MessagePollOptions = MessagePollOptions.empty(),
   ): MessagePoll {
     this.assertIsParticipant(authorId);
@@ -214,7 +213,6 @@ export class Conversation extends AggregateRoot {
         authorId,
         previousMessageIds,
         options.getCreatedAt(),
-        signature,
       ),
       pollId,
     );
@@ -228,7 +226,7 @@ export class Conversation extends AggregateRoot {
     authorId: IdentityId,
     targetMessageId: MessageId,
     encryptedPayload: EncryptedMessagePayload,
-    signature: Signature,
+    proof: PublicMutationProof,
     options: MessageEditOptions = MessageEditOptions.empty(),
   ): MessageEdited {
     this.assertCanChangeMessage(authorId, targetMessageId);
@@ -243,7 +241,6 @@ export class Conversation extends AggregateRoot {
         authorId,
         previousMessageIds,
         options.getCreatedAt(),
-        signature,
       ),
       targetMessageId,
       encryptedPayload,
@@ -254,6 +251,7 @@ export class Conversation extends AggregateRoot {
       new ConversationMessageWasEditedEvent(this.id.valueOf(), {
         message: message.toPrimitives(),
         messageId: message.getId().valueOf(),
+        mutationProof: proof.toPrimitives(),
         networkId: this.networkId.valueOf(),
         participantIds: this.participantIdValues(),
         targetMessageId: targetMessageId.valueOf(),
@@ -266,21 +264,14 @@ export class Conversation extends AggregateRoot {
   public deleteMessage(
     authorId: IdentityId,
     targetMessageId: MessageId,
-    signature: Signature,
+    proof: PublicMutationProof,
     createdAt: Timestamp = Timestamp.now(),
     id: MessageId = MessageId.generate(),
   ): MessageDeleted {
     this.assertCanChangeMessage(authorId, targetMessageId);
 
     const message = MessageDeleted.create(
-      new MessageMetadata(
-        id,
-        this.id,
-        authorId,
-        [targetMessageId],
-        createdAt,
-        signature,
-      ),
+      new MessageMetadata(id, this.id, authorId, [targetMessageId], createdAt),
       targetMessageId,
     );
 
@@ -289,6 +280,7 @@ export class Conversation extends AggregateRoot {
       new ConversationMessageWasDeletedEvent(this.id.valueOf(), {
         message: message.toPrimitives(),
         messageId: message.getId().valueOf(),
+        mutationProof: proof.toPrimitives(),
         networkId: this.networkId.valueOf(),
         participantIds: this.participantIdValues(),
         targetMessageId: targetMessageId.valueOf(),

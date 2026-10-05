@@ -41,7 +41,7 @@ export class PutCommunityChannelMessageRoute extends CommunityRouteSupport {
         mentions: body.mentions,
         messageId,
         plaintextPayload: body.plaintextPayload,
-        signature: body.signature,
+        mutation: body.mutation,
       }),
     );
 

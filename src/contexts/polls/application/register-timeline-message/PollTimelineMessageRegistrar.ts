@@ -30,10 +30,12 @@ export default class PollTimelineMessageRegistrar {
     conversation.addPollMessage(
       message.actorIdentityId,
       message.poll.getId(),
-      message.signature,
-      new MessagePollOptions(message.poll.getCreatedAt()),
+      new MessagePollOptions(message.poll.getCreatedAt(), undefined, []),
     );
-    await this.conversationRepository.save(conversation);
+    await this.conversationRepository.save(
+      conversation,
+      new Map([[message.poll.getId().valueOf(), message.proof]]),
+    );
   }
 
   private async registerCommunityChannelTimelineMessage(
@@ -52,6 +54,7 @@ export default class PollTimelineMessageRegistrar {
         ),
         message.poll.getId(),
       ),
+      message.proof,
     );
   }
 

@@ -1,14 +1,6 @@
-import { IsInt, IsNotEmpty, IsString } from 'class-validator';
+import { IsObject } from 'class-validator';
 
 export class DeleteCommunityChannelMessageBody {
-  @IsInt()
-  public readonly createdAt: number;
-
-  @IsString()
-  @IsNotEmpty()
-  public readonly id: string;
-
-  @IsString()
-  @IsNotEmpty()
-  public readonly signature: string;
+  @IsObject()
+  public readonly mutation: Record<string, unknown>;
 }

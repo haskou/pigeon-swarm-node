@@ -215,7 +215,7 @@ paths:
       tags:
         - conversations
       summary: Delete conversation message
-      description: Creates a signed deleted-message tombstone, publishes a deletion event, invalidates the target message locally and removes the local IPFS block when present. The deletion signature must use previousMessageIds with only the target message id.
+      description: Writes a client-signed immutable deleted-message record (store messages, recordId = body id), publishes a deletion event and removes the local IPFS block when present. Readers hide the target when a deleted message from the same author targets it. The signed record carries previousMessageIds equal to [path messageId].
       parameters:
         - $ref: '#/components/parameters/ConversationId'
         - in: path
@@ -530,7 +530,7 @@ components:
         - id
         - createdAt
         - encryptedPayload
-        - signature
+        - mutation
       properties:
         id:
           type: string
@@ -538,9 +538,8 @@ components:
           type: integer
         encryptedPayload:
           type: string
-        signature:
-          type: string
-          description: Signature of the sent-message canonical payload. Include previousMessageIds and replyToMessageId in the signed payload when present.
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
         previousMessageIds:
           type: array
           description: Optional previous message ids used by the client to sign the message. When included in the signed payload, send the exact same array in the body. When omitted, the node uses an empty list.
@@ -554,27 +553,26 @@ components:
       required:
         - id
         - createdAt
-        - signature
+        - mutation
       properties:
         id:
           type: string
-          description: Client-generated id for the deleted-message tombstone.
+          description: Client-generated id of the deleted-message record (the mutation recordId).
         createdAt:
           type: integer
-        signature:
-          type: string
-          description: Signature of the deleted-message canonical payload, using previousMessageIds equal to the path messageId.
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
     PutConversationMessageBody:
       type: object
       required:
         - id
         - createdAt
         - encryptedPayload
-        - signature
+        - mutation
       properties:
         id:
           type: string
-          description: Client-generated id for the edited-message tombstone.
+          description: Client-generated id of the edited-message record (the mutation recordId).
         createdAt:
           type: integer
         encryptedPayload:
@@ -585,9 +583,8 @@ components:
           description: Optional previous message ids used by the client to sign the edited payload. When omitted, the node uses an array containing the path messageId.
           items:
             type: string
-        signature:
-          type: string
-          description: Signature of the edited-message canonical payload, using targetMessageId equal to the path messageId.
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
     PutConversationMessagesReadUntilBody:
       type: object
       required:

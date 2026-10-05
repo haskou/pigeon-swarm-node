@@ -41,7 +41,7 @@ export class PostCommunityChannelMessageRoute extends CommunityRouteSupport {
         messageId: body.id,
         plaintextPayload: body.plaintextPayload,
         replyToMessageId: body.replyToMessageId,
-        signature: body.signature,
+        mutation: body.mutation,
       }),
     );
 

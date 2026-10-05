@@ -4,6 +4,7 @@ import CommunityInviteRepository from '@app/contexts/communities/domain/reposito
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
+import CommunityChannelMessageMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageMutationPolicy';
 import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy';
 import CommunityInviteMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy';
 import CommunityInviteUseMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy';
@@ -1059,6 +1060,134 @@ describe('PublicMutationGate over polls', () => {
 
     await expect(
       gate.accepts('polls', await sign(poll, creator)),
+    ).resolves.toBe(false);
+  });
+});
+
+describe('PublicMutationGate over community channel messages', () => {
+  const author = 'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=';
+  const moderator =
+    'MCowBQYDK2VwAyEA6q0J5o8mQm0h0v5x1o5J8W2b9GxX0m4mQn3r4Yl7k1c=';
+  const id = `community:c1:ch1:m1:${author}`;
+  const message = {
+    authorIdentityId: author,
+    channelId: 'ch1',
+    communityId: 'c1',
+    createdAt: 1780000000000,
+    encryptedPayload: 'ciphertext',
+    id,
+    mentions: [] as unknown[],
+    messageId: 'm1',
+    scopeType: 'community_channel',
+    type: 'sent',
+  };
+  const tombstone = {
+    authorIdentityId: author,
+    channelId: 'ch1',
+    communityId: 'c1',
+    id,
+    messageId: 'm1',
+    removed: true,
+    scopeType: 'community_channel',
+  };
+  const authorization = mock<PublicMutationAuthorAuthorization>();
+  const communityRepository = mock<CommunityRepository>();
+  const community = mock<Community>();
+  let gate: PublicMutationGate;
+
+  const sign = async (
+    payload: Record<string, unknown>,
+    kind: 'put' | 'delete',
+    sequence: number,
+    identityId = author,
+  ): Promise<Record<string, unknown>> => {
+    const device = await KeyPair.generate();
+    const body = {
+      author: {
+        deviceCredential: device.toPrimitives().publicKey,
+        identityId,
+      },
+      kind,
+      operationId: `operation-${sequence}`.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor: PublicMutationProof.digestOf({ previous: sequence }),
+      recordId: id,
+      sequence,
+      store: 'messages',
+      version: 1,
+    } as const;
+
+    return PublicMutationRecord.withProof(
+      payload,
+      PublicMutationProof.signed(
+        body,
+        device.sign(PublicMutationProof.signingContentOf(body)),
+      ),
+    );
+  };
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    authorization.isAuthorized.mockResolvedValue(true);
+    communityRepository.findById.mockResolvedValue(community);
+    gate = new PublicMutationGate(new PublicMutationVerifier(authorization), [
+      new CommunityChannelMessageMutationPolicy(communityRepository),
+    ]);
+  });
+
+  it('admits a signed message and its author deleting it', async () => {
+    await expect(
+      gate.accepts('messages', await sign(message, 'put', 1)),
+    ).resolves.toBe(true);
+    await expect(
+      gate.accepts('messages', await sign(tombstone, 'delete', 2)),
+    ).resolves.toBe(true);
+  });
+
+  it('admits a moderator tombstone only with the manage permission', async () => {
+    await expect(
+      gate.accepts('messages', await sign(tombstone, 'delete', 2, moderator)),
+    ).resolves.toBe(true);
+    expect(community.manageChannelMessages).toHaveBeenCalled();
+
+    community.manageChannelMessages.mockImplementation(() => {
+      throw new Error('forbidden');
+    });
+    await expect(
+      gate.accepts('messages', await sign(tombstone, 'delete', 2, moderator)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects unsigned, tampered and re-scoped messages', async () => {
+    await expect(gate.accepts('messages', message)).resolves.toBe(false);
+
+    const signed = await sign(message, 'put', 1);
+
+    await expect(
+      gate.accepts('messages', { ...signed, encryptedPayload: 'forged' }),
+    ).resolves.toBe(false);
+    await expect(
+      gate.accepts('messages', {
+        ...signed,
+        channelId: 'ch2',
+        id: `community:c1:ch2:m1:${author}`,
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a message signed by someone other than its author', async () => {
+    await expect(
+      gate.accepts('messages', await sign(message, 'put', 1, moderator)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a message the author may not send', async () => {
+    community.acceptSentChannelMessage.mockImplementation(() => {
+      throw new Error('forbidden');
+    });
+
+    await expect(
+      gate.accepts('messages', await sign(message, 'put', 1)),
     ).resolves.toBe(false);
   });
 });

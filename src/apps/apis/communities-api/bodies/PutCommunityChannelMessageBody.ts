@@ -32,7 +32,6 @@ export class PutCommunityChannelMessageBody {
   @IsNotEmpty()
   public readonly plaintextPayload?: string;
 
-  @IsString()
-  @IsNotEmpty()
-  public readonly signature: string;
+  @IsObject()
+  public readonly mutation: Record<string, unknown>;
 }

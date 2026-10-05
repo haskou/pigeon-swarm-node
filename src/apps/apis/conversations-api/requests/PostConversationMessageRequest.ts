@@ -18,7 +18,7 @@ export class PostConversationMessageRequest {
       new MessageSendPayload(
         this.body.id,
         this.body.encryptedPayload,
-        this.body.signature,
+        this.body.mutation,
         this.body.createdAt,
         this.body.previousMessageIds,
         this.body.replyToMessageId,

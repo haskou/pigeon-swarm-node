@@ -1,3 +1,7 @@
+/**
+ * Immutable, client-signed message record. The stored record is this document
+ * plus the `proof` field; nothing else is allowed in it.
+ */
 export interface OrbitDBConversationMessageDocument extends Record<
   string,
   unknown
@@ -7,18 +11,10 @@ export interface OrbitDBConversationMessageDocument extends Record<
   createdAt: number;
   encryptedPayload?: string;
   id: string;
-  lastEventId?: string;
-  lastEventType?: string;
-  messageId: string;
-  networkId?: string;
   pollId?: string;
   previousMessageIds: string[];
-  receivedAt?: number;
-  recipientIds?: string[];
   replyToMessageId?: string;
   scopeType: 'conversation';
-  signature: string;
   targetMessageId?: string;
   type: string;
-  valid?: boolean;
 }

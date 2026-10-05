@@ -1,12 +1,11 @@
 import { CommunityChannelMessageCandidate } from '@app/apps/consumers/pubsub/communities/CommunityChannelMessageCandidate';
 import CommunityChannelMessageCandidateRegistrar from '@app/apps/consumers/pubsub/communities/CommunityChannelMessageCandidateRegistrar';
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageSignaturePayload';
-import { InvalidCommunityChannelMessageSignatureError } from '@app/contexts/communities/domain/errors/InvalidCommunityChannelMessageSignatureError';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
-import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
+import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { mock, MockProxy } from 'jest-mock-extended';
 
+import { signedMutation } from '../../../../contexts/public-mutations/support/signedMutation';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe('CommunityChannelMessageCandidateRegistrar', () => {
@@ -15,7 +14,6 @@ describe('CommunityChannelMessageCandidateRegistrar', () => {
   const createdAt = 1778513696020;
   const messageId = 'community-message-1';
   const networkId = '550e8400-e29b-41d4-a716-446655440001';
-  const signatureService = new CommunityChannelMessageSignatureDomainService();
 
   let identityMother: IdentityMother;
   let messageRepository: MockProxy<CommunityChannelMessageRepository>;
@@ -26,7 +24,6 @@ describe('CommunityChannelMessageCandidateRegistrar', () => {
     messageRepository = mock<CommunityChannelMessageRepository>();
     registrar = new CommunityChannelMessageCandidateRegistrar(
       messageRepository,
-      signatureService,
     );
   });
 
@@ -74,25 +71,7 @@ describe('CommunityChannelMessageCandidateRegistrar', () => {
     });
   }
 
-  async function signedCandidate(): Promise<CommunityChannelMessageCandidate> {
-    const signaturePayload =
-      CommunityChannelMessageSignaturePayload.fromPrimitives({
-        authorIdentityId: identityMother.id.valueOf(),
-        channelId,
-        communityId,
-        createdAt,
-        encryptedPayload: 'encrypted-payload',
-        id: messageId,
-        mentions: [],
-        plaintextPayload: undefined,
-        replyToMessageId: undefined,
-        type: 'sent',
-      });
-    const signature = await identityMother.encryptedKeyPair.sign(
-      signatureService.getCanonicalSigningContent(signaturePayload),
-      identityMother.password,
-    );
-
+  function candidate(): CommunityChannelMessageCandidate {
     return {
       authorIdentityId: identityMother.id.valueOf(),
       channelId,
@@ -105,15 +84,26 @@ describe('CommunityChannelMessageCandidateRegistrar', () => {
       plaintextPayload: undefined,
       pollId: undefined,
       replyToMessageId: undefined,
-      signature: signature.valueOf(),
       type: 'sent',
     };
   }
 
-  it('persists signed community channel message candidates', async () => {
-    const primitives = await signedCandidate();
+  async function proof() {
+    return (
+      await signedMutation({
+        identityId: identityMother.id.valueOf(),
+        kind: 'put',
+        recordId: `community:${communityId}:${channelId}:${messageId}:${identityMother.id.valueOf()}`,
+        sequence: 1,
+        store: 'messages',
+      })
+    ).toPrimitives();
+  }
 
-    await registrar.registerSent(community(), primitives);
+  it('persists community channel message candidates with their proof', async () => {
+    const mutationProof = await proof();
+
+    await registrar.registerSent(community(), candidate(), mutationProof);
 
     expect(messageRepository.save).toHaveBeenCalledTimes(1);
     expect(
@@ -122,19 +112,17 @@ describe('CommunityChannelMessageCandidateRegistrar', () => {
       authorIdentityId: identityMother.id.valueOf(),
       encryptedPayload: 'encrypted-payload',
       id: messageId,
-      signature: primitives.signature,
     });
+    expect(messageRepository.save.mock.calls[0][1].toPrimitives()).toEqual(
+      mutationProof,
+    );
   });
 
-  it('rejects forged community channel message candidates', async () => {
-    const primitives = await signedCandidate();
+  it('drops candidates that the public mutation gate rejects', async () => {
+    messageRepository.save.mockRejectedValue(new InvalidPublicMutationError());
 
     await expect(
-      registrar.registerSent(community(), {
-        ...primitives,
-        encryptedPayload: 'forged-payload',
-      }),
-    ).rejects.toThrow(InvalidCommunityChannelMessageSignatureError);
-    expect(messageRepository.save).not.toHaveBeenCalled();
+      registrar.registerSent(community(), candidate(), await proof()),
+    ).resolves.toBeUndefined();
   });
 });

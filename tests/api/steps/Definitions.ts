@@ -86,6 +86,7 @@ export default class Definitions {
   private communityChannelId: string | undefined;
   private communityChannelMessageId: string | undefined;
   private communityThreadRootMessageId: string | undefined;
+  private communityMessageCreatedAt = 0;
   private communityId: string | undefined;
   private communityInviteToken: string | undefined;
   private communityMembershipRequestId: string | undefined;
@@ -1836,25 +1837,11 @@ export default class Definitions {
       throw new Error('Community and channel must be created first.');
     }
 
-    const keyPair = await this.ensureIdentityKeyPair();
-    const id = `community-message:${Date.now()}:${randomUUID()}`;
-    const createdAt = Date.now();
-    const payload = {
-      authorIdentityId: this.ownerIdentityId?.valueOf() || '',
-      channelId: this.communityChannelId,
-      communityId: this.communityId,
-      createdAt,
-      encryptedPayload: 'encrypted-community-channel-message-payload',
-      id,
-      type: 'sent',
-    };
-
-    this.body = JSON.stringify({
-      createdAt,
-      encryptedPayload: 'encrypted-community-channel-message-payload',
-      id,
-      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
-    });
+    this.body = JSON.stringify(
+      await this.communityMessageBody({
+        encryptedPayload: 'encrypted-community-channel-message-payload',
+      }),
+    );
   }
 
   @given('I set an encrypted community channel reply body')
@@ -1867,27 +1854,12 @@ export default class Definitions {
       throw new Error('Community, channel and message must be created first.');
     }
 
-    const keyPair = await this.ensureIdentityKeyPair();
-    const id = `community-message:${Date.now()}:${randomUUID()}`;
-    const createdAt = Date.now();
-    const payload = {
-      authorIdentityId: this.ownerIdentityId?.valueOf() || '',
-      channelId: this.communityChannelId,
-      communityId: this.communityId,
-      createdAt,
-      encryptedPayload: 'encrypted-community-channel-reply-payload',
-      id,
-      replyToMessageId: this.communityChannelMessageId,
-      type: 'sent',
-    };
-
-    this.body = JSON.stringify({
-      createdAt,
-      encryptedPayload: 'encrypted-community-channel-reply-payload',
-      id,
-      replyToMessageId: this.communityChannelMessageId,
-      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
-    });
+    this.body = JSON.stringify(
+      await this.communityMessageBody({
+        encryptedPayload: 'encrypted-community-channel-reply-payload',
+        replyToMessageId: this.communityChannelMessageId,
+      }),
+    );
   }
 
   @given('I remember the current community channel message as thread root')
@@ -1916,25 +1888,11 @@ export default class Definitions {
       throw new Error('Community and channel must be created first.');
     }
 
-    const keyPair = await this.ensureIdentityKeyPair();
-    const id = `community-message:${Date.now()}:${randomUUID()}`;
-    const createdAt = Date.now();
-    const payload = {
-      authorIdentityId: this.ownerIdentityId?.valueOf() || '',
-      channelId: this.communityChannelId,
-      communityId: this.communityId,
-      createdAt,
-      id,
-      plaintextPayload: 'plain public searchable community message',
-      type: 'sent',
-    };
-
-    this.body = JSON.stringify({
-      createdAt,
-      id,
-      plaintextPayload: 'plain public searchable community message',
-      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
-    });
+    this.body = JSON.stringify(
+      await this.communityMessageBody({
+        plaintextPayload: 'plain public searchable community message',
+      }),
+    );
   }
 
   @given(
@@ -1945,36 +1903,12 @@ export default class Definitions {
       throw new Error('Community and channel must be created first.');
     }
 
-    const keyPair = await this.ensureIdentityKeyPair();
-    const id = `community-message:${Date.now()}:${randomUUID()}`;
-    const createdAt = Date.now();
-    const mentions: {
-      targetId: string | undefined;
-      type: string;
-    }[] = [
-      {
-        targetId: undefined,
-        type: 'everyone',
-      },
-    ];
-    const payload = {
-      authorIdentityId: this.ownerIdentityId?.valueOf() || '',
-      channelId: this.communityChannelId,
-      communityId: this.communityId,
-      createdAt,
-      encryptedPayload: 'encrypted-community-channel-message-payload',
-      id,
-      mentions,
-      type: 'sent',
-    };
-
-    this.body = JSON.stringify({
-      createdAt,
-      encryptedPayload: 'encrypted-community-channel-message-payload',
-      id,
-      mentions,
-      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
-    });
+    this.body = JSON.stringify(
+      await this.communityMessageBody({
+        encryptedPayload: 'encrypted-community-channel-message-payload',
+        mentions: [{ type: 'everyone' }],
+      }),
+    );
   }
 
   @given('I set a delete community channel message body')
@@ -1987,23 +1921,22 @@ export default class Definitions {
       throw new Error('Community, channel and message must be created first.');
     }
 
-    const keyPair = await this.ensureIdentityKeyPair();
-    const id = `community-message:${Date.now()}:${randomUUID()}:deleted`;
-    const createdAt = Date.now();
-    const payload = {
-      actorIdentityId: this.ownerIdentityId?.valueOf() || '',
-      channelId: this.communityChannelId,
-      communityId: this.communityId,
-      createdAt,
-      id,
-      targetMessageId: this.communityChannelMessageId,
-      type: 'deleted',
-    };
+    const record = this.communityMessageRecord(this.communityChannelMessageId);
 
     this.body = JSON.stringify({
-      createdAt,
-      id,
-      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
+      mutation: await this.communityMessageMutation(
+        {
+          authorIdentityId: record.authorIdentityId,
+          channelId: record.channelId,
+          communityId: record.communityId,
+          id: record.id,
+          messageId: record.messageId,
+          removed: true,
+          scopeType: 'community_channel',
+        },
+        'delete',
+        2,
+      ),
     });
   }
 
@@ -2017,22 +1950,19 @@ export default class Definitions {
       throw new Error('Community, channel and message must be created first.');
     }
 
-    const keyPair = await this.ensureIdentityKeyPair();
-    const createdAt = Date.now();
-    const payload = {
-      authorIdentityId: this.ownerIdentityId?.valueOf() || '',
-      channelId: this.communityChannelId,
-      communityId: this.communityId,
-      createdAt,
+    const editedAt = Date.now();
+    const record = {
+      ...this.communityMessageRecord(this.communityChannelMessageId),
+      editedAt,
       encryptedPayload: 'edited-community-channel-message-payload',
-      id: this.communityChannelMessageId,
-      type: 'edited',
+      mentions: [] as unknown[],
+      type: 'sent',
     };
 
     this.body = JSON.stringify({
-      createdAt,
+      createdAt: editedAt,
       encryptedPayload: 'edited-community-channel-message-payload',
-      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
+      mutation: await this.communityMessageMutation(record, 'put', 1),
     });
   }
 
@@ -2592,27 +2522,22 @@ export default class Definitions {
 
   @given('I set an encrypted conversation message body')
   public async iSetAnEncryptedConversationMessageBody(): Promise<void> {
-    const keyPair = await this.ensureIdentityKeyPair();
     const id = MessageId.generate().valueOf();
     const createdAt = Date.now();
-    const payload = {
-      authorId: this.ownerIdentityId?.valueOf() || '',
-      conversationId: this.conversationId || '',
-      createdAt,
-      encryptedPayload: 'encrypted-message-payload',
-      id,
-      previousMessageIds: [] as string[],
-      replyToMessageId: undefined as string | undefined,
-      targetMessageId: undefined as string | undefined,
-      type: MessageType.SENT.valueOf(),
-    };
 
     this.body = JSON.stringify({
       createdAt,
       encryptedPayload: 'encrypted-message-payload',
       id,
+      mutation: await this.conversationMessageMutation({
+        conversationId: this.conversationId || '',
+        createdAt,
+        encryptedPayload: 'encrypted-message-payload',
+        id,
+        previousMessageIds: [],
+        type: MessageType.SENT.valueOf(),
+      }),
       previousMessageIds: [],
-      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
     });
   }
 
@@ -2622,41 +2547,24 @@ export default class Definitions {
       throw new Error('Message must be created first.');
     }
 
-    const keyPair = await this.ensureIdentityKeyPair();
     const id = MessageId.generate().valueOf();
     const createdAt = Date.now();
-    const payload = {
-      authorId: this.ownerIdentityId?.valueOf() || '',
-      conversationId: this.conversationId || '',
-      createdAt,
-      encryptedPayload: 'encrypted-reply-payload',
-      id,
-      previousMessageIds: [this.messageId],
-      replyToMessageId: this.messageId,
-      targetMessageId: undefined as string | undefined,
-      type: MessageType.SENT.valueOf(),
-    };
 
     this.body = JSON.stringify({
       createdAt,
       encryptedPayload: 'encrypted-reply-payload',
       id,
+      mutation: await this.conversationMessageMutation({
+        conversationId: this.conversationId || '',
+        createdAt,
+        encryptedPayload: 'encrypted-reply-payload',
+        id,
+        previousMessageIds: [this.messageId],
+        replyToMessageId: this.messageId,
+        type: MessageType.SENT.valueOf(),
+      }),
       previousMessageIds: [this.messageId],
       replyToMessageId: this.messageId,
-      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
-    });
-  }
-
-  @given('I set an invalid encrypted conversation message body')
-  public async iSetAnInvalidEncryptedConversationMessageBody(): Promise<void> {
-    await this.iSetAnEncryptedConversationMessageBody();
-
-    const invalidKeyPair = await KeyPair.generate();
-    const parsedBody = JSON.parse(this.body || '{}');
-
-    this.body = JSON.stringify({
-      ...parsedBody,
-      signature: invalidKeyPair.sign('invalid-message-payload').valueOf(),
     });
   }
 
@@ -2666,24 +2574,20 @@ export default class Definitions {
       throw new Error('Conversation and message must be created first.');
     }
 
-    const keyPair = await this.ensureIdentityKeyPair();
     const id = MessageId.generate().valueOf();
     const createdAt = Date.now();
-    const payload = {
-      authorId: this.ownerIdentityId?.valueOf() || '',
-      conversationId: this.conversationId,
-      createdAt,
-      encryptedPayload: undefined as string | undefined,
-      id,
-      previousMessageIds: [this.messageId],
-      targetMessageId: this.messageId,
-      type: MessageType.DELETED.valueOf(),
-    };
 
     this.body = JSON.stringify({
       createdAt,
       id,
-      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
+      mutation: await this.conversationMessageMutation({
+        conversationId: this.conversationId,
+        createdAt,
+        id,
+        previousMessageIds: [this.messageId],
+        targetMessageId: this.messageId,
+        type: MessageType.DELETED.valueOf(),
+      }),
     });
   }
 
@@ -2693,29 +2597,129 @@ export default class Definitions {
       throw new Error('Conversation and message must be created first.');
     }
 
-    const keyPair = await this.ensureIdentityKeyPair();
     const id = MessageId.generate().valueOf();
     const createdAt = Date.now();
     const previousMessageIds = [this.messageId];
-    const payload = {
-      authorId: this.ownerIdentityId?.valueOf() || '',
-      conversationId: this.conversationId,
-      createdAt,
-      encryptedPayload: 'edited-message-payload',
-      id,
-      previousMessageIds,
-      replyToMessageId: undefined as string | undefined,
-      targetMessageId: this.messageId,
-      type: MessageType.EDITED.valueOf(),
-    };
 
     this.body = JSON.stringify({
       createdAt,
       encryptedPayload: 'edited-message-payload',
       id,
+      mutation: await this.conversationMessageMutation({
+        conversationId: this.conversationId,
+        createdAt,
+        encryptedPayload: 'edited-message-payload',
+        id,
+        previousMessageIds,
+        targetMessageId: this.messageId,
+        type: MessageType.EDITED.valueOf(),
+      }),
       previousMessageIds,
-      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
     });
+  }
+
+  private communityMessageRecord(messageId: string): {
+    authorIdentityId: string;
+    channelId: string;
+    communityId: string;
+    createdAt: number;
+    id: string;
+    messageId: string;
+    scopeType: string;
+  } {
+    const authorIdentityId = this.ownerIdentityId?.valueOf() || '';
+
+    return {
+      authorIdentityId,
+      channelId: this.communityChannelId || '',
+      communityId: this.communityId || '',
+      createdAt: this.communityMessageCreatedAt,
+      id: `community:${this.communityId}:${this.communityChannelId}:${messageId}:${authorIdentityId}`,
+      messageId,
+      scopeType: 'community_channel',
+    };
+  }
+
+  private async communityMessageBody(
+    fields: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const messageId = `community-message:${Date.now()}:${randomUUID()}`;
+
+    this.communityMessageCreatedAt = Date.now();
+    const record = {
+      ...this.communityMessageRecord(messageId),
+      mentions: [] as unknown[],
+      ...fields,
+      type: 'sent',
+    };
+
+    return {
+      ...fields,
+      createdAt: this.communityMessageCreatedAt,
+      id: messageId,
+      mutation: await this.communityMessageMutation(record, 'put', 0),
+    };
+  }
+
+  private async communityMessageMutation(
+    payload: Record<string, unknown>,
+    kind: 'delete' | 'put',
+    sequence: number,
+  ): Promise<Record<string, unknown>> {
+    const keyPair = await this.ensureIdentityKeyPair();
+    const identityId = keyPair.toPrimitives().publicKey;
+    const proofBody = {
+      author: { deviceCredential: identityId, identityId },
+      kind,
+      operationId: `api-community-message-${kind}-${sequence}-${randomUUID()}`
+        .replace(/[^A-Za-z0-9_-]/g, '-')
+        .slice(0, 64),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor:
+        sequence === 0
+          ? (null as string | null)
+          : PublicMutationProof.digestOf({ previous: sequence }),
+      recordId: payload.id as string,
+      sequence,
+      store: 'messages',
+      version: 1,
+    } as const;
+
+    return PublicMutationProof.signed(
+      proofBody,
+      keyPair.sign(PublicMutationProof.signingContentOf(proofBody)),
+    ).toPrimitives() as unknown as Record<string, unknown>;
+  }
+
+  private async conversationMessageMutation(
+    fields: Record<string, unknown> & { id: string },
+  ): Promise<Record<string, unknown>> {
+    const keyPair = await this.ensureIdentityKeyPair();
+    const identityId = keyPair.toPrimitives().publicKey;
+    const payload = {
+      ...fields,
+      authorId: identityId,
+      scopeType: 'conversation',
+    };
+    const proofBody = {
+      author: { deviceCredential: identityId, identityId },
+      kind: 'put',
+      operationId: `api-conversation-message-${fields.id}`
+        .replace(/[^A-Za-z0-9_-]/g, '-')
+        .padEnd(22, '0')
+        .slice(0, 64),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor: null as string | null,
+      recordId: fields.id,
+      sequence: 0,
+      store: 'messages',
+      version: 1,
+    } as const;
+
+    return PublicMutationProof.signed(
+      proofBody,
+      keyPair.sign(PublicMutationProof.signingContentOf(proofBody)),
+    ).toPrimitives() as unknown as Record<string, unknown>;
   }
 
   private stickerDetailsOf(body: Record<string, unknown>) {

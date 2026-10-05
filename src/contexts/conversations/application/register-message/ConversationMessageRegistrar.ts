@@ -4,14 +4,10 @@ import { Message } from '../../domain/entities/messages/Message';
 import { ConversationNotFoundError } from '../../domain/errors/ConversationNotFoundError';
 import { RemoteMessageCandidateMismatchError } from '../../domain/errors/RemoteMessageCandidateMismatchError';
 import ConversationRepository from '../../domain/repositories/ConversationRepository';
-import MessageSignatureDomainService from '../../domain/services/MessageSignatureDomainService';
 import { RegisterConversationMessage } from './messages/RegisterConversationMessage';
 
 export default class ConversationMessageRegistrar {
-  constructor(
-    private readonly repository: ConversationRepository,
-    private readonly signatureService: MessageSignatureDomainService,
-  ) {}
+  constructor(private readonly repository: ConversationRepository) {}
 
   private assertCandidateMatchesAnnouncement(
     message: RegisterConversationMessage,
@@ -54,9 +50,12 @@ export default class ConversationMessageRegistrar {
 
     this.assertCandidateMatchesAnnouncement(message, candidate);
 
-    this.signatureService.assertValidMessageSignature(candidate);
-
     conversation.registerMessage(candidate);
-    await this.repository.save(conversation);
+    await this.repository.save(
+      conversation,
+      message.proof
+        ? new Map([[candidate.getId().valueOf(), message.proof]])
+        : undefined,
+    );
   }
 }

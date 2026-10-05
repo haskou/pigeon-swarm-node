@@ -26,6 +26,7 @@ import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { PollOptionId } from '@app/contexts/polls/domain/value-objects/PollOptionId';
 import { PollOptionText } from '@app/contexts/polls/domain/value-objects/PollOptionText';
 import { PollQuestion } from '@app/contexts/polls/domain/value-objects/PollQuestion';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { Timestamp } from '@haskou/value-objects';
@@ -245,12 +246,15 @@ describe('Poll application use cases', () => {
       new PollTimelineMessageRegisterMessage(
         creatorIdentityId,
         conversationPoll,
-        Buffer.alloc(64).toString('base64'),
+        PublicMutationProof.fromPrimitives(await proof()),
       ),
     );
 
     expect(conversation.addPollMessage).toHaveBeenCalledTimes(1);
-    expect(conversationRepository.save).toHaveBeenCalledWith(conversation);
+    expect(conversationRepository.save).toHaveBeenCalledWith(
+      conversation,
+      new Map([['poll-2', expect.anything()]]),
+    );
     expect(communityRepository.save).not.toHaveBeenCalled();
   });
 });
