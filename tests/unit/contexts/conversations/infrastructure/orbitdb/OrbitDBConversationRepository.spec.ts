@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await */
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
@@ -43,7 +44,7 @@ describe('OrbitDBConversationRepository', () => {
     );
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
-    registry.register(mother.networkId.valueOf(), {
+    void registry.register(mother.networkId.valueOf(), {
       conversations: {
         put: jest.fn(async (document) => {
           upsertDocument(conversationDocuments, document);

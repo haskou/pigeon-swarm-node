@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await */
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
@@ -52,7 +53,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
     query = jest.fn(async (matcher) => documents.filter(matcher));
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
-    registry.register('network-1', {
+    void registry.register('network-1', {
       heads: {
         get: headsGet,
         put: headsPut,

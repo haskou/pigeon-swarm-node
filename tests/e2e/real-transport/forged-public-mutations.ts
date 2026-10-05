@@ -1,15 +1,19 @@
 import 'reflect-metadata';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
+import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
 import { CommunityInviteNonce } from '@app/contexts/communities/domain/value-objects/CommunityInviteNonce';
+import OrbitDBCommunityChannelMessageMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityChannelMessageMapper';
 import OrbitDBCommunityInviteMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityInviteMapper';
 import OrbitDBCommunityChannelMessagePinRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessagePinRepository';
+import OrbitDBCommunityChannelMessageRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessageRepository';
 import OrbitDBCommunityInviteRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInviteRepository';
+import CommunityChannelMessageMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageMutationPolicy';
 import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy';
 import CommunityInviteMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
@@ -86,6 +90,7 @@ type Replica = {
     stickerPacks: OrbitDBDatabase;
     stickerUserLibraries: OrbitDBDatabase;
     polls: OrbitDBDatabase;
+    messages: OrbitDBDatabase;
   };
   registry?: OrbitDBReplicatedStateRegistry;
   pins?: OrbitDBCommunityChannelMessagePinRepository;
@@ -95,6 +100,7 @@ type Replica = {
   stickerPacks?: OrbitDBStickerPackRepository;
   stickerLibraries?: OrbitDBStickerUserLibraryRepository;
   polls?: OrbitDBPollRepository;
+  messages?: OrbitDBCommunityChannelMessageRepository;
 };
 
 const networkId = randomUUID();
@@ -166,6 +172,12 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
       sync: false,
       type: 'documents',
     }),
+    messages: await replica.orbitdb.open(`${networkId}/messages`, {
+      AccessController,
+      Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
+      sync: false,
+      type: 'documents',
+    }),
     pins: await replica.orbitdb.open(`${networkId}/pins`, {
       AccessController,
       Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
@@ -219,6 +231,16 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
       new PrivateAuthorizationStorageCoordinator(),
     ),
   );
+  replica.messages = new OrbitDBCommunityChannelMessageRepository(
+    replica.registry,
+    new OrbitDBCommunityChannelMessageMapper(),
+    new PrivateCommunityPublicStorageGuard(
+      {
+        findScope: (): Promise<undefined> => Promise.resolve(undefined),
+      } as never,
+      new PrivateAuthorizationStorageCoordinator(),
+    ),
+  );
   replica.stickerPacks = new OrbitDBStickerPackRepository(replica.registry);
   replica.stickerLibraries = new OrbitDBStickerUserLibraryRepository(
     replica.registry,
@@ -261,7 +283,9 @@ async function main(): Promise<void> {
     assertCanCreateInvite: (): void => undefined,
     authorizeTextChannelPollCreation: (): void => undefined,
     authorizeTextChannelPollVote: (): void => undefined,
+    acceptSentChannelMessage: (): void => undefined,
     manageChannelMessages: (): void => undefined,
+    viewTextChannel: (): void => undefined,
   } as unknown as Community;
   const communities = {
     findById: (): Promise<Community> => Promise.resolve(community),
@@ -277,6 +301,7 @@ async function main(): Promise<void> {
     new PublicMutationVerifier(authorization),
     [
       new CommunityChannelMessagePinMutationPolicy(communities),
+      new CommunityChannelMessageMutationPolicy(communities),
       new ConversationMessagePinMutationPolicy(conversations),
       new NotificationScopeSettingsMutationPolicy(),
       new CommunityInviteMutationPolicy(communities as never),
@@ -808,6 +833,105 @@ async function main(): Promise<void> {
     'closed',
   );
   console.log('PASS poll signed ballot and close applied');
+
+  stage = 'community channel messages are governed too';
+  const messageCommunityId = new CommunityId(randomUUID());
+  const messageChannelId = new CommunityChannelId('channel-messages');
+  const message = CommunityChannelMessage.fromPrimitives({
+    authorIdentityId: author,
+    channelId: messageChannelId.valueOf(),
+    communityId: messageCommunityId.valueOf(),
+    createdAt: 1780000000000,
+    encryptedPayload: 'signed-ciphertext',
+    id: 'message-forged-1',
+    mentions: [],
+    type: 'sent',
+  });
+  const messageDocument = new OrbitDBCommunityChannelMessageMapper().toDocument(
+    message,
+  ) as unknown as Record<string, unknown>;
+  const messageProof = (
+    kind: 'put' | 'delete',
+    sequence: number,
+    payload: Record<string, unknown>,
+  ): PublicMutationProof => {
+    const body = {
+      author: { deviceCredential: author, identityId: author },
+      kind,
+      operationId: `forged-message-${sequence}`.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor:
+        sequence === 0 ? null : PublicMutationProof.digestOf({ previous: 0 }),
+      recordId: payload.id as string,
+      sequence,
+      store: 'messages',
+      version: 1,
+    } as const;
+
+    return PublicMutationProof.signed(
+      body,
+      device.sign(PublicMutationProof.signingContentOf(body)),
+    );
+  };
+  const messageTombstone = {
+    authorIdentityId: author,
+    channelId: messageChannelId.valueOf(),
+    communityId: messageCommunityId.valueOf(),
+    id: messageDocument.id as string,
+    messageId: 'message-forged-1',
+    removed: true,
+    scopeType: 'community_channel',
+  };
+  const storedMessage = (replica: Replica) =>
+    replica.messages!.findById(
+      messageCommunityId,
+      messageChannelId,
+      new CommunityChannelMessageId('message-forged-1'),
+    );
+
+  await honest.messages!.save(message, messageProof('put', 0, messageDocument));
+  await until('message reached the malicious store', async () => {
+    const stored = await malicious.stores!.messages.query!(
+      (record) => record.id === messageDocument.id,
+    );
+
+    return stored.length === 1;
+  });
+  await malicious.stores!.messages.put!({
+    ...messageDocument,
+    editedAt: Date.now() + 10 ** 12,
+    encryptedPayload: 'forged-ciphertext',
+  });
+  await malicious.stores!.messages.put!({
+    ...messageTombstone,
+    updatedAt: Date.now() + 10 ** 12,
+  });
+  await until('forged message records reached honest', async () => {
+    const stored = await honest.stores!.messages.query!(
+      (record) => record.removed === true,
+    );
+
+    return stored.length === 1;
+  });
+  await pause(1500);
+  const served = await storedMessage(honest);
+
+  assert.notEqual(
+    served?.toPrimitives().encryptedPayload,
+    'forged-ciphertext',
+    'forged edit content must never be served',
+  );
+  console.log('PASS forged message records rejected by the honest node');
+
+  await honest.messages!.delete(
+    messageCommunityId,
+    messageChannelId,
+    new CommunityChannelMessageId('message-forged-1'),
+    identity,
+    messageProof('delete', 1, messageTombstone),
+  );
+  assert.equal(await storedMessage(honest), undefined);
+  console.log('PASS message signed removal applied');
 
   stage = 'stickers are governed too';
   const stickerProof = (
