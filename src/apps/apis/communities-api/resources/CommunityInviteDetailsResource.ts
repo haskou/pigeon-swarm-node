@@ -4,4 +4,5 @@ export type CommunityInviteDetailsResource = CommunityInviteResource & {
   communityAvatar?: string;
   communityBanner?: string;
   communityName: string;
+  networkId: string;
 };

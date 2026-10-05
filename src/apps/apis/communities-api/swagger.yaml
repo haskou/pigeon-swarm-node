@@ -1680,6 +1680,7 @@ components:
         - type: object
           required:
             - communityName
+            - networkId
           properties:
             communityAvatar:
               type: string
@@ -1687,6 +1688,9 @@ components:
               type: string
             communityName:
               type: string
+            networkId:
+              type: string
+              description: Network the community belongs to. The invited identity needs it to build the signed member_joined operation.
     CommunityChannelsResource:
       type: object
       required:

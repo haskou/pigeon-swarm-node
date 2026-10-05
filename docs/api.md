@@ -2766,6 +2766,7 @@ Response:
   "inviteToken": "<inviteToken>",
   "communityId": "<communityId>",
   "communityName": "Pigeon Swarm",
+  "networkId": "<networkId>",
   "communityAvatar": "bagaa...",
   "communityBanner": "bagaa...",
   "encryptedCommunityKey": {
@@ -2784,6 +2785,9 @@ Implemented:
 
 - resolve invite metadata by bearer token
 - return minimal community metadata for invite preview
+- return the community `networkId`, which the invited identity, not yet a member
+  and so unable to read `GET /communities/{communityId}`, needs to build the
+  signed `member_joined` operation of the accept
 - return `encryptedCommunityKey` exactly as stored
 - never receive the `#k` fragment secret
 

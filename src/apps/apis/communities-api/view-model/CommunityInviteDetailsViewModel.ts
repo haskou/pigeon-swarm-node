@@ -23,6 +23,7 @@ export class CommunityInviteDetailsViewModel {
       communityAvatar: community.avatar,
       communityBanner: community.banner,
       communityName: community.name,
+      networkId: community.networkId,
     };
   }
 }
