@@ -4907,7 +4907,7 @@ export default class Definitions {
 
     this.response = await this.restClient.delete(
       `/communities/${this.communityId}/members/me`,
-      undefined,
+      this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
   }
