@@ -12,7 +12,6 @@ import {
   join,
   mallory,
   networkId,
-  nonce,
   operation,
   owner,
 } from './CommunityOperationFixtures';
@@ -40,6 +39,105 @@ function shuffled<T>(items: T[], seed: number): T[] {
   }
 
   return result;
+}
+
+function seededRandom(seed: number): () => number {
+  let state = seed;
+
+  return () => {
+    state = (state * 1664525 + 1013904223) % 4294967296;
+
+    return state / 4294967296;
+  };
+}
+
+/**
+ * A random causal graph of operations signed by three identities, where the
+ * owner is the only one allowed to act until roles are handed out. Parents
+ * are picked among the earlier operations, so branches and merges happen.
+ */
+function randomGraph(seed: number): CommunityOperation[] {
+  const next = seededRandom(seed);
+  const pick = <T>(items: T[]): T => items[Math.floor(next() * items.length)];
+  const people = [owner, owner, owner, alice, mallory];
+  const permissions = [
+    'ban_members',
+    'manage_members',
+    'manage_roles',
+    'approve_members',
+  ];
+  const operations = [genesis(next() < 0.5)];
+  const roleIds: string[] = [];
+
+  for (let index = 0; index < 14; index++) {
+    const createdAt = index + 2;
+    const parents = [...new Set([pick(operations), pick(operations)])];
+    const author = pick(people);
+    const target = pick(people);
+    const roleId = CommunityRoleId.derive(
+      communityId.valueOf(),
+      author.valueOf(),
+      createdAt,
+    ).valueOf();
+    const targeting = (action: CommunityOperationAction) =>
+      operation(
+        action,
+        author,
+        { identityId: target.valueOf() },
+        parents,
+        createdAt,
+      );
+    const builders: Array<() => CommunityOperation> = [
+      () => join(parents, target, author),
+      () => join(parents, author, author),
+      () => ban(parents, target, author),
+      () => targeting(CommunityOperationAction.MEMBER_UNBANNED),
+      () => targeting(CommunityOperationAction.MEMBER_KICKED),
+      () =>
+        operation(
+          CommunityOperationAction.MEMBER_LEFT,
+          author,
+          { identityId: author.valueOf() },
+          parents,
+          createdAt,
+        ),
+      () =>
+        operation(
+          CommunityOperationAction.ROLE_CREATED,
+          author,
+          { name: `role-${index}`, permissions: [pick(permissions)], roleId },
+          parents,
+          createdAt,
+        ),
+      () =>
+        operation(
+          CommunityOperationAction.MEMBER_ROLES_UPDATED,
+          author,
+          {
+            identityId: target.valueOf(),
+            roleIds: roleIds.length > 0 ? [pick(roleIds)] : [],
+          },
+          parents,
+          createdAt,
+        ),
+      () =>
+        operation(
+          CommunityOperationAction.COMMUNITY_UPDATED,
+          author,
+          { description: `description-${index}`, name: `name-${index}` },
+          parents,
+          createdAt,
+        ),
+    ];
+    const built = pick(builders)();
+
+    if (built.getAction().isEqual(CommunityOperationAction.ROLE_CREATED)) {
+      roleIds.push(roleId);
+    }
+    operations.push(built);
+  }
+
+  return operations;
 }
 
 describe('CommunityStateFold', () => {
@@ -248,6 +346,44 @@ describe('CommunityStateFold', () => {
       [merged.getHash(), unrelated.getHash()].sort(),
     );
     expect(reference.skipped).toContain(unrelated.getHash());
+  });
+
+  it('folds every random causal graph to one state whatever the arrival order', () => {
+    let applied = 0;
+    let skipped = 0;
+    let forks = 0;
+    let tombstones = 0;
+
+    for (let graph = 1; graph <= 40; graph++) {
+      const operations = randomGraph(graph);
+      const reference = stateOf(operations);
+      const withoutOne = operations.filter(
+        (_, index) => index !== (graph * 7) % operations.length,
+      );
+      const subsetReference = stateOf(withoutOne);
+
+      for (let seed = 1; seed <= 8; seed++) {
+        expect(stateOf(shuffled(operations, seed * 7919 + graph))).toEqual(
+          reference,
+        );
+        expect(stateOf(shuffled(withoutOne, seed * 104729 + graph))).toEqual(
+          subsetReference,
+        );
+      }
+      expect(stateOf([...operations, ...shuffled(operations, graph)])).toEqual(
+        reference,
+      );
+
+      applied += operations.length - reference.skipped.length;
+      skipped += reference.skipped.length;
+      forks += reference.frontier.length > 1 ? 1 : 0;
+      tombstones += reference.deleted ? 1 : 0;
+    }
+
+    expect(applied).toBeGreaterThan(40);
+    expect(skipped).toBeGreaterThan(40);
+    expect(forks).toBeGreaterThan(5);
+    expect(tombstones).toBeGreaterThan(0);
   });
 
   it('orders ready operations by digest and always puts parents first', () => {
