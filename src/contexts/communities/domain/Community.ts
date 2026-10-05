@@ -27,6 +27,7 @@ import { CommunitySettings } from './entities/profile/CommunitySettings';
 import { CommunityOwnerCannotBeKickedError } from './errors/CommunityOwnerCannotBeKickedError';
 import { CommunityOwnerCannotLeaveError } from './errors/CommunityOwnerCannotLeaveError';
 import { CommunityOwnerMismatchError } from './errors/CommunityOwnerMismatchError';
+import { CommunityRequestActorMismatchError } from './errors/CommunityRequestActorMismatchError';
 import { CommunityChannelMessageWasDeletedEvent } from './events/CommunityChannelMessageWasDeletedEvent';
 import { CommunityChannelMessageWasEditedEvent } from './events/CommunityChannelMessageWasEditedEvent';
 import { CommunityChannelMessageWasSentEvent } from './events/CommunityChannelMessageWasSentEvent';
@@ -49,6 +50,7 @@ import { CommunityChannelType } from './value-objects/CommunityChannelType';
 import { CommunityDescription } from './value-objects/CommunityDescription';
 import { CommunityId } from './value-objects/CommunityId';
 import { CommunityInviteMaxUses } from './value-objects/CommunityInviteMaxUses';
+import { CommunityInviteNonce } from './value-objects/CommunityInviteNonce';
 import { CommunityName } from './value-objects/CommunityName';
 import { CommunityPermission } from './value-objects/CommunityPermission';
 import { CommunityRoleId } from './value-objects/CommunityRoleId';
@@ -179,6 +181,38 @@ export class Community extends AggregateRoot {
     );
   }
 
+  private assertInvitationResolvedByParty(
+    author: IdentityId,
+    request: CommunityMembershipRequest,
+  ): void {
+    const isInvitee = request.getIdentityId().isEqual(author);
+    const isCreatorWithdrawing =
+      request.isDeclined() && request.getCreatorIdentityId().isEqual(author);
+
+    if (!isInvitee && !isCreatorWithdrawing) {
+      throw new CommunityRequestActorMismatchError();
+    }
+  }
+
+  private assertRequestResolvedByAuthorized(
+    author: IdentityId,
+    request: CommunityMembershipRequest,
+  ): void {
+    const validator = this.createAccessValidator();
+    const isAutoJoinedRequester =
+      request.isAccepted() &&
+      this.isAutoJoinEnabled() &&
+      request.getIdentityId().isEqual(author);
+
+    if (isAutoJoinedRequester) {
+      this.requestMembership(author);
+    } else if (request.isAccepted()) {
+      validator.assertCanApproveMembers(author);
+    } else if (!request.getIdentityId().isEqual(author)) {
+      validator.assertCanRejectMembers(author);
+    }
+  }
+
   public addMember(actor: IdentityId, member: IdentityId): void {
     this.createAccessValidator().assertCanManageMembers(actor);
     this.join(member);
@@ -186,6 +220,8 @@ export class Community extends AggregateRoot {
 
   public createInvite(
     actor: IdentityId,
+    nonce: CommunityInviteNonce,
+    createdAt: Timestamp,
     expiresAt?: Timestamp,
     maxUses?: CommunityInviteMaxUses,
     encryptedCommunityKey?: EncryptedCommunityInviteKey,
@@ -195,6 +231,8 @@ export class Community extends AggregateRoot {
     const invite = CommunityInvite.create(
       this.id,
       actor,
+      nonce,
+      createdAt,
       expiresAt,
       maxUses,
       encryptedCommunityKey,
@@ -228,6 +266,7 @@ export class Community extends AggregateRoot {
   public inviteMember(
     actor: IdentityId,
     invitedIdentityId: IdentityId,
+    createdAt: Timestamp,
   ): CommunityMembershipRequest {
     this.createAccessValidator().assertCanCreateInvite(actor);
 
@@ -235,6 +274,7 @@ export class Community extends AggregateRoot {
       this.id,
       actor,
       invitedIdentityId,
+      createdAt,
       this.ownerIdentityId,
     );
   }
@@ -242,6 +282,7 @@ export class Community extends AggregateRoot {
   public acceptMembershipRequest(
     actor: IdentityId,
     membershipRequest: CommunityMembershipRequest,
+    updatedAt: Timestamp,
   ): void {
     if (membershipRequest.isRequest()) {
       this.createAccessValidator().assertCanApproveMembers(actor);
@@ -250,20 +291,23 @@ export class Community extends AggregateRoot {
     membershipRequest.accept(
       actor,
       membershipRequest.isRequest() ? actor : this.ownerIdentityId,
+      updatedAt,
     );
     this.join(membershipRequest.getIdentityId());
   }
 
   public acceptMembershipRequestAutomatically(
     membershipRequest: CommunityMembershipRequest,
+    updatedAt: Timestamp,
   ): void {
-    membershipRequest.acceptAutomatically(this.ownerIdentityId);
+    membershipRequest.acceptAutomatically(this.ownerIdentityId, updatedAt);
     this.join(membershipRequest.getIdentityId());
   }
 
   public declineMembershipRequest(
     actor: IdentityId,
     membershipRequest: CommunityMembershipRequest,
+    updatedAt: Timestamp,
   ): void {
     if (membershipRequest.isRequest()) {
       this.createAccessValidator().assertCanRejectMembers(actor);
@@ -272,6 +316,7 @@ export class Community extends AggregateRoot {
     membershipRequest.decline(
       actor,
       membershipRequest.isRequest() ? actor : this.ownerIdentityId,
+      updatedAt,
     );
   }
 
@@ -758,18 +803,55 @@ export class Community extends AggregateRoot {
     this.createAccessValidator().assertIsMember(identityId);
   }
 
+  /**
+   * Whether `author` may publish this exact state of a membership request.
+   * Pending states are written by the creator; resolutions by whoever may
+   * resolve it (requesters self-resolve only when auto-join is enabled).
+   */
+  public assertMembershipRequestAuthoredBy(
+    author: IdentityId,
+    request: CommunityMembershipRequest,
+  ): void {
+    const validator = this.createAccessValidator();
+
+    if (request.isPending()) {
+      if (!request.getCreatorIdentityId().isEqual(author)) {
+        throw new CommunityRequestActorMismatchError();
+      }
+
+      if (request.isInvitation()) validator.assertCanCreateInvite(author);
+      else this.requestMembership(author);
+
+      return;
+    }
+
+    if (request.isInvitation()) {
+      this.assertInvitationResolvedByParty(author, request);
+
+      return;
+    }
+
+    this.assertRequestResolvedByAuthorized(author, request);
+  }
+
+  public assertCanCreateInvite(actor: IdentityId): void {
+    this.createAccessValidator().assertCanCreateInvite(actor);
+  }
+
   public requestMembership(identityId: IdentityId): void {
     this.createAccessValidator().assertIsNotBanned(identityId);
   }
 
   public createMembershipRequest(
     requesterIdentityId: IdentityId,
+    createdAt: Timestamp,
   ): CommunityMembershipRequest {
     this.requestMembership(requesterIdentityId);
 
     return CommunityMembershipRequest.request(
       this.id,
       requesterIdentityId,
+      createdAt,
       this.ownerIdentityId,
     );
   }

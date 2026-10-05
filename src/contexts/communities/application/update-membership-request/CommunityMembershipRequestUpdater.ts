@@ -31,6 +31,7 @@ export default class CommunityMembershipRequestUpdater {
     community.acceptMembershipRequest(
       message.actorIdentityId,
       membershipRequest,
+      message.updatedAt,
     );
     await this.communityRepository.save(community);
     await this.eventPublisher.publish(community.pullDomainEvents());
@@ -48,6 +49,7 @@ export default class CommunityMembershipRequestUpdater {
     community.declineMembershipRequest(
       message.actorIdentityId,
       membershipRequest,
+      message.updatedAt,
     );
     await this.recordModerationLog(community, membershipRequest, message);
   }
@@ -93,7 +95,7 @@ export default class CommunityMembershipRequestUpdater {
       await this.declineRequest(membershipRequest, message);
     }
 
-    await this.requestRepository.save(membershipRequest);
+    await this.requestRepository.save(membershipRequest, message.proof);
     await this.eventPublisher.publish(membershipRequest.pullDomainEvents());
 
     return membershipRequest;

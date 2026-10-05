@@ -5,10 +5,15 @@ export class CommunityInviteDetails {
   constructor(
     private readonly invite: CommunityInvite,
     private readonly community: Community,
+    private readonly uses: number,
   ) {}
 
   public getCommunity(): Community {
     return this.community;
+  }
+
+  public getUses(): number {
+    return this.uses;
   }
 
   public getInvite(): CommunityInvite {

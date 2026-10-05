@@ -1,7 +1,10 @@
 import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { EncryptedCommunityInviteKey } from '@app/contexts/communities/domain/value-objects/EncryptedCommunityInviteKey';
 import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
+import { CommunityInviteNonce } from '@app/contexts/communities/domain/value-objects/CommunityInviteNonce';
+import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
+import { CommunityInviteUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteUses';
+import { EncryptedCommunityInviteKey } from '@app/contexts/communities/domain/value-objects/EncryptedCommunityInviteKey';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -11,35 +14,58 @@ describe('CommunityInvite', () => {
     'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
   );
 
-  it('consumes invite uses when accepted', () => {
-    const invite = CommunityInvite.create(communityId, creatorIdentityId);
+  const createdAt = new Timestamp(1770000000000);
+  const nonce = new CommunityInviteNonce('nonce-0123456789abcdef');
 
-    invite.accept();
+  it('derives its token from community, creator and nonce', () => {
+    const invite = CommunityInvite.create(
+      communityId,
+      creatorIdentityId,
+      nonce,
+      createdAt,
+    );
 
-    expect(invite.toPrimitives().uses).toBe(1);
+    expect(invite.getToken().valueOf()).toBe(
+      CommunityInviteToken.derive(
+        communityId.valueOf(),
+        creatorIdentityId.valueOf(),
+        nonce.valueOf(),
+      ).valueOf(),
+    );
   });
 
-  it('rejects exhausted invites', () => {
-    const invite = CommunityInvite.create(communityId, creatorIdentityId);
-
-    invite.accept();
-
-    expect(() => invite.accept()).toThrow(
-      'Community invite maximum uses exceeded',
+  it('accepts while uses remain and rejects once exhausted', () => {
+    const invite = CommunityInvite.create(
+      communityId,
+      creatorIdentityId,
+      nonce,
+      createdAt,
     );
+
+    expect(() =>
+      invite.checkAcceptanceAvailability(new CommunityInviteUses(0)),
+    ).not.toThrow();
+    expect(() =>
+      invite.checkAcceptanceAvailability(new CommunityInviteUses(1)),
+    ).toThrow('Community invite maximum uses exceeded');
   });
 
   it('rejects expired invites', () => {
     const invite = CommunityInvite.create(
       communityId,
       creatorIdentityId,
+      nonce,
+      createdAt,
       new Timestamp(1770000000000),
       new CommunityInviteMaxUses(1),
     );
 
-    expect(() => invite.accept(new Timestamp(1770000000001))).toThrow(
-      'Community invite has expired',
-    );
+    expect(() =>
+      invite.checkAcceptanceAvailability(
+        new CommunityInviteUses(0),
+        new Timestamp(1770000000001),
+      ),
+    ).toThrow('Community invite has expired');
   });
 
   it('keeps encrypted community key material opaque', () => {
@@ -52,6 +78,8 @@ describe('CommunityInvite', () => {
     const invite = CommunityInvite.create(
       communityId,
       creatorIdentityId,
+      nonce,
+      createdAt,
       undefined,
       new CommunityInviteMaxUses(1),
       encryptedCommunityKey,

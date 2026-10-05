@@ -2399,7 +2399,9 @@ Request:
 
 ```json
 {
-  "identityId": "<newMemberIdentityId>"
+  "identityId": "<newMemberIdentityId>",
+  "createdAt": 1780000000000,
+  "mutation": { "...": "SignedPublicMutation" }
 }
 ```
 
@@ -2430,6 +2432,15 @@ Implemented:
 ```http
 POST /communities/{communityId}/join-requests
 ```
+
+Request body: `{ "createdAt", "mutation", "acceptedAt"?, "acceptedMutation"? }`.
+`mutation` signs a `community_membership_request` document of type `request`
+(creator = identity = requester, `status: "pending"`, `updatedAt = createdAt`).
+The id is the first 24 hex chars of
+`sha256(JSON.stringify([communityId, type, creatorIdentityId, identityId, createdAt]))`.
+For auto-join communities `acceptedAt` and `acceptedMutation` are required:
+the same document with `status: "accepted"`, `updatedAt = acceptedAt` and
+sequence + 1, signed by the requester.
 
 Implemented:
 
@@ -2466,7 +2477,9 @@ Request:
 
 ```json
 {
-  "status": "accepted"
+  "status": "accepted",
+  "updatedAt": 1780000000000,
+  "mutation": { "...": "SignedPublicMutation" }
 }
 ```
 
@@ -2527,7 +2540,10 @@ Request:
     "ciphertext": "base64url"
   },
   "expiresAt": 1770000000000,
-  "maxUses": 1
+  "maxUses": 1,
+  "nonce": "<16-128 chars>",
+  "createdAt": 1780000000000,
+  "mutation": { "...": "SignedPublicMutation" }
 }
 ```
 
@@ -2611,11 +2627,18 @@ Implemented:
 POST /communities/invites/{inviteToken}/accept
 ```
 
+Request body: `{ "usedAt", "mutation" }`. `mutation` signs a
+`community_invite_use` document with id `invite-use:<token>:<identityId>`,
+signed by the acceptor. The invite token is
+`base64url(sha256(JSON.stringify([communityId, creatorIdentityId, nonce])))`.
+Uses are counted as signed use records, so `maxUses` can be exceeded when
+nodes are partitioned.
+
 Implemented:
 
 - require signed request auth from the identity accepting the invite
 - reject missing, expired or exhausted invite tokens
-- consume one invite use
+- record one signed invite use
 - add the authenticated identity as a community member
 - reject banned identities
 - publish `communities.v1.member.was_added` with the updated community

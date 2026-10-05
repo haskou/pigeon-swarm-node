@@ -1,17 +1,24 @@
 import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
-import { CommunityInviteNotFoundError } from '@app/contexts/communities/domain/errors/CommunityInviteNotFoundError';
 import CommunityInviteRepository from '@app/contexts/communities/domain/repositories/CommunityInviteRepository';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
+import { CommunityInviteUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteUses';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { Timestamp } from '@haskou/value-objects';
 
 import PrivateCommunityPublicStorageGuard from '../PrivateCommunityPublicStorageGuard';
 import { OrbitDBCommunityInviteDocument } from './documents/OrbitDBCommunityInviteDocument';
+import { OrbitDBCommunityInviteUseDocument } from './documents/OrbitDBCommunityInviteUseDocument';
 import OrbitDBCommunityInviteMapper from './mappers/OrbitDBCommunityInviteMapper';
 
 export default class OrbitDBCommunityInviteRepository extends CommunityInviteRepository {
   private readonly inviteIndex: OrbitDBHeadIndex<OrbitDBCommunityInviteDocument>;
+
+  private readonly useIndex: OrbitDBHeadIndex<OrbitDBCommunityInviteUseDocument>;
 
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
@@ -20,169 +27,154 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
   ) {
     super();
     this.inviteIndex = new OrbitDBHeadIndex(this.registry, {
-      collectionName: 'invites',
+      collectionName: 'requests',
       documentFromRecord: (record) =>
-        this.isDocument(record) ? record : undefined,
+        this.isInvite(record) ? record : undefined,
       recordId: (record) =>
         typeof record.id === 'string' ? record.id : undefined,
       shouldReplace: (current, candidate) =>
-        this.freshness(current) <= this.freshness(candidate),
+        PublicMutationRecord.replaces(current, candidate) ?? true,
+    });
+    this.useIndex = new OrbitDBHeadIndex(this.registry, {
+      collectionName: 'requests',
+      documentFromRecord: (record) => (this.isUse(record) ? record : undefined),
+      recordId: (record) =>
+        typeof record.id === 'string' ? record.id : undefined,
+      shouldReplace: (current, candidate) =>
+        PublicMutationRecord.replaces(current, candidate) ?? true,
     });
   }
 
-  private hasNumberFields(
-    value: Record<string, unknown>,
-    fields: string[],
-  ): boolean {
-    return fields.every((field) => typeof value[field] === 'number');
-  }
-
-  private hasStringFields(
-    value: Record<string, unknown>,
-    fields: string[],
-  ): boolean {
-    return fields.every((field) => typeof value[field] === 'string');
-  }
-
-  private isDocument(
+  private isInvite(
     value: Record<string, unknown>,
   ): value is OrbitDBCommunityInviteDocument {
-    const hasRequiredFields =
-      value.kind === 'community_invite' &&
-      value.deleted !== true &&
-      this.hasStringFields(value, [
-        'communityId',
-        'creatorIdentityId',
-        'id',
-        'token',
-      ]) &&
-      this.hasNumberFields(value, ['createdAt', 'maxUses', 'uses']);
-
-    if (!hasRequiredFields) return false;
-    const candidate = value as OrbitDBCommunityInviteDocument;
+    if (
+      value.scopeType !== 'community_invite' ||
+      ['communityId', 'creatorIdentityId', 'id', 'nonce', 'token'].some(
+        (field) => typeof value[field] !== 'string',
+      ) ||
+      typeof value.createdAt !== 'number' ||
+      typeof value.maxUses !== 'number'
+    ) {
+      return false;
+    }
 
     try {
-      this.mapper.toDomain(candidate);
+      const invite = this.mapper.toDomain(
+        value as OrbitDBCommunityInviteDocument,
+      );
 
-      return true;
+      return invite.getToken().valueOf() === value.id;
     } catch {
       return false;
     }
+  }
+
+  private isUse(
+    value: Record<string, unknown>,
+  ): value is OrbitDBCommunityInviteUseDocument {
+    return (
+      value.scopeType === 'community_invite_use' &&
+      ['communityId', 'id', 'identityId', 'token'].every(
+        (field) => typeof value[field] === 'string',
+      ) &&
+      typeof value.usedAt === 'number'
+    );
   }
 
   private tokenHeadKey(token: string): string {
     return `community-invite-token:${token}`;
   }
 
-  private communityIndexHeadKey(communityId: CommunityId | string): string {
-    const value =
-      communityId instanceof CommunityId ? communityId.valueOf() : communityId;
-
-    return `community-invite-community-index:${value}`;
+  private useHeadKey(token: string): string {
+    return `community-invite-uses:${token}`;
   }
 
-  private freshness(document: OrbitDBCommunityInviteDocument): number {
-    return document.deletedAt ?? document.createdAt;
-  }
-
-  private async putHeads(
-    document: OrbitDBCommunityInviteDocument,
+  private async put<T extends object>(
+    index: OrbitDBHeadIndex<T>,
+    communityId: CommunityId,
+    key: string,
+    payload: Record<string, unknown>,
+    proof: PublicMutationProof,
   ): Promise<void> {
-    await this.registry.putHeadExactly(this.tokenHeadKey(document.token), {
-      ...document,
-    });
+    const document = PublicMutationRecord.withProof(payload, proof);
 
-    const key = this.communityIndexHeadKey(document.communityId);
-    const invites = this.inviteIndex
-      .deduplicate([...((await this.inviteIndex.find(key)) ?? []), document])
-      .filter(
-        (candidate) =>
-          this.isDocument(candidate) &&
-          candidate.communityId === document.communityId,
-      );
-
-    await this.inviteIndex.putDocuments(
-      key,
-      {
-        communityId: document.communityId,
-        id: key,
-      },
-      invites,
-      { replace: true },
-    );
-  }
-
-  public async consume(invite: CommunityInvite): Promise<CommunityInvite> {
-    const currentInvite = await this.findByToken(invite.getToken());
-
-    if (!currentInvite) {
-      throw new CommunityInviteNotFoundError();
-    }
-
-    currentInvite.accept();
-    await this.save(currentInvite);
-
-    return currentInvite;
-  }
-
-  public async deleteByCommunity(communityId: CommunityId): Promise<void> {
     await this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      const documents =
-        (await this.inviteIndex.find(
-          this.communityIndexHeadKey(communityId),
-        )) ?? [];
-
-      await Promise.all(
-        documents
-          .filter(
-            (document) =>
-              this.isDocument(document) &&
-              document.communityId === communityId.valueOf(),
-          )
-          .map(async (document) => {
-            const tombstone = {
-              ...document,
-              deleted: true,
-              deletedAt: Date.now(),
-            };
-
-            await this.registry.putDocument('requests', tombstone);
-            await this.putHeads(tombstone);
-          }),
+      PublicMutationRecord.assertNotStale(
+        (await index.findRecords(key)).filter(
+          (stored) => stored.id === payload.id,
+        ),
+        document,
       );
+      await this.registry.putDocument('requests', document);
+      await index.putRecord(key, { id: key }, document, [], {
+        recordFilter: (record) => record.communityId === payload.communityId,
+        replace: true,
+      });
     });
+  }
+
+  public async countUses(
+    invite: CommunityInvite,
+  ): Promise<CommunityInviteUses> {
+    const token = invite.getToken().valueOf();
+    const uses = (await this.useIndex.find(this.useHeadKey(token))) ?? [];
+
+    return new CommunityInviteUses(
+      new Set(uses.filter((use) => use.token === token).map((use) => use.id))
+        .size,
+    );
   }
 
   public async findByToken(
     token: CommunityInviteToken,
   ): Promise<CommunityInvite | undefined> {
-    const head = await this.registry.findHead(
-      this.tokenHeadKey(token.valueOf()),
-    );
-    const document = head && this.isDocument(head) ? head : undefined;
+    const [document] = (
+      (await this.inviteIndex.find(this.tokenHeadKey(token.valueOf()))) ?? []
+    ).filter((candidate) => candidate.token === token.valueOf());
 
     if (!document) return undefined;
-    const communityId = new CommunityId(document.communityId);
 
-    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      const lockedHead = await this.registry.findHead(
-        this.tokenHeadKey(token.valueOf()),
-      );
-
-      return lockedHead && this.isDocument(lockedHead)
-        ? this.mapper.toDomain(lockedHead)
-        : undefined;
-    });
+    return this.publicStorageGuard.runWhilePublic(
+      new CommunityId(document.communityId),
+      () => Promise.resolve(this.mapper.toDomain(document)),
+    );
   }
 
-  public async save(invite: CommunityInvite): Promise<void> {
-    const document = this.mapper.toDocument(invite);
-    await this.publicStorageGuard.runWhilePublic(
-      new CommunityId(document.communityId),
-      async () => {
-        await this.registry.putDocument('requests', document);
-        await this.putHeads(document);
+  public async recordUse(
+    invite: CommunityInvite,
+    identityId: IdentityId,
+    usedAt: Timestamp,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    const token = invite.getToken().valueOf();
+
+    await this.put(
+      this.useIndex,
+      invite.getCommunityId(),
+      this.useHeadKey(token),
+      {
+        communityId: invite.getCommunityId().valueOf(),
+        id: `invite-use:${token}:${identityId.valueOf()}`,
+        identityId: identityId.valueOf(),
+        scopeType: 'community_invite_use',
+        token,
+        usedAt: usedAt.valueOf(),
       },
+      proof,
+    );
+  }
+
+  public async save(
+    invite: CommunityInvite,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    await this.put(
+      this.inviteIndex,
+      invite.getCommunityId(),
+      this.tokenHeadKey(invite.getToken().valueOf()),
+      this.mapper.toPayload(invite),
+      proof,
     );
   }
 }

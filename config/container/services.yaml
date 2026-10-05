@@ -373,12 +373,6 @@ services:
     class: /contexts/communities/application/find-community/CommunityFinder
     arguments:
       - '@contexts/communities/domain/repositories/CommunityRepository'
-  contexts/communities/application/find-membership-requests/CommunityMembershipRequestsFinder:
-    class: >-
-      /contexts/communities/application/find-membership-requests/CommunityMembershipRequestsFinder
-    arguments:
-      - >-
-        @contexts/communities/domain/repositories/CommunityMembershipRequestRepository
   contexts/communities/application/manage-channel-draft/CommunityChannelDraftsFinder:
     class: >-
       /contexts/communities/application/manage-channel-draft/CommunityChannelDraftsFinder
@@ -835,6 +829,13 @@ services:
     arguments:
       - '@contexts/communities/application/find-community/CommunityFinder'
       - '@contexts/communities/domain/repositories/CommunityInviteRepository'
+  contexts/communities/application/find-membership-requests/CommunityMembershipRequestsFinder:
+    class: >-
+      /contexts/communities/application/find-membership-requests/CommunityMembershipRequestsFinder
+    arguments:
+      - >-
+        @contexts/communities/domain/repositories/CommunityMembershipRequestRepository
+      - '@contexts/communities/domain/repositories/CommunityRepository'
   contexts/communities/application/find-moderation-logs/CommunityModerationLogsFinder:
     class: >-
       /contexts/communities/application/find-moderation-logs/CommunityModerationLogsFinder
@@ -887,6 +888,18 @@ services:
       /contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageReactionMutationPolicy
     arguments:
       - '@contexts/communities/domain/repositories/CommunityRepository'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
+  contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy:
+    class: >-
+      /contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy
+    arguments:
+      - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
+  contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy:
+    class: >-
+      /contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy
+    arguments:
+      - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/content-replication/application/find-summary/ContentReplicationStatusSummaryFinder:
     class: >-
@@ -1362,6 +1375,15 @@ services:
       - '@contexts/calls/domain/repositories/CallSignalDeliveryRepository'
       - '@contexts/nodes/domain/repositories/NodeRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/communities/application/delete-empty-community/EmptyCommunityDeleter:
+    class: >-
+      /contexts/communities/application/delete-empty-community/EmptyCommunityDeleter
+    arguments:
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+      - >-
+        @contexts/communities/domain/repositories/CommunityChannelMessageRepository
+      - >-
+        @contexts/communities/domain/repositories/CommunityModerationLogRepository
   contexts/communities/application/kick-member/CommunityMemberKicker:
     class: /contexts/communities/application/kick-member/CommunityMemberKicker
     arguments:
@@ -1426,6 +1448,13 @@ services:
       - >-
         @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaMerger
       - '@contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard'
+  contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy:
+    class: >-
+      /contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy
+    arguments:
+      - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
+      - '@contexts/communities/domain/repositories/CommunityInviteRepository'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicaClaimRepository:
     class: >-
       /contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicaClaimRepository
@@ -2121,18 +2150,6 @@ services:
       - >-
         @contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
-  contexts/communities/application/delete-empty-community/EmptyCommunityDeleter:
-    class: >-
-      /contexts/communities/application/delete-empty-community/EmptyCommunityDeleter
-    arguments:
-      - '@contexts/communities/domain/repositories/CommunityRepository'
-      - >-
-        @contexts/communities/domain/repositories/CommunityChannelMessageRepository
-      - '@contexts/communities/domain/repositories/CommunityInviteRepository'
-      - >-
-        @contexts/communities/domain/repositories/CommunityMembershipRequestRepository
-      - >-
-        @contexts/communities/domain/repositories/CommunityModerationLogRepository
   contexts/communities/application/update-membership-request/CommunityMembershipRequestUpdater:
     class: >-
       /contexts/communities/application/update-membership-request/CommunityMembershipRequestUpdater
@@ -2398,6 +2415,12 @@ services:
         @contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy
       - >-
         @contexts/stickers/infrastructure/orbitdb/policies/StickerRecentMutationPolicy
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy
   shared/infrastructure/http/HttpClient: '@shared/infrastructure/http/FetchHttpClient'
   shared/infrastructure/logs/Log: '@shared/infrastructure/logs/WinstonLogger'
   shared/infrastructure/messageBus/MessageBusAdapter: '@shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter'
@@ -2409,7 +2432,7 @@ services:
   contexts/private-authorization/application/provision-scope/PrivateGenesisProjectionAuthorizer: >-
     @contexts/communities/application/apply-private-control/PrivateCommunityGenesisAuthorizer
   contexts/public-mutations/domain/services/PublicMutationPolicy: >-
-    @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy
+    @contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy
   contexts/private-authorization/application/accept-operation/PrivateOperationDecoder: >-
     @contexts/private-authorization/infrastructure/contracts/PrivateControlOperationContract
   contexts/private-authorization/domain/services/PrivateDeviceCredentialCodec: >-

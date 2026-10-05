@@ -1,11 +1,20 @@
 import { StringValueObject } from '@haskou/value-objects';
-import { randomBytes } from 'crypto';
+import { createHash } from 'crypto';
 
 export class CommunityInviteToken extends StringValueObject {
   private static readonly MAX_LENGTH = 128;
 
-  public static generate(): CommunityInviteToken {
-    return new CommunityInviteToken(randomBytes(32).toString('base64url'));
+  /** base64url(sha256(JSON([communityId, creatorIdentityId, nonce]))). */
+  public static derive(
+    communityId: string,
+    creatorIdentityId: string,
+    nonce: string,
+  ): CommunityInviteToken {
+    return new CommunityInviteToken(
+      createHash('sha256')
+        .update(JSON.stringify([communityId, creatorIdentityId, nonce]))
+        .digest('base64url'),
+    );
   }
 
   constructor(value: string | StringValueObject) {

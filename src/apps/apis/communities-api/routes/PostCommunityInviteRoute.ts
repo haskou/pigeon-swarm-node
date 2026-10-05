@@ -24,7 +24,7 @@ export class PostCommunityInviteRoute extends CommunityRouteSupport {
   @Post('/:communityId/invites')
   public async createInvite(
     @Param('communityId') communityId: string,
-    @Body() body: PostCommunityInviteBody | undefined,
+    @Body() body: PostCommunityInviteBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
@@ -33,14 +33,17 @@ export class PostCommunityInviteRoute extends CommunityRouteSupport {
       new CommunityInviteCreateMessage(
         communityId,
         actorIdentityId.valueOf(),
-        body?.expiresAt,
-        body?.maxUses,
-        body?.encryptedCommunityKey,
+        body.nonce,
+        body.createdAt,
+        body.mutation,
+        body.expiresAt,
+        body.maxUses,
+        body.encryptedCommunityKey,
       ),
     );
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new CommunityInviteViewModel(invite).toResource());
+      .send(new CommunityInviteViewModel(invite, 0).toResource());
   }
 }

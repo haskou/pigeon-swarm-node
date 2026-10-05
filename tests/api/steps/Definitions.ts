@@ -5,6 +5,8 @@ import PigeonApplication from '@app/apps/PigeonApplication';
 import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import CallParticipantLeaseExpirationRegistrar from '@app/contexts/calls/application/expire-participant-leases/CallParticipantLeaseExpirationRegistrar';
+import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
+import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
@@ -15,21 +17,21 @@ import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/doma
 import { PairingAuthorization } from '@app/contexts/identity-devices/domain/value-objects/PairingAuthorization';
 import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
 import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/PairingId';
-import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import { NodeNetworkAdderMessage } from '@app/contexts/nodes/application/add-network/messages/NodeNetworkAdderMessage';
 import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNetworkAdder';
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
 import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
 import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
+import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import Ed25519PrivateDeviceCredentialCodec from '@app/contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec';
-import { StickerId } from '@app/contexts/stickers/domain/value-objects/StickerId';
-import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
+import { StickerId } from '@app/contexts/stickers/domain/value-objects/StickerId';
+import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { Kernel } from '@haskou/ddd-kernel';
@@ -70,11 +72,14 @@ type StickerPackDocument = Record<string, unknown> & {
 export default class Definitions {
   private binaryBody: Buffer | undefined;
   private readonly notificationSettingsSequences = new Map<string, number>();
+  private readonly communityRecordSequences = new Map<string, number>();
+  private communityMembershipRequest: Record<string, unknown> | undefined;
   private readonly stickerMutationSequences = new Map<string, number>();
   private readonly stickerPackDocuments = new Map<
     string,
     StickerPackDocument
   >();
+
   private stickerClock = 1_780_000_000_000;
   private body: string | undefined;
   private callId: string | undefined;
@@ -322,6 +327,105 @@ export default class Definitions {
     }
   }
 
+  private signCommunityRecord(
+    payload: Record<string, unknown>,
+    keyPair: KeyPair,
+    sequence?: number,
+  ): Record<string, unknown> {
+    const recordId = String(payload.id);
+    const next = sequence ?? this.communityRecordSequences.get(recordId) ?? 0;
+    const identityId = keyPair.toPrimitives().publicKey;
+    const proofBody = {
+      author: { deviceCredential: identityId, identityId },
+      kind: 'put',
+      operationId: `api-community-${next}-${recordId}`
+        .replace(/[^A-Za-z0-9]/g, '')
+        .slice(0, 22)
+        .padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor:
+        next === 0 ? null : PublicMutationProof.digestOf({ previous: next }),
+      recordId,
+      sequence: next,
+      store: 'requests',
+      version: 1,
+    } as const;
+
+    if (sequence === undefined) {
+      this.communityRecordSequences.set(recordId, next + 1);
+    }
+
+    return PublicMutationProof.signed(
+      proofBody,
+      keyPair.sign(PublicMutationProof.signingContentOf(proofBody)),
+    ).toPrimitives() as unknown as Record<string, unknown>;
+  }
+
+  private communityRequestPayload(
+    type: 'invitation' | 'request',
+    creatorIdentityId: string,
+    identityId: string,
+    createdAt: number,
+  ): Record<string, unknown> {
+    const communityId = String(this.communityId);
+
+    return {
+      communityId,
+      createdAt,
+      creatorIdentityId,
+      id: CommunityRequestId.derive(
+        communityId,
+        type,
+        creatorIdentityId,
+        identityId,
+        createdAt,
+      ).valueOf(),
+      identityId,
+      scopeType: 'community_membership_request',
+      status: 'pending',
+      type,
+      updatedAt: createdAt,
+    };
+  }
+
+  private async signMembershipRequestUpdate(
+    keyPair: KeyPair,
+    identityId?: IdentityId,
+  ): Promise<void> {
+    const request = this.communityMembershipRequest;
+
+    if (!request || !this.communityMembershipRequestId) {
+      throw new Error('Community membership request must be created first.');
+    }
+
+    const body = JSON.parse(this.body ?? '{}');
+    const updatedAt = Math.max(Date.now(), Number(request.updatedAt) + 1);
+    const payload = {
+      communityId: request.communityId,
+      createdAt: request.createdAt,
+      creatorIdentityId: request.creatorIdentityId,
+      id: request.id,
+      identityId: request.identityId,
+      scopeType: 'community_membership_request',
+      status: body.status,
+      type: request.type,
+      updatedAt,
+    };
+
+    this.body = JSON.stringify({
+      ...body,
+      mutation: this.signCommunityRecord(payload, keyPair),
+      updatedAt,
+    });
+    await this.signCurrentRequest(
+      'PATCH',
+      `/communities/membership-requests/${this.communityMembershipRequestId}`,
+      String(Date.now()),
+      keyPair,
+      identityId,
+    );
+  }
+
   private async signCurrentRequest(
     method: string,
     path: string,
@@ -381,6 +485,8 @@ export default class Definitions {
     this.communityId = undefined;
     this.communityInviteToken = undefined;
     this.communityMembershipRequestId = undefined;
+    this.communityMembershipRequest = undefined;
+    this.communityRecordSequences.clear();
     this.communityRoleId = undefined;
     this.concurrentCallResponses = [];
     this.formData = undefined;
@@ -1172,6 +1278,21 @@ export default class Definitions {
       throw new Error('Community must be created first.');
     }
 
+    const keyPair = await this.ensureIdentityKeyPair();
+    const body = JSON.parse(this.body ?? '{}');
+    const createdAt = Date.now();
+    const payload = this.communityRequestPayload(
+      'invitation',
+      String(this.ownerIdentityId?.valueOf()),
+      body.identityId,
+      createdAt,
+    );
+
+    this.body = JSON.stringify({
+      ...body,
+      createdAt,
+      mutation: this.signCommunityRecord(payload, keyPair),
+    });
     await this.signCurrentRequest(
       'POST',
       `/communities/${this.communityId}/members`,
@@ -1184,6 +1305,37 @@ export default class Definitions {
       throw new Error('Community must be created first.');
     }
 
+    const keyPair = await this.ensureIdentityKeyPair();
+    const creatorIdentityId = String(this.ownerIdentityId?.valueOf());
+    const body = JSON.parse(this.body ?? '{}');
+    const nonce = randomUUID().replace(/-/g, '');
+    const createdAt = Date.now();
+    const token = CommunityInviteToken.derive(
+      this.communityId,
+      creatorIdentityId,
+      nonce,
+    ).valueOf();
+    const payload = {
+      communityId: this.communityId,
+      createdAt,
+      creatorIdentityId,
+      ...(body.encryptedCommunityKey && {
+        encryptedCommunityKey: body.encryptedCommunityKey,
+      }),
+      ...(body.expiresAt !== undefined && { expiresAt: body.expiresAt }),
+      id: token,
+      maxUses: body.maxUses,
+      nonce,
+      scopeType: 'community_invite',
+      token,
+    };
+
+    this.body = JSON.stringify({
+      ...body,
+      createdAt,
+      mutation: this.signCommunityRecord(payload, keyPair),
+      nonce,
+    });
     await this.signCurrentRequest(
       'POST',
       `/communities/${this.communityId}/invites`,
@@ -1206,6 +1358,7 @@ export default class Definitions {
     }
 
     this.communityMembershipRequestId = this.response.data.id;
+    this.communityMembershipRequest = this.response.data;
   }
 
   @given('I remember the current community role')
@@ -1409,13 +1562,26 @@ export default class Definitions {
     'the community member signs the current community invite accept request',
   )
   public async theCommunityMemberSignsTheCurrentCommunityInviteAcceptRequest(): Promise<void> {
-    if (!this.communityInviteToken) {
+    if (!this.communityInviteToken || !this.communityId) {
       throw new Error('Community invite must be created first.');
     }
 
     const keyPair = await this.ensureOtherIdentityKeyPair();
+    const identityId = String(this.otherIdentityId?.valueOf());
+    const usedAt = Date.now();
+    const payload = {
+      communityId: this.communityId,
+      id: `invite-use:${this.communityInviteToken}:${identityId}`,
+      identityId,
+      scopeType: 'community_invite_use',
+      token: this.communityInviteToken,
+      usedAt,
+    };
 
-    this.body = undefined;
+    this.body = JSON.stringify({
+      mutation: this.signCommunityRecord(payload, keyPair),
+      usedAt,
+    });
     await this.signCurrentRequest(
       'POST',
       `/communities/invites/${this.communityInviteToken}/accept`,
@@ -1432,8 +1598,26 @@ export default class Definitions {
     }
 
     const keyPair = await this.ensureOtherIdentityKeyPair();
+    const identityId = String(this.otherIdentityId?.valueOf());
+    const createdAt = Date.now();
+    const payload = this.communityRequestPayload(
+      'request',
+      identityId,
+      identityId,
+      createdAt,
+    );
+    const acceptedAt = createdAt + 1;
 
-    this.body = undefined;
+    this.body = JSON.stringify({
+      acceptedAt,
+      acceptedMutation: this.signCommunityRecord(
+        { ...payload, status: 'accepted', updatedAt: acceptedAt },
+        keyPair,
+        1,
+      ),
+      createdAt,
+      mutation: this.signCommunityRecord(payload, keyPair),
+    });
     await this.signCurrentRequest(
       'POST',
       `/communities/${this.communityId}/join-requests`,
@@ -1445,19 +1629,9 @@ export default class Definitions {
 
   @given('the community member signs the current membership request update')
   public async theCommunityMemberSignsTheCurrentMembershipRequestUpdate(): Promise<void> {
-    if (!this.communityMembershipRequestId) {
-      throw new Error('Community membership request must be created first.');
-    }
-
     const keyPair = await this.ensureOtherIdentityKeyPair();
 
-    await this.signCurrentRequest(
-      'PATCH',
-      `/communities/membership-requests/${this.communityMembershipRequestId}`,
-      String(Date.now()),
-      keyPair,
-      this.otherIdentityId,
-    );
+    await this.signMembershipRequestUpdate(keyPair, this.otherIdentityId);
   }
 
   @given('I sign the current community membership requests request')
@@ -1468,14 +1642,9 @@ export default class Definitions {
 
   @given('I sign the current membership request update')
   public async iSignTheCurrentMembershipRequestUpdate(): Promise<void> {
-    if (!this.communityMembershipRequestId) {
-      throw new Error('Community membership request must be created first.');
-    }
+    const keyPair = await this.ensureIdentityKeyPair();
 
-    await this.signCurrentRequest(
-      'PATCH',
-      `/communities/membership-requests/${this.communityMembershipRequestId}`,
-    );
+    await this.signMembershipRequestUpdate(keyPair);
   }
 
   @given('I sign the current community leave request')

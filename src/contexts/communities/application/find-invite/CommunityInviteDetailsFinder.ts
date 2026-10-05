@@ -18,11 +18,13 @@ export default class CommunityInviteDetailsFinder {
     if (!invite) {
       throw new CommunityInviteNotFoundError();
     }
-    invite.checkAcceptanceAvailability();
+    const uses = await this.inviteRepository.countUses(invite);
+
+    invite.checkAcceptanceAvailability(uses);
     const community = await this.communityFinder.findById(
       invite.getCommunityId(),
     );
 
-    return new CommunityInviteDetails(invite, community);
+    return new CommunityInviteDetails(invite, community, uses.valueOf());
   }
 }

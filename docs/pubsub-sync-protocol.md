@@ -294,6 +294,17 @@ Signed public mutations (pins and reactions):
 - `notificationSettings` documents (public scopes only) are governed the same way
   with `scopeType: "notification_settings"`; the author must be the settings
   owner (`identityId`) and the record id is `<identityId>:<scopeKey>`.
+- `requests` documents are governed with three scope types.
+  `community_invite` (author = `creatorIdentityId`; id = token =
+  `base64url(sha256(JSON([communityId, creatorIdentityId, nonce])))`, immutable),
+  `community_invite_use` (author = the acceptor, id
+  `invite-use:<token>:<identityId>`; the use count is the number of use records,
+  so `maxUses` can overshoot while nodes are partitioned) and
+  `community_membership_request` (id derived from community, type, creator,
+  identity and `createdAt`; creator and identity are immutable, the status moves
+  from `pending` to `accepted`/`declined` by the authorised party: invitee,
+  creator, moderator/owner or the requester). Heads are index wrappers under
+  collection `requests`; community deletion writes no unsigned tombstones.
 - `stickerPacks` and `stickerUserLibraries` documents are governed too. Packs use
   `scopeType: "sticker_pack"` (author = `ownerIdentityId`, record id = pack id,
   whole-pack document). The library is three independent record kinds with

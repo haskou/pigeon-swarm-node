@@ -16,15 +16,17 @@ import CommunityMembershipRequestRepository from '@app/contexts/communities/doma
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
+import { CommunityInviteUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteUses';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { mock, MockProxy } from 'jest-mock-extended';
 
+import { signedMutation } from '../../public-mutations/support/signedMutation';
+
 const COMMUNITY_ID = '550e8400-e29b-41d4-a716-446655440000';
 const INVITE_TOKEN = 'invite-token';
-const ACTOR_ID =
-  'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=';
+const ACTOR_ID = 'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=';
 const INVITED_ID =
   'MCowBQYDK2VwAyEACdZwo16pCFQ1jxy5u2ZIOlVxcrx8QTHKDcLqGfWRgFk=';
 
@@ -36,6 +38,20 @@ describe('Community invitation use cases', () => {
   let requestRepository: MockProxy<CommunityMembershipRequestRepository>;
   let eventPublisher: MockProxy<DomainEventPublisher>;
   let moderationLogRecorder: MockProxy<CommunityModerationLogRecorder>;
+  let proof: Record<string, unknown>;
+  const at = 1780000000000;
+
+  beforeAll(async () => {
+    proof = (
+      await signedMutation({
+        identityId: ACTOR_ID,
+        kind: 'put',
+        recordId: INVITE_TOKEN,
+        sequence: 1,
+        store: 'requests',
+      })
+    ).toPrimitives() as unknown as Record<string, unknown>;
+  });
 
   beforeEach(() => {
     community = mock<Community>();
@@ -50,13 +66,17 @@ describe('Community invitation use cases', () => {
     community.pullDomainEvents.mockReturnValue([]);
   });
 
-  it('accepts and consumes an invite before persisting the community', async () => {
-    const message = new CommunityInviteAcceptMessage(INVITE_TOKEN, ACTOR_ID);
+  it('records the invite use before persisting the community', async () => {
+    const message = new CommunityInviteAcceptMessage(
+      INVITE_TOKEN,
+      ACTOR_ID,
+      at,
+      proof,
+    );
     const invite = mock<CommunityInvite>();
-    const acceptedInvite = mock<CommunityInvite>();
     invite.getCommunityId.mockReturnValue(new CommunityId(COMMUNITY_ID));
     inviteRepository.findByToken.mockResolvedValue(invite);
-    inviteRepository.consume.mockResolvedValue(acceptedInvite);
+    inviteRepository.countUses.mockResolvedValue(new CommunityInviteUses(0));
 
     const result = await new CommunityInviteAccepter(
       communityFinder,
@@ -68,10 +88,19 @@ describe('Community invitation use cases', () => {
     expect(community.requestMembership).toHaveBeenCalledWith(
       message.actorIdentityId,
     );
-    expect(inviteRepository.consume).toHaveBeenCalledWith(invite);
+    expect(invite.checkAcceptanceAvailability).toHaveBeenCalledWith(
+      new CommunityInviteUses(0),
+      message.usedAt,
+    );
+    expect(inviteRepository.recordUse).toHaveBeenCalledWith(
+      invite,
+      message.actorIdentityId,
+      message.usedAt,
+      message.proof,
+    );
     expect(community.acceptInvite).toHaveBeenCalledWith(
       message.actorIdentityId,
-      acceptedInvite,
+      invite,
     );
     expect(communityRepository.save).toHaveBeenCalledWith(community);
     expect(eventPublisher.publish).toHaveBeenCalledWith([]);
@@ -87,7 +116,9 @@ describe('Community invitation use cases', () => {
         communityRepository,
         inviteRepository,
         eventPublisher,
-      ).accept(new CommunityInviteAcceptMessage(INVITE_TOKEN, ACTOR_ID)),
+      ).accept(
+        new CommunityInviteAcceptMessage(INVITE_TOKEN, ACTOR_ID, at, proof),
+      ),
     ).rejects.toBeInstanceOf(CommunityInviteNotFoundError);
 
     expect(communityFinder.findById).not.toHaveBeenCalled();
@@ -99,6 +130,9 @@ describe('Community invitation use cases', () => {
     const message = new CommunityInviteCreateMessage(
       COMMUNITY_ID,
       ACTOR_ID,
+      'nonce-0123456789abcdef',
+      at,
+      proof,
       expiresAt,
       5,
     );
@@ -116,11 +150,13 @@ describe('Community invitation use cases', () => {
 
     expect(community.createInvite).toHaveBeenCalledWith(
       message.actorIdentityId,
+      message.nonce,
+      message.createdAt,
       message.expiresAt,
       message.maxUses,
       undefined,
     );
-    expect(inviteRepository.save).toHaveBeenCalledWith(invite);
+    expect(inviteRepository.save).toHaveBeenCalledWith(invite, message.proof);
     expect(eventPublisher.publish).toHaveBeenCalledWith([]);
     expect(moderationLogRecorder.record).toHaveBeenCalledWith(
       community,
@@ -141,6 +177,8 @@ describe('Community invitation use cases', () => {
       COMMUNITY_ID,
       ACTOR_ID,
       INVITED_ID,
+      at,
+      proof,
     );
     const pendingRequest = mock<CommunityMembershipRequest>();
     pendingRequest.isPending.mockReturnValue(true);
@@ -165,6 +203,8 @@ describe('Community invitation use cases', () => {
       COMMUNITY_ID,
       ACTOR_ID,
       INVITED_ID,
+      at,
+      proof,
     );
     const membershipRequest = mock<CommunityMembershipRequest>();
     membershipRequest.getId.mockReturnValue(
@@ -184,8 +224,12 @@ describe('Community invitation use cases', () => {
     expect(community.inviteMember).toHaveBeenCalledWith(
       message.actorIdentityId,
       message.invitedIdentityId,
+      message.createdAt,
     );
-    expect(requestRepository.save).toHaveBeenCalledWith(membershipRequest);
+    expect(requestRepository.save).toHaveBeenCalledWith(
+      membershipRequest,
+      message.proof,
+    );
     expect(eventPublisher.publish).toHaveBeenCalledWith([]);
     expect(moderationLogRecorder.record).toHaveBeenCalledWith(
       community,

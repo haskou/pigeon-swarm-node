@@ -37,9 +37,10 @@ export default class CommunityMemberInviter {
     const membershipRequest = community.inviteMember(
       message.actorIdentityId,
       message.invitedIdentityId,
+      message.createdAt,
     );
 
-    await this.requestRepository.save(membershipRequest);
+    await this.requestRepository.save(membershipRequest, message.proof);
     await this.eventPublisher.publish(membershipRequest.pullDomainEvents());
     await this.moderationLogRecorder.record(
       community,

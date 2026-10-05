@@ -1,12 +1,7 @@
-export interface OrbitDBCommunityInviteDocument extends Record<
-  string,
-  unknown
-> {
+export type OrbitDBCommunityInviteDocument = {
   communityId: string;
   createdAt: number;
   creatorIdentityId: string;
-  deleted?: boolean;
-  deletedAt?: number;
   encryptedCommunityKey?: {
     algorithm: string;
     ciphertext: string;
@@ -15,8 +10,9 @@ export interface OrbitDBCommunityInviteDocument extends Record<
   };
   expiresAt?: number;
   id: string;
-  kind: 'community_invite';
   maxUses: number;
+  nonce: string;
+  proof: Record<string, unknown>;
+  scopeType: 'community_invite';
   token: string;
-  uses: number;
-}
+};

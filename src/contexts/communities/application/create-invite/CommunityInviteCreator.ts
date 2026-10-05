@@ -23,12 +23,14 @@ export default class CommunityInviteCreator {
     const community = await this.communityFinder.findById(message.communityId);
     const invite = community.createInvite(
       message.actorIdentityId,
+      message.nonce,
+      message.createdAt,
       message.expiresAt,
       message.maxUses,
       message.encryptedCommunityKey,
     );
 
-    await this.inviteRepository.save(invite);
+    await this.inviteRepository.save(invite, message.proof);
     await this.eventPublisher.publish(community.pullDomainEvents());
     await this.moderationLogRecorder.record(
       community,
