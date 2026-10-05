@@ -1,3 +1,4 @@
+import { diagSpan } from '@app/contexts/shared/infrastructure/diag/Diag';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
@@ -228,7 +229,10 @@ export default class OrbitDBReplicatedStateRegistry {
     if (!gate?.governs(collection)) return true;
 
     try {
-      return await gate.accepts(collection, record);
+      return await diagSpan(
+        `gate.accepts collection=${collection} id=${String(record.id ?? record.messageId ?? '')}`,
+        () => gate.accepts(collection, record),
+      );
     } catch {
       Kernel.logger.warn?.(
         `Rejected unauthenticated replicated record: collection=${collection}`,
@@ -265,7 +269,12 @@ export default class OrbitDBReplicatedStateRegistry {
     attempt: number = 0,
   ): Promise<Record<string, unknown>> {
     if (!this.mutationGate) return value;
-    const { admitted, degraded } = await this.admitGatedCollections(value);
+    const { admitted, degraded } = await diagSpan(
+      `admitHead keys=${Object.keys(value).join(',')}`,
+      () => this.admitGatedCollections(value),
+      false,
+      100,
+    );
 
     if (degraded && onReadmitted) {
       this.scheduleReadmission(value, onReadmitted, attempt);
@@ -893,7 +902,9 @@ export default class OrbitDBReplicatedStateRegistry {
     const scoped = this.scopedHeadRecord(networkId, key, value);
 
     if (!scoped) return;
-    await stores.heads.put?.(key, scoped);
+    await diagSpan(`heads.put key=${key} network=${networkId}`, async () => {
+      await stores.heads.put?.(key, scoped);
+    });
 
     if (replace) {
       this.replicatedHeads(networkId).set(key, scoped);
@@ -901,7 +912,9 @@ export default class OrbitDBReplicatedStateRegistry {
       this.cacheReplicatedHead(networkId, key, scoped);
     }
     this.markPersistedHeadKey(networkId, key);
-    await this.persistHeadCache(networkId, key, scoped);
+    await diagSpan(`persistHeadCache key=${key} network=${networkId}`, () =>
+      this.persistHeadCache(networkId, key, scoped),
+    );
   }
 
   private cacheReplicatedHead(
@@ -1409,9 +1422,14 @@ export default class OrbitDBReplicatedStateRegistry {
     write: () => Promise<void>,
   ): Promise<void> {
     const previous = this.headWriteQueues.get(key);
+    const labelled = (): Promise<void> =>
+      diagSpan(
+        `headWrite key=${key} queuedBehind=${previous ? 'yes' : 'no'}`,
+        write,
+      );
     const next = previous
-      ? previous.catch((): void => undefined).then(write)
-      : write();
+      ? previous.catch((): void => undefined).then(labelled)
+      : labelled();
     const removeCompletedWrite = (): void => {
       if (this.headWriteQueues.get(key) === next) {
         this.headWriteQueues.delete(key);
@@ -1924,7 +1942,12 @@ export default class OrbitDBReplicatedStateRegistry {
     await Promise.all(
       this.networkStoreEntriesForNetworkIds(targetNetworkIds).map(
         async ({ stores }) => {
-          await this.getStore(stores, storeName)?.put?.(cleanDocument);
+          await diagSpan(
+            `store.put store=${storeName} id=${String(cleanDocument.id ?? '')}`,
+            async () => {
+              await this.getStore(stores, storeName)?.put?.(cleanDocument);
+            },
+          );
         },
       ),
     );

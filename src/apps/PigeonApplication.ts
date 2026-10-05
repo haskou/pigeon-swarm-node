@@ -1,3 +1,4 @@
+import { diag } from '@app/contexts/shared/infrastructure/diag/Diag';
 import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
 import DeviceAuthorizationPublicMutationAuthorization from '@app/contexts/public-mutations/infrastructure/DeviceAuthorizationPublicMutationAuthorization';
 import { Kernel } from '@haskou/ddd-kernel';
@@ -154,6 +155,17 @@ export default class PigeonApplication {
         kernel: this.kernel,
         port: this.kernel.environment.API_PORT,
         preControllerMiddlewares: [
+          (request, response, next) => {
+            const started = Date.now();
+            const label = `http ${request.method} ${request.originalUrl}`;
+
+            if (request.method === 'POST') diag(`${label} arrived`);
+            response.on('finish', () => {
+              if (request.method === 'POST')
+                diag(`${label} finished status=${response.statusCode} took=${Date.now() - started}ms`);
+            });
+            next();
+          },
           (request, _response, next) => {
             HttpRequestContext.run(request, next);
           },

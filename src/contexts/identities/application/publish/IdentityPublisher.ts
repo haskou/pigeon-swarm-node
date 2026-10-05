@@ -1,6 +1,7 @@
 import DeviceAuthorizationProvisioner from '@app/contexts/identity-devices/application/provision/DeviceAuthorizationProvisioner';
 import { DeviceAuthorizationProvisionMessage } from '@app/contexts/identity-devices/application/provision/messages/DeviceAuthorizationProvisionMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { diag, diagSpan } from '@app/contexts/shared/infrastructure/diag/Diag';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { assert } from '@haskou/value-objects';
 
@@ -25,19 +26,29 @@ export default class IdentityPublisher {
   ): Promise<IdentityCandidate> {
     const identity = message.identity;
     const primitives = identity.toPrimitives();
-    const isValid = await this.validator.isValidChainFor(
-      new IdentityId(primitives.id),
-      identity,
-      (externalIdentifier) =>
-        this.repository.findByExternalIdentifier(externalIdentifier),
+
+    diag(`publish enter id=${primitives.id}`);
+    const isValid = await diagSpan(
+      `publish.isValidChainFor id=${primitives.id}`,
+      () =>
+        this.validator.isValidChainFor(
+          new IdentityId(primitives.id),
+          identity,
+          (externalIdentifier) =>
+            this.repository.findByExternalIdentifier(externalIdentifier),
+        ),
+      true,
     );
 
     if (!isValid) {
       throw new InvalidIdentityCandidateError();
     }
 
-    const externalIdentifier =
-      await this.saver.calculateExternalIdentifier(identity);
+    const externalIdentifier = await diagSpan(
+      `publish.calculateExternalIdentifier id=${primitives.id}`,
+      () => this.saver.calculateExternalIdentifier(identity),
+      true,
+    );
 
     const provisionMessage = new DeviceAuthorizationProvisionMessage(
       new IdentityId(primitives.id),
@@ -48,10 +59,18 @@ export default class IdentityPublisher {
       identity.getRecoveryAuthority(),
     );
 
-    await this.deviceAuthorizationProvisioner.provision(provisionMessage);
+    await diagSpan(
+      `publish.provision id=${primitives.id}`,
+      () => this.deviceAuthorizationProvisioner.provision(provisionMessage),
+      true,
+    );
 
     try {
-      const savedExternalIdentifier = await this.saver.save(identity);
+      const savedExternalIdentifier = await diagSpan(
+        `publish.save id=${primitives.id}`,
+        () => this.saver.save(identity),
+        true,
+      );
 
       assert(
         externalIdentifier.isEqual(savedExternalIdentifier),
@@ -77,7 +96,12 @@ export default class IdentityPublisher {
       event.attributes.version = primitives.version;
     }
 
-    await this.eventPublisher.publish(events);
+    await diagSpan(
+      `publish.eventPublisher id=${primitives.id}`,
+      () => this.eventPublisher.publish(events),
+      true,
+    );
+    diag(`publish exit id=${primitives.id}`);
 
     return new IdentityCandidate(externalIdentifier, identity);
   }
