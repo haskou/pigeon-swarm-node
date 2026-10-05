@@ -1,7 +1,7 @@
-import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { Community } from '@app/contexts/communities/domain/Community';
-import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { ShortLivedLookup } from '@app/contexts/public-mutations/infrastructure/ShortLivedLookup';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -20,16 +20,6 @@ export default class PollMutationScopeAccess {
     private readonly communityRepository: CommunityRepository,
     private readonly conversationRepository: ConversationRepository,
   ) {}
-
-  /** Throws unless the identity may create or close polls in the scope. */
-  public assertCanManage(scope: PollScope, identityId: string): Promise<void> {
-    return this.assert(scope, identityId, 'manage');
-  }
-
-  /** Throws unless the identity may vote in the scope. */
-  public assertCanVote(scope: PollScope, identityId: string): Promise<void> {
-    return this.assert(scope, identityId, 'vote');
-  }
 
   private assert(
     scope: PollScope,
@@ -64,5 +54,15 @@ export default class PollMutationScopeAccess {
         }
       },
     });
+  }
+
+  /** Throws unless the identity may create or close polls in the scope. */
+  public assertCanManage(scope: PollScope, identityId: string): Promise<void> {
+    return this.assert(scope, identityId, 'manage');
+  }
+
+  /** Throws unless the identity may vote in the scope. */
+  public assertCanVote(scope: PollScope, identityId: string): Promise<void> {
+    return this.assert(scope, identityId, 'vote');
   }
 }
