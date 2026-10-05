@@ -1,0 +1,38 @@
+name: Diag convergence
+
+on:
+  pull_request:
+    branches: ['main']
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  convergence:
+    name: Convergence wrapper=${{ matrix.wrapper }} sample ${{ matrix.sample }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        wrapper: [on, off]
+        sample: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Disable single-flight wrapper
+        if: matrix.wrapper == 'off'
+        run: |
+          git fetch --depth=1 origin main
+          git checkout FETCH_HEAD -- src/contexts/shared/infrastructure/orbitdb/OrbitDBRuntimeAdapter.ts
+
+      - name: Community convergence
+        run: yarn test:integration:community-convergence
+        timeout-minutes: 6
