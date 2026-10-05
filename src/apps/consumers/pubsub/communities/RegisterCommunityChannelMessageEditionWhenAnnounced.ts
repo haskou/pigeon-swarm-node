@@ -1,4 +1,3 @@
-import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageWasEditedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasEditedEvent';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -48,18 +47,18 @@ export default class RegisterCommunityMessageEdition extends Consumer {
       return;
     }
 
-    const canonical = await this.communityRepository.findById(
+    const community = await this.communityRepository.findById(
       new CommunityId(event.attributes.community.id),
     );
-    const community = Community.fromPrimitives(event.attributes.community);
-    const message = await this.messageRegistrar.registerEdition(
+
+    if (!community) {
+      return;
+    }
+
+    await this.messageRegistrar.registerEdition(
       community,
       event.attributes.message,
       event.attributes.mutationProof,
     );
-
-    if (message) {
-      await this.communityRepository.save(canonical ?? community);
-    }
   }
 }

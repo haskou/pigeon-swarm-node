@@ -40,8 +40,8 @@ export class PutCommunityChannelMessageRoute extends CommunityRouteSupport {
         encryptedPayload: body.encryptedPayload,
         mentions: body.mentions,
         messageId,
-        plaintextPayload: body.plaintextPayload,
         mutation: body.mutation,
+        plaintextPayload: body.plaintextPayload,
       }),
     );
 

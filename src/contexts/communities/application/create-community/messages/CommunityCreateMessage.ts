@@ -1,25 +1,25 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
-import { CommunityProfile } from '../../../domain/entities/profile/CommunityProfile';
-import { CommunitySettings } from '../../../domain/entities/profile/CommunitySettings';
-import { CommunityAvatar } from '../../../domain/value-objects/CommunityAvatar';
-import { CommunityBanner } from '../../../domain/value-objects/CommunityBanner';
-import { CommunityDescription } from '../../../domain/value-objects/CommunityDescription';
-import { CommunityName } from '../../../domain/value-objects/CommunityName';
-import { CommunityVisibility } from '../../../domain/value-objects/CommunityVisibility';
+import { CommunityOperation } from '../../../domain/operations/CommunityOperation';
+import { CommunityId } from '../../../domain/value-objects/CommunityId';
+import { CommunityOperationAction } from '../../../domain/value-objects/CommunityOperationAction';
+import {
+  CommunityOperationMutation,
+  CommunityOperationMutationPrimitives,
+} from '../../record-operation/CommunityOperationMutation';
 
 export class CommunityCreateMessage {
-  public readonly networkId: NetworkId;
-  public readonly ownerIdentityId: IdentityId;
-  public readonly profile: CommunityProfile;
-  public readonly settings: CommunitySettings;
+  public readonly genesis: CommunityOperation;
+  public readonly operation: CommunityOperationMutation;
 
   constructor(
     ownerIdentityId: string,
     networkId: string,
+    nonce: string,
     name: string,
     description: string,
+    operation: CommunityOperationMutationPrimitives,
     avatar?: string,
     banner?: string,
     options: {
@@ -28,18 +28,29 @@ export class CommunityCreateMessage {
       visibility?: string;
     } = {},
   ) {
-    this.ownerIdentityId = new IdentityId(ownerIdentityId);
-    this.networkId = new NetworkId(networkId);
-    this.profile = new CommunityProfile(
-      new CommunityName(name),
-      new CommunityDescription(description),
-      avatar ? new CommunityAvatar(avatar) : undefined,
-      banner ? new CommunityBanner(banner) : undefined,
-    );
-    this.settings = CommunitySettings.create(
-      options.discoverable ?? true,
-      new CommunityVisibility(options.visibility ?? 'private'),
-      options.autoJoinEnabled ?? false,
-    );
+    const owner = new IdentityId(ownerIdentityId);
+    const network = new NetworkId(networkId);
+
+    this.operation = new CommunityOperationMutation(operation);
+    this.genesis = this.operation.build({
+      action: CommunityOperationAction.COMMUNITY_CREATED,
+      args: {
+        autoJoinEnabled: options.autoJoinEnabled ?? false,
+        description,
+        discoverable: options.discoverable ?? true,
+        name,
+        nonce,
+        visibility: options.visibility ?? 'private',
+        ...(avatar ? { avatar } : {}),
+        ...(banner ? { banner } : {}),
+      },
+      author: owner,
+      communityId: CommunityId.derive(
+        network.valueOf(),
+        owner.valueOf(),
+        nonce,
+      ),
+      networkId: network,
+    });
   }
 }

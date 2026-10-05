@@ -76,6 +76,14 @@ export class CommunityChannels {
     return channel;
   }
 
+  public getText(channelId: CommunityChannelId): CommunityTextChannel {
+    return this.findText(channelId);
+  }
+
+  public getVoice(channelId: CommunityChannelId): CommunityVoiceChannel {
+    return this.findVoice(channelId);
+  }
+
   public hasText(channelId: CommunityChannelId): boolean {
     return this.textChannels.some((candidate) =>
       candidate.getId().isEqual(channelId),

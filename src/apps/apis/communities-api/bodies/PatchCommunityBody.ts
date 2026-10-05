@@ -7,6 +7,7 @@ import {
 } from 'class-validator';
 
 import { CommunityModerationLogBody } from './CommunityModerationLogBody';
+import { CommunityOperationBody } from './CommunityOperationBody';
 
 export class PatchCommunityBody {
   @IsOptional()
@@ -34,4 +35,8 @@ export class PatchCommunityBody {
   @Type(() => CommunityModerationLogBody)
   @ValidateNested()
   public readonly moderationLog: CommunityModerationLogBody;
+
+  @Type(() => CommunityOperationBody)
+  @ValidateNested()
+  public readonly operation: CommunityOperationBody;
 }

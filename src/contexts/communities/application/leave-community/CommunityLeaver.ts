@@ -2,6 +2,7 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 
 import { Community } from '../../domain/Community';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
+import { CommunityOperationAction } from '../../domain/value-objects/CommunityOperationAction';
 import CommunityFinder from '../find-community/CommunityFinder';
 import { CommunityLeaveMessage } from './messages/CommunityLeaveMessage';
 
@@ -15,14 +16,14 @@ export default class CommunityLeaver {
   public async leave(message: CommunityLeaveMessage): Promise<Community> {
     const community = await this.communityFinder.findById(message.communityId);
 
-    community.leave(message.actorIdentityId);
+    const operation = message.operation.applyTo(
+      community,
+      message.actorIdentityId,
+      CommunityOperationAction.MEMBER_LEFT,
+      { identityId: message.actorIdentityId.valueOf() },
+    );
 
-    if (community.hasMembers()) {
-      await this.communityRepository.save(community);
-    } else {
-      await this.communityRepository.delete(community);
-    }
-
+    await this.communityRepository.save(operation, message.operation.proof);
     await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;

@@ -35,6 +35,7 @@ export class PostCommunityBanRoute extends CommunityRouteSupport {
         actorIdentityId.valueOf(),
         body.identityId,
         body.moderationLog,
+        body.operation,
         body.reason,
       ),
     );

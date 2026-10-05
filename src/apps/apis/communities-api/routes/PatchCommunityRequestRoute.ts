@@ -37,6 +37,7 @@ export class PatchCommunityRequestRoute extends CommunityRouteSupport {
         body.updatedAt,
         body.mutation,
         body.moderationLog,
+        body.operation,
       ),
     );
 

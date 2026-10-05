@@ -1,4 +1,3 @@
-import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageReactionWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasAddedEvent';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
@@ -60,10 +59,14 @@ export default class RegisterCommunityReactionWhenAdded extends Consumer {
       return;
     }
 
-    const canonical = await this.communityRepository.findById(
+    const community = await this.communityRepository.findById(
       new CommunityId(communityAttributes.id),
     );
-    const community = Community.fromPrimitives(communityAttributes);
+
+    if (!community) {
+      return;
+    }
+
     const communityId = new CommunityId(event.attributes.communityId);
     const channelId = new CommunityChannelId(event.attributes.channelId);
     const messageId = new CommunityChannelMessageId(event.attributes.messageId);
@@ -97,7 +100,5 @@ export default class RegisterCommunityReactionWhenAdded extends Consumer {
 
       throw error;
     }
-
-    await this.communityRepository.save(canonical ?? community);
   }
 }

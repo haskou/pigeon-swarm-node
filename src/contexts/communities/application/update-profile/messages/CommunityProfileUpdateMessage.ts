@@ -9,6 +9,10 @@ import {
   CommunityModerationLogMutation,
   CommunityModerationLogMutationPrimitives,
 } from '../../record-moderation-log/CommunityModerationLogMutation';
+import {
+  CommunityOperationMutation,
+  CommunityOperationMutationPrimitives,
+} from '../../record-operation/CommunityOperationMutation';
 
 export class CommunityProfileUpdateMessage {
   public readonly actorIdentityId: IdentityId;
@@ -19,6 +23,7 @@ export class CommunityProfileUpdateMessage {
   public readonly description: CommunityDescription;
   public readonly discoverable?: boolean;
   public readonly moderationLog: CommunityModerationLogMutation;
+  public readonly operation: CommunityOperationMutation;
   public readonly name: CommunityName;
 
   constructor(params: {
@@ -31,6 +36,7 @@ export class CommunityProfileUpdateMessage {
     discoverable?: boolean;
     moderationLog: CommunityModerationLogMutationPrimitives;
     name: string;
+    operation: CommunityOperationMutationPrimitives;
   }) {
     const {
       actorIdentityId,
@@ -42,6 +48,7 @@ export class CommunityProfileUpdateMessage {
       discoverable,
       moderationLog,
       name,
+      operation,
     } = params;
 
     this.actorIdentityId = new IdentityId(actorIdentityId);
@@ -53,5 +60,6 @@ export class CommunityProfileUpdateMessage {
     this.banner = banner ? new CommunityBanner(banner) : undefined;
     this.discoverable = discoverable;
     this.moderationLog = new CommunityModerationLogMutation(moderationLog);
+    this.operation = new CommunityOperationMutation(operation);
   }
 }

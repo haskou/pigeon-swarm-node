@@ -11,6 +11,7 @@ import { CommunityInvite } from '@app/contexts/communities/domain/entities/invit
 import { CommunityMembershipRequest } from '@app/contexts/communities/domain/entities/membership/CommunityMembershipRequest';
 import { CommunityModerationTarget } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationTarget';
 import { CommunityInviteNotFoundError } from '@app/contexts/communities/domain/errors/CommunityInviteNotFoundError';
+import { CommunityOperationApplier } from '@app/contexts/communities/domain/operations/CommunityOperationApplier';
 import CommunityInviteRepository from '@app/contexts/communities/domain/repositories/CommunityInviteRepository';
 import CommunityMembershipRequestRepository from '@app/contexts/communities/domain/repositories/CommunityMembershipRequestRepository';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
@@ -18,11 +19,13 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
 import { CommunityInviteUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteUses';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
+import { CommunityOperationAction } from '@app/contexts/communities/domain/value-objects/CommunityOperationAction';
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { signedMutation } from '../../public-mutations/support/signedMutation';
+import { genesis } from '../domain/operations/CommunityOperationFixtures';
 
 const COMMUNITY_ID = '550e8400-e29b-41d4-a716-446655440000';
 const INVITE_TOKEN = 'invite-token';
@@ -39,6 +42,11 @@ describe('Community invitation use cases', () => {
   let eventPublisher: MockProxy<DomainEventPublisher>;
   let moderationLogRecorder: MockProxy<CommunityModerationLogRecorder>;
   let proof: Record<string, unknown>;
+  let operation: {
+    createdAt: number;
+    mutation: unknown;
+    parents: string[];
+  };
   const at = 1780000000000;
   const moderationLog = () => ({ createdAt: at, mutation: proof });
 
@@ -52,6 +60,19 @@ describe('Community invitation use cases', () => {
         store: 'requests',
       })
     ).toPrimitives() as unknown as Record<string, unknown>;
+    operation = {
+      createdAt: at,
+      mutation: (
+        await signedMutation({
+          identityId: ACTOR_ID,
+          kind: 'put',
+          recordId: 'operation-1',
+          sequence: 0,
+          store: 'communityOperations',
+        })
+      ).toPrimitives(),
+      parents: [genesis().getHash()],
+    };
   });
 
   beforeEach(() => {
@@ -67,17 +88,21 @@ describe('Community invitation use cases', () => {
     community.pullDomainEvents.mockReturnValue([]);
   });
 
-  it('records the invite use before persisting the community', async () => {
+  it('records the invite use before persisting the signed join', async () => {
+    const created = CommunityOperationApplier.create(genesis());
     const message = new CommunityInviteAcceptMessage(
       INVITE_TOKEN,
       ACTOR_ID,
       at,
       proof,
+      operation,
     );
     const invite = mock<CommunityInvite>();
-    invite.getCommunityId.mockReturnValue(new CommunityId(COMMUNITY_ID));
+    invite.getCommunityId.mockReturnValue(created.getId());
+    invite.getToken.mockReturnValue(new CommunityInviteToken(INVITE_TOKEN));
     inviteRepository.findByToken.mockResolvedValue(invite);
     inviteRepository.countUses.mockResolvedValue(new CommunityInviteUses(0));
+    communityFinder.findById.mockResolvedValue(created);
 
     const result = await new CommunityInviteAccepter(
       communityFinder,
@@ -86,9 +111,6 @@ describe('Community invitation use cases', () => {
       eventPublisher,
     ).accept(message);
 
-    expect(community.requestMembership).toHaveBeenCalledWith(
-      message.actorIdentityId,
-    );
     expect(invite.checkAcceptanceAvailability).toHaveBeenCalledWith(
       new CommunityInviteUses(0),
       message.usedAt,
@@ -99,13 +121,22 @@ describe('Community invitation use cases', () => {
       message.usedAt,
       message.proof,
     );
-    expect(community.acceptInvite).toHaveBeenCalledWith(
-      message.actorIdentityId,
-      invite,
+    const [saved, savedProof] = communityRepository.save.mock.calls[0];
+
+    expect(saved.getAction()).toEqual(CommunityOperationAction.MEMBER_JOINED);
+    expect(saved.getAuthorIdentityId()).toEqual(message.actorIdentityId);
+    expect(saved.getArguments()).toEqual({
+      identityId: ACTOR_ID,
+      method: 'invite_link',
+      reference: INVITE_TOKEN,
+    });
+    expect(savedProof).toBe(message.operation.proof);
+    expect(inviteRepository.recordUse.mock.invocationCallOrder[0]).toBeLessThan(
+      communityRepository.save.mock.invocationCallOrder[0],
     );
-    expect(communityRepository.save).toHaveBeenCalledWith(community);
-    expect(eventPublisher.publish).toHaveBeenCalledWith([]);
-    expect(result).toBe(community);
+    expect(result).toBe(created);
+    expect(result.isMember(message.actorIdentityId)).toBe(true);
+    expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
   });
 
   it('rejects an unknown invite token without mutating a community', async () => {
@@ -118,7 +149,13 @@ describe('Community invitation use cases', () => {
         inviteRepository,
         eventPublisher,
       ).accept(
-        new CommunityInviteAcceptMessage(INVITE_TOKEN, ACTOR_ID, at, proof),
+        new CommunityInviteAcceptMessage(
+          INVITE_TOKEN,
+          ACTOR_ID,
+          at,
+          proof,
+          operation,
+        ),
       ),
     ).rejects.toBeInstanceOf(CommunityInviteNotFoundError);
 

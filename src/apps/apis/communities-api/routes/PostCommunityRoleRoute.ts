@@ -34,6 +34,7 @@ export class PostCommunityRoleRoute extends CommunityRouteSupport {
         body.name,
         body.permissions,
         body.moderationLog,
+        body.operation,
       ),
     );
 

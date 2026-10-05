@@ -797,6 +797,18 @@ export class Community extends AggregateRoot {
     return this.networkId;
   }
 
+  public getRole(roleId: CommunityRoleId): CommunityRole {
+    return this.membership.getRole(roleId);
+  }
+
+  public getTextChannel(channelId: CommunityChannelId): CommunityTextChannel {
+    return this.channels.getText(channelId);
+  }
+
+  public getVoiceChannel(channelId: CommunityChannelId): CommunityVoiceChannel {
+    return this.channels.getVoice(channelId);
+  }
+
   public isIdentifiedBy(communityId: CommunityId): boolean {
     return this.id.isEqual(communityId);
   }

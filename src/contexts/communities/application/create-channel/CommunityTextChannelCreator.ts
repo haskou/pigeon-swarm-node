@@ -7,6 +7,7 @@ import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelI
 import { CommunityChannelType } from '../../domain/value-objects/CommunityChannelType';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
+import { CommunityOperationAction } from '../../domain/value-objects/CommunityOperationAction';
 import CommunityFinder from '../find-community/CommunityFinder';
 import CommunityModerationLogRecorder from '../record-moderation-log/CommunityModerationLogRecorder';
 import { CommunityChannelCreateMessage } from './messages/CommunityChannelCreateMessage';
@@ -23,15 +24,22 @@ export default class CommunityTextChannelCreator {
     message: CommunityChannelCreateMessage,
   ): Promise<CommunityTextChannel> {
     const community = await this.communityFinder.findById(message.communityId);
-    const channel = community.addTextChannel(
-      message.actorIdentityId,
-      message.name,
-      CommunityChannelId.derive(
-        message.communityId.valueOf(),
-        message.actorIdentityId.valueOf(),
-        message.moderationLog.createdAt.valueOf(),
-      ),
+    const channelId = CommunityChannelId.derive(
+      message.communityId.valueOf(),
+      message.actorIdentityId.valueOf(),
+      message.operation.createdAt,
     );
+    const operation = message.operation.applyTo(
+      community,
+      message.actorIdentityId,
+      CommunityOperationAction.CHANNEL_CREATED,
+      {
+        channelId: channelId.valueOf(),
+        name: message.name.valueOf(),
+        type: CommunityChannelType.TEXT.valueOf(),
+      },
+    );
+    const channel = community.getTextChannel(channelId);
 
     await this.moderationLogRecorder.record(
       community,
@@ -47,7 +55,7 @@ export default class CommunityTextChannelCreator {
         type: CommunityChannelType.TEXT.valueOf(),
       },
     );
-    await this.communityRepository.save(community);
+    await this.communityRepository.save(operation, message.operation.proof);
     await this.eventPublisher.publish(community.pullDomainEvents());
 
     return channel;

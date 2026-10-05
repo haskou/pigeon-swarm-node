@@ -37,6 +37,7 @@ export class PostCommunityJoinRequestRoute extends CommunityRouteSupport {
         body.mutation,
         body.acceptedAt,
         body.acceptedMutation,
+        body.operation,
       ),
     );
 

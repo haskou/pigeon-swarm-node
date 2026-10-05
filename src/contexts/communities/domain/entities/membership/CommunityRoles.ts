@@ -69,6 +69,14 @@ export class CommunityRoles {
     return role;
   }
 
+  public get(roleId: CommunityRoleId): CommunityRole {
+    const role = this.findRole(roleId);
+
+    assert(role, new CommunityRoleNotFoundError());
+
+    return role;
+  }
+
   public update(
     roleId: CommunityRoleId,
     name: CommunityRoleName,

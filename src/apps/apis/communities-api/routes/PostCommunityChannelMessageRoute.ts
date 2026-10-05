@@ -39,9 +39,9 @@ export class PostCommunityChannelMessageRoute extends CommunityRouteSupport {
         encryptedPayload: body.encryptedPayload,
         mentions: body.mentions,
         messageId: body.id,
+        mutation: body.mutation,
         plaintextPayload: body.plaintextPayload,
         replyToMessageId: body.replyToMessageId,
-        mutation: body.mutation,
       }),
     );
 

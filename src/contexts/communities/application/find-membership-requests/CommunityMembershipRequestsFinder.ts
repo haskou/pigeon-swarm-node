@@ -12,9 +12,14 @@ export default class CommunityMembershipRequestsFinder {
   public async find(
     message: CommunityMembershipRequestsFindMessage,
   ): Promise<CommunityMembershipRequest[]> {
+    const ownedCommunities = (
+      await this.communityRepository.findByMember(message.identityId)
+    ).filter((community) => community.isOwner(message.identityId));
     const [identityRequests, ownedCommunityRequests] = await Promise.all([
       this.requestRepository.findByIdentity(message.identityId),
-      this.requestRepository.findByOwnedCommunities(message.identityId),
+      this.requestRepository.findByCommunities(
+        ownedCommunities.map((community) => community.getId()),
+      ),
     ]);
     const requestsById = new Map(
       [...identityRequests, ...ownedCommunityRequests].map(

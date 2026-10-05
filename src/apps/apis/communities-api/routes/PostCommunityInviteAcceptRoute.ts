@@ -35,6 +35,7 @@ export class PostCommunityInviteAcceptRoute extends CommunityRouteSupport {
         actorIdentityId.valueOf(),
         body.usedAt,
         body.mutation,
+        body.operation,
       ),
     );
 
