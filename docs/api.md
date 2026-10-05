@@ -2212,8 +2212,91 @@ text channel messages. Community channels are not backed by `Conversation`;
 they live inside the `communities` context.
 
 Implemented mutating endpoints use signed HTTP requests with `X-Identity-Id`,
-`X-Timestamp` and `X-Signature`. Moderation routes additionally carry a
-client-signed `moderationLog` (see *Signed moderation log entries*).
+`X-Timestamp` and `X-Signature`. Every route that changes a community also
+carries a client-signed `operation` (see *Signed community operations*), and
+moderation routes additionally carry a client-signed `moderationLog` (see
+*Signed moderation log entries*).
+
+### Signed community operations
+
+A community is not a replicated document: its state is the deterministic fold of
+the operations its members signed, so a peer cannot forge a role, ban, membership,
+setting or deletion. The node never signs for a user and has no unsigned
+fallback. A route that changes a community takes an `operation` body field:
+
+```json
+{
+  "operation": {
+    "createdAt": 1773848829055,
+    "parents": ["<digest from GET /communities/{id} frontier>"],
+    "mutation": { "...": "SignedPublicMutation" }
+  }
+}
+```
+
+`mutation` signs the operation record (store `communityOperations`, `kind: "put"`,
+`sequence` 0, `predecessor` null, signer = the authenticated identity):
+
+```json
+{
+  "id": "community:<communityId>:op:<digest>",
+  "scopeType": "community_operation",
+  "communityId": "<communityId>",
+  "networkId": "<networkId>",
+  "authorIdentityId": "<identityId>",
+  "action": "channel_created",
+  "args": { "channelId": "<id>", "name": "general", "type": "text" },
+  "parents": ["<digest>"],
+  "createdAt": 1773848829055
+}
+```
+
+`<digest>` is the base64url sha256 of the canonical payload without `id`, and the
+record id and `payloadDigest` bind it. Identity ids in `authorIdentityId` and
+`args.identityId` are the base64 public key without PEM headers. The client reads
+`frontier` from `GET /communities/{communityId}` immediately before signing and
+sends it as the sorted `parents` (the genesis has none). The node rebuilds the
+operation from the path community, the authenticated actor, the action of the
+endpoint, the `args` it derives from the other body fields, and `createdAt` and
+`parents`; the signature only verifies if the client signed exactly that. An
+operation whose author lacks the permission in the history named by `parents`, or
+that names an unknown parent, is rejected. Operations are applied in a total order
+(parents first, lowest digest first among concurrent ones) and each is authorized
+again at that point, so concurrent conflicting changes converge on every node:
+for example a role grant by a member that a concurrent ban ordered earlier is
+skipped. The last member leaving deletes the community and nothing revives it.
+
+| Route | action | `args` |
+| --- | --- | --- |
+| `POST /communities` | `community_created` | `{nonce, name, description, visibility, discoverable, autoJoinEnabled, avatar?, banner?}` |
+| `PATCH /communities/{id}` | `community_updated` | `{name, description, avatar?, banner?, discoverable?, autoJoinEnabled?}` |
+| `POST .../channels/text`, `.../channels/voice` | `channel_created` | `{channelId, name, type}` |
+| `PATCH .../channels/{channelId}` | `channel_renamed` | `{channelId, name}` |
+| `DELETE .../channels/{channelId}` | `channel_deleted` | `{channelId}` |
+| `PATCH .../channels/{channelId}/permissions` | `channel_permissions_updated` | `{channelId, visibleRoleIds}` |
+| `POST .../roles` | `role_created` | `{roleId, name, permissions}` |
+| `PATCH .../roles/{roleId}` | `role_updated` | `{roleId, name, permissions}` |
+| `DELETE .../roles/{roleId}` | `role_deleted` | `{roleId}` |
+| `PUT .../members/{identityId}/roles` | `member_roles_updated` | `{identityId, roleIds}` |
+| `POST .../bans` | `member_banned` | `{identityId}` |
+| `DELETE .../bans/{identityId}` | `member_unbanned` | `{identityId}` |
+| `DELETE .../members/{identityId}/kick` | `member_kicked` | `{identityId}` |
+| `DELETE .../members/me` | `member_left` | `{identityId}` |
+| `POST .../join-requests` (auto-join), `PATCH .../membership-requests/{id}` (accept), `POST .../invites/{token}/accept` | `member_joined` | `{identityId, method, reference?}` |
+
+`member_joined` carries `method` `added`, `approval`, `invitation`, `invite_link` or
+`automatic`, and `reference` exactly for `approval`, `invitation` and
+`invite_link`: the id of the accepted `community_membership_request` (type
+`request` for `approval`, `invitation` for `invitation`), or the invite token
+(which must also have the member's `community_invite_use` record). `approval`
+needs `approve_members`, `added` needs `manage_members`, `automatic` needs
+`autoJoinEnabled`, and the other methods are signed by the joining identity.
+A node that has not replicated the referenced records yet admits the operation
+later.
+
+Channel and role ids are not chosen: `channelId` and `roleId` are the first 24 hex
+characters of `sha256(JSON.stringify(["channel" | "role", communityId,
+authorIdentityId, operation.createdAt]))`.
 
 ### List communities
 
@@ -2331,15 +2414,27 @@ Request:
 ```json
 {
   "networkId": "<networkId>",
+  "nonce": "<random string chosen by the client>",
   "name": "Pigeon Lab",
   "description": "Private workspace",
   "avatar": "<publicAvatarCid>",
   "banner": "<publicBannerCid>",
   "discoverable": true,
   "autoJoinEnabled": false,
-  "visibility": "private"
+  "visibility": "private",
+  "operation": { "createdAt": 1773848829055, "parents": [], "mutation": { "...": "SignedPublicMutation" } }
 }
 ```
+
+The genesis is a `community_created` operation signed by the owner with no
+parents. The community id is not chosen by the node:
+`communityId = base64url(sha256(canonicalize({ networkId, nonce, ownerIdentityId })))`
+(RFC 8785 canonical JSON, `ownerIdentityId` without PEM headers), so the client
+computes it before signing and a replayed genesis cannot be moved to another
+owner or network. The signed `args` carry the values the node applies
+(`discoverable` true, `autoJoinEnabled` false and `visibility` `private` when the
+body omits them). The Community document is rebuilt from the operations on every
+node and is never accepted as a replicated record.
 
 Implemented:
 
@@ -2370,6 +2465,8 @@ Implemented:
 
 - require signed request auth
 - only allow community members to read the community
+- return `frontier` (sorted operation digests), the `parents` for the next signed
+  operation
 
 ### Update community profile
 
@@ -2386,9 +2483,13 @@ Request:
   "avatar": "<publicAvatarCid>",
   "banner": "<publicBannerCid>",
   "discoverable": false,
-  "autoJoinEnabled": true
+  "autoJoinEnabled": true,
+  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
 }
 ```
+
+The `operation` signs a `community_updated` operation whose `args` are the other
+body fields.
 
 Implemented:
 
@@ -2450,6 +2551,10 @@ Response:
 }
 ```
 
+The invitation is a signed `requests` record only and carries no `operation`:
+the invitee joins by signing `member_joined` (`method: "invitation"`,
+`reference: <requestId>`) when they accept.
+
 Implemented:
 
 - require signed request auth from the community owner
@@ -2463,14 +2568,16 @@ Implemented:
 POST /communities/{communityId}/join-requests
 ```
 
-Request body: `{ "createdAt", "mutation", "acceptedAt"?, "acceptedMutation"? }`.
+Request body: `{ "createdAt", "mutation", "acceptedAt"?, "acceptedMutation"?, "operation"? }`.
 `mutation` signs a `community_membership_request` document of type `request`
 (creator = identity = requester, `status: "pending"`, `updatedAt = createdAt`).
 The id is the first 24 hex chars of
 `sha256(JSON.stringify([communityId, type, creatorIdentityId, identityId, createdAt]))`.
-For auto-join communities `acceptedAt` and `acceptedMutation` are required:
-the same document with `status: "accepted"`, `updatedAt = acceptedAt` and
-sequence + 1, signed by the requester.
+For auto-join communities `acceptedAt`, `acceptedMutation` and `operation` are
+required: `acceptedMutation` is the same document with `status: "accepted"`,
+`updatedAt = acceptedAt` and sequence + 1, signed by the requester, and
+`operation` signs `member_joined` with `args` `{identityId: <requester>,
+method: "automatic"}` and no `reference`.
 
 Implemented:
 
@@ -2509,9 +2616,17 @@ Request:
 {
   "status": "accepted",
   "updatedAt": 1780000000000,
-  "mutation": { "...": "SignedPublicMutation" }
+  "mutation": { "...": "SignedPublicMutation" },
+  "moderationLog": { "createdAt": 1780000000000, "mutation": { "...": "SignedPublicMutation" } },
+  "operation": { "createdAt": 1780000000000, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
 }
 ```
+
+`operation` is required when `status` is `accepted` and signs `member_joined`
+with `args` `{identityId: <request.identityId>, method, reference: <requestId>}`:
+`method` is `approval` for a `request` (signed by a member with
+`approve_members`) and `invitation` for an `invitation` (signed by the invited
+identity). It is not sent when `status` is `declined`.
 
 Implemented:
 
@@ -2528,6 +2643,9 @@ Implemented:
 DELETE /communities/{communityId}/members/me
 ```
 
+Body: `{ "operation": { "createdAt", "parents", "mutation" } }`, signing
+`member_left` with `args` `{identityId: <actor>}`.
+
 Implemented:
 
 - require signed request auth from the member that is leaving
@@ -2541,6 +2659,9 @@ Implemented:
 ```http
 DELETE /communities/{communityId}/members/{identityId}/kick
 ```
+
+Body: `{ "operation": { "createdAt", "parents", "mutation" } }`, signing
+`member_kicked` with `args` `{identityId: <target>}`.
 
 Implemented:
 
@@ -2657,12 +2778,15 @@ Implemented:
 POST /communities/invites/{inviteToken}/accept
 ```
 
-Request body: `{ "usedAt", "mutation" }`. `mutation` signs a
+Request body: `{ "usedAt", "mutation", "operation" }`. `mutation` signs a
 `community_invite_use` document with id `invite-use:<token>:<identityId>`,
 signed by the acceptor. The invite token is
 `base64url(sha256(JSON.stringify([communityId, creatorIdentityId, nonce])))`.
 Uses are counted as signed use records, so `maxUses` can be exceeded when
-nodes are partitioned.
+nodes are partitioned. `operation` signs `member_joined` with `args`
+`{identityId: <acceptor>, method: "invite_link", reference: <inviteToken>}`; the
+operation is only admitted by a node that also holds the signed invite and the
+acceptor's `invite-use:<token>:<identityId>` record.
 
 Implemented:
 
@@ -2686,7 +2810,9 @@ Ban request:
 ```json
 {
   "identityId": "<identityId>",
-  "reason": "optional moderation note"
+  "reason": "optional moderation note",
+  "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "SignedPublicMutation" } },
+  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
 }
 ```
 
@@ -2800,12 +2926,15 @@ match what was signed and the actor holds the permission for the action.
 | `PATCH /communities/membership-requests/{requestId}` | `membership_request_accepted` or `membership_request_declined` | membership_request, `requestId` | `{identityId, type}` of the request |
 | `DELETE .../channels/{channelId}/messages/{messageId}` | `message_deleted` | message, `messageId` | `{channelId, targetMessageAuthorId}` |
 
-Channel and role creation use `moderationLog.createdAt` as the `createdAt`
-input of the derived channel/role id (`sha256(JSON.stringify(["channel" |
-"role", communityId, actorIdentityId, createdAt]))`, first 24 hex characters),
-so the id in the log target is the id the node assigns. The routes that used to
-take no body (`DELETE` channel, role and ban) now take
-`{ "moderationLog": { "createdAt", "mutation" } }`.
+Channel and role creation derive the id from the `createdAt` of the signed
+community operation (`operation.createdAt`), not from `moderationLog.createdAt`
+(`sha256(JSON.stringify(["channel" | "role", communityId, actorIdentityId,
+operation.createdAt]))`, first 24 hex characters). The id in the log target is
+the id the node assigns. The log is an audit trail with its own signature; the
+community state comes only from the signed community operation that every one
+of these routes also takes (see "Signed community operations"). The `DELETE`
+routes for channel, role and ban take
+`{ "moderationLog": { "createdAt", "mutation" }, "operation": { ... } }`.
 
 Permissions checked against the signed actor: channel actions need
 `manage_channels`, role and member-role actions `manage_roles`, bans
@@ -2936,7 +3065,9 @@ Role body:
 ```json
 {
   "name": "Admin",
-  "permissions": ["manage_channels", "create_invites"]
+  "permissions": ["manage_channels", "create_invites"],
+  "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "SignedPublicMutation" } },
+  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
 }
 ```
 
@@ -2944,9 +3075,15 @@ Member role replacement body:
 
 ```json
 {
-  "roleIds": ["<roleId>"]
+  "roleIds": ["<roleId>"],
+  "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "SignedPublicMutation" } },
+  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
 }
 ```
+
+`DELETE` role, channel and ban routes take the same `moderationLog` and
+`operation` fields as their only body. A role creation signs `role_created` with
+the derived `roleId`; the other routes sign the action in the table above.
 
 Implemented:
 
@@ -2955,7 +3092,7 @@ Implemented:
   role assignment
 - keep `everyone` implicit for every member; clients should not assign it
   manually
-- persist roles and assignments in the community document
+- the roles and assignments are folded from the signed operations
 
 ### Create text channel
 
@@ -2967,7 +3104,9 @@ Request:
 
 ```json
 {
-  "name": "general"
+  "name": "general",
+  "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "SignedPublicMutation" } },
+  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
 }
 ```
 
@@ -2987,7 +3126,9 @@ Request:
 
 ```json
 {
-  "name": "Voice"
+  "name": "Voice",
+  "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "SignedPublicMutation" } },
+  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
 }
 ```
 
@@ -3009,7 +3150,9 @@ Request:
 
 ```json
 {
-  "name": "announcements"
+  "name": "announcements",
+  "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "SignedPublicMutation" } },
+  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
 }
 ```
 
@@ -3029,7 +3172,9 @@ Request:
 
 ```json
 {
-  "visibleRoleIds": ["everyone", "<roleId>"]
+  "visibleRoleIds": ["everyone", "<roleId>"],
+  "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "SignedPublicMutation" } },
+  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
 }
 ```
 
@@ -3047,6 +3192,9 @@ Implemented:
 ```http
 DELETE /communities/{communityId}/channels/{channelId}
 ```
+
+Body: `{ "moderationLog": { "createdAt", "mutation" }, "operation": { "createdAt",
+"parents", "mutation" } }`, signing `channel_deleted`.
 
 Response:
 

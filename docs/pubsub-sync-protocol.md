@@ -255,31 +255,118 @@ Acknowledgements are internal node-to-node events and are not forwarded to
 frontend WebSockets. If an acknowledgement is lost, the next signal retry
 causes the frontend to acknowledge the same `signalId` again.
 
-## Community replica convergence
+## Community signed operations
 
-Community documents carry optional `replicaState: { version: 1, entries }` metadata.
-Entries are keyed by the canonical JSON encoding of `[field, elementId]`; scalar
-profile fields use an empty element ID. Each entry carries a safe integer revision,
-a removal marker and its value. The existing community document and member-index
-heads carry this state on the same private-network OrbitDB stores. This change does
-not introduce a second transport, a public discovery topic, or a new recipient set.
+A community has no replicated document. Its state is the deterministic fold of
+client-signed operations stored in the `communityOperations` collection of the
+private-network OrbitDB stores, so nothing a peer replicates can state a role, a
+ban, a membership, a setting or a deletion that no authorized member signed. The
+`Community` aggregate, the API projections and the local head caches are derived
+from verified operations and are never accepted from the network. Legacy community
+documents, `replicaState` metadata and the replica merger are gone: there is no
+unsigned or snapshot fallback. This change does not introduce a second transport, a
+public discovery topic, or a new recipient set.
 
-A repository-loaded aggregate retains its own baseline. A save derives changes
-against that baseline, increments only changed registers, and then combines the
-locally authored state with the latest replica. Unseen changes do not become causal
-predecessors of a local edit. Reusing an aggregate for another save preserves its
-local view and only its observed/authored revisions as the next baseline, so remote
-additions are not mistaken for removals and an unrelated save cannot promote an
-unseen revocation into the next local grant's causal history.
-Existing aggregates must be loaded through the repository before being updated.
-Message, edition, reaction and deletion consumers preserve their existing
-event-snapshot validation semantics, including delayed events. Persistence uses the
-repository-loaded current community when present; an event snapshot bootstraps only
-an absent community and does not replace an existing one. Authenticating historical
-membership and permissions requires the operation authorization work in #288; an
-event snapshot alone is not evidence of authority.
+An operation is an immutable record `{ id, scopeType: "community_operation",
+communityId, networkId, authorIdentityId, action, args, parents, createdAt }`.
+Its id is `community:<communityId>:op:<digest>`, where the digest is the base64url
+SHA-256 of the canonical payload without `id`. It carries a create-only
+`PublicMutationProof` (`put`, sequence 0, no predecessor) signed by the device of
+the author. `parents` are the sorted digests of the operations the author had seen
+(the `frontier` of `GET /communities/{id}`, at most 64): a non-genesis operation
+names at least one parent and the genesis `community_created` none. The genesis
+carries the `nonce` from which `communityId = CommunityId.derive(networkId, owner,
+nonce)` is computed, so the id is bound to its creator. Actions are
+`community_created`, `community_updated`, `channel_created`, `channel_renamed`,
+`channel_deleted`, `channel_permissions_updated`, `role_created`, `role_updated`,
+`role_deleted`, `member_roles_updated`, `member_joined`, `member_left`,
+`member_kicked`, `member_banned` and `member_unbanned`. `createdAt` is metadata,
+except that channel and role ids are derived from `(communityId, author,
+createdAt)`.
 
-Signed public mutations (pins and reactions):
+Admission: every node checks an operation on write, on replicated read and on head
+hydration. `PublicMutationVerifier` checks the signature, the device in the
+identity's current device authorization head, and the binding of id, scope and
+author to the payload digest. `CommunityOperationMutationPolicy` then applies the
+operation to the state of its causal past in a per-community ledger and refuses it
+when the author lacked the permission at that point of history. A
+`member_joined` needs evidence: `added` requires manage-members, `approval`
+requires approve-members, `automatic` requires auto-join, and self-join methods
+require author == member. Methods `approval`, `invitation` and `invite_link` carry
+a `reference` that must resolve to signed `requests` records: an accepted
+`community_membership_request` of the right type for the member, or a
+`community_invite` plus the `community_invite_use` record of the member. An
+operation with an unknown parent or unreplicated evidence is not stored; its head
+is demoted and re-admitted after 2 s, 10 s and 60 s.
+
+Replication: operations travel as one index head per community
+(`community-operation-index:<communityId>`) holding the operation records by id.
+Replicas author operations concurrently, so two heads of one community never
+supersede each other. The registry merges them as the union of their operations
+sorted by id, which makes every replica publish the same head, and heads only grow.
+The client writes through the endpoint of each action, sending the signed
+`operation` (`createdAt`, `parents` and the `mutation` proof); the server rebuilds
+the operation from the path, the actor and the other body fields, so the signature
+verifies only if the client signed exactly that operation.
+
+### Community operation fold
+
+State is `CommunityStateFold.fold(operations)`. Operations whose parents are all
+known are applied in a total order (parents first; the lowest digest first among
+concurrent operations), and each one is authorized again against the state it
+applies to. An operation that is no longer permitted there is skipped, for example
+a role grant by a member that a concurrent operation ordered earlier banned. The
+order uses no wall clock, so every replica folds the same set of operations into the
+same state; the order-independence property test shuffles random causal graphs.
+
+Conflict rules:
+
+- Operations on different fields, roles, channels or members do not conflict; all of
+  them apply.
+- Concurrent operations on the same field apply in the total order, so the same
+  operation wins on every replica.
+- A ban, kick or leave ordered before a concurrent operation of the removed member
+  makes that operation unauthorized and it is skipped. Ordered after it, the
+  operation stays applied.
+- The last member leaving deletes the community. The fold then skips every later
+  operation, so nothing revives it. There is no `deleted`, `deletedAt` or
+  `updatedAt` in the replicated record that could win instead.
+- An operation that names a parent no node has seen is not part of any state until
+  the parent arrives.
+
+### Trust boundaries
+
+The signed operation is the only source of community state: a replicated head or
+document is never read as a community. `moderationLogs` stay a separate audit
+trail with their own signature, written by the same request. Device authorization
+and the `requests` records that justify a join are evaluated against the current
+heads when the operation is admitted, so an operation whose evidence has not
+replicated yet is re-admitted later (see the limits above). The stores still
+reveal community metadata to their readers; this work neither establishes E2EE nor
+hides the social graph from an authorized or compromised node. Protected and
+private communities keep their local repository and never enter this path.
+
+### Verification
+
+`yarn test:integration:forged-community-operations` uses three real private
+Helia/OrbitDB instances with separate peer identities, directories and registries,
+in one process. A malicious node writes forged records straight into the replicated
+stores: a future-dated tombstone, role grants and a ban by a member without the
+permission, a self-join without evidence, a record copied into another community, a
+swapped proof and a replayed operation. Every replica ignores them and keeps
+serving the signed state. The fixture then partitions the replicas, authors three
+concurrent operations, reconnects them and compares the complete folded community
+and frontier on every replica with the expected fold. It restarts one replica with a
+fresh registry and catches it up, applies a signed tombstone (the last member
+leaving) and rejects a later revival, and rejects operations of a revoked device.
+Fixtures own and remove their temporary data. The check runs in `test:ci`; unit
+regressions additionally cover the fold, the causal ledger, the admission policy and
+the repository. Loopback transport does not validate external NAT traversal or
+calls.
+
+## Other signed public mutations
+
+Signed public mutations (pins, reactions and the other governed collections):
 
 - Each `pins`/`reactions` document carries a `proof` (`PublicMutationProof`): version,
   `operationId`, `kind` (`put`|`delete`), `store`, `recordId`, `payloadDigest`,
@@ -356,73 +443,6 @@ Signed public mutations (pins and reactions):
   because the community has not replicated yet is re-admitted after 2 s, 10 s
   and 60 s. Authorization lookups are coalesced for 1 s per batch. Other record
   types (#316) are still unsigned.
-
-Conflict rules:
-
-- Different profile fields and different collection elements combine independently.
-  The same scalar, role or channel uses the higher element revision, then canonical
-  value ordering for equal revisions. Simultaneous edits to different properties of
-  the **same role or channel** are a conflict; they do not merge property by property.
-- Member additions are independent. Removal wins an equal-revision membership
-  conflict; readmission requires observing the removed register before adding again.
-  Each admission has a distinct token. Role assignments remain bound to the admission
-  observed or authored by their editor and cannot transfer to an unseen readmission.
-- Concurrent equal-revision role assignments for the same admission intersect their
-  role sets. Higher revisions replace earlier assignments. References to missing
-  members or roles are excluded from the materialized view.
-- Bans have their own registers and suppress membership and assignments while active.
-  Removing a ban exposes the membership register again; it does not create a new
-  admission. Removing membership and removing a ban are separate operations.
-- Role and channel removal is terminal for that UUID, including against a later stale
-  rename. Recreating one requires a new UUID. Channel visibility references to deleted
-  roles are removed; an empty visibility list remains empty.
-- Community deletion is terminal between versioned documents. Timestamps remain
-  informational and never decide element conflicts. Community ID, network, owner and
-  creation time must match before two documents can combine.
-
-The same merge runs before head-cache and member-index replacement. During cold
-hydration and head reconciliation, the registry replays reachable head-log ancestors
-for registered community keys: the key-value index alone hides overwritten values.
-It persists a combined head when that content differs from the current persisted
-head. Reconciliation uses the source network's cached head, and every community
-head write is scoped to its destination network. A local member-index query may
-combine communities from several networks, but each persisted index contains only
-communities belonging to that network. This does not erase previously replicated
-or IPFS history. Replay yields between batches and fails if an ancestor is missing;
-it does not mark an incomplete reconstruction as warm. Historical replay is proportional to the
-reachable log, and tombstones remain stored. Safe checkpointing and coordinated
-compaction are future work; deleting these markers is unsafe.
-
-### Replica metadata and trust boundaries
-
-Every community snapshot carries version 1 replica metadata; a snapshot without it
-is rejected rather than merged.
-
-Structural validation rejects unsupported versions, malformed paths, invalid revision
-counters and incompatible register values. It is not authentication. A node with write
-access can still forge plausible values or revisions. Deterministic conflict resolution
-does not prove who authorized a grant, ban, deletion or profile change. Durable
-operation authorization and revocation enforcement remain tracked in
-[haskou/pigeon-swarm-node#288](https://github.com/haskou/pigeon-swarm-node/issues/288).
-The current stores still reveal community metadata to their readers; this work neither
-establishes E2EE nor hides the social graph from an authorized or compromised node.
-
-### Verification
-
-`yarn test:integration:community-convergence` uses three real private Helia/OrbitDB
-instances with separate peer identities, directories and registries, in one process.
-It partitions store synchronization and closes connections, authors independent
-changes, reconnects peers, delays a third replica, checks explicit removal against a
-stale edit, verifies a fresh persisted marker crosses a repeated reconnection, and
-reopens a store with a fresh registry. Assertions compare complete community content
-and member-index results. A fourth instance uses a separate private network and key
-while sharing the backend registry. The fixture checks every reachable member-index
-log entry for foreign-network content and reconstructs both networks from persisted
-stores, preserving combined local queries without cross-network writes. Fixtures own
-and remove their temporary data. The check runs
-in `test:ci`; unit regressions additionally exercise three-write permutations, stale
-grants, role/channel deletion, replay and malformed metadata. Loopback transport
-does not validate external NAT traversal or calls.
 
 ## Protected control frame delivery
 
