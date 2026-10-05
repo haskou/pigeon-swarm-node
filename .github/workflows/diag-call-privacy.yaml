@@ -26,6 +26,9 @@ jobs:
       - name: Setup workspace
         uses: ./.github/actions/setup-workspace
 
+      - name: Instrument OrbitDB
+        run: node scripts/diag-patch-orbitdb.cjs
+
       - name: Call privacy
         run: yarn test:integration:call-privacy
         timeout-minutes: 6
