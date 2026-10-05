@@ -26,6 +26,7 @@ import { CommunitySettings } from './entities/profile/CommunitySettings';
 import { CommunityOwnerCannotBeKickedError } from './errors/CommunityOwnerCannotBeKickedError';
 import { CommunityOwnerCannotLeaveError } from './errors/CommunityOwnerCannotLeaveError';
 import { CommunityOwnerMismatchError } from './errors/CommunityOwnerMismatchError';
+import { CommunityPermissionDeniedError } from './errors/CommunityPermissionDeniedError';
 import { CommunityRequestActorMismatchError } from './errors/CommunityRequestActorMismatchError';
 import { CommunityChannelMessageWasDeletedEvent } from './events/CommunityChannelMessageWasDeletedEvent';
 import { CommunityChannelMessageWasEditedEvent } from './events/CommunityChannelMessageWasEditedEvent';
@@ -50,6 +51,7 @@ import { CommunityDescription } from './value-objects/CommunityDescription';
 import { CommunityId } from './value-objects/CommunityId';
 import { CommunityInviteMaxUses } from './value-objects/CommunityInviteMaxUses';
 import { CommunityInviteNonce } from './value-objects/CommunityInviteNonce';
+import { CommunityJoinMethod } from './value-objects/CommunityJoinMethod';
 import { CommunityModerationAction } from './value-objects/CommunityModerationAction';
 import { CommunityName } from './value-objects/CommunityName';
 import { CommunityPermission } from './value-objects/CommunityPermission';
@@ -63,9 +65,10 @@ export class Community extends AggregateRoot {
     networkId: NetworkId,
     profile: CommunityProfile,
     settings: CommunitySettings,
+    id: CommunityId = CommunityId.generate(),
   ): Community {
     const community = new Community(
-      CommunityId.generate(),
+      id,
       networkId,
       ownerIdentityId,
       profile,
@@ -215,6 +218,36 @@ export class Community extends AggregateRoot {
 
   public addMember(actor: IdentityId, member: IdentityId): void {
     this.createAccessValidator().assertCanManageMembers(actor);
+    this.join(member);
+  }
+
+  /**
+   * Applies a member join authored by `author`. The join reference (invite,
+   * invitation or request record) is verified when the operation is admitted;
+   * here only the community state decides whether the author may join.
+   */
+  public joinAs(
+    author: IdentityId,
+    member: IdentityId,
+    method: CommunityJoinMethod,
+  ): void {
+    const validator = this.createAccessValidator();
+
+    if (method.isSelfJoin()) {
+      assert(author.isEqual(member), new CommunityRequestActorMismatchError());
+    }
+
+    if (method.isEqual(CommunityJoinMethod.ADDED)) {
+      validator.assertCanManageMembers(author);
+    } else if (method.isEqual(CommunityJoinMethod.APPROVAL)) {
+      validator.assertCanApproveMembers(author);
+    } else if (method.isEqual(CommunityJoinMethod.AUTOMATIC)) {
+      assert(
+        this.isAutoJoinEnabled(),
+        new CommunityPermissionDeniedError('auto_join'),
+      );
+    }
+
     this.join(member);
   }
 
@@ -554,10 +587,11 @@ export class Community extends AggregateRoot {
     actor: IdentityId,
     name: CommunityChannelName,
     id?: CommunityChannelId,
+    createdAt?: Timestamp,
   ): CommunityTextChannel {
     this.createAccessValidator().assertCanManageChannels(actor);
 
-    const channel = this.channels.addText(name, id);
+    const channel = this.channels.addText(name, id, createdAt);
 
     this.record(
       new CommunityChannelWasCreatedEvent(this.id.valueOf(), {
@@ -573,10 +607,11 @@ export class Community extends AggregateRoot {
     actor: IdentityId,
     name: CommunityChannelName,
     id?: CommunityChannelId,
+    createdAt?: Timestamp,
   ): CommunityVoiceChannel {
     this.createAccessValidator().assertCanManageChannels(actor);
 
-    const channel = this.channels.addVoice(name, id);
+    const channel = this.channels.addVoice(name, id, createdAt);
 
     this.record(
       new CommunityChannelWasCreatedEvent(this.id.valueOf(), {

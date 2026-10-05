@@ -9,9 +9,10 @@ export class CommunitySettings {
     discoverable: boolean,
     visibility = CommunityVisibility.PRIVATE,
     autoJoinEnabled = false,
+    createdAt: Timestamp = Timestamp.now(),
   ): CommunitySettings {
     return new CommunitySettings(
-      Timestamp.now(),
+      createdAt,
       discoverable,
       visibility,
       autoJoinEnabled,
