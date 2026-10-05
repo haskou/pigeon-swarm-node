@@ -45,10 +45,43 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       shouldReplace: (current, candidate) =>
         PublicMutationRecord.replaces(current, candidate) ?? true,
     });
+    this.registry.registerHeadRecordMerger(
+      OrbitDBCommunityRepository.HEAD_PREFIX,
+      (current, candidate) => this.mergeHeads(current, candidate),
+    );
   }
 
   private headKey(communityId: CommunityId | string): string {
     return `${OrbitDBCommunityRepository.HEAD_PREFIX}${communityId.valueOf()}`;
+  }
+
+  /**
+   * Replicas sign operations of one community concurrently, so two heads of
+   * the same community are never superseded: their operations are unioned
+   * and sorted, which makes every replica publish the same head.
+   */
+  private mergeHeads(
+    current: Record<string, unknown> | undefined,
+    candidate: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (!current) return candidate;
+
+    const operations = this.operationIndex
+      .recordsFromHead(candidate)
+      .reduce(
+        (records, record) => this.operationIndex.mergeRecords(records, record),
+        this.operationIndex.recordsFromHead(current),
+      )
+      .sort((left, right) => (String(left.id) < String(right.id) ? -1 : 1));
+
+    return {
+      ...candidate,
+      communityOperations: operations,
+      updatedAt: Math.max(
+        Number(current.updatedAt) || 0,
+        Number(candidate.updatedAt) || 0,
+      ),
+    };
   }
 
   private escapeRegex(value: string): string {
@@ -229,7 +262,6 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
           {
             recordFilter: (record) =>
               record.communityId === payload.communityId,
-            replace: true,
           },
         );
       },
