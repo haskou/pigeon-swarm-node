@@ -40,6 +40,7 @@ describe('Community invitation use cases', () => {
   let moderationLogRecorder: MockProxy<CommunityModerationLogRecorder>;
   let proof: Record<string, unknown>;
   const at = 1780000000000;
+  const moderationLog = () => ({ createdAt: at, mutation: proof });
 
   beforeAll(async () => {
     proof = (
@@ -133,6 +134,7 @@ describe('Community invitation use cases', () => {
       'nonce-0123456789abcdef',
       at,
       proof,
+      moderationLog(),
       expiresAt,
       5,
     );
@@ -163,6 +165,7 @@ describe('Community invitation use cases', () => {
       message.actorIdentityId,
       CommunityModerationAction.INVITE_LINK_CREATED,
       expect.any(CommunityModerationTarget),
+      message.moderationLog,
       {
         encryptedCommunityKeyStored: false,
         expiresAt,
@@ -179,6 +182,7 @@ describe('Community invitation use cases', () => {
       INVITED_ID,
       at,
       proof,
+      moderationLog(),
     );
     const pendingRequest = mock<CommunityMembershipRequest>();
     pendingRequest.isPending.mockReturnValue(true);
@@ -205,6 +209,7 @@ describe('Community invitation use cases', () => {
       INVITED_ID,
       at,
       proof,
+      moderationLog(),
     );
     const membershipRequest = mock<CommunityMembershipRequest>();
     membershipRequest.getId.mockReturnValue(
@@ -236,6 +241,7 @@ describe('Community invitation use cases', () => {
       message.actorIdentityId,
       CommunityModerationAction.INVITATION_CREATED,
       expect.any(CommunityModerationTarget),
+      message.moderationLog,
       { identityId: INVITED_ID },
     );
     expect(result).toBe(membershipRequest);

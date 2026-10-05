@@ -17,8 +17,11 @@ import { CommunityRole } from '@app/contexts/communities/domain/entities/members
 import { CommunityModerationTarget } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationTarget';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
+import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { mock, MockProxy } from 'jest-mock-extended';
+
+import { signedMutation } from '../../public-mutations/support/signedMutation';
 
 const COMMUNITY_ID = '550e8400-e29b-41d4-a716-446655440000';
 const ROLE_ID = '550e8400-e29b-41d4-a716-446655440001';
@@ -28,11 +31,27 @@ const TARGET_ID =
   'MCowBQYDK2VwAyEACdZwo16pCFQ1jxy5u2ZIOlVxcrx8QTHKDcLqGfWRgFk=';
 
 describe('Community role and moderation use cases', () => {
+  let moderationLog: { createdAt: number; mutation: unknown };
   let community: MockProxy<Community>;
   let communityFinder: MockProxy<CommunityFinder>;
   let communityRepository: MockProxy<CommunityRepository>;
   let eventPublisher: MockProxy<DomainEventPublisher>;
   let moderationLogRecorder: MockProxy<CommunityModerationLogRecorder>;
+
+  beforeAll(async () => {
+    moderationLog = {
+      createdAt: 1780000000000,
+      mutation: (
+        await signedMutation({
+          identityId: ACTOR_ID,
+          kind: 'put',
+          recordId: 'log-1',
+          sequence: 1,
+          store: 'moderationLogs',
+        })
+      ).toPrimitives(),
+    };
+  });
 
   beforeEach(() => {
     community = mock<Community>();
@@ -50,6 +69,7 @@ describe('Community role and moderation use cases', () => {
       ACTOR_ID,
       TARGET_ID,
       [ROLE_ID],
+      moderationLog,
     );
 
     const result = await new CommunityMemberRolesAssigner(
@@ -71,6 +91,7 @@ describe('Community role and moderation use cases', () => {
       message.actorIdentityId,
       CommunityModerationAction.MEMBER_ROLES_UPDATED,
       expect.any(CommunityModerationTarget),
+      message.moderationLog,
       { roleIds: [ROLE_ID] },
     );
     expect(result).toBe(community);
@@ -81,6 +102,7 @@ describe('Community role and moderation use cases', () => {
       COMMUNITY_ID,
       ACTOR_ID,
       TARGET_ID,
+      moderationLog,
       'spam',
     );
 
@@ -100,6 +122,7 @@ describe('Community role and moderation use cases', () => {
       message.actorIdentityId,
       CommunityModerationAction.MEMBER_BANNED,
       expect.any(CommunityModerationTarget),
+      message.moderationLog,
       { reason: 'spam' },
     );
     expect(result).toBe(community);
@@ -110,6 +133,7 @@ describe('Community role and moderation use cases', () => {
       COMMUNITY_ID,
       ACTOR_ID,
       TARGET_ID,
+      moderationLog,
     );
 
     const result = await new CommunityMemberUnbanner(
@@ -128,6 +152,7 @@ describe('Community role and moderation use cases', () => {
       message.actorIdentityId,
       CommunityModerationAction.MEMBER_UNBANNED,
       expect.any(CommunityModerationTarget),
+      message.moderationLog,
     );
     expect(result).toBe(community);
   });
@@ -138,6 +163,7 @@ describe('Community role and moderation use cases', () => {
       ACTOR_ID,
       'Moderators',
       ['manage_members'],
+      moderationLog,
     );
     const role = mock<CommunityRole>();
     community.addRole.mockReturnValue(role);
@@ -153,12 +179,18 @@ describe('Community role and moderation use cases', () => {
       message.actorIdentityId,
       message.name,
       message.permissions,
+      CommunityRoleId.derive(
+        COMMUNITY_ID,
+        ACTOR_ID,
+        moderationLog.createdAt,
+      ),
     );
     expect(moderationLogRecorder.record).toHaveBeenCalledWith(
       community,
       message.actorIdentityId,
       CommunityModerationAction.ROLE_CREATED,
       expect.any(CommunityModerationTarget),
+      message.moderationLog,
       { name: 'Moderators', permissions: ['manage_members'] },
     );
     expect(result).toBe(role);
@@ -171,6 +203,7 @@ describe('Community role and moderation use cases', () => {
       ACTOR_ID,
       'Editors',
       ['manage_messages'],
+      moderationLog,
     );
 
     const result = await new CommunityRoleUpdater(
@@ -191,6 +224,7 @@ describe('Community role and moderation use cases', () => {
       message.actorIdentityId,
       CommunityModerationAction.ROLE_UPDATED,
       expect.any(CommunityModerationTarget),
+      message.moderationLog,
       { name: 'Editors', permissions: ['manage_messages'] },
     );
     expect(result).toBe(community);
@@ -201,6 +235,7 @@ describe('Community role and moderation use cases', () => {
       COMMUNITY_ID,
       ROLE_ID,
       ACTOR_ID,
+      moderationLog,
     );
 
     const result = await new CommunityRoleDeleter(
@@ -219,6 +254,7 @@ describe('Community role and moderation use cases', () => {
       message.actorIdentityId,
       CommunityModerationAction.ROLE_DELETED,
       expect.any(CommunityModerationTarget),
+      message.moderationLog,
     );
     expect(result).toBe(community);
   });

@@ -9,6 +9,7 @@ describe('CommunityMembershipRequestUpdateMessage', () => {
     'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=';
   const requestId = '507f1f77bcf86cd799439011';
   let proof: PublicMutationProof;
+  let moderationLog: { createdAt: number; mutation: unknown };
 
   beforeAll(async () => {
     proof = await signedMutation({
@@ -18,6 +19,10 @@ describe('CommunityMembershipRequestUpdateMessage', () => {
       sequence: 1,
       store: 'requests',
     });
+    moderationLog = {
+      createdAt: 1780000000000,
+      mutation: proof.toPrimitives(),
+    };
   });
 
   it('should expose accepted request resolutions', () => {
@@ -27,6 +32,7 @@ describe('CommunityMembershipRequestUpdateMessage', () => {
       'accepted',
       1780000000000,
       proof.toPrimitives(),
+      moderationLog,
     );
 
     expect(message.isAccepted()).toBe(true);
@@ -40,6 +46,7 @@ describe('CommunityMembershipRequestUpdateMessage', () => {
       'declined',
       1780000000000,
       proof.toPrimitives(),
+      moderationLog,
     );
 
     expect(message.isAccepted()).toBe(false);
@@ -55,6 +62,7 @@ describe('CommunityMembershipRequestUpdateMessage', () => {
           'pending',
           1780000000000,
           proof.toPrimitives(),
+          moderationLog,
         ),
     ).toThrow(InvalidCommunityRequestResolutionStatusError);
   });
