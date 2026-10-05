@@ -201,6 +201,27 @@ patch('oplog/log.js', [
       dg(\`log=\${String(id).slice(-14)} joinEntry traversed hash=\${String(entry.hash).slice(-8)} took=\${Date.now() - jt0}ms\`)
       signal.throwIfAborted()`,
   ],
+  [
+    `        const canAppend = await access.canAppend(entry)
+        if (!canAppend) {`,
+    `        const vt0 = Date.now()
+        dg(\`log=\${String(id).slice(-14)} verifyEntry canAppend start hash=\${String(entry.hash).slice(-8)} writer=\${String(entry.identity).slice(-8)}\`)
+        const canAppend = await access.canAppend(entry)
+        dg(\`log=\${String(id).slice(-14)} verifyEntry canAppend done=\${canAppend} hash=\${String(entry.hash).slice(-8)} took=\${Date.now() - vt0}ms\`)
+        if (!canAppend) {`,
+  ],
+  [
+    `        const isValid = await Entry.verify(identity, entry)`,
+    `        const sv0 = Date.now()
+        const isValid = await Entry.verify(identity, entry)
+        dg(\`log=\${String(id).slice(-14)} verifyEntry sig done=\${isValid} hash=\${String(entry.hash).slice(-8)} took=\${Date.now() - sv0}ms\`)`,
+  ],
+  [
+    `      const headsHashes = (await heads(signal)).map(e => e.hash)`,
+    `      dg(\`log=\${String(id).slice(-14)} joinEntry verified hash=\${String(entry.hash).slice(-8)} took=\${Date.now() - jt0}ms\`)
+      const headsHashes = (await heads(signal)).map(e => e.hash)
+      dg(\`log=\${String(id).slice(-14)} joinEntry heads done hash=\${String(entry.hash).slice(-8)} took=\${Date.now() - jt0}ms\`)`,
+  ],
 ]);
 
 patch('storage/ipfs-block.js', [
@@ -211,6 +232,7 @@ patch('storage/ipfs-block.js', [
       const chunks = []`,
     `    const providers = (ipfs.libp2p?.getPeers?.() || []).map(peer => peer.toCID())
     const bt0 = Date.now()
+    dg(\`blockstore get start \${String(hash).slice(-8)} providers=\${providers.length}\`)
 
     try {
       const chunks = []`,
@@ -239,6 +261,20 @@ patch('storage/ipfs-block.js', [
   }
 
   const persist`,
+  ],
+]);
+
+patch('storage/composed.js', [
+  [
+    `    let value = await storage1.get(hash, signal)
+    if (!value) {
+      value = await storage2.get(hash, signal)`,
+    `    let value = await storage1.get(hash, signal)
+    if (!value) {
+      const ct0 = Date.now()
+      dg(\`composed miss \${String(hash).slice(-8)} -> second storage\`)
+      value = await storage2.get(hash, signal)
+      dg(\`composed second storage \${String(hash).slice(-8)} found=\${!!value} took=\${Date.now() - ct0}ms\`)`,
   ],
 ]);
 
