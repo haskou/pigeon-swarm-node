@@ -846,7 +846,7 @@ async function main(): Promise<void> {
     id: 'message-forged-1',
     mentions: [],
     type: 'sent',
-  });
+  } as never);
   const messageDocument = new OrbitDBCommunityChannelMessageMapper().toDocument(
     message,
   ) as unknown as Record<string, unknown>;

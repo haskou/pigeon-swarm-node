@@ -2568,18 +2568,6 @@ export default class Definitions {
     });
   }
 
-  @given('I set an invalid encrypted conversation message body')
-  public async iSetAnInvalidEncryptedConversationMessageBody(): Promise<void> {
-    await this.iSetAnEncryptedConversationMessageBody();
-
-    const parsedBody = JSON.parse(this.body || '{}');
-
-    this.body = JSON.stringify({
-      ...parsedBody,
-      encryptedPayload: 'tampered-message-payload',
-    });
-  }
-
   @given('I set a delete conversation message body')
   public async iSetADeleteConversationMessageBody(): Promise<void> {
     if (!this.conversationId || !this.messageId) {
