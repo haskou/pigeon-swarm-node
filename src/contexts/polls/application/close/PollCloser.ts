@@ -19,8 +19,13 @@ export class PollCloser {
       throw new PollNotFoundError();
     }
 
-    poll.close();
-    await this.repository.save(poll);
+    poll.close(message.closedAt);
+    await this.repository.saveClose(
+      poll,
+      message.actorIdentityId,
+      message.closedAt,
+      message.getProof(),
+    );
     const eventStreamId = poll.getScope().match({
       communityChannel: (communityId) => communityId.valueOf(),
       groupConversation: (conversationId) => conversationId.valueOf(),

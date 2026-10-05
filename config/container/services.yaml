@@ -181,6 +181,9 @@ services:
       /contexts/notifications/infrastructure/orbitdb/mappers/OrbitDBNotificationMapper
     arguments: []
   contexts/polls/domain/repositories/PollRepository: '@contexts/polls/infrastructure/orbitdb/OrbitDBPollRepository'
+  contexts/polls/infrastructure/orbitdb/PollMutationRecords:
+    class: /contexts/polls/infrastructure/orbitdb/PollMutationRecords
+    arguments: []
   contexts/presence/domain/repositories/IdentityPresenceRepository: '@contexts/presence/infrastructure/memory/InMemoryIdentityPresenceRepository'
   contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator:
     class: >-
@@ -1120,6 +1123,26 @@ services:
       - '@contexts/conversations/domain/repositories/ConversationRepository'
       - >-
         @contexts/communities/domain/repositories/CommunityChannelMessageRepository
+  contexts/polls/infrastructure/orbitdb/policies/PollCloseMutationPolicy:
+    class: /contexts/polls/infrastructure/orbitdb/policies/PollCloseMutationPolicy
+    arguments:
+      - '@contexts/polls/infrastructure/orbitdb/policies/PollMutationScopeAccess'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
+  contexts/polls/infrastructure/orbitdb/policies/PollMutationPolicy:
+    class: /contexts/polls/infrastructure/orbitdb/policies/PollMutationPolicy
+    arguments:
+      - '@contexts/polls/infrastructure/orbitdb/policies/PollMutationScopeAccess'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
+  contexts/polls/infrastructure/orbitdb/policies/PollMutationScopeAccess:
+    class: /contexts/polls/infrastructure/orbitdb/policies/PollMutationScopeAccess
+    arguments:
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+      - '@contexts/conversations/domain/repositories/ConversationRepository'
+  contexts/polls/infrastructure/orbitdb/policies/PollVoteMutationPolicy:
+    class: /contexts/polls/infrastructure/orbitdb/policies/PollVoteMutationPolicy
+    arguments:
+      - '@contexts/polls/infrastructure/orbitdb/policies/PollMutationScopeAccess'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/private-authorization/infrastructure/freshness/InMemoryPrivateFreshnessGate:
     class: >-
       /contexts/private-authorization/infrastructure/freshness/InMemoryPrivateFreshnessGate
@@ -2421,6 +2444,9 @@ services:
         @contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy
       - >-
         @contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy
+      - '@contexts/polls/infrastructure/orbitdb/policies/PollMutationPolicy'
+      - '@contexts/polls/infrastructure/orbitdb/policies/PollVoteMutationPolicy'
+      - '@contexts/polls/infrastructure/orbitdb/policies/PollCloseMutationPolicy'
   shared/infrastructure/http/HttpClient: '@shared/infrastructure/http/FetchHttpClient'
   shared/infrastructure/logs/Log: '@shared/infrastructure/logs/WinstonLogger'
   shared/infrastructure/messageBus/MessageBusAdapter: '@shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter'

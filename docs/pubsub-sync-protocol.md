@@ -305,6 +305,14 @@ Signed public mutations (pins and reactions):
   from `pending` to `accepted`/`declined` by the authorised party: invitee,
   creator, moderator/owner or the requester). Heads are index wrappers under
   collection `requests`; community deletion writes no unsigned tombstones.
+- `polls` documents are governed with three scope types: `poll` (author =
+  `creatorIdentityId`, id = client-chosen poll id, immutable), `poll_vote`
+  (author = voter, id `poll-vote:<pollId>:<voterIdentityId>`, replaced by a
+  higher sequence, removed by a signed tombstone) and `poll_close` (author =
+  `closedByIdentityId`, id `poll-close:<pollId>`). Authors must be allowed in
+  the community channel or be participants of the group conversation. Readers
+  assemble the poll from its records and ignore ballots dated after the earliest
+  close. Heads are index wrappers under collection `polls`.
 - `stickerPacks` and `stickerUserLibraries` documents are governed too. Packs use
   `scopeType: "sticker_pack"` (author = `ownerIdentityId`, record id = pack id,
   whole-pack document). The library is three independent record kinds with

@@ -35,6 +35,8 @@ export class PostPollVoteRoute extends PollRouteSupport {
         actor.valueOf(),
         body.optionIds,
         scopeAccess.audience,
+        body.createdAt,
+        body.mutation,
       ),
     );
 

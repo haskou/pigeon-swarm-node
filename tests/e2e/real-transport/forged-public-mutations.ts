@@ -24,6 +24,19 @@ import { NotificationScopeSettingsPreferences } from '@app/contexts/notification
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import OrbitDBNotificationScopeSettingsRepository from '@app/contexts/notification-settings/infrastructure/orbitdb/OrbitDBNotificationScopeSettingsRepository';
 import NotificationScopeSettingsMutationPolicy from '@app/contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy';
+import { Poll } from '@app/contexts/polls/domain/Poll';
+import { PollOption } from '@app/contexts/polls/domain/PollOption';
+import { PollScope } from '@app/contexts/polls/domain/PollScope';
+import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
+import { PollOptionId } from '@app/contexts/polls/domain/value-objects/PollOptionId';
+import { PollOptionText } from '@app/contexts/polls/domain/value-objects/PollOptionText';
+import { PollQuestion } from '@app/contexts/polls/domain/value-objects/PollQuestion';
+import OrbitDBPollRepository from '@app/contexts/polls/infrastructure/orbitdb/OrbitDBPollRepository';
+import PollCloseMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollCloseMutationPolicy';
+import PollMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollMutationPolicy';
+import PollMutationScopeAccess from '@app/contexts/polls/infrastructure/orbitdb/policies/PollMutationScopeAccess';
+import PollVoteMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollVoteMutationPolicy';
+import PollMutationRecords from '@app/contexts/polls/infrastructure/orbitdb/PollMutationRecords';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
@@ -72,6 +85,7 @@ type Replica = {
     notificationSettings: OrbitDBDatabase;
     stickerPacks: OrbitDBDatabase;
     stickerUserLibraries: OrbitDBDatabase;
+    polls: OrbitDBDatabase;
   };
   registry?: OrbitDBReplicatedStateRegistry;
   pins?: OrbitDBCommunityChannelMessagePinRepository;
@@ -80,6 +94,7 @@ type Replica = {
   settings?: OrbitDBNotificationScopeSettingsRepository;
   stickerPacks?: OrbitDBStickerPackRepository;
   stickerLibraries?: OrbitDBStickerUserLibraryRepository;
+  polls?: OrbitDBPollRepository;
 };
 
 const networkId = randomUUID();
@@ -145,6 +160,12 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
       sync: false,
       type: 'documents',
     }),
+    polls: await replica.orbitdb.open(`${networkId}/polls`, {
+      AccessController,
+      Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
+      sync: false,
+      type: 'documents',
+    }),
     pins: await replica.orbitdb.open(`${networkId}/pins`, {
       AccessController,
       Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
@@ -180,6 +201,23 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
   );
   replica.settings = new OrbitDBNotificationScopeSettingsRepository(
     replica.registry,
+  );
+  replica.polls = new OrbitDBPollRepository(
+    replica.registry,
+    {
+      findById: (): Promise<unknown> =>
+        Promise.resolve({ toPrimitives: () => ({ networkId }) }),
+    } as never,
+    {
+      findMetadataById: (): Promise<unknown> =>
+        Promise.resolve({ toPrimitives: () => ({ networkId }) }),
+    } as never,
+    new PrivateCommunityPublicStorageGuard(
+      {
+        findScope: (): Promise<undefined> => Promise.resolve(undefined),
+      } as never,
+      new PrivateAuthorizationStorageCoordinator(),
+    ),
   );
   replica.stickerPacks = new OrbitDBStickerPackRepository(replica.registry);
   replica.stickerLibraries = new OrbitDBStickerUserLibraryRepository(
@@ -221,6 +259,8 @@ async function main(): Promise<void> {
   };
   const community = {
     assertCanCreateInvite: (): void => undefined,
+    authorizeTextChannelPollCreation: (): void => undefined,
+    authorizeTextChannelPollVote: (): void => undefined,
     manageChannelMessages: (): void => undefined,
   } as unknown as Community;
   const communities = {
@@ -232,6 +272,7 @@ async function main(): Promise<void> {
         hasParticipant: () => true,
       } as unknown as Conversation),
   } as unknown as ConversationRepository;
+  const pollAccess = new PollMutationScopeAccess(communities, conversations);
   const gate = new PublicMutationGate(
     new PublicMutationVerifier(authorization),
     [
@@ -239,6 +280,9 @@ async function main(): Promise<void> {
       new ConversationMessagePinMutationPolicy(conversations),
       new NotificationScopeSettingsMutationPolicy(),
       new CommunityInviteMutationPolicy(communities as never),
+      new PollMutationPolicy(pollAccess),
+      new PollVoteMutationPolicy(pollAccess),
+      new PollCloseMutationPolicy(pollAccess),
       new StickerPackMutationPolicy(),
       new StickerFavoriteMutationPolicy(),
       new StickerSavedPackMutationPolicy(),
@@ -630,6 +674,140 @@ async function main(): Promise<void> {
     'forged unsigned invite rewrite must be ignored',
   );
   console.log('PASS forged invite rewrite rejected by the honest node');
+
+  stage = 'polls are governed too';
+  const pollScope = PollScope.communityChannel(
+    new CommunityId(randomUUID()),
+    new CommunityChannelId('channel-1'),
+  );
+  const poll = Poll.create(
+    new PollId('poll-forged-1'),
+    identity,
+    pollScope,
+    new PollQuestion('Which?'),
+    [
+      PollOption.create(new PollOptionId('a'), new PollOptionText('A')),
+      PollOption.create(new PollOptionId('b'), new PollOptionText('B')),
+    ],
+    false,
+    new Timestamp(1780000000000),
+  );
+  const pollProof = (
+    kind: 'put' | 'delete',
+    sequence: number,
+    recordId: string,
+    payload: Record<string, unknown>,
+  ): PublicMutationProof => {
+    const body = {
+      author: { deviceCredential: author, identityId: author },
+      kind,
+      operationId: `forged-poll-${sequence}`.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor:
+        sequence === 0 ? null : PublicMutationProof.digestOf({ previous: 0 }),
+      recordId,
+      sequence,
+      store: 'polls',
+      version: 1,
+    } as const;
+
+    return PublicMutationProof.signed(
+      body,
+      device.sign(PublicMutationProof.signingContentOf(body)),
+    );
+  };
+  const pollId = poll.getId();
+  const pollPayload = PollMutationRecords.pollPayload(poll);
+
+  await honest.polls!.save(
+    poll,
+    pollProof('put', 0, pollId.valueOf(), pollPayload),
+  );
+  await until('poll reached the malicious store', async () => {
+    const stored = await malicious.stores!.polls.query!(
+      (record) => record.id === pollId.valueOf(),
+    );
+
+    return stored.length === 1;
+  });
+  const castVote = async (
+    from: Poll,
+    optionId: string,
+    sequence: number,
+  ): Promise<void> => {
+    from.castVote(
+      identity,
+      [new PollOptionId(optionId)],
+      new Timestamp(1780000000100 + sequence),
+    );
+    await honest.polls!.saveVote(
+      from,
+      identity,
+      pollProof(
+        'put',
+        sequence,
+        PollMutationRecords.voteId(pollId.valueOf(), author),
+        PollMutationRecords.votePayload(from, identity),
+      ),
+    );
+  };
+  const voteOf = async (): Promise<string[] | undefined> =>
+    (await honest.polls!.findById(pollId))?.toPrimitives().votes[0]?.optionIds;
+
+  await castVote(poll, 'a', 0);
+  assert.deepEqual(await voteOf(), ['a']);
+  await until('ballot reached the malicious store', async () => {
+    const stored = await malicious.stores!.polls.query!(
+      (record) => record.scopeType === 'poll_vote',
+    );
+
+    return stored.length === 1;
+  });
+  await malicious.stores!.polls.put!({
+    ...PollMutationRecords.votePayload(poll, identity),
+    createdAt: 1780000000100,
+    optionIds: ['b'],
+  });
+  await malicious.stores!.polls.put!({
+    ...pollPayload,
+    question: 'Hijacked?',
+  });
+  await malicious.stores!.polls.put!({
+    ...PollMutationRecords.closePayload(
+      poll,
+      identity,
+      new Timestamp(1780000000050),
+    ),
+  });
+  await pause(3000);
+  const afterForgery = (await honest.polls!.findById(pollId))?.toPrimitives();
+
+  assert.deepEqual(afterForgery?.votes[0]?.optionIds, ['a']);
+  assert.equal(afterForgery?.question, 'Which?');
+  assert.equal(afterForgery?.status, 'open');
+  console.log('PASS forged poll records rejected by the honest node');
+
+  await castVote(poll, 'b', 1);
+  assert.deepEqual(await voteOf(), ['b']);
+  const closedAt = new Timestamp(1780000000900);
+
+  poll.close(closedAt);
+  await honest.polls!.saveClose(
+    poll,
+    identity,
+    closedAt,
+    pollProof(
+      'put',
+      0,
+      PollMutationRecords.closeId(pollId.valueOf()),
+      PollMutationRecords.closePayload(poll, identity, closedAt),
+    ),
+  );
+  assert.equal(
+    (await honest.polls!.findById(pollId))?.toPrimitives().status,
+    'closed',
+  );
+  console.log('PASS poll signed ballot and close applied');
 
   stage = 'stickers are governed too';
   const stickerProof = (

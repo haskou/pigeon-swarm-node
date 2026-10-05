@@ -2,8 +2,16 @@ import { PollCloseMessage } from '@app/contexts/polls/application/close/messages
 import { PollCloser } from '@app/contexts/polls/application/close/PollCloser';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  JsonController,
+  Param,
+  Post,
+  Req,
+  Res,
+} from 'routing-controllers';
 
+import { PostPollCloseBody } from '../bodies/PostPollCloseBody';
 import { PollViewModel } from '../view-model/PollViewModel';
 import { PollRouteSupport } from './PollRouteSupport';
 
@@ -14,6 +22,7 @@ export class PostPollCloseRoute extends PollRouteSupport {
   @Post('/:pollId/close')
   public async closePoll(
     @Param('pollId') pollId: string,
+    @Body() body: PostPollCloseBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
@@ -21,7 +30,13 @@ export class PostPollCloseRoute extends PollRouteSupport {
     const poll = await this.findPoll(pollId);
     const scopeAccess = await this.managePollScope(actor, poll);
     const updatedPoll = await this.closer.close(
-      new PollCloseMessage(pollId, actor.valueOf(), scopeAccess.audience),
+      new PollCloseMessage(
+        pollId,
+        actor.valueOf(),
+        scopeAccess.audience,
+        body.createdAt,
+        body.mutation,
+      ),
     );
 
     return response

@@ -3,8 +3,11 @@ import { Timestamp } from '@haskou/value-objects';
 import { PollStatus } from './value-objects/PollStatus';
 
 export class PollLifecycle {
-  public static open(expiresAt?: Timestamp): PollLifecycle {
-    return new PollLifecycle(PollStatus.OPEN, Timestamp.now(), expiresAt);
+  public static open(
+    createdAt: Timestamp,
+    expiresAt?: Timestamp,
+  ): PollLifecycle {
+    return new PollLifecycle(PollStatus.OPEN, createdAt, expiresAt);
   }
 
   public static fromPrimitives(primitives: {

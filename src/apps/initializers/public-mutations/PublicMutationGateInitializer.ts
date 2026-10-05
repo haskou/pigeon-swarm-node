@@ -6,6 +6,9 @@ import CommunityMembershipRequestMutationPolicy from '@app/contexts/communities/
 import ConversationMessagePinMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy';
 import ConversationMessageReactionMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy';
 import NotificationScopeSettingsMutationPolicy from '@app/contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy';
+import PollCloseMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollCloseMutationPolicy';
+import PollMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollMutationPolicy';
+import PollVoteMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollVoteMutationPolicy';
 import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 import { PublicMutationGate } from '@app/contexts/public-mutations/infrastructure/PublicMutationGate';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
@@ -30,6 +33,9 @@ export default class PublicMutationGateInitializer {
     private readonly communityInvites: CommunityInviteMutationPolicy,
     private readonly communityInviteUses: CommunityInviteUseMutationPolicy,
     private readonly communityMembershipRequests: CommunityMembershipRequestMutationPolicy,
+    private readonly polls: PollMutationPolicy,
+    private readonly pollVotes: PollVoteMutationPolicy,
+    private readonly pollCloses: PollCloseMutationPolicy,
   ) {}
 
   public ensure(): Promise<void> {
@@ -47,6 +53,9 @@ export default class PublicMutationGateInitializer {
         this.communityInvites,
         this.communityInviteUses,
         this.communityMembershipRequests,
+        this.polls,
+        this.pollVotes,
+        this.pollCloses,
       ]),
     );
 

@@ -1,7 +1,7 @@
-import { CommunityChannelPollScopeAuthorizeMessage } from '@app/contexts/polls/application/authorize-poll-scope/messages/CommunityChannelPollScopeAuthorizeMessage';
-import PollScopeAuthorizer from '@app/contexts/polls/application/authorize-poll-scope/PollScopeAuthorizer';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { CommunityChannelPollScopeAuthorizeMessage } from '@app/contexts/polls/application/authorize-poll-scope/messages/CommunityChannelPollScopeAuthorizeMessage';
+import PollScopeAuthorizer from '@app/contexts/polls/application/authorize-poll-scope/PollScopeAuthorizer';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('PollScopeAuthorizer', () => {

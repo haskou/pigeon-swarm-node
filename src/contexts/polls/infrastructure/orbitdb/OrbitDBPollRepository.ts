@@ -6,16 +6,28 @@ import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infras
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { Timestamp } from '@haskou/value-objects';
 
 import { Poll } from '../../domain/Poll';
 import PollRepository from '../../domain/repositories/PollRepository';
 import { PollId } from '../../domain/value-objects/PollId';
-import { OrbitDBPollDocument } from './documents/OrbitDBPollDocument';
+import { PollOptionId } from '../../domain/value-objects/PollOptionId';
+import PollMutationRecords from './PollMutationRecords';
 
+type PollRecord = Record<string, unknown>;
+
+/**
+ * Polls live in the signed `polls` store as three kinds of record: the
+ * creator's definition, one ballot per voter and an optional close record.
+ * `poll:<id>` holds every record of a poll; the scope indexes only definitions.
+ */
 export default class OrbitDBPollRepository extends PollRepository {
-  private readonly pollIndex: OrbitDBHeadIndex<OrbitDBPollDocument>;
+  private readonly pollIndex: OrbitDBHeadIndex<PollRecord>;
 
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
@@ -27,61 +39,46 @@ export default class OrbitDBPollRepository extends PollRepository {
     this.pollIndex = new OrbitDBHeadIndex(this.registry, {
       collectionName: 'polls',
       documentFromRecord: (record) =>
-        this.isDocument(record) ? record : undefined,
+        this.isRecord(record) ? record : undefined,
       recordId: (record) =>
         typeof record.id === 'string' ? record.id : undefined,
       shouldReplace: (current, candidate) =>
-        this.freshness(current) <= this.freshness(candidate),
+        PublicMutationRecord.replaces(current, candidate) ?? true,
     });
   }
 
-  private hasPollIdentityFields(document: Record<string, unknown>): boolean {
-    return (
-      typeof document.id === 'string' &&
-      typeof document.createdAt === 'number' &&
-      typeof document.creatorIdentityId === 'string' &&
-      typeof document.networkId === 'string'
-    );
+  private pollHeadKey(pollId: string): string {
+    return `poll:${pollId}`;
   }
 
-  private hasPollConfigurationFields(
-    document: Record<string, unknown>,
-  ): boolean {
-    return (
-      typeof document.allowsMultipleVotes === 'boolean' &&
-      Array.isArray(document.options) &&
-      typeof document.question === 'string' &&
-      typeof document.status === 'string' &&
-      Array.isArray(document.votes)
-    );
+  private communityChannelIndexHeadKey(
+    communityId: string,
+    channelId: string,
+  ): string {
+    return `poll-community-channel-index:${communityId}:${channelId}`;
   }
 
-  private hasPollScopeField(document: Record<string, unknown>): boolean {
-    return typeof document.scope === 'object' && document.scope !== null;
+  private groupConversationIndexHeadKey(conversationId: string): string {
+    return `poll-group-conversation-index:${conversationId}`;
   }
 
-  private isDocument(
-    document: Record<string, unknown>,
-  ): document is OrbitDBPollDocument {
-    const hasRequiredFields =
-      this.hasPollIdentityFields(document) &&
-      this.hasPollConfigurationFields(document) &&
-      this.hasPollScopeField(document);
-
-    if (!hasRequiredFields) return false;
-    const candidate = document as OrbitDBPollDocument;
-
+  private isRecord(record: PollRecord): boolean {
     try {
-      const poll = this.toDomain(candidate);
-      poll.getScope().match<void>({
-        communityChannel: () => undefined,
-        groupConversation: () => undefined,
-      });
+      if (record.scopeType === PollMutationRecords.POLL) {
+        PollMutationRecords.pollOf(record);
+      } else if (record.scopeType === PollMutationRecords.VOTE) {
+        if (record.removed === true) {
+          PollMutationRecords.voteTombstoneOf(record);
+        } else {
+          PollMutationRecords.voteOf(record);
+        }
+      } else if (record.scopeType === PollMutationRecords.CLOSE) {
+        PollMutationRecords.closeOf(record);
+      } else {
+        return false;
+      }
 
-      return (
-        poll.getId().valueOf() === candidate.id &&
-        poll.getCreatorIdentityId().valueOf() === candidate.creatorIdentityId
-      );
+      return true;
     } catch {
       return false;
     }
@@ -111,26 +108,6 @@ export default class OrbitDBPollRepository extends PollRepository {
     });
   }
 
-  private async toDocument(poll: Poll): Promise<OrbitDBPollDocument> {
-    const primitives = poll.toPrimitives();
-    const networkId = await this.resolveNetworkId(poll);
-
-    return {
-      allowsMultipleVotes: primitives.allowsMultipleVotes,
-      createdAt: primitives.createdAt,
-      creatorIdentityId: primitives.creatorIdentityId,
-      expiresAt: primitives.expiresAt,
-      id: primitives.id,
-      networkId,
-      options: primitives.options,
-      question: primitives.question,
-      scope: primitives.scope,
-      status: primitives.status,
-      updatedAt: Date.now(),
-      votes: primitives.votes,
-    };
-  }
-
   private runWhilePublicCommunityScope<T>(
     poll: Poll,
     action: () => Promise<T>,
@@ -142,190 +119,230 @@ export default class OrbitDBPollRepository extends PollRepository {
     });
   }
 
-  private toDomain(document: OrbitDBPollDocument): Poll {
-    return Poll.fromPrimitives({
-      allowsMultipleVotes: document.allowsMultipleVotes,
-      createdAt: document.createdAt,
-      creatorIdentityId: document.creatorIdentityId,
-      expiresAt: document.expiresAt,
-      id: document.id,
-      options: document.options,
-      question: document.question,
-      scope: document.scope,
-      status: document.status,
-      votes: document.votes,
+  private scopeIndexKey(poll: Poll): string {
+    return poll.getScope().match<string>({
+      communityChannel: (communityId, channelId) =>
+        this.communityChannelIndexHeadKey(
+          communityId.valueOf(),
+          channelId.valueOf(),
+        ),
+      groupConversation: (conversationId) =>
+        this.groupConversationIndexHeadKey(conversationId.valueOf()),
     });
   }
 
-  private freshness(document: OrbitDBPollDocument): number {
-    return Math.max(document.updatedAt ?? 0, document.createdAt);
+  private sameScope(record: PollRecord, poll: Poll): boolean {
+    try {
+      return PollMutationRecords.scopeOf(record).isEqual(poll.getScope());
+    } catch {
+      return false;
+    }
   }
 
-  private pollHeadKey(pollId: string): string {
-    return `poll:${pollId}`;
-  }
+  /** Replays the ballots and the close record of a poll over its definition. */
+  private assemble(definition: PollRecord, records: PollRecord[]): Poll {
+    const poll = PollMutationRecords.pollOf(definition);
+    const pollId = poll.getId().valueOf();
+    const belongs = (record: PollRecord, scopeType: string): boolean =>
+      record.scopeType === scopeType &&
+      record.pollId === pollId &&
+      record.removed !== true &&
+      this.isRecord(record) &&
+      this.sameScope(record, poll);
+    const closes = records
+      .filter((record) => belongs(record, PollMutationRecords.CLOSE))
+      .map((record) => PollMutationRecords.closeOf(record).createdAt);
+    const closedAt = closes.length > 0 ? Math.min(...closes) : undefined;
+    const ballots = records
+      .filter((record) => belongs(record, PollMutationRecords.VOTE))
+      .map((record) => PollMutationRecords.voteOf(record))
+      .filter(
+        (ballot) => closedAt === undefined || ballot.createdAt <= closedAt,
+      )
+      .sort((left, right) => left.createdAt - right.createdAt);
 
-  private communityChannelIndexHeadKey(
-    communityId: string,
-    channelId: string,
-  ): string {
-    return `poll-community-channel-index:${communityId}:${channelId}`;
-  }
-
-  private groupConversationIndexHeadKey(conversationId: string): string {
-    return `poll-group-conversation-index:${conversationId}`;
-  }
-
-  private belongsToIndex(key: string, document: OrbitDBPollDocument): boolean {
-    if (document.scope.type === 'community_channel') {
-      return (
-        key ===
-        this.communityChannelIndexHeadKey(
-          document.scope.communityId ?? '',
-          document.scope.channelId ?? '',
-        )
-      );
+    for (const ballot of ballots) {
+      try {
+        poll.castVote(
+          new IdentityId(ballot.voterIdentityId),
+          ballot.optionIds.map((id) => new PollOptionId(id)),
+          new Timestamp(ballot.createdAt),
+        );
+      } catch {
+        // A ballot the poll rules reject is ignored, not fatal.
+      }
     }
 
-    return (
-      document.scope.type === 'group_conversation' &&
-      key ===
-        this.groupConversationIndexHeadKey(document.scope.conversationId ?? '')
+    if (closedAt !== undefined) {
+      try {
+        poll.close(new Timestamp(closedAt));
+      } catch {
+        // Already expired before it was closed.
+      }
+    }
+
+    return poll;
+  }
+
+  private definitionOf(records: PollRecord[]): PollRecord | undefined {
+    return records.find(
+      (record) =>
+        record.scopeType === PollMutationRecords.POLL && this.isRecord(record),
     );
   }
 
-  private async putIndexDocument(
-    key: string,
-    document: OrbitDBPollDocument,
+  private async load(pollId: string): Promise<Poll | undefined> {
+    const records = await this.pollIndex.findRecords(this.pollHeadKey(pollId));
+    const definition = this.definitionOf(records);
+
+    return definition ? this.assemble(definition, records) : undefined;
+  }
+
+  private async loadMany(
+    indexKey: string,
+    limit: number,
+    beforeCreatedAt?: number,
+  ): Promise<Poll[]> {
+    const definitions = (await this.pollIndex.findRecords(indexKey))
+      .filter((record) => record.scopeType === PollMutationRecords.POLL)
+      .filter((record) => this.isRecord(record))
+      .filter((record) =>
+        beforeCreatedAt
+          ? (record.createdAt as number) <= beforeCreatedAt
+          : true,
+      )
+      .sort((left, right) =>
+        left.createdAt === right.createdAt
+          ? (right.id as string).localeCompare(left.id as string)
+          : (right.createdAt as number) - (left.createdAt as number),
+      )
+      .slice(0, limit);
+    const polls = await Promise.all(
+      definitions.map(async (definition) =>
+        this.assemble(
+          definition,
+          await this.pollIndex.findRecords(
+            this.pollHeadKey(definition.id as string),
+          ),
+        ),
+      ),
+    );
+
+    return polls;
+  }
+
+  private async write(
+    poll: Poll,
+    payload: PollRecord,
+    proof: PublicMutationProof,
+    isDefinition = false,
   ): Promise<void> {
-    await this.pollIndex.putRecord(
-      key,
-      { id: key },
-      document,
-      [document.networkId],
-      {
-        recordFilter: (candidate) => {
-          const poll = this.isDocument(candidate) ? candidate : undefined;
+    const document = PublicMutationRecord.withProof(payload, proof);
+    const networkId = await this.resolveNetworkId(poll);
+    const pollKey = this.pollHeadKey(poll.getId().valueOf());
 
-          return poll !== undefined && this.belongsToIndex(key, poll);
-        },
-        replace: true,
-      },
-    );
-  }
-
-  private async putHeads(document: OrbitDBPollDocument): Promise<void> {
-    await this.registry.putHeadExactly(
-      this.pollHeadKey(document.id),
-      { ...document },
-      [document.networkId],
-    );
-
-    if (
-      document.scope.type === 'community_channel' &&
-      document.scope.communityId &&
-      document.scope.channelId
-    ) {
-      await this.putIndexDocument(
-        this.communityChannelIndexHeadKey(
-          document.scope.communityId,
-          document.scope.channelId,
+    await this.runWhilePublicCommunityScope(poll, async () => {
+      PublicMutationRecord.assertNotStale(
+        (await this.pollIndex.findRecords(pollKey)).filter(
+          (stored) => stored.id === payload.id,
         ),
         document,
       );
-    }
-
-    if (
-      document.scope.type === 'group_conversation' &&
-      document.scope.conversationId
-    ) {
-      await this.putIndexDocument(
-        this.groupConversationIndexHeadKey(document.scope.conversationId),
+      await this.registry.putDocument('polls', document, [networkId]);
+      await this.pollIndex.putRecord(
+        pollKey,
+        { id: pollKey },
         document,
+        [networkId],
+        { replace: true },
       );
-    }
-  }
 
-  private sortDocuments(
-    documents: OrbitDBPollDocument[],
-  ): OrbitDBPollDocument[] {
-    return [...documents].sort((left, right) => {
-      if (left.createdAt === right.createdAt) {
-        return right.id.localeCompare(left.id);
+      if (isDefinition) {
+        const indexKey = this.scopeIndexKey(poll);
+
+        await this.pollIndex.putRecord(
+          indexKey,
+          { id: indexKey },
+          document,
+          [networkId],
+          {
+            recordFilter: (record) =>
+              record.scopeType === PollMutationRecords.POLL,
+            replace: true,
+          },
+        );
       }
-
-      return right.createdAt - left.createdAt;
     });
   }
 
   public async findById(id: PollId): Promise<Poll | undefined> {
-    const head = await this.registry.findHead(this.pollHeadKey(id.valueOf()));
-    const poll =
-      head && this.isDocument(head) ? this.toDomain(head) : undefined;
+    const poll = await this.load(id.valueOf());
 
     if (!poll) return undefined;
 
     return this.runWhilePublicCommunityScope(poll, async () => {
-      const lockedHead = await this.registry.findHead(
-        this.pollHeadKey(id.valueOf()),
-      );
-      const lockedPoll =
-        lockedHead && this.isDocument(lockedHead)
-          ? this.toDomain(lockedHead)
-          : undefined;
+      const locked = await this.load(id.valueOf());
 
-      return lockedPoll?.getScope().isEqual(poll.getScope())
-        ? lockedPoll
-        : undefined;
+      return locked?.getScope().isEqual(poll.getScope()) ? locked : undefined;
     });
   }
 
-  public async findByCommunityChannel(
+  public findByCommunityChannel(
     communityId: CommunityId,
     channelId: CommunityChannelId,
     limit: number,
     beforeCreatedAt?: number,
   ): Promise<Poll[]> {
-    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      const key = this.communityChannelIndexHeadKey(
-        communityId.valueOf(),
-        channelId.valueOf(),
-      );
-      const indexedDocuments = await this.pollIndex.find(key);
-      const documents = indexedDocuments ?? [];
-
-      return this.sortDocuments(documents)
-        .filter((document) =>
-          beforeCreatedAt ? document.createdAt <= beforeCreatedAt : true,
-        )
-        .slice(0, limit)
-        .map((document) => this.toDomain(document));
-    });
+    return this.publicStorageGuard.runWhilePublic(communityId, () =>
+      this.loadMany(
+        this.communityChannelIndexHeadKey(
+          communityId.valueOf(),
+          channelId.valueOf(),
+        ),
+        limit,
+        beforeCreatedAt,
+      ),
+    );
   }
 
-  public async findByGroupConversation(
+  public findByGroupConversation(
     conversationId: ConversationId,
     limit: number,
     beforeCreatedAt?: number,
   ): Promise<Poll[]> {
-    const key = this.groupConversationIndexHeadKey(conversationId.valueOf());
-    const indexedDocuments = await this.pollIndex.find(key);
-    const documents = indexedDocuments ?? [];
-
-    return this.sortDocuments(documents)
-      .filter((document) =>
-        beforeCreatedAt ? document.createdAt <= beforeCreatedAt : true,
-      )
-      .slice(0, limit)
-      .map((document) => this.toDomain(document));
+    return this.loadMany(
+      this.groupConversationIndexHeadKey(conversationId.valueOf()),
+      limit,
+      beforeCreatedAt,
+    );
   }
 
-  public async save(poll: Poll): Promise<void> {
-    const document = await this.toDocument(poll);
+  public save(poll: Poll, proof: PublicMutationProof): Promise<void> {
+    return this.write(poll, PollMutationRecords.pollPayload(poll), proof, true);
+  }
 
-    await this.runWhilePublicCommunityScope(poll, async () => {
-      await this.registry.putDocument('polls', document);
-      await this.putHeads(document);
-    });
+  public saveVote(
+    poll: Poll,
+    voterIdentityId: IdentityId,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    return this.write(
+      poll,
+      PollMutationRecords.votePayload(poll, voterIdentityId),
+      proof,
+    );
+  }
+
+  public saveClose(
+    poll: Poll,
+    closedByIdentityId: IdentityId,
+    closedAt: Timestamp,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    return this.write(
+      poll,
+      PollMutationRecords.closePayload(poll, closedByIdentityId, closedAt),
+      proof,
+    );
   }
 }

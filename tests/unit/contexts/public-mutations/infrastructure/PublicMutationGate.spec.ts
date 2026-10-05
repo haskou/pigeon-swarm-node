@@ -12,6 +12,10 @@ import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import ConversationMessagePinMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy';
 import NotificationScopeSettingsMutationPolicy from '@app/contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy';
+import PollCloseMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollCloseMutationPolicy';
+import PollMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollMutationPolicy';
+import PollMutationScopeAccess from '@app/contexts/polls/infrastructure/orbitdb/policies/PollMutationScopeAccess';
+import PollVoteMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollVoteMutationPolicy';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
@@ -821,6 +825,240 @@ describe('PublicMutationGate over community invites and requests', () => {
 
     await expect(
       gate.accepts('requests', await sign(invite, creator)),
+    ).resolves.toBe(false);
+  });
+});
+
+describe('PublicMutationGate over polls', () => {
+  const creator =
+    'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=';
+  const voter = 'MCowBQYDK2VwAyEACdZwo16pCFQ1jxy5u2ZIOlVxcrx8QTHKDcLqGfWRgFk=';
+  const createdAt = 1780000000000;
+  const scope = { channelId: 'channel-1', communityId: 'community-1' };
+  const poll = {
+    ...scope,
+    allowsMultipleVotes: false,
+    createdAt,
+    creatorIdentityId: creator,
+    id: 'poll-1',
+    options: [
+      { id: 'a', text: 'A' },
+      { id: 'b', text: 'B' },
+    ],
+    question: 'Which?',
+    scopeType: 'poll',
+  };
+  const vote = {
+    ...scope,
+    createdAt,
+    id: `poll-vote:poll-1:${voter}`,
+    optionIds: ['a'],
+    pollId: 'poll-1',
+    scopeType: 'poll_vote',
+    voterIdentityId: voter,
+  };
+  const voteTombstone = {
+    id: vote.id,
+    pollId: 'poll-1',
+    removed: true,
+    scopeType: 'poll_vote',
+    voterIdentityId: voter,
+  };
+  const close = {
+    ...scope,
+    closedByIdentityId: creator,
+    createdAt,
+    id: 'poll-close:poll-1',
+    pollId: 'poll-1',
+    scopeType: 'poll_close',
+  };
+  const authorization = mock<PublicMutationAuthorAuthorization>();
+  const communityRepository = mock<CommunityRepository>();
+  const conversationRepository = mock<ConversationRepository>();
+  const community = mock<Community>();
+  let gate: PublicMutationGate;
+
+  const sign = async (
+    payload: Record<string, unknown>,
+    author: string,
+  ): Promise<Record<string, unknown>> => {
+    const device = await KeyPair.generate();
+    const body = {
+      author: {
+        deviceCredential: device.toPrimitives().publicKey,
+        identityId: author,
+      },
+      kind: payload.removed === true ? 'delete' : 'put',
+      operationId: 'operation-1'.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor: PublicMutationProof.digestOf({ previous: 1 }),
+      recordId: payload.id as string,
+      sequence: 1,
+      store: 'polls',
+      version: 1,
+    } as const;
+
+    return PublicMutationRecord.withProof(
+      payload,
+      PublicMutationProof.signed(
+        body,
+        device.sign(PublicMutationProof.signingContentOf(body)),
+      ),
+    );
+  };
+
+  beforeEach(() => {
+    authorization.isAuthorized.mockResolvedValue(true);
+    communityRepository.findById.mockResolvedValue(community);
+    community.authorizeTextChannelPollCreation.mockReset();
+    community.authorizeTextChannelPollVote.mockReset();
+    const access = new PollMutationScopeAccess(
+      communityRepository,
+      conversationRepository,
+    );
+
+    gate = new PublicMutationGate(new PublicMutationVerifier(authorization), [
+      new PollMutationPolicy(access),
+      new PollVoteMutationPolicy(access),
+      new PollCloseMutationPolicy(access),
+    ]);
+  });
+
+  it('admits a signed poll, ballot, tombstone and close from the right authors', async () => {
+    await expect(
+      gate.accepts('polls', await sign(poll, creator)),
+    ).resolves.toBe(true);
+    await expect(gate.accepts('polls', await sign(vote, voter))).resolves.toBe(
+      true,
+    );
+    await expect(
+      gate.accepts('polls', await sign(voteTombstone, voter)),
+    ).resolves.toBe(true);
+    await expect(
+      gate.accepts('polls', await sign(close, creator)),
+    ).resolves.toBe(true);
+  });
+
+  it('rejects unsigned records of every scope', async () => {
+    for (const record of [poll, vote, voteTombstone, close]) {
+      await expect(gate.accepts('polls', record)).resolves.toBe(false);
+    }
+  });
+
+  it('rejects a poll signed by someone other than its creator', async () => {
+    await expect(gate.accepts('polls', await sign(poll, voter))).resolves.toBe(
+      false,
+    );
+  });
+
+  it('rejects a ballot cast under another identity', async () => {
+    await expect(
+      gate.accepts('polls', await sign(vote, creator)),
+    ).resolves.toBe(false);
+    await expect(
+      gate.accepts('polls', await sign(voteTombstone, creator)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a ballot whose id is not derived from poll and voter', async () => {
+    await expect(
+      gate.accepts('polls', await sign({ ...vote, id: 'forged' }, voter)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a ballot with duplicate or no options', async () => {
+    await expect(
+      gate.accepts(
+        'polls',
+        await sign({ ...vote, optionIds: ['a', 'a'] }, voter),
+      ),
+    ).resolves.toBe(false);
+    await expect(
+      gate.accepts('polls', await sign({ ...vote, optionIds: [] }, voter)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a poll with a single option or extra fields', async () => {
+    await expect(
+      gate.accepts(
+        'polls',
+        await sign({ ...poll, options: [{ id: 'a', text: 'A' }] }, creator),
+      ),
+    ).resolves.toBe(false);
+    await expect(
+      gate.accepts('polls', await sign({ ...poll, status: 'open' }, creator)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a poll whose scope names both a channel and a conversation', async () => {
+    await expect(
+      gate.accepts(
+        'polls',
+        await sign({ ...poll, conversationId: 'group:1' }, creator),
+      ),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a poll or close the community does not let the author manage', async () => {
+    community.authorizeTextChannelPollCreation.mockImplementation(() => {
+      throw new Error('forbidden');
+    });
+
+    await expect(
+      gate.accepts('polls', await sign(poll, creator)),
+    ).resolves.toBe(false);
+    await expect(
+      gate.accepts('polls', await sign(close, creator)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a ballot the community does not let the author cast, but admits its removal', async () => {
+    community.authorizeTextChannelPollVote.mockImplementation(() => {
+      throw new Error('forbidden');
+    });
+
+    await expect(gate.accepts('polls', await sign(vote, voter))).resolves.toBe(
+      false,
+    );
+    await expect(
+      gate.accepts('polls', await sign(voteTombstone, voter)),
+    ).resolves.toBe(true);
+  });
+
+  it('admits group conversation polls only for participants of a group', async () => {
+    const conversation = mock<Conversation>();
+    const groupPoll = {
+      allowsMultipleVotes: false,
+      conversationId: 'group:1',
+      createdAt,
+      creatorIdentityId: creator,
+      id: 'poll-2',
+      options: poll.options,
+      question: 'Which?',
+      scopeType: 'poll',
+    };
+
+    conversationRepository.findMetadataById.mockResolvedValue(conversation);
+    conversation.isGroup.mockReturnValue(true);
+    conversation.hasParticipant.mockReturnValue(true);
+    await expect(
+      gate.accepts('polls', await sign(groupPoll, creator)),
+    ).resolves.toBe(true);
+
+    conversation.hasParticipant.mockReturnValue(false);
+    await expect(
+      gate.accepts(
+        'polls',
+        await sign({ ...groupPoll, id: 'poll-3' }, creator),
+      ),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects records of an unknown community', async () => {
+    communityRepository.findById.mockResolvedValue(undefined);
+
+    await expect(
+      gate.accepts('polls', await sign(poll, creator)),
     ).resolves.toBe(false);
   });
 });

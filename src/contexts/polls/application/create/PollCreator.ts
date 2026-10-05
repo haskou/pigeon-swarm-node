@@ -12,16 +12,18 @@ export class PollCreator {
 
   public async create(message: PollCreateMessage): Promise<Poll> {
     const poll = Poll.create(
+      message.pollId,
       message.creatorIdentityId,
       message.scope,
       message.question,
       message.options,
       message.allowsMultipleVotes,
+      message.createdAt,
       message.expiresAt,
       message.audience,
     );
 
-    await this.repository.save(poll);
+    await this.repository.save(poll, message.getProof());
     await this.eventPublisher.publish(poll.pullDomainEvents());
 
     return poll;

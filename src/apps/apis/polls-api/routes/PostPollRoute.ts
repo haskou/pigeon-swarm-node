@@ -35,12 +35,15 @@ export class PostPollRoute extends PollRouteSupport {
         : await this.groupConversationScope(actor, body.conversationId || '');
     const poll = await this.creator.create(
       new PollCreateMessage(
+        body.pollId,
         actor.valueOf(),
         scopeAccess.scope,
         body.question,
         body.options,
         body.allowsMultipleVotes,
         scopeAccess.audience,
+        body.createdAt,
+        body.mutation,
         body.expiresAt,
       ),
     );

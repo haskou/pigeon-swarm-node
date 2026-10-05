@@ -2,8 +2,16 @@ import { PollVoteRemoveMessage } from '@app/contexts/polls/application/remove-vo
 import { PollVoteRemover } from '@app/contexts/polls/application/remove-vote/PollVoteRemover';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  Delete,
+  JsonController,
+  Param,
+  Req,
+  Res,
+} from 'routing-controllers';
 
+import { DeletePollVoteBody } from '../bodies/DeletePollVoteBody';
 import { PollViewModel } from '../view-model/PollViewModel';
 import { PollRouteSupport } from './PollRouteSupport';
 
@@ -14,6 +22,7 @@ export class DeletePollVoteRoute extends PollRouteSupport {
   @Delete('/:pollId/votes/me')
   public async removeVote(
     @Param('pollId') pollId: string,
+    @Body() body: DeletePollVoteBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
@@ -21,7 +30,12 @@ export class DeletePollVoteRoute extends PollRouteSupport {
     const poll = await this.findPoll(pollId);
     const scopeAccess = await this.accessPollScope(actor, poll);
     const updatedPoll = await this.remover.remove(
-      new PollVoteRemoveMessage(pollId, actor.valueOf(), scopeAccess.audience),
+      new PollVoteRemoveMessage(
+        pollId,
+        actor.valueOf(),
+        scopeAccess.audience,
+        body.mutation,
+      ),
     );
 
     return response

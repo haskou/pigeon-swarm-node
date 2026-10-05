@@ -19,8 +19,16 @@ export class PollVoteCaster {
       throw new PollNotFoundError();
     }
 
-    poll.castVote(message.voterIdentityId, message.optionIds);
-    await this.repository.save(poll);
+    poll.castVote(
+      message.voterIdentityId,
+      message.optionIds,
+      message.createdAt,
+    );
+    await this.repository.saveVote(
+      poll,
+      message.voterIdentityId,
+      message.getProof(),
+    );
     const eventStreamId = poll.getScope().match({
       communityChannel: (communityId) => communityId.valueOf(),
       groupConversation: (conversationId) => conversationId.valueOf(),
