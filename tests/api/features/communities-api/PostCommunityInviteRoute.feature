@@ -49,6 +49,7 @@ Feature: Post community invite API
     Then response code is equal to 200
     And response body should contain "encryptedCommunityKey"
     And response body should contain "API community"
+    And response body should contain the current network id
 
   Scenario: Invite cannot be accepted more times than allowed
     Given I am an anonymous user

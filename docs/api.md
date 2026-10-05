@@ -2298,6 +2298,17 @@ Channel and role ids are not chosen: `channelId` and `roleId` are the first 24 h
 characters of `sha256(JSON.stringify(["channel" | "role", communityId,
 authorIdentityId, operation.createdAt]))`.
 
+Fixed, reproducible vectors for the genesis and `member_joined` operations live in
+[`tests/fixtures/community-operation-vectors.json`](../tests/fixtures/community-operation-vectors.json).
+Per case they give the inputs (`networkId`, community nonce, owner, `createdAt`,
+`parents`, `args`, a deterministic ed25519 test key) and every derived value:
+`communityId`, the canonical payload and its `digest`, the `recordId`,
+`payloadDigest`, the signing content, the signature and the request `operation`.
+A unit spec recomputes all of them with the domain code and with plain
+`canonicalize` and `sha256`, so a client can use the file as its conformance test.
+A client that is not a member yet reads the `networkId` it needs for the
+`member_joined` of an invite from `GET /communities/invites/{inviteToken}`.
+
 ### List communities
 
 ```http
@@ -2766,6 +2777,7 @@ Response:
   "inviteToken": "<inviteToken>",
   "communityId": "<communityId>",
   "communityName": "Pigeon Swarm",
+  "networkId": "<networkId>",
   "communityAvatar": "bagaa...",
   "communityBanner": "bagaa...",
   "encryptedCommunityKey": {
@@ -2784,6 +2796,9 @@ Implemented:
 
 - resolve invite metadata by bearer token
 - return minimal community metadata for invite preview
+- return the community `networkId`, which the invited identity, not yet a member
+  and so unable to read `GET /communities/{communityId}`, needs to build the
+  signed `member_joined` operation of the accept
 - return `encryptedCommunityKey` exactly as stored
 - never receive the `#k` fragment secret
 

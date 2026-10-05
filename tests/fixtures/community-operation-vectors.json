@@ -1,0 +1,439 @@
+{
+  "algorithms": {
+    "canonicalization": "RFC 8785 JSON Canonicalization Scheme (npm package canonicalize)",
+    "communityId": "base64url(sha256(utf8(canonicalize({networkId, nonce, ownerIdentityId}))))",
+    "deviceCredential": "mutation.author.deviceCredential is the PEM-less base64 public key of the signing device, here the identity's own key acting as its first device, so it equals identityId and the same key signs",
+    "digest": "base64url(sha256(utf8(canonicalize(payload without id)))), also the value other operations list in parents",
+    "inviteToken": "base64url(sha256(utf8(JSON.stringify([communityId, creatorIdentityId, nonce])))), only used as the member_joined reference of an invite_link",
+    "payloadDigest": "base64url(sha256(utf8(canonicalize(payload))))",
+    "recordId": "community:<communityId>:op:<digest>",
+    "signature": "ed25519 over utf8(signingContent), standard base64 with padding (88 characters)",
+    "signingContent": "\"pigeon:public-mutation:v1\\n\" + canonicalize(mutationBody), mutationBody being the mutation without its signature"
+  },
+  "cases": [
+    {
+      "derived": {
+        "digest": "EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI",
+        "digestPreimage": "{\"action\":\"community_created\",\"args\":{\"autoJoinEnabled\":false,\"description\":\"A private community\",\"discoverable\":true,\"name\":\"Pigeon Lab\",\"nonce\":\"vector-genesis-nonce-1\",\"visibility\":\"private\"},\"authorIdentityId\":\"MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=\",\"communityId\":\"889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c\",\"createdAt\":1773848829055,\"networkId\":\"550e8400-e29b-41d4-a716-446655440000\",\"parents\":[],\"scopeType\":\"community_operation\"}",
+        "mutation": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=",
+            "identityId": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM="
+          },
+          "kind": "put",
+          "operationId": "vector-genesis-0000000",
+          "payloadDigest": "nSAdKJWUX9NjScwOhkPk3EymlAFM3K_NXEIOaYrjei4",
+          "predecessor": null,
+          "recordId": "community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI",
+          "sequence": 0,
+          "store": "communityOperations",
+          "version": 1,
+          "signature": "ZDL1ONursLt9Uug74umW5Dl+j1MW+PIu+xJ1DfmsKGYB5jZO8DPE0ukHPapEdfdzdFHDsaAJniGQ4yeRKUCpAA=="
+        },
+        "mutationBody": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=",
+            "identityId": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM="
+          },
+          "kind": "put",
+          "operationId": "vector-genesis-0000000",
+          "payloadDigest": "nSAdKJWUX9NjScwOhkPk3EymlAFM3K_NXEIOaYrjei4",
+          "predecessor": null,
+          "recordId": "community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI",
+          "sequence": 0,
+          "store": "communityOperations",
+          "version": 1
+        },
+        "payload": {
+          "action": "community_created",
+          "args": {
+            "autoJoinEnabled": false,
+            "description": "A private community",
+            "discoverable": true,
+            "name": "Pigeon Lab",
+            "nonce": "vector-genesis-nonce-1",
+            "visibility": "private"
+          },
+          "authorIdentityId": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=",
+          "communityId": "889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c",
+          "createdAt": 1773848829055,
+          "id": "community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI",
+          "networkId": "550e8400-e29b-41d4-a716-446655440000",
+          "parents": [],
+          "scopeType": "community_operation"
+        },
+        "payloadCanonical": "{\"action\":\"community_created\",\"args\":{\"autoJoinEnabled\":false,\"description\":\"A private community\",\"discoverable\":true,\"name\":\"Pigeon Lab\",\"nonce\":\"vector-genesis-nonce-1\",\"visibility\":\"private\"},\"authorIdentityId\":\"MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=\",\"communityId\":\"889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c\",\"createdAt\":1773848829055,\"id\":\"community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI\",\"networkId\":\"550e8400-e29b-41d4-a716-446655440000\",\"parents\":[],\"scopeType\":\"community_operation\"}",
+        "payloadDigest": "nSAdKJWUX9NjScwOhkPk3EymlAFM3K_NXEIOaYrjei4",
+        "recordId": "community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI",
+        "requestOperation": {
+          "createdAt": 1773848829055,
+          "mutation": {
+            "author": {
+              "deviceCredential": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=",
+              "identityId": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM="
+            },
+            "kind": "put",
+            "operationId": "vector-genesis-0000000",
+            "payloadDigest": "nSAdKJWUX9NjScwOhkPk3EymlAFM3K_NXEIOaYrjei4",
+            "predecessor": null,
+            "recordId": "community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI",
+            "sequence": 0,
+            "store": "communityOperations",
+            "version": 1,
+            "signature": "ZDL1ONursLt9Uug74umW5Dl+j1MW+PIu+xJ1DfmsKGYB5jZO8DPE0ukHPapEdfdzdFHDsaAJniGQ4yeRKUCpAA=="
+          },
+          "parents": []
+        },
+        "signature": "ZDL1ONursLt9Uug74umW5Dl+j1MW+PIu+xJ1DfmsKGYB5jZO8DPE0ukHPapEdfdzdFHDsaAJniGQ4yeRKUCpAA==",
+        "signingContent": "pigeon:public-mutation:v1\n{\"author\":{\"deviceCredential\":\"MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=\",\"identityId\":\"MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=\"},\"kind\":\"put\",\"operationId\":\"vector-genesis-0000000\",\"payloadDigest\":\"nSAdKJWUX9NjScwOhkPk3EymlAFM3K_NXEIOaYrjei4\",\"predecessor\":null,\"recordId\":\"community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI\",\"sequence\":0,\"store\":\"communityOperations\",\"version\":1}"
+      },
+      "input": {
+        "action": "community_created",
+        "args": {
+          "autoJoinEnabled": false,
+          "description": "A private community",
+          "discoverable": true,
+          "name": "Pigeon Lab",
+          "nonce": "vector-genesis-nonce-1",
+          "visibility": "private"
+        },
+        "communityId": "889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c",
+        "createdAt": 1773848829055,
+        "networkId": "550e8400-e29b-41d4-a716-446655440000",
+        "operationId": "vector-genesis-0000000",
+        "parents": [],
+        "signer": "owner"
+      },
+      "name": "genesis",
+      "note": "POST /communities. Minimal genesis, no parents, no avatar or banner."
+    },
+    {
+      "derived": {
+        "digest": "IQiKd8yPyf_tJAXO-TWmobnViOCj_fWh4tx4mSkKXlg",
+        "digestPreimage": "{\"action\":\"community_created\",\"args\":{\"autoJoinEnabled\":true,\"avatar\":\"bafkreiavatarvector\",\"banner\":\"bafkreibannervector\",\"description\":\"Café ✨ — ünïcode, \\\"quotes\\\", back\\\\slash and a\\nnewline\",\"discoverable\":false,\"name\":\"Pigeon Café ✨\",\"nonce\":\"vector-genesis-nonce-2\",\"visibility\":\"private\"},\"authorIdentityId\":\"MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=\",\"communityId\":\"jS4VE6GtU1G8SVCazF00N1SQJr2W6gHBDcaVKtG_L_0\",\"createdAt\":1773848830000,\"networkId\":\"550e8400-e29b-41d4-a716-446655440000\",\"parents\":[],\"scopeType\":\"community_operation\"}",
+        "mutation": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=",
+            "identityId": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM="
+          },
+          "kind": "put",
+          "operationId": "vector-genesis-media-0",
+          "payloadDigest": "nenxyIsD8DobYsTY_d-5Z0WzXcjJgOL1c_yfhxkvxp0",
+          "predecessor": null,
+          "recordId": "community:jS4VE6GtU1G8SVCazF00N1SQJr2W6gHBDcaVKtG_L_0:op:IQiKd8yPyf_tJAXO-TWmobnViOCj_fWh4tx4mSkKXlg",
+          "sequence": 0,
+          "store": "communityOperations",
+          "version": 1,
+          "signature": "RpkSXL2H4hBhvv0C9mb708jGH/umh9XWDiaZluKAo85RxxtEj72BZ6erxfqWraTFwuPW+GCv9QKKOZa2La8aAw=="
+        },
+        "mutationBody": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=",
+            "identityId": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM="
+          },
+          "kind": "put",
+          "operationId": "vector-genesis-media-0",
+          "payloadDigest": "nenxyIsD8DobYsTY_d-5Z0WzXcjJgOL1c_yfhxkvxp0",
+          "predecessor": null,
+          "recordId": "community:jS4VE6GtU1G8SVCazF00N1SQJr2W6gHBDcaVKtG_L_0:op:IQiKd8yPyf_tJAXO-TWmobnViOCj_fWh4tx4mSkKXlg",
+          "sequence": 0,
+          "store": "communityOperations",
+          "version": 1
+        },
+        "payload": {
+          "action": "community_created",
+          "args": {
+            "autoJoinEnabled": true,
+            "avatar": "bafkreiavatarvector",
+            "banner": "bafkreibannervector",
+            "description": "Café ✨ — ünïcode, \"quotes\", back\\slash and a\nnewline",
+            "discoverable": false,
+            "name": "Pigeon Café ✨",
+            "nonce": "vector-genesis-nonce-2",
+            "visibility": "private"
+          },
+          "authorIdentityId": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=",
+          "communityId": "jS4VE6GtU1G8SVCazF00N1SQJr2W6gHBDcaVKtG_L_0",
+          "createdAt": 1773848830000,
+          "id": "community:jS4VE6GtU1G8SVCazF00N1SQJr2W6gHBDcaVKtG_L_0:op:IQiKd8yPyf_tJAXO-TWmobnViOCj_fWh4tx4mSkKXlg",
+          "networkId": "550e8400-e29b-41d4-a716-446655440000",
+          "parents": [],
+          "scopeType": "community_operation"
+        },
+        "payloadCanonical": "{\"action\":\"community_created\",\"args\":{\"autoJoinEnabled\":true,\"avatar\":\"bafkreiavatarvector\",\"banner\":\"bafkreibannervector\",\"description\":\"Café ✨ — ünïcode, \\\"quotes\\\", back\\\\slash and a\\nnewline\",\"discoverable\":false,\"name\":\"Pigeon Café ✨\",\"nonce\":\"vector-genesis-nonce-2\",\"visibility\":\"private\"},\"authorIdentityId\":\"MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=\",\"communityId\":\"jS4VE6GtU1G8SVCazF00N1SQJr2W6gHBDcaVKtG_L_0\",\"createdAt\":1773848830000,\"id\":\"community:jS4VE6GtU1G8SVCazF00N1SQJr2W6gHBDcaVKtG_L_0:op:IQiKd8yPyf_tJAXO-TWmobnViOCj_fWh4tx4mSkKXlg\",\"networkId\":\"550e8400-e29b-41d4-a716-446655440000\",\"parents\":[],\"scopeType\":\"community_operation\"}",
+        "payloadDigest": "nenxyIsD8DobYsTY_d-5Z0WzXcjJgOL1c_yfhxkvxp0",
+        "recordId": "community:jS4VE6GtU1G8SVCazF00N1SQJr2W6gHBDcaVKtG_L_0:op:IQiKd8yPyf_tJAXO-TWmobnViOCj_fWh4tx4mSkKXlg",
+        "requestOperation": {
+          "createdAt": 1773848830000,
+          "mutation": {
+            "author": {
+              "deviceCredential": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=",
+              "identityId": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM="
+            },
+            "kind": "put",
+            "operationId": "vector-genesis-media-0",
+            "payloadDigest": "nenxyIsD8DobYsTY_d-5Z0WzXcjJgOL1c_yfhxkvxp0",
+            "predecessor": null,
+            "recordId": "community:jS4VE6GtU1G8SVCazF00N1SQJr2W6gHBDcaVKtG_L_0:op:IQiKd8yPyf_tJAXO-TWmobnViOCj_fWh4tx4mSkKXlg",
+            "sequence": 0,
+            "store": "communityOperations",
+            "version": 1,
+            "signature": "RpkSXL2H4hBhvv0C9mb708jGH/umh9XWDiaZluKAo85RxxtEj72BZ6erxfqWraTFwuPW+GCv9QKKOZa2La8aAw=="
+          },
+          "parents": []
+        },
+        "signature": "RpkSXL2H4hBhvv0C9mb708jGH/umh9XWDiaZluKAo85RxxtEj72BZ6erxfqWraTFwuPW+GCv9QKKOZa2La8aAw==",
+        "signingContent": "pigeon:public-mutation:v1\n{\"author\":{\"deviceCredential\":\"MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=\",\"identityId\":\"MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=\"},\"kind\":\"put\",\"operationId\":\"vector-genesis-media-0\",\"payloadDigest\":\"nenxyIsD8DobYsTY_d-5Z0WzXcjJgOL1c_yfhxkvxp0\",\"predecessor\":null,\"recordId\":\"community:jS4VE6GtU1G8SVCazF00N1SQJr2W6gHBDcaVKtG_L_0:op:IQiKd8yPyf_tJAXO-TWmobnViOCj_fWh4tx4mSkKXlg\",\"sequence\":0,\"store\":\"communityOperations\",\"version\":1}"
+      },
+      "input": {
+        "action": "community_created",
+        "args": {
+          "autoJoinEnabled": true,
+          "avatar": "bafkreiavatarvector",
+          "banner": "bafkreibannervector",
+          "description": "Café ✨ — ünïcode, \"quotes\", back\\slash and a\nnewline",
+          "discoverable": false,
+          "name": "Pigeon Café ✨",
+          "nonce": "vector-genesis-nonce-2",
+          "visibility": "private"
+        },
+        "communityId": "jS4VE6GtU1G8SVCazF00N1SQJr2W6gHBDcaVKtG_L_0",
+        "createdAt": 1773848830000,
+        "networkId": "550e8400-e29b-41d4-a716-446655440000",
+        "operationId": "vector-genesis-media-0",
+        "parents": [],
+        "signer": "owner"
+      },
+      "name": "genesis_with_media_and_unicode",
+      "note": "POST /communities with the optional avatar and banner and non-ASCII text. Canonical JSON keeps the UTF-8 characters and escapes only the JSON control characters, quotes and backslashes."
+    },
+    {
+      "derived": {
+        "digest": "H__-el7T2XwxtooLjjc2Cf5ehHz4-EoIHymUkHwICXg",
+        "digestPreimage": "{\"action\":\"member_joined\",\"args\":{\"identityId\":\"MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=\",\"method\":\"invite_link\",\"reference\":\"nFBbDhdANKkuGgbf7_5wl34gEUTZFqvBxVakTq4Qpeo\"},\"authorIdentityId\":\"MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=\",\"communityId\":\"889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c\",\"createdAt\":1773848831000,\"networkId\":\"550e8400-e29b-41d4-a716-446655440000\",\"parents\":[\"EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI\"],\"scopeType\":\"community_operation\"}",
+        "mutation": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=",
+            "identityId": "MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI="
+          },
+          "kind": "put",
+          "operationId": "vector-member-joined-0",
+          "payloadDigest": "ZOObZ5XxUC_Ww3YXYI-aVlafXUxaTGeagWXFkDacr6k",
+          "predecessor": null,
+          "recordId": "community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:H__-el7T2XwxtooLjjc2Cf5ehHz4-EoIHymUkHwICXg",
+          "sequence": 0,
+          "store": "communityOperations",
+          "version": 1,
+          "signature": "qiHGogbXbn8yhxu+VSt/+s88a9tYTB0PjTmSkV+XuB8ds3qyHZQKus9/8OiOM0CiqUZ0a4Il6CbUrVOAmP36BQ=="
+        },
+        "mutationBody": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=",
+            "identityId": "MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI="
+          },
+          "kind": "put",
+          "operationId": "vector-member-joined-0",
+          "payloadDigest": "ZOObZ5XxUC_Ww3YXYI-aVlafXUxaTGeagWXFkDacr6k",
+          "predecessor": null,
+          "recordId": "community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:H__-el7T2XwxtooLjjc2Cf5ehHz4-EoIHymUkHwICXg",
+          "sequence": 0,
+          "store": "communityOperations",
+          "version": 1
+        },
+        "payload": {
+          "action": "member_joined",
+          "args": {
+            "identityId": "MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=",
+            "method": "invite_link",
+            "reference": "nFBbDhdANKkuGgbf7_5wl34gEUTZFqvBxVakTq4Qpeo"
+          },
+          "authorIdentityId": "MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=",
+          "communityId": "889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c",
+          "createdAt": 1773848831000,
+          "id": "community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:H__-el7T2XwxtooLjjc2Cf5ehHz4-EoIHymUkHwICXg",
+          "networkId": "550e8400-e29b-41d4-a716-446655440000",
+          "parents": ["EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI"],
+          "scopeType": "community_operation"
+        },
+        "payloadCanonical": "{\"action\":\"member_joined\",\"args\":{\"identityId\":\"MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=\",\"method\":\"invite_link\",\"reference\":\"nFBbDhdANKkuGgbf7_5wl34gEUTZFqvBxVakTq4Qpeo\"},\"authorIdentityId\":\"MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=\",\"communityId\":\"889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c\",\"createdAt\":1773848831000,\"id\":\"community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:H__-el7T2XwxtooLjjc2Cf5ehHz4-EoIHymUkHwICXg\",\"networkId\":\"550e8400-e29b-41d4-a716-446655440000\",\"parents\":[\"EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI\"],\"scopeType\":\"community_operation\"}",
+        "payloadDigest": "ZOObZ5XxUC_Ww3YXYI-aVlafXUxaTGeagWXFkDacr6k",
+        "recordId": "community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:H__-el7T2XwxtooLjjc2Cf5ehHz4-EoIHymUkHwICXg",
+        "requestOperation": {
+          "createdAt": 1773848831000,
+          "mutation": {
+            "author": {
+              "deviceCredential": "MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=",
+              "identityId": "MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI="
+            },
+            "kind": "put",
+            "operationId": "vector-member-joined-0",
+            "payloadDigest": "ZOObZ5XxUC_Ww3YXYI-aVlafXUxaTGeagWXFkDacr6k",
+            "predecessor": null,
+            "recordId": "community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:H__-el7T2XwxtooLjjc2Cf5ehHz4-EoIHymUkHwICXg",
+            "sequence": 0,
+            "store": "communityOperations",
+            "version": 1,
+            "signature": "qiHGogbXbn8yhxu+VSt/+s88a9tYTB0PjTmSkV+XuB8ds3qyHZQKus9/8OiOM0CiqUZ0a4Il6CbUrVOAmP36BQ=="
+          },
+          "parents": ["EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI"]
+        },
+        "signature": "qiHGogbXbn8yhxu+VSt/+s88a9tYTB0PjTmSkV+XuB8ds3qyHZQKus9/8OiOM0CiqUZ0a4Il6CbUrVOAmP36BQ==",
+        "signingContent": "pigeon:public-mutation:v1\n{\"author\":{\"deviceCredential\":\"MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=\",\"identityId\":\"MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=\"},\"kind\":\"put\",\"operationId\":\"vector-member-joined-0\",\"payloadDigest\":\"ZOObZ5XxUC_Ww3YXYI-aVlafXUxaTGeagWXFkDacr6k\",\"predecessor\":null,\"recordId\":\"community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:H__-el7T2XwxtooLjjc2Cf5ehHz4-EoIHymUkHwICXg\",\"sequence\":0,\"store\":\"communityOperations\",\"version\":1}"
+      },
+      "input": {
+        "action": "member_joined",
+        "args": {
+          "identityId": "MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=",
+          "method": "invite_link",
+          "reference": "nFBbDhdANKkuGgbf7_5wl34gEUTZFqvBxVakTq4Qpeo"
+        },
+        "communityId": "889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c",
+        "createdAt": 1773848831000,
+        "networkId": "550e8400-e29b-41d4-a716-446655440000",
+        "operationId": "vector-member-joined-0",
+        "parents": ["EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI"],
+        "signer": "member"
+      },
+      "name": "member_joined_invite_link",
+      "note": "POST /communities/invites/{token}/accept. Signed by the joining identity. parents is the frontier read from GET /communities/{communityId}/frontier, here the genesis digest. reference is the invite token. The networkId comes from GET /communities/invites/{token}."
+    },
+    {
+      "derived": {
+        "digest": "twtRxBOyGECWk637BfoaevH_y5p_Qhx6Y_p7kkndC7o",
+        "digestPreimage": "{\"action\":\"member_joined\",\"args\":{\"identityId\":\"MCowBQYDK2VwAyEAY9c4uJOxftxqpNbSo9x/vpz9bKr56kHpvf6MuZSutJM=\",\"method\":\"added\"},\"authorIdentityId\":\"MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=\",\"communityId\":\"889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c\",\"createdAt\":1773848832000,\"networkId\":\"550e8400-e29b-41d4-a716-446655440000\",\"parents\":[\"EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI\",\"H__-el7T2XwxtooLjjc2Cf5ehHz4-EoIHymUkHwICXg\"],\"scopeType\":\"community_operation\"}",
+        "mutation": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=",
+            "identityId": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM="
+          },
+          "kind": "put",
+          "operationId": "vector-member-added-00",
+          "payloadDigest": "Ulp9GTD6t2jFo9eXHztvzFxxLZ-YXx2_CvcceC2ZL3g",
+          "predecessor": null,
+          "recordId": "community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:twtRxBOyGECWk637BfoaevH_y5p_Qhx6Y_p7kkndC7o",
+          "sequence": 0,
+          "store": "communityOperations",
+          "version": 1,
+          "signature": "DD8NlO84VIyeCtxNrtHlf2YA31dStaxQZmKbs5N7TUDFl367O8yzmSq076CHsGPdbbyKdRieyDbfjWc1l/rPCw=="
+        },
+        "mutationBody": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=",
+            "identityId": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM="
+          },
+          "kind": "put",
+          "operationId": "vector-member-added-00",
+          "payloadDigest": "Ulp9GTD6t2jFo9eXHztvzFxxLZ-YXx2_CvcceC2ZL3g",
+          "predecessor": null,
+          "recordId": "community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:twtRxBOyGECWk637BfoaevH_y5p_Qhx6Y_p7kkndC7o",
+          "sequence": 0,
+          "store": "communityOperations",
+          "version": 1
+        },
+        "payload": {
+          "action": "member_joined",
+          "args": {
+            "identityId": "MCowBQYDK2VwAyEAY9c4uJOxftxqpNbSo9x/vpz9bKr56kHpvf6MuZSutJM=",
+            "method": "added"
+          },
+          "authorIdentityId": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=",
+          "communityId": "889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c",
+          "createdAt": 1773848832000,
+          "id": "community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:twtRxBOyGECWk637BfoaevH_y5p_Qhx6Y_p7kkndC7o",
+          "networkId": "550e8400-e29b-41d4-a716-446655440000",
+          "parents": [
+            "EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI",
+            "H__-el7T2XwxtooLjjc2Cf5ehHz4-EoIHymUkHwICXg"
+          ],
+          "scopeType": "community_operation"
+        },
+        "payloadCanonical": "{\"action\":\"member_joined\",\"args\":{\"identityId\":\"MCowBQYDK2VwAyEAY9c4uJOxftxqpNbSo9x/vpz9bKr56kHpvf6MuZSutJM=\",\"method\":\"added\"},\"authorIdentityId\":\"MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=\",\"communityId\":\"889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c\",\"createdAt\":1773848832000,\"id\":\"community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:twtRxBOyGECWk637BfoaevH_y5p_Qhx6Y_p7kkndC7o\",\"networkId\":\"550e8400-e29b-41d4-a716-446655440000\",\"parents\":[\"EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI\",\"H__-el7T2XwxtooLjjc2Cf5ehHz4-EoIHymUkHwICXg\"],\"scopeType\":\"community_operation\"}",
+        "payloadDigest": "Ulp9GTD6t2jFo9eXHztvzFxxLZ-YXx2_CvcceC2ZL3g",
+        "recordId": "community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:twtRxBOyGECWk637BfoaevH_y5p_Qhx6Y_p7kkndC7o",
+        "requestOperation": {
+          "createdAt": 1773848832000,
+          "mutation": {
+            "author": {
+              "deviceCredential": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=",
+              "identityId": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM="
+            },
+            "kind": "put",
+            "operationId": "vector-member-added-00",
+            "payloadDigest": "Ulp9GTD6t2jFo9eXHztvzFxxLZ-YXx2_CvcceC2ZL3g",
+            "predecessor": null,
+            "recordId": "community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:twtRxBOyGECWk637BfoaevH_y5p_Qhx6Y_p7kkndC7o",
+            "sequence": 0,
+            "store": "communityOperations",
+            "version": 1,
+            "signature": "DD8NlO84VIyeCtxNrtHlf2YA31dStaxQZmKbs5N7TUDFl367O8yzmSq076CHsGPdbbyKdRieyDbfjWc1l/rPCw=="
+          },
+          "parents": [
+            "EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI",
+            "H__-el7T2XwxtooLjjc2Cf5ehHz4-EoIHymUkHwICXg"
+          ]
+        },
+        "signature": "DD8NlO84VIyeCtxNrtHlf2YA31dStaxQZmKbs5N7TUDFl367O8yzmSq076CHsGPdbbyKdRieyDbfjWc1l/rPCw==",
+        "signingContent": "pigeon:public-mutation:v1\n{\"author\":{\"deviceCredential\":\"MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=\",\"identityId\":\"MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=\"},\"kind\":\"put\",\"operationId\":\"vector-member-added-00\",\"payloadDigest\":\"Ulp9GTD6t2jFo9eXHztvzFxxLZ-YXx2_CvcceC2ZL3g\",\"predecessor\":null,\"recordId\":\"community:889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c:op:twtRxBOyGECWk637BfoaevH_y5p_Qhx6Y_p7kkndC7o\",\"sequence\":0,\"store\":\"communityOperations\",\"version\":1}"
+      },
+      "input": {
+        "action": "member_joined",
+        "args": {
+          "identityId": "MCowBQYDK2VwAyEAY9c4uJOxftxqpNbSo9x/vpz9bKr56kHpvf6MuZSutJM=",
+          "method": "added"
+        },
+        "communityId": "889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c",
+        "createdAt": 1773848832000,
+        "networkId": "550e8400-e29b-41d4-a716-446655440000",
+        "operationId": "vector-member-added-00",
+        "parents": [
+          "H__-el7T2XwxtooLjjc2Cf5ehHz4-EoIHymUkHwICXg",
+          "EcWkD4mudE3FiCjzd_5etJbovqkB-hXtyDcJsBQ4cNI"
+        ],
+        "signer": "owner"
+      },
+      "name": "member_joined_added_two_parents",
+      "note": "Signed by the owner, who needs manage_members. method added has no reference. input.parents is deliberately not sorted, the signed payload and the request carry the parents sorted ascending (plain string comparison, base64url digests)."
+    }
+  ],
+  "communities": {
+    "genesis": {
+      "communityId": "889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c",
+      "communityIdPreimage": "{\"networkId\":\"550e8400-e29b-41d4-a716-446655440000\",\"nonce\":\"vector-genesis-nonce-1\",\"ownerIdentityId\":\"MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=\"}"
+    },
+    "genesis_with_media_and_unicode": {
+      "communityId": "jS4VE6GtU1G8SVCazF00N1SQJr2W6gHBDcaVKtG_L_0",
+      "communityIdPreimage": "{\"networkId\":\"550e8400-e29b-41d4-a716-446655440000\",\"nonce\":\"vector-genesis-nonce-2\",\"ownerIdentityId\":\"MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=\"}"
+    }
+  },
+  "description": "Fixed vectors for client-signed community operations. Every value in derived is computed from input and the keys only, and a unit spec recomputes them with the real domain code, so they cannot drift.",
+  "inviteToken": {
+    "communityId": "889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c",
+    "creatorIdentityId": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=",
+    "nonce": "vector-invite-nonce-1",
+    "token": "nFBbDhdANKkuGgbf7_5wl34gEUTZFqvBxVakTq4Qpeo"
+  },
+  "keys": {
+    "member": {
+      "identityId": "MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=",
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEILDZV/VJ156PVuezQ2VLU9Vy3Xf6oTEIZ5RjTJGhzYZ5\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=\n-----END PUBLIC KEY-----\n",
+      "seedHex": "b0d957f549d79e8f56e7b343654b53d572dd77faa131086794634c91a1cd8679",
+      "seedDerivation": "sha256(utf8(\"pigeon-vector:member\")), PKCS#8 ed25519 private key with the 16 byte prefix 302e020100300506032b657004220420 in front of the 32 byte seed"
+    },
+    "other": {
+      "identityId": "MCowBQYDK2VwAyEAY9c4uJOxftxqpNbSo9x/vpz9bKr56kHpvf6MuZSutJM=",
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIIQMaTpFcHUI0y6x+osTv+2OCLSbFrxNt7XDo2UyBt5f\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAY9c4uJOxftxqpNbSo9x/vpz9bKr56kHpvf6MuZSutJM=\n-----END PUBLIC KEY-----\n",
+      "seedHex": "840c693a45707508d32eb1fa8b13bfed8e08b49b16bc4db7b5c3a3653206de5f",
+      "seedDerivation": "sha256(utf8(\"pigeon-vector:other\")), PKCS#8 ed25519 private key with the 16 byte prefix 302e020100300506032b657004220420 in front of the 32 byte seed"
+    },
+    "owner": {
+      "identityId": "MCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=",
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIBRj87162no0tyzP87WEOUQLBFkZCX6ohfwtlj59P0V4\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAqB+GBbuXZLmdsbPWs3Ie0lfU6Nj9ab7x0HCHHivC1HM=\n-----END PUBLIC KEY-----\n",
+      "seedHex": "1463f3bd7ada7a34b72ccff3b58439440b045919097ea885fc2d963e7d3f4578",
+      "seedDerivation": "sha256(utf8(\"pigeon-vector:owner\")), PKCS#8 ed25519 private key with the 16 byte prefix 302e020100300506032b657004220420 in front of the 32 byte seed"
+    }
+  },
+  "networkId": "550e8400-e29b-41d4-a716-446655440000"
+}

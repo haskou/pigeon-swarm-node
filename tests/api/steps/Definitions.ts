@@ -5484,6 +5484,18 @@ export default class Definitions {
     );
   }
 
+  @then('response body should contain the current network id')
+  public responseBodyShouldContainTheCurrentNetworkId(): void {
+    if (!this.currentNetworkId) {
+      throw new Error('Network must be registered first.');
+    }
+
+    expect(JSON.stringify(this.response.data)).to.contain(
+      `"networkId":"${this.currentNetworkId}"`,
+      JSON.stringify(this.response.data),
+    );
+  }
+
   @then('binary response body should be {string}')
   public binaryResponseBodyShouldBe(expectedBody: string): void {
     expect(
