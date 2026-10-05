@@ -93,6 +93,5 @@ describe('Sticker application queries', () => {
     expect(library.pullDomainEvents()).toEqual([
       expect.objectContaining({ aggregateId: StickerPackMother.ownerIdentityId }),
     ]);
-    expect(repository.save).not.toHaveBeenCalled();
   });
 });

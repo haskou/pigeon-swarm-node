@@ -13,9 +13,13 @@ export default class StickerDeleter {
       throw new StickerPackNotFoundError();
     }
 
-    pack.removeSticker(message.actorIdentityId, message.stickerId);
+    pack.removeSticker(
+      message.actorIdentityId,
+      message.stickerId,
+      message.updatedAt,
+    );
 
-    await this.repository.save(pack);
+    await this.repository.save(pack, message.proof);
 
     return pack;
   }

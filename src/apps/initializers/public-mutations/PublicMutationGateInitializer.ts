@@ -6,6 +6,10 @@ import NotificationScopeSettingsMutationPolicy from '@app/contexts/notification-
 import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 import { PublicMutationGate } from '@app/contexts/public-mutations/infrastructure/PublicMutationGate';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import StickerFavoriteMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerFavoriteMutationPolicy';
+import StickerPackMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerPackMutationPolicy';
+import StickerRecentMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerRecentMutationPolicy';
+import StickerSavedPackMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy';
 
 export default class PublicMutationGateInitializer {
   constructor(
@@ -16,6 +20,10 @@ export default class PublicMutationGateInitializer {
     private readonly conversationPins: ConversationMessagePinMutationPolicy,
     private readonly conversationReactions: ConversationMessageReactionMutationPolicy,
     private readonly notificationSettings: NotificationScopeSettingsMutationPolicy,
+    private readonly stickerPacks: StickerPackMutationPolicy,
+    private readonly stickerFavorites: StickerFavoriteMutationPolicy,
+    private readonly stickerSavedPacks: StickerSavedPackMutationPolicy,
+    private readonly stickerRecents: StickerRecentMutationPolicy,
   ) {}
 
   public ensure(): Promise<void> {
@@ -26,6 +34,10 @@ export default class PublicMutationGateInitializer {
         this.conversationPins,
         this.conversationReactions,
         this.notificationSettings,
+        this.stickerPacks,
+        this.stickerFavorites,
+        this.stickerSavedPacks,
+        this.stickerRecents,
       ]),
     );
 

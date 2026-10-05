@@ -7,6 +7,16 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import OrbitDBCommunityChannelMessagePinRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessagePinRepository';
 import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import { StickerPack } from '@app/contexts/stickers/domain/StickerPack';
+import { StickerId } from '@app/contexts/stickers/domain/value-objects/StickerId';
+import { StickerPackName } from '@app/contexts/stickers/domain/value-objects/StickerPackName';
+import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
+import OrbitDBStickerPackRepository from '@app/contexts/stickers/infrastructure/orbitdb/OrbitDBStickerPackRepository';
+import OrbitDBStickerUserLibraryRepository from '@app/contexts/stickers/infrastructure/orbitdb/OrbitDBStickerUserLibraryRepository';
+import StickerFavoriteMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerFavoriteMutationPolicy';
+import StickerPackMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerPackMutationPolicy';
+import StickerRecentMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerRecentMutationPolicy';
+import StickerSavedPackMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy';
 import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
 import { NotificationScopeSettingsPreferences } from '@app/contexts/notification-settings/domain/NotificationScopeSettingsPreferences';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
@@ -53,11 +63,15 @@ type Replica = {
     pins: OrbitDBDatabase;
     heads: OrbitDBDatabase;
     notificationSettings: OrbitDBDatabase;
+    stickerPacks: OrbitDBDatabase;
+    stickerUserLibraries: OrbitDBDatabase;
   };
   registry?: OrbitDBReplicatedStateRegistry;
   pins?: OrbitDBCommunityChannelMessagePinRepository;
   conversationPins?: OrbitDBConversationMessagePinRepository;
   settings?: OrbitDBNotificationScopeSettingsRepository;
+  stickerPacks?: OrbitDBStickerPackRepository;
+  stickerLibraries?: OrbitDBStickerUserLibraryRepository;
 };
 
 const networkId = randomUUID();
@@ -102,6 +116,21 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
         type: 'documents',
       },
     ),
+    stickerPacks: await replica.orbitdb.open(`${networkId}/stickerPacks`, {
+      AccessController,
+      Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
+      sync: false,
+      type: 'documents',
+    }),
+    stickerUserLibraries: await replica.orbitdb.open(
+      `${networkId}/stickerUserLibraries`,
+      {
+        AccessController,
+        Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
+        sync: false,
+        type: 'documents',
+      },
+    ),
     pins: await replica.orbitdb.open(`${networkId}/pins`, {
       AccessController,
       Database: await orbitDBRuntimeAdapter.createDocumentsDatabase(),
@@ -126,6 +155,10 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
     replica.registry,
   );
   replica.settings = new OrbitDBNotificationScopeSettingsRepository(
+    replica.registry,
+  );
+  replica.stickerPacks = new OrbitDBStickerPackRepository(replica.registry);
+  replica.stickerLibraries = new OrbitDBStickerUserLibraryRepository(
     replica.registry,
   );
   await replica.registry.register(
@@ -180,6 +213,10 @@ async function main(): Promise<void> {
       new CommunityChannelMessagePinMutationPolicy(communities),
       new ConversationMessagePinMutationPolicy(conversations),
       new NotificationScopeSettingsMutationPolicy(),
+      new StickerPackMutationPolicy(),
+      new StickerFavoriteMutationPolicy(),
+      new StickerSavedPackMutationPolicy(),
+      new StickerRecentMutationPolicy(),
     ],
   );
   const device = await KeyPair.generate();
@@ -511,6 +548,134 @@ async function main(): Promise<void> {
     return (await settingsCount(honest)) === 0;
   });
   console.log('PASS settings signed reset applied');
+
+  stage = 'stickers are governed too';
+  const stickerProof = (
+    store: 'stickerPacks' | 'stickerUserLibraries',
+    kind: 'put' | 'delete',
+    sequence: number,
+    payload: Record<string, unknown>,
+  ): PublicMutationProof => {
+    const body = {
+      author: { deviceCredential: author, identityId: author },
+      kind,
+      operationId: `forged-sticker-${sequence}`.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor:
+        sequence === 0 ? null : PublicMutationProof.digestOf({ previous: 0 }),
+      recordId: payload.id as string,
+      sequence,
+      store,
+      version: 1,
+    } as const;
+
+    return PublicMutationProof.signed(
+      body,
+      device.sign(PublicMutationProof.signingContentOf(body)),
+    );
+  };
+  const stickerPackId = StickerPackId.generate();
+  const stickerId = StickerId.generate();
+  const pack = StickerPack.create(
+    stickerPackId,
+    identity,
+    new StickerPackName('Forgery target'),
+    new Timestamp(1780000000000),
+  );
+  const packDocument = { ...pack.toPrimitives(), scopeType: 'sticker_pack' };
+  const favoriteId = `favorite:${author}:${stickerPackId.valueOf()}:${stickerId.valueOf()}`;
+  const favoriteTombstone = {
+    id: favoriteId,
+    identityId: author,
+    packId: stickerPackId.valueOf(),
+    removed: true,
+    scopeType: 'sticker_favorite',
+    stickerId: stickerId.valueOf(),
+  };
+  const favoriteCount = async (replica: Replica): Promise<number> =>
+    (await replica.stickerLibraries!.findByIdentityId(identity))?.toPrimitives()
+      .favoriteStickers.length ?? 0;
+
+  await honest.stickerPacks!.save(
+    pack,
+    stickerProof('stickerPacks', 'put', 0, packDocument),
+  );
+  await honest.stickerLibraries!.favorite(
+    identity,
+    stickerPackId,
+    stickerId,
+    new Timestamp(1780000000000),
+    stickerProof('stickerUserLibraries', 'put', 0, {
+      favoritedAt: 1780000000000,
+      id: favoriteId,
+      identityId: author,
+      packId: stickerPackId.valueOf(),
+      scopeType: 'sticker_favorite',
+      stickerId: stickerId.valueOf(),
+    }),
+  );
+  await until('sticker records reached the malicious store', async () => {
+    const packs = await malicious.stores!.stickerPacks.query!(
+      (record) => record.id === stickerPackId.valueOf(),
+    );
+    const favorites = await malicious.stores!.stickerUserLibraries.query!(
+      (record) => record.id === favoriteId,
+    );
+
+    return packs.length === 1 && favorites.length === 1;
+  });
+  await malicious.stores!.stickerUserLibraries.put!({
+    ...favoriteTombstone,
+    updatedAt: Date.now() + 10 ** 12,
+  });
+  await malicious.stores!.stickerPacks.put!({
+    ...packDocument,
+    name: 'Hijacked',
+    updatedAt: Date.now() + 10 ** 12,
+  });
+  await malicious.stores!.heads.put!(`sticker-user-library:${author}`, {
+    favoriteStickers: [],
+    id: `sticker-user-library:${author}`,
+    identityId: author,
+    recentStickers: [],
+    savedPackIds: ['forged'],
+  });
+  await until('forged sticker records reached honest', async () => {
+    const stored = await honest.stores!.stickerUserLibraries.query!(
+      (record) => record.id === favoriteId && record.removed === true,
+    );
+
+    return stored.length === 1;
+  });
+  await pause(1500);
+  assert.equal(
+    await favoriteCount(honest),
+    1,
+    'forged tombstone must not remove the favorite',
+  );
+  assert.equal(
+    (await honest.stickerPacks!.findById(stickerPackId))?.toPrimitives().name,
+    'Forgery target',
+    'forged pack document must not replace the signed pack',
+  );
+  assert.deepEqual(
+    (await honest.stickerLibraries!.findByIdentityId(identity))?.toPrimitives()
+      .savedPackIds,
+    [],
+    'forged flat library head must be ignored',
+  );
+  console.log('PASS forged sticker records rejected by the honest node');
+
+  await honest.stickerLibraries!.unfavorite(
+    identity,
+    stickerPackId,
+    stickerId,
+    stickerProof('stickerUserLibraries', 'delete', 1, favoriteTombstone),
+  );
+  await until('signed unfavorite applied', async () => {
+    return (await favoriteCount(honest)) === 0;
+  });
+  console.log('PASS sticker signed removal applied');
 }
 
 const watchdog = setTimeout(() => {

@@ -1,52 +1,34 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { StickerUserLibrary } from '@app/contexts/stickers/domain/StickerUserLibrary';
-import { StickerId } from '@app/contexts/stickers/domain/value-objects/StickerId';
-import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
+
+import { StickerPackMother } from '../../../mothers/StickerPackMother';
 
 describe('StickerUserLibrary', () => {
-  const identityId = new IdentityId(
-    'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=',
-  );
-
-  it('saves each sticker pack only once', () => {
-    const library = StickerUserLibrary.create(identityId);
-    const packId = StickerPackId.generate();
-
-    library.savePack(packId);
-    library.savePack(packId);
-
-    expect(library.toPrimitives().savedPackIds).toEqual([packId.valueOf()]);
-  });
+  const identityId = StickerPackMother.ownerIdentityId;
 
   it('records a creation event', () => {
-    const library = StickerUserLibrary.create(identityId);
+    const library = StickerUserLibrary.create(new IdentityId(identityId));
     const events = library.pullDomainEvents();
 
     expect(events).toHaveLength(1);
-    expect(events[0].eventName()).toBe(
-      'stickers.v1.user_library.was_created',
-    );
+    expect(events[0].eventName()).toBe('stickers.v1.user_library.was_created');
   });
 
-  it('favorites and unfavorites stickers', () => {
-    const library = StickerUserLibrary.create(identityId);
-    const packId = StickerPackId.generate();
-    const stickerId = StickerId.generate();
+  it('projects only the ten most recently used stickers, newest first', () => {
+    const library = StickerUserLibrary.fromPrimitives({
+      favoriteStickers: [],
+      identityId,
+      recentStickers: Array.from({ length: 12 }, (_, index) => ({
+        packId: 'pack-1',
+        stickerId: `sticker-${index}`,
+        usedAt: 1780000000000 + index,
+      })),
+      savedPackIds: [],
+    });
+    const recents = library.toPrimitives().recentStickers;
 
-    library.favoriteSticker(packId, stickerId);
-    library.favoriteSticker(packId, stickerId);
-    library.unfavoriteSticker(packId, stickerId);
-
-    expect(library.toPrimitives().favoriteStickers).toEqual([]);
-  });
-
-  it('keeps at most ten recent stickers', () => {
-    const library = StickerUserLibrary.create(identityId);
-
-    for (let index = 0; index < 12; index += 1) {
-      library.recordStickerUse(StickerPackId.generate(), StickerId.generate());
-    }
-
-    expect(library.toPrimitives().recentStickers).toHaveLength(10);
+    expect(recents).toHaveLength(10);
+    expect(recents[0].stickerId).toBe('sticker-11');
+    expect(recents[9].stickerId).toBe('sticker-2');
   });
 });

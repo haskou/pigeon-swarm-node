@@ -11,7 +11,7 @@ import {
   Res,
 } from 'routing-controllers';
 
-import { StickerBody } from '../bodies/StickerBody';
+import { PostStickerBody } from '../bodies/PostStickerBody';
 import { StickerPackViewModel } from '../view-model/StickerPackViewModel';
 import { StickerRouteSupport } from './StickerRouteSupport';
 
@@ -22,13 +22,20 @@ export class PostStickerRoute extends StickerRouteSupport {
   @Post('/:packId/stickers')
   public async addSticker(
     @Param('packId') packId: string,
-    @Body() body: StickerBody,
+    @Body() body: PostStickerBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const actor = await this.authenticate(request);
     const pack = await this.adder.add(
-      new StickerAddMessage(packId, actor.valueOf(), body),
+      new StickerAddMessage(
+        packId,
+        actor.valueOf(),
+        body,
+        body.stickerId,
+        body.updatedAt,
+        body.mutation,
+      ),
     );
 
     return response

@@ -12,8 +12,12 @@ import StickerUserLibraryRepository from '@app/contexts/stickers/domain/reposito
 import { StickerPack } from '@app/contexts/stickers/domain/StickerPack';
 import { StickerUserLibrary } from '@app/contexts/stickers/domain/StickerUserLibrary';
 import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
+import { StickerId } from '@app/contexts/stickers/domain/value-objects/StickerId';
+import { Timestamp } from '@haskou/value-objects';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+
+import { StickerMutationMother } from '../../../mothers/StickerMutationMother';
 
 class InMemoryStickerPackRepository implements StickerPackRepository {
   public readonly savedPacks: StickerPack[] = [];
@@ -50,30 +54,77 @@ class InMemoryStickerPackRepository implements StickerPackRepository {
 class InMemoryStickerUserLibraryRepository
   implements StickerUserLibraryRepository
 {
-  public readonly savedLibraries: StickerUserLibrary[] = [];
+  public readonly favorites = new Set<string>();
+  public readonly recents = new Map<string, number>();
+  public readonly savedPacks = new Set<string>();
+  public touched = false;
+
+  public async favorite(
+    _identityId: IdentityId,
+    packId: StickerPackId,
+    stickerId: StickerId,
+  ): Promise<void> {
+    this.touched = true;
+    this.favorites.add(`${packId.valueOf()}:${stickerId.valueOf()}`);
+  }
 
   public async findByIdentityId(
     identityId: IdentityId,
   ): Promise<StickerUserLibrary | undefined> {
-    return this.savedLibraries.find(
-      (library) => library.toPrimitives().identityId === identityId.valueOf(),
+    if (!this.touched) {
+      return undefined;
+    }
+
+    return StickerUserLibrary.fromPrimitives({
+      favoriteStickers: [...this.favorites].map((key) => {
+        const [packId, stickerId] = key.split(':');
+
+        return { favoritedAt: 1780000000000, packId, stickerId };
+      }),
+      identityId: identityId.valueOf(),
+      recentStickers: [...this.recents].map(([key, usedAt]) => {
+        const [packId, stickerId] = key.split(':');
+
+        return { packId, stickerId, usedAt };
+      }),
+      savedPackIds: [...this.savedPacks],
+    });
+  }
+
+  public async forgetPack(
+    _identityId: IdentityId,
+    packId: StickerPackId,
+  ): Promise<void> {
+    this.savedPacks.delete(packId.valueOf());
+  }
+
+  public async recordUse(
+    _identityId: IdentityId,
+    packId: StickerPackId,
+    stickerId: StickerId,
+    usedAt: Timestamp,
+  ): Promise<void> {
+    this.touched = true;
+    this.recents.set(
+      `${packId.valueOf()}:${stickerId.valueOf()}`,
+      usedAt.valueOf(),
     );
   }
 
-  public async save(library: StickerUserLibrary): Promise<void> {
-    const index = this.savedLibraries.findIndex(
-      (savedLibrary) =>
-        savedLibrary.toPrimitives().identityId ===
-        library.toPrimitives().identityId,
-    );
+  public async savePack(
+    _identityId: IdentityId,
+    packId: StickerPackId,
+  ): Promise<void> {
+    this.touched = true;
+    this.savedPacks.add(packId.valueOf());
+  }
 
-    if (index >= 0) {
-      this.savedLibraries[index] = library;
-
-      return;
-    }
-
-    this.savedLibraries.push(library);
+  public async unfavorite(
+    _identityId: IdentityId,
+    packId: StickerPackId,
+    stickerId: StickerId,
+  ): Promise<void> {
+    this.favorites.delete(`${packId.valueOf()}:${stickerId.valueOf()}`);
   }
 }
 
@@ -98,9 +149,17 @@ describe('Sticker pack application services', () => {
     sizeBytes: 32 * 1024,
     type: 'static',
   };
+  const createdAt = 1780000000000;
+  const packId = 'sticker-pack-1';
+  const stickerId = 'sticker-1';
+  let mutation: Awaited<ReturnType<typeof StickerMutationMother.create>>;
   let packRepository: InMemoryStickerPackRepository;
   let libraryRepository: InMemoryStickerUserLibraryRepository;
   let eventPublisher: SpyDomainEventPublisher;
+
+  beforeAll(async () => {
+    mutation = await StickerMutationMother.create();
+  });
 
   beforeEach(() => {
     packRepository = new InMemoryStickerPackRepository();
@@ -113,15 +172,24 @@ describe('Sticker pack application services', () => {
       packRepository,
       libraryRepository,
       eventPublisher,
-    ).create(new StickerPackCreateMessage(ownerIdentityId, 'Pigeon moods'));
+    ).create(
+      new StickerPackCreateMessage(
+        ownerIdentityId,
+        packId,
+        'Pigeon moods',
+        createdAt,
+        mutation,
+        mutation,
+      ),
+    );
     const library = await libraryRepository.findByIdentityId(
       new IdentityId(ownerIdentityId),
     );
 
     expect(packRepository.savedPacks).toHaveLength(1);
-    expect(library?.toPrimitives().savedPackIds).toEqual([
-      pack.getId().valueOf(),
-    ]);
+    expect(pack.getId().valueOf()).toBe(packId);
+    expect(pack.toPrimitives().createdAt).toBe(createdAt);
+    expect(library?.toPrimitives().savedPackIds).toEqual([packId]);
     expect(
       eventPublisher.publishedEvents.map((event) => event.eventName()),
     ).toEqual([
@@ -131,24 +199,51 @@ describe('Sticker pack application services', () => {
   });
 
   it('adds, favorites and records sticker use through application messages', async () => {
-    const pack = await new StickerPackCreator(
+    await new StickerPackCreator(
       packRepository,
       libraryRepository,
       eventPublisher,
-    ).create(new StickerPackCreateMessage(ownerIdentityId, 'Pigeon moods'));
-    const updatedPack = await new StickerAdder(packRepository).add(
-      new StickerAddMessage(pack.getId().valueOf(), ownerIdentityId, stickerDetails),
+    ).create(
+      new StickerPackCreateMessage(
+        ownerIdentityId,
+        packId,
+        'Pigeon moods',
+        createdAt,
+        mutation,
+        mutation,
+      ),
     );
-    const stickerId = updatedPack.toPrimitives().stickers[0].id;
+    const updatedPack = await new StickerAdder(packRepository).add(
+      new StickerAddMessage(
+        packId,
+        ownerIdentityId,
+        stickerDetails,
+        stickerId,
+        createdAt + 1,
+        mutation,
+      ),
+    );
 
     await new StickerFavoriter(packRepository, libraryRepository).favorite(
-      new StickerFavoriteMessage(ownerIdentityId, pack.getId().valueOf(), stickerId),
+      new StickerFavoriteMessage(
+        ownerIdentityId,
+        packId,
+        stickerId,
+        createdAt + 2,
+        mutation,
+      ),
     );
     const library = await new StickerUseRecorder(
       packRepository,
       libraryRepository,
     ).record(
-      new StickerUseRecordMessage(ownerIdentityId, pack.getId().valueOf(), stickerId),
+      new StickerUseRecordMessage(
+        ownerIdentityId,
+        packId,
+        stickerId,
+        createdAt + 3,
+        mutation,
+      ),
     );
 
     expect(updatedPack.toPrimitives().stickers).toHaveLength(1);
@@ -156,3 +251,4 @@ describe('Sticker pack application services', () => {
     expect(library.toPrimitives().recentStickers).toHaveLength(1);
   });
 });
+

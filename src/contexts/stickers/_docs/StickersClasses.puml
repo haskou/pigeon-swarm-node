@@ -80,31 +80,28 @@ package "stickers/domain" {
     - savedPackIds: StickerPackId[]
     - favoriteStickers: StickerReference[]
     - recentStickers: StickerReference[]
-    + savePack(packId): void
-    + forgetPack(packId): void
-    + favoriteSticker(packId, stickerId): void
-    + unfavoriteSticker(packId, stickerId): void
-    + recordStickerUse(packId, stickerId): void
   }
 
   class StickerReference {
     - packId: StickerPackId
     - stickerId: StickerId
     - timestamp: Timestamp
-    + isSameSticker(packId, stickerId): boolean
-    + touch(timestamp?): void
   }
 
   interface StickerPackRepository {
     + findAll(): StickerPack[]
     + findById(id): StickerPack?
     + findByOwner(ownerIdentityId): StickerPack[]
-    + save(pack): void
+    + save(pack, proof): void
   }
 
   interface StickerUserLibraryRepository {
     + findByIdentityId(identityId): StickerUserLibrary?
-    + save(library): void
+    + favorite(identityId, packId, stickerId, favoritedAt, proof): void
+    + unfavorite(identityId, packId, stickerId, proof): void
+    + recordUse(identityId, packId, stickerId, usedAt, proof): void
+    + savePack(identityId, packId, savedAt, proof): void
+    + forgetPack(identityId, packId, proof): void
   }
 
   class StickerPackWasCreatedEvent <<DomainEvent>>
@@ -122,6 +119,10 @@ package "stickers/domain" {
 package "stickers/infrastructure" {
   class OrbitDBStickerPackRepository
   class OrbitDBStickerUserLibraryRepository
+  class StickerPackMutationPolicy <<PublicMutationPolicy>>
+  class StickerFavoriteMutationPolicy <<PublicMutationPolicy>>
+  class StickerSavedPackMutationPolicy <<PublicMutationPolicy>>
+  class StickerRecentMutationPolicy <<PublicMutationPolicy>>
 
   OrbitDBStickerPackRepository ..|> StickerPackRepository
   OrbitDBStickerUserLibraryRepository ..|> StickerUserLibraryRepository

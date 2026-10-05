@@ -294,6 +294,15 @@ Signed public mutations (pins and reactions):
 - `notificationSettings` documents (public scopes only) are governed the same way
   with `scopeType: "notification_settings"`; the author must be the settings
   owner (`identityId`) and the record id is `<identityId>:<scopeKey>`.
+- `stickerPacks` and `stickerUserLibraries` documents are governed too. Packs use
+  `scopeType: "sticker_pack"` (author = `ownerIdentityId`, record id = pack id,
+  whole-pack document). The library is three independent record kinds with
+  `scopeType` `sticker_favorite`, `sticker_saved_pack` and `sticker_recent`
+  (author = `identityId`, ids `favorite:<identityId>:<packId>:<stickerId>`,
+  `saved:<identityId>:<packId>`, `recent:<identityId>:<packId>:<stickerId>`);
+  favorites and saved packs are removed by signed tombstones. Their heads
+  (`sticker-pack:<id>`, `sticker-user-library:<identityId>`) are index wrappers
+  checked on admission; flat unsigned heads are no longer read.
 - Every node verifies on write, on replicated read, on head hydration and on the
   persisted head cache: signature, scope binding, the device in the identity's
   current device authorization head, and the community permission (pin needs

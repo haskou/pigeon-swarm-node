@@ -23,6 +23,8 @@ import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/Node
 import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import Ed25519PrivateDeviceCredentialCodec from '@app/contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec';
+import { StickerId } from '@app/contexts/stickers/domain/value-objects/StickerId';
+import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
@@ -60,10 +62,20 @@ setDefaultTimeout(20_000);
 
 let application: PigeonApplication | null = null;
 
+type StickerPackDocument = Record<string, unknown> & {
+  stickers: Record<string, unknown>[];
+};
+
 @binding()
 export default class Definitions {
   private binaryBody: Buffer | undefined;
   private readonly notificationSettingsSequences = new Map<string, number>();
+  private readonly stickerMutationSequences = new Map<string, number>();
+  private readonly stickerPackDocuments = new Map<
+    string,
+    StickerPackDocument
+  >();
+  private stickerClock = 1_780_000_000_000;
   private body: string | undefined;
   private callId: string | undefined;
   private communityChannelId: string | undefined;
@@ -2537,6 +2549,120 @@ export default class Definitions {
     });
   }
 
+  private stickerDetailsOf(body: Record<string, unknown>) {
+    return {
+      assetCid: body.assetCid,
+      contentType: body.contentType,
+      dimensions: body.dimensions,
+      sizeBytes: body.sizeBytes,
+      type: body.type,
+    };
+  }
+
+  private async signStickerMutation(
+    store: 'stickerPacks' | 'stickerUserLibraries',
+    kind: 'put' | 'delete',
+    payload: Record<string, unknown>,
+  ): Promise<ReturnType<PublicMutationProof['toPrimitives']>> {
+    const keyPair = await this.ensureIdentityKeyPair();
+    const identityId = keyPair.toPrimitives().publicKey;
+    const recordId = String(payload.id);
+    const sequence = this.stickerMutationSequences.get(recordId) ?? 0;
+    const proofBody = {
+      author: { deviceCredential: identityId, identityId },
+      kind,
+      operationId: `api-sticker-${sequence}`.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor:
+        sequence === 0
+          ? null
+          : PublicMutationProof.digestOf({ previous: sequence - 1 }),
+      recordId,
+      sequence,
+      store,
+      version: 1,
+    } as const;
+
+    this.stickerMutationSequences.set(recordId, sequence + 1);
+
+    return PublicMutationProof.signed(
+      proofBody,
+      keyPair.sign(PublicMutationProof.signingContentOf(proofBody)),
+    ).toPrimitives();
+  }
+
+  private async withStickerPackMutation(
+    packId: string,
+    update: (pack: StickerPackDocument) => void,
+    creation?: { createdAt: number },
+  ): Promise<void> {
+    const keyPair = await this.ensureIdentityKeyPair();
+    const at = creation?.createdAt ?? (this.stickerClock += 1);
+    const pack: StickerPackDocument = this.stickerPackDocuments.get(packId) ?? {
+      createdAt: at,
+      id: packId,
+      name: '',
+      ownerIdentityId: keyPair.toPrimitives().publicKey,
+      scopeType: 'sticker_pack',
+      stickers: [],
+      updatedAt: at,
+    };
+
+    update(pack);
+    pack.updatedAt = at;
+    this.stickerPackDocuments.set(packId, pack);
+    this.body = JSON.stringify({
+      ...JSON.parse(this.body || '{}'),
+      ...(creation ? { ...creation, packId } : { updatedAt: at }),
+      mutation: await this.signStickerMutation('stickerPacks', 'put', pack),
+    });
+  }
+
+  private async withStickerLibraryMutation(
+    kind: 'favorite' | 'saved' | 'recent',
+    removed: boolean,
+  ): Promise<void> {
+    const keyPair = await this.ensureIdentityKeyPair();
+    const identityId = keyPair.toPrimitives().publicKey;
+    const at = (this.stickerClock += 1);
+    const base = {
+      favorite: {
+        id: `favorite:${identityId}:${this.stickerPackId}:${this.stickerId}`,
+        identityId,
+        packId: this.stickerPackId,
+        scopeType: 'sticker_favorite',
+        stickerId: this.stickerId,
+      },
+      recent: {
+        id: `recent:${identityId}:${this.stickerPackId}:${this.stickerId}`,
+        identityId,
+        packId: this.stickerPackId,
+        scopeType: 'sticker_recent',
+        stickerId: this.stickerId,
+      },
+      saved: {
+        id: `saved:${identityId}:${this.stickerPackId}`,
+        identityId,
+        packId: this.stickerPackId,
+        scopeType: 'sticker_saved_pack',
+      },
+    }[kind];
+    const timestamp = {
+      favorite: { favoritedAt: at },
+      recent: { usedAt: at },
+      saved: { savedAt: at },
+    }[kind];
+    const mutation = await this.signStickerMutation(
+      'stickerUserLibraries',
+      removed ? 'delete' : 'put',
+      removed ? { ...base, removed: true } : { ...base, ...timestamp },
+    );
+
+    this.body = JSON.stringify(
+      removed ? { mutation } : { ...timestamp, mutation },
+    );
+  }
+
   private async withNotificationSettingsMutation(
     kind: 'put' | 'delete',
   ): Promise<void> {
@@ -3098,6 +3224,55 @@ export default class Definitions {
 
   @given('I sign the current sticker pack creation request')
   public async iSignTheCurrentStickerPackCreationRequest(): Promise<void> {
+    const keyPair = await this.ensureIdentityKeyPair();
+    const identityId = keyPair.toPrimitives().publicKey;
+    const packId = StickerPackId.generate().valueOf();
+    const createdAt = (this.stickerClock += 1);
+    const body = JSON.parse(this.body || '{}');
+
+    await this.withStickerPackMutation(
+      packId,
+      (pack) => {
+        pack.name = body.name;
+      },
+      { createdAt },
+    );
+    this.body = JSON.stringify({
+      ...JSON.parse(this.body as string),
+      savedPackMutation: await this.signStickerMutation(
+        'stickerUserLibraries',
+        'put',
+        {
+          id: `saved:${identityId}:${packId}`,
+          identityId,
+          packId,
+          savedAt: createdAt,
+          scopeType: 'sticker_saved_pack',
+        },
+      ),
+    });
+    await this.signCurrentRequest('POST', '/stickers/packs/');
+  }
+
+  @given('I sign the current unsigned sticker pack creation request')
+  public async iSignTheCurrentUnsignedStickerPackCreationRequest(): Promise<void> {
+    const keyPair = await this.ensureIdentityKeyPair();
+
+    this.body = JSON.stringify({
+      createdAt: this.stickerClock,
+      name: 'Unsigned pack',
+      packId: StickerPackId.generate().valueOf(),
+      savedPackMutation: {},
+    });
+    this.body = JSON.stringify({
+      ...JSON.parse(this.body),
+      mutation: {
+        ...(await this.signStickerMutation('stickerPacks', 'put', {
+          id: 'someone-elses-pack',
+          ownerIdentityId: keyPair.toPrimitives().publicKey,
+        })),
+      },
+    });
     await this.signCurrentRequest('POST', '/stickers/packs/');
   }
 
@@ -3166,6 +3341,16 @@ export default class Definitions {
 
   @given('I sign the current sticker creation request')
   public async iSignTheCurrentStickerCreationRequest(): Promise<void> {
+    const body = JSON.parse(this.body || '{}');
+    const stickerId = StickerId.generate().valueOf();
+
+    await this.withStickerPackMutation(this.stickerPackId as string, (pack) => {
+      pack.stickers.push({ id: stickerId, ...this.stickerDetailsOf(body) });
+    });
+    this.body = JSON.stringify({
+      ...JSON.parse(this.body as string),
+      stickerId,
+    });
     await this.signCurrentRequest(
       'POST',
       `/stickers/packs/${this.stickerPackId}/stickers`,
@@ -3183,6 +3368,11 @@ export default class Definitions {
 
   @given('I sign the current sticker pack update request')
   public async iSignTheCurrentStickerPackUpdateRequest(): Promise<void> {
+    const body = JSON.parse(this.body || '{}');
+
+    await this.withStickerPackMutation(this.stickerPackId as string, (pack) => {
+      pack.name = body.name;
+    });
     await this.signCurrentRequest(
       'PATCH',
       `/stickers/packs/${this.stickerPackId}`,
@@ -3191,6 +3381,18 @@ export default class Definitions {
 
   @given('I sign the current sticker update request')
   public async iSignTheCurrentStickerUpdateRequest(): Promise<void> {
+    const body = JSON.parse(this.body || '{}');
+
+    await this.withStickerPackMutation(this.stickerPackId as string, (pack) => {
+      const index = pack.stickers.findIndex(
+        (sticker) => sticker.id === this.stickerId,
+      );
+
+      pack.stickers[index] = {
+        id: this.stickerId,
+        ...this.stickerDetailsOf(body),
+      };
+    });
     await this.signCurrentRequest(
       'PATCH',
       `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}`,
@@ -3200,6 +3402,11 @@ export default class Definitions {
   @given('I sign the current sticker removal request')
   public async iSignTheCurrentStickerRemovalRequest(): Promise<void> {
     this.body = JSON.stringify({});
+    await this.withStickerPackMutation(this.stickerPackId as string, (pack) => {
+      pack.stickers = pack.stickers.filter(
+        (sticker) => sticker.id !== this.stickerId,
+      );
+    });
     await this.signCurrentRequest(
       'DELETE',
       `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}`,
@@ -3220,7 +3427,7 @@ export default class Definitions {
 
   @given('I sign the current saved sticker pack request')
   public async iSignTheCurrentSavedStickerPackRequest(): Promise<void> {
-    this.body = JSON.stringify({});
+    await this.withStickerLibraryMutation('saved', false);
     await this.signCurrentRequest(
       'PUT',
       `/stickers/packs/${this.stickerPackId}/saved`,
@@ -3229,7 +3436,7 @@ export default class Definitions {
 
   @given('I sign the current saved sticker pack removal request')
   public async iSignTheCurrentSavedStickerPackRemovalRequest(): Promise<void> {
-    this.body = JSON.stringify({});
+    await this.withStickerLibraryMutation('saved', true);
     await this.signCurrentRequest(
       'DELETE',
       `/stickers/packs/${this.stickerPackId}/saved`,
@@ -3238,7 +3445,7 @@ export default class Definitions {
 
   @given('I sign the current favorite sticker request')
   public async iSignTheCurrentFavoriteStickerRequest(): Promise<void> {
-    this.body = JSON.stringify({});
+    await this.withStickerLibraryMutation('favorite', false);
     await this.signCurrentRequest(
       'PUT',
       `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}/favorite`,
@@ -3247,7 +3454,7 @@ export default class Definitions {
 
   @given('I sign the current favorite sticker removal request')
   public async iSignTheCurrentFavoriteStickerRemovalRequest(): Promise<void> {
-    this.body = JSON.stringify({});
+    await this.withStickerLibraryMutation('favorite', true);
     await this.signCurrentRequest(
       'DELETE',
       `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}/favorite`,
@@ -3256,7 +3463,7 @@ export default class Definitions {
 
   @given('I sign the current used sticker request')
   public async iSignTheCurrentUsedStickerRequest(): Promise<void> {
-    this.body = JSON.stringify({});
+    await this.withStickerLibraryMutation('recent', false);
     await this.signCurrentRequest(
       'POST',
       `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}/used`,

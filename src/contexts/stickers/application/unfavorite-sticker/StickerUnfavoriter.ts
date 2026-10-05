@@ -5,23 +5,19 @@ import { StickerUnfavoriteMessage } from './messages/StickerUnfavoriteMessage';
 export default class StickerUnfavoriter {
   constructor(private readonly repository: StickerUserLibraryRepository) {}
 
-  private async findLibrary(
-    message: StickerUnfavoriteMessage,
-  ): Promise<StickerUserLibrary> {
-    const library = await this.repository.findByIdentityId(message.identityId);
-
-    return library ?? StickerUserLibrary.create(message.identityId);
-  }
-
   public async unfavorite(
     message: StickerUnfavoriteMessage,
   ): Promise<StickerUserLibrary> {
-    const library = await this.findLibrary(message);
+    await this.repository.unfavorite(
+      message.identityId,
+      message.packId,
+      message.stickerId,
+      message.proof,
+    );
 
-    library.unfavoriteSticker(message.packId, message.stickerId);
-
-    await this.repository.save(library);
-
-    return library;
+    return (
+      (await this.repository.findByIdentityId(message.identityId)) ??
+      StickerUserLibrary.create(message.identityId)
+    );
   }
 }

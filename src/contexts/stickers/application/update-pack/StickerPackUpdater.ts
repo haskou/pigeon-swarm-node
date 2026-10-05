@@ -13,9 +13,13 @@ export default class StickerPackUpdater {
       throw new StickerPackNotFoundError();
     }
 
-    pack.updateProfile(message.actorIdentityId, message.name);
+    pack.updateProfile(
+      message.actorIdentityId,
+      message.name,
+      message.updatedAt,
+    );
 
-    await this.repository.save(pack);
+    await this.repository.save(pack, message.proof);
 
     return pack;
   }

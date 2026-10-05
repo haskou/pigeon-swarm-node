@@ -29,17 +29,24 @@ export default class StickerPackCreator {
   }
 
   public async create(message: StickerPackCreateMessage): Promise<StickerPack> {
-    const pack = StickerPack.create(message.ownerIdentityId, message.name);
+    const pack = StickerPack.create(
+      message.packId,
+      message.ownerIdentityId,
+      message.name,
+      message.createdAt,
+    );
     const lookup = await this.findLibrary(message);
-    const { library } = lookup;
 
-    library.savePack(pack.getId());
-
-    await this.packRepository.save(pack);
-    await this.libraryRepository.save(library);
+    await this.packRepository.save(pack, message.proof);
+    await this.libraryRepository.savePack(
+      message.ownerIdentityId,
+      message.packId,
+      message.createdAt,
+      message.savedPackProof,
+    );
     await this.eventPublisher.publish([
       ...pack.pullDomainEvents(),
-      ...(lookup.created ? library.pullDomainEvents() : []),
+      ...(lookup.created ? lookup.library.pullDomainEvents() : []),
     ]);
 
     return pack;

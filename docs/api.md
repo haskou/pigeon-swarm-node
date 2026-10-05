@@ -4033,6 +4033,31 @@ Sticker files are public IPFS assets. Upload the binary first with
 sticker pack metadata lives in OrbitDB replicated state and is returned through
 this API.
 
+Sticker packs and user library records are public replicated records, so every
+mutating route requires a client-signed `mutation` (`SignedPublicMutation`, see
+Notification settings). The node holds no user private keys: the client chooses
+every id and timestamp, signs the resulting record, and the node applies the same
+change and verifies that the digest of the result equals the signed digest. Missing,
+forged, copied, stale or wrong-author proofs fail with 409.
+
+- Store `stickerPacks`: one whole-pack document per pack, signed by the owner. The
+  proof has `recordId = <packId>`, kind `put`, and `payloadDigest` covers
+  `{ id, name, ownerIdentityId, createdAt, updatedAt, stickers: [{ id, type,
+  assetCid, contentType, sizeBytes, dimensions: { width, height } }], scopeType:
+  "sticker_pack" }` without `proof`. Packs are never deleted.
+- Store `stickerUserLibraries`: independent signed records, author = `identityId`:
+  - `sticker_favorite`, id `favorite:<identityId>:<packId>:<stickerId>`:
+    `{ id, identityId, packId, stickerId, favoritedAt, scopeType }`; removal is a
+    `delete` proof over `{ id, identityId, packId, stickerId, removed: true, scopeType }`.
+  - `sticker_saved_pack`, id `saved:<identityId>:<packId>`:
+    `{ id, identityId, packId, savedAt, scopeType }`; removal is a `delete` proof over
+    `{ id, identityId, packId, removed: true, scopeType }`.
+  - `sticker_recent`, id `recent:<identityId>:<packId>:<stickerId>`:
+    `{ id, identityId, packId, stickerId, usedAt, scopeType }`; never deleted. Only
+    the 10 newest by `usedAt` are returned.
+- Proofs for the same record increase `sequence` (predecessor = digest of the
+  previous mutation, null at 0).
+
 Current limits:
 
 - static stickers: max 512 KiB
@@ -4054,7 +4079,11 @@ Body:
 
 ```json
 {
-  "name": "Blue archive reactions"
+  "packId": "<client generated id>",
+  "name": "Blue archive reactions",
+  "createdAt": 1780000000000,
+  "mutation": "SignedPublicMutation (pack document, updatedAt = createdAt, stickers [])",
+  "savedPackMutation": "SignedPublicMutation (saved record saved:<identityId>:<packId>, savedAt = createdAt)"
 }
 ```
 
@@ -4137,6 +4166,8 @@ PUT /stickers/packs/{packId}/saved
 Requires signed HTTP headers. Adds the pack to the authenticated identity
 library and returns the updated library.
 
+Body: `{ "savedAt": <ms>, "mutation": SignedPublicMutation (saved record put) }`.
+
 ### Remove saved sticker pack
 
 ```http
@@ -4145,6 +4176,8 @@ DELETE /stickers/packs/{packId}/saved
 
 Requires signed HTTP headers. Removes the pack from the authenticated identity
 library and returns the updated library.
+
+Body: `{ "mutation": SignedPublicMutation (delete proof over the saved tombstone) }`.
 
 ### Update sticker pack
 
@@ -4158,7 +4191,9 @@ Body:
 
 ```json
 {
-  "name": "Updated pack name"
+  "name": "Updated pack name",
+  "updatedAt": 1780000000000,
+  "mutation": "SignedPublicMutation (whole resulting pack document)"
 }
 ```
 
@@ -4174,6 +4209,9 @@ Body:
 
 ```json
 {
+  "stickerId": "<client generated id>",
+  "updatedAt": 1780000000000,
+  "mutation": "SignedPublicMutation (whole resulting pack document)",
   "type": "static",
   "assetCid": "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq",
   "contentType": "image/png",
@@ -4198,7 +4236,7 @@ PATCH /stickers/packs/{packId}/stickers/{stickerId}
 ```
 
 Requires signed HTTP headers from the pack owner. Body is the same as add
-sticker.
+sticker without `stickerId`.
 
 ### Remove sticker
 
@@ -4206,7 +4244,8 @@ sticker.
 DELETE /stickers/packs/{packId}/stickers/{stickerId}
 ```
 
-Requires signed HTTP headers from the pack owner.
+Requires signed HTTP headers from the pack owner. Body:
+`{ "updatedAt": <ms>, "mutation": SignedPublicMutation (pack document without the sticker) }`.
 
 ### Favorite sticker
 
@@ -4217,6 +4256,8 @@ PUT /stickers/packs/{packId}/stickers/{stickerId}/favorite
 Requires signed HTTP headers. The sticker must exist. Returns the updated
 authenticated identity sticker library.
 
+Body: `{ "favoritedAt": <ms>, "mutation": SignedPublicMutation (favorite put) }`.
+
 ### Remove favorite sticker
 
 ```http
@@ -4225,6 +4266,8 @@ DELETE /stickers/packs/{packId}/stickers/{stickerId}/favorite
 
 Requires signed HTTP headers. Returns the updated authenticated identity sticker
 library.
+
+Body: `{ "mutation": SignedPublicMutation (delete proof over the favorite tombstone) }`.
 
 ### Record sticker usage
 
@@ -4235,6 +4278,8 @@ POST /stickers/packs/{packId}/stickers/{stickerId}/used
 Requires signed HTTP headers. The sticker must exist. Returns the updated
 authenticated identity sticker library with the sticker moved to the front of
 `recentStickers`. The list is capped at 10 entries.
+
+Body: `{ "usedAt": <ms>, "mutation": SignedPublicMutation (recent put) }`.
 
 ## Polls API
 

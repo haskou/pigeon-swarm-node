@@ -11,6 +11,10 @@ import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutation
 import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 import { PublicMutationGate } from '@app/contexts/public-mutations/infrastructure/PublicMutationGate';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import StickerFavoriteMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerFavoriteMutationPolicy';
+import StickerPackMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerPackMutationPolicy';
+import StickerRecentMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerRecentMutationPolicy';
+import StickerSavedPackMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
@@ -396,6 +400,238 @@ describe('PublicMutationGate over notification settings', () => {
       gate.accepts(
         'notificationSettings',
         await sign({ ...settings, scopeKey: 'community:c2' }),
+      ),
+    ).resolves.toBe(false);
+  });
+});
+
+describe('PublicMutationGate over stickers', () => {
+  const author = 'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=';
+  const otherAuthor = 'MCowBQYDK2VwAyEA' + 'A'.repeat(43) + '=';
+  const sticker = {
+    assetCid: 'bagaaierastickerassetcid',
+    contentType: 'image/png',
+    dimensions: { height: 128, width: 128 },
+    id: 's1',
+    sizeBytes: 32768,
+    type: 'static',
+  };
+  const pack = {
+    createdAt: 1780000000000,
+    id: 'p1',
+    name: 'Pigeon moods',
+    ownerIdentityId: author,
+    scopeType: 'sticker_pack',
+    stickers: [sticker],
+    updatedAt: 1780000000001,
+  };
+  const favorite = {
+    favoritedAt: 1780000000000,
+    id: `favorite:${author}:p1:s1`,
+    identityId: author,
+    packId: 'p1',
+    scopeType: 'sticker_favorite',
+    stickerId: 's1',
+  };
+  const favoriteTombstone = {
+    id: favorite.id,
+    identityId: author,
+    packId: 'p1',
+    removed: true,
+    scopeType: 'sticker_favorite',
+    stickerId: 's1',
+  };
+  const saved = {
+    id: `saved:${author}:p1`,
+    identityId: author,
+    packId: 'p1',
+    savedAt: 1780000000000,
+    scopeType: 'sticker_saved_pack',
+  };
+  const savedTombstone = {
+    id: saved.id,
+    identityId: author,
+    packId: 'p1',
+    removed: true,
+    scopeType: 'sticker_saved_pack',
+  };
+  const recent = {
+    id: `recent:${author}:p1:s1`,
+    identityId: author,
+    packId: 'p1',
+    scopeType: 'sticker_recent',
+    stickerId: 's1',
+    usedAt: 1780000000000,
+  };
+  const authorization = mock<PublicMutationAuthorAuthorization>();
+  let gate: PublicMutationGate;
+
+  const sign = async (
+    store: string,
+    payload: Record<string, unknown>,
+    signer: string = author,
+  ): Promise<Record<string, unknown>> => {
+    const device = await KeyPair.generate();
+    const body = {
+      author: {
+        deviceCredential: device.toPrimitives().publicKey,
+        identityId: signer,
+      },
+      kind: payload.removed === true ? 'delete' : 'put',
+      operationId: 'operation-1'.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor: null as string | null,
+      recordId: payload.id as string,
+      sequence: 0,
+      store,
+      version: 1,
+    } as const;
+
+    return PublicMutationRecord.withProof(
+      payload,
+      PublicMutationProof.signed(
+        body,
+        device.sign(PublicMutationProof.signingContentOf(body)),
+      ),
+    );
+  };
+
+  const cases: [string, string, Record<string, unknown>][] = [
+    ['stickerPacks', 'pack', pack],
+    ['stickerUserLibraries', 'favorite', favorite],
+    ['stickerUserLibraries', 'saved pack', saved],
+    ['stickerUserLibraries', 'recent', recent],
+  ];
+
+  beforeEach(() => {
+    authorization.isAuthorized.mockResolvedValue(true);
+    gate = new PublicMutationGate(new PublicMutationVerifier(authorization), [
+      new StickerPackMutationPolicy(),
+      new StickerFavoriteMutationPolicy(),
+      new StickerSavedPackMutationPolicy(),
+      new StickerRecentMutationPolicy(),
+    ]);
+  });
+
+  it.each(cases)('admits a signed %s from its owner', async (store, _, doc) => {
+    await expect(gate.accepts(store, await sign(store, doc))).resolves.toBe(
+      true,
+    );
+  });
+
+  it.each(cases)('rejects an unsigned %s', async (store, _, doc) => {
+    await expect(gate.accepts(store, doc)).resolves.toBe(false);
+  });
+
+  it.each(cases)('rejects a %s signed by someone else', async (store, _, doc) => {
+    await expect(
+      gate.accepts(store, await sign(store, doc, otherAuthor)),
+    ).resolves.toBe(false);
+  });
+
+  it('admits signed unfavorite and forget tombstones', async () => {
+    await expect(
+      gate.accepts(
+        'stickerUserLibraries',
+        await sign('stickerUserLibraries', favoriteTombstone),
+      ),
+    ).resolves.toBe(true);
+    await expect(
+      gate.accepts(
+        'stickerUserLibraries',
+        await sign('stickerUserLibraries', savedTombstone),
+      ),
+    ).resolves.toBe(true);
+  });
+
+  it('rejects forged future-dated tombstones without proof', async () => {
+    await expect(
+      gate.accepts('stickerUserLibraries', {
+        ...favoriteTombstone,
+        usedAt: Date.now() + 10 ** 12,
+      }),
+    ).resolves.toBe(false);
+    await expect(
+      gate.accepts('stickerPacks', {
+        id: 'p1',
+        ownerIdentityId: author,
+        removed: true,
+        scopeType: 'sticker_pack',
+        updatedAt: Date.now() + 10 ** 12,
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a proof copied onto another record', async () => {
+    const signedPack = await sign('stickerPacks', pack);
+    const signedFavorite = await sign('stickerUserLibraries', favorite);
+
+    await expect(
+      gate.accepts('stickerPacks', {
+        ...signedPack,
+        id: 'p2',
+        name: 'Hijacked',
+      }),
+    ).resolves.toBe(false);
+    await expect(
+      gate.accepts('stickerUserLibraries', {
+        ...signedFavorite,
+        id: `favorite:${author}:p1:s2`,
+        stickerId: 's2',
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects library records whose id does not match their fields', async () => {
+    await expect(
+      gate.accepts(
+        'stickerUserLibraries',
+        await sign('stickerUserLibraries', {
+          ...favorite,
+          id: `favorite:${author}:p9:s1`,
+        }),
+      ),
+    ).resolves.toBe(false);
+    await expect(
+      gate.accepts(
+        'stickerUserLibraries',
+        await sign('stickerUserLibraries', {
+          ...saved,
+          id: `recent:${author}:p1`,
+        }),
+      ),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects malformed packs and stickers', async () => {
+    await expect(
+      gate.accepts(
+        'stickerPacks',
+        await sign('stickerPacks', { ...pack, extra: true }),
+      ),
+    ).resolves.toBe(false);
+    await expect(
+      gate.accepts(
+        'stickerPacks',
+        await sign('stickerPacks', {
+          ...pack,
+          stickers: [{ ...sticker, smuggled: 'x' }],
+        }),
+      ),
+    ).resolves.toBe(false);
+    await expect(
+      gate.accepts(
+        'stickerPacks',
+        await sign('stickerPacks', {
+          ...pack,
+          stickers: [{ ...sticker, type: 'hologram' }],
+        }),
+      ),
+    ).resolves.toBe(false);
+    await expect(
+      gate.accepts(
+        'stickerUserLibraries',
+        await sign('stickerUserLibraries', { ...recent, usedAt: 'later' }),
       ),
     ).resolves.toBe(false);
   });

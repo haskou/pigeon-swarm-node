@@ -2,8 +2,16 @@ import { StickerPackForgetMessage } from '@app/contexts/stickers/application/for
 import StickerPackForgetter from '@app/contexts/stickers/application/forget-pack/StickerPackForgetter';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  Delete,
+  JsonController,
+  Param,
+  Req,
+  Res,
+} from 'routing-controllers';
 
+import { StickerMutationBody } from '../bodies/StickerMutationBody';
 import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
@@ -14,12 +22,13 @@ export class DeleteSavedStickerPackRoute extends StickerRouteSupport {
   @Delete('/:packId/saved')
   public async forgetPack(
     @Param('packId') packId: string,
+    @Body() body: StickerMutationBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
     const library = await this.forgetter.forget(
-      new StickerPackForgetMessage(identityId.valueOf(), packId),
+      new StickerPackForgetMessage(identityId.valueOf(), packId, body.mutation),
     );
 
     return response

@@ -13,16 +13,18 @@ import { StickerPackName } from './value-objects/StickerPackName';
 
 export class StickerPack extends AggregateRoot {
   public static create(
+    id: StickerPackId,
     ownerIdentityId: IdentityId,
     name: StickerPackName,
+    createdAt: Timestamp,
   ): StickerPack {
     const pack = new StickerPack(
-      StickerPackId.generate(),
+      id,
       ownerIdentityId,
       name,
       [],
-      Timestamp.now(),
-      Timestamp.now(),
+      createdAt,
+      createdAt,
     );
 
     const primitives = pack.toPrimitives();
@@ -73,17 +75,18 @@ export class StickerPack extends AggregateRoot {
     return this.stickers.find((sticker) => sticker.getId().isEqual(stickerId));
   }
 
-  private touch(): void {
-    this.updatedAt = Timestamp.now();
-  }
-
-  public addSticker(actor: IdentityId, details: StickerDetails): Sticker {
+  public addSticker(
+    actor: IdentityId,
+    stickerId: StickerId,
+    details: StickerDetails,
+    at: Timestamp,
+  ): Sticker {
     this.assertOwner(actor);
 
-    const sticker = Sticker.create(details);
+    const sticker = Sticker.create(stickerId, details);
 
     this.stickers.push(sticker);
-    this.touch();
+    this.updatedAt = at;
 
     return sticker;
   }
@@ -92,7 +95,11 @@ export class StickerPack extends AggregateRoot {
     return this.findSticker(stickerId) !== undefined;
   }
 
-  public removeSticker(actor: IdentityId, stickerId: StickerId): void {
+  public removeSticker(
+    actor: IdentityId,
+    stickerId: StickerId,
+    at: Timestamp,
+  ): void {
     this.assertOwner(actor);
 
     const stickerIndex = this.stickers.findIndex((sticker) =>
@@ -101,19 +108,24 @@ export class StickerPack extends AggregateRoot {
 
     assert(stickerIndex >= 0, new StickerNotFoundError());
     this.stickers.splice(stickerIndex, 1);
-    this.touch();
+    this.updatedAt = at;
   }
 
-  public updateProfile(actor: IdentityId, name: StickerPackName): void {
+  public updateProfile(
+    actor: IdentityId,
+    name: StickerPackName,
+    at: Timestamp,
+  ): void {
     this.assertOwner(actor);
     this.name = name;
-    this.touch();
+    this.updatedAt = at;
   }
 
   public updateSticker(
     actor: IdentityId,
     stickerId: StickerId,
     details: StickerDetails,
+    at: Timestamp,
   ): Sticker {
     this.assertOwner(actor);
 
@@ -121,7 +133,7 @@ export class StickerPack extends AggregateRoot {
 
     assert(sticker, new StickerNotFoundError());
     sticker.update(details);
-    this.touch();
+    this.updatedAt = at;
 
     return sticker;
   }

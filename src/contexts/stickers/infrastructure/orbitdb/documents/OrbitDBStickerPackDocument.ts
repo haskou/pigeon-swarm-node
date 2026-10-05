@@ -5,6 +5,7 @@ export interface OrbitDBStickerPackDocument extends Record<string, unknown> {
   id: string;
   name: string;
   ownerIdentityId: string;
+  scopeType: 'sticker_pack';
   stickers: OrbitDBStickerDocument[];
   updatedAt: number;
 }

@@ -11,16 +11,6 @@ export default class StickerUseRecorder {
     private readonly libraryRepository: StickerUserLibraryRepository,
   ) {}
 
-  private async findLibrary(
-    message: StickerUseRecordMessage,
-  ): Promise<StickerUserLibrary> {
-    const library = await this.libraryRepository.findByIdentityId(
-      message.identityId,
-    );
-
-    return library ?? StickerUserLibrary.create(message.identityId);
-  }
-
   public async record(
     message: StickerUseRecordMessage,
   ): Promise<StickerUserLibrary> {
@@ -34,12 +24,17 @@ export default class StickerUseRecorder {
       throw new StickerNotFoundError();
     }
 
-    const library = await this.findLibrary(message);
+    await this.libraryRepository.recordUse(
+      message.identityId,
+      message.packId,
+      message.stickerId,
+      message.usedAt,
+      message.proof,
+    );
 
-    library.recordStickerUse(message.packId, message.stickerId);
-
-    await this.libraryRepository.save(library);
-
-    return library;
+    return (
+      (await this.libraryRepository.findByIdentityId(message.identityId)) ??
+      StickerUserLibrary.create(message.identityId)
+    );
   }
 }
