@@ -3,6 +3,7 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 import { CommunityVoiceChannel } from '../../domain/entities/channels/CommunityVoiceChannel';
 import { CommunityModerationTarget } from '../../domain/entities/moderation/CommunityModerationTarget';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
+import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
 import { CommunityChannelType } from '../../domain/value-objects/CommunityChannelType';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
@@ -25,10 +26,13 @@ export default class CommunityVoiceChannelCreator {
     const channel = community.addVoiceChannel(
       message.actorIdentityId,
       message.name,
+      CommunityChannelId.derive(
+        message.communityId.valueOf(),
+        message.actorIdentityId.valueOf(),
+        message.moderationLog.createdAt.valueOf(),
+      ),
     );
 
-    await this.communityRepository.save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
     await this.moderationLogRecorder.record(
       community,
       message.actorIdentityId,
@@ -37,11 +41,14 @@ export default class CommunityVoiceChannelCreator {
         CommunityModerationTargetType.CHANNEL,
         channel.getId(),
       ),
+      message.moderationLog,
       {
         name: message.name.valueOf(),
         type: CommunityChannelType.VOICE.valueOf(),
       },
     );
+    await this.communityRepository.save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return channel;
   }

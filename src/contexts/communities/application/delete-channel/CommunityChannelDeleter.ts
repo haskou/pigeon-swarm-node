@@ -26,8 +26,6 @@ export default class CommunityChannelDeleter {
       message.channelId,
     );
 
-    await this.communityRepository.save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
     await this.moderationLogRecorder.record(
       community,
       message.actorIdentityId,
@@ -36,8 +34,11 @@ export default class CommunityChannelDeleter {
         CommunityModerationTargetType.CHANNEL,
         message.channelId,
       ),
+      message.moderationLog,
       { type: channelType.valueOf() },
     );
+    await this.communityRepository.save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;
   }

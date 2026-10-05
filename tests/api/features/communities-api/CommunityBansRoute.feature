@@ -20,3 +20,19 @@ Feature: Community bans API
     When I POST to request joining the current community
     Then response code is equal to 409
     And response body should contain "Identity is banned"
+
+  Scenario: Owner removes a ban
+    Given I am an anonymous user
+    And I register a test IPFS network "communities-api-unban-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities/"
+    Then response code is equal to 200
+    And I remember the current community
+    And I set a community ban body for another identity
+    And I sign the current community ban request
+    When I POST a ban to the current community
+    Then response code is equal to 200
+    And I sign the current community unban request for another identity
+    When I DELETE the ban for another identity from the current community
+    Then response code is equal to 200

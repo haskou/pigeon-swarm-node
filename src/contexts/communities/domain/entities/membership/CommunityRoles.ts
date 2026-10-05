@@ -60,8 +60,9 @@ export class CommunityRoles {
   public add(
     name: CommunityRoleName,
     permissions: CommunityPermission[],
+    id?: CommunityRoleId,
   ): CommunityRole {
-    const role = CommunityRole.create(name, permissions);
+    const role = CommunityRole.create(name, permissions, id);
 
     this.roles.push(role);
 

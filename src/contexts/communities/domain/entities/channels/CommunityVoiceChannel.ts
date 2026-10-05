@@ -6,9 +6,12 @@ import { CommunityChannelType } from '../../value-objects/CommunityChannelType';
 import { CommunityChannelPermissions } from './CommunityChannelPermissions';
 
 export class CommunityVoiceChannel {
-  public static create(name: CommunityChannelName): CommunityVoiceChannel {
+  public static create(
+    name: CommunityChannelName,
+    id: CommunityChannelId = CommunityChannelId.generate(),
+  ): CommunityVoiceChannel {
     return new CommunityVoiceChannel(
-      CommunityChannelId.generate(),
+      id,
       name,
       CommunityChannelPermissions.visibleForEveryone(),
       Timestamp.now(),

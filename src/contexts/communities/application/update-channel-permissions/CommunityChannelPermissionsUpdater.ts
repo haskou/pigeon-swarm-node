@@ -27,8 +27,6 @@ export default class CommunityChannelPermissionsUpdater {
       message.channelId,
       message.permissions,
     );
-    await this.communityRepository.save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
     await this.moderationLogRecorder.record(
       community,
       message.actorIdentityId,
@@ -37,8 +35,11 @@ export default class CommunityChannelPermissionsUpdater {
         CommunityModerationTargetType.CHANNEL,
         message.channelId,
       ),
+      message.moderationLog,
       { visibleRoleIds: message.visibleRoleIds },
     );
+    await this.communityRepository.save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;
   }

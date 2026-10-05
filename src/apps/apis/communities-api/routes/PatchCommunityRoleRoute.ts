@@ -36,6 +36,7 @@ export class PatchCommunityRoleRoute extends CommunityRouteSupport {
         actorIdentityId.valueOf(),
         body.name,
         body.permissions,
+        body.moderationLog,
       ),
     );
 

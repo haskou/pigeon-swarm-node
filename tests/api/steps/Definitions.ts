@@ -5,8 +5,11 @@ import PigeonApplication from '@app/apps/PigeonApplication';
 import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import CallParticipantLeaseExpirationRegistrar from '@app/contexts/calls/application/expire-participant-leases/CallParticipantLeaseExpirationRegistrar';
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
+import { CommunityModerationLogId } from '@app/contexts/communities/domain/value-objects/CommunityModerationLogId';
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
+import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
@@ -73,6 +76,7 @@ export default class Definitions {
   private binaryBody: Buffer | undefined;
   private readonly notificationSettingsSequences = new Map<string, number>();
   private readonly communityRecordSequences = new Map<string, number>();
+  private communityChannelType: 'text' | 'voice' = 'text';
   private communityMembershipRequest: Record<string, unknown> | undefined;
   private readonly stickerMutationSequences = new Map<string, number>();
   private readonly stickerPackDocuments = new Map<
@@ -332,6 +336,7 @@ export default class Definitions {
     payload: Record<string, unknown>,
     keyPair: KeyPair,
     sequence?: number,
+    store = 'requests',
   ): Record<string, unknown> {
     const recordId = String(payload.id);
     const next = sequence ?? this.communityRecordSequences.get(recordId) ?? 0;
@@ -348,7 +353,7 @@ export default class Definitions {
         next === 0 ? null : PublicMutationProof.digestOf({ previous: next }),
       recordId,
       sequence: next,
-      store: 'requests',
+      store,
       version: 1,
     } as const;
 
@@ -427,6 +432,289 @@ export default class Definitions {
     );
   }
 
+  private communityModerationLogFor(
+    method: string,
+    path: string,
+    body: Record<string, unknown>,
+    actorIdentityId: string,
+    createdAt: number,
+  ):
+    | {
+        action: string;
+        details: Record<string, unknown>;
+        target: { id: string; type: string };
+      }
+    | undefined {
+    type Log = {
+      action: string;
+      details: Record<string, unknown>;
+      target: { id: string; type: string };
+    };
+    const communityId = String(this.communityId);
+    const text = body as Record<string, string>;
+    const channelId = String(this.communityChannelId);
+    const roleId = String(this.communityRoleId);
+    const channel = (id: string) => ({ id, type: 'channel' });
+    const role = (id: string) => ({ id, type: 'role' });
+    const member = (id: string) => ({ id, type: 'member' });
+    const derivedChannelId = CommunityChannelId.derive(
+      communityId,
+      actorIdentityId,
+      createdAt,
+    ).valueOf();
+    const derivedRoleId = CommunityRoleId.derive(
+      communityId,
+      actorIdentityId,
+      createdAt,
+    ).valueOf();
+    const rules: [string, RegExp, (match: RegExpExecArray) => Log][] = [
+      [
+        'POST',
+        /^\/communities\/[^/]+\/channels\/(text|voice)$/,
+        (match) => ({
+          action: 'channel_created',
+          details: { name: body.name, type: match[1] },
+          target: channel(derivedChannelId),
+        }),
+      ],
+      [
+        'PATCH',
+        /^\/communities\/[^/]+\/channels\/[^/]+$/,
+        () => ({
+          action: 'channel_renamed',
+          details: { name: body.name },
+          target: channel(channelId),
+        }),
+      ],
+      [
+        'DELETE',
+        /^\/communities\/[^/]+\/channels\/[^/]+$/,
+        () => ({
+          action: 'channel_deleted',
+          details: { type: this.communityChannelType },
+          target: channel(channelId),
+        }),
+      ],
+      [
+        'PATCH',
+        /\/channels\/[^/]+\/permissions$/,
+        () => ({
+          action: 'channel_permissions_updated',
+          details: { visibleRoleIds: body.visibleRoleIds },
+          target: channel(channelId),
+        }),
+      ],
+      [
+        'POST',
+        /^\/communities\/[^/]+\/roles$/,
+        () => ({
+          action: 'role_created',
+          details: { name: body.name, permissions: body.permissions },
+          target: role(derivedRoleId),
+        }),
+      ],
+      [
+        'PATCH',
+        /^\/communities\/[^/]+\/roles\/[^/]+$/,
+        () => ({
+          action: 'role_updated',
+          details: { name: body.name, permissions: body.permissions },
+          target: role(roleId),
+        }),
+      ],
+      [
+        'DELETE',
+        /^\/communities\/[^/]+\/roles\/[^/]+$/,
+        () => ({
+          action: 'role_deleted',
+          details: {},
+          target: role(roleId),
+        }),
+      ],
+      [
+        'PUT',
+        /^\/communities\/[^/]+\/members\/([^/]+)\/roles$/,
+        (match) => ({
+          action: 'member_roles_updated',
+          details: { roleIds: body.roleIds },
+          target: member(decodeURIComponent(match[1])),
+        }),
+      ],
+      [
+        'POST',
+        /^\/communities\/[^/]+\/bans$/,
+        () => ({
+          action: 'member_banned',
+          details: { reason: body.reason },
+          target: member(text.identityId),
+        }),
+      ],
+      [
+        'DELETE',
+        /^\/communities\/[^/]+\/bans\/([^/]+)$/,
+        (match) => ({
+          action: 'member_unbanned',
+          details: {},
+          target: member(decodeURIComponent(match[1])),
+        }),
+      ],
+      [
+        'POST',
+        /^\/communities\/[^/]+\/invites$/,
+        () => ({
+          action: 'invite_link_created',
+          details: {
+            encryptedCommunityKeyStored: Boolean(body.encryptedCommunityKey),
+            expiresAt: body.expiresAt,
+            maxUses: body.maxUses,
+          },
+          target: {
+            id: CommunityInviteToken.derive(
+              communityId,
+              actorIdentityId,
+              text.nonce,
+            ).valueOf(),
+            type: 'invite',
+          },
+        }),
+      ],
+      [
+        'POST',
+        /^\/communities\/[^/]+\/members$/,
+        () => ({
+          action: 'invitation_created',
+          details: { identityId: body.identityId },
+          target: {
+            id: CommunityRequestId.derive(
+              communityId,
+              'invitation',
+              actorIdentityId,
+              text.identityId,
+              Number(body.createdAt),
+            ).valueOf(),
+            type: 'membership_request',
+          },
+        }),
+      ],
+      [
+        'PATCH',
+        /^\/communities\/membership-requests\/[^/]+$/,
+        () => {
+          const request = this.communityMembershipRequest as Record<
+            string,
+            string
+          >;
+
+          return {
+            action:
+              body.status === 'accepted'
+                ? 'membership_request_accepted'
+                : 'membership_request_declined',
+            details: { identityId: request.identityId, type: request.type },
+            target: { id: request.id, type: 'membership_request' },
+          };
+        },
+      ],
+      [
+        'PATCH',
+        /^\/communities\/[^/]+$/,
+        () => ({
+          action: 'community_updated',
+          details: {
+            autoJoinEnabled: body.autoJoinEnabled,
+            avatar: body.avatar,
+            banner: body.banner,
+            description: body.description,
+            discoverable: body.discoverable,
+            name: body.name,
+          },
+          target: { id: communityId, type: 'community' },
+        }),
+      ],
+      [
+        'DELETE',
+        /\/channels\/[^/]+\/messages\/[^/]+$/,
+        () => ({
+          action: 'message_deleted',
+          details: {
+            channelId: this.communityChannelId,
+            targetMessageAuthorId: this.ownerIdentityId?.valueOf(),
+          },
+          target: {
+            id: String(this.communityChannelMessageId),
+            type: 'message',
+          },
+        }),
+      ],
+    ];
+    const pathname = path.split('?')[0];
+
+    for (const [ruleMethod, pattern, build] of rules) {
+      const match = ruleMethod === method ? pattern.exec(pathname) : null;
+
+      if (match) {
+        return build(match);
+      }
+    }
+
+    return undefined;
+  }
+
+  /** Adds the client-signed moderation log entry to a community mutation body. */
+  private attachCommunityModerationLog(
+    method: string,
+    path: string,
+    keyPair: KeyPair,
+  ): void {
+    const body = JSON.parse(this.body ?? '{}');
+    const actorIdentityId = keyPair.toPrimitives().publicKey;
+    const createdAt = Date.now();
+    const entry = this.communityModerationLogFor(
+      method,
+      path,
+      body,
+      actorIdentityId,
+      createdAt,
+    );
+
+    if (!entry || !this.communityId || body.moderationLog) {
+      return;
+    }
+
+    const payload = JSON.parse(
+      JSON.stringify({
+        action: entry.action,
+        actorIdentityId,
+        communityId: this.communityId,
+        createdAt,
+        details: entry.details,
+        id: CommunityModerationLogId.derive(
+          this.communityId,
+          actorIdentityId,
+          entry.action,
+          entry.target.type,
+          entry.target.id,
+          createdAt,
+        ).valueOf(),
+        scopeType: 'community_moderation_log',
+        target: entry.target,
+      }),
+    );
+
+    this.body = JSON.stringify({
+      ...body,
+      moderationLog: {
+        createdAt,
+        mutation: this.signCommunityRecord(
+          payload,
+          keyPair,
+          undefined,
+          'moderationLogs',
+        ),
+      },
+    });
+  }
+
   private async signCurrentRequest(
     method: string,
     path: string,
@@ -436,6 +724,8 @@ export default class Definitions {
   ): Promise<void> {
     const signerKeyPair = await this.resolveSignerKeyPair(keyPair);
     const signerIdentityId = this.resolveSignerIdentityId(identityId);
+
+    this.attachCommunityModerationLog(method, path, signerKeyPair);
     const verifier = new SignedHttpRequestVerifier();
     const signedRequestPayload = verifier.getCanonicalPayload(
       method,
@@ -1455,6 +1745,46 @@ export default class Definitions {
     );
   }
 
+  @given('I sign the current community role update request')
+  public async iSignTheCurrentCommunityRoleUpdateRequest(): Promise<void> {
+    if (!this.communityId || !this.communityRoleId) {
+      throw new Error('Community and role must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'PATCH',
+      `/communities/${this.communityId}/roles/${this.communityRoleId}`,
+    );
+  }
+
+  @given('I sign the current community role deletion request')
+  public async iSignTheCurrentCommunityRoleDeletionRequest(): Promise<void> {
+    if (!this.communityId || !this.communityRoleId) {
+      throw new Error('Community and role must be created first.');
+    }
+
+    this.body = '{}';
+    await this.signCurrentRequest(
+      'DELETE',
+      `/communities/${this.communityId}/roles/${this.communityRoleId}`,
+    );
+  }
+
+  @given('I sign the current community unban request for another identity')
+  public async iSignTheCurrentCommunityUnbanRequestForAnotherIdentity(): Promise<void> {
+    if (!this.communityId || !this.otherIdentityId) {
+      throw new Error('Community and banned identity must be available first.');
+    }
+
+    this.body = '{}';
+    await this.signCurrentRequest(
+      'DELETE',
+      `/communities/${this.communityId}/bans/${encodeURIComponent(
+        this.otherIdentityId.valueOf(),
+      )}`,
+    );
+  }
+
   @given('I sign the current community channel permissions request')
   public async iSignTheCurrentCommunityChannelPermissionsRequest(): Promise<void> {
     if (!this.communityId || !this.communityChannelId) {
@@ -1755,6 +2085,7 @@ export default class Definitions {
     }
 
     this.communityChannelId = this.response.data.id;
+    this.communityChannelType = 'text';
   }
 
   @given('I remember the current community voice channel')
@@ -1764,6 +2095,7 @@ export default class Definitions {
     }
 
     this.communityChannelId = this.response.data.id;
+    this.communityChannelType = 'voice';
   }
 
   @given('I set a community text channel rename body')
@@ -1791,7 +2123,7 @@ export default class Definitions {
       throw new Error('Community and channel must be created first.');
     }
 
-    this.body = undefined;
+    this.body = '{}';
     await this.signCurrentRequest(
       'DELETE',
       `/communities/${this.communityId}/channels/${this.communityChannelId}`,
@@ -1808,7 +2140,7 @@ export default class Definitions {
 
     const keyPair = await this.ensureOtherIdentityKeyPair();
 
-    this.body = undefined;
+    this.body = '{}';
     await this.signCurrentRequest(
       'DELETE',
       `/communities/${this.communityId}/channels/${this.communityChannelId}`,
@@ -4157,6 +4489,47 @@ export default class Definitions {
     );
   }
 
+  @when('I PATCH the current community role')
+  public async iPATCHTheCurrentCommunityRole(): Promise<void> {
+    if (!this.communityId || !this.communityRoleId) {
+      throw new Error('Community and role must be created first.');
+    }
+
+    this.response = await this.restClient.patch(
+      `/communities/${this.communityId}/roles/${this.communityRoleId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the current community role')
+  public async iDELETETheCurrentCommunityRole(): Promise<void> {
+    if (!this.communityId || !this.communityRoleId) {
+      throw new Error('Community and role must be created first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/communities/${this.communityId}/roles/${this.communityRoleId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the ban for another identity from the current community')
+  public async iDELETETheBanForAnotherIdentityFromTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId || !this.otherIdentityId) {
+      throw new Error('Community and banned identity must be available first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/communities/${this.communityId}/bans/${encodeURIComponent(
+        this.otherIdentityId.valueOf(),
+      )}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
   @when('I PATCH permissions for the current community channel')
   public async iPATCHPermissionsForTheCurrentCommunityChannel(): Promise<void> {
     if (!this.communityId || !this.communityChannelId) {
@@ -4445,7 +4818,7 @@ export default class Definitions {
 
     this.response = await this.restClient.delete(
       `/communities/${this.communityId}/channels/${this.communityChannelId}`,
-      undefined,
+      this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
   }

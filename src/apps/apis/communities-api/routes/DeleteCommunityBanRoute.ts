@@ -2,8 +2,16 @@ import CommunityMemberUnbanner from '@app/contexts/communities/application/ban-m
 import { CommunityMemberUnbanMessage } from '@app/contexts/communities/application/ban-member/messages/CommunityMemberUnbanMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  Delete,
+  JsonController,
+  Param,
+  Req,
+  Res,
+} from 'routing-controllers';
 
+import { DeleteCommunityBanBody } from '../bodies/DeleteCommunityBanBody';
 import { CommunityViewModel } from '../view-model/CommunityViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
@@ -17,6 +25,7 @@ export class DeleteCommunityBanRoute extends CommunityRouteSupport {
   public async unbanMember(
     @Param('communityId') communityId: string,
     @Param('identityId') identityId: string,
+    @Body() body: DeleteCommunityBanBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
@@ -26,6 +35,7 @@ export class DeleteCommunityBanRoute extends CommunityRouteSupport {
         communityId,
         actorIdentityId.valueOf(),
         identityId,
+        body.moderationLog,
       ),
     );
 

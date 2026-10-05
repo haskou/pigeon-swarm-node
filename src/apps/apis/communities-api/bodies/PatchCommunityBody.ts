@@ -1,4 +1,12 @@
-import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
+
+import { CommunityModerationLogBody } from './CommunityModerationLogBody';
 
 export class PatchCommunityBody {
   @IsOptional()
@@ -22,4 +30,8 @@ export class PatchCommunityBody {
 
   @IsString()
   public readonly name: string;
+
+  @Type(() => CommunityModerationLogBody)
+  @ValidateNested()
+  public readonly moderationLog: CommunityModerationLogBody;
 }

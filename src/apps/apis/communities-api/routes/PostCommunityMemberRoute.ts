@@ -36,6 +36,7 @@ export class PostCommunityMemberRoute extends CommunityRouteSupport {
         body.identityId,
         body.createdAt,
         body.mutation,
+        body.moderationLog,
       ),
     );
 

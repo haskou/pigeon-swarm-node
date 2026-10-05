@@ -50,6 +50,7 @@ import { CommunityDescription } from './value-objects/CommunityDescription';
 import { CommunityId } from './value-objects/CommunityId';
 import { CommunityInviteMaxUses } from './value-objects/CommunityInviteMaxUses';
 import { CommunityInviteNonce } from './value-objects/CommunityInviteNonce';
+import { CommunityModerationAction } from './value-objects/CommunityModerationAction';
 import { CommunityName } from './value-objects/CommunityName';
 import { CommunityPermission } from './value-objects/CommunityPermission';
 import { CommunityRoleId } from './value-objects/CommunityRoleId';
@@ -500,6 +501,19 @@ export class Community extends AggregateRoot {
     this.createAccessValidator().assertCanViewModerationLog(identityId);
   }
 
+  /** Whether `actor` may author a moderation log entry for `action`. */
+  public assertCanRecordModerationAction(
+    actor: IdentityId,
+    action: CommunityModerationAction,
+    details: Record<string, unknown>,
+  ): void {
+    this.createAccessValidator().assertCanRecordModerationAction(
+      actor,
+      action,
+      details,
+    );
+  }
+
   public leave(member: IdentityId): void {
     this.createAccessValidator().assertIsMember(member);
     assert(
@@ -539,10 +553,11 @@ export class Community extends AggregateRoot {
   public addTextChannel(
     actor: IdentityId,
     name: CommunityChannelName,
+    id?: CommunityChannelId,
   ): CommunityTextChannel {
     this.createAccessValidator().assertCanManageChannels(actor);
 
-    const channel = this.channels.addText(name);
+    const channel = this.channels.addText(name, id);
 
     this.record(
       new CommunityChannelWasCreatedEvent(this.id.valueOf(), {
@@ -557,10 +572,11 @@ export class Community extends AggregateRoot {
   public addVoiceChannel(
     actor: IdentityId,
     name: CommunityChannelName,
+    id?: CommunityChannelId,
   ): CommunityVoiceChannel {
     this.createAccessValidator().assertCanManageChannels(actor);
 
-    const channel = this.channels.addVoice(name);
+    const channel = this.channels.addVoice(name, id);
 
     this.record(
       new CommunityChannelWasCreatedEvent(this.id.valueOf(), {
@@ -625,10 +641,11 @@ export class Community extends AggregateRoot {
     actor: IdentityId,
     name: CommunityRoleName,
     permissions: CommunityPermission[],
+    id?: CommunityRoleId,
   ): CommunityRole {
     this.createAccessValidator().assertCanManageRoles(actor);
 
-    const role = this.membership.addRole(name, permissions);
+    const role = this.membership.addRole(name, permissions, id);
 
     this.record(
       new CommunityWasUpdatedEvent(this.id.valueOf(), {

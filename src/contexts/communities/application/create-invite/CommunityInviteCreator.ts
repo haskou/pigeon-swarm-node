@@ -30,8 +30,6 @@ export default class CommunityInviteCreator {
       message.encryptedCommunityKey,
     );
 
-    await this.inviteRepository.save(invite, message.proof);
-    await this.eventPublisher.publish(community.pullDomainEvents());
     await this.moderationLogRecorder.record(
       community,
       message.actorIdentityId,
@@ -40,12 +38,15 @@ export default class CommunityInviteCreator {
         CommunityModerationTargetType.INVITE,
         invite.getToken(),
       ),
+      message.moderationLog,
       {
         encryptedCommunityKeyStored: invite.hasEncryptedCommunityKey(),
         expiresAt: message.expiresAt?.valueOf(),
         maxUses: message.maxUses?.valueOf(),
       },
     );
+    await this.inviteRepository.save(invite, message.proof);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return invite;
   }

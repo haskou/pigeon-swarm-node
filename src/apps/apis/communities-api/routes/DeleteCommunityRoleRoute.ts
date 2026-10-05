@@ -2,8 +2,16 @@ import CommunityRoleDeleter from '@app/contexts/communities/application/delete-r
 import { CommunityRoleDeleteMessage } from '@app/contexts/communities/application/delete-role/messages/CommunityRoleDeleteMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  Delete,
+  JsonController,
+  Param,
+  Req,
+  Res,
+} from 'routing-controllers';
 
+import { DeleteCommunityRoleBody } from '../bodies/DeleteCommunityRoleBody';
 import { CommunityViewModel } from '../view-model/CommunityViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
@@ -16,6 +24,7 @@ export class DeleteCommunityRoleRoute extends CommunityRouteSupport {
   public async deleteRole(
     @Param('communityId') communityId: string,
     @Param('roleId') roleId: string,
+    @Body() body: DeleteCommunityRoleBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
@@ -25,6 +34,7 @@ export class DeleteCommunityRoleRoute extends CommunityRouteSupport {
         communityId,
         roleId,
         actorIdentityId.valueOf(),
+        body.moderationLog,
       ),
     );
 

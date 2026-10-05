@@ -816,13 +816,6 @@ services:
     arguments:
       - '@contexts/communities/domain/repositories/CommunityRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
-  contexts/communities/application/delete-empty-community/EmptyCommunityDeleter:
-    class: >-
-      /contexts/communities/application/delete-empty-community/EmptyCommunityDeleter
-    arguments:
-      - '@contexts/communities/domain/repositories/CommunityRepository'
-      - >-
-        @contexts/communities/domain/repositories/CommunityModerationLogRepository
   contexts/communities/application/discover-communities/CommunitiesDiscoverer:
     class: >-
       /contexts/communities/application/discover-communities/CommunitiesDiscoverer
@@ -910,6 +903,12 @@ services:
   contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy:
     class: >-
       /contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy
+    arguments:
+      - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
+  contexts/communities/infrastructure/orbitdb/policies/CommunityModerationLogMutationPolicy:
+    class: >-
+      /contexts/communities/infrastructure/orbitdb/policies/CommunityModerationLogMutationPolicy
     arguments:
       - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
@@ -1436,6 +1435,12 @@ services:
       - '@contexts/communities/application/find-community/CommunityFinder'
       - '@contexts/communities/domain/repositories/CommunityRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/communities/application/leave-community/CommunityLeaver:
+    class: /contexts/communities/application/leave-community/CommunityLeaver
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+      - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/communities/application/manage-channel-message-pin/CommunityChannelMessagePinsFinder:
     class: >-
       /contexts/communities/application/manage-channel-message-pin/CommunityChannelMessagePinsFinder
@@ -1858,14 +1863,6 @@ services:
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
       - >-
         @contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder
-  contexts/communities/application/leave-community/CommunityLeaver:
-    class: /contexts/communities/application/leave-community/CommunityLeaver
-    arguments:
-      - '@contexts/communities/application/find-community/CommunityFinder'
-      - '@contexts/communities/domain/repositories/CommunityRepository'
-      - >-
-        @contexts/communities/application/delete-empty-community/EmptyCommunityDeleter
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/communities/application/manage-channel-message-pin/CommunityChannelMessagePinner:
     class: >-
       /contexts/communities/application/manage-channel-message-pin/CommunityChannelMessagePinner
@@ -2434,6 +2431,8 @@ services:
         @contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy
       - >-
         @contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityModerationLogMutationPolicy
       - '@contexts/polls/infrastructure/orbitdb/policies/PollMutationPolicy'
       - '@contexts/polls/infrastructure/orbitdb/policies/PollVoteMutationPolicy'
       - '@contexts/polls/infrastructure/orbitdb/policies/PollCloseMutationPolicy'

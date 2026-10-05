@@ -32,8 +32,6 @@ export default class CommunityProfileUpdater {
       message.autoJoinEnabled,
     );
 
-    await this.repository.save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
     await this.moderationLogRecorder.record(
       community,
       message.actorIdentityId,
@@ -42,6 +40,7 @@ export default class CommunityProfileUpdater {
         CommunityModerationTargetType.COMMUNITY,
         community.getId(),
       ),
+      message.moderationLog,
       {
         autoJoinEnabled: message.autoJoinEnabled,
         avatar: message.avatar?.valueOf(),
@@ -51,6 +50,8 @@ export default class CommunityProfileUpdater {
         name: message.name.valueOf(),
       },
     );
+    await this.repository.save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;
   }

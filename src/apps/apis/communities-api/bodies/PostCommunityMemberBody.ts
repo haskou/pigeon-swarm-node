@@ -1,4 +1,13 @@
-import { IsInt, IsObject, IsString, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsInt,
+  IsObject,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+
+import { CommunityModerationLogBody } from './CommunityModerationLogBody';
 
 export class PostCommunityMemberBody {
   @IsInt()
@@ -10,4 +19,8 @@ export class PostCommunityMemberBody {
 
   @IsObject()
   public readonly mutation: Record<string, unknown>;
+
+  @Type(() => CommunityModerationLogBody)
+  @ValidateNested()
+  public readonly moderationLog: CommunityModerationLogBody;
 }

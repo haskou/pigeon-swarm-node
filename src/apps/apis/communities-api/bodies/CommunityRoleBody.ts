@@ -1,4 +1,12 @@
-import { ArrayUnique, IsArray, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayUnique,
+  IsArray,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
+
+import { CommunityModerationLogBody } from './CommunityModerationLogBody';
 
 export class CommunityRoleBody {
   @IsString()
@@ -8,4 +16,8 @@ export class CommunityRoleBody {
   @IsArray()
   @IsString({ each: true })
   public readonly permissions: string[];
+
+  @Type(() => CommunityModerationLogBody)
+  @ValidateNested()
+  public readonly moderationLog: CommunityModerationLogBody;
 }

@@ -5,6 +5,7 @@ import { CommunityModerationLogEntry } from '../../domain/entities/moderation/Co
 import { CommunityModerationTarget } from '../../domain/entities/moderation/CommunityModerationTarget';
 import CommunityModerationLogRepository from '../../domain/repositories/CommunityModerationLogRepository';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
+import { CommunityModerationLogMutation } from './CommunityModerationLogMutation';
 
 export default class CommunityModerationLogRecorder {
   constructor(
@@ -16,16 +17,19 @@ export default class CommunityModerationLogRecorder {
     actorIdentityId: IdentityId,
     action: CommunityModerationAction,
     target: CommunityModerationTarget,
+    mutation: CommunityModerationLogMutation,
     details: Record<string, unknown> = {},
   ): Promise<void> {
     await this.moderationLogRepository.save(
-      CommunityModerationLogEntry.record(
+      CommunityModerationLogEntry.create(
         community.getId(),
         actorIdentityId,
         action,
         target,
         new CommunityModerationLogDetails(details),
+        mutation.createdAt,
       ),
+      mutation.proof,
     );
   }
 }

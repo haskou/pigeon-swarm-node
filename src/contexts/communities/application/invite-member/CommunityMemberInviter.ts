@@ -40,8 +40,6 @@ export default class CommunityMemberInviter {
       message.createdAt,
     );
 
-    await this.requestRepository.save(membershipRequest, message.proof);
-    await this.eventPublisher.publish(membershipRequest.pullDomainEvents());
     await this.moderationLogRecorder.record(
       community,
       message.actorIdentityId,
@@ -50,8 +48,11 @@ export default class CommunityMemberInviter {
         CommunityModerationTargetType.MEMBERSHIP_REQUEST,
         membershipRequest.getId(),
       ),
+      message.moderationLog,
       { identityId: message.invitedIdentityId.valueOf() },
     );
+    await this.requestRepository.save(membershipRequest, message.proof);
+    await this.eventPublisher.publish(membershipRequest.pullDomainEvents());
 
     return membershipRequest;
   }

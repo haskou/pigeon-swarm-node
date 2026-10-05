@@ -33,6 +33,7 @@ export class PostCommunityRoleRoute extends CommunityRouteSupport {
         actorIdentityId.valueOf(),
         body.name,
         body.permissions,
+        body.moderationLog,
       ),
     );
 

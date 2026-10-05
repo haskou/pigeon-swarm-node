@@ -3,12 +3,13 @@ import {
   IsInt,
   IsNumber,
   IsObject,
-  IsString,
   IsOptional,
+  IsString,
   Min,
   ValidateNested,
 } from 'class-validator';
 
+import { CommunityModerationLogBody } from './CommunityModerationLogBody';
 import { EncryptedCommunityInviteKeyBody } from './EncryptedCommunityInviteKeyBody';
 
 export class PostCommunityInviteBody {
@@ -35,4 +36,8 @@ export class PostCommunityInviteBody {
 
   @IsString()
   public readonly nonce: string;
+
+  @Type(() => CommunityModerationLogBody)
+  @ValidateNested()
+  public readonly moderationLog: CommunityModerationLogBody;
 }

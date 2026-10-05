@@ -38,6 +38,7 @@ export class PatchCommunityRoute extends CommunityRouteSupport {
         communityId,
         description: body.description,
         discoverable: body.discoverable,
+        moderationLog: body.moderationLog,
         name: body.name,
       }),
     );

@@ -36,6 +36,7 @@ export class PatchCommunityChannelRoute extends CommunityRouteSupport {
         channelId,
         actorIdentityId.valueOf(),
         body.name,
+        body.moderationLog,
       ),
     );
 

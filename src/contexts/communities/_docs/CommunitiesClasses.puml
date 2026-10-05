@@ -20,7 +20,7 @@ package "communities/application" {
   }
 
   class CommunityModerationLogRecorder {
-    + record(...): CommunityModerationLogEntry
+    + record(community, actor, action, target, mutation, details?): CommunityModerationLogEntry
   }
 
   class CommunityMemberBanner {
@@ -73,10 +73,6 @@ package "communities/application" {
 
   class CommunityLeaver {
     + leave(message): Community
-  }
-
-  class EmptyCommunityDeleter {
-    + delete(message): void
   }
 
   class CommunityInviteCreator {
@@ -165,7 +161,6 @@ package "communities/application" {
   CommunityMemberRolesAssigner ..> CommunityRepository
   CommunityMemberKicker ..> CommunityRepository
   CommunityLeaver ..> CommunityRepository
-  EmptyCommunityDeleter ..> CommunityRepository
   CommunityInviteCreator ..> CommunityRepository
   CommunityInviteCreator ..> CommunityInviteRepository
   CommunityInviteAccepter ..> CommunityRepository
@@ -374,7 +369,7 @@ package "communities/domain" {
     - target: CommunityModerationTarget
     - details: CommunityModerationLogDetails
     - createdAt: Timestamp
-    + record(communityId, actorIdentityId, action, target, details?): CommunityModerationLogEntry
+    + create(communityId, actorIdentityId, action, target, details, createdAt): CommunityModerationLogEntry
   }
 
   class CommunityModerationTarget {
@@ -499,8 +494,7 @@ package "communities/domain" {
 
   interface CommunityModerationLogRepository {
     + findByCommunity(communityId, limit, beforeLogId?): CommunityModerationLogEntry[]
-    + save(entry): void
-    + deleteByCommunity(communityId): void
+    + save(entry, proof): void
   }
 
   Community *-- CommunityMembership

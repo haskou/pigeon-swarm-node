@@ -36,6 +36,7 @@ export class DeleteCommunityChannelMessageRoute extends CommunityRouteSupport {
         actorIdentityId: actorIdentityId.valueOf(),
         channelId,
         communityId,
+        moderationLog: body.moderationLog,
         mutation: body.mutation,
         targetMessageId: messageId,
       }),

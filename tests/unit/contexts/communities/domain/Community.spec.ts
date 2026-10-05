@@ -1,6 +1,7 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityProfile } from '@app/contexts/communities/domain/entities/profile/CommunityProfile';
 import { CommunitySettings } from '@app/contexts/communities/domain/entities/profile/CommunitySettings';
+import { CommunityRequestActorMismatchError } from '@app/contexts/communities/domain/errors/CommunityRequestActorMismatchError';
 import { CommunityChannelWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasCreatedEvent';
 import { CommunityChannelWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasDeletedEvent';
 import { CommunityChannelWasRenamedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasRenamedEvent';
@@ -13,6 +14,7 @@ import { CommunityBanner } from '@app/contexts/communities/domain/value-objects/
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelName } from '@app/contexts/communities/domain/value-objects/CommunityChannelName';
 import { CommunityDescription } from '@app/contexts/communities/domain/value-objects/CommunityDescription';
+import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityName } from '@app/contexts/communities/domain/value-objects/CommunityName';
 import { CommunityVisibility } from '@app/contexts/communities/domain/value-objects/CommunityVisibility';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -300,6 +302,50 @@ describe('Community', () => {
 
     expect(community.isAutoJoinEnabled()).toBe(true);
     expect(community.toPrimitives().autoJoinEnabled).toBe(true);
+  });
+
+  describe('moderation log permissions', () => {
+    it('lets an invitee, but not a bystander, record an invitation acceptance', () => {
+      const community = createCommunity();
+      const bystander = new IdentityId(
+        'MCowBQYDK2VwAyEA0b+eY0HcM3dWnxGMaJqCwUq4Yk3ZcqrQKz2Y4mQw1Jk=',
+      );
+      const details = { identityId: member.valueOf(), type: 'invitation' };
+
+      expect(() =>
+        community.assertCanRecordModerationAction(
+          member,
+          CommunityModerationAction.MEMBERSHIP_REQUEST_ACCEPTED,
+          details,
+        ),
+      ).not.toThrow();
+      expect(() =>
+        community.assertCanRecordModerationAction(
+          bystander,
+          CommunityModerationAction.MEMBERSHIP_REQUEST_ACCEPTED,
+          details,
+        ),
+      ).toThrow(CommunityRequestActorMismatchError);
+    });
+
+    it('rejects actions the actor has no permission for', () => {
+      const community = createCommunity();
+
+      expect(() =>
+        community.assertCanRecordModerationAction(
+          owner,
+          CommunityModerationAction.COMMUNITY_UPDATED,
+          {},
+        ),
+      ).not.toThrow();
+      expect(() =>
+        community.assertCanRecordModerationAction(
+          member,
+          CommunityModerationAction.COMMUNITY_UPDATED,
+          {},
+        ),
+      ).toThrow();
+    });
   });
 
   function createCommunity(): Community {

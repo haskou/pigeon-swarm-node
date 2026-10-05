@@ -5,10 +5,15 @@ import { assert, Timestamp } from '@haskou/value-objects';
 import { InvalidCommunityRequestResolutionStatusError } from '../../../domain/errors/InvalidCommunityRequestResolutionStatusError';
 import { CommunityRequestId } from '../../../domain/value-objects/CommunityRequestId';
 import { CommunityRequestStatus } from '../../../domain/value-objects/CommunityRequestStatus';
+import {
+  CommunityModerationLogMutation,
+  CommunityModerationLogMutationPrimitives,
+} from '../../record-moderation-log/CommunityModerationLogMutation';
 
 export class CommunityMembershipRequestUpdateMessage {
   private readonly status: CommunityRequestStatus;
   public readonly actorIdentityId: IdentityId;
+  public readonly moderationLog: CommunityModerationLogMutation;
   public readonly proof: PublicMutationProof;
   public readonly requestId: CommunityRequestId;
   public readonly updatedAt: Timestamp;
@@ -19,8 +24,10 @@ export class CommunityMembershipRequestUpdateMessage {
     status: string,
     updatedAt: number,
     proof: unknown,
+    moderationLog: CommunityModerationLogMutationPrimitives,
   ) {
     this.actorIdentityId = new IdentityId(actorIdentityId);
+    this.moderationLog = new CommunityModerationLogMutation(moderationLog);
     this.proof = PublicMutationProof.fromPrimitives(proof);
     this.requestId = new CommunityRequestId(requestId);
     this.status = new CommunityRequestStatus(status);

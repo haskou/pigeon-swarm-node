@@ -1,3 +1,4 @@
+import { CommunityModerationLogDetails } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationLogDetails';
 import { CommunityModerationLogEntry } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationLogEntry';
 import { CommunityModerationTarget } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationTarget';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -8,6 +9,9 @@ import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infras
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { Timestamp } from '@haskou/value-objects';
+
+import { signedMutation } from '../../../public-mutations/support/signedMutation';
 
 const publicStorageGuard = () =>
   new PrivateCommunityPublicStorageGuard(
@@ -72,37 +76,28 @@ describe('OrbitDBCommunityModerationLogRepository', () => {
     registry.clear();
   });
 
-  it('should not wait for community moderation log indexes when saving logs', async () => {
+  it('should store the signed document and index it by community', async () => {
     const entry = moderationLogEntry();
 
-    headsPut.mockImplementation(
-      async (key: string, value: Record<string, unknown>) => {
-        if (key.startsWith('community-moderation-log-index:')) {
-          return new Promise(() => undefined);
-        }
+    await repository.save(entry, await proofOf(entry));
 
-        heads.set(key, value);
-
-        return 'ok';
-      },
-    );
-
-    const result = await Promise.race([
-      repository.save(entry).then(() => 'saved'),
-      new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
+    expect(moderationLogs).toEqual([
+      expect.objectContaining({
+        id: entry.getId().valueOf(),
+        proof: expect.objectContaining({ store: 'moderationLogs' }),
+        scopeType: 'community_moderation_log',
+      }),
     ]);
-
-    expect(result).toBe('saved');
     expect(
-      heads.get(`community-moderation-log:${entry.getId().valueOf()}`),
-    ).toEqual(expect.objectContaining({ id: entry.getId().valueOf() }));
+      heads.get(`community-moderation-log-index:${communityId.valueOf()}`),
+    ).toBeDefined();
   });
 
-  it('should find moderation logs from fresh heads when indexes lag', async () => {
+  it('should find moderation logs from the community index', async () => {
     const entry = moderationLogEntry();
 
-    await repository.save(entry);
-    heads.delete(`community-moderation-log-index:${communityId.valueOf()}`);
+    await repository.save(entry, await proofOf(entry));
+    await flushBackgroundTasks();
 
     const logs = await repository.findByCommunity(communityId, 10);
 
@@ -111,30 +106,34 @@ describe('OrbitDBCommunityModerationLogRepository', () => {
     ]);
   });
 
-  it('should not return deleted moderation logs from stale indexes', async () => {
+  it('should reject a mutation outranked by the stored one', async () => {
     const entry = moderationLogEntry();
-    const indexKey = `community-moderation-log-index:${communityId.valueOf()}`;
 
-    await repository.save(entry);
+    await repository.save(entry, await proofOf(entry, 2));
     await flushBackgroundTasks();
-    const staleIndex = heads.get(indexKey);
 
-    await repository.deleteByCommunity(communityId);
-
-    if (staleIndex) {
-      heads.set(indexKey, staleIndex);
-    }
-
-    const logs = await repository.findByCommunity(communityId, 10);
-
-    expect(logs).toEqual([]);
-    expect(
-      heads.get(`community-moderation-log:${entry.getId().valueOf()}`),
-    ).toEqual(expect.objectContaining({ deleted: true }));
+    await expect(
+      repository.save(entry, await proofOf(entry, 1)),
+    ).rejects.toThrow();
+    expect(moderationLogs).toHaveLength(1);
   });
 
+  function proofOf(entry: CommunityModerationLogEntry, sequence = 1) {
+    return signedMutation({
+      identityId: actorIdentityId.valueOf(),
+      kind: 'put',
+      payload: {
+        ...entry.toPrimitives(),
+        scopeType: 'community_moderation_log',
+      },
+      recordId: entry.getId().valueOf(),
+      sequence,
+      store: 'moderationLogs',
+    });
+  }
+
   function moderationLogEntry(): CommunityModerationLogEntry {
-    return CommunityModerationLogEntry.record(
+    return CommunityModerationLogEntry.create(
       communityId,
       actorIdentityId,
       CommunityModerationAction.CHANNEL_RENAMED,
@@ -142,6 +141,8 @@ describe('OrbitDBCommunityModerationLogRepository', () => {
         CommunityModerationTargetType.CHANNEL,
         communityId,
       ),
+      new CommunityModerationLogDetails({ name: 'general' }),
+      new Timestamp(1780000000000),
     );
   }
 });

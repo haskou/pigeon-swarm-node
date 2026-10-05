@@ -328,6 +328,15 @@ Signed public mutations (pins and reactions):
   favorites and saved packs are removed by signed tombstones. Their heads
   (`sticker-pack:<id>`, `sticker-user-library:<identityId>`) are index wrappers
   checked on admission; flat unsigned heads are no longer read.
+- `moderationLogs` documents are governed with `scopeType:
+  "community_moderation_log"`: author = `actorIdentityId` (the moderator), id =
+  first 24 hex of `sha256(JSON([communityId, actor, action, target.type,
+  target.id, createdAt]))`, immutable (tombstones are always rejected; the
+  unsigned per-community tombstones on community deletion are gone). Admission
+  checks the derived id and that the actor holds the permission for the action
+  in the current community (channels, roles, bans, invites, request decisions,
+  owner for profile updates, message author or manage messages for message
+  deletions). Heads are index wrappers under collection `moderationLogs`.
 - Every node verifies on write, on replicated read, on head hydration and on the
   persisted head cache: signature, scope binding, the device in the identity's
   current device authorization head, and the community permission (pin needs

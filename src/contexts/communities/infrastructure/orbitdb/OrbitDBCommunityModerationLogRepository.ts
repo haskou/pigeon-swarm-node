@@ -1,3 +1,5 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
@@ -17,68 +19,42 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
   ) {
     super();
     this.logIndex = new OrbitDBHeadIndex(this.registry, {
-      collectionName: 'logs',
+      collectionName: 'moderationLogs',
       documentFromRecord: (record) =>
         this.isDocument(record) ? record : undefined,
       recordId: (record) =>
         typeof record.id === 'string' ? record.id : undefined,
       shouldReplace: (current, candidate) =>
-        this.isNewerOrEqualDocument(current, candidate),
+        PublicMutationRecord.replaces(current, candidate) ?? true,
     });
-  }
-
-  private hasModerationIdentityFields(
-    document: Record<string, unknown>,
-  ): boolean {
-    return (
-      typeof document.id === 'string' &&
-      typeof document.action === 'string' &&
-      typeof document.actorIdentityId === 'string' &&
-      typeof document.communityId === 'string' &&
-      typeof document.createdAt === 'number'
-    );
-  }
-
-  private hasModerationPayloadFields(
-    document: Record<string, unknown>,
-  ): boolean {
-    return (
-      typeof document.details === 'object' &&
-      document.details !== null &&
-      typeof document.target === 'object' &&
-      document.target !== null
-    );
   }
 
   private isDocument(
     document: Record<string, unknown>,
   ): document is OrbitDBCommunityModerationLogDocument {
-    if (!this.isStoredDocument(document) || document.deleted === true) {
+    const isObject = (value: unknown): boolean =>
+      typeof value === 'object' && value !== null;
+
+    if (
+      document.scopeType !== 'community_moderation_log' ||
+      document.removed === true ||
+      ['action', 'actorIdentityId', 'communityId', 'id'].some(
+        (field) => typeof document[field] !== 'string',
+      ) ||
+      typeof document.createdAt !== 'number' ||
+      !isObject(document.details) ||
+      !isObject(document.target)
+    ) {
       return false;
     }
 
     try {
-      this.toDomain(document);
+      this.toDomain(document as OrbitDBCommunityModerationLogDocument);
 
       return true;
     } catch {
       return false;
     }
-  }
-
-  private isStoredDocument(
-    document: Record<string, unknown>,
-  ): document is OrbitDBCommunityModerationLogDocument {
-    return (
-      this.hasModerationIdentityFields(document) &&
-      this.hasModerationPayloadFields(document)
-    );
-  }
-
-  private toDocument(
-    entry: CommunityModerationLogEntry,
-  ): OrbitDBCommunityModerationLogDocument {
-    return entry.toPrimitives();
   }
 
   private toDomain(
@@ -94,94 +70,17 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
     return `community-moderation-log-index:${value}`;
   }
 
-  private logHeadKey(logId: string): string {
-    return `community-moderation-log:${logId}`;
-  }
-
-  private freshness(document: OrbitDBCommunityModerationLogDocument): number {
-    return document.deletedAt ?? document.createdAt;
-  }
-
-  private isNewerOrEqualDocument(
-    current: OrbitDBCommunityModerationLogDocument,
-    candidate: OrbitDBCommunityModerationLogDocument,
-  ): boolean {
-    const currentFreshness = this.freshness(current);
-    const candidateFreshness = this.freshness(candidate);
-
-    if (currentFreshness !== candidateFreshness) {
-      return currentFreshness <= candidateFreshness;
-    }
-
-    return current.deleted !== true && candidate.deleted === true;
-  }
-
-  private cachedLogDocuments(
-    communityId: CommunityId,
-  ): OrbitDBCommunityModerationLogDocument[] {
-    return this.registry
-      .findCachedHeadsByPrefix('community-moderation-log:')
-      .filter(
-        (document): document is OrbitDBCommunityModerationLogDocument =>
-          this.isDocument(document) &&
-          document.communityId === communityId.valueOf(),
-      );
-  }
-
-  private cachedStoredLogDocuments(
-    communityId: CommunityId,
-  ): OrbitDBCommunityModerationLogDocument[] {
-    return this.registry
-      .findCachedHeadsByPrefix('community-moderation-log:')
-      .filter(
-        (document): document is OrbitDBCommunityModerationLogDocument =>
-          this.isStoredDocument(document) &&
-          document.communityId === communityId.valueOf(),
-      );
-  }
-
-  private async putIndex(
-    document: OrbitDBCommunityModerationLogDocument,
-  ): Promise<void> {
-    const key = this.communityIndexHeadKey(document.communityId);
-    const logs = this.logIndex
-      .deduplicate([...((await this.logIndex.find(key)) ?? []), document])
-      .filter(
-        (candidate) =>
-          this.isStoredDocument(candidate) &&
-          candidate.communityId === document.communityId,
-      );
-
-    await this.logIndex.putDocuments(
-      key,
-      {
-        communityId: document.communityId,
-        id: key,
-      },
-      logs,
-      { replace: true },
-    );
-  }
-
   public async findByCommunity(
     communityId: CommunityId,
     limit: number,
     beforeLogId?: CommunityModerationLogId,
   ): Promise<CommunityModerationLogEntry[]> {
     return this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      const indexedDocuments =
+      const typedDocuments = (
         (await this.logIndex.find(this.communityIndexHeadKey(communityId))) ??
-        [];
-      const typedDocuments = this.logIndex
-        .deduplicate([
-          ...indexedDocuments,
-          ...this.cachedStoredLogDocuments(communityId),
-        ])
-        .filter(
-          (document): document is OrbitDBCommunityModerationLogDocument =>
-            this.isDocument(document) &&
-            document.communityId === communityId.valueOf(),
-        )
+        []
+      )
+        .filter((document) => document.communityId === communityId.valueOf())
         .sort((left, right) => {
           if (left.createdAt === right.createdAt) {
             return right.id.localeCompare(left.id);
@@ -209,51 +108,37 @@ export default class OrbitDBCommunityModerationLogRepository extends CommunityMo
     });
   }
 
-  public async deleteByCommunity(communityId: CommunityId): Promise<void> {
-    await this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      const documents = this.logIndex.deduplicate([
-        ...((await this.logIndex.find(
-          this.communityIndexHeadKey(communityId),
-        )) ?? []),
-        ...this.cachedLogDocuments(communityId),
-      ]);
+  public async save(
+    entry: CommunityModerationLogEntry,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    const payload = {
+      ...entry.toPrimitives(),
+      scopeType: 'community_moderation_log',
+    };
+    const document = PublicMutationRecord.withProof(payload, proof);
+    const key = this.communityIndexHeadKey(payload.communityId);
 
-      await Promise.all(
-        documents
-          .filter(
-            (document): document is OrbitDBCommunityModerationLogDocument =>
-              this.isDocument(document) &&
-              document.communityId === communityId.valueOf(),
-          )
-          .map(async (document) => {
-            const tombstone = {
-              ...document,
-              deleted: true,
-              deletedAt: Date.now(),
-            };
-
-            await this.registry.putDocument('moderationLogs', tombstone);
-            await this.registry.putHeadExactly(this.logHeadKey(document.id), {
-              ...tombstone,
-            });
-            await this.putIndex(tombstone);
-          }),
-      );
-    });
-  }
-
-  public async save(entry: CommunityModerationLogEntry): Promise<void> {
-    const document = this.toDocument(entry);
     await this.publicStorageGuard.runWhilePublic(
-      new CommunityId(document.communityId),
+      new CommunityId(payload.communityId),
       async () => {
+        PublicMutationRecord.assertNotStale(
+          (await this.logIndex.findRecords(key)).filter(
+            (stored) => stored.id === payload.id,
+          ),
+          document,
+        );
         await this.registry.putDocument('moderationLogs', document);
-        await this.registry.putHeadExactly(this.logHeadKey(document.id), {
-          ...document,
-        });
-        this.publicStorageGuard.runInBackgroundWhilePublic(
-          new CommunityId(document.communityId),
-          () => this.putIndex(document),
+        await this.logIndex.putRecord(
+          key,
+          { communityId: payload.communityId, id: key },
+          document,
+          [],
+          {
+            recordFilter: (record) =>
+              record.communityId === payload.communityId,
+            replace: true,
+          },
         );
       },
     );

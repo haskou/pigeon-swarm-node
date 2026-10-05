@@ -40,16 +40,8 @@ export default class CommunityChannelMessageDeleter {
       message.proof,
     );
 
-    await this.messageRepository.delete(
-      message.communityId,
-      message.channelId,
-      message.targetMessageId,
-      targetMessage.getAuthorIdentityId(),
-      message.proof,
-    );
-    await this.eventPublisher.publish(community.pullDomainEvents());
     await this.moderationLogRepository.save(
-      CommunityModerationLogEntry.record(
+      CommunityModerationLogEntry.create(
         message.communityId,
         message.actorIdentityId,
         CommunityModerationAction.MESSAGE_DELETED,
@@ -61,7 +53,17 @@ export default class CommunityChannelMessageDeleter {
           channelId: message.channelId.valueOf(),
           targetMessageAuthorId: targetMessage.getAuthorIdentityId().valueOf(),
         }),
+        message.moderationLog.createdAt,
       ),
+      message.moderationLog.proof,
     );
+    await this.messageRepository.delete(
+      message.communityId,
+      message.channelId,
+      message.targetMessageId,
+      targetMessage.getAuthorIdentityId(),
+      message.proof,
+    );
+    await this.eventPublisher.publish(community.pullDomainEvents());
   }
 }

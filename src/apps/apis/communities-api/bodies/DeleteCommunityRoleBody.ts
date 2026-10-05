@@ -1,16 +1,9 @@
 import { Type } from 'class-transformer';
-import { IsOptional, IsString, ValidateNested } from 'class-validator';
+import { ValidateNested } from 'class-validator';
 
 import { CommunityModerationLogBody } from './CommunityModerationLogBody';
 
-export class PostCommunityBanBody {
-  @IsString()
-  public readonly identityId: string;
-
-  @IsOptional()
-  @IsString()
-  public readonly reason?: string;
-
+export class DeleteCommunityRoleBody {
   @Type(() => CommunityModerationLogBody)
   @ValidateNested()
   public readonly moderationLog: CommunityModerationLogBody;

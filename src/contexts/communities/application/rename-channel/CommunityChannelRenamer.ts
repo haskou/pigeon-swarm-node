@@ -27,8 +27,6 @@ export default class CommunityChannelRenamer {
       message.channelId,
       message.name,
     );
-    await this.communityRepository.save(community);
-    await this.eventPublisher.publish(community.pullDomainEvents());
     await this.moderationLogRecorder.record(
       community,
       message.actorIdentityId,
@@ -37,8 +35,11 @@ export default class CommunityChannelRenamer {
         CommunityModerationTargetType.CHANNEL,
         message.channelId,
       ),
+      message.moderationLog,
       { name: message.name.valueOf() },
     );
+    await this.communityRepository.save(community);
+    await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;
   }

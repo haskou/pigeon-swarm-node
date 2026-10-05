@@ -36,6 +36,7 @@ export class PutCommunityMemberRolesRoute extends CommunityRouteSupport {
         actorIdentityId.valueOf(),
         identityId,
         body.roleIds,
+        body.moderationLog,
       ),
     );
 
