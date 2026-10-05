@@ -1,4 +1,14 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+/**
+ * Serializes the storage work of a scope (a community). The lock is
+ * re-entrant for the async call chain that holds it: public mutation
+ * policies run while a repository holds the scope and read other
+ * repositories of the same scope, which take the same lock again.
+ */
 export default class PrivateAuthorizationStorageCoordinator {
+  private readonly held = new AsyncLocalStorage<ReadonlySet<string>>();
+
   private readonly queues = new Map<string, Promise<void>>();
 
   public exclusivelyAll<T>(
@@ -20,6 +30,10 @@ export default class PrivateAuthorizationStorageCoordinator {
     scopeId: string,
     action: () => Promise<T>,
   ): Promise<T> {
+    const held = this.held.getStore();
+
+    if (held?.has(scopeId)) return action();
+
     const previous = this.queues.get(scopeId) ?? Promise.resolve();
     let release!: () => void;
     const gate = new Promise<void>((resolve) => {
@@ -30,7 +44,7 @@ export default class PrivateAuthorizationStorageCoordinator {
     await previous;
 
     try {
-      return await action();
+      return await this.held.run(new Set([...(held ?? []), scopeId]), action);
     } finally {
       release();
 

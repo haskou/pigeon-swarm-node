@@ -1,15 +1,21 @@
-import { Timestamp } from '@haskou/value-objects';
-import { signedMutation } from '../../../public-mutations/support/signedMutation';
-import { CommunityInviteNonce } from '@app/contexts/communities/domain/value-objects/CommunityInviteNonce';
 import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
+import { CommunityInviteNonce } from '@app/contexts/communities/domain/value-objects/CommunityInviteNonce';
 import OrbitDBCommunityInviteMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityInviteMapper';
 import OrbitDBCommunityInviteRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInviteRepository';
+import CommunityInviteUseMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
+import { PublicMutationGate } from '@app/contexts/public-mutations/infrastructure/PublicMutationGate';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
+
+import { signedMutation } from '../../../public-mutations/support/signedMutation';
 
 const publicStorageGuard = () =>
   new PrivateCommunityPublicStorageGuard(
@@ -108,5 +114,85 @@ describe('OrbitDBCommunityInviteRepository', () => {
     expect(found?.toPrimitives()).toEqual(invite.toPrimitives());
     expect(before.valueOf()).toBe(0);
     expect((await repository.countUses(invite)).valueOf()).toBe(2);
+  });
+
+  it('should admit an invite use through the gate without waiting for its own community lock', async () => {
+    const createdAt = new Timestamp(1780000000000);
+    const invite = CommunityInvite.create(
+      communityId,
+      creatorIdentityId,
+      new CommunityInviteNonce('nonce-0123456789abcdef'),
+      createdAt,
+      undefined,
+      new CommunityInviteMaxUses(2),
+    );
+    const token = invite.getToken().valueOf();
+    const requestMembership = jest.fn();
+
+    await repository.save(
+      invite,
+      await signedMutation({
+        identityId: creatorIdentityId.valueOf(),
+        kind: 'put',
+        recordId: token,
+        sequence: 1,
+        store: 'requests',
+      }),
+    );
+    registry.useMutationGate(
+      new PublicMutationGate(
+        new PublicMutationVerifier({ isAuthorized: async () => true }),
+        [
+          new CommunityInviteUseMutationPolicy(
+            {
+              findById: async () => ({ requestMembership }),
+            } as never,
+            repository,
+          ),
+        ],
+      ),
+    );
+    const payload = {
+      communityId: communityId.valueOf(),
+      id: `invite-use:${token}:${otherIdentityId.valueOf()}`,
+      identityId: otherIdentityId.valueOf(),
+      scopeType: 'community_invite_use',
+      token,
+      usedAt: createdAt.valueOf(),
+    };
+    const device = await KeyPair.generate();
+    const body = {
+      author: {
+        deviceCredential: device.toPrimitives().publicKey,
+        identityId: otherIdentityId.valueOf(),
+      },
+      kind: 'put',
+      operationId: 'operation-1'.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor: null as string | null,
+      recordId: payload.id,
+      sequence: 0,
+      store: 'requests',
+      version: 1,
+    } as const;
+
+    await expect(
+      Promise.race([
+        repository
+          .recordUse(
+            invite,
+            otherIdentityId,
+            createdAt,
+            PublicMutationProof.signed(
+              body,
+              device.sign(PublicMutationProof.signingContentOf(body)),
+            ),
+          )
+          .then(() => 'recorded'),
+        new Promise((resolve) => setTimeout(() => resolve('deadlock'), 3000)),
+      ]),
+    ).resolves.toBe('recorded');
+    expect(requestMembership).toHaveBeenCalledTimes(1);
+    expect((await repository.countUses(invite)).valueOf()).toBe(1);
   });
 });
