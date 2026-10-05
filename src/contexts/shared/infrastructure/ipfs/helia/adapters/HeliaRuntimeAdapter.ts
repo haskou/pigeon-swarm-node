@@ -32,6 +32,8 @@ import type { HeliaLibp2pConfig } from './types/HeliaLibp2pConfig';
 import type { HeliaUnixfsClient } from './types/HeliaUnixfsClient';
 import type { Libp2pDefaults } from './types/Libp2pDefaults';
 
+import { withSingleFlightGets } from '../SingleFlightBlocks';
+
 export type { DatastoreKeyLike } from './types/DatastoreKeyLike';
 export type { HeliaInstance } from './types/HeliaInstance';
 export type { HeliaJSONClient } from './types/HeliaJSONClient';
@@ -630,10 +632,16 @@ export class HeliaRuntimeAdapter {
       throw new Error('Helia requires a libp2p configuration.');
     }
 
-    return (await heliaLibp2pModule.withLibp2p(
+    const heliaWithLibp2p = (await heliaLibp2pModule.withLibp2p(
       helia,
       libp2p as unknown as Parameters<typeof heliaLibp2pModule.withLibp2p>[1],
     )) as HeliaInstance;
+
+    heliaWithLibp2p.blockstore = withSingleFlightGets(
+      heliaWithLibp2p.blockstore,
+    );
+
+    return heliaWithLibp2p;
   }
 
   public async withBootstrapRelays(
