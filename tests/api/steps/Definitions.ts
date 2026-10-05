@@ -5,7 +5,10 @@ import PigeonApplication from '@app/apps/PigeonApplication';
 import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import CallParticipantLeaseExpirationRegistrar from '@app/contexts/calls/application/expire-participant-leases/CallParticipantLeaseExpirationRegistrar';
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
+import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
+import { CommunityModerationLogId } from '@app/contexts/communities/domain/value-objects/CommunityModerationLogId';
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
@@ -73,6 +76,7 @@ export default class Definitions {
   private binaryBody: Buffer | undefined;
   private readonly notificationSettingsSequences = new Map<string, number>();
   private readonly communityRecordSequences = new Map<string, number>();
+  private communityChannelType: 'text' | 'voice' = 'text';
   private communityMembershipRequest: Record<string, unknown> | undefined;
   private readonly stickerMutationSequences = new Map<string, number>();
   private readonly stickerPackDocuments = new Map<
@@ -332,6 +336,7 @@ export default class Definitions {
     payload: Record<string, unknown>,
     keyPair: KeyPair,
     sequence?: number,
+    store = 'requests',
   ): Record<string, unknown> {
     const recordId = String(payload.id);
     const next = sequence ?? this.communityRecordSequences.get(recordId) ?? 0;
@@ -348,7 +353,7 @@ export default class Definitions {
         next === 0 ? null : PublicMutationProof.digestOf({ previous: next }),
       recordId,
       sequence: next,
-      store: 'requests',
+      store,
       version: 1,
     } as const;
 
@@ -427,6 +432,254 @@ export default class Definitions {
     );
   }
 
+  private communityModerationLogFor(
+    method: string,
+    path: string,
+    body: Record<string, any>,
+    actorIdentityId: string,
+    createdAt: number,
+  ):
+    | {
+        action: string;
+        details: Record<string, unknown>;
+        target: { id: string; type: string };
+      }
+    | undefined {
+    const communityId = String(this.communityId);
+    const derivedChannelId = CommunityChannelId.derive(
+      communityId,
+      actorIdentityId,
+      createdAt,
+    ).valueOf();
+    const derivedRoleId = CommunityRoleId.derive(
+      communityId,
+      actorIdentityId,
+      createdAt,
+    ).valueOf();
+    const channel = (id: string) => ({ id, type: 'channel' });
+    const role = (id: string) => ({ id, type: 'role' });
+    const member = (id: string) => ({ id, type: 'member' });
+    const route = (pattern: RegExp) => pattern.exec(path.split('?')[0]);
+
+    if (method === 'POST' && route(/^\/communities\/[^/]+\/channels\/(text|voice)$/)) {
+      const type = route(/\/channels\/(text|voice)$/)![1];
+
+      return {
+        action: 'channel_created',
+        details: { name: body.name, type },
+        target: channel(derivedChannelId),
+      };
+    }
+
+    if (method === 'PATCH' && route(/^\/communities\/[^/]+\/channels\/[^/]+$/)) {
+      return {
+        action: 'channel_renamed',
+        details: { name: body.name },
+        target: channel(String(this.communityChannelId)),
+      };
+    }
+
+    if (method === 'DELETE' && route(/^\/communities\/[^/]+\/channels\/[^/]+$/)) {
+      return {
+        action: 'channel_deleted',
+        details: { type: this.communityChannelType },
+        target: channel(String(this.communityChannelId)),
+      };
+    }
+
+    if (method === 'PATCH' && route(/\/channels\/[^/]+\/permissions$/)) {
+      return {
+        action: 'channel_permissions_updated',
+        details: { visibleRoleIds: body.visibleRoleIds },
+        target: channel(String(this.communityChannelId)),
+      };
+    }
+
+    if (method === 'POST' && route(/^\/communities\/[^/]+\/roles$/)) {
+      return {
+        action: 'role_created',
+        details: { name: body.name, permissions: body.permissions },
+        target: role(derivedRoleId),
+      };
+    }
+
+    if (method === 'PATCH' && route(/^\/communities\/[^/]+\/roles\/[^/]+$/)) {
+      return {
+        action: 'role_updated',
+        details: { name: body.name, permissions: body.permissions },
+        target: role(String(this.communityRoleId)),
+      };
+    }
+
+    if (method === 'DELETE' && route(/^\/communities\/[^/]+\/roles\/[^/]+$/)) {
+      return {
+        action: 'role_deleted',
+        details: {},
+        target: role(String(this.communityRoleId)),
+      };
+    }
+
+    const memberRoles = route(/^\/communities\/[^/]+\/members\/([^/]+)\/roles$/);
+
+    if (method === 'PUT' && memberRoles) {
+      return {
+        action: 'member_roles_updated',
+        details: { roleIds: body.roleIds },
+        target: member(decodeURIComponent(memberRoles[1])),
+      };
+    }
+
+    if (method === 'POST' && route(/^\/communities\/[^/]+\/bans$/)) {
+      return {
+        action: 'member_banned',
+        details: { reason: body.reason },
+        target: member(body.identityId),
+      };
+    }
+
+    const unban = route(/^\/communities\/[^/]+\/bans\/([^/]+)$/);
+
+    if (method === 'DELETE' && unban) {
+      return {
+        action: 'member_unbanned',
+        details: {},
+        target: member(decodeURIComponent(unban[1])),
+      };
+    }
+
+    if (method === 'POST' && route(/^\/communities\/[^/]+\/invites$/)) {
+      return {
+        action: 'invite_link_created',
+        details: {
+          encryptedCommunityKeyStored: Boolean(body.encryptedCommunityKey),
+          expiresAt: body.expiresAt,
+          maxUses: body.maxUses,
+        },
+        target: {
+          id: CommunityInviteToken.derive(
+            communityId,
+            actorIdentityId,
+            body.nonce,
+          ).valueOf(),
+          type: 'invite',
+        },
+      };
+    }
+
+    if (method === 'POST' && route(/^\/communities\/[^/]+\/members$/)) {
+      return {
+        action: 'invitation_created',
+        details: { identityId: body.identityId },
+        target: {
+          id: CommunityRequestId.derive(
+            communityId,
+            'invitation',
+            actorIdentityId,
+            body.identityId,
+            body.createdAt,
+          ).valueOf(),
+          type: 'membership_request',
+        },
+      };
+    }
+
+    if (method === 'PATCH' && route(/^\/communities\/membership-requests\/[^/]+$/)) {
+      const request = this.communityMembershipRequest as Record<string, string>;
+
+      return {
+        action:
+          body.status === 'accepted'
+            ? 'membership_request_accepted'
+            : 'membership_request_declined',
+        details: { identityId: request.identityId, type: request.type },
+        target: { id: request.id, type: 'membership_request' },
+      };
+    }
+
+    if (method === 'PATCH' && route(/^\/communities\/[^/]+$/)) {
+      return {
+        action: 'community_updated',
+        details: {
+          autoJoinEnabled: body.autoJoinEnabled,
+          avatar: body.avatar,
+          banner: body.banner,
+          description: body.description,
+          discoverable: body.discoverable,
+          name: body.name,
+        },
+        target: { id: communityId, type: 'community' },
+      };
+    }
+
+    if (method === 'DELETE' && route(/\/channels\/[^/]+\/messages\/[^/]+$/)) {
+      return {
+        action: 'message_deleted',
+        details: {
+          channelId: this.communityChannelId,
+          targetMessageAuthorId: this.ownerIdentityId?.valueOf(),
+        },
+        target: { id: String(this.communityChannelMessageId), type: 'message' },
+      };
+    }
+
+    return undefined;
+  }
+
+  /** Adds the client-signed moderation log entry to a community mutation body. */
+  private attachCommunityModerationLog(
+    method: string,
+    path: string,
+    keyPair: KeyPair,
+  ): void {
+    const body = JSON.parse(this.body ?? '{}');
+    const actorIdentityId = keyPair.toPrimitives().publicKey;
+    const createdAt = Date.now();
+    const entry = this.communityModerationLogFor(
+      method,
+      path,
+      body,
+      actorIdentityId,
+      createdAt,
+    );
+
+    if (!entry || !this.communityId || body.moderationLog) {
+      return;
+    }
+
+    const payload = JSON.parse(
+      JSON.stringify({
+        action: entry.action,
+        actorIdentityId,
+        communityId: this.communityId,
+        createdAt,
+        details: entry.details,
+        id: CommunityModerationLogId.derive(
+          this.communityId,
+          actorIdentityId,
+          entry.action,
+          entry.target.type,
+          entry.target.id,
+          createdAt,
+        ).valueOf(),
+        scopeType: 'community_moderation_log',
+        target: entry.target,
+      }),
+    );
+
+    this.body = JSON.stringify({
+      ...body,
+      moderationLog: {
+        createdAt,
+        mutation: this.signCommunityRecord(
+          payload,
+          keyPair,
+          undefined,
+          'moderationLogs',
+        ),
+      },
+    });
+  }
+
   private async signCurrentRequest(
     method: string,
     path: string,
@@ -436,6 +689,8 @@ export default class Definitions {
   ): Promise<void> {
     const signerKeyPair = await this.resolveSignerKeyPair(keyPair);
     const signerIdentityId = this.resolveSignerIdentityId(identityId);
+
+    this.attachCommunityModerationLog(method, path, signerKeyPair);
     const verifier = new SignedHttpRequestVerifier();
     const signedRequestPayload = verifier.getCanonicalPayload(
       method,
@@ -1755,6 +2010,7 @@ export default class Definitions {
     }
 
     this.communityChannelId = this.response.data.id;
+    this.communityChannelType = 'text';
   }
 
   @given('I remember the current community voice channel')
@@ -1764,6 +2020,7 @@ export default class Definitions {
     }
 
     this.communityChannelId = this.response.data.id;
+    this.communityChannelType = 'voice';
   }
 
   @given('I set a community text channel rename body')

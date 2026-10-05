@@ -534,10 +534,8 @@ export class Community extends AggregateRoot {
         validator.assertCanManageRoles(actor);
         break;
       case CommunityModerationAction.MEMBERSHIP_REQUEST_ACCEPTED.valueOf():
-        validator.assertCanApproveMembers(actor);
-        break;
       case CommunityModerationAction.MEMBERSHIP_REQUEST_DECLINED.valueOf():
-        validator.assertCanRejectMembers(actor);
+        this.assertCanRecordMembershipRequestDecision(actor, action, details);
         break;
       case CommunityModerationAction.MESSAGE_DELETED.valueOf():
         validator.assertCanRecordMessageDeletion(
@@ -546,6 +544,38 @@ export class Community extends AggregateRoot {
         );
         break;
     }
+  }
+
+  /**
+   * Requests are decided by moderators; invitations by the invited identity,
+   * or (declines only) by whoever may create invitations.
+   */
+  private assertCanRecordMembershipRequestDecision(
+    actor: IdentityId,
+    action: CommunityModerationAction,
+    details: Record<string, unknown>,
+  ): void {
+    const validator = this.createAccessValidator();
+    const accepted =
+      action.valueOf() ===
+      CommunityModerationAction.MEMBERSHIP_REQUEST_ACCEPTED.valueOf();
+
+    if (details.type === 'request') {
+      if (accepted) {
+        validator.assertCanApproveMembers(actor);
+      } else {
+        validator.assertCanRejectMembers(actor);
+      }
+
+      return;
+    }
+
+    if (details.identityId === actor.valueOf()) {
+      return;
+    }
+
+    assert(!accepted, new CommunityRequestActorMismatchError());
+    validator.assertCanCreateInvite(actor);
   }
 
   public leave(member: IdentityId): void {
