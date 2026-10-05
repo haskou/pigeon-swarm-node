@@ -165,6 +165,8 @@ paths:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1membership-requests~1{requestId}'
   /communities/{communityId}:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}'
+  /communities/{communityId}/frontier:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1frontier'
   /communities/{communityId}/moderation-logs:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1moderation-logs'
   /communities/{communityId}/members:

@@ -1,10 +1,13 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { assert } from '@haskou/value-objects';
 
+import { Community } from '../../domain/Community';
 import { CommunityMembershipRequest } from '../../domain/entities/membership/CommunityMembershipRequest';
 import { CommunityRequestAutoAcceptanceRequiredError } from '../../domain/errors/CommunityRequestAutoAcceptanceRequiredError';
 import CommunityMembershipRequestRepository from '../../domain/repositories/CommunityMembershipRequestRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
+import { CommunityJoinMethod } from '../../domain/value-objects/CommunityJoinMethod';
+import { CommunityOperationAction } from '../../domain/value-objects/CommunityOperationAction';
 import CommunityFinder from '../find-community/CommunityFinder';
 import { CommunityMembershipRequestCreateMessage } from './messages/CommunityMembershipRequestCreateMessage';
 
@@ -17,20 +20,31 @@ export default class CommunityMembershipRequester {
   ) {}
 
   private async acceptAutomatically(
-    community: Awaited<ReturnType<CommunityFinder['find']>>,
+    community: Community,
     membershipRequest: CommunityMembershipRequest,
     message: CommunityMembershipRequestCreateMessage,
   ): Promise<void> {
     assert(
-      message.acceptedAt !== undefined && message.acceptedProof !== undefined,
+      message.acceptedAt !== undefined &&
+        message.acceptedProof !== undefined &&
+        message.operation !== undefined,
       new CommunityRequestAutoAcceptanceRequiredError(),
+    );
+    const operation = message.operation.applyTo(
+      community,
+      message.actorIdentityId,
+      CommunityOperationAction.MEMBER_JOINED,
+      {
+        identityId: message.actorIdentityId.valueOf(),
+        method: CommunityJoinMethod.AUTOMATIC.valueOf(),
+      },
     );
     community.acceptMembershipRequestAutomatically(
       membershipRequest,
       message.acceptedAt,
     );
-    await this.communityRepository.save(community);
     await this.requestRepository.save(membershipRequest, message.acceptedProof);
+    await this.communityRepository.save(operation, message.operation.proof);
     await this.eventPublisher.publish(community.pullDomainEvents());
     await this.eventPublisher.publish(membershipRequest.pullDomainEvents());
   }

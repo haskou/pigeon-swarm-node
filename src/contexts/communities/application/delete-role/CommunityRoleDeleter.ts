@@ -5,6 +5,7 @@ import { CommunityModerationTarget } from '../../domain/entities/moderation/Comm
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
+import { CommunityOperationAction } from '../../domain/value-objects/CommunityOperationAction';
 import CommunityFinder from '../find-community/CommunityFinder';
 import CommunityModerationLogRecorder from '../record-moderation-log/CommunityModerationLogRecorder';
 import { CommunityRoleDeleteMessage } from './messages/CommunityRoleDeleteMessage';
@@ -20,7 +21,12 @@ export default class CommunityRoleDeleter {
   public async delete(message: CommunityRoleDeleteMessage): Promise<Community> {
     const community = await this.communityFinder.findById(message.communityId);
 
-    community.deleteRole(message.actorIdentityId, message.roleId);
+    const operation = message.operation.applyTo(
+      community,
+      message.actorIdentityId,
+      CommunityOperationAction.ROLE_DELETED,
+      { roleId: message.roleId.valueOf() },
+    );
     await this.moderationLogRecorder.record(
       community,
       message.actorIdentityId,
@@ -31,7 +37,7 @@ export default class CommunityRoleDeleter {
       ),
       message.moderationLog,
     );
-    await this.communityRepository.save(community);
+    await this.communityRepository.save(operation, message.operation.proof);
     await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;

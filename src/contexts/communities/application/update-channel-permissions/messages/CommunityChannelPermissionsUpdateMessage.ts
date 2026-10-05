@@ -8,12 +8,17 @@ import {
   CommunityModerationLogMutation,
   CommunityModerationLogMutationPrimitives,
 } from '../../record-moderation-log/CommunityModerationLogMutation';
+import {
+  CommunityOperationMutation,
+  CommunityOperationMutationPrimitives,
+} from '../../record-operation/CommunityOperationMutation';
 
 export class CommunityChannelPermissionsUpdateMessage {
   public readonly actorIdentityId: IdentityId;
   public readonly channelId: CommunityChannelId;
   public readonly communityId: CommunityId;
   public readonly moderationLog: CommunityModerationLogMutation;
+  public readonly operation: CommunityOperationMutation;
   public readonly permissions: CommunityChannelPermissions;
   public readonly visibleRoleIds: string[];
 
@@ -23,11 +28,13 @@ export class CommunityChannelPermissionsUpdateMessage {
     actorIdentityId: string,
     visibleRoleIds: string[],
     moderationLog: CommunityModerationLogMutationPrimitives,
+    operation: CommunityOperationMutationPrimitives,
   ) {
     this.actorIdentityId = new IdentityId(actorIdentityId);
     this.channelId = new CommunityChannelId(channelId);
     this.communityId = new CommunityId(communityId);
     this.moderationLog = new CommunityModerationLogMutation(moderationLog);
+    this.operation = new CommunityOperationMutation(operation);
     this.permissions = new CommunityChannelPermissions(
       visibleRoleIds.map((roleId) => new CommunityRoleId(roleId)),
     );

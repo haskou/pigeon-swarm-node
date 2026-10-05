@@ -1,8 +1,8 @@
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import NodeNetworkSynchronizationMonitor from '@app/contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
-import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import Kernel from '@haskou/ddd-kernel';
 
 type FakeStore = {
@@ -24,7 +24,7 @@ function fakeStore(): FakeStore {
 function fakeStores(): OrbitDBPrivateNetworkStores {
   const stores = {
     calls: fakeStore(),
-    communities: fakeStore(),
+    communityOperations: fakeStore(),
     contentReplication: fakeStore(),
     conversations: fakeStore(),
     getSynchronizationStores: jest.fn().mockReturnValue([]),
@@ -167,7 +167,7 @@ describe('OrbitDBReplicatedStateRuntime', () => {
 
     for (const store of [
       stores.calls,
-      stores.communities,
+      stores.communityOperations,
       stores.conversations,
       stores.identities,
       stores.keychains,

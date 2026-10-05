@@ -37,6 +37,7 @@ export class PutCommunityMemberRolesRoute extends CommunityRouteSupport {
         identityId,
         body.roleIds,
         body.moderationLog,
+        body.operation,
       ),
     );
 

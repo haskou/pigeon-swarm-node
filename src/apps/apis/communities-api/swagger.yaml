@@ -26,7 +26,7 @@ paths:
       tags:
         - communities
       summary: Create a community
-      description: The authenticated identity becomes the owner and first member. visibility defaults to private and cannot be changed later. Private communities require encrypted channel message payloads. Public communities require plaintext channel message payloads so messages can be indexed and searched.
+      description: The authenticated identity becomes the owner and first member. visibility defaults to private and cannot be changed later. Private communities require encrypted channel message payloads. Public communities require plaintext channel message payloads so messages can be indexed and searched. The body carries the client-signed genesis operation (community_created, no parents); communityId is base64url(sha256(canonicalize({networkId, nonce, ownerIdentityId}))) and is never chosen by the node.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -161,6 +161,26 @@ paths:
                 $ref: '#/components/schemas/CommunityResource'
         '409':
           description: Authenticated identity is not the community owner.
+  /communities/{communityId}/frontier:
+    get:
+      tags:
+        - communities
+      summary: Get the operation frontier of a community
+      description: Returns the sorted digests of the signed community operations no other operation names as parent. A client signs its next community operation with them as parents. Any authenticated identity can read it because a non-member signs the member_joined operation of a join, an invite link or an accepted invitation. The digests are ids of immutable records already replicated to every peer of the network.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Frontier found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityFrontierResource'
+        '409':
+          description: The community is unknown to the node.
   /communities/{communityId}/moderation-logs:
     get:
       tags:
@@ -433,6 +453,12 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteCommunityMemberBody'
       responses:
         '200':
           description: Member removed from the community.
@@ -459,6 +485,12 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteCommunityMemberKickBody'
       responses:
         '200':
           description: Member removed from the community.
@@ -1494,13 +1526,15 @@ components:
             - public
     PatchCommunityMembershipRequestBody:
       type: object
-      description: The mutation signs the stored request document (same fields, new status and updatedAt) in store requests, recordId = request id, sequence above the previous one. Signer is the invitee (accept/decline an invitation), the creator (decline an invitation), a moderator or the owner (resolve a request) or the requester (decline own request).
+      description: The mutation signs the stored request document (same fields, new status and updatedAt) in store requests, recordId = request id, sequence above the previous one. Signer is the invitee (accept/decline an invitation), the creator (decline an invitation), a moderator or the owner (resolve a request) or the requester (decline own request). operation is required when status is accepted and signs member_joined with args identityId = request.identityId, method = approval for a request or invitation for an invitation, reference = requestId; it is not sent when declining.
       required:
         - status
         - updatedAt
         - mutation
         - moderationLog
       properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
         moderationLog:
           $ref: '#/components/schemas/CommunityModerationLogBody'
         updatedAt:
@@ -1852,10 +1886,17 @@ components:
     PostCommunityBody:
       type: object
       required:
+        - nonce
+        - operation
         - networkId
         - name
         - description
       properties:
+        nonce:
+          type: string
+          description: Random value chosen by the client; part of the genesis community id.
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
         networkId:
           type: string
         name:
@@ -1888,10 +1929,13 @@ components:
     PatchCommunityBody:
       type: object
       required:
+        - operation
         - name
         - description
         - moderationLog
       properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
         moderationLog:
           $ref: '#/components/schemas/CommunityModerationLogBody'
         name:
@@ -1961,11 +2005,14 @@ components:
           default: 1
     PostCommunityInviteAcceptBody:
       type: object
-      description: The mutation signs a community_invite_use document {communityId, id 'invite-use:<token>:<identityId>', identityId, token, usedAt} in store requests. Signer is the acceptor. Uses are counted as signed use records, so maxUses can be exceeded under network partitions.
+      description: The mutation signs a community_invite_use document {communityId, id 'invite-use:<token>:<identityId>', identityId, token, usedAt} in store requests. Signer is the acceptor. Uses are counted as signed use records, so maxUses can be exceeded under network partitions. operation signs member_joined with args identityId = acceptor, method = invite_link, reference = inviteToken; it is only admitted by a node that also holds the signed invite and the use record.
       required:
+        - operation
         - usedAt
         - mutation
       properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
         usedAt:
           type: integer
           minimum: 0
@@ -1973,11 +2020,13 @@ components:
           $ref: '#/components/schemas/SignedPublicMutation'
     PostCommunityJoinRequestBody:
       type: object
-      description: The mutation signs a community_membership_request document of type request (creator = identity = requester, status pending, updatedAt = createdAt). For autoJoinEnabled communities acceptedAt and acceptedMutation are required; acceptedMutation signs the same document with status accepted, updatedAt = acceptedAt and sequence + 1, signed by the requester.
+      description: The mutation signs a community_membership_request document of type request (creator = identity = requester, status pending, updatedAt = createdAt). For autoJoinEnabled communities acceptedAt, acceptedMutation and operation are required; acceptedMutation signs the same document with status accepted, updatedAt = acceptedAt and sequence + 1, signed by the requester, and operation signs member_joined with args identityId = requester, method = automatic and no reference.
       required:
         - createdAt
         - mutation
       properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
         createdAt:
           type: integer
           minimum: 0
@@ -2013,27 +2062,82 @@ components:
     DeleteCommunityBanBody:
       type: object
       required:
+        - operation
         - moderationLog
       properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
         moderationLog:
           $ref: '#/components/schemas/CommunityModerationLogBody'
     DeleteCommunityRoleBody:
       type: object
       required:
+        - operation
         - moderationLog
       properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
         moderationLog:
           $ref: '#/components/schemas/CommunityModerationLogBody'
     DeleteCommunityChannelBody:
       type: object
       required:
+        - operation
         - moderationLog
       properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
         moderationLog:
           $ref: '#/components/schemas/CommunityModerationLogBody'
+    DeleteCommunityMemberBody:
+      type: object
+      description: Leaving signs member_left with args identityId = the authenticated identity.
+      required:
+        - operation
+      properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
+    DeleteCommunityMemberKickBody:
+      type: object
+      description: Kicking signs member_kicked with args identityId = the target identity from the path.
+      required:
+        - operation
+      properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
+    CommunityOperationBody:
+      type: object
+      description: Client-signed community operation. The community is the deterministic fold of the operations its members signed, so peers cannot forge roles, bans, memberships, settings or deletion. The mutation signs {id 'community:<communityId>:op:<digest>', scopeType 'community_operation', communityId, networkId, authorIdentityId, action, args, parents, createdAt} in store communityOperations, kind put, sequence 0, predecessor null, signer = the authenticated identity. digest is base64url(sha256(canonicalize(payload without id))). authorIdentityId and args.identityId are the base64 public key without PEM headers. The node rebuilds the payload from the path, the actor, the endpoint action, the args derived from the other body fields, createdAt and parents, so the signature only verifies if the client signed exactly that. parents are the sorted frontier read from GET /communities/{communityId} immediately before signing (empty for the genesis). An operation whose author lacks the permission in the history named by parents, or that names an unknown parent, is rejected.
+      required:
+        - createdAt
+        - parents
+        - mutation
+      properties:
+        createdAt:
+          type: integer
+          minimum: 0
+          description: Also feeds the derived channel and role ids.
+        parents:
+          type: array
+          maxItems: 64
+          items:
+            type: string
+            description: Operation digest (43-char base64url) from the community frontier.
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    CommunityFrontierResource:
+      type: object
+      required:
+        - frontier
+      properties:
+        frontier:
+          type: array
+          description: Sorted digests of the operations no other operation names as parent. Use them as parents of the next signed operation.
+          items:
+            type: string
     CommunityModerationLogBody:
       type: object
-      description: Client-signed moderation log entry. The mutation signs {action, actorIdentityId, communityId, createdAt, details, id, scopeType 'community_moderation_log', target {id, type}} in store moderationLogs, recordId = id, sequence 0, signer = the acting moderator. id is the first 24 hex chars of sha256(JSON.stringify([communityId, actorIdentityId, action, target.type, target.id, createdAt])). Channel and role creation use createdAt as the input of the derived channel/role id.
+      description: Client-signed moderation log entry, kept as the audit trail beside the signed community operation (separate signature, separate store). The mutation signs {action, actorIdentityId, communityId, createdAt, details, id, scopeType 'community_moderation_log', target {id, type}} in store moderationLogs, recordId = id, sequence 0, signer = the acting moderator. id is the first 24 hex chars of sha256(JSON.stringify([communityId, actorIdentityId, action, target.type, target.id, createdAt])). For channel and role creation target.id is the channel/role id derived from the operation createdAt, not from this createdAt.
       required:
         - createdAt
         - mutation
@@ -2046,9 +2150,12 @@ components:
     PostCommunityBanBody:
       type: object
       required:
+        - operation
         - identityId
         - moderationLog
       properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
         moderationLog:
           $ref: '#/components/schemas/CommunityModerationLogBody'
         identityId:
@@ -2058,9 +2165,12 @@ components:
     PostCommunityTextChannelBody:
       type: object
       required:
+        - operation
         - name
         - moderationLog
       properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
         moderationLog:
           $ref: '#/components/schemas/CommunityModerationLogBody'
         name:
@@ -2069,9 +2179,12 @@ components:
     PostCommunityVoiceChannelBody:
       type: object
       required:
+        - operation
         - name
         - moderationLog
       properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
         moderationLog:
           $ref: '#/components/schemas/CommunityModerationLogBody'
         name:
@@ -2080,9 +2193,12 @@ components:
     PatchCommunityChannelBody:
       type: object
       required:
+        - operation
         - name
         - moderationLog
       properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
         moderationLog:
           $ref: '#/components/schemas/CommunityModerationLogBody'
         name:
@@ -2091,10 +2207,13 @@ components:
     CommunityRoleBody:
       type: object
       required:
+        - operation
         - name
         - permissions
         - moderationLog
       properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
         moderationLog:
           $ref: '#/components/schemas/CommunityModerationLogBody'
         name:
@@ -2107,9 +2226,12 @@ components:
     PutCommunityMemberRolesBody:
       type: object
       required:
+        - operation
         - roleIds
         - moderationLog
       properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
         moderationLog:
           $ref: '#/components/schemas/CommunityModerationLogBody'
         roleIds:
@@ -2120,9 +2242,12 @@ components:
     PatchCommunityChannelPermissionsBody:
       type: object
       required:
+        - operation
         - visibleRoleIds
         - moderationLog
       properties:
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
         moderationLog:
           $ref: '#/components/schemas/CommunityModerationLogBody'
         visibleRoleIds:
@@ -2225,7 +2350,7 @@ components:
             $ref: '#/components/schemas/CommunityMessageMentionResource'
     SignedPublicMutation:
       type: object
-      description: Client-signed intent for a replicated public record. The node holds no user private keys, so the UI signs it. payloadDigest commits to the record without its proof; author.deviceCredential must be an authorized device of author.identityId in its current device authorization head. The winner of concurrent mutations is the higher sequence, then the lower digest; no wall clock is used.
+      description: Client-signed intent for a replicated public record. The node holds no user private keys, so the UI signs it. payloadDigest commits to the record without its proof; author.deviceCredential must be an authorized device of author.identityId in its current device authorization head. The winner of concurrent mutations is the higher sequence, then the lower digest; no wall clock is used. Community operations (store communityOperations) are create-only (sequence 0, no predecessor) and never replace each other; the community state is their deterministic fold.
       required:
         - version
         - operationId

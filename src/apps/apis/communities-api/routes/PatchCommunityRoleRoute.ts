@@ -37,6 +37,7 @@ export class PatchCommunityRoleRoute extends CommunityRouteSupport {
         body.name,
         body.permissions,
         body.moderationLog,
+        body.operation,
       ),
     );
 

@@ -37,6 +37,7 @@ export class PatchCommunityChannelPermissionsRoute extends CommunityRouteSupport
         actorIdentityId.valueOf(),
         body.visibleRoleIds,
         body.moderationLog,
+        body.operation,
       ),
     );
 

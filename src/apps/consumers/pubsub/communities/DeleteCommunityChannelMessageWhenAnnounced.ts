@@ -1,4 +1,3 @@
-import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasDeletedEvent';
@@ -47,21 +46,12 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
     return pigeonEnvironment().SERVICE_NAME || 'pigeon-swarm';
   }
 
-  private async resolveCommunity(
-    snapshot: ReturnType<Community['toPrimitives']>,
-  ): Promise<Community> {
-    return (
-      (await this.communityRepository.findById(new CommunityId(snapshot.id))) ??
-      Community.fromPrimitives(snapshot)
-    );
-  }
-
   private async deleteStored(
     communityId: CommunityId,
     channelId: CommunityChannelId,
     targetMessage: CommunityChannelMessage,
     proof: PublicMutationProof,
-  ): Promise<boolean> {
+  ): Promise<void> {
     try {
       await this.messageRepository.delete(
         communityId,
@@ -75,13 +65,11 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
         error instanceof InvalidPublicMutationError ||
         error instanceof StalePublicMutationError
       ) {
-        return false;
+        return;
       }
 
       throw error;
     }
-
-    return true;
   }
 
   public async handler(event: DomainEvent): Promise<void> {
@@ -95,8 +83,14 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
       return;
     }
 
-    const canonical = await this.resolveCommunity(event.attributes.community);
-    const community = Community.fromPrimitives(event.attributes.community);
+    const community = await this.communityRepository.findById(
+      new CommunityId(event.attributes.community.id),
+    );
+
+    if (!community) {
+      return;
+    }
+
     const communityId = new CommunityId(
       String(event.attributes.communityId || event.aggregateId),
     );
@@ -129,17 +123,6 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
       proof,
     );
 
-    const deleted = await this.deleteStored(
-      communityId,
-      channelId,
-      targetMessage,
-      proof,
-    );
-
-    if (!deleted) {
-      return;
-    }
-
-    await this.communityRepository.save(canonical);
+    await this.deleteStored(communityId, channelId, targetMessage, proof);
   }
 }

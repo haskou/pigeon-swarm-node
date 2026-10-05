@@ -5,6 +5,7 @@ import { CommunityModerationTarget } from '../../domain/entities/moderation/Comm
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
+import { CommunityOperationAction } from '../../domain/value-objects/CommunityOperationAction';
 import CommunityFinder from '../find-community/CommunityFinder';
 import CommunityModerationLogRecorder from '../record-moderation-log/CommunityModerationLogRecorder';
 import { CommunityRoleUpdateMessage } from './messages/CommunityRoleUpdateMessage';
@@ -20,11 +21,15 @@ export default class CommunityRoleUpdater {
   public async update(message: CommunityRoleUpdateMessage): Promise<Community> {
     const community = await this.communityFinder.findById(message.communityId);
 
-    community.updateRole(
+    const operation = message.operation.applyTo(
+      community,
       message.actorIdentityId,
-      message.roleId,
-      message.name,
-      message.permissions,
+      CommunityOperationAction.ROLE_UPDATED,
+      {
+        name: message.name.valueOf(),
+        permissions: message.permissionValues,
+        roleId: message.roleId.valueOf(),
+      },
     );
     await this.moderationLogRecorder.record(
       community,
@@ -37,7 +42,7 @@ export default class CommunityRoleUpdater {
       message.moderationLog,
       { name: message.name.valueOf(), permissions: message.permissionValues },
     );
-    await this.communityRepository.save(community);
+    await this.communityRepository.save(operation, message.operation.proof);
     await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;

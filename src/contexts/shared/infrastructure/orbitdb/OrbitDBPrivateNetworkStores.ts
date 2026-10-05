@@ -23,7 +23,7 @@ export class OrbitDBPrivateNetworkStores {
   >();
 
   public readonly calls: OrbitDBDatabase;
-  public readonly communities: OrbitDBDatabase;
+  public readonly communityOperations: OrbitDBDatabase;
   public readonly conversations: OrbitDBDatabase;
   public readonly heads: OrbitDBDatabase;
   public readonly identities: OrbitDBDatabase;
@@ -155,10 +155,10 @@ export class OrbitDBPrivateNetworkStores {
         'documents/calls',
         AccessController,
       ),
-      communities: await this.openDocumentsStore(
+      communityOperations: await this.openDocumentsStore(
         orbitdb,
         networkId,
-        'documents/communities',
+        'documents/community-operations',
         AccessController,
       ),
       contentReplication: await this.openDocumentsStore(
@@ -252,7 +252,7 @@ export class OrbitDBPrivateNetworkStores {
 
   private constructor(stores: OrbitDBPrivateNetworkStoreSet) {
     this.calls = stores.calls;
-    this.communities = stores.communities;
+    this.communityOperations = stores.communityOperations;
     this.conversations = stores.conversations;
     this.heads = stores.heads;
     this.identities = stores.identities;
@@ -289,7 +289,7 @@ export class OrbitDBPrivateNetworkStores {
   public getAddresses(): OrbitDBPrivateNetworkStoreAddresses {
     return {
       calls: this.calls.address,
-      communities: this.communities.address,
+      communityOperations: this.communityOperations.address,
       contentReplication: this.contentReplication.address,
       conversations: this.conversations.address,
       heads: this.heads.address,
@@ -318,7 +318,7 @@ export class OrbitDBPrivateNetworkStores {
       name: OrbitDBPrivateNetworkStoreName;
     }> = [
       { database: this.calls, name: 'calls' },
-      { database: this.communities, name: 'communities' },
+      { database: this.communityOperations, name: 'communityOperations' },
       { database: this.contentReplication, name: 'contentReplication' },
       { database: this.conversations, name: 'conversations' },
       { database: this.heads, name: 'heads' },

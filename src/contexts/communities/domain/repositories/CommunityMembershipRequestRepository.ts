@@ -11,16 +11,16 @@ export default abstract class CommunityMembershipRequestRepository {
     identityId: IdentityId,
   ): Promise<CommunityMembershipRequest[]>;
 
+  public abstract findByCommunities(
+    communityIds: CommunityId[],
+  ): Promise<CommunityMembershipRequest[]>;
+
   public abstract findById(
     id: CommunityRequestId,
   ): Promise<CommunityMembershipRequest | undefined>;
 
   public abstract findByIdentity(
     identityId: IdentityId,
-  ): Promise<CommunityMembershipRequest[]>;
-
-  public abstract findByOwnedCommunities(
-    ownerIdentityId: IdentityId,
   ): Promise<CommunityMembershipRequest[]>;
 
   public abstract save(

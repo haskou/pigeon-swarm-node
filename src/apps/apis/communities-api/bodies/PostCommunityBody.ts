@@ -1,4 +1,13 @@
-import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
+
+import { CommunityOperationBody } from './CommunityOperationBody';
 
 export class PostCommunityBody {
   @IsOptional()
@@ -25,6 +34,13 @@ export class PostCommunityBody {
 
   @IsString()
   public readonly networkId: string;
+
+  @IsString()
+  public readonly nonce: string;
+
+  @Type(() => CommunityOperationBody)
+  @ValidateNested()
+  public readonly operation: CommunityOperationBody;
 
   @IsOptional()
   @IsIn(['private', 'public'])

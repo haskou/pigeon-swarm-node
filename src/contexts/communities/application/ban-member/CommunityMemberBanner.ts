@@ -5,6 +5,7 @@ import { CommunityModerationTarget } from '../../domain/entities/moderation/Comm
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
+import { CommunityOperationAction } from '../../domain/value-objects/CommunityOperationAction';
 import CommunityFinder from '../find-community/CommunityFinder';
 import CommunityModerationLogRecorder from '../record-moderation-log/CommunityModerationLogRecorder';
 import { CommunityMemberBanMessage } from './messages/CommunityMemberBanMessage';
@@ -20,7 +21,12 @@ export default class CommunityMemberBanner {
   public async ban(message: CommunityMemberBanMessage): Promise<Community> {
     const community = await this.communityFinder.findById(message.communityId);
 
-    community.banMember(message.actorIdentityId, message.targetIdentityId);
+    const operation = message.operation.applyTo(
+      community,
+      message.actorIdentityId,
+      CommunityOperationAction.MEMBER_BANNED,
+      { identityId: message.targetIdentityId.valueOf() },
+    );
     await this.moderationLogRecorder.record(
       community,
       message.actorIdentityId,
@@ -32,7 +38,7 @@ export default class CommunityMemberBanner {
       message.moderationLog,
       { reason: message.reason },
     );
-    await this.communityRepository.save(community);
+    await this.communityRepository.save(operation, message.operation.proof);
     await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;

@@ -24,6 +24,7 @@ import { GetCommunityChannelMessageSearchRoute } from '@app/apps/apis/communitie
 import { GetCommunityChannelMessagesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelMessagesRoute';
 import { GetCommunityChannelsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelsRoute';
 import { GetCommunityDiscoveryRoute } from '@app/apps/apis/communities-api/routes/GetCommunityDiscoveryRoute';
+import { GetCommunityFrontierRoute } from '@app/apps/apis/communities-api/routes/GetCommunityFrontierRoute';
 import { GetCommunityInviteRoute } from '@app/apps/apis/communities-api/routes/GetCommunityInviteRoute';
 import { GetCommunityMembershipRequestsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMembershipRequestsRoute';
 import { GetCommunityMembersRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMembersRoute';
@@ -217,6 +218,7 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PatchCommunityRequestRoute,
   PostCommunityRoute,
   GetCommunityRoute,
+  GetCommunityFrontierRoute,
   PatchCommunityRoute,
   GetCommunityMembersRoute,
   GetCommunityModerationLogsRoute,

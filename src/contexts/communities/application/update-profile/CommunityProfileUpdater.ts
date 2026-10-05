@@ -5,6 +5,7 @@ import { CommunityModerationTarget } from '../../domain/entities/moderation/Comm
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
+import { CommunityOperationAction } from '../../domain/value-objects/CommunityOperationAction';
 import CommunityFinder from '../find-community/CommunityFinder';
 import CommunityModerationLogRecorder from '../record-moderation-log/CommunityModerationLogRecorder';
 import { CommunityProfileUpdateMessage } from './messages/CommunityProfileUpdateMessage';
@@ -22,14 +23,26 @@ export default class CommunityProfileUpdater {
   ): Promise<Community> {
     const community = await this.communityFinder.findById(message.communityId);
 
-    community.updateProfile(
+    const operation = message.operation.applyTo(
+      community,
       message.actorIdentityId,
-      message.name,
-      message.description,
-      message.avatar,
-      message.banner,
-      message.discoverable,
-      message.autoJoinEnabled,
+      CommunityOperationAction.COMMUNITY_UPDATED,
+      {
+        ...(message.autoJoinEnabled === undefined
+          ? {}
+          : { autoJoinEnabled: message.autoJoinEnabled }),
+        ...(message.avatar === undefined
+          ? {}
+          : { avatar: message.avatar.valueOf() }),
+        ...(message.banner === undefined
+          ? {}
+          : { banner: message.banner.valueOf() }),
+        description: message.description.valueOf(),
+        ...(message.discoverable === undefined
+          ? {}
+          : { discoverable: message.discoverable }),
+        name: message.name.valueOf(),
+      },
     );
 
     await this.moderationLogRecorder.record(
@@ -50,7 +63,7 @@ export default class CommunityProfileUpdater {
         name: message.name.valueOf(),
       },
     );
-    await this.repository.save(community);
+    await this.repository.save(operation, message.operation.proof);
     await this.eventPublisher.publish(community.pullDomainEvents());
 
     return community;

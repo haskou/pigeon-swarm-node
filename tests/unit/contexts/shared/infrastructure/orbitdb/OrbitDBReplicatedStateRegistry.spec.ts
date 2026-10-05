@@ -1,7 +1,3 @@
-import OrbitDBCommunityReplicaMerger from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaMerger';
-import OrbitDBCommunityReplicaProjection from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaProjection';
-import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
-import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { OrbitDBEntry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBEntry';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import OrbitDBReplicatedHeadCache, {
@@ -173,7 +169,7 @@ function createStore(): Store {
 
 function createStores(): {
   calls: Store;
-  communities: Store;
+  communityOperations: Store;
   contentReplication: Store;
   identities: Store;
   keychains: Store;
@@ -183,7 +179,7 @@ function createStores(): {
   stores: OrbitDBPrivateNetworkStores;
 } {
   const calls = createStore();
-  const communities = createStore();
+  const communityOperations = createStore();
   const contentReplication = createStore();
   const identities = createStore();
   const keychains = createStore();
@@ -192,7 +188,7 @@ function createStores(): {
   const heads = createStore();
   const storeSet = {
     calls,
-    communities,
+    communityOperations,
     contentReplication,
     conversations: createStore(),
     heads,
@@ -206,7 +202,7 @@ function createStores(): {
 
   return {
     calls,
-    communities,
+    communityOperations,
     contentReplication,
     heads,
     identities,
@@ -218,169 +214,6 @@ function createStores(): {
 }
 
 describe('OrbitDBReplicatedStateRegistry', () => {
-  it('does not publish merged community heads after protection', async () => {
-    const registry = new OrbitDBReplicatedStateRegistry();
-    const network = createStores();
-    const guard = new PrivateCommunityPublicStorageGuard(
-      { findScope: jest.fn().mockResolvedValue({}) } as never,
-      new PrivateAuthorizationStorageCoordinator(),
-    );
-    new OrbitDBCommunityReplicaProjection(
-      registry,
-      new OrbitDBCommunityReplicaMerger(),
-      guard,
-    ).register();
-    await registry.register('network-1', network.stores);
-    const community = {
-      createdAt: 1,
-      description: 'private',
-      id: 'community-1',
-      memberIds: ['member'],
-      name: 'community',
-      networkId: 'network-1',
-      ownerIdentityId: 'owner',
-      textChannels: [] as unknown[],
-      updatedAt: 2,
-      visibility: 'private',
-    };
-    const key = 'community-member-index:member';
-    registry.cacheHeadLocally(key, {
-      communities: [community],
-      id: key,
-      memberId: 'member',
-      updatedAt: 2,
-    });
-    network.heads.put.mockClear();
-
-    network.heads.emitUpdate({
-      payload: {
-        key,
-        value: {
-          communities: [{ ...community, updatedAt: 1 }],
-          id: key,
-          memberId: 'member',
-          updatedAt: 1,
-        },
-      },
-    });
-    await flushPromises();
-    await flushPromises();
-
-    expect(network.heads.put).not.toHaveBeenCalled();
-  });
-
-  it('does not repair a community head whose key and document identity differ', async () => {
-    const registry = new OrbitDBReplicatedStateRegistry();
-    const network = createStores();
-    const findScope = jest.fn(async (communityId: { value: string }) =>
-      communityId.value === 'protected-community' ? {} : undefined,
-    );
-    new OrbitDBCommunityReplicaProjection(
-      registry,
-      new OrbitDBCommunityReplicaMerger(),
-      new PrivateCommunityPublicStorageGuard(
-        { findScope } as never,
-        new PrivateAuthorizationStorageCoordinator(),
-      ),
-    ).register();
-    await registry.register('network-1', network.stores);
-    const key = 'community:protected-community';
-    const community = {
-      createdAt: 1,
-      description: 'public',
-      id: 'public-community',
-      memberIds: ['member'],
-      name: 'community',
-      networkId: 'network-1',
-      ownerIdentityId: 'owner',
-      textChannels: [] as unknown[],
-      updatedAt: 2,
-      visibility: 'public',
-    };
-    network.heads.emitUpdate({ payload: { key, value: community } });
-    await flushPromises();
-    network.heads.put.mockClear();
-
-    network.heads.emitUpdate({
-      payload: { key, value: { ...community, updatedAt: 1 } },
-    });
-    await flushPromises();
-    await flushPromises();
-
-    expect(findScope).not.toHaveBeenCalledWith(
-      expect.objectContaining({ value: 'public-community' }),
-    );
-    expect(network.heads.put).not.toHaveBeenCalled();
-  });
-
-  it('never persists another private network community through a shared member index', async () => {
-    const registry = new OrbitDBReplicatedStateRegistry();
-    new OrbitDBCommunityReplicaProjection(
-      registry,
-      new OrbitDBCommunityReplicaMerger(),
-      new PrivateCommunityPublicStorageGuard(
-        { findScope: jest.fn().mockResolvedValue(undefined) } as never,
-        new PrivateAuthorizationStorageCoordinator(),
-      ),
-    ).register();
-    const first = createStores();
-    const second = createStores();
-    const key = 'community-member-index:member';
-    const merger = new OrbitDBCommunityReplicaMerger();
-    const community = (networkId: string) =>
-      merger.nextDocument(
-        {
-          createdAt: 1,
-          description: 'private',
-          id: `community-${networkId}`,
-          memberIds: ['member'],
-          name: networkId,
-          networkId,
-          ownerIdentityId: 'owner',
-          textChannels: [] as unknown[],
-          visibility: 'private',
-        } as never,
-        undefined,
-        undefined,
-        1,
-      );
-    const head = (networkId: string) => ({
-      communities: [community(networkId)],
-      id: key,
-      identityId: 'member',
-      memberId: 'member',
-      networkId,
-      updatedAt: 1,
-    });
-    first.heads.all.mockResolvedValue([{ key, value: head('first') }]);
-    second.heads.all.mockResolvedValue([{ key, value: head('second') }]);
-    await registry.register('first', first.stores);
-    await registry.register('second', second.stores);
-    await flushPromises();
-    await registry.putHead(
-      key,
-      { ...head('second'), updatedAt: 2 },
-      ['second'],
-      true,
-    );
-    const stored = second.heads.put.mock.calls.map(
-      ([, value]) => value as { communities: Array<{ networkId: string }> },
-    );
-    expect(stored.length).toBeGreaterThan(0);
-    for (const value of stored)
-      expect(value.communities.map((entry) => entry.networkId)).toEqual([
-        'second',
-      ]);
-    const local = registry.findCachedHead(key) as {
-      communities: Array<{ networkId: string }>;
-    };
-    expect(local.communities.map((entry) => entry.networkId).sort()).toEqual([
-      'first',
-      'second',
-    ]);
-    registry.clear();
-  });
-
   it('honors a registered merge decision even when its timestamp is older', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const { stores } = createStores();
@@ -551,7 +384,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     const registry = new OrbitDBReplicatedStateRegistry();
 
     await expect(
-      registry.putDocument('communities', { id: 'community-1' }),
+      registry.putDocument('communityOperations', { id: 'community-1' }),
     ).rejects.toMatchObject({
       code: 503020,
       httpCode: 503,
@@ -566,12 +399,12 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     await registry.register('network-1', firstNetwork.stores);
     await registry.register('network-2', secondNetwork.stores);
 
-    await registry.putDocument('communities', {
+    await registry.putDocument('communityOperations', {
       id: 'community-1',
       networkId: 'network-1',
     });
     await registry.putHead(
-      'community:community-1',
+      'community-operation-index:community-1',
       {
         id: 'community-1',
         networkId: 'network-1',
@@ -587,8 +420,8 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       id: 'local-notification',
     });
 
-    expect(firstNetwork.communities.put).toHaveBeenCalledTimes(1);
-    expect(secondNetwork.communities.put).not.toHaveBeenCalled();
+    expect(firstNetwork.communityOperations.put).toHaveBeenCalledTimes(1);
+    expect(secondNetwork.communityOperations.put).not.toHaveBeenCalled();
     expect(firstNetwork.messages.put).toHaveBeenCalledTimes(1);
     expect(secondNetwork.messages.put).not.toHaveBeenCalled();
     expect(firstNetwork.notifications.put).toHaveBeenCalledTimes(1);
@@ -603,18 +436,18 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
     await registry.register('network-1', firstNetwork.stores);
     await registry.register('network-2', secondNetwork.stores);
-    firstNetwork.communities.put.mockImplementationOnce(
+    firstNetwork.communityOperations.put.mockImplementationOnce(
       async () => delayedWrite.promise,
     );
 
-    const write = registry.putDocument('communities', {
+    const write = registry.putDocument('communityOperations', {
       id: 'community-1',
     });
 
     await flushPromises();
 
-    expect(firstNetwork.communities.put).toHaveBeenCalledTimes(1);
-    expect(secondNetwork.communities.put).toHaveBeenCalledTimes(1);
+    expect(firstNetwork.communityOperations.put).toHaveBeenCalledTimes(1);
+    expect(secondNetwork.communityOperations.put).toHaveBeenCalledTimes(1);
 
     delayedWrite.resolve('ok');
     await write;
@@ -626,13 +459,13 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     const delayedWrite = deferred<string>();
 
     await registry.register('network-1', firstNetwork.stores);
-    firstNetwork.communities.put.mockImplementationOnce(
+    firstNetwork.communityOperations.put.mockImplementationOnce(
       async () => delayedWrite.promise,
     );
 
     const result = await Promise.race([
       registry
-        .replicateDocumentInBackground('communities', {
+        .replicateDocumentInBackground('communityOperations', {
           id: 'community-1',
           networkId: 'network-1',
         })
@@ -641,7 +474,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     ]);
 
     expect(result).toBe('written');
-    expect(firstNetwork.communities.put).toHaveBeenCalledWith({
+    expect(firstNetwork.communityOperations.put).toHaveBeenCalledWith({
       id: 'community-1',
       networkId: 'network-1',
     });
@@ -969,15 +802,15 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     registry.register('network-2', secondNetwork.stores);
 
     await registry.putHead(
-      'community:community-1',
+      'community-operation-index:community-1',
       {
         id: 'community-1',
         networkId: 'network-2',
       },
       ['network-2'],
     );
-    firstNetwork.communities.query.mockClear();
-    secondNetwork.communities.query.mockClear();
+    firstNetwork.communityOperations.query.mockClear();
+    secondNetwork.communityOperations.query.mockClear();
 
     await registry.putDocument('messages', {
       communityId: 'community-1',
@@ -987,8 +820,8 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
     expect(firstNetwork.messages.put).not.toHaveBeenCalled();
     expect(secondNetwork.messages.put).toHaveBeenCalledTimes(1);
-    expect(firstNetwork.communities.query).not.toHaveBeenCalled();
-    expect(secondNetwork.communities.query).not.toHaveBeenCalled();
+    expect(firstNetwork.communityOperations.query).not.toHaveBeenCalled();
+    expect(secondNetwork.communityOperations.query).not.toHaveBeenCalled();
   });
 
   it('uses the recipient identity head when a notification related document is not cached', async () => {
@@ -1060,7 +893,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
     registry.register('network-1', firstNetwork.stores);
 
-    expect(firstNetwork.communities.put).not.toHaveBeenCalled();
+    expect(firstNetwork.communityOperations.put).not.toHaveBeenCalled();
     expect(firstNetwork.messages.put).not.toHaveBeenCalled();
   });
 
@@ -2143,7 +1976,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     await registry.register('network-1', firstNetwork.stores);
 
     expect(firstNetwork.calls.events.on).not.toHaveBeenCalled();
-    expect(firstNetwork.communities.events.on).not.toHaveBeenCalled();
+    expect(firstNetwork.communityOperations.events.on).not.toHaveBeenCalled();
 
     await registry.onDocumentUpdated('calls', jest.fn());
 
@@ -2156,7 +1989,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       'join',
       expect.any(Function),
     );
-    expect(firstNetwork.communities.events.on).not.toHaveBeenCalled();
+    expect(firstNetwork.communityOperations.events.on).not.toHaveBeenCalled();
   });
 
   it('projects documents received through OrbitDB updates', async () => {

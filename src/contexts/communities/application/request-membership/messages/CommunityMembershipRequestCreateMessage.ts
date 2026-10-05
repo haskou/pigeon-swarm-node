@@ -3,6 +3,10 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { Timestamp } from '@haskou/value-objects';
 
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
+import {
+  CommunityOperationMutation,
+  CommunityOperationMutationPrimitives,
+} from '../../record-operation/CommunityOperationMutation';
 
 export class CommunityMembershipRequestCreateMessage {
   public readonly acceptedAt?: Timestamp;
@@ -10,6 +14,7 @@ export class CommunityMembershipRequestCreateMessage {
   public readonly actorIdentityId: IdentityId;
   public readonly communityId: CommunityId;
   public readonly createdAt: Timestamp;
+  public readonly operation?: CommunityOperationMutation;
   public readonly proof: PublicMutationProof;
 
   constructor(
@@ -19,6 +24,7 @@ export class CommunityMembershipRequestCreateMessage {
     proof: unknown,
     acceptedAt?: number,
     acceptedProof?: unknown,
+    operation?: CommunityOperationMutationPrimitives,
   ) {
     this.acceptedAt =
       acceptedAt === undefined ? undefined : new Timestamp(acceptedAt);
@@ -29,6 +35,7 @@ export class CommunityMembershipRequestCreateMessage {
     this.actorIdentityId = new IdentityId(actorIdentityId);
     this.communityId = new CommunityId(communityId);
     this.createdAt = new Timestamp(createdAt);
+    this.operation = operation && new CommunityOperationMutation(operation);
     this.proof = PublicMutationProof.fromPrimitives(proof);
   }
 }

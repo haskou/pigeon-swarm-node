@@ -31,17 +31,16 @@ class FakeCommunityReactionRepository {
 }
 
 class FakeCommunityRepository {
-  public saved: Community[] = [];
+  public written: unknown[] = [];
 
-  constructor(private community: Community) {}
+  constructor(private readonly community: Community) {}
 
   public async findById(id: CommunityId): Promise<Community | undefined> {
     return this.community.isIdentifiedBy(id) ? this.community : undefined;
   }
 
-  public async save(community: Community): Promise<void> {
-    this.saved.push(community);
-    this.community = community;
+  public async save(operation: unknown): Promise<void> {
+    this.written.push(operation);
   }
 }
 
@@ -62,14 +61,12 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
 
   private reactionRepository = new FakeCommunityReactionRepository();
   private communityRepository?: FakeCommunityRepository;
-  private expectedCommunity?: PrimitiveOf<Community>;
 
   @before()
   public async reset(): Promise<void> {
     await this.resetConsumerTestContext();
     this.reactionRepository = new FakeCommunityReactionRepository();
     this.communityRepository = undefined;
-    this.expectedCommunity = undefined;
   }
 
   private communityPrimitives(): PrimitiveOf<Community> {
@@ -116,24 +113,20 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
     };
   }
 
-  private canonicalCommunityRepository(): FakeCommunityRepository {
+  private foldedCommunityRepository(): FakeCommunityRepository {
     const community = Community.fromPrimitives({
       ...this.communityPrimitives(),
       description: 'A newer description than the event snapshot',
       discoverable: false,
       name: 'Updated community profile',
     });
-    this.expectedCommunity = community.toPrimitives();
     this.communityRepository = new FakeCommunityRepository(community);
 
     return this.communityRepository;
   }
 
-  private assertCanonicalCommunityPreserved(): void {
-    expect(this.communityRepository?.saved).to.have.length(1);
-    expect(this.communityRepository?.saved[0].toPrimitives()).to.deep.equal(
-      this.expectedCommunity,
-    );
+  private assertCommunityNeverWritten(): void {
+    expect(this.communityRepository?.written).to.have.length(0);
   }
 
   private async mutationProof(): Promise<unknown> {
@@ -165,7 +158,7 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   public async addedConsumerHandlesAReactionAnnouncement(): Promise<void> {
     const consumer = new RegisterCommunityReactionWhenAdded(
       this.eventConsumer(),
-      this.canonicalCommunityRepository() as unknown as CommunityRepository,
+      this.foldedCommunityRepository() as unknown as CommunityRepository,
       new FakeCommunityMessageRepository() as unknown as CommunityChannelMessageRepository,
       this.reactionRepository as unknown as CommunityMessageReactionRepository,
     );
@@ -185,7 +178,7 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
   public async removedConsumerHandlesAReactionAnnouncement(): Promise<void> {
     const consumer = new RegisterCommunityReactionWhenRemoved(
       this.eventConsumer(),
-      this.canonicalCommunityRepository() as unknown as CommunityRepository,
+      this.foldedCommunityRepository() as unknown as CommunityRepository,
       new FakeCommunityMessageRepository() as unknown as CommunityChannelMessageRepository,
       this.reactionRepository as unknown as CommunityMessageReactionRepository,
     );
@@ -204,7 +197,7 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
     const reaction = this.reactionRepository.saved.at(-1);
 
     expect(reaction?.toPrimitives()).to.deep.equal(this.reactionAttributes());
-    this.assertCanonicalCommunityPreserved();
+    this.assertCommunityNeverWritten();
   }
 
   @then('the community message reaction repository should delete that reaction')
@@ -212,6 +205,6 @@ export default class CommunityPubSubConsumersDefinition extends PubSubConsumerTe
     const reaction = this.reactionRepository.deleted.at(-1);
 
     expect(reaction?.toPrimitives()).to.deep.equal(this.reactionAttributes());
-    this.assertCanonicalCommunityPreserved();
+    this.assertCommunityNeverWritten();
   }
 }

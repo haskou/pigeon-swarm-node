@@ -2,8 +2,16 @@ import CommunityLeaver from '@app/contexts/communities/application/leave-communi
 import { CommunityLeaveMessage } from '@app/contexts/communities/application/leave-community/messages/CommunityLeaveMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  Delete,
+  JsonController,
+  Param,
+  Req,
+  Res,
+} from 'routing-controllers';
 
+import { DeleteCommunityMemberBody } from '../bodies/DeleteCommunityMemberBody';
 import { CommunityViewModel } from '../view-model/CommunityViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
@@ -14,12 +22,17 @@ export class DeleteCommunityMemberRoute extends CommunityRouteSupport {
   @Delete('/:communityId/members/me')
   public async leave(
     @Param('communityId') communityId: string,
+    @Body() body: DeleteCommunityMemberBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
     const community = await this.leaver.leave(
-      new CommunityLeaveMessage(communityId, actorIdentityId.valueOf()),
+      new CommunityLeaveMessage(
+        communityId,
+        actorIdentityId.valueOf(),
+        body.operation,
+      ),
     );
 
     return response

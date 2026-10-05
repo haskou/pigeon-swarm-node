@@ -5,6 +5,7 @@ import { CommunityModerationTarget } from '../../domain/entities/moderation/Comm
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '../../domain/value-objects/CommunityModerationTargetType';
+import { CommunityOperationAction } from '../../domain/value-objects/CommunityOperationAction';
 import { CommunityRoleId } from '../../domain/value-objects/CommunityRoleId';
 import CommunityFinder from '../find-community/CommunityFinder';
 import CommunityModerationLogRecorder from '../record-moderation-log/CommunityModerationLogRecorder';
@@ -22,16 +23,22 @@ export default class CommunityRoleCreator {
     message: CommunityRoleCreateMessage,
   ): Promise<CommunityRole> {
     const community = await this.communityFinder.findById(message.communityId);
-    const role = community.addRole(
-      message.actorIdentityId,
-      message.name,
-      message.permissions,
-      CommunityRoleId.derive(
-        message.communityId.valueOf(),
-        message.actorIdentityId.valueOf(),
-        message.moderationLog.createdAt.valueOf(),
-      ),
+    const roleId = CommunityRoleId.derive(
+      message.communityId.valueOf(),
+      message.actorIdentityId.valueOf(),
+      message.operation.createdAt,
     );
+    const operation = message.operation.applyTo(
+      community,
+      message.actorIdentityId,
+      CommunityOperationAction.ROLE_CREATED,
+      {
+        name: message.name.valueOf(),
+        permissions: message.permissionValues,
+        roleId: roleId.valueOf(),
+      },
+    );
+    const role = community.getRole(roleId);
 
     await this.moderationLogRecorder.record(
       community,
@@ -44,7 +51,7 @@ export default class CommunityRoleCreator {
       message.moderationLog,
       { name: message.name.valueOf(), permissions: message.permissionValues },
     );
-    await this.communityRepository.save(community);
+    await this.communityRepository.save(operation, message.operation.proof);
     await this.eventPublisher.publish(community.pullDomainEvents());
 
     return role;

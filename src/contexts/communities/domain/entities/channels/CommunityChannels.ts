@@ -1,4 +1,4 @@
-import { assert } from '@haskou/value-objects';
+import { assert, Timestamp } from '@haskou/value-objects';
 
 import { CommunityChannelNotFoundError } from '../../errors/CommunityChannelNotFoundError';
 import { CommunityChannelId } from '../../value-objects/CommunityChannelId';
@@ -55,8 +55,9 @@ export class CommunityChannels {
   public addText(
     name: CommunityChannelName,
     id?: CommunityChannelId,
+    createdAt?: Timestamp,
   ): CommunityTextChannel {
-    const channel = CommunityTextChannel.create(name, id);
+    const channel = CommunityTextChannel.create(name, id, createdAt);
 
     this.textChannels.push(channel);
 
@@ -66,12 +67,21 @@ export class CommunityChannels {
   public addVoice(
     name: CommunityChannelName,
     id?: CommunityChannelId,
+    createdAt?: Timestamp,
   ): CommunityVoiceChannel {
-    const channel = CommunityVoiceChannel.create(name, id);
+    const channel = CommunityVoiceChannel.create(name, id, createdAt);
 
     this.voiceChannels.push(channel);
 
     return channel;
+  }
+
+  public getText(channelId: CommunityChannelId): CommunityTextChannel {
+    return this.findText(channelId);
+  }
+
+  public getVoice(channelId: CommunityChannelId): CommunityVoiceChannel {
+    return this.findVoice(channelId);
   }
 
   public hasText(channelId: CommunityChannelId): boolean {

@@ -14,6 +14,7 @@ import { generateKeyPairSync } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import WebSocket from 'ws';
 
+import { signCommunityOperation } from '../../support/signCommunityOperation';
 import {
   addPrivateNetwork,
   buildNodeRuntime,
@@ -245,6 +246,28 @@ async function main(): Promise<void> {
       ),
     );
     console.log('Fixture identities replicated');
+    const communityNonce = 'call-privacy-integration';
+    const communityId = CommunityId.derive(
+      NETWORK_ID,
+      identities[0].id,
+      communityNonce,
+    ).valueOf();
+    const genesis = signCommunityOperation({
+      action: 'community_created',
+      args: {
+        autoJoinEnabled: true,
+        description: 'Disposable integration fixture',
+        discoverable: true,
+        name: 'Call privacy integration',
+        nonce: communityNonce,
+        visibility: 'private',
+      },
+      communityId,
+      createdAt: Date.now(),
+      networkId: NETWORK_ID,
+      parents: [],
+      signer: identities[0],
+    });
     const community = await request<{ id: string }>(
       nodes[0],
       'POST',
@@ -255,9 +278,13 @@ async function main(): Promise<void> {
         discoverable: true,
         name: 'Call privacy integration',
         networkId: NETWORK_ID,
+        nonce: communityNonce,
+        operation: genesis.body,
+        visibility: 'private',
       },
       identities[0],
     );
+    assert.equal(community.id, communityId);
     const channelCreatedAt = Date.now();
     const channelEntry = CommunityModerationLogEntry.create(
       new CommunityId(community.id),
@@ -292,6 +319,23 @@ async function main(): Promise<void> {
       store: 'moderationLogs',
       version: 1,
     } as const;
+    const channelOperation = signCommunityOperation({
+      action: 'channel_created',
+      args: {
+        channelId: CommunityChannelId.derive(
+          community.id,
+          identities[0].id,
+          channelCreatedAt,
+        ).valueOf(),
+        name: 'voice',
+        type: 'voice',
+      },
+      communityId: community.id,
+      createdAt: channelCreatedAt,
+      networkId: NETWORK_ID,
+      parents: [genesis.operation.getHash()],
+      signer: identities[0],
+    });
     const channel = await request<{ id: string }>(
       nodes[0],
       'POST',
@@ -307,6 +351,7 @@ async function main(): Promise<void> {
           ).toPrimitives(),
         },
         name: 'voice',
+        operation: channelOperation.body,
       },
       identities[0],
     );
@@ -359,6 +404,23 @@ async function main(): Promise<void> {
     };
     await waitFor(async () => {
       try {
+        const replicated = await request<{ frontier: string[] }>(
+          nodes[1],
+          'GET',
+          `/communities/${community.id}/frontier`,
+          undefined,
+          identities[1],
+        );
+        const joinOperation = signCommunityOperation({
+          action: 'member_joined',
+          args: { identityId: requesterId, method: 'automatic' },
+          communityId: community.id,
+          createdAt: joinAcceptedAt,
+          networkId: NETWORK_ID,
+          parents: replicated.frontier,
+          signer: identities[1],
+        });
+
         await request(
           nodes[1],
           'POST',
@@ -371,6 +433,7 @@ async function main(): Promise<void> {
             ),
             createdAt: joinCreatedAt,
             mutation: signJoin(joinRecord, 0),
+            operation: joinOperation.body,
           },
           identities[1],
         );
@@ -550,11 +613,28 @@ async function main(): Promise<void> {
         identities[0],
       ),
     );
+    const beforeLeave = await request<{ frontier: string[] }>(
+      nodes[1],
+      'GET',
+      `/communities/${community.id}/frontier`,
+      undefined,
+      identities[1],
+    );
     await request(
       nodes[1],
       'DELETE',
       `/communities/${community.id}/members/me`,
-      undefined,
+      {
+        operation: signCommunityOperation({
+          action: 'member_left',
+          args: { identityId: identities[1].id },
+          communityId: community.id,
+          createdAt: Date.now(),
+          networkId: NETWORK_ID,
+          parents: beforeLeave.frontier,
+          signer: identities[1],
+        }).body,
+      },
       identities[1],
     );
     await waitFor(async () => {

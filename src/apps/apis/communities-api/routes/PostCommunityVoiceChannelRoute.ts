@@ -35,6 +35,7 @@ export class PostCommunityVoiceChannelRoute extends CommunityRouteSupport {
         actorIdentityId.valueOf(),
         body.name,
         body.moderationLog,
+        body.operation,
       ),
     );
 

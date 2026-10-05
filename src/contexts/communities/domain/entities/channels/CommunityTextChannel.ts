@@ -9,12 +9,13 @@ export class CommunityTextChannel {
   public static create(
     name: CommunityChannelName,
     id: CommunityChannelId = CommunityChannelId.generate(),
+    createdAt: Timestamp = Timestamp.now(),
   ): CommunityTextChannel {
     return new CommunityTextChannel(
       id,
       name,
       CommunityChannelPermissions.visibleForEveryone(),
-      Timestamp.now(),
+      createdAt,
     );
   }
 

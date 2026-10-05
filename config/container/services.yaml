@@ -52,9 +52,6 @@ services:
   contexts/communities/domain/repositories/CommunityModerationLogRepository: >-
     @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityModerationLogRepository
   contexts/communities/domain/repositories/CommunityRepository: '@contexts/communities/infrastructure/CommunityRepositoryRouter'
-  contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaMerger:
-    class: /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaMerger
-    arguments: []
   contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityChannelMessageMapper:
     class: >-
       /contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityChannelMessageMapper
@@ -66,10 +63,6 @@ services:
   contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityInviteMapper:
     class: >-
       /contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityInviteMapper
-    arguments: []
-  contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMapper:
-    class: >-
-      /contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMapper
     arguments: []
   contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMembershipRequestMapper:
     class: >-
@@ -296,11 +289,6 @@ services:
     arguments:
       - >-
         @contexts/communities/domain/repositories/CommunityChannelMessageRepository
-  apps/initializers/community-replication/CommunityReplicationInitializer:
-    class: /apps/initializers/community-replication/CommunityReplicationInitializer
-    arguments:
-      - >-
-        @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaProjection
   apps/runtimes/ipfs-runtime/IPFSRuntime:
     class: /apps/runtimes/ipfs-runtime/IPFSRuntime
     arguments:
@@ -912,6 +900,12 @@ services:
     arguments:
       - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
+  contexts/communities/infrastructure/orbitdb/policies/CommunityOperationMutationPolicy:
+    class: >-
+      /contexts/communities/infrastructure/orbitdb/policies/CommunityOperationMutationPolicy
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/content-replication/application/find-summary/ContentReplicationStatusSummaryFinder:
     class: >-
       /contexts/content-replication/application/find-summary/ContentReplicationStatusSummaryFinder
@@ -1499,14 +1493,12 @@ services:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - '@contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard'
     parent: contexts/communities/domain/repositories/CommunityModerationLogRepository
-  contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaProjection:
-    class: >-
-      /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaProjection
+  contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository:
+    class: /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
-      - >-
-        @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaMerger
       - '@contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard'
+    parent: contexts/communities/domain/repositories/CommunityRepository
   contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy:
     class: >-
       /contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy
@@ -2315,18 +2307,6 @@ services:
       - '@contexts/calls/domain/repositories/CallParticipantLeaseRepository'
       - '@contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard'
     parent: contexts/calls/domain/repositories/CallRepository
-  contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository:
-    class: /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository
-    arguments:
-      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
-      - >-
-        @contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMapper
-      - >-
-        @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaMerger
-      - >-
-        @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaProjection
-      - '@contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard'
-    parent: contexts/communities/domain/repositories/CommunityRepository
   contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationDocumentValidator:
     class: >-
       /contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationDocumentValidator
@@ -2433,6 +2413,8 @@ services:
         @contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy
       - >-
         @contexts/communities/infrastructure/orbitdb/policies/CommunityModerationLogMutationPolicy
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityOperationMutationPolicy
       - '@contexts/polls/infrastructure/orbitdb/policies/PollMutationPolicy'
       - '@contexts/polls/infrastructure/orbitdb/policies/PollVoteMutationPolicy'
       - '@contexts/polls/infrastructure/orbitdb/policies/PollCloseMutationPolicy'

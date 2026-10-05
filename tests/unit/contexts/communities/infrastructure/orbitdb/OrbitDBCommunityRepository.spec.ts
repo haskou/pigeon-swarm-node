@@ -1,50 +1,46 @@
-import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
-import { CommunityName } from '@app/contexts/communities/domain/value-objects/CommunityName';
-import { CommunityDescription } from '@app/contexts/communities/domain/value-objects/CommunityDescription';
-import OrbitDBCommunityReplicaMerger from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaMerger';
-import OrbitDBCommunityReplicaProjection from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaProjection';
-import { generateKeyPairSync } from 'node:crypto';
-import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityChannelName } from '@app/contexts/communities/domain/value-objects/CommunityChannelName';
+import { CommunityOperation } from '@app/contexts/communities/domain/operations/CommunityOperation';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import OrbitDBCommunityMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMapper';
+import { CommunityOperationAction } from '@app/contexts/communities/domain/value-objects/CommunityOperationAction';
 import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { PrimitiveOf } from '@haskou/value-objects';
 
-import { IdentityMother } from '../../../../mothers/IdentityMother';
+import { signedMutation } from '../../../public-mutations/support/signedMutation';
+import {
+  alice,
+  ban,
+  communityId,
+  genesis,
+  join,
+  mallory,
+  operation,
+  owner,
+} from '../../domain/operations/CommunityOperationFixtures';
 
 describe('OrbitDBCommunityRepository', () => {
-  const identityMother = new IdentityMother();
-  const networkId = '550e8400-e29b-41d4-a716-446655440000';
+  const networkId = genesis().getNetworkId().valueOf();
   const documents: Record<string, unknown>[] = [];
   const heads = new Map<string, Record<string, unknown>>();
-  let communitiesPut: jest.Mock;
-  let headsPut: jest.Mock;
+  let findScope: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBCommunityRepository;
 
   beforeEach(async () => {
     documents.splice(0);
     heads.clear();
-    communitiesPut = jest.fn((document) => {
-      upsertDocument(documents, document);
-
-      return 'ok';
-    });
-    headsPut = jest.fn((key: string, value: Record<string, unknown>) => {
-      heads.set(key, value);
-
-      return 'ok';
-    });
+    findScope = jest.fn().mockResolvedValue(undefined);
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
     await registry.register(networkId, {
-      communities: {
-        put: communitiesPut,
+      communityOperations: {
+        put: jest.fn((document) => {
+          upsertDocument(documents, document);
+
+          return 'ok';
+        }),
         query: jest.fn((matcher) => documents.filter(matcher)),
       },
       heads: {
@@ -53,23 +49,19 @@ describe('OrbitDBCommunityRepository', () => {
 
           return value ? { key, value } : undefined;
         }),
-        put: headsPut,
+        put: jest.fn((key: string, value: Record<string, unknown>) => {
+          heads.set(key, value);
+
+          return 'ok';
+        }),
       },
     } as never);
-    const publicStorageGuard = new PrivateCommunityPublicStorageGuard(
-      { findScope: jest.fn().mockResolvedValue(undefined) } as never,
-      new PrivateAuthorizationStorageCoordinator(),
-    );
     repository = new OrbitDBCommunityRepository(
       registry,
-      new OrbitDBCommunityMapper(),
-      new OrbitDBCommunityReplicaMerger(),
-      new OrbitDBCommunityReplicaProjection(
-        registry,
-        new OrbitDBCommunityReplicaMerger(),
-        publicStorageGuard,
+      new PrivateCommunityPublicStorageGuard(
+        { findScope } as never,
+        new PrivateAuthorizationStorageCoordinator(),
       ),
-      publicStorageGuard,
     );
   });
 
@@ -77,463 +69,234 @@ describe('OrbitDBCommunityRepository', () => {
     registry.clear();
   });
 
-  it('does not adopt unseen revocation revisions through an unrelated save', async () => {
-    const member = new IdentityId(generateKeyPairSync('ed25519').publicKey.export({ format: 'pem', type: 'spki' }).toString());
-    const primitives = communityPrimitives();
-    primitives.memberIds.push(member.valueOf());
-    primitives.roles.push(...['alpha', 'beta'].map(id => ({ id, name: id, builtIn: false, permissions: [] as string[] })));
-    primitives.memberRoles.push({ identityId: member.valueOf(), roleIds: ['alpha'] });
-    const community = Community.fromPrimitives(primitives);
-    await repository.save(community);
+  it('folds the signed operations of a community into its aggregate', async () => {
+    const created = genesis();
+    const joined = join([created], alice);
+
+    await save(created);
+    await save(joined);
     await flushBackgroundTasks();
-    const stale = (await repository.findById(community.getId()))!;
-    const remote = (await repository.findById(community.getId()))!;
-    remote.assignRoles(identityMother.id, member, []);
-    await repository.save(remote);
-    await flushBackgroundTasks();
-    stale.updateProfile(identityMother.id, new CommunityName('Local profile'), new CommunityDescription('Unrelated edit'));
-    await repository.save(stale);
-    await flushBackgroundTasks();
-    stale.assignRoles(identityMother.id, member, [new CommunityRoleId('alpha'), new CommunityRoleId('beta')]);
-    await repository.save(stale);
-    await flushBackgroundTasks();
-    const result = (await repository.findById(community.getId()))!.toPrimitives();
-    expect(result.memberRoles.find(role => role.identityId === member.valueOf())?.roleIds ?? []).toEqual([]);
-    expect(result.name).toBe('Local profile');
+
+    const community = await repository.findById(communityId);
+
+    expect(community?.toPrimitives().memberIds.sort()).toEqual(
+      [alice.valueOf(), owner.valueOf()].sort(),
+    );
+    expect(community?.toPrimitives().name).toBe('Community');
   });
 
-  it('preserves independent additions from separately loaded aggregates', async () => {
-    await repository.save(Community.fromPrimitives(communityPrimitives()));
-    await flushBackgroundTasks();
-    const first = await repository.findById(new CommunityId('community-1'));
-    const second = await repository.findById(new CommunityId('community-1'));
-    const alice = new IdentityId(
-      generateKeyPairSync('ed25519')
-        .publicKey.export({ format: 'pem', type: 'spki' })
-        .toString(),
-    );
-    const bob = new IdentityId(
-      generateKeyPairSync('ed25519')
-        .publicKey.export({ format: 'pem', type: 'spki' })
-        .toString(),
-    );
-    first!.addMember(identityMother.id, alice);
-    second!.addMember(identityMother.id, bob);
-    await repository.save(first!);
-    await repository.save(second!);
-    await flushBackgroundTasks();
-    const result = await repository.findById(new CommunityId('community-1'));
-    expect(result!.toPrimitives().memberIds).toEqual(
-      expect.arrayContaining([
-        identityMother.id.valueOf(),
-        alice.valueOf(),
-        bob.valueOf(),
-      ]),
-    );
-  });
+  it('reports the unreferenced operations as the frontier', async () => {
+    const created = genesis();
+    const joined = join([created], alice);
+    const concurrent = join([created], mallory);
 
-  it('should save and find communities from OrbitDB replicated documents', async () => {
-    const community = Community.fromPrimitives(communityPrimitives());
-
-    await repository.save(community);
-    await flushBackgroundTasks();
-
-    const byId = await repository.findById(new CommunityId('community-1'));
-    const byMember = await repository.findByMember(identityMother.id);
-    const discoverable = await repository.findDiscoverable({
-      networkId,
-      query: 'orbit',
-    });
-
-    expect(byId?.toPrimitives()).toMatchObject({
-      id: 'community-1',
-      name: 'Orbit community',
-      ownerIdentityId: identityMother.id.valueOf(),
-    });
-    expect(byMember.map((item) => item.getId().valueOf())).toEqual([
-      'community-1',
+    await save(created);
+    await expect(repository.findFrontier(communityId)).resolves.toEqual([
+      created.getHash(),
     ]);
-    expect(discoverable.map((item) => item.getId().valueOf())).toEqual([
-      'community-1',
-    ]);
-    expect(heads.get('community:community-1')).toEqual(
-      expect.objectContaining({
-        id: 'community-1',
-        updatedAt: expect.any(Number),
-      }),
-    );
-    expect(
-      heads.get(`community-member-index:${identityMother.id.valueOf()}:community-1`),
-    ).toEqual(
-      expect.objectContaining({
-        communities: [expect.objectContaining({ id: 'community-1' })],
-      }),
+    await save(joined);
+    await save(concurrent);
+    await flushBackgroundTasks();
+
+    await expect(repository.findFrontier(communityId)).resolves.toEqual(
+      [joined.getHash(), concurrent.getHash()].sort(),
     );
   });
 
-  it('excludes protected communities before applying the discovery limit', async () => {
-    const protectedId = new CommunityId('protected');
-    const protectedCommunity = {
-      ...communityPrimitives(),
-      createdAt: 1780000000100,
-      id: protectedId.valueOf(),
-    };
-    await registry.putHead(
-      `community:${protectedId.valueOf()}`,
-      versioned(protectedCommunity),
-      [networkId],
-    );
+  it('knows nothing about a community without a stored operation', async () => {
+    await expect(repository.findById(communityId)).resolves.toBeUndefined();
+    await expect(repository.findFrontier(communityId)).resolves.toEqual([]);
+    await expect(repository.findByMember(owner)).resolves.toEqual([]);
+  });
 
-    for (let index = 0; index < 50; index += 1) {
-      const id = `public-${index}`;
-      await registry.putHead(
-        `community:${id}`,
-        versioned({
-          ...communityPrimitives(),
-          createdAt: 1780000000000 - index,
-          id,
-        }),
-        [networkId],
-      );
+  it('stores one record per operation however many times it is saved', async () => {
+    const created = genesis();
+
+    await save(created);
+    await save(created);
+    await flushBackgroundTasks();
+
+    expect(documents).toHaveLength(1);
+    expect(documents[0]).toMatchObject({
+      authorIdentityId: owner.valueOf(),
+      communityId: communityId.valueOf(),
+      id: created.getId(),
+      scopeType: 'community_operation',
+    });
+  });
+
+  it('converges on the same community whatever order the operations arrive in', async () => {
+    const created = genesis();
+    const joined = join([created], alice);
+    const banned = ban([joined], alice);
+    const operations = [created, joined, banned];
+    const states = [];
+
+    for (const order of [
+      [0, 1, 2],
+      [2, 0, 1],
+      [1, 2, 0],
+    ]) {
+      documents.splice(0);
+      heads.clear();
+      registry.clear();
+      await registry.register(networkId, storesOf());
+
+      for (const index of order) await save(operations[index]);
+
+      await flushBackgroundTasks();
+      states.push((await repository.findById(communityId))?.toPrimitives());
     }
 
-    const discoverable = await repository.findDiscoverable(
-      { networkId },
-      [protectedId],
-    );
+    expect(states[1]).toEqual(states[0]);
+    expect(states[2]).toEqual(states[0]);
+    expect(states[0]?.bannedMemberIds).toEqual([alice.valueOf()]);
+  });
 
-    expect(discoverable).toHaveLength(50);
+  it('lists the communities of a member and the discoverable ones', async () => {
+    const created = genesis();
+
+    await save(created);
+    await save(join([created], alice));
+    await flushBackgroundTasks();
+
+    const byMember = await repository.findByMember(alice);
+    const discoverable = await repository.findDiscoverable({ networkId });
+
+    expect(byMember.map((community) => community.getId().valueOf())).toEqual([
+      communityId.valueOf(),
+    ]);
     expect(
       discoverable.map((community) => community.getId().valueOf()),
-    ).not.toContain(protectedId.valueOf());
+    ).toEqual([communityId.valueOf()]);
+    await expect(repository.findByMember(mallory)).resolves.toEqual([]);
   });
 
-  it('should persist channel mutations as newer community documents', async () => {
-    const community = Community.fromPrimitives(communityPrimitives());
-
-    await repository.save(community);
-    community.addTextChannel(
-      identityMother.id,
-      new CommunityChannelName('updates'),
-    );
-    await repository.save(community);
+  it('filters discoverable communities by network, query and exclusion', async () => {
+    await save(genesis());
     await flushBackgroundTasks();
 
-    const byId = await repository.findById(new CommunityId('community-1'));
-
-    expect(
-      byId?.toPrimitives().textChannels.map((channel) => channel.name),
-    ).toEqual(['general', 'updates']);
-    expect(heads.get('community:community-1')).toEqual(
-      expect.objectContaining({
-        textChannels: expect.arrayContaining([
-          expect.objectContaining({ name: 'updates' }),
-        ]),
-        updatedAt: expect.any(Number),
-      }),
-    );
-  });
-
-  it('keeps the save pending until member index persistence finishes', async () => {
-    const community = Community.fromPrimitives(communityPrimitives());
-    const delayedMemberIndex = deferred<string>();
-
-    headsPut.mockImplementation(
-      async (key: string, value: Record<string, unknown>) => {
-        if (key.startsWith('community-member-index:')) {
-          await delayedMemberIndex.promise;
-        }
-
-        heads.set(key, value);
-
-        return 'ok';
-      },
-    );
-
-    const save = repository.save(community);
-    const result = await Promise.race([
-      save.then(() => 'saved'),
-      new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
-    ]);
-
-    expect(result).toBe('blocked');
-    expect(heads.get('community:community-1')).toEqual(
-      expect.objectContaining({ id: 'community-1' }),
-    );
-    expect(
-      heads.get(`community-member-index:${identityMother.id.valueOf()}:community-1`),
-    ).toBeUndefined();
     await expect(
-      repository.findByMember(identityMother.id),
+      repository.findDiscoverable({ networkId: 'another-network' }),
+    ).resolves.toEqual([]);
+    await expect(
+      repository.findDiscoverable({ query: 'nothing like it' }),
+    ).resolves.toEqual([]);
+    await expect(
+      repository.findDiscoverable({ query: 'COMMUNITY' }),
     ).resolves.toHaveLength(1);
-
-    delayedMemberIndex.resolve('ok');
-    await save;
-
-    expect(
-      heads.get(`community-member-index:${identityMother.id.valueOf()}:community-1`),
-    ).toEqual(
-      expect.objectContaining({
-        communities: [expect.objectContaining({ id: 'community-1' })],
-      }),
-    );
-  });
-
-  it('keeps the save pending until document persistence finishes', async () => {
-    const community = Community.fromPrimitives(communityPrimitives());
-    const delayedWrite = deferred<string>();
-
-    communitiesPut.mockImplementationOnce(async () => delayedWrite.promise);
-
-    const save = repository.save(community);
-    const result = await Promise.race([
-      save.then(() => 'saved'),
-      new Promise((resolve) => setTimeout(() => resolve('blocked'), 10)),
-    ]);
-
-    expect(result).toBe('blocked');
     await expect(
-      repository.findById(new CommunityId('community-1')),
-    ).resolves.toBeUndefined();
-
-    delayedWrite.resolve('ok');
-    await save;
-    await expect(
-      repository.findById(new CommunityId('community-1')),
-    ).resolves.toBeDefined();
+      repository.findDiscoverable({}, [communityId]),
+    ).resolves.toEqual([]);
   });
 
-  it('does not publish community indexes when canonical persistence fails', async () => {
-    const community = Community.fromPrimitives(communityPrimitives());
-
-    communitiesPut.mockRejectedValueOnce(new Error('canonical write failed'));
-
-    await expect(repository.save(community)).rejects.toThrow(
-      'canonical write failed',
-    );
-    expect(headsPut).not.toHaveBeenCalled();
-    await expect(
-      repository.findById(new CommunityId('community-1')),
-    ).resolves.toBeUndefined();
-    await expect(repository.findByMember(identityMother.id)).resolves.toEqual(
-      [],
-    );
-  });
-
-  it('should prefer fresh community heads over stale member indexes', async () => {
-    const stalePrimitives = communityPrimitives();
-    const freshCommunity = Community.fromPrimitives(communityPrimitives());
-
-    freshCommunity.addTextChannel(
-      identityMother.id,
-      new CommunityChannelName('updates'),
-    );
-    await repository.save(freshCommunity);
-    heads.set(`community-member-index:${identityMother.id.valueOf()}:community-1`, {
-      communities: [stalePrimitives],
-      id: `community-member-index:${identityMother.id.valueOf()}:community-1`,
-      identityId: identityMother.id.valueOf(),
-      updatedAt: Date.now() - 1,
-    });
-
-    const byMember = await repository.findByMember(identityMother.id);
-
-    expect(
-      byMember
-        .find((community) => community.getId().valueOf() === 'community-1')
-        ?.toPrimitives()
-        .textChannels.map((channel) => channel.name),
-    ).toEqual(['general', 'updates']);
-  });
-
-  it('should expose membership removals before background replication settles', async () => {
-    const memberId = new IdentityId(
-      'MCowBQYDK2VwAyEAe0LjQOVZBAN7CbruJPg6LKFMzEJR4FEbB3ySIDpSVV4=',
-    );
-    const community = Community.fromPrimitives(communityPrimitives());
-
-    community.addMember(identityMother.id, memberId);
-    await repository.save(community);
-    const memberIndexKey = `community-member-index:${memberId.valueOf()}:community-1`;
-    const staleMemberIndex = registry.findCachedHead(memberIndexKey);
-
-    community.leave(memberId);
-    await repository.save(community);
-
-    expect(registry.findCachedHead('community:community-1')).toEqual(
-      expect.objectContaining({
-        memberIds: [identityMother.id.valueOf()],
-      }),
-    );
-    expect(
-      JSON.stringify(registry.findCachedHead(memberIndexKey)),
-    ).not.toContain('"removed":true');
-    if (staleMemberIndex) {
-      await registry.putHead(memberIndexKey, staleMemberIndex, [networkId]);
-    }
-    await expect(repository.findByMember(memberId)).resolves.toEqual([]);
-  });
-
-  it('should prefer fresh community heads over stale member indexes on timestamp ties', async () => {
-    const stalePrimitives = communityPrimitives();
-    const freshCommunity = Community.fromPrimitives(communityPrimitives());
-
-    freshCommunity.addTextChannel(
-      identityMother.id,
-      new CommunityChannelName('updates'),
-    );
-    await repository.save(freshCommunity);
-    const freshHead = heads.get('community:community-1');
-
-    heads.set(`community-member-index:${identityMother.id.valueOf()}:community-1`, {
-      communities: [
-        {
-          ...stalePrimitives,
-          updatedAt: freshHead?.updatedAt,
-        },
-      ],
-      id: `community-member-index:${identityMother.id.valueOf()}:community-1`,
-      identityId: identityMother.id.valueOf(),
-      updatedAt: Date.now(),
-    });
-
-    const byMember = await repository.findByMember(identityMother.id);
-
-    expect(
-      byMember
-        .find((community) => community.getId().valueOf() === 'community-1')
-        ?.toPrimitives()
-        .textChannels.map((channel) => channel.name),
-    ).toEqual(['general', 'updates']);
-  });
-
-  it('should read communities from heads when indexes exist', async () => {
-    const primitives = communityPrimitives();
-
-    await registry.putHead('community:community-1', versioned(primitives), [
-      networkId,
-    ]);
-    await registry.putHead(
-      `community-member-index:${identityMother.id.valueOf()}:community-1`,
-      {
-        communities: [primitives],
-        id: `community-member-index:${identityMother.id.valueOf()}:community-1`,
-        identityId: identityMother.id.valueOf(),
-        updatedAt: Date.now(),
-      },
-      [networkId],
+  it('forgets a community once its last member left', async () => {
+    const created = genesis();
+    const left = operation(
+      CommunityOperationAction.MEMBER_LEFT,
+      owner,
+      { identityId: owner.valueOf() },
+      [created],
     );
 
-    const byId = await repository.findById(new CommunityId('community-1'));
-    const byMember = await repository.findByMember(identityMother.id);
-
-    expect(byId?.getId().valueOf()).toBe('community-1');
-    expect(byMember.map((item) => item.getId().valueOf())).toEqual([
-      'community-1',
-    ]);
-    expect(documents).toEqual([]);
-  });
-
-  it('should not return deleted communities', async () => {
-    const community = Community.fromPrimitives(communityPrimitives());
-
-    await repository.save(community);
-    await repository.delete(community);
-
-    const byId = await repository.findById(new CommunityId('community-1'));
-
-    expect(byId).toBeUndefined();
-  });
-
-  it('should not return deleted communities from stale member indexes', async () => {
-    const community = Community.fromPrimitives(communityPrimitives());
-    const indexKey = `community-member-index:${identityMother.id.valueOf()}:community-1`;
-
-    await repository.save(community);
+    await save(created);
+    await save(left);
     await flushBackgroundTasks();
-    const staleMemberIndex = heads.get(indexKey);
 
-    await repository.delete(community);
-
-    if (staleMemberIndex) {
-      heads.set(indexKey, staleMemberIndex);
-    }
-
-    const byMember = await repository.findByMember(identityMother.id);
-
-    expect(byMember).toEqual([]);
+    await expect(repository.findById(communityId)).resolves.toBeUndefined();
+    await expect(repository.findByMember(owner)).resolves.toEqual([]);
+    await expect(repository.findDiscoverable({})).resolves.toEqual([]);
   });
 
-  function versioned(
-    primitives: PrimitiveOf<Community>,
-  ): Record<string, unknown> {
-    return new OrbitDBCommunityReplicaMerger().nextDocument(
-      primitives as never,
-      undefined,
-      undefined,
-      primitives.createdAt,
-    ) as never;
+  it('ignores a stored record whose operation does not hold together', async () => {
+    const created = genesis();
+
+    await save(created);
+    await flushBackgroundTasks();
+
+    const key = `community-operation-index:${communityId.valueOf()}`;
+    const head = heads.get(key) as {
+      communityOperations: Record<string, unknown>[];
+    };
+    const [record] = head.communityOperations;
+
+    heads.set(key, {
+      ...head,
+      communityOperations: [{ ...record, authorIdentityId: 'not-an-identity' }],
+    });
+    registry.clear();
+    await registry.register(networkId, storesOf());
+
+    await expect(repository.findById(communityId)).resolves.toBeUndefined();
+  });
+
+  it('never lets a community that became protected take public operations', async () => {
+    findScope.mockResolvedValue({});
+
+    await expect(save(genesis())).rejects.toBeInstanceOf(
+      InvalidPrivateAuthorizationError,
+    );
+    expect(documents).toHaveLength(0);
+  });
+
+  it('keeps communities of other ids apart', async () => {
+    const created = genesis();
+
+    await save(created);
+    await flushBackgroundTasks();
+
+    await expect(
+      repository.findById(new CommunityId('another-community')),
+    ).resolves.toBeUndefined();
+  });
+
+  async function save(operationToSave: CommunityOperation): Promise<void> {
+    await repository.save(operationToSave, await proofOf(operationToSave));
   }
 
-  function communityPrimitives(): PrimitiveOf<Community> {
+  function storesOf(): never {
     return {
-      autoJoinEnabled: false,
-      avatar: undefined,
-      bannedMemberIds: [],
-      banner: undefined,
-      createdAt: 1780000000000,
-      description: 'OrbitDB replicated community',
-      discoverable: true,
-      id: 'community-1',
-      memberIds: [identityMother.id.valueOf()],
-      memberRoles: [],
-      name: 'Orbit community',
-      networkId,
-      ownerIdentityId: identityMother.id.valueOf(),
-      roles: [
-        {
-          builtIn: true,
-          id: 'everyone',
-          name: 'everyone',
-          permissions: [
-            'attach_files',
-            'connect_voice',
-            'embed_links',
-            'send_messages',
-            'send_stickers',
-            'view_channels',
-          ],
-        },
-      ],
-      textChannels: [
-        {
-          createdAt: 1780000000000,
-          id: 'channel-1',
-          name: 'general',
-          permissions: { visibleRoleIds: ['everyone'] },
-          type: 'text',
-        },
-      ],
-      visibility: 'private',
-      voiceChannels: [],
-    };
+      communityOperations: {
+        put: jest.fn((document) => {
+          upsertDocument(documents, document);
+
+          return 'ok';
+        }),
+        query: jest.fn((matcher) => documents.filter(matcher)),
+      },
+      heads: {
+        get: jest.fn((key: string) => {
+          const value = heads.get(key);
+
+          return value ? { key, value } : undefined;
+        }),
+        put: jest.fn((key: string, value: Record<string, unknown>) => {
+          heads.set(key, value);
+
+          return 'ok';
+        }),
+      },
+    } as never;
   }
 });
 
-function flushBackgroundTasks(): Promise<void> {
-  return new Promise((resolve) => setImmediate(resolve));
+function proofOf(operation: CommunityOperation): Promise<PublicMutationProof> {
+  return signedMutation({
+    identityId: operation.getAuthorIdentityId().valueOf(),
+    kind: 'put',
+    payload: operation.toPrimitives() as unknown as Record<string, unknown>,
+    recordId: operation.getId(),
+    sequence: 0,
+    store: 'communityOperations',
+  });
 }
 
-function deferred<T>(): {
-  promise: Promise<T>;
-  resolve(value: T): void;
-} {
-  let resolve: (value: T) => void = () => undefined;
-  const promise = new Promise<T>((next) => {
-    resolve = next;
-  });
+function flushBackgroundTasks(): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<void>();
 
-  return { promise, resolve };
+  setImmediate(resolve);
+
+  return promise;
 }
 
 function upsertDocument(

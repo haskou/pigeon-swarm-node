@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import { IsString, ValidateNested } from 'class-validator';
 
 import { CommunityModerationLogBody } from './CommunityModerationLogBody';
+import { CommunityOperationBody } from './CommunityOperationBody';
 
 export class PostCommunityTextChannelBody {
   @IsString()
@@ -10,4 +11,8 @@ export class PostCommunityTextChannelBody {
   @Type(() => CommunityModerationLogBody)
   @ValidateNested()
   public readonly moderationLog: CommunityModerationLogBody;
+
+  @Type(() => CommunityOperationBody)
+  @ValidateNested()
+  public readonly operation: CommunityOperationBody;
 }

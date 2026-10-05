@@ -32,12 +32,6 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
     });
   }
 
-  private isCommunityDocument(value: Record<string, unknown>): boolean {
-    return (
-      typeof value.id === 'string' && typeof value.ownerIdentityId === 'string'
-    );
-  }
-
   private isDocument(
     value: Record<string, unknown>,
   ): value is OrbitDBCommunityMembershipRequestDocument {
@@ -156,28 +150,15 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
     );
   }
 
-  public async findByOwnedCommunities(
-    ownerIdentityId: IdentityId,
+  public async findByCommunities(
+    communityIds: CommunityId[],
   ): Promise<CommunityMembershipRequest[]> {
-    const communityIds = new Set(
-      this.registry
-        .findCachedHeadsByPrefix('community:')
-        .filter(
-          (document) =>
-            this.isCommunityDocument(document) &&
-            new IdentityId(String(document.ownerIdentityId)).isEqual(
-              ownerIdentityId,
-            ),
-        )
-        .map((community) => community.id)
-        .filter((id): id is string => typeof id === 'string'),
-    );
     const documents = (
       await Promise.all(
-        [...communityIds].map(
+        communityIds.map(
           async (communityId) =>
             (await this.requestIndex.find(
-              this.communityIndexHeadKey(communityId),
+              this.communityIndexHeadKey(communityId.valueOf()),
             )) ?? [],
         ),
       )

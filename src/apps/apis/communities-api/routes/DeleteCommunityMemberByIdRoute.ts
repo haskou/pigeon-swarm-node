@@ -2,8 +2,16 @@ import CommunityMemberKicker from '@app/contexts/communities/application/kick-me
 import { CommunityMemberKickMessage } from '@app/contexts/communities/application/kick-member/messages/CommunityMemberKickMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  Delete,
+  JsonController,
+  Param,
+  Req,
+  Res,
+} from 'routing-controllers';
 
+import { DeleteCommunityMemberKickBody } from '../bodies/DeleteCommunityMemberKickBody';
 import { CommunityViewModel } from '../view-model/CommunityViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
@@ -17,6 +25,7 @@ export class DeleteCommunityMemberByIdRoute extends CommunityRouteSupport {
   public async kickMember(
     @Param('communityId') communityId: string,
     @Param('identityId') identityId: string,
+    @Body() body: DeleteCommunityMemberKickBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
@@ -26,6 +35,7 @@ export class DeleteCommunityMemberByIdRoute extends CommunityRouteSupport {
         communityId,
         actorIdentityId.valueOf(),
         identityId,
+        body.operation,
       ),
     );
 

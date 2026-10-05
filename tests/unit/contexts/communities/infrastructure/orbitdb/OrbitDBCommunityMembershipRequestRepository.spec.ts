@@ -36,7 +36,6 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
   const invitedIdentityId = new IdentityId(
     'MCowBQYDK2VwAyEARcVr0970Zu0KPAIPEEvpy9RjsnM05VnDmccfWloMx8k=',
   );
-  const communities: Record<string, unknown>[] = [];
   const heads = new Map<string, Record<string, unknown>>();
   const requests: Record<string, unknown>[] = [];
   let headsPut: jest.Mock;
@@ -45,7 +44,6 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
   let store: OrbitDBCommunityMembershipRequestRepository;
 
   beforeEach(() => {
-    communities.splice(0);
     heads.clear();
     requests.splice(0);
     headsPut = jest.fn(async (key: string, value: Record<string, unknown>) => {
@@ -69,14 +67,6 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     });
     registry = new OrbitDBReplicatedStateRegistry();
     registry.register('network-1', {
-      communities: {
-        put: jest.fn(async (document) => {
-          communities.push(document as Record<string, unknown>);
-
-          return 'ok';
-        }),
-        query: jest.fn(async (matcher) => communities.filter(matcher)),
-      },
       heads: {
         all: jest.fn(async () =>
           [...heads.entries()].map(([key, value]) => ({ key, value })),
@@ -109,11 +99,6 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
       ownerIdentityId,
     );
 
-    await registry.putHead(`community:${communityId.valueOf()}`, {
-      id: communityId.valueOf(),
-      networkId: 'network-1',
-      ownerIdentityId: ownerIdentityId.valueOf(),
-    });
     await store.save(request, await proofOf(request));
     await flushBackgroundTasks();
 
@@ -123,13 +108,12 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
       communityId,
       invitedIdentityId,
     );
-    const byOwnedCommunity =
-      await store.findByOwnedCommunities(ownerIdentityId);
+    const byCommunity = await store.findByCommunities([communityId]);
 
     expect(byId?.toPrimitives()).toEqual(request.toPrimitives());
     expect(byIdentity).toHaveLength(1);
     expect(byCommunityAndIdentity).toHaveLength(1);
-    expect(byOwnedCommunity).toHaveLength(1);
+    expect(byCommunity).toHaveLength(1);
   });
 
   it('does not project a membership request when its document write fails', async () => {

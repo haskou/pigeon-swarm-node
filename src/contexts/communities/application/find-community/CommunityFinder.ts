@@ -20,4 +20,9 @@ export default class CommunityFinder {
 
     return community;
   }
+
+  /** The parents the next signed operation of the community must reference. */
+  public findFrontier(communityId: CommunityId): Promise<string[]> {
+    return this.repository.findFrontier(communityId);
+  }
 }

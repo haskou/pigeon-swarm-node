@@ -47,6 +47,10 @@ export class CommunityMembership {
     return this.roles.add(name, permissions, id);
   }
 
+  public getRole(roleId: CommunityRoleId): CommunityRole {
+    return this.roles.get(roleId);
+  }
+
   public updateRole(
     roleId: CommunityRoleId,
     name: CommunityRoleName,

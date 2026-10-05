@@ -23,8 +23,10 @@ export class PostCommunityRoute extends CommunityRouteSupport {
       new CommunityCreateMessage(
         ownerIdentityId.valueOf(),
         body.networkId,
+        body.nonce,
         body.name,
         body.description,
+        body.operation,
         body.avatar,
         body.banner,
         {

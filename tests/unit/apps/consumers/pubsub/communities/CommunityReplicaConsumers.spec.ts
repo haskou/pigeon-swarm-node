@@ -8,10 +8,9 @@ import { CommunityChannelMessage } from '@app/contexts/communities/domain/entiti
 import { CommunityChannelMessageWasSentEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasSentEvent';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
-import { CommunityDescription } from '@app/contexts/communities/domain/value-objects/CommunityDescription';
-import { CommunityName } from '@app/contexts/communities/domain/value-objects/CommunityName';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
+import { PrimitiveOf } from '@haskou/value-objects';
 import { mock } from 'jest-mock-extended';
 import { generateKeyPairSync } from 'node:crypto';
 
@@ -21,36 +20,36 @@ import { IdentityMother } from '../../../../mothers/IdentityMother';
 describe.each([
   ['sent', RegisterCommunityMessageWhenAnnounced, 'registerSent'],
   ['edited', RegisterCommunityMessageEdition, 'registerEdition'],
-] as const)('%s community snapshot consumption', (_kind, Consumer, method) => {
+] as const)('%s community message consumption', (kind, Consumer, method) => {
   function fixture() {
     const owner = new IdentityMother().id;
     const community = Community.fromPrimitives({
+      autoJoinEnabled: false,
+      avatar: undefined,
+      bannedMemberIds: [],
+      banner: undefined,
+      createdAt: 1778513696020,
+      description: 'Folded description',
+      discoverable: false,
       id: 'community-replica',
+      memberIds: [owner.valueOf()],
+      memberRoles: [],
+      name: 'Folded profile',
       networkId: '550e8400-e29b-41d4-a716-446655440001',
       ownerIdentityId: owner.valueOf(),
-      name: 'Old profile',
-      description: 'Old description',
-      memberIds: [owner.valueOf()],
-      bannedMemberIds: [],
-      memberRoles: [],
       roles: [CommunityRole.everyone().toPrimitives()],
       textChannels: [],
-      voiceChannels: [],
       visibility: 'private',
-      createdAt: 1778513696020,
-      autoJoinEnabled: false,
-      discoverable: false,
-      avatar: undefined,
-      banner: undefined,
+      voiceChannels: [],
     });
     const snapshot = structuredClone(community.toPrimitives());
     const message = {
-      id: 'message-replica',
-      communityId: snapshot.id,
-      channelId: 'channel-replica',
       authorIdentityId: owner.valueOf(),
+      channelId: 'channel-replica',
+      communityId: snapshot.id,
       createdAt: snapshot.createdAt,
       encryptedPayload: 'encrypted-content',
+      id: 'message-replica',
       type: 'sent',
     };
     const mutationProof = { proof: 'placeholder' };
@@ -69,85 +68,59 @@ describe.each([
     );
 
     return {
-      owner,
       community,
-      snapshot,
-      event,
-      repository,
-      registrar,
       consumer,
+      event,
       message,
       mutationProof,
+      registrar,
+      repository,
     };
   }
 
-  it('retains the loaded replica while validating the event snapshot', async () => {
+  it('validates against the community folded from signed operations, never the event snapshot', async () => {
     const {
-      owner,
       community,
-      snapshot,
-      event,
-      repository,
-      registrar,
       consumer,
+      event,
       message,
       mutationProof,
+      registrar,
+      repository,
     } = fixture();
-    const added = new IdentityId(
-      generateKeyPairSync('ed25519')
-        .publicKey.export({ format: 'der', type: 'spki' })
-        .toString('base64'),
-    );
-    community.addMember(owner, added);
-    community.updateProfile(
-      owner,
-      new CommunityName('Current profile'),
-      new CommunityDescription('Current description'),
-    );
-    const current = structuredClone(community.toPrimitives());
     repository.findById.mockResolvedValue(community);
 
     await consumer.handler(event);
 
     expect(repository.findById).toHaveBeenCalledWith(community.getId());
-    const validated = registrar[method].mock.calls[0][0];
-    expect(validated.toPrimitives()).toEqual(snapshot);
-    expect(validated).not.toBe(community);
     expect(registrar[method]).toHaveBeenCalledWith(
-      validated,
+      community,
       message,
       mutationProof,
     );
-    expect(repository.save).toHaveBeenCalledWith(community);
-    expect(repository.save.mock.calls[0][0].toPrimitives()).toEqual(current);
-    expect(event.attributes.community).toEqual(snapshot);
-    expect(community.isMember(added)).toBe(true);
+    expect(registrar[method].mock.calls[0][0]).toBe(community);
   });
 
-  it('bootstraps an absent community from the event snapshot', async () => {
-    const {
-      snapshot,
-      event,
-      repository,
-      registrar,
-      consumer,
-      message,
-      mutationProof,
-    } = fixture();
+  it('never writes the community document it validated against', async () => {
+    const { community, consumer, event, repository } = fixture();
+    repository.findById.mockResolvedValue(community);
+
+    await consumer.handler(event);
+
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it('ignores a message whose community has no signed operations locally', async () => {
+    const { consumer, event, registrar, repository } = fixture();
     repository.findById.mockResolvedValue(undefined);
 
     await consumer.handler(event);
 
-    const hydrated = repository.save.mock.calls[0][0];
-    expect(hydrated.toPrimitives()).toEqual(snapshot);
-    expect(registrar[method]).toHaveBeenCalledWith(
-      hydrated,
-      message,
-      mutationProof,
-    );
+    expect(registrar[method]).not.toHaveBeenCalled();
+    expect(repository.save).not.toHaveBeenCalled();
   });
 
-  it('accepts a signed delayed event after its author leaves without restoring membership', async () => {
+  it('rejects a delayed event whose author is no longer a member of the folded community', async () => {
     const { community: initial, repository } = fixture();
     const owner = new IdentityId(
       generateKeyPairSync('ed25519')
@@ -156,35 +129,34 @@ describe.each([
     );
     const author = new IdentityMother();
     const channelId = 'channel-delayed';
-    const snapshot: ReturnType<Community['toPrimitives']> = {
+    const snapshot: PrimitiveOf<Community> = {
       ...initial.toPrimitives(),
-      ownerIdentityId: owner.valueOf(),
       memberIds: [owner.valueOf(), author.id.valueOf()],
+      ownerIdentityId: owner.valueOf(),
       textChannels: [
         {
+          createdAt: 1778513696020,
           id: channelId,
           name: 'general',
-          createdAt: 1778513696020,
-          type: 'text',
           permissions: { visibleRoleIds: ['everyone'] },
+          type: 'text',
         },
       ],
     };
-    const canonical = Community.fromPrimitives(snapshot);
-    canonical.kickMember(owner, author.id);
-    repository.findById.mockResolvedValue(canonical);
-    const current = structuredClone(canonical.toPrimitives());
+    const folded = Community.fromPrimitives(snapshot);
+    folded.kickMember(owner, author.id);
+    repository.findById.mockResolvedValue(folded);
     const messages = mock<CommunityChannelMessageRepository>();
     const candidate: CommunityChannelMessageCandidate = {
-      id: 'delayed-message',
-      communityId: snapshot.id,
-      channelId,
       authorIdentityId: author.id.valueOf(),
+      channelId,
+      communityId: snapshot.id,
       createdAt: 1778513696020,
-      editedAt: _kind === 'edited' ? 1778513697020 : undefined,
+      editedAt: kind === 'edited' ? 1778513697020 : undefined,
       encryptedPayload: 'encrypted-payload',
-      plaintextPayload: undefined,
+      id: 'delayed-message',
       mentions: [],
+      plaintextPayload: undefined,
       pollId: undefined,
       replyToMessageId: undefined,
       type: 'sent' as const,
@@ -204,13 +176,10 @@ describe.each([
         store: 'messages',
       })
     ).toPrimitives();
-    const realRegistrar = new CommunityChannelMessageCandidateRegistrar(
-      messages,
-    );
     const consumer = new Consumer(
       mock<DomainEventConsumer>(),
       repository,
-      realRegistrar,
+      new CommunityChannelMessageCandidateRegistrar(messages),
     );
     const event = new CommunityChannelMessageWasSentEvent(snapshot.id, {
       community: snapshot,
@@ -218,25 +187,15 @@ describe.each([
       mutationProof,
     });
 
-    await expect(
-      realRegistrar[method](canonical, candidate, mutationProof),
-    ).rejects.toThrow();
-    expect(messages.save).not.toHaveBeenCalled();
-    await consumer.handler(event);
+    await expect(consumer.handler(event)).rejects.toThrow();
 
-    expect(messages.save).toHaveBeenCalledTimes(1);
-    expect(messages.save.mock.calls[0][0].toPrimitives()).toMatchObject({
-      id: candidate.id,
-      authorIdentityId: author.id.valueOf(),
-      encryptedPayload: candidate.encryptedPayload,
-    });
-    expect(repository.save).toHaveBeenCalledWith(canonical);
-    expect(canonical.toPrimitives()).toEqual(current);
-    expect(canonical.isMember(author.id)).toBe(false);
+    expect(messages.save).not.toHaveBeenCalled();
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(folded.isMember(author.id)).toBe(false);
   });
 
-  it('does not fall back to a snapshot when canonical lookup fails', async () => {
-    const { event, repository, registrar, consumer } = fixture();
+  it('does not fall back to the snapshot when the local lookup fails', async () => {
+    const { consumer, event, registrar, repository } = fixture();
     repository.findById.mockRejectedValue(new Error('Storage unavailable'));
 
     await expect(consumer.handler(event)).rejects.toThrow(

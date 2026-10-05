@@ -36,6 +36,7 @@ export class DeleteCommunityBanRoute extends CommunityRouteSupport {
         actorIdentityId.valueOf(),
         identityId,
         body.moderationLog,
+        body.operation,
       ),
     );
 
