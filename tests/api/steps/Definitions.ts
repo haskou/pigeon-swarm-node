@@ -2190,6 +2190,24 @@ export default class Definitions {
     );
   }
 
+  @given('the community member signs the current community frontier request')
+  public async theCommunityMemberSignsTheCurrentCommunityFrontierRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/frontier`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
   @given('the community member signs the current community leave request')
   public async theCommunityMemberSignsTheCurrentCommunityLeaveRequest(): Promise<void> {
     if (!this.communityId) {
@@ -5062,6 +5080,18 @@ export default class Definitions {
 
     this.response = await this.restClient.get(
       `/communities/${this.communityId}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the current community frontier')
+  public async iGETTheCurrentCommunityFrontier(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/frontier`,
       this.headers,
     );
   }

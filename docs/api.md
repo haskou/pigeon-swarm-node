@@ -2228,7 +2228,7 @@ fallback. A route that changes a community takes an `operation` body field:
 {
   "operation": {
     "createdAt": 1773848829055,
-    "parents": ["<digest from GET /communities/{id} frontier>"],
+    "parents": ["<digest from GET /communities/{id}/frontier>"],
     "mutation": { "...": "SignedPublicMutation" }
   }
 }
@@ -2254,7 +2254,7 @@ fallback. A route that changes a community takes an `operation` body field:
 `<digest>` is the base64url sha256 of the canonical payload without `id`, and the
 record id and `payloadDigest` bind it. Identity ids in `authorIdentityId` and
 `args.identityId` are the base64 public key without PEM headers. The client reads
-`frontier` from `GET /communities/{communityId}` immediately before signing and
+`frontier` from `GET /communities/{communityId}/frontier` immediately before signing and
 sends it as the sorted `parents` (the genesis has none). The node rebuilds the
 operation from the path community, the authenticated actor, the action of the
 endpoint, the `args` it derives from the other body fields, and `createdAt` and
@@ -2465,8 +2465,23 @@ Implemented:
 
 - require signed request auth
 - only allow community members to read the community
-- return `frontier` (sorted operation digests), the `parents` for the next signed
-  operation
+
+### Get community frontier
+
+```http
+GET /communities/{communityId}/frontier
+```
+
+Implemented:
+
+- require signed request auth
+- allow any authenticated identity, members or not, because a non-member signs the
+  `member_joined` operation of a join, an invite link or an accepted invitation
+- fail with `CommunityNotFoundError` when the community is unknown to the node
+- return `{ "frontier": ["<digest>"] }`, the sorted operation digests no other
+  operation names as parent: the `parents` for the next signed operation. The
+  digests are the ids of immutable records already replicated to every peer of the
+  network, so they disclose nothing else.
 
 ### Update community profile
 

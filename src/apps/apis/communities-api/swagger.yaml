@@ -133,7 +133,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CommunityWithFrontierResource'
+                $ref: '#/components/schemas/CommunityResource'
         '409':
           description: Authenticated identity is not a community member.
     patch:
@@ -161,6 +161,26 @@ paths:
                 $ref: '#/components/schemas/CommunityResource'
         '409':
           description: Authenticated identity is not the community owner.
+  /communities/{communityId}/frontier:
+    get:
+      tags:
+        - communities
+      summary: Get the operation frontier of a community
+      description: Returns the sorted digests of the signed community operations no other operation names as parent. A client signs its next community operation with them as parents. Any authenticated identity can read it because a non-member signs the member_joined operation of a join, an invite link or an accepted invitation. The digests are ids of immutable records already replicated to every peer of the network.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Frontier found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityFrontierResource'
+        '409':
+          description: The community is unknown to the node.
   /communities/{communityId}/moderation-logs:
     get:
       tags:
@@ -2105,18 +2125,16 @@ components:
             description: Operation digest (43-char base64url) from the community frontier.
         mutation:
           $ref: '#/components/schemas/SignedPublicMutation'
-    CommunityWithFrontierResource:
-      allOf:
-        - $ref: '#/components/schemas/CommunityResource'
-        - type: object
-          required:
-            - frontier
-          properties:
-            frontier:
-              type: array
-              description: Sorted digests of the operations no other operation names as parent. Use them as parents of the next signed operation.
-              items:
-                type: string
+    CommunityFrontierResource:
+      type: object
+      required:
+        - frontier
+      properties:
+        frontier:
+          type: array
+          description: Sorted digests of the operations no other operation names as parent. Use them as parents of the next signed operation.
+          items:
+            type: string
     CommunityModerationLogBody:
       type: object
       description: Client-signed moderation log entry, kept as the audit trail beside the signed community operation (separate signature, separate store). The mutation signs {action, actorIdentityId, communityId, createdAt, details, id, scopeType 'community_moderation_log', target {id, type}} in store moderationLogs, recordId = id, sequence 0, signer = the acting moderator. id is the first 24 hex chars of sha256(JSON.stringify([communityId, actorIdentityId, action, target.type, target.id, createdAt])). For channel and role creation target.id is the channel/role id derived from the operation createdAt, not from this createdAt.

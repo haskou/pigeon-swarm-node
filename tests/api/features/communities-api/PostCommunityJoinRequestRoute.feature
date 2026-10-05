@@ -11,6 +11,13 @@ Feature: Post community join request API
     When I POST to "/communities/"
     Then response code is equal to 200
     And I remember the current community
+    And the community member signs the current community request
+    When I GET the current community
+    Then response code is equal to 409
+    And the community member signs the current community frontier request
+    When I GET the current community frontier
+    Then response code is equal to 200
+    And response body should contain "frontier"
     And the community member signs the current community join request
     When I POST to request joining the current community
     Then response code is equal to 200

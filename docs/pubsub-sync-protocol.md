@@ -273,7 +273,7 @@ Its id is `community:<communityId>:op:<digest>`, where the digest is the base64u
 SHA-256 of the canonical payload without `id`. It carries a create-only
 `PublicMutationProof` (`put`, sequence 0, no predecessor) signed by the device of
 the author. `parents` are the sorted digests of the operations the author had seen
-(the `frontier` of `GET /communities/{id}`, at most 64): a non-genesis operation
+(the `frontier` of `GET /communities/{id}/frontier`, at most 64): a non-genesis operation
 names at least one parent and the genesis `community_created` none. The genesis
 carries the `nonce` from which `communityId = CommunityId.derive(networkId, owner,
 nonce)` is computed, so the id is bound to its creator. Actions are

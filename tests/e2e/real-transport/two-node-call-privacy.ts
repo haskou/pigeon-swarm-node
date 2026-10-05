@@ -407,7 +407,7 @@ async function main(): Promise<void> {
         const replicated = await request<{ frontier: string[] }>(
           nodes[1],
           'GET',
-          `/communities/${community.id}`,
+          `/communities/${community.id}/frontier`,
           undefined,
           identities[1],
         );
@@ -616,7 +616,7 @@ async function main(): Promise<void> {
     const beforeLeave = await request<{ frontier: string[] }>(
       nodes[1],
       'GET',
-      `/communities/${community.id}`,
+      `/communities/${community.id}/frontier`,
       undefined,
       identities[1],
     );
