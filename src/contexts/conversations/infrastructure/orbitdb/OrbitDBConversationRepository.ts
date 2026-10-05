@@ -6,6 +6,9 @@ import ConversationRepository from '@app/contexts/conversations/domain/repositor
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
+import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
@@ -29,6 +32,38 @@ export default class OrbitDBConversationRepository implements ConversationReposi
   ) {
     this.conversationIndex = new OrbitDBConversationIndex(this.registry);
     this.messageIndex = new OrbitDBConversationMessageIndex(this.registry);
+  }
+
+  private assertAllProofed(
+    messages: { id: string }[],
+    proofs: ReadonlyMap<string, PublicMutationProof>,
+  ): void {
+    if (messages.some((message) => !proofs.has(message.id))) {
+      throw new InvalidPublicMutationError();
+    }
+  }
+
+  private async putMessage(
+    conversation: Conversation,
+    messageId: string,
+    proofs: ReadonlyMap<string, PublicMutationProof>,
+  ): Promise<void> {
+    const domainMessage = conversation.findMessageById(
+      new MessageId(messageId),
+    );
+    const proof = proofs.get(messageId);
+
+    if (!domainMessage || !proof) {
+      return;
+    }
+
+    await this.registry.putDocument(
+      'messages',
+      PublicMutationRecord.withProof(
+        this.messageMapper.toDocument(domainMessage),
+        proof,
+      ),
+    );
   }
 
   private numberValue(
@@ -68,24 +103,13 @@ export default class OrbitDBConversationRepository implements ConversationReposi
 
   private async readMarkerNetworkId(
     conversationId: ConversationId,
-    message?: OrbitDBConversationMessageDocument,
     networkId?: NetworkId,
   ): Promise<string | undefined> {
     if (networkId) {
       return networkId.valueOf();
     }
 
-    if (message?.networkId) {
-      return message.networkId;
-    }
-
     return (await this.conversationIndex.findById(conversationId))?.networkId;
-  }
-
-  private async putMessageRecord(
-    record: Record<string, unknown>,
-  ): Promise<void> {
-    await this.registry.putDocument('messages', { ...record });
   }
 
   private deduplicateMessages(
@@ -115,10 +139,7 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       : undefined;
     const readUntil =
       (marker ? this.numberValue(marker, 'messageCreatedAt') : undefined) ??
-      documents.find(
-        (document) =>
-          document.id === messageId || document.messageId === messageId,
-      )?.createdAt;
+      documents.find((document) => document.id === messageId)?.createdAt;
     const unreadCount = documents.filter((document) =>
       this.isUnreadFor(document, recipientIdentityId, readUntil),
     ).length;
@@ -161,12 +182,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     messageId: MessageId,
   ): Promise<OrbitDBConversationMessageDocument | undefined> {
     return this.messageIndex.findById(conversationId, messageId);
-  }
-
-  private messageDocumentIds(
-    documents: OrbitDBConversationMessageDocument[],
-  ): Set<string> {
-    return this.messageIndex.documentIds(documents);
   }
 
   private async findMessagesByConversationId(
@@ -424,7 +439,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
 
     const markerNetworkId = await this.readMarkerNetworkId(
       conversationId,
-      message,
       networkId,
     );
 
@@ -442,8 +456,19 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     this.registry.replicateHeadInBackground(key, marker, markerNetworkIds);
   }
 
-  public async save(conversation: Conversation): Promise<void> {
+  public async save(
+    conversation: Conversation,
+    proofs: ReadonlyMap<string, PublicMutationProof> = new Map(),
+  ): Promise<void> {
     const conversationId = conversation.getId();
+    const existingMessageIds =
+      await this.messageIndex.findStoredIds(conversationId);
+    const newMessages = conversation
+      .toPrimitives()
+      .messages.filter((message) => !existingMessageIds.has(message.id));
+
+    this.assertAllProofed(newMessages, proofs);
+
     const existingDocument =
       await this.conversationIndex.findById(conversationId);
     const document = this.conversationMapper.toDocument(
@@ -454,41 +479,8 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     await this.registry.putDocument('conversations', { ...document });
     this.conversationIndex.replicateInBackground(document);
 
-    const existingMessageIds = this.messageDocumentIds(
-      await this.findMessageDocumentsByConversationId(conversationId),
-    );
-
-    for (const message of conversation.toPrimitives().messages) {
-      const messageId = new MessageId(message.id);
-
-      if (existingMessageIds.has(messageId.valueOf())) {
-        continue;
-      }
-
-      const domainMessage = conversation.findMessageById(messageId);
-
-      if (!domainMessage) {
-        continue;
-      }
-
-      await this.putMessageRecord({
-        ...this.messageMapper.toDocument(conversation, domainMessage),
-      });
-      existingMessageIds.add(messageId.valueOf());
-
-      const targetMessageId = domainMessage.getTargetMessageId();
-
-      if (
-        domainMessage.getType().isEqual(MessageType.DELETED) &&
-        targetMessageId
-      ) {
-        await this.putMessageRecord({
-          ...this.messageMapper.tombstone(
-            message.conversationId,
-            targetMessageId.valueOf(),
-          ),
-        });
-      }
+    for (const message of newMessages) {
+      await this.putMessage(conversation, message.id, proofs);
     }
   }
 

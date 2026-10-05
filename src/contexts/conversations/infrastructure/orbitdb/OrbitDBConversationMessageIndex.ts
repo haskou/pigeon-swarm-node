@@ -1,5 +1,6 @@
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
+import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { OrbitDBConversationMessageDocument } from './documents/OrbitDBConversationMessageDocument';
@@ -38,15 +39,6 @@ export default class OrbitDBConversationMessageIndex {
     return typeof value === 'string' ? value : undefined;
   }
 
-  private booleanValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): boolean | undefined {
-    const value = document[attribute];
-
-    return typeof value === 'boolean' ? value : undefined;
-  }
-
   private isCompleteDocument(
     document: Partial<OrbitDBConversationMessageDocument>,
   ): document is OrbitDBConversationMessageDocument {
@@ -55,10 +47,8 @@ export default class OrbitDBConversationMessageIndex {
       document.conversationId,
       document.createdAt,
       document.id,
-      document.messageId,
       document.previousMessageIds,
       document.scopeType,
-      document.signature,
       document.type,
     ].every((value) => value !== undefined);
   }
@@ -71,26 +61,14 @@ export default class OrbitDBConversationMessageIndex {
       conversationId: this.stringValue(record, 'conversationId'),
       createdAt: this.numberValue(record, 'createdAt'),
       encryptedPayload: this.stringValue(record, 'encryptedPayload'),
-      id:
-        this.stringValue(record, 'id') || this.stringValue(record, 'messageId'),
-      lastEventId: this.stringValue(record, 'lastEventId'),
-      lastEventType: this.stringValue(record, 'lastEventType'),
-      messageId:
-        this.stringValue(record, 'messageId') || this.stringValue(record, 'id'),
-      networkId: this.stringValue(record, 'networkId'),
+      id: this.stringValue(record, 'id'),
       pollId: this.stringValue(record, 'pollId'),
-      previousMessageIds:
-        this.stringArrayValue(record, 'previousMessageIds') ?? [],
-      receivedAt: this.numberValue(record, 'receivedAt'),
-      recipientIds: this.stringArrayValue(record, 'recipientIds'),
+      previousMessageIds: this.stringArrayValue(record, 'previousMessageIds'),
       replyToMessageId: this.stringValue(record, 'replyToMessageId'),
       scopeType: this.stringValue(record, 'scopeType') as
         OrbitDBConversationMessageDocument['scopeType'] | undefined,
-      signature: this.stringValue(record, 'signature'),
       targetMessageId: this.stringValue(record, 'targetMessageId'),
-      type: this.stringValue(record, 'type') as
-        OrbitDBConversationMessageDocument['type'] | undefined,
-      valid: this.booleanValue(record, 'valid'),
+      type: this.stringValue(record, 'type'),
     };
 
     return this.isCompleteDocument(document) &&
@@ -99,52 +77,86 @@ export default class OrbitDBConversationMessageIndex {
       : undefined;
   }
 
-  public documentIds(
+  /**
+   * A message is hidden when a `deleted` message written by the same author
+   * targets it. The author is checked on read, so the outcome does not depend
+   * on the order in which records replicate.
+   */
+  private withoutDeletedTargets(
     documents: OrbitDBConversationMessageDocument[],
-  ): Set<string> {
-    return new Set(
-      documents.flatMap((document) => [document.id, document.messageId]),
+  ): OrbitDBConversationMessageDocument[] {
+    const deleters = new Map<string, Set<string>>();
+
+    for (const document of documents) {
+      if (
+        document.type !== MessageType.DELETED.valueOf() ||
+        !document.targetMessageId
+      ) {
+        continue;
+      }
+
+      const authors = deleters.get(document.targetMessageId) ?? new Set();
+
+      authors.add(document.authorId);
+      deleters.set(document.targetMessageId, authors);
+    }
+
+    return documents.filter(
+      (document) => !deleters.get(document.id)?.has(document.authorId),
     );
   }
 
-  public deduplicate(
-    documents: OrbitDBConversationMessageDocument[],
-  ): OrbitDBConversationMessageDocument[] {
-    const deduplicated = new Map<string, OrbitDBConversationMessageDocument>();
-
-    for (const document of documents) {
-      const current = deduplicated.get(document.id);
-
-      if (!current || (current.receivedAt ?? 0) <= (document.receivedAt ?? 0)) {
-        deduplicated.set(document.id, document);
-      }
-    }
-
-    return [...deduplicated.values()];
-  }
-
-  public async findByConversationId(
+  private async findAllByConversationId(
     conversationId: ConversationId | string,
   ): Promise<OrbitDBConversationMessageDocument[]> {
     const value =
       conversationId instanceof ConversationId
         ? conversationId.valueOf()
         : conversationId;
-    const documents = await this.registry.queryDocuments(
+    const records = await this.registry.queryDocuments(
       'messages',
       (document) =>
         document.conversationId === value &&
-        document.scopeType === 'conversation' &&
-        document.valid !== false,
+        document.scopeType === 'conversation',
     );
-    const mappedDocuments = documents
-      .map((document) => this.documentFromRecord(document))
-      .filter(
-        (document): document is OrbitDBConversationMessageDocument =>
-          document !== undefined && document.valid !== false,
-      );
 
-    return this.deduplicate(mappedDocuments);
+    return this.deduplicate(
+      records
+        .map((record) => this.documentFromRecord(record))
+        .filter(
+          (document): document is OrbitDBConversationMessageDocument =>
+            document !== undefined,
+        ),
+    );
+  }
+
+  public documentIds(
+    documents: OrbitDBConversationMessageDocument[],
+  ): Set<string> {
+    return new Set(documents.map((document) => document.id));
+  }
+
+  public deduplicate(
+    documents: OrbitDBConversationMessageDocument[],
+  ): OrbitDBConversationMessageDocument[] {
+    return [
+      ...new Map(documents.map((document) => [document.id, document])).values(),
+    ];
+  }
+
+  /** Every stored message id, including messages hidden by their deletion. */
+  public async findStoredIds(
+    conversationId: ConversationId,
+  ): Promise<Set<string>> {
+    return this.documentIds(await this.findAllByConversationId(conversationId));
+  }
+
+  public async findByConversationId(
+    conversationId: ConversationId | string,
+  ): Promise<OrbitDBConversationMessageDocument[]> {
+    return this.withoutDeletedTargets(
+      await this.findAllByConversationId(conversationId),
+    );
   }
 
   public async findById(
@@ -152,9 +164,7 @@ export default class OrbitDBConversationMessageIndex {
     messageId: MessageId,
   ): Promise<OrbitDBConversationMessageDocument | undefined> {
     return (await this.findByConversationId(conversationId)).find(
-      (document) =>
-        document.id === messageId.valueOf() ||
-        document.messageId === messageId.valueOf(),
+      (document) => document.id === messageId.valueOf(),
     );
   }
 }

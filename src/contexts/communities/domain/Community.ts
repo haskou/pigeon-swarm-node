@@ -1,7 +1,7 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { CommunityAccessValidator } from './asserts/CommunityAccessValidator';
@@ -17,7 +17,6 @@ import { CommunityMembershipRequest } from './entities/membership/CommunityMembe
 import { CommunityRole } from './entities/membership/CommunityRole';
 import { CommunityRoles } from './entities/membership/CommunityRoles';
 import { CommunityChannelMessage } from './entities/messages/CommunityChannelMessage';
-import { CommunityChannelMessageDeletion } from './entities/messages/CommunityChannelMessageDeletion';
 import { CommunityChannelMessageEdition } from './entities/messages/CommunityChannelMessageEdition';
 import { CommunityChannelMessageMetadata } from './entities/messages/CommunityChannelMessageMetadata';
 import { CommunityChannelMessagePayload } from './entities/messages/CommunityChannelMessagePayload';
@@ -323,8 +322,8 @@ export class Community extends AggregateRoot {
   public sendChannelMessage(
     metadata: CommunityChannelMessageMetadata,
     payload: CommunityChannelMessagePayload,
-    signature: Signature,
     mentions: CommunityChannelMessageMentions,
+    proof: PublicMutationProof,
   ): CommunityChannelMessage {
     const authorIdentityId = metadata.getAuthorIdentityId();
     const channelId = metadata.getChannelId();
@@ -336,12 +335,7 @@ export class Community extends AggregateRoot {
       mentions,
     );
 
-    const message = CommunityChannelMessage.create(
-      metadata,
-      payload,
-      signature,
-      mentions,
-    );
+    const message = CommunityChannelMessage.create(metadata, payload, mentions);
 
     const primitives = message.toPrimitives();
 
@@ -353,6 +347,7 @@ export class Community extends AggregateRoot {
         community: this.toPrimitives(),
         message: primitives,
         messageId: primitives.id,
+        mutationProof: proof.toPrimitives(),
       }),
     );
 
@@ -380,6 +375,7 @@ export class Community extends AggregateRoot {
     targetMessage: CommunityChannelMessage,
     channelId: CommunityChannelId,
     edition: CommunityChannelMessageEdition,
+    proof: PublicMutationProof,
   ): CommunityChannelMessage {
     this.createAccessValidator().assertCanEditMessage(
       actor,
@@ -400,6 +396,7 @@ export class Community extends AggregateRoot {
         community: this.toPrimitives(),
         message: primitives,
         messageId: primitives.id,
+        mutationProof: proof.toPrimitives(),
       }),
     );
 
@@ -439,7 +436,7 @@ export class Community extends AggregateRoot {
     actor: IdentityId,
     targetMessage: CommunityChannelMessage,
     channelId: CommunityChannelId,
-    deletion: CommunityChannelMessageDeletion,
+    proof: PublicMutationProof,
   ): void {
     this.createAccessValidator().assertCanDeleteMessage(
       actor,
@@ -452,10 +449,8 @@ export class Community extends AggregateRoot {
         ...this.eventAttributes(),
         channelId: channelId.valueOf(),
         community: this.toPrimitives(),
-        createdAt: deletion.getCreatedAt().valueOf(),
         deletedByIdentityId: actor.valueOf(),
-        messageId: deletion.getId().valueOf(),
-        signature: deletion.getSignature().valueOf(),
+        mutationProof: proof.toPrimitives(),
         targetMessageAuthorId: targetMessage.getAuthorIdentityId().valueOf(),
         targetMessageId: targetMessage.getId().valueOf(),
       }),

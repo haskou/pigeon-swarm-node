@@ -2,6 +2,7 @@ import {
   IsArray,
   IsInt,
   IsNotEmpty,
+  IsObject,
   IsOptional,
   IsString,
 } from 'class-validator';
@@ -23,7 +24,6 @@ export class PutConversationMessageBody {
   @IsString({ each: true })
   public readonly previousMessageIds?: string[];
 
-  @IsString()
-  @IsNotEmpty()
-  public readonly signature: string;
+  @IsObject()
+  public readonly mutation: Record<string, unknown>;
 }

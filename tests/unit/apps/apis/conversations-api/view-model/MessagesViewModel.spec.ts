@@ -104,7 +104,6 @@ describe('MessagesViewModel', () => {
         createdAt,
         id,
         previousMessageIds: [] as string[],
-        signature: 'signature',
         type: 'sent',
       }),
     } as unknown as Message;
@@ -120,7 +119,6 @@ describe('MessagesViewModel', () => {
         id,
         pollId: id,
         previousMessageIds: [] as string[],
-        signature: 'signature',
         type: 'poll',
       }),
     } as unknown as Message;

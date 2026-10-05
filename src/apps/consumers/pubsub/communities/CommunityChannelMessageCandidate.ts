@@ -10,6 +10,5 @@ export interface CommunityChannelMessageCandidate {
   plaintextPayload: string | undefined;
   pollId: string | undefined;
   replyToMessageId: string | undefined;
-  signature: string | undefined;
   type: 'poll' | 'sent';
 }

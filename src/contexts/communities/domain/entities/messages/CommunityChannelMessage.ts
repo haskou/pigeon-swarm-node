@@ -1,6 +1,5 @@
 import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { CommunityChannelMessageMentions as Mentions } from '../../CommunityChannelMessageMentions';
@@ -10,16 +9,14 @@ import { CommunityId } from '../../value-objects/CommunityId';
 import { CommunityChannelMessageMention } from './CommunityChannelMessageMention';
 import { CommunityChannelMessageMetadata } from './CommunityChannelMessageMetadata';
 import { CommunityChannelMessagePayload } from './CommunityChannelMessagePayload';
-import { CommunityChannelMessageSignaturePayload } from './CommunityChannelMessageSignaturePayload';
 
 export class CommunityChannelMessage {
   public static create(
     metadata: CommunityChannelMessageMetadata,
     payload: CommunityChannelMessagePayload,
-    signature: Signature,
     mentions: Mentions = Mentions.empty(),
   ): CommunityChannelMessage {
-    return new CommunityChannelMessage(metadata, payload, signature, mentions);
+    return new CommunityChannelMessage(metadata, payload, mentions);
   }
 
   public static poll(
@@ -28,7 +25,6 @@ export class CommunityChannelMessage {
   ): CommunityChannelMessage {
     return new CommunityChannelMessage(
       metadata,
-      undefined,
       undefined,
       Mentions.empty(),
       undefined,
@@ -56,7 +52,6 @@ export class CommunityChannelMessage {
             plaintextPayload: primitives.plaintextPayload,
           })
         : undefined,
-      primitives.signature ? new Signature(primitives.signature) : undefined,
       Mentions.from(
         (primitives.mentions || []).map((mention) =>
           CommunityChannelMessageMention.fromPrimitives(mention),
@@ -70,7 +65,6 @@ export class CommunityChannelMessage {
   constructor(
     private readonly metadata: CommunityChannelMessageMetadata,
     private readonly payload: CommunityChannelMessagePayload | undefined,
-    private readonly signature: Signature | undefined,
     private readonly mentions: Mentions,
     private readonly editedAt?: Timestamp,
     private readonly pollId?: PollId,
@@ -108,37 +102,18 @@ export class CommunityChannelMessage {
     return this.payload?.isPlaintext() ?? false;
   }
 
-  public toSignaturePayload(): CommunityChannelMessageSignaturePayload {
-    const primitives = this.toPrimitives();
-
-    return CommunityChannelMessageSignaturePayload.fromPrimitives({
-      authorIdentityId: primitives.authorIdentityId,
-      channelId: primitives.channelId,
-      communityId: primitives.communityId,
-      createdAt: primitives.createdAt,
-      encryptedPayload: primitives.encryptedPayload,
-      id: primitives.id,
-      mentions: primitives.mentions,
-      plaintextPayload: primitives.plaintextPayload,
-      replyToMessageId: primitives.replyToMessageId,
-      type: primitives.type,
-    });
-  }
-
   public getMentions(): Mentions {
     return this.mentions;
   }
 
   public edit(
     payload: CommunityChannelMessagePayload,
-    signature: Signature,
     editedAt: Timestamp,
     mentions: Mentions,
   ): CommunityChannelMessage {
     return new CommunityChannelMessage(
       this.metadata,
       payload,
-      signature,
       mentions,
       editedAt,
     );
@@ -159,7 +134,6 @@ export class CommunityChannelMessage {
       plaintextPayload: payload?.plaintextPayload,
       pollId: this.pollId?.valueOf(),
       replyToMessageId: this.metadata.getReplyToMessageId()?.valueOf(),
-      signature: this.signature?.valueOf(),
       type: this.type(),
     };
   }

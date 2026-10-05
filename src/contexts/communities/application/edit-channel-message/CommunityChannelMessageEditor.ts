@@ -3,7 +3,6 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 import { CommunityChannelMessage } from '../../domain/entities/messages/CommunityChannelMessage';
 import { CommunityChannelMessageNotFoundError } from '../../domain/errors/CommunityChannelMessageNotFoundError';
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
-import CommunityChannelMessageSignatureDomainService from '../../domain/services/CommunityChannelMessageSignatureDomainService';
 import CommunityFinder from '../find-community/CommunityFinder';
 import { CommunityChannelMessageEditMessage } from './messages/CommunityChannelMessageEditMessage';
 
@@ -11,8 +10,6 @@ export default class CommunityChannelMessageEditor {
   constructor(
     private readonly communityFinder: CommunityFinder,
     private readonly messageRepository: CommunityChannelMessageRepository,
-
-    private readonly signatureService: CommunityChannelMessageSignatureDomainService,
     private readonly eventPublisher: DomainEventPublisher,
   ) {}
 
@@ -35,15 +32,10 @@ export default class CommunityChannelMessageEditor {
       targetMessage,
       message.channelId,
       message.edition,
+      message.proof,
     );
 
-    this.signatureService.assertValidSignature(
-      message.actorIdentityId,
-      message.signaturePayload,
-      message.signature,
-    );
-
-    await this.messageRepository.save(editedMessage);
+    await this.messageRepository.save(editedMessage, message.proof);
     await this.eventPublisher.publish(community.pullDomainEvents());
 
     return editedMessage;

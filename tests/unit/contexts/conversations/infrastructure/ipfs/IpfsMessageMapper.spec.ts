@@ -1,11 +1,10 @@
 import { MessageMetadata } from '@app/contexts/conversations/domain/entities/messages/MessageMetadata';
 import { MessageSent } from '@app/contexts/conversations/domain/entities/messages/MessageSent';
-import IpfsMessageMapper from '@app/contexts/conversations/infrastructure/ipfs/mappers/IpfsMessageMapper';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
+import IpfsMessageMapper from '@app/contexts/conversations/infrastructure/ipfs/mappers/IpfsMessageMapper';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
 describe('IpfsMessageMapper', () => {
@@ -40,9 +39,6 @@ function buildSentMessage(): MessageSent {
     'MCowBQYDK2VwAyEA/F0Ob4wHf4zDpyTntjxjcuFMmbb9uKDa4wb3xCnyVV8=',
   );
   const conversationId = new ConversationId('conversation-a:conversation-b');
-  const signature = new Signature(
-    'ta2dfyeYjMKesUJsgAxzYP3k4Zt6YCvgEQDQrVxhzjOPu0xVvhGHb+nYJHRBRDRl41O4gS5u2lrGCspjVD/NCg==',
-  );
 
   return MessageSent.create(
     new MessageMetadata(
@@ -51,7 +47,6 @@ function buildSentMessage(): MessageSent {
       authorId,
       [],
       Timestamp.now(),
-      signature,
     ),
     new EncryptedMessagePayload('encrypted-payload'),
   );

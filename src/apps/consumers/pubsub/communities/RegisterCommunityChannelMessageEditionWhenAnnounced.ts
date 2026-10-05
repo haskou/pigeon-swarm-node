@@ -55,6 +55,7 @@ export default class RegisterCommunityMessageEdition extends Consumer {
     const message = await this.messageRegistrar.registerEdition(
       community,
       event.attributes.message,
+      event.attributes.mutationProof,
     );
 
     if (message) {

@@ -47,7 +47,6 @@ package "conversations.domain" {
     -previousMessageIds: MessageId[]
     -replyToMessageId?: MessageId
     -targetMessageId?: MessageId
-    -signature: Signature
   }
 
   class MessageSent {
@@ -97,11 +96,6 @@ package "conversations.domain" {
     +eventName(): string
   }
 
-  class MessageSignatureDomainService {
-    +sign(message): Signature
-    +verify(message): boolean
-  }
-
   interface ConversationRepository {
     +save(conversation: Conversation): Promise<void>
     +findById(id: ConversationId): Promise<Conversation>
@@ -141,7 +135,6 @@ MessageEdited --> MessageId
   MessageDeleted --> MessageId
   Conversation ..> MessageSendOptions
   Conversation ..> MessageEditOptions
-  MessageSignatureDomainService ..> Message
   MessageReaction --> ConversationId
   MessageReaction --> MessageId
   MessageReaction --> IdentityId
@@ -275,20 +268,21 @@ package "conversations.infrastructure" {
     -payload: object
     -previousMessageIds: string[]
     -createdAt: number
-    -signature: string
   }
 
   class OrbitDBConversationMessageDocument {
     -id: string
-    -messageId: string
     -conversationId: string
     -authorId: string
     -scopeType: string
     -type: string
     -createdAt: number
-    -receivedAt: number
-    -externalIdentifier?: string
+    -encryptedPayload?: string
+    -pollId?: string
+    -replyToMessageId?: string
     -targetMessageId?: string
+    -previousMessageIds: string[]
+    -proof: PublicMutationProof
   }
 
   class OrbitDBConversationRepository

@@ -1926,9 +1926,9 @@ Request:
   "id": "<clientGeneratedMessageId>",
   "createdAt": 1773848829055,
   "encryptedPayload": "<encryptedMessagePayload>",
-  "signature": "<messageSignature>",
   "previousMessageIds": ["<lastKnownMessageId>"],
-  "replyToMessageId": "<messageId>"
+  "replyToMessageId": "<messageId>",
+  "mutation": SignedPublicMutation
 }
 ```
 
@@ -1951,17 +1951,15 @@ Response:
 Implemented:
 
 - enforce encrypted payloads for 1to1 conversations
-- accept optional `previousMessageIds` so clients can sign the same canonical
-  payload that will be persisted; when omitted, the node uses an empty list
-- when `previousMessageIds` is included in the canonical signed payload, send
-  the exact same array in the request body
+- accept optional `previousMessageIds`; when omitted, the node uses an empty
+  list. The signed record must carry exactly the array sent in the body
 - allow replies by sending `replyToMessageId` with the id of an existing,
   non-deleted `sent` message in the same conversation
-- validate the signature against the canonical message payload
+- require a client-signed `mutation` (see below); there is no unsigned fallback
 - persist immutable message document in IPFS
-- persist message metadata in OrbitDB replicated metadata
+- persist the signed message record in the OrbitDB `messages` store
 - publish `ConversationMessageWasSentEvent` with `messageId`, `authorId`,
-  `networkId` and `participantIds`
+  `mutationProof`, `networkId` and `participantIds`
 - derive unread state from OrbitDB replicated read markers and message metadata
 - attachment CIDs and metadata belong inside the client-encrypted payload; private
   attachment bytes must be encrypted by the client and published first with
@@ -1981,7 +1979,7 @@ Request:
   "createdAt": 1773848829055,
   "encryptedPayload": "<updatedEncryptedMessagePayload>",
   "previousMessageIds": ["<editedMessageId>"],
-  "signature": "<editedMessageSignature>"
+  "mutation": SignedPublicMutation
 }
 ```
 
@@ -2006,15 +2004,45 @@ Implemented:
 - require signed request auth
 - only allow the original message author to edit the message
 - reject edits for deleted messages
-- validate the edit tombstone signature against the canonical edited message
-  payload
+- require a client-signed `mutation` over the edited-message record
 - use `targetMessageId` from the path and default `previousMessageIds` to
   `[messageId]` when the body omits it
-- persist the immutable `edited` tombstone in IPFS
+- persist the immutable `edited` record in IPFS
 - publish `ConversationMessageWasEditedEvent` with `messageId`,
   `targetMessageId`, `networkId` and `participantIds`
 - consuming nodes register the edit through the existing conversation message
   registrar
+
+#### Signed conversation message records
+
+Every conversation message (`sent`, `edited`, `deleted` and the `poll`
+timeline message) is an immutable record in the replicated `messages` store,
+written once with a client-signed `SignedPublicMutation`: `store: "messages"`,
+`recordId` = the message `id`, `kind: "put"`, `sequence: 0`,
+`predecessor: null`, signed by an authorized device of the author. `payloadDigest`
+commits to this record (the stored document without `proof`), whose field set is
+closed:
+
+```json
+{
+  "authorId": "<identityId>",
+  "conversationId": "<conversationId>",
+  "createdAt": 1773848829055,
+  "encryptedPayload": "<only sent/edited>",
+  "id": "<messageId>",
+  "pollId": "<only poll>",
+  "previousMessageIds": [],
+  "replyToMessageId": "<optional, sent only>",
+  "scopeType": "conversation",
+  "targetMessageId": "<only edited/deleted>",
+  "type": "sent | edited | deleted | poll"
+}
+```
+
+Optional fields are omitted when absent. `authorId` is the authenticated identity.
+`edited` and `deleted` default `previousMessageIds` to `[targetMessageId]`
+(the path `messageId`); `sent` defaults to `[]`. Nodes reject records whose
+author is not a conversation participant.
 
 ### Mark messages as read
 
@@ -2137,7 +2165,7 @@ Request:
 {
   "id": "<clientGeneratedDeletionMessageId>",
   "createdAt": 1773848829055,
-  "signature": "<deletedMessageSignature>"
+  "mutation": SignedPublicMutation
 }
 ```
 
@@ -2160,15 +2188,13 @@ Implemented:
 
 - require signed request auth
 - only allow the original message author to delete the message
-- validate the deletion tombstone signature against the canonical deleted
-  message payload
-- use `previousMessageIds: [messageId]` for deletion signatures, so the client
-  signs a deterministic payload based on the message being deleted
-- persist the immutable `deleted` tombstone in IPFS
+- require a client-signed `mutation` over the deleted-message record, with
+  `previousMessageIds: [messageId]`
+- persist the immutable `deleted` record in IPFS
 - publish `ConversationMessageWasDeletedEvent` with `messageId`,
   `targetMessageId`, `networkId` and `participantIds`
-- invalidate the target message metadata locally so it no longer appears in
-  message reads
+- readers hide the target message when a `deleted` message from the same author
+  targets it (no unsigned tombstone is written)
 - remove unread flags for the deleted target message
 - remove the target message block from local IPFS blockstores when present
 - apply the same invalidation/removal when a deletion event is consumed from
@@ -3343,6 +3369,22 @@ Implemented:
 - drafts are local embedded DB state scoped to the authenticated identity
 - the backend treats `encryptedPayload` as opaque client-encrypted data
 - saving or deleting a draft requires access to the target text channel
+
+### Community channel messages
+
+Sending, editing and deleting a channel message require a client-signed
+`mutation` in the body (schema `SignedPublicMutation`, store `messages`, record
+id `community:<communityId>:<channelId>:<messageId>:<authorIdentityId>`). The
+signed payload is the stored record without `proof`:
+`{authorIdentityId, channelId, communityId, createdAt, editedAt?,
+encryptedPayload?, id: <recordId>, mentions, messageId, plaintextPayload?,
+pollId?, replyToMessageId?, scopeType: "community_channel", type: "sent"}`
+(undefined fields omitted). An edit is a `put` with a higher `sequence` and
+`editedAt` set. `DELETE` takes only `{mutation}`: a `kind: "delete"` proof over
+`{authorIdentityId (original author), channelId, communityId, id, messageId,
+removed: true, scopeType: "community_channel"}`, signed by the author or a
+member with `manage_messages`. The client chooses `id` and `createdAt`.
+Poll creation carries the same kind of proof as `timelineMutation`.
 
 ### Community channel pins
 

@@ -4,17 +4,17 @@ import { CommunityChannelMessage } from '@app/contexts/communities/domain/entiti
 import { CommunityChannelMessageEdition } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageEdition';
 import { CommunityChannelMessageMention } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageMention';
 import { CommunityChannelMessagePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessagePayload';
-import { CommunityChannelMessageSignaturePayload } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageSignaturePayload';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
-import CommunityChannelMessageSignatureDomainService from '@app/contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityMentionTargetId } from '@app/contexts/communities/domain/value-objects/CommunityMentionTargetId';
 import { CommunityMentionType } from '@app/contexts/communities/domain/value-objects/CommunityMentionType';
+import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { StalePublicMutationError } from '@app/contexts/public-mutations/domain/errors/StalePublicMutationError';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { assert, Timestamp } from '@haskou/value-objects';
 
 import { CommunityChannelMessageCandidate } from './CommunityChannelMessageCandidate';
@@ -22,9 +22,30 @@ import { CommunityChannelMessageCandidate } from './CommunityChannelMessageCandi
 export default class CommunityChannelMessageCandidateRegistrar {
   constructor(
     private readonly messageRepository: CommunityChannelMessageRepository,
-
-    private readonly signatureService: CommunityChannelMessageSignatureDomainService,
   ) {}
+
+  private async saveAccepted(
+    message: CommunityChannelMessage,
+    proof: unknown,
+  ): Promise<CommunityChannelMessage | undefined> {
+    try {
+      await this.messageRepository.save(
+        message,
+        PublicMutationProof.fromPrimitives(proof),
+      );
+    } catch (error) {
+      if (
+        error instanceof InvalidPublicMutationError ||
+        error instanceof StalePublicMutationError
+      ) {
+        return undefined;
+      }
+
+      throw error;
+    }
+
+    return message;
+  }
 
   private sameCommunity(
     community: Community,
@@ -84,6 +105,7 @@ export default class CommunityChannelMessageCandidateRegistrar {
   public async registerSent(
     community: Community,
     primitives: CommunityChannelMessageCandidate,
+    proof: unknown,
     acceptedMessageIds: ReadonlySet<string> = new Set(),
   ): Promise<CommunityChannelMessage | undefined> {
     if (primitives.type !== 'sent' || primitives.editedAt) {
@@ -92,13 +114,12 @@ export default class CommunityChannelMessageCandidateRegistrar {
 
     const payload = this.payloadFrom(primitives);
 
-    if (!payload || !primitives.signature) {
+    if (!payload) {
       return undefined;
     }
 
     const communityId = new CommunityId(primitives.communityId);
     const channelId = new CommunityChannelId(primitives.channelId);
-    const authorIdentityId = new IdentityId(primitives.authorIdentityId);
 
     if (!this.sameCommunity(community, communityId)) {
       return undefined;
@@ -113,22 +134,16 @@ export default class CommunityChannelMessageCandidateRegistrar {
       primitives.replyToMessageId,
       acceptedMessageIds,
     );
-    this.signatureService.assertValidSignature(
-      authorIdentityId,
-      message.toSignaturePayload(),
-      new Signature(primitives.signature),
-    );
 
-    await this.messageRepository.save(message);
-
-    return message;
+    return this.saveAccepted(message, proof);
   }
 
   public async registerEdition(
     community: Community,
     primitives: CommunityChannelMessageCandidate,
+    proof: unknown,
   ): Promise<CommunityChannelMessage | undefined> {
-    if (!primitives.editedAt || !primitives.signature) {
+    if (!primitives.editedAt) {
       return undefined;
     }
 
@@ -162,31 +177,12 @@ export default class CommunityChannelMessageCandidateRegistrar {
       channelId,
       new CommunityChannelMessageEdition(
         payload,
-        new Signature(primitives.signature),
         new Timestamp(primitives.editedAt),
         mentions,
       ),
+      PublicMutationProof.fromPrimitives(proof),
     );
 
-    this.signatureService.assertValidSignature(
-      authorIdentityId,
-      CommunityChannelMessageSignaturePayload.fromPrimitives({
-        authorIdentityId: authorIdentityId.valueOf(),
-        channelId: primitives.channelId,
-        communityId: primitives.communityId,
-        createdAt: primitives.editedAt,
-        encryptedPayload: primitives.encryptedPayload,
-        id: primitives.id,
-        mentions: mentions.toPrimitives(),
-        plaintextPayload: primitives.plaintextPayload,
-        replyToMessageId: undefined,
-        type: 'edited',
-      }),
-      new Signature(primitives.signature),
-    );
-
-    await this.messageRepository.save(editedMessage);
-
-    return editedMessage;
+    return this.saveAccepted(editedMessage, proof);
   }
 }

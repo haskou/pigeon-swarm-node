@@ -41,7 +41,6 @@ export class PostCommunityChannelMessageBody {
   @IsNotEmpty()
   public readonly replyToMessageId?: string;
 
-  @IsString()
-  @IsNotEmpty()
-  public readonly signature: string;
+  @IsObject()
+  public readonly mutation: Record<string, unknown>;
 }

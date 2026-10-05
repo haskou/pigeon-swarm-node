@@ -20,6 +20,9 @@ export class PostPollBody {
   @IsObject()
   public readonly mutation: Record<string, unknown>;
 
+  @IsObject()
+  public readonly timelineMutation: Record<string, unknown>;
+
   @IsInt()
   public readonly createdAt: number;
 

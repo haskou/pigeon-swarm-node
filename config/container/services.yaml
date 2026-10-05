@@ -52,10 +52,6 @@ services:
   contexts/communities/domain/repositories/CommunityModerationLogRepository: >-
     @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityModerationLogRepository
   contexts/communities/domain/repositories/CommunityRepository: '@contexts/communities/infrastructure/CommunityRepositoryRouter'
-  contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService:
-    class: >-
-      /contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService
-    arguments: []
   contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaMerger:
     class: /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityReplicaMerger
     arguments: []
@@ -104,9 +100,6 @@ services:
   contexts/conversations/domain/repositories/ConversationRepository: '@contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository'
   contexts/conversations/domain/repositories/MessageReactionRepository: >-
     @contexts/conversations/infrastructure/orbitdb/OrbitDBMessageReactionRepository
-  contexts/conversations/domain/services/MessageSignatureDomainService:
-    class: /contexts/conversations/domain/services/MessageSignatureDomainService
-    arguments: []
   contexts/conversations/infrastructure/ipfs/mappers/IpfsMessageMapper:
     class: /contexts/conversations/infrastructure/ipfs/mappers/IpfsMessageMapper
     arguments: []
@@ -297,6 +290,12 @@ services:
     arguments:
       - >-
         @contexts/private-authorization/application/accept-operation/PrivateOperationAcceptor
+  apps/consumers/pubsub/communities/CommunityChannelMessageCandidateRegistrar:
+    class: >-
+      /apps/consumers/pubsub/communities/CommunityChannelMessageCandidateRegistrar
+    arguments:
+      - >-
+        @contexts/communities/domain/repositories/CommunityChannelMessageRepository
   apps/initializers/community-replication/CommunityReplicationInitializer:
     class: /apps/initializers/community-replication/CommunityReplicationInitializer
     arguments:
@@ -435,6 +434,11 @@ services:
   contexts/conversations/application/register-conversation/ConversationRegistrar:
     class: >-
       /contexts/conversations/application/register-conversation/ConversationRegistrar
+    arguments:
+      - '@contexts/conversations/domain/repositories/ConversationRepository'
+  contexts/conversations/application/register-message/ConversationMessageRegistrar:
+    class: >-
+      /contexts/conversations/application/register-message/ConversationMessageRegistrar
     arguments:
       - '@contexts/conversations/domain/repositories/ConversationRepository'
   contexts/conversations/infrastructure/orbitdb/OrbitDBConversationIndex:
@@ -758,14 +762,6 @@ services:
     arguments:
       - '@apps/apis/calls-api/CallRelayRecordRegistry'
       - '@apps/apis/calls-api/CallRelayRecordSigner'
-  apps/consumers/pubsub/communities/CommunityChannelMessageCandidateRegistrar:
-    class: >-
-      /apps/consumers/pubsub/communities/CommunityChannelMessageCandidateRegistrar
-    arguments:
-      - >-
-        @contexts/communities/domain/repositories/CommunityChannelMessageRepository
-      - >-
-        @contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService
   apps/runtimes/call-turn-configuration-runtime/CallTurnConfigurationRuntime:
     class: >-
       /apps/runtimes/call-turn-configuration-runtime/CallTurnConfigurationRuntime
@@ -820,6 +816,13 @@ services:
     arguments:
       - '@contexts/communities/domain/repositories/CommunityRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/communities/application/delete-empty-community/EmptyCommunityDeleter:
+    class: >-
+      /contexts/communities/application/delete-empty-community/EmptyCommunityDeleter
+    arguments:
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+      - >-
+        @contexts/communities/domain/repositories/CommunityModerationLogRepository
   contexts/communities/application/discover-communities/CommunitiesDiscoverer:
     class: >-
       /contexts/communities/application/discover-communities/CommunitiesDiscoverer
@@ -880,6 +883,12 @@ services:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - >-
         @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessageIndex
+  contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageMutationPolicy:
+    class: >-
+      /contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageMutationPolicy
+    arguments:
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy:
     class: >-
       /contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy
@@ -955,6 +964,16 @@ services:
       - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
     parent: >-
       contexts/content-replication/domain/repositories/ContentReplicationStatusSummaryRepository
+  contexts/conversations/application/delete-message/MessageDeleter:
+    class: /contexts/conversations/application/delete-message/MessageDeleter
+    arguments:
+      - '@contexts/conversations/domain/repositories/ConversationRepository'
+      - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/conversations/application/edit-message/MessageEditor:
+    class: /contexts/conversations/application/edit-message/MessageEditor
+    arguments:
+      - '@contexts/conversations/domain/repositories/ConversationRepository'
+      - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/conversations/application/manage-draft/ConversationDraftDeleter:
     class: /contexts/conversations/application/manage-draft/ConversationDraftDeleter
     arguments:
@@ -970,18 +989,17 @@ services:
     arguments:
       - '@contexts/conversations/domain/repositories/ConversationRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
-  contexts/conversations/application/register-message/ConversationMessageRegistrar:
-    class: >-
-      /contexts/conversations/application/register-message/ConversationMessageRegistrar
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-      - '@contexts/conversations/domain/services/MessageSignatureDomainService'
   contexts/conversations/application/register-reaction/MessageReactionRegistrar:
     class: >-
       /contexts/conversations/application/register-reaction/MessageReactionRegistrar
     arguments:
       - '@contexts/conversations/domain/repositories/ConversationRepository'
       - '@contexts/conversations/domain/repositories/MessageReactionRepository'
+  contexts/conversations/application/send-message/MessageSender:
+    class: /contexts/conversations/application/send-message/MessageSender
+    arguments:
+      - '@contexts/conversations/domain/repositories/ConversationRepository'
+      - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/conversations/infrastructure/local-db/LocalConversationDraftRepository:
     class: >-
       /contexts/conversations/infrastructure/local-db/LocalConversationDraftRepository
@@ -995,6 +1013,12 @@ services:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
     parent: >-
       contexts/conversations/domain/repositories/ConversationMessagePinRepository
+  contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageMutationPolicy:
+    class: >-
+      /contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageMutationPolicy
+    arguments:
+      - '@contexts/conversations/domain/repositories/ConversationRepository'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy:
     class: >-
       /contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy
@@ -1398,15 +1422,14 @@ services:
       - '@contexts/calls/domain/repositories/CallSignalDeliveryRepository'
       - '@contexts/nodes/domain/repositories/NodeRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
-  contexts/communities/application/delete-empty-community/EmptyCommunityDeleter:
+  contexts/communities/application/edit-channel-message/CommunityChannelMessageEditor:
     class: >-
-      /contexts/communities/application/delete-empty-community/EmptyCommunityDeleter
+      /contexts/communities/application/edit-channel-message/CommunityChannelMessageEditor
     arguments:
-      - '@contexts/communities/domain/repositories/CommunityRepository'
+      - '@contexts/communities/application/find-community/CommunityFinder'
       - >-
         @contexts/communities/domain/repositories/CommunityChannelMessageRepository
-      - >-
-        @contexts/communities/domain/repositories/CommunityModerationLogRepository
+      - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/communities/application/kick-member/CommunityMemberKicker:
     class: /contexts/communities/application/kick-member/CommunityMemberKicker
     arguments:
@@ -1448,6 +1471,14 @@ services:
         @contexts/communities/domain/repositories/CommunityChannelMessageRepository
       - >-
         @contexts/communities/domain/repositories/CommunityMessageReactionRepository
+  contexts/communities/application/send-channel-message/CommunityChannelMessageSender:
+    class: >-
+      /contexts/communities/application/send-channel-message/CommunityChannelMessageSender
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - >-
+        @contexts/communities/domain/repositories/CommunityChannelMessageRepository
+      - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessagePinRepository:
     class: >-
       /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessagePinRepository
@@ -1502,18 +1533,6 @@ services:
       - '@contexts/conversations/domain/repositories/ConversationRepository'
       - '@contexts/conversations/domain/repositories/MessageReactionRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
-  contexts/conversations/application/delete-message/MessageDeleter:
-    class: /contexts/conversations/application/delete-message/MessageDeleter
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-      - '@contexts/conversations/domain/services/MessageSignatureDomainService'
-  contexts/conversations/application/edit-message/MessageEditor:
-    class: /contexts/conversations/application/edit-message/MessageEditor
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-      - '@contexts/conversations/domain/services/MessageSignatureDomainService'
   contexts/conversations/application/manage-pin/ConversationMessagePinsFinder:
     class: >-
       /contexts/conversations/application/manage-pin/ConversationMessagePinsFinder
@@ -1624,6 +1643,14 @@ services:
       - '@contexts/stickers/domain/repositories/StickerPackRepository'
       - '@contexts/stickers/domain/repositories/StickerUserLibraryRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  apps/consumers/pubsub/communities/DeleteCommunityChannelMessageWhenAnnounced:
+    class: >-
+      /apps/consumers/pubsub/communities/DeleteCommunityChannelMessageWhenAnnounced
+    arguments:
+      - '@shared/infrastructure/messageBus/DomainEventConsumer'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+      - >-
+        @contexts/communities/domain/repositories/CommunityChannelMessageRepository
   apps/consumers/pubsub/communities/RegisterCommunityChannelMessageEditionWhenAnnounced:
     class: >-
       /apps/consumers/pubsub/communities/RegisterCommunityChannelMessageEditionWhenAnnounced
@@ -1778,6 +1805,24 @@ services:
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
       - >-
         @contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder
+  contexts/communities/application/delete-channel/CommunityChannelDeleter:
+    class: /contexts/communities/application/delete-channel/CommunityChannelDeleter
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+      - '@shared/infrastructure/messageBus/DomainEventPublisher'
+      - >-
+        @contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder
+  contexts/communities/application/delete-channel-message/CommunityChannelMessageDeleter:
+    class: >-
+      /contexts/communities/application/delete-channel-message/CommunityChannelMessageDeleter
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - >-
+        @contexts/communities/domain/repositories/CommunityChannelMessageRepository
+      - >-
+        @contexts/communities/domain/repositories/CommunityModerationLogRepository
+      - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/communities/application/delete-role/CommunityRoleDeleter:
     class: /contexts/communities/application/delete-role/CommunityRoleDeleter
     arguments:
@@ -1786,16 +1831,6 @@ services:
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
       - >-
         @contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder
-  contexts/communities/application/edit-channel-message/CommunityChannelMessageEditor:
-    class: >-
-      /contexts/communities/application/edit-channel-message/CommunityChannelMessageEditor
-    arguments:
-      - '@contexts/communities/application/find-community/CommunityFinder'
-      - >-
-        @contexts/communities/domain/repositories/CommunityChannelMessageRepository
-      - >-
-        @contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/communities/application/find-channel-messages/CommunityChannelMessagesFinder:
     class: >-
       /contexts/communities/application/find-channel-messages/CommunityChannelMessagesFinder
@@ -1877,16 +1912,6 @@ services:
       - '@contexts/communities/domain/repositories/CommunityRepository'
       - >-
         @contexts/communities/domain/repositories/CommunityMembershipRequestRepository
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-  contexts/communities/application/send-channel-message/CommunityChannelMessageSender:
-    class: >-
-      /contexts/communities/application/send-channel-message/CommunityChannelMessageSender
-    arguments:
-      - '@contexts/communities/application/find-community/CommunityFinder'
-      - >-
-        @contexts/communities/domain/repositories/CommunityChannelMessageRepository
-      - >-
-        @contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/communities/application/update-channel-permissions/CommunityChannelPermissionsUpdater:
     class: >-
@@ -2005,13 +2030,6 @@ services:
       - >-
         @contexts/conversations/application/manage-pin/ConversationMessagePinAccess
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
-  contexts/conversations/application/send-message/MessageSender:
-    class: /contexts/conversations/application/send-message/MessageSender
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-      - '@contexts/polls/domain/repositories/PollRepository'
-      - '@contexts/conversations/domain/services/MessageSignatureDomainService'
   contexts/identities/infrastructure/ipfs/IpfsIdentityRepository:
     class: /contexts/identities/infrastructure/ipfs/IpfsIdentityRepository
     arguments:
@@ -2094,16 +2112,6 @@ services:
       - '@contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry'
       - '@shared/infrastructure/messageBus/libp2p/PubSubTopicResolver'
       - '@shared/infrastructure/messageBus/libp2p/PubSubNetworkMessageCodec'
-  apps/consumers/pubsub/communities/DeleteCommunityChannelMessageWhenAnnounced:
-    class: >-
-      /apps/consumers/pubsub/communities/DeleteCommunityChannelMessageWhenAnnounced
-    arguments:
-      - '@shared/infrastructure/messageBus/DomainEventConsumer'
-      - '@contexts/communities/domain/repositories/CommunityRepository'
-      - >-
-        @contexts/communities/domain/repositories/CommunityChannelMessageRepository
-      - >-
-        @contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService
   apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenAdded:
     class: >-
       /apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenAdded
@@ -2151,28 +2159,6 @@ services:
         @contexts/calls/application/renew-participant-lease/CallParticipantLeaseRenewer
       - >-
         @contexts/calls/application/start-call/CommunityChannelCallStartCoordinator
-  contexts/communities/application/delete-channel/CommunityChannelDeleter:
-    class: /contexts/communities/application/delete-channel/CommunityChannelDeleter
-    arguments:
-      - '@contexts/communities/application/find-community/CommunityFinder'
-      - '@contexts/communities/domain/repositories/CommunityRepository'
-      - >-
-        @contexts/communities/domain/repositories/CommunityChannelMessageRepository
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-      - >-
-        @contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder
-  contexts/communities/application/delete-channel-message/CommunityChannelMessageDeleter:
-    class: >-
-      /contexts/communities/application/delete-channel-message/CommunityChannelMessageDeleter
-    arguments:
-      - '@contexts/communities/application/find-community/CommunityFinder'
-      - >-
-        @contexts/communities/domain/repositories/CommunityChannelMessageRepository
-      - >-
-        @contexts/communities/domain/repositories/CommunityModerationLogRepository
-      - >-
-        @contexts/communities/domain/services/CommunityChannelMessageSignatureDomainService
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/communities/application/update-membership-request/CommunityMembershipRequestUpdater:
     class: >-
       /contexts/communities/application/update-membership-request/CommunityMembershipRequestUpdater
@@ -2420,6 +2406,10 @@ services:
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageMutationPolicy
+      - >-
+        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageMutationPolicy
       - >-
         @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy
       - >-

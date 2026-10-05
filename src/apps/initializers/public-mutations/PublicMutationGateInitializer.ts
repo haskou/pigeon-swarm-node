@@ -1,8 +1,10 @@
+import CommunityChannelMessageMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageMutationPolicy';
 import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy';
 import CommunityChannelMessageReactionMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageReactionMutationPolicy';
 import CommunityInviteMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy';
 import CommunityInviteUseMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy';
 import CommunityMembershipRequestMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy';
+import ConversationMessageMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageMutationPolicy';
 import ConversationMessagePinMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy';
 import ConversationMessageReactionMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy';
 import NotificationScopeSettingsMutationPolicy from '@app/contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy';
@@ -21,6 +23,8 @@ export default class PublicMutationGateInitializer {
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly verifier: PublicMutationVerifier,
+    private readonly messages: CommunityChannelMessageMutationPolicy,
+    private readonly conversationMessages: ConversationMessageMutationPolicy,
     private readonly pins: CommunityChannelMessagePinMutationPolicy,
     private readonly reactions: CommunityChannelMessageReactionMutationPolicy,
     private readonly conversationPins: ConversationMessagePinMutationPolicy,
@@ -41,6 +45,8 @@ export default class PublicMutationGateInitializer {
   public ensure(): Promise<void> {
     this.registry.useMutationGate(
       new PublicMutationGate(this.verifier, [
+        this.messages,
+        this.conversationMessages,
         this.pins,
         this.reactions,
         this.conversationPins,

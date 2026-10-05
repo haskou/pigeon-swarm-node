@@ -1,7 +1,6 @@
 import { MessageEdited } from '@app/contexts/conversations/domain/entities/messages/MessageEdited';
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import MessageSignatureDomainService from '@app/contexts/conversations/domain/services/MessageSignatureDomainService';
 import { MessageEditOptions } from '@app/contexts/conversations/domain/value-objects/MessageEditOptions';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
@@ -11,7 +10,6 @@ export default class MessageEditor {
   constructor(
     private readonly conversationRepository: ConversationRepository,
     private readonly eventPublisher: DomainEventPublisher,
-    private readonly signatureService: MessageSignatureDomainService,
   ) {}
 
   public async edit(message: MessageEditMessage): Promise<MessageEdited> {
@@ -27,7 +25,7 @@ export default class MessageEditor {
       message.authorIdentityId,
       message.targetMessageId,
       message.encryptedPayload,
-      message.signature,
+      message.proof,
       new MessageEditOptions(
         message.createdAt,
         message.id,
@@ -35,9 +33,10 @@ export default class MessageEditor {
       ),
     );
 
-    this.signatureService.assertValidMessageSignature(editedMessage);
-
-    await this.conversationRepository.save(conversation);
+    await this.conversationRepository.save(
+      conversation,
+      new Map([[editedMessage.getId().valueOf(), message.proof]]),
+    );
     await this.eventPublisher.publish(conversation.pullDomainEvents());
 
     return editedMessage;

@@ -31,14 +31,12 @@ export class DeleteCommunityChannelMessageRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const deletion = await this.deleter.delete(
+    await this.deleter.delete(
       new CommunityChannelMessageDeleteMessage({
         actorIdentityId: actorIdentityId.valueOf(),
         channelId,
         communityId,
-        createdAt: body.createdAt,
-        messageId: body.id,
-        signature: body.signature,
+        mutation: body.mutation,
         targetMessageId: messageId,
       }),
     );
@@ -48,7 +46,7 @@ export class DeleteCommunityChannelMessageRoute extends CommunityRouteSupport {
         channelId,
         communityId,
         deletedByIdentityId: actorIdentityId.valueOf(),
-        id: deletion.getId().valueOf(),
+        id: messageId,
         targetMessageId: messageId,
         type: 'deleted',
       }).toResource(),

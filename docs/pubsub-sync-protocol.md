@@ -305,6 +305,12 @@ Signed public mutations (pins and reactions):
   from `pending` to `accepted`/`declined` by the authorised party: invitee,
   creator, moderator/owner or the requester). Heads are index wrappers under
   collection `requests`; community deletion writes no unsigned tombstones.
+- `messages` documents are governed with scope types `community_channel`
+  (record id `community:<community>:<channel>:<message>:<author>`; an edit is
+  a higher-sequence put, a delete is a `delete` tombstone signed by the author
+  or a moderator) and `conversation` (one immutable record per sent, edited,
+  deleted or poll event, id = message id). Node-authored system and call
+  messages are not part of this path.
 - `polls` documents are governed with three scope types: `poll` (author =
   `creatorIdentityId`, id = client-chosen poll id, immutable), `poll_vote`
   (author = voter, id `poll-vote:<pollId>:<voterIdentityId>`, replaced by a

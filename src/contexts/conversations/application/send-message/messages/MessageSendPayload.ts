@@ -1,4 +1,4 @@
-import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { Timestamp } from '@haskou/value-objects';
 
 import { EncryptedMessagePayload } from '../../../domain/value-objects/EncryptedMessagePayload';
@@ -10,13 +10,13 @@ export class MessageSendPayload {
   private readonly encryptedPayload: EncryptedMessagePayload;
   private readonly id: MessageId;
   private readonly previousMessageIds: MessageId[];
+  private readonly proof: PublicMutationProof;
   private readonly replyToMessageId?: MessageId;
-  private readonly signature: Signature;
 
   constructor(
     id: string,
     encryptedPayload: string,
-    signature: string,
+    mutation: unknown,
     createdAt: number,
     previousMessageIds: string[] = [],
     replyToMessageId?: string,
@@ -30,15 +30,15 @@ export class MessageSendPayload {
     this.replyToMessageId = replyToMessageId
       ? new MessageId(replyToMessageId)
       : undefined;
-    this.signature = new Signature(signature);
+    this.proof = PublicMutationProof.fromPrimitives(mutation);
   }
 
   public getEncryptedPayload(): EncryptedMessagePayload {
     return this.encryptedPayload;
   }
 
-  public getSignature(): Signature {
-    return this.signature;
+  public getProof(): PublicMutationProof {
+    return this.proof;
   }
 
   public getOptions(): MessageSendOptions {

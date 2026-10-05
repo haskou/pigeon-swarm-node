@@ -1,5 +1,4 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
 import { ConversationId } from '../../value-objects/ConversationId';
@@ -12,7 +11,6 @@ export class MessageMetadata {
     private readonly authorId: IdentityId,
     private readonly previousMessageIds: MessageId[],
     private readonly createdAt: Timestamp,
-    private readonly signature: Signature,
     private readonly replyToMessageId?: MessageId,
   ) {}
 
@@ -34,10 +32,6 @@ export class MessageMetadata {
 
   public getCreatedAt(): Timestamp {
     return this.createdAt;
-  }
-
-  public getSignature(): Signature {
-    return this.signature;
   }
 
   public getReplyToMessageId(): MessageId | undefined {

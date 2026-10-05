@@ -1,6 +1,5 @@
 import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { ConversationId } from '../../value-objects/ConversationId';
@@ -25,7 +24,6 @@ export class MessagePoll extends Message {
           (messageId) => new MessageId(messageId),
         ),
         new Timestamp(primitives.createdAt),
-        new Signature(primitives.signature),
       ),
       new PollId(primitives.pollId),
     );

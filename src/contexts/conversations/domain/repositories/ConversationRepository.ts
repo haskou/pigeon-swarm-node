@@ -1,3 +1,4 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
@@ -81,5 +82,13 @@ export default abstract class ConversationRepository {
     networkId?: NetworkId,
   ): Promise<void>;
 
-  public abstract save(conversation: Conversation): Promise<void>;
+  /**
+   * Persists the conversation. Every message that is new to the replicated
+   * store is written together with its client-signed proof, keyed by message
+   * id; a new message without a proof is rejected.
+   */
+  public abstract save(
+    conversation: Conversation,
+    proofs?: ReadonlyMap<string, PublicMutationProof>,
+  ): Promise<void>;
 }
