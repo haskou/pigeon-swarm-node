@@ -9,6 +9,8 @@ export interface PublicMutationRecordShapeExtras {
   objects?: string[];
   /** Plain JSON object, or null, or absent. */
   optionalObjects?: string[];
+  /** String, or absent; a put only. */
+  optionalStrings?: string[];
   /** Strings that only a put carries. */
   putStrings?: string[];
   /** Plain JSON arrays whose items the policy validates itself. */
@@ -28,12 +30,16 @@ export class PublicMutationRecordShape {
     private readonly extras: PublicMutationRecordShapeExtras = {},
   ) {}
 
-  private hasKeysOf(record: Record<string, unknown>, extra: string[]): boolean {
-    const optional = [
+  private optionalFields(): string[] {
+    return [
       ...(this.extras.optionalIntegers ?? []),
       ...(this.extras.optionalObjects ?? []),
+      ...(this.extras.optionalStrings ?? []),
     ];
-    const required = [
+  }
+
+  private requiredFields(extra: string[]): string[] {
+    return [
       ...this.strings,
       ...this.integers,
       ...(this.extras.putStrings ?? []),
@@ -43,7 +49,11 @@ export class PublicMutationRecordShape {
       'scopeType',
       ...extra,
     ];
-    const allowed = new Set([...required, ...optional]);
+  }
+
+  private hasKeysOf(record: Record<string, unknown>, extra: string[]): boolean {
+    const required = this.requiredFields(extra);
+    const allowed = new Set([...required, ...this.optionalFields()]);
 
     return (
       required.every((field) => Object.hasOwn(record, field)) &&
@@ -60,9 +70,17 @@ export class PublicMutationRecordShape {
   }
 
   private hasValidScalars(record: Record<string, unknown>): boolean {
-    const { booleans = [], putStrings = [] } = this.extras;
+    const {
+      booleans = [],
+      optionalStrings = [],
+      putStrings = [],
+    } = this.extras;
 
     return (
+      optionalStrings.every(
+        (field) =>
+          record[field] === undefined || typeof record[field] === 'string',
+      ) &&
       [...this.strings, ...putStrings].every(
         (field) => typeof record[field] === 'string',
       ) &&

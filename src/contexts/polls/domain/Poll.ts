@@ -19,21 +19,23 @@ import { PollQuestion } from './value-objects/PollQuestion';
 
 export class Poll extends AggregateRoot {
   public static create(
+    id: PollId,
     creatorIdentityId: IdentityId,
     scope: PollScope,
     question: PollQuestion,
     options: PollOption[],
     allowsMultipleVotes: boolean,
+    createdAt: Timestamp,
     expiresAt?: Timestamp,
     audience: PollAudience = PollAudience.empty(),
   ): Poll {
     const poll = new Poll(
-      PollId.generate(),
+      id,
       creatorIdentityId,
       scope,
       new PollContent(question, options),
       allowsMultipleVotes,
-      PollLifecycle.open(expiresAt),
+      PollLifecycle.open(createdAt, expiresAt),
       [],
     );
     const primitives = poll.toPrimitives();
@@ -110,8 +112,9 @@ export class Poll extends AggregateRoot {
   public castVote(
     voterIdentityId: IdentityId,
     optionIds: PollOptionId[],
+    castAt: Timestamp,
   ): void {
-    this.assertOpen();
+    this.assertOpen(castAt);
     assert(optionIds.length > 0, new PollOptionNotFoundError());
     assert(
       this.allowsMultipleVotes || optionIds.length === 1,
@@ -120,11 +123,11 @@ export class Poll extends AggregateRoot {
     this.assertUniqueOptions(optionIds);
     this.assertOptionsExist(optionIds);
     this.removeVoteBy(voterIdentityId);
-    this.votes.push(PollVote.create(voterIdentityId, optionIds));
+    this.votes.push(PollVote.create(voterIdentityId, optionIds, castAt));
   }
 
-  public close(): void {
-    this.assertOpen();
+  public close(closedAt: Timestamp): void {
+    this.assertOpen(closedAt);
     this.lifecycle.close();
   }
 

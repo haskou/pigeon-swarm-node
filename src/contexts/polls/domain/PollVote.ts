@@ -7,8 +7,9 @@ export class PollVote {
   public static create(
     voterIdentityId: IdentityId,
     optionIds: PollOptionId[],
+    createdAt: Timestamp,
   ): PollVote {
-    return new PollVote(voterIdentityId, optionIds, Timestamp.now());
+    return new PollVote(voterIdentityId, optionIds, createdAt);
   }
 
   public static fromPrimitives(primitives: PrimitiveOf<PollVote>): PollVote {

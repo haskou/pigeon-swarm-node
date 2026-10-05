@@ -20,7 +20,11 @@ export class PollVoteRemover {
     }
 
     poll.removeVote(message.voterIdentityId);
-    await this.repository.save(poll);
+    await this.repository.saveVote(
+      poll,
+      message.voterIdentityId,
+      message.getProof(),
+    );
     const eventStreamId = poll.getScope().match({
       communityChannel: (communityId) => communityId.valueOf(),
       groupConversation: (conversationId) => conversationId.valueOf(),

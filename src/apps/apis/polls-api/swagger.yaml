@@ -63,11 +63,17 @@ paths:
   /polls/{pollId}/votes/me:
     delete:
       tags: [polls]
-      summary: Remove the authenticated identity vote
+      summary: Remove the authenticated identity vote with a signed tombstone
       security:
         - signedRequest: []
       parameters:
         - $ref: '#/components/parameters/PollId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeletePollVoteBody'
       responses:
         '200':
           description: Updated poll.
@@ -83,6 +89,12 @@ paths:
         - signedRequest: []
       parameters:
         - $ref: '#/components/parameters/PollId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostPollCloseBody'
       responses:
         '200':
           description: Closed poll.
@@ -108,10 +120,21 @@ components:
       type: object
       required:
         - allowsMultipleVotes
+        - createdAt
+        - mutation
         - options
+        - pollId
         - question
         - scopeType
       properties:
+        pollId:
+          type: string
+          description: Client-chosen poll id; the signed record id.
+        createdAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
         allowsMultipleVotes:
           type: boolean
         channelId:
@@ -144,13 +167,81 @@ components:
     PostPollVoteBody:
       type: object
       required:
+        - createdAt
+        - mutation
         - optionIds
       properties:
+        createdAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
         optionIds:
           type: array
           minItems: 1
           items:
             type: string
+    DeletePollVoteBody:
+      type: object
+      required: [mutation]
+      properties:
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    PostPollCloseBody:
+      type: object
+      required: [createdAt, mutation]
+      properties:
+        createdAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    SignedPublicMutation:
+      type: object
+      description: Client-signed intent for a replicated public record. The node holds no user private keys, so the UI signs it. payloadDigest commits to the record without its proof; author.deviceCredential must be an authorized device of author.identityId in its current device authorization head. The winner of concurrent mutations is the higher sequence, then the lower digest; no wall clock is used.
+      required:
+        - version
+        - operationId
+        - kind
+        - store
+        - recordId
+        - payloadDigest
+        - predecessor
+        - sequence
+        - author
+        - signature
+      properties:
+        version:
+          type: integer
+          enum: [1]
+        operationId:
+          type: string
+        kind:
+          type: string
+          enum: [put, delete]
+        store:
+          type: string
+        recordId:
+          type: string
+        payloadDigest:
+          type: string
+        predecessor:
+          type: string
+          nullable: true
+          description: Digest of the previous mutation. Null if and only if sequence is 0.
+        sequence:
+          type: integer
+          minimum: 0
+        author:
+          type: object
+          required: [identityId, deviceCredential]
+          properties:
+            identityId:
+              type: string
+            deviceCredential:
+              type: string
+        signature:
+          type: string
     Poll:
       type: object
       required:

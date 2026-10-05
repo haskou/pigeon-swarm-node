@@ -610,6 +610,9 @@ Community channel call request:
 
 ```json
 {
+  "pollId": "<pollId>",
+  "createdAt": 1780000000000,
+  "mutation": { "...": "SignedPublicMutation" },
   "scopeType": "community_channel",
   "communityId": "<communityId>",
   "channelId": "<voiceChannelId>"
@@ -4340,7 +4343,14 @@ member list. Group conversation poll events include `participantIds`.
 POST /polls/
 ```
 
-Requires signed HTTP headers.
+Requires signed HTTP headers. Polls are public replicated records (store
+`polls`), so the client signs the mutation: the body also carries `pollId`
+(client-chosen id, the record id), `createdAt` (epoch ms) and `mutation`
+(`SignedPublicMutation`, `put`, signer = creator). The signed payload is the
+record without `proof`: `allowsMultipleVotes`, `createdAt`, `creatorIdentityId`,
+`expiresAt` (omitted when none), `id` (= `pollId`), `options` (`{id,text}`),
+`question`, `scopeType: "poll"` and the scope fields (`communityId` +
+`channelId`, or `conversationId`).
 
 Community channel poll:
 
@@ -4363,6 +4373,9 @@ Group conversation poll:
 
 ```json
 {
+  "pollId": "<pollId>",
+  "createdAt": 1780000000000,
+  "mutation": { "...": "SignedPublicMutation" },
   "scopeType": "group_conversation",
   "conversationId": "<groupConversationId>",
   "question": "Pizza or sushi?",
@@ -4405,9 +4418,16 @@ Requires signed HTTP headers and access to the poll scope.
 
 ```json
 {
-  "optionIds": ["pizza"]
+  "optionIds": ["pizza"],
+  "createdAt": 1780000000000,
+  "mutation": { "...": "SignedPublicMutation" }
 }
 ```
+
+The ballot is the record `poll-vote:<pollId>:<voterIdentityId>` (store `polls`,
+`scopeType: "poll_vote"`, signer = voter). Signed payload: scope fields,
+`createdAt`, `id`, `optionIds`, `pollId`, `scopeType`, `voterIdentityId`.
+Changing the vote is a `put` with a higher `sequence`.
 
 Sending a new vote replaces the authenticated identity's previous vote. Polls
 with `allowsMultipleVotes: false` accept exactly one option id.
@@ -4419,7 +4439,10 @@ Expired or manually closed polls reject new votes.
 DELETE /polls/{pollId}/votes/me
 ```
 
-Requires signed HTTP headers and access to the poll scope.
+Requires signed HTTP headers and access to the poll scope. Body
+`{ "mutation": SignedPublicMutation }` with a `delete` proof over the tombstone
+`{ id, pollId, removed: true, scopeType: "poll_vote", voterIdentityId }` (same
+record id as the ballot, higher `sequence`).
 
 ### Close poll
 
@@ -4428,7 +4451,11 @@ POST /polls/{pollId}/close
 ```
 
 Requires signed HTTP headers and access to the poll scope. Closed or expired
-polls reject new votes.
+polls reject new votes. Body `{ "createdAt", "mutation" }`; the close is the
+record `poll-close:<pollId>` (`scopeType: "poll_close"`, signer = closer, who
+must be the creator or manage polls in the channel). Signed payload: scope
+fields, `closedByIdentityId`, `createdAt`, `id`, `pollId`, `scopeType`. Ballots
+with `createdAt` after the earliest close are ignored.
 
 ## Private operation authorization
 

@@ -6,6 +6,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsObject,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -16,6 +17,16 @@ import {
 import { PollOptionBody } from './PollOptionBody';
 
 export class PostPollBody {
+  @IsObject()
+  public readonly mutation: Record<string, unknown>;
+
+  @IsInt()
+  public readonly createdAt: number;
+
+  @IsString()
+  @IsNotEmpty()
+  public readonly pollId: string;
+
   @IsBoolean()
   public readonly allowsMultipleVotes: boolean;
 

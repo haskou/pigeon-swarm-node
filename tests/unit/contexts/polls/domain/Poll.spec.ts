@@ -1,13 +1,14 @@
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { PollDuplicateOptionVoteError } from '@app/contexts/polls/domain/errors/PollDuplicateOptionVoteError';
-import { PollAlreadyClosedError } from '@app/contexts/polls/domain/errors/PollAlreadyClosedError';
 import { InvalidPollOptionError } from '@app/contexts/polls/domain/errors/InvalidPollOptionError';
+import { PollAlreadyClosedError } from '@app/contexts/polls/domain/errors/PollAlreadyClosedError';
+import { PollDuplicateOptionVoteError } from '@app/contexts/polls/domain/errors/PollDuplicateOptionVoteError';
 import { PollMultipleVotesNotAllowedError } from '@app/contexts/polls/domain/errors/PollMultipleVotesNotAllowedError';
 import { Poll } from '@app/contexts/polls/domain/Poll';
 import { PollAudience } from '@app/contexts/polls/domain/PollAudience';
 import { PollOption } from '@app/contexts/polls/domain/PollOption';
 import { PollScope } from '@app/contexts/polls/domain/PollScope';
+import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { PollOptionId } from '@app/contexts/polls/domain/value-objects/PollOptionId';
 import { PollOptionText } from '@app/contexts/polls/domain/value-objects/PollOptionText';
 import { PollQuestion } from '@app/contexts/polls/domain/value-objects/PollQuestion';
@@ -36,14 +37,16 @@ describe('Poll', () => {
 
   it('creates and records a single-choice vote', () => {
     const poll = Poll.create(
+      new PollId('poll'),
       creator,
       scope,
       new PollQuestion('Choose one'),
       options,
       false,
+      new Timestamp(Date.now()),
     );
 
-    poll.castVote(voter, [new PollOptionId('a')]);
+    poll.castVote(voter, [new PollOptionId('a')], new Timestamp(Date.now()));
 
     expect(poll.toPrimitives()).toMatchObject({
       allowsMultipleVotes: false,
@@ -67,11 +70,13 @@ describe('Poll', () => {
 
   it('records a creation event with poll payload and routing recipients', () => {
     const poll = Poll.create(
+      new PollId('poll'),
       creator,
       scope,
       new PollQuestion('Choose one'),
       options,
       false,
+      new Timestamp(Date.now()),
       undefined,
       PollAudience.communityMembers([creator, voter]),
     );
@@ -94,29 +99,41 @@ describe('Poll', () => {
 
   it('rejects multiple options when the poll is single-choice', () => {
     const poll = Poll.create(
+      new PollId('poll'),
       creator,
       scope,
       new PollQuestion('Choose one'),
       options,
       false,
+      new Timestamp(Date.now()),
     );
 
     expect(() =>
-      poll.castVote(voter, [new PollOptionId('a'), new PollOptionId('b')]),
+      poll.castVote(
+        voter,
+        [new PollOptionId('a'), new PollOptionId('b')],
+        new Timestamp(Date.now()),
+      ),
     ).toThrow(PollMultipleVotesNotAllowedError);
   });
 
   it('rejects duplicate option ids in the same vote', () => {
     const poll = Poll.create(
+      new PollId('poll'),
       creator,
       scope,
       new PollQuestion('Choose any'),
       options,
       true,
+      new Timestamp(Date.now()),
     );
 
     expect(() =>
-      poll.castVote(voter, [new PollOptionId('a'), new PollOptionId('a')]),
+      poll.castVote(
+        voter,
+        [new PollOptionId('a'), new PollOptionId('a')],
+        new Timestamp(Date.now()),
+      ),
     ).toThrow(PollDuplicateOptionVoteError);
   });
 
@@ -134,28 +151,32 @@ describe('Poll', () => {
 
     expect(() =>
       Poll.create(
+        new PollId('poll'),
         creator,
         scope,
         new PollQuestion('Choose one'),
         duplicateOptions,
         false,
+        new Timestamp(Date.now()),
       ),
     ).toThrow(InvalidPollOptionError);
   });
 
   it('rejects votes after the expiration time', () => {
     const poll = Poll.create(
+      new PollId('poll'),
       creator,
       scope,
       new PollQuestion('Choose one'),
       options,
       false,
+      new Timestamp(Date.now()),
       new Timestamp(Date.now() - 1),
     );
 
-    expect(() => poll.castVote(voter, [new PollOptionId('a')])).toThrow(
-      PollAlreadyClosedError,
-    );
+    expect(() =>
+      poll.castVote(voter, [new PollOptionId('a')], new Timestamp(Date.now())),
+    ).toThrow(PollAlreadyClosedError);
     expect(poll.toPrimitives().status).toBe('closed');
   });
 
@@ -165,15 +186,17 @@ describe('Poll', () => {
     jest.spyOn(Date, 'now').mockReturnValue(now);
 
     const poll = Poll.create(
+      new PollId('poll'),
       creator,
       scope,
       new PollQuestion('Choose one'),
       options,
       false,
+      new Timestamp(Date.now()),
       new Timestamp(now),
     );
 
-    poll.castVote(voter, [new PollOptionId('a')]);
+    poll.castVote(voter, [new PollOptionId('a')], new Timestamp(Date.now()));
 
     expect(poll.toPrimitives().status).toBe('open');
     expect(poll.toPrimitives().votes).toHaveLength(1);

@@ -34,7 +34,15 @@ package "polls/application" {
 
 package "polls/infrastructure" {
   class OrbitDBPollRepository
+  class PollMutationRecords
+  class PollMutationScopeAccess
+  class PollMutationPolicy
+  class PollVoteMutationPolicy
+  class PollCloseMutationPolicy
 }
+
+interface PublicMutationPolicy
+class PublicMutationProof <<ValueObject>>
 
 Poll *-- PollContent
 Poll *-- PollLifecycle
@@ -58,5 +66,14 @@ PollVoteRemover ..> PollRepository
 
 OrbitDBPollRepository ..|> PollRepository
 OrbitDBPollRepository ..> Poll
+OrbitDBPollRepository ..> PollMutationRecords
+OrbitDBPollRepository ..> PublicMutationProof
+PollRepository ..> PublicMutationProof
+PollMutationPolicy ..|> PublicMutationPolicy
+PollVoteMutationPolicy ..|> PublicMutationPolicy
+PollCloseMutationPolicy ..|> PublicMutationPolicy
+PollMutationPolicy ..> PollMutationScopeAccess
+PollVoteMutationPolicy ..> PollMutationScopeAccess
+PollCloseMutationPolicy ..> PollMutationScopeAccess
 
 @enduml
