@@ -1710,6 +1710,46 @@ export default class Definitions {
     );
   }
 
+  @given('I sign the current community role update request')
+  public async iSignTheCurrentCommunityRoleUpdateRequest(): Promise<void> {
+    if (!this.communityId || !this.communityRoleId) {
+      throw new Error('Community and role must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'PATCH',
+      `/communities/${this.communityId}/roles/${this.communityRoleId}`,
+    );
+  }
+
+  @given('I sign the current community role deletion request')
+  public async iSignTheCurrentCommunityRoleDeletionRequest(): Promise<void> {
+    if (!this.communityId || !this.communityRoleId) {
+      throw new Error('Community and role must be created first.');
+    }
+
+    this.body = '{}';
+    await this.signCurrentRequest(
+      'DELETE',
+      `/communities/${this.communityId}/roles/${this.communityRoleId}`,
+    );
+  }
+
+  @given('I sign the current community unban request for another identity')
+  public async iSignTheCurrentCommunityUnbanRequestForAnotherIdentity(): Promise<void> {
+    if (!this.communityId || !this.otherIdentityId) {
+      throw new Error('Community and banned identity must be available first.');
+    }
+
+    this.body = '{}';
+    await this.signCurrentRequest(
+      'DELETE',
+      `/communities/${this.communityId}/bans/${encodeURIComponent(
+        this.otherIdentityId.valueOf(),
+      )}`,
+    );
+  }
+
   @given('I sign the current community channel permissions request')
   public async iSignTheCurrentCommunityChannelPermissionsRequest(): Promise<void> {
     if (!this.communityId || !this.communityChannelId) {
@@ -2048,7 +2088,7 @@ export default class Definitions {
       throw new Error('Community and channel must be created first.');
     }
 
-    this.body = undefined;
+    this.body = '{}';
     await this.signCurrentRequest(
       'DELETE',
       `/communities/${this.communityId}/channels/${this.communityChannelId}`,
@@ -2065,7 +2105,7 @@ export default class Definitions {
 
     const keyPair = await this.ensureOtherIdentityKeyPair();
 
-    this.body = undefined;
+    this.body = '{}';
     await this.signCurrentRequest(
       'DELETE',
       `/communities/${this.communityId}/channels/${this.communityChannelId}`,
@@ -4414,6 +4454,47 @@ export default class Definitions {
     );
   }
 
+  @when('I PATCH the current community role')
+  public async iPATCHTheCurrentCommunityRole(): Promise<void> {
+    if (!this.communityId || !this.communityRoleId) {
+      throw new Error('Community and role must be created first.');
+    }
+
+    this.response = await this.restClient.patch(
+      `/communities/${this.communityId}/roles/${this.communityRoleId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the current community role')
+  public async iDELETETheCurrentCommunityRole(): Promise<void> {
+    if (!this.communityId || !this.communityRoleId) {
+      throw new Error('Community and role must be created first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/communities/${this.communityId}/roles/${this.communityRoleId}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the ban for another identity from the current community')
+  public async iDELETETheBanForAnotherIdentityFromTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId || !this.otherIdentityId) {
+      throw new Error('Community and banned identity must be available first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/communities/${this.communityId}/bans/${encodeURIComponent(
+        this.otherIdentityId.valueOf(),
+      )}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
   @when('I PATCH permissions for the current community channel')
   public async iPATCHPermissionsForTheCurrentCommunityChannel(): Promise<void> {
     if (!this.communityId || !this.communityChannelId) {
@@ -4702,7 +4783,7 @@ export default class Definitions {
 
     this.response = await this.restClient.delete(
       `/communities/${this.communityId}/channels/${this.communityChannelId}`,
-      undefined,
+      this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
   }

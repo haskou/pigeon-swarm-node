@@ -2212,7 +2212,8 @@ text channel messages. Community channels are not backed by `Conversation`;
 they live inside the `communities` context.
 
 Implemented mutating endpoints use signed HTTP requests with `X-Identity-Id`,
-`X-Timestamp` and `X-Signature`.
+`X-Timestamp` and `X-Signature`. Moderation routes additionally carry a
+client-signed `moderationLog` (see *Signed moderation log entries*).
 
 ### List communities
 
@@ -2740,6 +2741,78 @@ Implemented:
   `invitation_created`, `invite_link_created`,
   `membership_request_accepted`, `membership_request_declined`,
   `member_banned`, `member_unbanned` and `message_deleted`
+
+### Signed moderation log entries
+
+Every community moderation action is recorded in the `moderationLogs`
+replicated collection, and the entry is signed by the moderator's own client.
+There is no unsigned fallback: an entry whose signature, id or permission check
+fails is rejected on write and on replication, and entries are immutable (no
+tombstones). The routes below therefore carry an extra body field:
+
+```json
+{
+  "moderationLog": {
+    "createdAt": 1773848829055,
+    "mutation": { "...": "SignedPublicMutation" }
+  }
+}
+```
+
+`mutation` signs this record (store `moderationLogs`, `kind: "put"`,
+`recordId` = `id`, signer = `actorIdentityId`, `sequence` 0):
+
+```json
+{
+  "action": "channel_created",
+  "actorIdentityId": "<identityId>",
+  "communityId": "<communityId>",
+  "createdAt": 1773848829055,
+  "details": { "name": "general", "type": "text" },
+  "id": "<derived log id>",
+  "scopeType": "community_moderation_log",
+  "target": { "id": "<channelId>", "type": "channel" }
+}
+```
+
+The log id is derived, not chosen: the first 24 hex characters of the sha256
+of `JSON.stringify([communityId, actorIdentityId, action, target.type,
+target.id, createdAt])` (UTF-8). `createdAt` is the same value as
+`moderationLog.createdAt`. The node records exactly the action, target and
+details it computes from the request, and the entry is only admitted when they
+match what was signed and the actor holds the permission for the action.
+
+| Route | action | target | details |
+| --- | --- | --- | --- |
+| `PATCH /communities/{id}` | `community_updated` | community, `communityId` | `{autoJoinEnabled, avatar, banner, description, discoverable, name}` as sent in the request (absent or empty `avatar`, `banner`, `autoJoinEnabled`, `discoverable` omitted) |
+| `POST .../channels/text`, `.../channels/voice` | `channel_created` | channel, derived channel id | `{name, type: "text" \| "voice"}` |
+| `PATCH .../channels/{channelId}` | `channel_renamed` | channel, `channelId` | `{name}` |
+| `DELETE .../channels/{channelId}` | `channel_deleted` | channel, `channelId` | `{type}` |
+| `PATCH .../channels/{channelId}/permissions` | `channel_permissions_updated` | channel, `channelId` | `{visibleRoleIds}` |
+| `POST .../roles` | `role_created` | role, derived role id | `{name, permissions}` |
+| `PATCH .../roles/{roleId}` | `role_updated` | role, `roleId` | `{name, permissions}` |
+| `DELETE .../roles/{roleId}` | `role_deleted` | role, `roleId` | `{}` |
+| `PUT .../members/{identityId}/roles` | `member_roles_updated` | member, `identityId` | `{roleIds}` |
+| `POST .../bans` | `member_banned` | member, banned `identityId` | `{reason}` |
+| `DELETE .../bans/{identityId}` | `member_unbanned` | member, `identityId` | `{}` |
+| `POST .../invites` | `invite_link_created` | invite, invite `token` | `{encryptedCommunityKeyStored, expiresAt, maxUses}` |
+| `POST .../members` | `invitation_created` | membership_request, request id | `{identityId}` (the invited identity) |
+| `PATCH /communities/membership-requests/{requestId}` | `membership_request_accepted` or `membership_request_declined` | membership_request, `requestId` | `{identityId, type}` of the request |
+| `DELETE .../channels/{channelId}/messages/{messageId}` | `message_deleted` | message, `messageId` | `{channelId, targetMessageAuthorId}` |
+
+Channel and role creation use `moderationLog.createdAt` as the `createdAt`
+input of the derived channel/role id (`sha256(JSON.stringify(["channel" |
+"role", communityId, actorIdentityId, createdAt]))`, first 24 hex characters),
+so the id in the log target is the id the node assigns. The routes that used to
+take no body (`DELETE` channel, role and ban) now take
+`{ "moderationLog": { "createdAt", "mutation" } }`.
+
+Permissions checked against the signed actor: channel actions need
+`manage_channels`, role and member-role actions `manage_roles`, bans
+`ban_members`, invitations `create_invites`, request decisions
+`approve_members`/`reject_members` (invitations are decided by the invited
+identity), `community_updated` the owner, and `message_deleted` the message
+author or `manage_messages`.
 
 ### List community channels
 
