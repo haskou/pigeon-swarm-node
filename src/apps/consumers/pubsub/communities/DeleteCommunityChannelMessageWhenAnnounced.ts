@@ -1,4 +1,5 @@
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasDeletedEvent';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
@@ -55,6 +56,34 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
     );
   }
 
+  private async deleteStored(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+    targetMessage: CommunityChannelMessage,
+    proof: PublicMutationProof,
+  ): Promise<boolean> {
+    try {
+      await this.messageRepository.delete(
+        communityId,
+        channelId,
+        targetMessage.getId(),
+        targetMessage.getAuthorIdentityId(),
+        proof,
+      );
+    } catch (error) {
+      if (
+        error instanceof InvalidPublicMutationError ||
+        error instanceof StalePublicMutationError
+      ) {
+        return false;
+      }
+
+      throw error;
+    }
+
+    return true;
+  }
+
   public async handler(event: DomainEvent): Promise<void> {
     if (!isCommunityPrimitive(event.attributes.community)) {
       return;
@@ -100,23 +129,15 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
       proof,
     );
 
-    try {
-      await this.messageRepository.delete(
-        communityId,
-        channelId,
-        targetMessageId,
-        targetMessage.getAuthorIdentityId(),
-        proof,
-      );
-    } catch (error) {
-      if (
-        error instanceof InvalidPublicMutationError ||
-        error instanceof StalePublicMutationError
-      ) {
-        return;
-      }
+    const deleted = await this.deleteStored(
+      communityId,
+      channelId,
+      targetMessage,
+      proof,
+    );
 
-      throw error;
+    if (!deleted) {
+      return;
     }
 
     await this.communityRepository.save(canonical);

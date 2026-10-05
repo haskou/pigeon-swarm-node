@@ -63,22 +63,24 @@ export default class CommunityChannelMessageMutationPolicy extends PublicMutatio
   }
 
   private assertPutContent(record: Record<string, unknown>): void {
-    const hasPoll = record.pollId !== undefined;
     const hasPayload =
       record.encryptedPayload !== undefined ||
       record.plaintextPayload !== undefined;
+    const hasPoll = record.pollId !== undefined;
+    const valid =
+      record.type === 'poll'
+        ? this.isPollContent(record, hasPoll, hasPayload)
+        : record.type === 'sent' && !hasPoll && hasPayload;
 
-    if (record.type === 'poll') {
-      if (!hasPoll || hasPayload || record.editedAt !== undefined) {
-        throw new InvalidPublicMutationError();
-      }
+    if (!valid) throw new InvalidPublicMutationError();
+  }
 
-      return;
-    }
-
-    if (record.type !== 'sent' || hasPoll || !hasPayload) {
-      throw new InvalidPublicMutationError();
-    }
+  private isPollContent(
+    record: Record<string, unknown>,
+    hasPoll: boolean,
+    hasPayload: boolean,
+  ): boolean {
+    return hasPoll && !hasPayload && record.editedAt === undefined;
   }
 
   private async findCommunity(communityId: string): Promise<Community> {
