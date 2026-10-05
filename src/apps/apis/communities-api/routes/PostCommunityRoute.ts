@@ -27,10 +27,10 @@ export class PostCommunityRoute extends CommunityRouteSupport {
         body.name,
         body.description,
         body.operation,
-        body.avatar,
-        body.banner,
         {
           autoJoinEnabled: body.autoJoinEnabled,
+          avatar: body.avatar,
+          banner: body.banner,
           discoverable: body.discoverable,
           visibility: body.visibility,
         },

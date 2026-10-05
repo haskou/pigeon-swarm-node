@@ -2,14 +2,10 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 
 import { CommunityChannelName } from '../../../domain/value-objects/CommunityChannelName';
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
-import {
-  CommunityModerationLogMutation,
-  CommunityModerationLogMutationPrimitives,
-} from '../../record-moderation-log/CommunityModerationLogMutation';
-import {
-  CommunityOperationMutation,
-  CommunityOperationMutationPrimitives,
-} from '../../record-operation/CommunityOperationMutation';
+import { CommunityModerationLogMutation } from '../../record-moderation-log/CommunityModerationLogMutation';
+import { CommunityModerationLogMutationPrimitives } from '../../record-moderation-log/CommunityModerationLogMutationPrimitives';
+import { CommunityOperationMutation } from '../../record-operation/CommunityOperationMutation';
+import { CommunityOperationMutationPrimitives } from '../../record-operation/CommunityOperationMutationPrimitives';
 
 export class CommunityChannelCreateMessage {
   public readonly actorIdentityId: IdentityId;

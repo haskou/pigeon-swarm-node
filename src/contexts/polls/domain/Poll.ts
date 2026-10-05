@@ -24,11 +24,15 @@ export class Poll extends AggregateRoot {
     scope: PollScope,
     question: PollQuestion,
     options: PollOption[],
-    allowsMultipleVotes: boolean,
     createdAt: Timestamp,
-    expiresAt?: Timestamp,
-    audience: PollAudience = PollAudience.empty(),
+    settings: {
+      allowsMultipleVotes: boolean;
+      audience?: PollAudience;
+      expiresAt?: Timestamp;
+    },
   ): Poll {
+    const { allowsMultipleVotes, expiresAt } = settings;
+    const audience = settings.audience ?? PollAudience.empty();
     const poll = new Poll(
       id,
       creatorIdentityId,

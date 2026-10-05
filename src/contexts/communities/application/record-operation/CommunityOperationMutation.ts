@@ -8,12 +8,7 @@ import { CommunityOperationApplier } from '../../domain/operations/CommunityOper
 import { CommunityOperationArguments } from '../../domain/operations/CommunityOperationArguments';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { CommunityOperationAction } from '../../domain/value-objects/CommunityOperationAction';
-
-export interface CommunityOperationMutationPrimitives {
-  createdAt: number;
-  mutation: unknown;
-  parents: string[];
-}
+import { CommunityOperationMutationPrimitives } from './CommunityOperationMutationPrimitives';
 
 /**
  * The client-signed `communityOperations` put that carries a community change:

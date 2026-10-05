@@ -1,4 +1,4 @@
-import { PublicMutationAuthorPrimitives } from '../PublicMutationProofPrimitives';
+import { PublicMutationAuthorPrimitives } from '../PublicMutationAuthorPrimitives';
 
 /** Resolves whether a device was authorized to speak for an identity. */
 export abstract class PublicMutationAuthorAuthorization {

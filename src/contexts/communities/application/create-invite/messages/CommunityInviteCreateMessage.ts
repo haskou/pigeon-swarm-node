@@ -6,10 +6,8 @@ import { CommunityId } from '../../../domain/value-objects/CommunityId';
 import { CommunityInviteMaxUses } from '../../../domain/value-objects/CommunityInviteMaxUses';
 import { CommunityInviteNonce } from '../../../domain/value-objects/CommunityInviteNonce';
 import { EncryptedCommunityInviteKey } from '../../../domain/value-objects/EncryptedCommunityInviteKey';
-import {
-  CommunityModerationLogMutation,
-  CommunityModerationLogMutationPrimitives,
-} from '../../record-moderation-log/CommunityModerationLogMutation';
+import { CommunityModerationLogMutation } from '../../record-moderation-log/CommunityModerationLogMutation';
+import { CommunityModerationLogMutationPrimitives } from '../../record-moderation-log/CommunityModerationLogMutationPrimitives';
 
 export class CommunityInviteCreateMessage {
   public readonly actorIdentityId: IdentityId;
@@ -29,18 +27,26 @@ export class CommunityInviteCreateMessage {
     createdAt: number,
     proof: unknown,
     moderationLog: CommunityModerationLogMutationPrimitives,
-    expiresAt?: number,
-    maxUses?: number,
-    encryptedCommunityKey?: PrimitiveOf<EncryptedCommunityInviteKey>,
+    options: {
+      encryptedCommunityKey?: PrimitiveOf<EncryptedCommunityInviteKey>;
+      expiresAt?: number;
+      maxUses?: number;
+    } = {},
   ) {
     this.actorIdentityId = new IdentityId(actorIdentityId);
     this.communityId = new CommunityId(communityId);
     this.createdAt = new Timestamp(createdAt);
-    this.encryptedCommunityKey = encryptedCommunityKey
-      ? EncryptedCommunityInviteKey.fromPrimitives(encryptedCommunityKey)
+    this.encryptedCommunityKey = options.encryptedCommunityKey
+      ? EncryptedCommunityInviteKey.fromPrimitives(
+          options.encryptedCommunityKey,
+        )
       : undefined;
-    this.expiresAt = expiresAt ? new Timestamp(expiresAt) : undefined;
-    this.maxUses = maxUses ? new CommunityInviteMaxUses(maxUses) : undefined;
+    this.expiresAt = options.expiresAt
+      ? new Timestamp(options.expiresAt)
+      : undefined;
+    this.maxUses = options.maxUses
+      ? new CommunityInviteMaxUses(options.maxUses)
+      : undefined;
     this.moderationLog = new CommunityModerationLogMutation(moderationLog);
     this.nonce = new CommunityInviteNonce(nonce);
     this.proof = PublicMutationProof.fromPrimitives(proof);

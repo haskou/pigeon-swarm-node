@@ -1,6 +1,6 @@
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationBodyPrimitives } from '@app/contexts/public-mutations/domain/PublicMutationBodyPrimitives';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
-import { PublicMutationBodyPrimitives } from '@app/contexts/public-mutations/domain/PublicMutationProofPrimitives';
 import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
 import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';

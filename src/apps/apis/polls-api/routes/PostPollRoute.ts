@@ -39,13 +39,15 @@ export class PostPollRoute extends PollRouteSupport {
         body.pollId,
         actor.valueOf(),
         scopeAccess.scope,
-        body.question,
-        body.options,
-        body.allowsMultipleVotes,
-        scopeAccess.audience,
+        {
+          allowsMultipleVotes: body.allowsMultipleVotes,
+          audience: scopeAccess.audience,
+          expiresAt: body.expiresAt,
+          options: body.options,
+          question: body.question,
+        },
         body.createdAt,
         body.mutation,
-        body.expiresAt,
       ),
     );
     await this.timelineRegistrar.register(

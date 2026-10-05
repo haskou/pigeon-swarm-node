@@ -42,8 +42,8 @@ describe('Poll', () => {
       scope,
       new PollQuestion('Choose one'),
       options,
-      false,
       new Timestamp(Date.now()),
+      { allowsMultipleVotes: false },
     );
 
     poll.castVote(voter, [new PollOptionId('a')], new Timestamp(Date.now()));
@@ -75,10 +75,11 @@ describe('Poll', () => {
       scope,
       new PollQuestion('Choose one'),
       options,
-      false,
       new Timestamp(Date.now()),
-      undefined,
-      PollAudience.communityMembers([creator, voter]),
+      {
+        allowsMultipleVotes: false,
+        audience: PollAudience.communityMembers([creator, voter]),
+      },
     );
     const events = poll.pullDomainEvents();
 
@@ -104,8 +105,8 @@ describe('Poll', () => {
       scope,
       new PollQuestion('Choose one'),
       options,
-      false,
       new Timestamp(Date.now()),
+      { allowsMultipleVotes: false },
     );
 
     expect(() =>
@@ -124,8 +125,8 @@ describe('Poll', () => {
       scope,
       new PollQuestion('Choose any'),
       options,
-      true,
       new Timestamp(Date.now()),
+      { allowsMultipleVotes: true },
     );
 
     expect(() =>
@@ -156,8 +157,8 @@ describe('Poll', () => {
         scope,
         new PollQuestion('Choose one'),
         duplicateOptions,
-        false,
         new Timestamp(Date.now()),
+        { allowsMultipleVotes: false },
       ),
     ).toThrow(InvalidPollOptionError);
   });
@@ -169,9 +170,8 @@ describe('Poll', () => {
       scope,
       new PollQuestion('Choose one'),
       options,
-      false,
       new Timestamp(Date.now()),
-      new Timestamp(Date.now() - 1),
+      { allowsMultipleVotes: false, expiresAt: new Timestamp(Date.now() - 1) },
     );
 
     expect(() =>
@@ -191,9 +191,8 @@ describe('Poll', () => {
       scope,
       new PollQuestion('Choose one'),
       options,
-      false,
       new Timestamp(Date.now()),
-      new Timestamp(now),
+      { allowsMultipleVotes: false, expiresAt: new Timestamp(now) },
     );
 
     poll.castVote(voter, [new PollOptionId('a')], new Timestamp(Date.now()));

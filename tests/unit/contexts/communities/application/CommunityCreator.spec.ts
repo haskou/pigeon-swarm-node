@@ -35,9 +35,11 @@ describe('CommunityCreator', () => {
         mutation: mutation.toPrimitives(),
         parents: [],
       },
-      'bagaaieraavatar',
-      'bagaaierabanner',
-      { autoJoinEnabled: true },
+      {
+        autoJoinEnabled: true,
+        avatar: 'bagaaieraavatar',
+        banner: 'bagaaierabanner',
+      },
     );
 
     const community = await new CommunityCreator(

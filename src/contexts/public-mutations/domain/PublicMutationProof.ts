@@ -3,12 +3,10 @@ import canonicalize from 'canonicalize';
 import { createHash } from 'crypto';
 
 import { InvalidPublicMutationError } from './errors/InvalidPublicMutationError';
-import {
-  PublicMutationAuthorPrimitives,
-  PublicMutationBodyPrimitives,
-  PublicMutationKind,
-  PublicMutationProofPrimitives,
-} from './PublicMutationProofPrimitives';
+import { PublicMutationAuthorPrimitives } from './PublicMutationAuthorPrimitives';
+import { PublicMutationBodyPrimitives } from './PublicMutationBodyPrimitives';
+import { PublicMutationKind } from './PublicMutationKind';
+import { PublicMutationProofPrimitives } from './PublicMutationProofPrimitives';
 
 /**
  * Client-signed proof that an authorized device mutated one public record.

@@ -1395,6 +1395,21 @@ services:
       - '@shared/infrastructure/messageBus/DomainEventConsumer'
       - '@contexts/push-notifications/application/send/PushNotificationDispatcher'
     parent: apps/consumers/pubsub/push/SendPushNotificationWhenEventReceived
+  apps/initializers/public-mutations/CommunityChannelMutationPolicies:
+    class: /apps/initializers/public-mutations/CommunityChannelMutationPolicies
+    arguments:
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageMutationPolicy
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageReactionMutationPolicy
+  apps/initializers/public-mutations/PollMutationPolicies:
+    class: /apps/initializers/public-mutations/PollMutationPolicies
+    arguments:
+      - '@contexts/polls/infrastructure/orbitdb/policies/PollMutationPolicy'
+      - '@contexts/polls/infrastructure/orbitdb/policies/PollVoteMutationPolicy'
+      - '@contexts/polls/infrastructure/orbitdb/policies/PollCloseMutationPolicy'
   apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime:
     class: /apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime
     arguments:
@@ -1693,6 +1708,28 @@ services:
       - '@apps/apis/calls-api/CallRelayRecordDiscovery'
       - '@apps/apis/calls-api/CallRelayRecordSigner'
       - '@apps/apis/calls-api/FederatedCallRelayCredentials'
+  apps/initializers/public-mutations/ConversationMutationPolicies:
+    class: /apps/initializers/public-mutations/ConversationMutationPolicies
+    arguments:
+      - >-
+        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageMutationPolicy
+      - >-
+        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy
+      - >-
+        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy
+      - >-
+        @contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy
+  apps/initializers/public-mutations/StickerMutationPolicies:
+    class: /apps/initializers/public-mutations/StickerMutationPolicies
+    arguments:
+      - >-
+        @contexts/stickers/infrastructure/orbitdb/policies/StickerPackMutationPolicy
+      - >-
+        @contexts/stickers/infrastructure/orbitdb/policies/StickerFavoriteMutationPolicy
+      - >-
+        @contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy
+      - >-
+        @contexts/stickers/infrastructure/orbitdb/policies/StickerRecentMutationPolicy
   apps/runtimes/call-signal-delivery-maintenance-runtime/CallSignalDeliveryMaintenanceRuntime:
     class: >-
       /apps/runtimes/call-signal-delivery-maintenance-runtime/CallSignalDeliveryMaintenanceRuntime
@@ -2121,6 +2158,19 @@ services:
         @contexts/communities/domain/repositories/CommunityChannelMessageRepository
       - >-
         @contexts/communities/domain/repositories/CommunityMessageReactionRepository
+  apps/initializers/public-mutations/CommunityGovernanceMutationPolicies:
+    class: /apps/initializers/public-mutations/CommunityGovernanceMutationPolicies
+    arguments:
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityModerationLogMutationPolicy
+      - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityOperationMutationPolicy
   contexts/calls/application/leave-call/CallLeaver:
     class: /contexts/calls/application/leave-call/CallLeaver
     arguments:
@@ -2349,6 +2399,16 @@ services:
         @contexts/private-authorization/application/accept-operation/PrivateControlTransitionProcessor
       - >-
         @contexts/private-authorization/application/accept-operation/PrivateControlMutationAuthorizer
+  apps/initializers/public-mutations/PublicMutationGateInitializer:
+    class: /apps/initializers/public-mutations/PublicMutationGateInitializer
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
+      - '@apps/initializers/public-mutations/CommunityChannelMutationPolicies'
+      - '@apps/initializers/public-mutations/CommunityGovernanceMutationPolicies'
+      - '@apps/initializers/public-mutations/ConversationMutationPolicies'
+      - '@apps/initializers/public-mutations/StickerMutationPolicies'
+      - '@apps/initializers/public-mutations/PollMutationPolicies'
   contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationDocumentMerger:
     class: >-
       /contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationDocumentMerger
@@ -2378,46 +2438,6 @@ services:
       - '@contexts/calls/domain/repositories/CallRepository'
       - '@contexts/calls/domain/repositories/CallParticipantLeaseRepository'
       - '@contexts/calls/application/authorize-call/CallAccessAuthorizer'
-  apps/initializers/public-mutations/PublicMutationGateInitializer:
-    class: /apps/initializers/public-mutations/PublicMutationGateInitializer
-    arguments:
-      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
-      - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
-      - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageMutationPolicy
-      - >-
-        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageMutationPolicy
-      - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy
-      - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageReactionMutationPolicy
-      - >-
-        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy
-      - >-
-        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy
-      - >-
-        @contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy
-      - >-
-        @contexts/stickers/infrastructure/orbitdb/policies/StickerPackMutationPolicy
-      - >-
-        @contexts/stickers/infrastructure/orbitdb/policies/StickerFavoriteMutationPolicy
-      - >-
-        @contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy
-      - >-
-        @contexts/stickers/infrastructure/orbitdb/policies/StickerRecentMutationPolicy
-      - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy
-      - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy
-      - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy
-      - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityModerationLogMutationPolicy
-      - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityOperationMutationPolicy
-      - '@contexts/polls/infrastructure/orbitdb/policies/PollMutationPolicy'
-      - '@contexts/polls/infrastructure/orbitdb/policies/PollVoteMutationPolicy'
-      - '@contexts/polls/infrastructure/orbitdb/policies/PollCloseMutationPolicy'
   shared/infrastructure/http/HttpClient: '@shared/infrastructure/http/FetchHttpClient'
   shared/infrastructure/logs/Log: '@shared/infrastructure/logs/WinstonLogger'
   shared/infrastructure/messageBus/MessageBusAdapter: '@shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter'

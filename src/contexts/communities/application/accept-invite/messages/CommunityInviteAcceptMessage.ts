@@ -3,10 +3,8 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { Timestamp } from '@haskou/value-objects';
 
 import { CommunityInviteToken } from '../../../domain/value-objects/CommunityInviteToken';
-import {
-  CommunityOperationMutation,
-  CommunityOperationMutationPrimitives,
-} from '../../record-operation/CommunityOperationMutation';
+import { CommunityOperationMutation } from '../../record-operation/CommunityOperationMutation';
+import { CommunityOperationMutationPrimitives } from '../../record-operation/CommunityOperationMutationPrimitives';
 
 export class CommunityInviteAcceptMessage {
   public readonly actorIdentityId: IdentityId;
