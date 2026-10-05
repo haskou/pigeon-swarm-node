@@ -1,5 +1,14 @@
+import { CommunityModerationLogDetails } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationLogDetails';
+import { CommunityModerationLogEntry } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationLogEntry';
+import { CommunityModerationTarget } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationTarget';
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
+import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { Timestamp } from '@haskou/value-objects';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
 import { rm } from 'node:fs/promises';
@@ -121,17 +130,17 @@ async function startIsolatedNodes(
   key: string,
 ): Promise<void> {
   const configurations = nodes.map((_, index) => ({
-    publicHost: '127.0.0.1',
     callsRelay: { port: 19501 + index },
-    privateRelay: {
-      enabled: true,
-      portStart: 19400 + index * 10,
-      portEnd: 19409 + index * 10,
-      publicationEnabled: false,
-      discoveryEnabled: false,
-    },
-    publicNetwork: { enabled: false },
     manualRelayMultiaddrs: [] as string[],
+    privateRelay: {
+      discoveryEnabled: false,
+      enabled: true,
+      portEnd: 19409 + index * 10,
+      portStart: 19400 + index * 10,
+      publicationEnabled: false,
+    },
+    publicHost: '127.0.0.1',
+    publicNetwork: { enabled: false },
   }));
   for (const [index, node] of nodes.entries()) {
     await startNode(node);
@@ -249,11 +258,56 @@ async function main(): Promise<void> {
       },
       identities[0],
     );
+    const channelCreatedAt = Date.now();
+    const channelEntry = CommunityModerationLogEntry.create(
+      new CommunityId(community.id),
+      new IdentityId(identities[0].id),
+      CommunityModerationAction.CHANNEL_CREATED,
+      CommunityModerationTarget.create(
+        CommunityModerationTargetType.CHANNEL,
+        CommunityChannelId.derive(
+          community.id,
+          identities[0].id,
+          channelCreatedAt,
+        ),
+      ),
+      new CommunityModerationLogDetails({ name: 'voice', type: 'voice' }),
+      new Timestamp(channelCreatedAt),
+    );
+    const channelLogPayload = {
+      ...channelEntry.toPrimitives(),
+      scopeType: 'community_moderation_log',
+    };
+    const channelLogBody = {
+      author: {
+        deviceCredential: identities[0].deviceCredential,
+        identityId: identities[0].id,
+      },
+      kind: 'put',
+      operationId: 'call-privacy-channel-log'.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(channelLogPayload),
+      predecessor: null as string | null,
+      recordId: channelLogPayload.id,
+      sequence: 0,
+      store: 'moderationLogs',
+      version: 1,
+    } as const;
     const channel = await request<{ id: string }>(
       nodes[0],
       'POST',
       `/communities/${community.id}/channels/voice`,
-      { name: 'voice' },
+      {
+        moderationLog: {
+          createdAt: channelCreatedAt,
+          mutation: PublicMutationProof.signed(
+            channelLogBody,
+            identities[0].deviceKeyPair.sign(
+              PublicMutationProof.signingContentOf(channelLogBody),
+            ),
+          ).toPrimitives(),
+        },
+        name: 'voice',
+      },
       identities[0],
     );
     const requesterId = identities[1].id;
