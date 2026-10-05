@@ -3672,25 +3672,14 @@ Request:
 
 ```json
 {
-  "id": "<clientGeneratedDeletionId>",
-  "createdAt": 1773848829055,
-  "signature": "<deletionSignature>"
+  "mutation": { "...": "client-signed removal proof for the `messages` record" },
+  "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "..." } }
 }
 ```
 
-The deletion signature covers:
-
-```json
-{
-  "actorIdentityId": "<identityId>",
-  "channelId": "<channelId>",
-  "communityId": "<communityId>",
-  "createdAt": 1773848829055,
-  "id": "<clientGeneratedDeletionId>",
-  "targetMessageId": "<messageId>",
-  "type": "deleted"
-}
-```
+`mutation` is the signed tombstone of the message record. `moderationLog` is
+the signed `message_deleted` entry (see *Signed moderation log entries*) with
+target `message`/`messageId` and details `{ channelId, targetMessageAuthorId }`.
 
 Response:
 
