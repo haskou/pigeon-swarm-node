@@ -2,6 +2,7 @@ import { HeliaInstance } from '@app/contexts/shared/infrastructure/ipfs/helia/ad
 
 import { OrbitDBCore } from './OrbitDBCore';
 import { OrbitDBInstance } from './OrbitDBInstance';
+import { withSingleFlightBlocks } from './OrbitDBSingleFlightBlocks';
 
 export class OrbitDBRuntimeAdapter {
   private orbitDBModulePromise?: Promise<OrbitDBCore>;
@@ -28,7 +29,10 @@ export class OrbitDBRuntimeAdapter {
   }): Promise<OrbitDBInstance> {
     const orbitDBModule = await this.loadOrbitDBModule();
 
-    return orbitDBModule.createOrbitDB(options);
+    return orbitDBModule.createOrbitDB({
+      ...options,
+      ipfs: withSingleFlightBlocks(options.ipfs),
+    });
   }
 
   public async createDocumentsDatabase(): Promise<unknown> {
