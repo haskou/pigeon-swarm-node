@@ -3,7 +3,7 @@ import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/Devic
 import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
-import { PublicMutationAuthorPrimitives } from '../domain/PublicMutationProofPrimitives';
+import { PublicMutationAuthorPrimitives } from '../domain/PublicMutationAuthorPrimitives';
 import { PublicMutationAuthorAuthorization } from '../domain/services/PublicMutationAuthorAuthorization';
 import { ShortLivedLookup } from './ShortLivedLookup';
 

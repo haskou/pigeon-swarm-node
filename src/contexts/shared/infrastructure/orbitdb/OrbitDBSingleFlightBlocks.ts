@@ -1,17 +1,18 @@
 import type { HeliaInstance } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
 
 type HeliaBlocks = HeliaInstance['blockstore'];
-type BlockCid = Parameters<HeliaBlocks['get']>[0];
-type BlockGetOptions = NonNullable<Parameters<HeliaBlocks['get']>[1]>;
-
-type BlockRetrieval = {
-  readonly chunks: Promise<Uint8Array[]>;
-  readonly controller: AbortController;
-  settled: boolean;
-  waiters: number;
-};
 
 function singleFlightBlocks(blocks: HeliaBlocks): HeliaBlocks {
+  type BlockCid = Parameters<HeliaBlocks['get']>[0];
+  type BlockGetOptions = NonNullable<Parameters<HeliaBlocks['get']>[1]>;
+
+  type BlockRetrieval = {
+    readonly chunks: Promise<Uint8Array[]>;
+    readonly controller: AbortController;
+    settled: boolean;
+    waiters: number;
+  };
+
   const retrievals = new Map<string, BlockRetrieval>();
 
   const startRetrieval = (

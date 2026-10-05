@@ -98,8 +98,8 @@ describe('OrbitDBPollRepository', () => {
         PollOption.create(new PollOptionId('yes-1'), new PollOptionText('Yes')),
         PollOption.create(new PollOptionId('no-1'), new PollOptionText('No')),
       ],
-      false,
       new Timestamp(1_780_000_000_000),
+      { allowsMultipleVotes: false },
     );
   }
 

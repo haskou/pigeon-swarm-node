@@ -172,8 +172,7 @@ describe('Community invitation use cases', () => {
       at,
       proof,
       moderationLog(),
-      expiresAt,
-      5,
+      { expiresAt, maxUses: 5 },
     );
     const invite = mock<CommunityInvite>();
     invite.getToken.mockReturnValue(new CommunityInviteToken(INVITE_TOKEN));

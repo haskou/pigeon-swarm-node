@@ -807,8 +807,8 @@ async function main(): Promise<void> {
       PollOption.create(new PollOptionId('a'), new PollOptionText('A')),
       PollOption.create(new PollOptionId('b'), new PollOptionText('B')),
     ],
-    false,
     new Timestamp(1780000000000),
+    { allowsMultipleVotes: false },
   );
   const pollProof = (
     kind: 'put' | 'delete',

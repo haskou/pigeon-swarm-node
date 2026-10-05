@@ -3,14 +3,10 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
 import { CommunityPermission } from '../../../domain/value-objects/CommunityPermission';
 import { CommunityRoleName } from '../../../domain/value-objects/CommunityRoleName';
-import {
-  CommunityModerationLogMutation,
-  CommunityModerationLogMutationPrimitives,
-} from '../../record-moderation-log/CommunityModerationLogMutation';
-import {
-  CommunityOperationMutation,
-  CommunityOperationMutationPrimitives,
-} from '../../record-operation/CommunityOperationMutation';
+import { CommunityModerationLogMutation } from '../../record-moderation-log/CommunityModerationLogMutation';
+import { CommunityModerationLogMutationPrimitives } from '../../record-moderation-log/CommunityModerationLogMutationPrimitives';
+import { CommunityOperationMutation } from '../../record-operation/CommunityOperationMutation';
+import { CommunityOperationMutationPrimitives } from '../../record-operation/CommunityOperationMutationPrimitives';
 
 export class CommunityRoleCreateMessage {
   public readonly actorIdentityId: IdentityId;

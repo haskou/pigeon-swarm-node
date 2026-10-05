@@ -5,14 +5,10 @@ import { CommunityBanner } from '../../../domain/value-objects/CommunityBanner';
 import { CommunityDescription } from '../../../domain/value-objects/CommunityDescription';
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
 import { CommunityName } from '../../../domain/value-objects/CommunityName';
-import {
-  CommunityModerationLogMutation,
-  CommunityModerationLogMutationPrimitives,
-} from '../../record-moderation-log/CommunityModerationLogMutation';
-import {
-  CommunityOperationMutation,
-  CommunityOperationMutationPrimitives,
-} from '../../record-operation/CommunityOperationMutation';
+import { CommunityModerationLogMutation } from '../../record-moderation-log/CommunityModerationLogMutation';
+import { CommunityModerationLogMutationPrimitives } from '../../record-moderation-log/CommunityModerationLogMutationPrimitives';
+import { CommunityOperationMutation } from '../../record-operation/CommunityOperationMutation';
+import { CommunityOperationMutationPrimitives } from '../../record-operation/CommunityOperationMutationPrimitives';
 
 export class CommunityProfileUpdateMessage {
   public readonly actorIdentityId: IdentityId;

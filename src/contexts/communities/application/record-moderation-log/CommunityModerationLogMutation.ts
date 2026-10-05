@@ -1,10 +1,7 @@
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { Timestamp } from '@haskou/value-objects';
 
-export interface CommunityModerationLogMutationPrimitives {
-  createdAt: number;
-  mutation: unknown;
-}
+import { CommunityModerationLogMutationPrimitives } from './CommunityModerationLogMutationPrimitives';
 
 /** The client-signed `moderationLogs` put that accompanies a moderation action. */
 export class CommunityModerationLogMutation {

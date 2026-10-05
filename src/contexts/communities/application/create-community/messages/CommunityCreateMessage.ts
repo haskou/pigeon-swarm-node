@@ -4,10 +4,8 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { CommunityOperation } from '../../../domain/operations/CommunityOperation';
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
 import { CommunityOperationAction } from '../../../domain/value-objects/CommunityOperationAction';
-import {
-  CommunityOperationMutation,
-  CommunityOperationMutationPrimitives,
-} from '../../record-operation/CommunityOperationMutation';
+import { CommunityOperationMutation } from '../../record-operation/CommunityOperationMutation';
+import { CommunityOperationMutationPrimitives } from '../../record-operation/CommunityOperationMutationPrimitives';
 
 export class CommunityCreateMessage {
   public readonly genesis: CommunityOperation;
@@ -20,10 +18,10 @@ export class CommunityCreateMessage {
     name: string,
     description: string,
     operation: CommunityOperationMutationPrimitives,
-    avatar?: string,
-    banner?: string,
     options: {
       autoJoinEnabled?: boolean;
+      avatar?: string;
+      banner?: string;
       discoverable?: boolean;
       visibility?: string;
     } = {},
@@ -41,8 +39,8 @@ export class CommunityCreateMessage {
         name,
         nonce,
         visibility: options.visibility ?? 'private',
-        ...(avatar ? { avatar } : {}),
-        ...(banner ? { banner } : {}),
+        ...(options.avatar ? { avatar: options.avatar } : {}),
+        ...(options.banner ? { banner: options.banner } : {}),
       },
       author: owner,
       communityId: CommunityId.derive(

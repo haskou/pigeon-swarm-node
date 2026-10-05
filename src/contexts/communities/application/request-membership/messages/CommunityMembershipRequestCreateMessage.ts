@@ -3,10 +3,8 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { Timestamp } from '@haskou/value-objects';
 
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
-import {
-  CommunityOperationMutation,
-  CommunityOperationMutationPrimitives,
-} from '../../record-operation/CommunityOperationMutation';
+import { CommunityOperationMutation } from '../../record-operation/CommunityOperationMutation';
+import { CommunityOperationMutationPrimitives } from '../../record-operation/CommunityOperationMutationPrimitives';
 
 export class CommunityMembershipRequestCreateMessage {
   public readonly acceptedAt?: Timestamp;

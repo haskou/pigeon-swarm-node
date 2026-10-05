@@ -6,14 +6,10 @@ import { CommunityRequestAcceptanceOperationRequiredError } from '../../../domai
 import { InvalidCommunityRequestResolutionStatusError } from '../../../domain/errors/InvalidCommunityRequestResolutionStatusError';
 import { CommunityRequestId } from '../../../domain/value-objects/CommunityRequestId';
 import { CommunityRequestStatus } from '../../../domain/value-objects/CommunityRequestStatus';
-import {
-  CommunityModerationLogMutation,
-  CommunityModerationLogMutationPrimitives,
-} from '../../record-moderation-log/CommunityModerationLogMutation';
-import {
-  CommunityOperationMutation,
-  CommunityOperationMutationPrimitives,
-} from '../../record-operation/CommunityOperationMutation';
+import { CommunityModerationLogMutation } from '../../record-moderation-log/CommunityModerationLogMutation';
+import { CommunityModerationLogMutationPrimitives } from '../../record-moderation-log/CommunityModerationLogMutationPrimitives';
+import { CommunityOperationMutation } from '../../record-operation/CommunityOperationMutation';
+import { CommunityOperationMutationPrimitives } from '../../record-operation/CommunityOperationMutationPrimitives';
 
 export class CommunityMembershipRequestUpdateMessage {
   private readonly operation?: CommunityOperationMutation;

@@ -1,4 +1,4 @@
-type Window = { count: number; resetAt: number };
+import { WebSocketAdmissionWindow } from './WebSocketAdmissionWindow';
 
 /**
  * Bounds WebSocket upgrade attempts per remote address and the number of
@@ -10,7 +10,7 @@ export class WebSocketAdmissionLimiter {
   public static readonly UPGRADES_PER_ADDRESS = 60;
   public static readonly WINDOW_MS = 60_000;
 
-  private readonly addresses = new Map<string, Window>();
+  private readonly addresses = new Map<string, WebSocketAdmissionWindow>();
 
   private evictExpired(now: number): void {
     if (this.addresses.size < WebSocketAdmissionLimiter.MAX_TRACKED_ADDRESSES) {

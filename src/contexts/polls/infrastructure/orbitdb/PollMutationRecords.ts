@@ -6,19 +6,8 @@ import { Poll } from '../../domain/Poll';
 import { PollScope } from '../../domain/PollScope';
 import { PollId } from '../../domain/value-objects/PollId';
 import { PollOptionId } from '../../domain/value-objects/PollOptionId';
-
-export interface PollVoteRecord {
-  createdAt: number;
-  optionIds: string[];
-  pollId: string;
-  voterIdentityId: string;
-}
-
-export interface PollCloseRecord {
-  closedByIdentityId: string;
-  createdAt: number;
-  pollId: string;
-}
+import { PollCloseRecord } from './PollCloseRecord';
+import { PollVoteRecord } from './PollVoteRecord';
 
 /** Wire format of the signed `polls` records: definition, ballot and close. */
 export default class PollMutationRecords {

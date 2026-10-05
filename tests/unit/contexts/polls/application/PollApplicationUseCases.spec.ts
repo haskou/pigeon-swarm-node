@@ -54,13 +54,15 @@ describe('Poll application use cases', () => {
         'poll-1',
         creatorIdentityId,
         pollScope(),
-        'Choose one',
-        [
-          { id: 'a', text: 'Option A' },
-          { id: 'b', text: 'Option B' },
-        ],
-        false,
-        audience,
+        {
+          allowsMultipleVotes: false,
+          audience,
+          options: [
+            { id: 'a', text: 'Option A' },
+            { id: 'b', text: 'Option B' },
+          ],
+          question: 'Choose one',
+        },
         createdAt,
         createProof,
       ),
@@ -233,8 +235,8 @@ describe('Poll application use cases', () => {
       conversationScope,
       new PollQuestion('Choose one'),
       pollOptions(),
-      false,
       new Timestamp(createdAt),
+      { allowsMultipleVotes: false },
     );
 
     conversationRepository.findById.mockResolvedValue(conversation);
@@ -280,7 +282,7 @@ function createPoll(): Poll {
     pollScope(),
     new PollQuestion('Choose one'),
     pollOptions(),
-    false,
     new Timestamp(createdAt),
+    { allowsMultipleVotes: false },
   );
 }

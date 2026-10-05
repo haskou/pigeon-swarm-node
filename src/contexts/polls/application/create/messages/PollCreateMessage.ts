@@ -26,23 +26,27 @@ export class PollCreateMessage {
     pollId: string,
     creatorIdentityId: string,
     scope: PollScope,
-    question: string,
-    options: Array<{
-      id: string;
-      text: string;
-    }>,
-    allowsMultipleVotes: boolean,
-    audience: PollAudience,
+    definition: {
+      allowsMultipleVotes: boolean;
+      audience: PollAudience;
+      expiresAt?: number;
+      options: Array<{
+        id: string;
+        text: string;
+      }>;
+      question: string;
+    },
     createdAt: number,
     proof: unknown,
-    expiresAt?: number,
   ) {
-    this.allowsMultipleVotes = allowsMultipleVotes;
-    this.audience = audience;
+    this.allowsMultipleVotes = definition.allowsMultipleVotes;
+    this.audience = definition.audience;
     this.createdAt = new Timestamp(createdAt);
     this.creatorIdentityId = new IdentityId(creatorIdentityId);
-    this.expiresAt = expiresAt ? new Timestamp(expiresAt) : undefined;
-    this.options = options.map((option) =>
+    this.expiresAt = definition.expiresAt
+      ? new Timestamp(definition.expiresAt)
+      : undefined;
+    this.options = definition.options.map((option) =>
       PollOption.create(
         new PollOptionId(option.id),
         new PollOptionText(option.text),
@@ -50,7 +54,7 @@ export class PollCreateMessage {
     );
     this.pollId = new PollId(pollId);
     this.proof = PublicMutationProof.fromPrimitives(proof);
-    this.question = new PollQuestion(question);
+    this.question = new PollQuestion(definition.question);
     this.scope = scope;
   }
 

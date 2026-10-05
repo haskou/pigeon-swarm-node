@@ -35,30 +35,32 @@ describe('OrbitDBCommunityModerationLogRepository', () => {
   beforeEach(async () => {
     heads.clear();
     moderationLogs.splice(0);
-    headsPut = jest.fn(async (key: string, value: Record<string, unknown>) => {
+    headsPut = jest.fn((key: string, value: Record<string, unknown>) => {
       heads.set(key, value);
 
-      return 'ok';
+      return Promise.resolve('ok');
     });
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
     await registry.register('network-1', {
       heads: {
-        all: jest.fn(async () =>
-          [...heads.entries()].map(([key, value]) => ({ key, value })),
+        all: jest.fn(() =>
+          Promise.resolve(
+            [...heads.entries()].map(([key, value]) => ({ key, value })),
+          ),
         ),
-        get: jest.fn(async (key: string) => {
+        get: jest.fn((key: string) => {
           const value = heads.get(key);
 
-          return value ? { key, value } : undefined;
+          return Promise.resolve(value ? { key, value } : undefined);
         }),
         put: headsPut,
       },
       moderationLogs: {
-        put: jest.fn(async (document) => {
+        put: jest.fn((document) => {
           moderationLogs.push(document as Record<string, unknown>);
 
-          return 'ok';
+          return Promise.resolve('ok');
         }),
       },
     } as never);

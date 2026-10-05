@@ -4,10 +4,8 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { CommunityChannelId } from '../../../domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../../../domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
-import {
-  CommunityModerationLogMutation,
-  CommunityModerationLogMutationPrimitives,
-} from '../../record-moderation-log/CommunityModerationLogMutation';
+import { CommunityModerationLogMutation } from '../../record-moderation-log/CommunityModerationLogMutation';
+import { CommunityModerationLogMutationPrimitives } from '../../record-moderation-log/CommunityModerationLogMutationPrimitives';
 
 export class CommunityChannelMessageDeleteMessage {
   public readonly actorIdentityId: IdentityId;

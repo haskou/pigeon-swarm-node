@@ -17,10 +17,12 @@ export class PollCreator {
       message.scope,
       message.question,
       message.options,
-      message.allowsMultipleVotes,
       message.createdAt,
-      message.expiresAt,
-      message.audience,
+      {
+        allowsMultipleVotes: message.allowsMultipleVotes,
+        audience: message.audience,
+        expiresAt: message.expiresAt,
+      },
     );
 
     await this.repository.save(poll, message.getProof());
