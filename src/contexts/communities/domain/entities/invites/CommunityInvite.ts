@@ -5,6 +5,7 @@ import { CommunityInviteExpiredError } from '../../errors/CommunityInviteExpired
 import { CommunityInviteUsesExceededError } from '../../errors/CommunityInviteUsesExceededError';
 import { CommunityId } from '../../value-objects/CommunityId';
 import { CommunityInviteMaxUses } from '../../value-objects/CommunityInviteMaxUses';
+import { CommunityInviteNonce } from '../../value-objects/CommunityInviteNonce';
 import { CommunityInviteToken } from '../../value-objects/CommunityInviteToken';
 import { CommunityInviteUses } from '../../value-objects/CommunityInviteUses';
 import { EncryptedCommunityInviteKey } from '../../value-objects/EncryptedCommunityInviteKey';
@@ -15,18 +16,24 @@ export class CommunityInvite {
   public static create(
     communityId: CommunityId,
     creatorIdentityId: IdentityId,
+    nonce: CommunityInviteNonce,
+    createdAt: Timestamp,
     expiresAt?: Timestamp,
     maxUses: CommunityInviteMaxUses = new CommunityInviteMaxUses(1),
     encryptedCommunityKey?: EncryptedCommunityInviteKey,
   ): CommunityInvite {
     const invite = new CommunityInvite(
-      CommunityInviteToken.generate(),
+      CommunityInviteToken.derive(
+        communityId.valueOf(),
+        creatorIdentityId.valueOf(),
+        nonce.valueOf(),
+      ),
       communityId,
       creatorIdentityId,
-      Timestamp.now(),
+      nonce,
+      createdAt,
       expiresAt,
       maxUses,
-      CommunityInviteUses.zero(),
     );
 
     invite.setEncryptedCommunityKey(encryptedCommunityKey);
@@ -41,10 +48,10 @@ export class CommunityInvite {
       new CommunityInviteToken(primitives.token),
       new CommunityId(primitives.communityId),
       new IdentityId(primitives.creatorIdentityId),
+      new CommunityInviteNonce(primitives.nonce),
       new Timestamp(primitives.createdAt),
       primitives.expiresAt ? new Timestamp(primitives.expiresAt) : undefined,
       new CommunityInviteMaxUses(primitives.maxUses),
-      new CommunityInviteUses(primitives.uses),
     );
 
     invite.setEncryptedCommunityKey(
@@ -62,19 +69,11 @@ export class CommunityInvite {
     private readonly token: CommunityInviteToken,
     private readonly communityId: CommunityId,
     private readonly creatorIdentityId: IdentityId,
+    private readonly nonce: CommunityInviteNonce,
     private readonly createdAt: Timestamp,
     private readonly expiresAt: Timestamp | undefined,
     private readonly maxUses: CommunityInviteMaxUses,
-    private uses: CommunityInviteUses,
   ) {}
-
-  private isExpired(now: Timestamp): boolean {
-    return this.expiresAt?.isBeforeOrEqual(now) ?? false;
-  }
-
-  private hasUsesAvailable(): boolean {
-    return this.uses.isLessThan(this.maxUses);
-  }
 
   private setEncryptedCommunityKey(
     encryptedCommunityKey?: EncryptedCommunityInviteKey,
@@ -82,19 +81,23 @@ export class CommunityInvite {
     this.encryptedCommunityKey = encryptedCommunityKey;
   }
 
-  private assertCanBeAccepted(now: Timestamp = Timestamp.now()): void {
+  public isExpired(now: Timestamp = Timestamp.now()): boolean {
+    return this.expiresAt?.isBeforeOrEqual(now) ?? false;
+  }
+
+  /**
+   * Uses are signed records written by each acceptor, so concurrent
+   * acceptances on partitioned nodes can exceed maxUses.
+   */
+  public checkAcceptanceAvailability(
+    uses: CommunityInviteUses,
+    now: Timestamp = Timestamp.now(),
+  ): void {
     assert(!this.isExpired(now), new CommunityInviteExpiredError());
-    assert(this.hasUsesAvailable(), new CommunityInviteUsesExceededError());
-  }
-
-  public checkAcceptanceAvailability(now: Timestamp = Timestamp.now()): void {
-    this.assertCanBeAccepted(now);
-  }
-
-  public accept(now: Timestamp = Timestamp.now()): void {
-    this.assertCanBeAccepted(now);
-
-    this.uses = this.uses.next();
+    assert(
+      uses.isLessThan(this.maxUses),
+      new CommunityInviteUsesExceededError(),
+    );
   }
 
   public getCommunityId(): CommunityId {
@@ -117,8 +120,8 @@ export class CommunityInvite {
       encryptedCommunityKey: this.encryptedCommunityKey?.toPrimitives(),
       expiresAt: this.expiresAt?.valueOf(),
       maxUses: this.maxUses.valueOf(),
+      nonce: this.nonce.valueOf(),
       token: this.token.valueOf(),
-      uses: this.uses.valueOf(),
     };
   }
 }

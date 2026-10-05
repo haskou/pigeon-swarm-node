@@ -1,6 +1,8 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
+import { assert } from '@haskou/value-objects';
 
 import { CommunityMembershipRequest } from '../../domain/entities/membership/CommunityMembershipRequest';
+import { CommunityRequestAutoAcceptanceRequiredError } from '../../domain/errors/CommunityRequestAutoAcceptanceRequiredError';
 import CommunityMembershipRequestRepository from '../../domain/repositories/CommunityMembershipRequestRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import CommunityFinder from '../find-community/CommunityFinder';
@@ -17,10 +19,18 @@ export default class CommunityMembershipRequester {
   private async acceptAutomatically(
     community: Awaited<ReturnType<CommunityFinder['find']>>,
     membershipRequest: CommunityMembershipRequest,
+    message: CommunityMembershipRequestCreateMessage,
   ): Promise<void> {
-    community.acceptMembershipRequestAutomatically(membershipRequest);
+    assert(
+      message.acceptedAt !== undefined && message.acceptedProof !== undefined,
+      new CommunityRequestAutoAcceptanceRequiredError(),
+    );
+    community.acceptMembershipRequestAutomatically(
+      membershipRequest,
+      message.acceptedAt,
+    );
     await this.communityRepository.save(community);
-    await this.requestRepository.save(membershipRequest);
+    await this.requestRepository.save(membershipRequest, message.acceptedProof);
     await this.eventPublisher.publish(community.pullDomainEvents());
     await this.eventPublisher.publish(membershipRequest.pullDomainEvents());
   }
@@ -43,13 +53,7 @@ export default class CommunityMembershipRequester {
 
     community.requestMembership(message.actorIdentityId);
 
-    if (pendingRequest && community.isAutoJoinEnabled()) {
-      await this.acceptAutomatically(community, pendingRequest);
-
-      return pendingRequest;
-    }
-
-    if (pendingRequest) {
+    if (pendingRequest && !community.isAutoJoinEnabled()) {
       return pendingRequest;
     }
 
@@ -59,15 +63,17 @@ export default class CommunityMembershipRequester {
 
     const membershipRequest = community.createMembershipRequest(
       message.actorIdentityId,
+      message.createdAt,
     );
 
+    await this.requestRepository.save(membershipRequest, message.proof);
+
     if (community.isAutoJoinEnabled()) {
-      await this.acceptAutomatically(community, membershipRequest);
+      await this.acceptAutomatically(community, membershipRequest, message);
 
       return membershipRequest;
     }
 
-    await this.requestRepository.save(membershipRequest);
     await this.eventPublisher.publish(membershipRequest.pullDomainEvents());
 
     return membershipRequest;

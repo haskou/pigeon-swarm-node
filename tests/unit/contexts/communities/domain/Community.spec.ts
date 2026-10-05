@@ -17,6 +17,7 @@ import { CommunityName } from '@app/contexts/communities/domain/value-objects/Co
 import { CommunityVisibility } from '@app/contexts/communities/domain/value-objects/CommunityVisibility';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { Timestamp } from '@haskou/value-objects';
 
 describe('Community', () => {
   const owner = new IdentityId(
@@ -248,7 +249,10 @@ describe('Community', () => {
   it('records the owner identity in join request events', () => {
     const community = createCommunity();
     community.pullDomainEvents();
-    const request = community.createMembershipRequest(member);
+    const request = community.createMembershipRequest(
+      member,
+      new Timestamp(1780000000000),
+    );
     const event = request.pullDomainEvents()[0];
 
     expect(event.attributes).toMatchObject({

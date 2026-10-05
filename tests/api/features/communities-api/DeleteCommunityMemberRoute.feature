@@ -61,7 +61,7 @@ Feature: Delete community member API
     Given the community member signs the current community invite accept request
     When I POST to accept the current community invite
     Then response code is equal to 409
-    And response body should contain "Community invite not found"
+    And response body should contain "Community not found"
     Given the community member signs the community membership requests request
     When I GET community membership requests
     Then response body should not contain the current community id

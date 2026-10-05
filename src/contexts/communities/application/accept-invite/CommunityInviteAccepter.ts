@@ -28,8 +28,17 @@ export default class CommunityInviteAccepter {
     );
 
     community.requestMembership(message.actorIdentityId);
-    const acceptedInvite = await this.inviteRepository.consume(invite);
-    community.acceptInvite(message.actorIdentityId, acceptedInvite);
+    invite.checkAcceptanceAvailability(
+      await this.inviteRepository.countUses(invite),
+      message.usedAt,
+    );
+    await this.inviteRepository.recordUse(
+      invite,
+      message.actorIdentityId,
+      message.usedAt,
+      message.proof,
+    );
+    community.acceptInvite(message.actorIdentityId, invite);
 
     await this.communityRepository.save(community);
     await this.eventPublisher.publish(community.pullDomainEvents());

@@ -8,10 +8,14 @@ export class CommunityInviteDetailsViewModel {
   constructor(
     private readonly invite: CommunityInvite,
     private readonly community: Community,
+    private readonly uses: number,
   ) {}
 
   public toResource(): CommunityInviteDetailsResource {
-    const invite = new CommunityInviteViewModel(this.invite).toResource();
+    const invite = new CommunityInviteViewModel(
+      this.invite,
+      this.uses,
+    ).toResource();
     const community = this.community.toPrimitives();
 
     return {

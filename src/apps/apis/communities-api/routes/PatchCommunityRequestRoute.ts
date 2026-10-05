@@ -34,6 +34,8 @@ export class PatchCommunityRequestRoute extends CommunityRouteSupport {
         requestId,
         actorIdentityId.valueOf(),
         body.status,
+        body.updatedAt,
+        body.mutation,
       ),
     );
 

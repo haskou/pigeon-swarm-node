@@ -7,6 +7,8 @@ export interface PublicMutationRecordShapeExtras {
   optionalIntegers?: string[];
   /** Plain JSON objects whose inner shape the policy validates itself. */
   objects?: string[];
+  /** Plain JSON object, or null, or absent. */
+  optionalObjects?: string[];
   /** Strings that only a put carries. */
   putStrings?: string[];
   /** Plain JSON arrays whose items the policy validates itself. */
@@ -27,7 +29,10 @@ export class PublicMutationRecordShape {
   ) {}
 
   private hasKeysOf(record: Record<string, unknown>, extra: string[]): boolean {
-    const optional = this.extras.optionalIntegers ?? [];
+    const optional = [
+      ...(this.extras.optionalIntegers ?? []),
+      ...(this.extras.optionalObjects ?? []),
+    ];
     const required = [
       ...this.strings,
       ...this.integers,
@@ -67,13 +72,24 @@ export class PublicMutationRecordShape {
   }
 
   private hasValidStructures(record: Record<string, unknown>): boolean {
-    const { arrays = [], objects = [], optionalIntegers = [] } = this.extras;
+    const {
+      arrays = [],
+      objects = [],
+      optionalIntegers = [],
+      optionalObjects = [],
+    } = this.extras;
 
     return (
       objects.every((field) =>
         PublicMutationRecordShape.isObject(record[field]),
       ) &&
       arrays.every((field) => Array.isArray(record[field])) &&
+      optionalObjects.every(
+        (field) =>
+          record[field] === undefined ||
+          record[field] === null ||
+          PublicMutationRecordShape.isObject(record[field]),
+      ) &&
       optionalIntegers.every(
         (field) =>
           record[field] === undefined ||

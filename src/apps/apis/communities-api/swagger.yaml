@@ -468,7 +468,7 @@ paths:
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
       requestBody:
-        required: false
+        required: true
         content:
           application/json:
             schema:
@@ -514,6 +514,12 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityJoinRequestBody'
       responses:
         '200':
           description: Pending or auto-accepted join request.
@@ -536,6 +542,12 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityInviteAcceptBody'
       responses:
         '200':
           description: Invite accepted and community updated.
@@ -1464,9 +1476,17 @@ components:
             - public
     PatchCommunityMembershipRequestBody:
       type: object
+      description: The mutation signs the stored request document (same fields, new status and updatedAt) in store requests, recordId = request id, sequence above the previous one. Signer is the invitee (accept/decline an invitation), the creator (decline an invitation), a moderator or the owner (resolve a request) or the requester (decline own request).
       required:
         - status
+        - updatedAt
+        - mutation
       properties:
+        updatedAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
         status:
           type: string
           enum:
@@ -1873,14 +1893,36 @@ components:
           description: Set true to let any non-banned identity join without owner approval.
     PostCommunityMemberBody:
       type: object
+      description: The mutation signs a community_membership_request document of type invitation (creator = actor, identityId = invitee, status pending, updatedAt = createdAt). Its id is the first 24 hex chars of sha256(JSON.stringify([communityId, type, creatorIdentityId, identityId, createdAt])).
       required:
         - identityId
+        - createdAt
+        - mutation
       properties:
+        createdAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
         identityId:
           type: string
     PostCommunityInviteBody:
       type: object
+      description: The mutation signs a community_invite document in store requests whose id and token are base64url(sha256(JSON.stringify([communityId, creatorIdentityId, nonce]))). Signer is the creator.
+      required:
+        - nonce
+        - createdAt
+        - mutation
       properties:
+        nonce:
+          type: string
+          minLength: 16
+          maxLength: 128
+        createdAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
         encryptedCommunityKey:
           $ref: '#/components/schemas/EncryptedCommunityInviteKey'
         expiresAt:
@@ -1890,6 +1932,35 @@ components:
           type: integer
           minimum: 1
           default: 1
+    PostCommunityInviteAcceptBody:
+      type: object
+      description: The mutation signs a community_invite_use document {communityId, id 'invite-use:<token>:<identityId>', identityId, token, usedAt} in store requests. Signer is the acceptor. Uses are counted as signed use records, so maxUses can be exceeded under network partitions.
+      required:
+        - usedAt
+        - mutation
+      properties:
+        usedAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    PostCommunityJoinRequestBody:
+      type: object
+      description: The mutation signs a community_membership_request document of type request (creator = identity = requester, status pending, updatedAt = createdAt). For autoJoinEnabled communities acceptedAt and acceptedMutation are required; acceptedMutation signs the same document with status accepted, updatedAt = acceptedAt and sequence + 1, signed by the requester.
+      required:
+        - createdAt
+        - mutation
+      properties:
+        createdAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+        acceptedAt:
+          type: integer
+          minimum: 0
+        acceptedMutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
     EncryptedCommunityInviteKey:
       type: object
       required:

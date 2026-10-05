@@ -16,6 +16,7 @@ type IdentityFixture = {
   authorizationRevision: number;
   deviceCredential: string;
   deviceCredentialCommitment: string;
+  deviceKeyPair: KeyPair;
   externalIdentifier?: string;
   id: string;
   keyPair: KeyPair;
@@ -80,6 +81,7 @@ type IdentityResponse = {
   authorizationRevision: number;
   deviceCredential: string;
   deviceCredentialCommitment: string;
+  deviceKeyPair: KeyPair;
   identityExternalIdentifier: string;
   id: string;
   profile?: {
@@ -488,6 +490,7 @@ async function publishIdentity(
     authorizationRevision: response.authorizationRevision,
     deviceCredential: response.deviceCredential,
     deviceCredentialCommitment: response.deviceCredentialCommitment,
+    deviceKeyPair,
     externalIdentifier: response.identityExternalIdentifier,
     id: response.id,
     keyPair,
@@ -538,6 +541,7 @@ async function updateIdentity(
     authorizationRevision: response.authorizationRevision,
     deviceCredential: response.deviceCredential,
     deviceCredentialCommitment: response.deviceCredentialCommitment,
+    deviceKeyPair: identity.deviceKeyPair,
     externalIdentifier: response.identityExternalIdentifier,
     id: response.id,
     keyPair: identity.keyPair,

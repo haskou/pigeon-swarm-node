@@ -1,13 +1,34 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { Timestamp } from '@haskou/value-objects';
 
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
 
 export class CommunityMembershipRequestCreateMessage {
+  public readonly acceptedAt?: Timestamp;
+  public readonly acceptedProof?: PublicMutationProof;
   public readonly actorIdentityId: IdentityId;
   public readonly communityId: CommunityId;
+  public readonly createdAt: Timestamp;
+  public readonly proof: PublicMutationProof;
 
-  constructor(communityId: string, actorIdentityId: string) {
+  constructor(
+    communityId: string,
+    actorIdentityId: string,
+    createdAt: number,
+    proof: unknown,
+    acceptedAt?: number,
+    acceptedProof?: unknown,
+  ) {
+    this.acceptedAt =
+      acceptedAt === undefined ? undefined : new Timestamp(acceptedAt);
+    this.acceptedProof =
+      acceptedProof === undefined
+        ? undefined
+        : PublicMutationProof.fromPrimitives(acceptedProof);
     this.actorIdentityId = new IdentityId(actorIdentityId);
     this.communityId = new CommunityId(communityId);
+    this.createdAt = new Timestamp(createdAt);
+    this.proof = PublicMutationProof.fromPrimitives(proof);
   }
 }

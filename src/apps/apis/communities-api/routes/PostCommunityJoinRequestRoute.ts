@@ -2,8 +2,16 @@ import CommunityMembershipRequester from '@app/contexts/communities/application/
 import { CommunityMembershipRequestCreateMessage } from '@app/contexts/communities/application/request-membership/messages/CommunityMembershipRequestCreateMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  JsonController,
+  Param,
+  Post,
+  Req,
+  Res,
+} from 'routing-controllers';
 
+import { PostCommunityJoinRequestBody } from '../bodies/PostCommunityJoinRequestBody';
 import { CommunityMembershipRequestViewModel } from '../view-model/CommunityMembershipRequestViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
@@ -16,6 +24,7 @@ export class PostCommunityJoinRequestRoute extends CommunityRouteSupport {
   @Post('/:communityId/join-requests')
   public async requestJoin(
     @Param('communityId') communityId: string,
+    @Body() body: PostCommunityJoinRequestBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
@@ -24,6 +33,10 @@ export class PostCommunityJoinRequestRoute extends CommunityRouteSupport {
       new CommunityMembershipRequestCreateMessage(
         communityId,
         actorIdentityId.valueOf(),
+        body.createdAt,
+        body.mutation,
+        body.acceptedAt,
+        body.acceptedMutation,
       ),
     );
 

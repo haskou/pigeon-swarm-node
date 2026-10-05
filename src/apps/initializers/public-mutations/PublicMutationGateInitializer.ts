@@ -1,5 +1,8 @@
 import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy';
 import CommunityChannelMessageReactionMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageReactionMutationPolicy';
+import CommunityInviteMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy';
+import CommunityInviteUseMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy';
+import CommunityMembershipRequestMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy';
 import ConversationMessagePinMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy';
 import ConversationMessageReactionMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy';
 import NotificationScopeSettingsMutationPolicy from '@app/contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy';
@@ -24,6 +27,9 @@ export default class PublicMutationGateInitializer {
     private readonly stickerFavorites: StickerFavoriteMutationPolicy,
     private readonly stickerSavedPacks: StickerSavedPackMutationPolicy,
     private readonly stickerRecents: StickerRecentMutationPolicy,
+    private readonly communityInvites: CommunityInviteMutationPolicy,
+    private readonly communityInviteUses: CommunityInviteUseMutationPolicy,
+    private readonly communityMembershipRequests: CommunityMembershipRequestMutationPolicy,
   ) {}
 
   public ensure(): Promise<void> {
@@ -38,6 +44,9 @@ export default class PublicMutationGateInitializer {
         this.stickerFavorites,
         this.stickerSavedPacks,
         this.stickerRecents,
+        this.communityInvites,
+        this.communityInviteUses,
+        this.communityMembershipRequests,
       ]),
     );
 

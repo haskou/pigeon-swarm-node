@@ -1,3 +1,4 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { CommunityMembershipRequest } from '../entities/membership/CommunityMembershipRequest';
@@ -5,7 +6,6 @@ import { CommunityId } from '../value-objects/CommunityId';
 import { CommunityRequestId } from '../value-objects/CommunityRequestId';
 
 export default abstract class CommunityMembershipRequestRepository {
-  public abstract deleteByCommunity(communityId: CommunityId): Promise<void>;
   public abstract findByCommunityAndIdentity(
     communityId: CommunityId,
     identityId: IdentityId,
@@ -23,5 +23,8 @@ export default abstract class CommunityMembershipRequestRepository {
     ownerIdentityId: IdentityId,
   ): Promise<CommunityMembershipRequest[]>;
 
-  public abstract save(request: CommunityMembershipRequest): Promise<void>;
+  public abstract save(
+    request: CommunityMembershipRequest,
+    proof: PublicMutationProof,
+  ): Promise<void>;
 }

@@ -34,6 +34,8 @@ export class PostCommunityMemberRoute extends CommunityRouteSupport {
         communityId,
         actorIdentityId.valueOf(),
         body.identityId,
+        body.createdAt,
+        body.mutation,
       ),
     );
 

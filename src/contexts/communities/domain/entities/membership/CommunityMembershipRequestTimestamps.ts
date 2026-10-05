@@ -1,10 +1,8 @@
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 export class CommunityMembershipRequestTimestamps {
-  public static now(): CommunityMembershipRequestTimestamps {
-    const now = Timestamp.now();
-
-    return new CommunityMembershipRequestTimestamps(now, now);
+  public static at(createdAt: Timestamp): CommunityMembershipRequestTimestamps {
+    return new CommunityMembershipRequestTimestamps(createdAt, createdAt);
   }
 
   public static fromPrimitives(
@@ -21,11 +19,8 @@ export class CommunityMembershipRequestTimestamps {
     private readonly updatedAt: Timestamp,
   ) {}
 
-  public touch(): CommunityMembershipRequestTimestamps {
-    return new CommunityMembershipRequestTimestamps(
-      this.createdAt,
-      Timestamp.now(),
-    );
+  public touch(updatedAt: Timestamp): CommunityMembershipRequestTimestamps {
+    return new CommunityMembershipRequestTimestamps(this.createdAt, updatedAt);
   }
 
   public toPrimitives() {

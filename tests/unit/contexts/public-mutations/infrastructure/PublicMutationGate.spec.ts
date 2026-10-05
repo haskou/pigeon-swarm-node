@@ -1,6 +1,13 @@
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
+import CommunityInviteRepository from '@app/contexts/communities/domain/repositories/CommunityInviteRepository';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
+import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
+import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
 import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy';
+import CommunityInviteMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy';
+import CommunityInviteUseMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy';
+import CommunityMembershipRequestMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import ConversationMessagePinMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy';
@@ -523,11 +530,14 @@ describe('PublicMutationGate over stickers', () => {
     await expect(gate.accepts(store, doc)).resolves.toBe(false);
   });
 
-  it.each(cases)('rejects a %s signed by someone else', async (store, _, doc) => {
-    await expect(
-      gate.accepts(store, await sign(store, doc, otherAuthor)),
-    ).resolves.toBe(false);
-  });
+  it.each(cases)(
+    'rejects a %s signed by someone else',
+    async (store, _, doc) => {
+      await expect(
+        gate.accepts(store, await sign(store, doc, otherAuthor)),
+      ).resolves.toBe(false);
+    },
+  );
 
   it('admits signed unfavorite and forget tombstones', async () => {
     await expect(
@@ -633,6 +643,184 @@ describe('PublicMutationGate over stickers', () => {
         'stickerUserLibraries',
         await sign('stickerUserLibraries', { ...recent, usedAt: 'later' }),
       ),
+    ).resolves.toBe(false);
+  });
+});
+
+describe('PublicMutationGate over community invites and requests', () => {
+  const creator =
+    'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=';
+  const invitee =
+    'MCowBQYDK2VwAyEACdZwo16pCFQ1jxy5u2ZIOlVxcrx8QTHKDcLqGfWRgFk=';
+  const communityId = '550e8400-e29b-41d4-a716-446655440000';
+  const createdAt = 1780000000000;
+  const nonce = 'nonce-0123456789abcdef';
+  const token = CommunityInviteToken.derive(
+    communityId,
+    creator,
+    nonce,
+  ).valueOf();
+  const requestId = CommunityRequestId.derive(
+    communityId,
+    'invitation',
+    creator,
+    invitee,
+    createdAt,
+  ).valueOf();
+  const invite = {
+    communityId,
+    createdAt,
+    creatorIdentityId: creator,
+    id: token,
+    maxUses: 1,
+    nonce,
+    scopeType: 'community_invite',
+    token,
+  };
+  const use = {
+    communityId,
+    id: `invite-use:${token}:${invitee}`,
+    identityId: invitee,
+    scopeType: 'community_invite_use',
+    token,
+    usedAt: createdAt,
+  };
+  const request = {
+    communityId,
+    createdAt,
+    creatorIdentityId: creator,
+    id: requestId,
+    identityId: invitee,
+    scopeType: 'community_membership_request',
+    status: 'pending',
+    type: 'invitation',
+    updatedAt: createdAt,
+  };
+  const authorization = mock<PublicMutationAuthorAuthorization>();
+  const communityRepository = mock<CommunityRepository>();
+  const inviteRepository = mock<CommunityInviteRepository>();
+  const community = mock<Community>();
+  let gate: PublicMutationGate;
+
+  const sign = async (
+    payload: Record<string, unknown>,
+    author: string,
+  ): Promise<Record<string, unknown>> => {
+    const device = await KeyPair.generate();
+    const body = {
+      author: {
+        deviceCredential: device.toPrimitives().publicKey,
+        identityId: author,
+      },
+      kind: 'put',
+      operationId: 'operation-1'.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor: PublicMutationProof.digestOf({ previous: 1 }),
+      recordId: payload.id as string,
+      sequence: 1,
+      store: 'requests',
+      version: 1,
+    } as const;
+
+    return PublicMutationRecord.withProof(
+      payload,
+      PublicMutationProof.signed(
+        body,
+        device.sign(PublicMutationProof.signingContentOf(body)),
+      ),
+    );
+  };
+
+  beforeEach(() => {
+    authorization.isAuthorized.mockResolvedValue(true);
+    communityRepository.findById.mockResolvedValue(community);
+    community.assertCanCreateInvite.mockReset();
+    community.assertMembershipRequestAuthoredBy.mockReset();
+    community.requestMembership.mockReset();
+    inviteRepository.findByToken.mockResolvedValue(
+      CommunityInvite.fromPrimitives(invite as never),
+    );
+    gate = new PublicMutationGate(new PublicMutationVerifier(authorization), [
+      new CommunityInviteMutationPolicy(communityRepository as never),
+      new CommunityInviteUseMutationPolicy(
+        communityRepository as never,
+        inviteRepository,
+      ),
+      new CommunityMembershipRequestMutationPolicy(
+        communityRepository as never,
+      ),
+    ]);
+  });
+
+  it('admits a signed invite, use and request from the right authors', async () => {
+    await expect(
+      gate.accepts('requests', await sign(invite, creator)),
+    ).resolves.toBe(true);
+    await expect(
+      gate.accepts('requests', await sign(use, invitee)),
+    ).resolves.toBe(true);
+    await expect(
+      gate.accepts('requests', await sign(request, creator)),
+    ).resolves.toBe(true);
+  });
+
+  it('rejects unsigned records of every scope', async () => {
+    for (const record of [invite, use, request]) {
+      await expect(gate.accepts('requests', record)).resolves.toBe(false);
+    }
+  });
+
+  it('rejects an invite whose token is not derived from its fields', async () => {
+    const forged = { ...invite, id: 'forged', token: 'forged' };
+
+    await expect(
+      gate.accepts('requests', await sign(forged, creator)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects an invite signed by someone other than its creator', async () => {
+    await expect(
+      gate.accepts('requests', await sign(invite, invitee)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects an invite use recorded by another identity', async () => {
+    await expect(
+      gate.accepts('requests', await sign(use, creator)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a use of an invite that belongs to another community', async () => {
+    inviteRepository.findByToken.mockResolvedValue(undefined);
+
+    await expect(
+      gate.accepts('requests', await sign(use, invitee)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a request whose id is not derived from its immutable fields', async () => {
+    const forged = { ...request, id: '123456789012345678901234' };
+
+    await expect(
+      gate.accepts('requests', await sign(forged, creator)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a request the community does not allow the author to publish', async () => {
+    community.assertMembershipRequestAuthoredBy.mockImplementation(() => {
+      throw new Error('forbidden');
+    });
+
+    await expect(
+      gate.accepts('requests', await sign(request, creator)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects records of an unknown community', async () => {
+    communityRepository.findById.mockResolvedValue(undefined);
+
+    await expect(
+      gate.accepts('requests', await sign(invite, creator)),
     ).resolves.toBe(false);
   });
 });

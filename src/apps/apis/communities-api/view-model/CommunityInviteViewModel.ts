@@ -3,7 +3,10 @@ import { CommunityInvite } from '@app/contexts/communities/domain/entities/invit
 import { CommunityInviteResource } from '../resources/CommunityInviteResource';
 
 export class CommunityInviteViewModel {
-  constructor(private readonly invite: CommunityInvite) {}
+  constructor(
+    private readonly invite: CommunityInvite,
+    private readonly uses: number,
+  ) {}
 
   public toResource(): CommunityInviteResource {
     const primitives = this.invite.toPrimitives();
@@ -14,7 +17,7 @@ export class CommunityInviteViewModel {
       expiresAt: primitives.expiresAt,
       inviteToken: primitives.token,
       maxUses: primitives.maxUses,
-      uses: primitives.uses,
+      uses: this.uses,
     };
   }
 }

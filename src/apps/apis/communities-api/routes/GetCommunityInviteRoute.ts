@@ -28,6 +28,7 @@ export class GetCommunityInviteRoute extends CommunityRouteSupport {
         new CommunityInviteDetailsViewModel(
           details.getInvite(),
           details.getCommunity(),
+          details.getUses(),
         ).toResource(),
       );
   }

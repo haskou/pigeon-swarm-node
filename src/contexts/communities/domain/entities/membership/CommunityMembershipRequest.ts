@@ -1,6 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
-import { assert, PrimitiveOf } from '@haskou/value-objects';
+import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { CommunityRequestActorMismatchError } from '../../errors/CommunityRequestActorMismatchError';
 import { CommunityRequestAlreadyResolvedError } from '../../errors/CommunityRequestAlreadyResolvedError';
@@ -18,16 +18,23 @@ export class CommunityMembershipRequest extends AggregateRoot {
     communityId: CommunityId,
     creatorIdentityId: IdentityId,
     identityId: IdentityId,
+    createdAt: Timestamp,
     ownerIdentityId: IdentityId = creatorIdentityId,
   ): CommunityMembershipRequest {
     const request = new CommunityMembershipRequest(
-      CommunityRequestId.generate(),
+      CommunityRequestId.derive(
+        communityId.valueOf(),
+        CommunityRequestType.INVITATION.valueOf(),
+        creatorIdentityId.valueOf(),
+        identityId.valueOf(),
+        createdAt.valueOf(),
+      ),
       communityId,
       CommunityRequestType.INVITATION,
       CommunityRequestStatus.PENDING,
       creatorIdentityId,
       identityId,
-      CommunityMembershipRequestTimestamps.now(),
+      CommunityMembershipRequestTimestamps.at(createdAt),
     );
 
     request.recordCreated(ownerIdentityId);
@@ -38,16 +45,23 @@ export class CommunityMembershipRequest extends AggregateRoot {
   public static request(
     communityId: CommunityId,
     requesterIdentityId: IdentityId,
+    createdAt: Timestamp,
     ownerIdentityId?: IdentityId,
   ): CommunityMembershipRequest {
     const request = new CommunityMembershipRequest(
-      CommunityRequestId.generate(),
+      CommunityRequestId.derive(
+        communityId.valueOf(),
+        CommunityRequestType.REQUEST.valueOf(),
+        requesterIdentityId.valueOf(),
+        requesterIdentityId.valueOf(),
+        createdAt.valueOf(),
+      ),
       communityId,
       CommunityRequestType.REQUEST,
       CommunityRequestStatus.PENDING,
       requesterIdentityId,
       requesterIdentityId,
-      CommunityMembershipRequestTimestamps.now(),
+      CommunityMembershipRequestTimestamps.at(createdAt),
     );
 
     request.recordCreated(ownerIdentityId);
@@ -147,11 +161,12 @@ export class CommunityMembershipRequest extends AggregateRoot {
   public accept(
     actorIdentityId: IdentityId,
     ownerIdentityId: IdentityId,
+    updatedAt: Timestamp,
   ): void {
     this.assertPending();
     this.assertCanAccept(actorIdentityId, ownerIdentityId);
     this.status = CommunityRequestStatus.ACCEPTED;
-    this.timestamps = this.timestamps.touch();
+    this.timestamps = this.timestamps.touch(updatedAt);
     this.record(
       new CommunityMembershipRequestWasAcceptedEvent(
         this.communityId.valueOf(),
@@ -160,10 +175,13 @@ export class CommunityMembershipRequest extends AggregateRoot {
     );
   }
 
-  public acceptAutomatically(ownerIdentityId: IdentityId): void {
+  public acceptAutomatically(
+    ownerIdentityId: IdentityId,
+    updatedAt: Timestamp,
+  ): void {
     this.assertPending();
     this.status = CommunityRequestStatus.ACCEPTED;
-    this.timestamps = this.timestamps.touch();
+    this.timestamps = this.timestamps.touch(updatedAt);
     this.record(
       new CommunityMembershipRequestWasAcceptedEvent(
         this.communityId.valueOf(),
@@ -175,17 +193,26 @@ export class CommunityMembershipRequest extends AggregateRoot {
   public decline(
     actorIdentityId: IdentityId,
     ownerIdentityId: IdentityId,
+    updatedAt: Timestamp,
   ): void {
     this.assertPending();
     this.assertCanDecline(actorIdentityId, ownerIdentityId);
     this.status = CommunityRequestStatus.DECLINED;
-    this.timestamps = this.timestamps.touch();
+    this.timestamps = this.timestamps.touch(updatedAt);
     this.record(
       new CommunityMembershipRequestWasDeclinedEvent(
         this.communityId.valueOf(),
         this.eventAttributes(ownerIdentityId),
       ),
     );
+  }
+
+  public getCreatorIdentityId(): IdentityId {
+    return this.creatorIdentityId;
+  }
+
+  public isDeclined(): boolean {
+    return this.status.isDeclined();
   }
 
   public getCommunityId(): CommunityId {

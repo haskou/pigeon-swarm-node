@@ -1,3 +1,5 @@
+import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
 import { rm } from 'node:fs/promises';
@@ -64,7 +66,10 @@ function minimal(call: LiveCall): void {
     ])
       assert.ok(!(field in participant), `Unexpected ${field}`);
     assert.notEqual(participant.status, 'left');
-    assert.ok(!('mediaConnections' in participant), 'Unexpected mediaConnections');
+    assert.ok(
+      !('mediaConnections' in participant),
+      'Unexpected mediaConnections',
+    );
   }
 }
 
@@ -251,13 +256,68 @@ async function main(): Promise<void> {
       { name: 'voice' },
       identities[0],
     );
+    const requesterId = identities[1].id;
+    const joinCreatedAt = Date.now();
+    const joinAcceptedAt = joinCreatedAt + 1;
+    const joinRecord = {
+      communityId: community.id,
+      createdAt: joinCreatedAt,
+      creatorIdentityId: requesterId,
+      id: CommunityRequestId.derive(
+        community.id,
+        'request',
+        requesterId,
+        requesterId,
+        joinCreatedAt,
+      ).valueOf(),
+      identityId: requesterId,
+      scopeType: 'community_membership_request',
+      status: 'pending',
+      type: 'request',
+      updatedAt: joinCreatedAt,
+    };
+    const signJoin = (
+      payload: Record<string, unknown>,
+      sequence: number,
+    ): Record<string, unknown> => {
+      const body = {
+        author: {
+          deviceCredential: identities[1].deviceCredential,
+          identityId: requesterId,
+        },
+        kind: 'put',
+        operationId: `call-privacy-join-${sequence}`.padEnd(22, '0'),
+        payloadDigest: PublicMutationProof.digestOf(payload),
+        predecessor:
+          sequence === 0 ? null : PublicMutationProof.digestOf(joinRecord),
+        recordId: joinRecord.id,
+        sequence,
+        store: 'requests',
+        version: 1,
+      } as const;
+
+      return PublicMutationProof.signed(
+        body,
+        identities[1].deviceKeyPair.sign(
+          PublicMutationProof.signingContentOf(body),
+        ),
+      ).toPrimitives() as unknown as Record<string, unknown>;
+    };
     await waitFor(async () => {
       try {
         await request(
           nodes[1],
           'POST',
           `/communities/${community.id}/join-requests`,
-          {},
+          {
+            acceptedAt: joinAcceptedAt,
+            acceptedMutation: signJoin(
+              { ...joinRecord, status: 'accepted', updatedAt: joinAcceptedAt },
+              1,
+            ),
+            createdAt: joinCreatedAt,
+            mutation: signJoin(joinRecord, 0),
+          },
           identities[1],
         );
 
@@ -281,6 +341,7 @@ async function main(): Promise<void> {
         undefined,
         identities[1],
       );
+
       return replicated.voiceChannels.some(
         (candidate) => candidate.id === channel.id,
       );
@@ -403,6 +464,7 @@ async function main(): Promise<void> {
         undefined,
         identities[1],
       );
+
       return ended.status === 'ended';
     }, 'explicit session termination replication');
     const restarted = await Promise.all(
