@@ -36,6 +36,7 @@ export default class CallJoiner {
     await this.repository.saveParticipant(
       call,
       message.participantIdentityId,
+      message.at,
       message.getProof(),
     );
     const lease = await this.leaseRenewer.renew(

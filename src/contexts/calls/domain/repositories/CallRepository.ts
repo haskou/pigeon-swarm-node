@@ -44,10 +44,14 @@ export default abstract class CallRepository {
     proof: PublicMutationProof,
   ): Promise<void>;
 
-  /** Persists the signed state of one participant (joined, left or declined). */
+  /**
+   * Persists the signed state of one participant (joined, left or declined)
+   * at the signed time `at`, which may differ from the time the call state holds.
+   */
   public abstract saveParticipant(
     call: Call,
     identityId: IdentityId,
+    at: Timestamp,
     proof: PublicMutationProof,
   ): Promise<void>;
 

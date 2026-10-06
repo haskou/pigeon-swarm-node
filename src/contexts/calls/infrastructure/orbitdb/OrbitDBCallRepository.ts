@@ -110,21 +110,16 @@ export default class OrbitDBCallRepository extends CallRepository {
   private participantRecord(
     call: Call,
     identityId: IdentityId,
+    at: Timestamp,
   ): Record<string, unknown> {
-    const participant = call
+    const status = call
       .toPrimitives()
       .participants.find(
         (candidate) => candidate.identityId === identityId.valueOf(),
-      );
-    const state =
-      participant?.status === 'joined'
-        ? { at: participant.joinedAt, state: 'joined' }
-        : participant?.status === 'declined'
-          ? { at: participant.declinedAt, state: 'declined' }
-          : { at: participant?.leftAt, state: 'left' };
+      )?.status;
 
     return {
-      ...state,
+      at: at.valueOf(),
       callId: call.getId().valueOf(),
       id: CallRecordIds.participant(
         call.getId().valueOf(),
@@ -132,6 +127,7 @@ export default class OrbitDBCallRepository extends CallRepository {
       ),
       identityId: identityId.valueOf(),
       scopeType: 'call_participant',
+      state: status === 'joined' || status === 'declined' ? status : 'left',
     };
   }
 
@@ -305,9 +301,10 @@ export default class OrbitDBCallRepository extends CallRepository {
   public saveParticipant(
     call: Call,
     identityId: IdentityId,
+    at: Timestamp,
     proof: PublicMutationProof,
   ): Promise<void> {
-    return this.put(call, this.participantRecord(call, identityId), proof);
+    return this.put(call, this.participantRecord(call, identityId, at), proof);
   }
 
   public saveEnd(call: Call, proof: PublicMutationProof): Promise<void> {

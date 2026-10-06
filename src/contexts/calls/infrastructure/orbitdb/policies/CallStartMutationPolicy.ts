@@ -155,7 +155,9 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
       new CommunityChannelId(scope.channelId as string),
     );
 
-    const starts = await this.registry.queryDocuments(
+    // Sibling starts of this very collection: `queryDocuments` would admit each
+    // of them again through this policy and recurse once per start.
+    const starts = await this.registry.queryUnadmittedDocuments(
       this.collection,
       (document) =>
         document.scopeType === 'call_start' &&

@@ -32,6 +32,7 @@ export default class CallLeaver {
     await this.repository.saveParticipant(
       call,
       message.participantIdentityId,
+      message.at,
       message.getProof(),
     );
     const releasedLeases = await this.leaseReleaser.release(
