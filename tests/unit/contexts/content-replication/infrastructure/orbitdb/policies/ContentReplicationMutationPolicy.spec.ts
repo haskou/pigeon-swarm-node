@@ -7,11 +7,12 @@ import IdentityRepository from '@app/contexts/identities/domain/repositories/Ide
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { signedMutation } from '../../../../public-mutations/support/signedMutation';
 
-const OWNER = '1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b';
+let OWNER = '';
 const MALLORY = 'ff'.repeat(32);
 const NETWORK = '550e8400-e29b-41d4-a716-446655440001';
 const FOREIGN_NETWORK = '550e8400-e29b-41d4-a716-446655440002';
@@ -62,6 +63,10 @@ describe('ContentReplicationMutationPolicy', () => {
       ).toPrimitives(),
     };
   }
+
+  beforeAll(async () => {
+    OWNER = (await KeyPair.generate()).toPrimitives().publicKey;
+  });
 
   beforeEach(() => {
     registry = mock<OrbitDBReplicatedStateRegistry>();

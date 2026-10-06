@@ -85,7 +85,9 @@ export default class ContentReplicationMutationPolicy extends PublicMutationPoli
     if (!proof || record.removed === true) return false;
 
     try {
-      const expectation = this.expectationOf(record);
+      const expectation = this.expectationOf(
+        PublicMutationRecord.payloadOf(record),
+      );
 
       if (this.verifiedDigests.has(proof.digest())) return true;
 
@@ -147,10 +149,7 @@ export default class ContentReplicationMutationPolicy extends PublicMutationPoli
 
     if (
       record.id !==
-      ContentReplication.idOf(
-        record.networkId as string,
-        record.cid as string,
-      )
+      ContentReplication.idOf(record.networkId as string, record.cid as string)
     ) {
       throw new InvalidPublicMutationError();
     }

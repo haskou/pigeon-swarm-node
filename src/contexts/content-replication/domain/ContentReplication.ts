@@ -70,7 +70,10 @@ export class ContentReplication {
   }
 
   public getId(): string {
-    return ContentReplication.idOf(this.networkId.valueOf(), this.cid.valueOf());
+    return ContentReplication.idOf(
+      this.networkId.valueOf(),
+      this.cid.valueOf(),
+    );
   }
 
   public getNetworkId(): NetworkId {
