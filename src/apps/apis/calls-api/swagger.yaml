@@ -144,7 +144,7 @@ paths:
         '204':
           description: Participant heartbeat recorded. No response body.
         '409':
-          description: Call is inactive, inaccessible, or the community participation grant is missing or expired.
+          description: Call is inactive, inaccessible, a media connection targets the sender or a non-participant (for example a participant that just left) or repeats a remote identity, or the community participation grant is missing or expired.
   /calls/{callId}/signals:
     post:
       tags:

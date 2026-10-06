@@ -3152,6 +3152,34 @@ export default class Definitions {
     );
   }
 
+  @given(
+    'the other identity signs a heartbeat reporting a media connection to a departed participant',
+  )
+  public async theOtherIdentitySignsAHeartbeatReportingAMediaConnectionToADepartedParticipant(): Promise<void> {
+    if (!this.callId) {
+      throw new Error('Call must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = JSON.stringify({
+      mediaConnections: [
+        {
+          remoteIdentityId:
+            'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=',
+          state: 'connected',
+        },
+      ],
+    });
+    await this.signCurrentRequest(
+      'POST',
+      `/calls/${this.callId}/participants/me/heartbeat`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
   @given('I sign the current call end request')
   public async iSignTheCurrentCallEndRequest(): Promise<void> {
     if (!this.callId) {

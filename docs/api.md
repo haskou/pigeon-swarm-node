@@ -654,7 +654,11 @@ Implemented:
   the call scope
 - joined participants should send a signed heartbeat while media is active
 - heartbeat body contains one `mediaConnections` entry per remote
-  `RTCPeerConnection`; an empty array is valid before ICE selects a pair
+  `RTCPeerConnection`; an empty array is valid before ICE selects a pair. An
+  entry that targets the sender, a non-participant (such as a participant that
+  just left) or a repeated remote identity is rejected with HTTP 409
+  `InvalidCallParticipantMediaConnectionError`; clients send the next heartbeat
+  from their refreshed roster
 - heartbeat renews an in-memory lease owned by the node serving that client and
   replicates it through `calls.v1.participant_lease.was_updated`
 - heartbeat never writes the call document or its indexes to OrbitDB

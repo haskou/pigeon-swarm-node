@@ -9,7 +9,7 @@ import { CallRelayUrl } from '@app/contexts/calls/domain/value-objects/CallRelay
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
-import { Timestamp } from '@haskou/value-objects';
+import { DomainError, Timestamp } from '@haskou/value-objects';
 
 describe('CallParticipantLease', () => {
   const callId = new CallId('550e8400-e29b-41d4-a716-446655440010');
@@ -171,7 +171,33 @@ describe('CallParticipantLease', () => {
         [mediaConnection],
         new Timestamp(300),
       ),
-    ).toThrow();
+    ).toThrow(InvalidCallParticipantMediaConnectionError);
+  });
+
+  it('reports invalid media reports as domain conflicts instead of server failures', () => {
+    const lease = CallParticipantLease.connect(
+      callId,
+      identityId,
+      nodeId,
+      networkId,
+      [identityId],
+      [],
+      new Timestamp(100),
+    );
+    const departedConnection = CallParticipantMediaConnection.fromPrimitives({
+      remoteIdentityId: remoteIdentityId.valueOf(),
+      state: 'connected',
+    });
+    let thrown: unknown;
+
+    try {
+      lease.renew([identityId], [departedConnection], new Timestamp(200));
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(InvalidCallParticipantMediaConnectionError);
+    expect(thrown).toBeInstanceOf(DomainError);
   });
 
   it('rejects media reports targeting self or duplicate participants', () => {
