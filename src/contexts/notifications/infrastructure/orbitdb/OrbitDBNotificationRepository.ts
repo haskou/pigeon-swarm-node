@@ -105,8 +105,7 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
     const invitations = await this.query('notification_invitation', matches);
     const states = new Map(
       (await this.query('notification_state', matches)).map((record) => {
-        const state =
-          this.payloadOf<OrbitDBNotificationStateDocument>(record);
+        const state = this.payloadOf<OrbitDBNotificationStateDocument>(record);
 
         return [state.notificationId, state];
       }),
@@ -120,8 +119,8 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
       }),
     );
     const start = beforeNotificationId
-      ? ordered.findIndex(
-          (notification) => notification.getId().isEqual(beforeNotificationId),
+      ? ordered.findIndex((notification) =>
+          notification.getId().isEqual(beforeNotificationId),
         ) + 1
       : 0;
 

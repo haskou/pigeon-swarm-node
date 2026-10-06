@@ -47,8 +47,11 @@ export default class NotificationStateMutationPolicy extends PublicMutationPolic
 
     if (
       record.removed !== undefined ||
-      !NotificationStateMutationPolicy.STATES.includes(record.state as string) ||
-      record.id !== NotificationStateMutationPolicy.idOf(record.notificationId as string) ||
+      !NotificationStateMutationPolicy.STATES.includes(
+        record.state as string,
+      ) ||
+      record.id !==
+        NotificationStateMutationPolicy.idOf(record.notificationId as string) ||
       !(record.notificationId as string).startsWith(
         NotificationId.INVITATION_PREFIX,
       )
@@ -69,7 +72,10 @@ export default class NotificationStateMutationPolicy extends PublicMutationPolic
     };
   }
 
-  private find(id: string, scopeType: string): Promise<Record<string, unknown> | undefined> {
+  private find(
+    id: string,
+    scopeType: string,
+  ): Promise<Record<string, unknown> | undefined> {
     return this.registry
       .queryDocuments(
         this.collection,
@@ -106,7 +112,10 @@ export default class NotificationStateMutationPolicy extends PublicMutationPolic
       throw new InvalidPublicMutationError();
     }
 
-    const invitation = await this.find(notificationId, 'notification_invitation');
+    const invitation = await this.find(
+      notificationId,
+      'notification_invitation',
+    );
 
     if (invitation?.recipientIdentityId !== authorIdentityId) {
       throw new InvalidPublicMutationError();

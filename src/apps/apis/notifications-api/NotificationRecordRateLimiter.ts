@@ -13,7 +13,8 @@ export default class NotificationRecordRateLimiter {
   constructor(private readonly database: EmbeddedLocalDatabase) {}
 
   private limit(): number {
-    const configured = pigeonEnvironment().NOTIFICATIONS_RECORD_RATE_LIMIT_PER_MINUTE;
+    const configured =
+      pigeonEnvironment().NOTIFICATIONS_RECORD_RATE_LIMIT_PER_MINUTE;
 
     return Number.isFinite(configured) && configured >= 0
       ? configured
@@ -46,6 +47,7 @@ export default class NotificationRecordRateLimiter {
       resetAt,
     });
 
-    if (count > limit) throw new NotificationRecordRateLimitExceededError(limit);
+    if (count > limit)
+      throw new NotificationRecordRateLimitExceededError(limit);
   }
 }

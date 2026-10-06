@@ -91,9 +91,7 @@ export class Notification extends AggregateRoot {
     return Notification.recordCreated(notification);
   }
 
-  public static missedCall(
-    payload: MissedCallPayload,
-  ): Notification {
+  public static missedCall(payload: MissedCallPayload): Notification {
     const notification = new Notification(
       payload.notificationId(),
       NotificationType.MISSED_CALL,

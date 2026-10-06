@@ -13,7 +13,8 @@ export class PostNotificationRequest {
           this.body.inviterIdentityId,
           this.body.recipientIdentityId,
           this.body.encryptedCommunityKey || '',
-          this.body.inviterSignature,
+          this.body.nonce,
+          this.body.mutation,
         ),
       conversation_invitation: (): NotificationCreateMessage =>
         NotificationCreateMessage.conversationInvitation(
@@ -21,7 +22,8 @@ export class PostNotificationRequest {
           this.body.inviterIdentityId,
           this.body.recipientIdentityId,
           this.body.encryptedConversationKey || '',
-          this.body.inviterSignature,
+          this.body.nonce,
+          this.body.mutation,
         ),
       group_conversation_invitation: (): NotificationCreateMessage =>
         NotificationCreateMessage.groupConversationInvitation(
@@ -29,7 +31,8 @@ export class PostNotificationRequest {
           this.body.inviterIdentityId,
           this.body.recipientIdentityId,
           this.body.encryptedConversationKey || '',
-          this.body.inviterSignature,
+          this.body.nonce,
+          this.body.mutation,
         ),
     };
 
