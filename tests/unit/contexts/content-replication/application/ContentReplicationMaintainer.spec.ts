@@ -72,6 +72,7 @@ describe('ContentReplicationMaintainer', () => {
       withdraw: async () => undefined,
     };
     const contentStorage = {
+      findBytesInNetwork: async () => Buffer.from([]),
       findJSONInNetwork: async (_cid: { valueOf(): string }) => {
         if (_cid.valueOf() === 'bafy-failure') {
           throw new Error('CID not available');
@@ -79,7 +80,6 @@ describe('ContentReplicationMaintainer', () => {
 
         return {};
       },
-      findBytesInNetwork: async () => Buffer.from([]),
       provideInNetwork: async (_cid: ContentId): Promise<void> => {
         providedReplicas.push(_cid);
       },
@@ -391,4 +391,60 @@ describe('ContentReplicationMaintainer', () => {
     });
     expect(providedReplicas).toEqual([`bafy-claimed:${networkId}`]);
   });
+
+  it.each([
+    [128, 128],
+    [900 * 1024 * 1024, 50 * 1024 * 1024],
+  ])(
+    'bounds the replicated fetch by min(declared %d, cap) = %d bytes',
+    async (sizeBytes, expectedMaxBytes) => {
+      const limits: Array<number | undefined> = [];
+      const contentStorage = {
+        findBytesInNetwork: async (
+          _cid: unknown,
+          _networkId: unknown,
+          maxBytes?: number,
+        ) => {
+          limits.push(maxBytes);
+
+          return Buffer.from('x');
+        },
+        findJSONInNetwork: async () => ({}),
+        provideInNetwork: async (): Promise<void> => undefined,
+        removeFromNetwork: async (): Promise<void> => undefined,
+      };
+
+      await new ContentReplicationMaintainer(
+        {
+          find: async () => ({
+            contents: [
+              {
+                cid: 'bafy-bounded',
+                context: 'ipfs_public_upload',
+                networks: [
+                  {
+                    knownReplicaNodeIds: [] as string[],
+                    localResponsible: true,
+                    networkId,
+                    releaseLocalReplica: false,
+                  },
+                ],
+                sizeBytes,
+              },
+            ],
+            localNodeId,
+          }),
+        } as unknown as ContentReplicationStatusFinder,
+        {
+          findByCids: async () => [],
+          save: async () => undefined,
+          withdraw: async () => undefined,
+        },
+        contentStorage as unknown as ReplicatedContentStorage,
+        { publish: async () => undefined },
+      ).maintain();
+
+      expect(limits).toEqual([expectedMaxBytes]);
+    },
+  );
 });

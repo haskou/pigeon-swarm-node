@@ -51,11 +51,13 @@ export default class IpfsContentStorage extends ReplicatedContentStorage {
   public findBytesInNetwork(
     contentId: ContentId,
     networkId: NetworkId,
+    maxBytes?: number,
   ): Promise<Buffer> {
     return this.translateNotFound(contentId, () =>
       this.ipfs.getBytesFromNetwork(
         this.toIpfsId(contentId),
         networkId.valueOf(),
+        maxBytes,
       ),
     );
   }
@@ -63,11 +65,13 @@ export default class IpfsContentStorage extends ReplicatedContentStorage {
   public findJSONInNetwork<T>(
     contentId: ContentId,
     networkId: NetworkId,
+    maxBytes?: number,
   ): Promise<T> {
     return this.translateNotFound(contentId, () =>
       this.ipfs.getJSONFromNetwork<T>(
         this.toIpfsId(contentId),
         networkId.valueOf(),
+        maxBytes,
       ),
     );
   }
