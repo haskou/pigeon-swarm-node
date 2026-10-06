@@ -28,15 +28,6 @@ services:
   contexts/calls/domain/repositories/CallParticipantLeaseRepository: '@contexts/calls/infrastructure/memory/InMemoryCallParticipantLeaseRepository'
   contexts/calls/domain/repositories/CallRepository: '@contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository'
   contexts/calls/domain/repositories/CallSignalDeliveryRepository: '@contexts/calls/infrastructure/memory/InMemoryCallSignalDeliveryRepository'
-  contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentMerger:
-    class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentMerger
-    arguments: []
-  contexts/calls/infrastructure/orbitdb/OrbitDBCallHistoryReplay:
-    class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallHistoryReplay
-    arguments: []
-  contexts/calls/infrastructure/orbitdb/mappers/OrbitDBCallMapper:
-    class: /contexts/calls/infrastructure/orbitdb/mappers/OrbitDBCallMapper
-    arguments: []
   contexts/communities/domain/repositories/CommunityChannelDraftRepository: >-
     @contexts/communities/infrastructure/local-db/LocalCommunityChannelDraftRepository
   contexts/communities/domain/repositories/CommunityChannelMessagePinRepository: >-
@@ -251,6 +242,10 @@ services:
   shared/infrastructure/ui/routes/HealthRoute:
     class: /shared/infrastructure/ui/routes/HealthRoute
     arguments: []
+  apps/apis/calls-api/CallRecordRateLimiter:
+    class: /apps/apis/calls-api/CallRecordRateLimiter
+    arguments:
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
   apps/apis/calls-api/CallSignalRateLimiter:
     class: /apps/apis/calls-api/CallSignalRateLimiter
     arguments:
@@ -338,8 +333,8 @@ services:
     class: /contexts/calls/infrastructure/memory/InMemoryCallSignalDeliveryRepository
     arguments: []
     parent: contexts/calls/domain/repositories/CallSignalDeliveryRepository
-  contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentReplicator:
-    class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentReplicator
+  contexts/calls/infrastructure/orbitdb/OrbitDBCallProjection:
+    class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallProjection
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
   contexts/communities/application/apply-private-control/PrivateCommunityControlApplier:
@@ -821,6 +816,11 @@ services:
     arguments:
       - '@contexts/conversations/domain/repositories/ConversationRepository'
       - '@contexts/communities/domain/repositories/CommunityRepository'
+  contexts/calls/infrastructure/orbitdb/policies/CallEndMutationPolicy:
+    class: /contexts/calls/infrastructure/orbitdb/policies/CallEndMutationPolicy
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/communities/application/create-community/CommunityCreator:
     class: /contexts/communities/application/create-community/CommunityCreator
     arguments:
@@ -1291,11 +1291,6 @@ services:
       - '@shared/infrastructure/messageBus/DomainEventConsumer'
       - >-
         @contexts/calls/application/register-signal-delivery/CallSignalDeliveryRegistrar
-  apps/consumers/pubsub/calls/RegisterCallWhenStarted:
-    class: /apps/consumers/pubsub/calls/RegisterCallWhenStarted
-    arguments:
-      - '@shared/infrastructure/messageBus/DomainEventConsumer'
-      - '@contexts/calls/domain/repositories/CallRepository'
   apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced:
     class: /apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced
     arguments:
@@ -1403,6 +1398,13 @@ services:
       - '@shared/infrastructure/messageBus/DomainEventConsumer'
       - '@contexts/push-notifications/application/send/PushNotificationDispatcher'
     parent: apps/consumers/pubsub/push/SendPushNotificationWhenEventReceived
+  apps/initializers/public-mutations/CallMutationPolicies:
+    class: /apps/initializers/public-mutations/CallMutationPolicies
+    arguments:
+      - '@contexts/calls/infrastructure/orbitdb/policies/CallStartMutationPolicy'
+      - >-
+        @contexts/calls/infrastructure/orbitdb/policies/CallParticipantMutationPolicy
+      - '@contexts/calls/infrastructure/orbitdb/policies/CallEndMutationPolicy'
   apps/initializers/public-mutations/CommunityChannelMutationPolicies:
     class: /apps/initializers/public-mutations/CommunityChannelMutationPolicies
     arguments:
@@ -1438,6 +1440,13 @@ services:
       - '@contexts/calls/domain/repositories/CallSignalDeliveryRepository'
       - '@contexts/nodes/domain/repositories/NodeRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/calls/infrastructure/orbitdb/policies/CallParticipantMutationPolicy:
+    class: >-
+      /contexts/calls/infrastructure/orbitdb/policies/CallParticipantMutationPolicy
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/communities/application/edit-channel-message/CommunityChannelMessageEditor:
     class: >-
       /contexts/communities/application/edit-channel-message/CommunityChannelMessageEditor
@@ -1785,6 +1794,14 @@ services:
       - >-
         @contexts/calls/application/renew-participant-lease/CallParticipantLeaseRenewer
       - '@contexts/calls/application/authorize-call/CallAccessAuthorizer'
+  contexts/calls/application/leave-call/CallLeaver:
+    class: /contexts/calls/application/leave-call/CallLeaver
+    arguments:
+      - '@contexts/calls/domain/repositories/CallRepository'
+      - '@shared/infrastructure/messageBus/DomainEventPublisher'
+      - >-
+        @contexts/calls/application/release-participant-lease/CallParticipantLeaseReleaser
+      - '@contexts/calls/application/authorize-call/CallAccessAuthorizer'
   contexts/calls/application/record-participant-heartbeat/CallParticipantHeartbeatRecorder:
     class: >-
       /contexts/calls/application/record-participant-heartbeat/CallParticipantHeartbeatRecorder
@@ -1794,13 +1811,13 @@ services:
         @contexts/calls/application/renew-participant-lease/CallParticipantLeaseRenewer
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
       - '@contexts/calls/application/authorize-call/CallAccessAuthorizer'
-  contexts/calls/infrastructure/orbitdb/OrbitDBCallProjection:
-    class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallProjection
+  contexts/calls/infrastructure/orbitdb/policies/CallStartMutationPolicy:
+    class: /contexts/calls/infrastructure/orbitdb/policies/CallStartMutationPolicy
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
-      - '@contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentMerger'
-      - '@contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentReplicator'
-      - '@contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard'
+      - '@contexts/conversations/domain/repositories/ConversationRepository'
+      - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/communities/application/accept-invite/CommunityInviteAccepter:
     class: /contexts/communities/application/accept-invite/CommunityInviteAccepter
     arguments:
@@ -2192,15 +2209,6 @@ services:
         @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy
       - >-
         @contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy
-  contexts/calls/application/leave-call/CallLeaver:
-    class: /contexts/calls/application/leave-call/CallLeaver
-    arguments:
-      - '@contexts/calls/domain/repositories/CallRepository'
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-      - >-
-        @contexts/calls/application/release-participant-lease/CallParticipantLeaseReleaser
-      - '@contexts/calls/application/authorize-call/CallAccessAuthorizer'
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
   contexts/calls/application/send-signal/CallSignalSender:
     class: /contexts/calls/application/send-signal/CallSignalSender
     arguments:
@@ -2219,6 +2227,14 @@ services:
         @contexts/calls/application/renew-participant-lease/CallParticipantLeaseRenewer
       - >-
         @contexts/calls/application/start-call/CommunityChannelCallStartCoordinator
+  contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository:
+    class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/calls/infrastructure/orbitdb/OrbitDBCallProjection'
+      - '@contexts/calls/domain/repositories/CallParticipantLeaseRepository'
+      - '@contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard'
+    parent: contexts/calls/domain/repositories/CallRepository
   contexts/communities/application/update-membership-request/CommunityMembershipRequestUpdater:
     class: >-
       /contexts/communities/application/update-membership-request/CommunityMembershipRequestUpdater
@@ -2345,15 +2361,6 @@ services:
       - '@contexts/push-notifications/application/send/PushNotificationDelivery'
       - >-
         @contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker
-  contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository:
-    class: /contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository
-    arguments:
-      - '@contexts/calls/infrastructure/orbitdb/mappers/OrbitDBCallMapper'
-      - '@contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentReplicator'
-      - '@contexts/calls/infrastructure/orbitdb/OrbitDBCallProjection'
-      - '@contexts/calls/domain/repositories/CallParticipantLeaseRepository'
-      - '@contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard'
-    parent: contexts/calls/domain/repositories/CallRepository
   contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationDocumentValidator:
     class: >-
       /contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationDocumentValidator
@@ -2437,6 +2444,7 @@ services:
       - '@apps/initializers/public-mutations/PollMutationPolicies'
       - '@apps/initializers/public-mutations/ContentReplicationMutationPolicies'
       - '@apps/initializers/public-mutations/NotificationMutationPolicies'
+      - '@apps/initializers/public-mutations/CallMutationPolicies'
   shared/infrastructure/http/HttpClient: '@shared/infrastructure/http/FetchHttpClient'
   shared/infrastructure/logs/Log: '@shared/infrastructure/logs/WinstonLogger'
   shared/infrastructure/messageBus/MessageBusAdapter: '@shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter'

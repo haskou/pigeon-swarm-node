@@ -6,19 +6,23 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
+import { CallRecordIds } from '../../domain/CallRecordIds';
 import CallParticipantLeaseRepository from '../../domain/repositories/CallParticipantLeaseRepository';
-import { OrbitDBCallDocument } from './documents/OrbitDBCallDocument';
-import OrbitDBCallMapper from './mappers/OrbitDBCallMapper';
-import OrbitDBCallDocumentReplicator from './OrbitDBCallDocumentReplicator';
+import { CallPrimitives } from './OrbitDBCallFold';
 import OrbitDBCallProjection from './OrbitDBCallProjection';
 
 export default class OrbitDBCallRepository extends CallRepository {
+  /** A community call nobody holds a participation lease on is hidden after this. */
+  private static readonly COMMUNITY_LEASE_GRACE_MS = 60_000;
+
   constructor(
-    private readonly mapper: OrbitDBCallMapper,
-    private readonly documentReplicator: OrbitDBCallDocumentReplicator,
+    private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly callProjection: OrbitDBCallProjection,
     private readonly leases: CallParticipantLeaseRepository,
     private readonly publicStorageGuard: PrivateCommunityPublicStorageGuard,
@@ -26,8 +30,8 @@ export default class OrbitDBCallRepository extends CallRepository {
     super();
   }
 
-  private async hydrate(document: OrbitDBCallDocument): Promise<Call> {
-    const call = this.mapper.toDomain(document);
+  private async hydrate(document: CallPrimitives): Promise<Call> {
+    const call = Call.fromPrimitives(document);
 
     if (call.getScope().isCommunityChannel()) {
       const leases = call.isActive()
@@ -41,6 +45,15 @@ export default class OrbitDBCallRepository extends CallRepository {
         ids.set(id.valueOf(), id);
       }
       call.restoreCommunityParticipants([...ids.values()]);
+
+      if (
+        call.isActive() &&
+        ids.size === 0 &&
+        Date.now() - call.toPrimitives().createdAt >
+          OrbitDBCallRepository.COMMUNITY_LEASE_GRACE_MS
+      ) {
+        call.expire(Timestamp.now());
+      }
     }
 
     return call;
@@ -58,12 +71,12 @@ export default class OrbitDBCallRepository extends CallRepository {
       : action();
   }
 
-  private hydrateList(documents: OrbitDBCallDocument[]): Promise<Call[]> {
+  private hydrateList(documents: CallPrimitives[]): Promise<Call[]> {
     return Promise.all(documents.map((document) => this.hydrate(document)));
   }
 
   private async hydrateIfPublic(
-    document: OrbitDBCallDocument,
+    document: CallPrimitives,
   ): Promise<Call | undefined> {
     const communityId =
       document.scope.type === 'community_channel' &&
@@ -85,7 +98,7 @@ export default class OrbitDBCallRepository extends CallRepository {
   }
 
   private async hydratePublicList(
-    documents: OrbitDBCallDocument[],
+    documents: CallPrimitives[],
   ): Promise<Call[]> {
     const calls = await Promise.all(
       documents.map((document) => this.hydrateIfPublic(document)),
@@ -94,17 +107,105 @@ export default class OrbitDBCallRepository extends CallRepository {
     return calls.filter((call): call is Call => call !== undefined);
   }
 
+  private participantRecord(
+    call: Call,
+    identityId: IdentityId,
+  ): Record<string, unknown> {
+    const participant = call
+      .toPrimitives()
+      .participants.find(
+        (candidate) => candidate.identityId === identityId.valueOf(),
+      );
+    const state =
+      participant?.status === 'joined'
+        ? { at: participant.joinedAt, state: 'joined' }
+        : participant?.status === 'declined'
+          ? { at: participant.declinedAt, state: 'declined' }
+          : { at: participant?.leftAt, state: 'left' };
+
+    return {
+      ...state,
+      callId: call.getId().valueOf(),
+      id: CallRecordIds.participant(
+        call.getId().valueOf(),
+        identityId.valueOf(),
+      ),
+      identityId: identityId.valueOf(),
+      scopeType: 'call_participant',
+    };
+  }
+
+  private startRecord(call: Call): Record<string, unknown> {
+    const primitives = call.toPrimitives();
+    const scope = primitives.scope;
+
+    return {
+      callId: primitives.id,
+      creatorIdentityId: primitives.creatorIdentityId,
+      id: CallRecordIds.start(primitives.id),
+      networkId: primitives.networkId,
+      nonce: primitives.nonce,
+      participantIds: call.getScope().isCommunityChannel()
+        ? []
+        : primitives.participantIds,
+      scope: call.getScope().isCommunityChannel()
+        ? {
+            channelId: scope.channelId,
+            communityId: scope.communityId,
+            type: scope.type,
+          }
+        : { conversationId: scope.conversationId, type: scope.type },
+      scopeType: 'call_start',
+      ...(primitives.sessionEpoch === undefined
+        ? {}
+        : { sessionEpoch: primitives.sessionEpoch }),
+      startedAt: primitives.createdAt,
+    };
+  }
+
+  private endRecord(call: Call): Record<string, unknown> {
+    const primitives = call.toPrimitives();
+
+    return {
+      at: primitives.endedAt,
+      callId: primitives.id,
+      endedByIdentityId: primitives.endedByIdentityId,
+      id: CallRecordIds.end(primitives.id),
+      scopeType: 'call_end',
+    };
+  }
+
+  private async put(
+    call: Call,
+    payload: Record<string, unknown>,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    await this.runWhilePublicCommunityScope(call, async () => {
+      const document = PublicMutationRecord.withProof(payload, proof);
+
+      PublicMutationRecord.assertNotStale(
+        await this.registry.queryDocuments(
+          'calls',
+          (stored) =>
+            stored.scopeType === payload.scopeType && stored.id === payload.id,
+        ),
+        document,
+      );
+      await this.registry.putDocument('calls', document);
+    });
+  }
+
   public async findById(id: CallId): Promise<Call | undefined> {
     const document = await this.callProjection.findById(id);
 
     if (!document) return undefined;
-    const initialScope = this.mapper.toDomain(document).getScope();
+    const initialScope = Call.fromPrimitives(document).getScope();
     const communityId = initialScope.getCommunityId();
     const read = async (): Promise<Call | undefined> => {
       const lockedDocument = await this.callProjection.findById(id);
 
       if (!lockedDocument) return undefined;
-      const lockedScope = this.mapper.toDomain(lockedDocument).getScope();
+      const lockedScope = Call.fromPrimitives(lockedDocument).getScope();
 
       return lockedScope.isEqual(initialScope)
         ? this.hydrate(lockedDocument)
@@ -128,7 +229,9 @@ export default class OrbitDBCallRepository extends CallRepository {
       ...communities,
     ]);
 
-    return calls.filter((call) => call.hasParticipant(participantId));
+    return calls.filter(
+      (call) => call.isActive() && call.hasParticipant(participantId),
+    );
   }
 
   public async findByParticipant(participantId: IdentityId): Promise<Call[]> {
@@ -169,7 +272,9 @@ export default class OrbitDBCallRepository extends CallRepository {
         channelId,
       );
 
-      return document ? this.hydrate(document) : undefined;
+      const call = document ? await this.hydrate(document) : undefined;
+
+      return call?.isActive() ? call : undefined;
     });
   }
 
@@ -177,9 +282,11 @@ export default class OrbitDBCallRepository extends CallRepository {
     communityId: CommunityId,
   ): Promise<Call[]> {
     return this.publicStorageGuard.runWhilePublic(communityId, async () =>
-      this.hydrateList(
-        await this.callProjection.findActiveByCommunity(communityId),
-      ),
+      (
+        await this.hydrateList(
+          await this.callProjection.findActiveByCommunity(communityId),
+        )
+      ).filter((call) => call.isActive()),
     );
   }
 
@@ -191,25 +298,28 @@ export default class OrbitDBCallRepository extends CallRepository {
     );
   }
 
-  public async save(call: Call): Promise<void> {
-    await this.runWhilePublicCommunityScope(call, async () => {
-      const document = this.mapper.toDocument(call);
-
-      this.callProjection.project(document);
-      await this.documentReplicator.replicate(document);
-    });
+  public saveStart(call: Call, proof: PublicMutationProof): Promise<void> {
+    return this.put(call, this.startRecord(call), proof);
   }
 
-  public async registerReplica(call: Call): Promise<void> {
-    await this.runWhilePublicCommunityScope(call, () => {
-      const document = this.mapper.toDocument(call);
+  public saveParticipant(
+    call: Call,
+    identityId: IdentityId,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    return this.put(call, this.participantRecord(call, identityId), proof);
+  }
 
-      this.callProjection.project({
-        ...document,
-        updatedAt: document.createdAt,
-      });
+  public saveEnd(call: Call, proof: PublicMutationProof): Promise<void> {
+    return this.put(call, this.endRecord(call), proof);
+  }
 
-      return Promise.resolve();
-    });
+  public markTimedOut(call: Call): Promise<void> {
+    this.callProjection.markTimedOut(
+      call.getId(),
+      call.toPrimitives().endedAt ?? Date.now(),
+    );
+
+    return Promise.resolve();
   }
 }

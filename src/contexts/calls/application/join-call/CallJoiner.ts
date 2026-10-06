@@ -28,12 +28,16 @@ export default class CallJoiner {
     );
 
     if (call.getScope().isCommunityChannel()) {
-      call.joinOrAdd(message.participantIdentityId);
+      call.joinOrAdd(message.participantIdentityId, message.at);
     } else {
-      call.join(message.participantIdentityId);
+      call.join(message.participantIdentityId, message.at);
     }
 
-    await this.repository.save(call);
+    await this.repository.saveParticipant(
+      call,
+      message.participantIdentityId,
+      message.getProof(),
+    );
     const lease = await this.leaseRenewer.renew(
       call,
       message.participantIdentityId,

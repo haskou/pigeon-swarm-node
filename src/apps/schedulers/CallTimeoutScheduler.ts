@@ -2,6 +2,7 @@ import CallRepository from '@app/contexts/calls/domain/repositories/CallReposito
 import { MissedCallPayload } from '@app/contexts/notifications/domain/MissedCallPayload';
 import { Notification } from '@app/contexts/notifications/domain/Notification';
 import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
+import { NotificationId } from '@app/contexts/notifications/domain/value-objects/NotificationId';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import ReplicatedStateSchedulerErrorPolicy from '@app/shared/infrastructure/scheduler/ReplicatedStateSchedulerErrorPolicy';
 import Scheduler from '@haskou/ddd-kernel/scheduler';
@@ -31,10 +32,16 @@ export default class CallTimeoutScheduler extends Scheduler {
       const missedParticipants = call.markTimedOut(Timestamp.now());
       const primitives = call.toPrimitives();
 
-      await this.callRepository.save(call);
+      await this.callRepository.markTimedOut(call);
       await this.eventPublisher.publish(call.pullDomainEvents());
 
       for (const participant of missedParticipants) {
+        const existing = await this.notificationRepository.findById(
+          NotificationId.missedCall(primitives.id, participant.valueOf()),
+        );
+
+        if (existing) continue;
+
         const notification = Notification.missedCall(
           MissedCallPayload.fromPrimitives({
             callerIdentityId: primitives.creatorIdentityId,

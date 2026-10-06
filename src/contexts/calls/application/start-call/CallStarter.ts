@@ -2,7 +2,6 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 
 import { Call } from '../../domain/Call';
 import CallRepository from '../../domain/repositories/CallRepository';
-import { CallSessionEpoch } from '../../domain/value-objects/CallSessionEpoch';
 import CallParticipantLeaseRenewer from '../renew-participant-lease/CallParticipantLeaseRenewer';
 import CallScopeResolver from './CallScopeResolver';
 import CommunityChannelCallStartCoordinator from './CommunityChannelCallStartCoordinator';
@@ -18,60 +17,31 @@ export default class CallStarter {
     private readonly communityChannelStartCoordinator: CommunityChannelCallStartCoordinator,
   ) {}
 
-  private nextSessionEpoch(previousCalls: Call[]): CallSessionEpoch {
-    const latest = previousCalls.reduce(
-      (epoch, call) => Math.max(epoch, call.getSessionEpoch()?.valueOf() ?? 0),
-      0,
-    );
-
-    return new CallSessionEpoch(latest + 1);
-  }
-
   private async startResolved(
     message: CallStartMessage,
     resolvedScope: ResolvedCallScope,
   ): Promise<Call> {
-    const previousCalls = message.scopeType.isCommunityChannel()
-      ? await this.repository.findByCommunityChannel(
-          message.getCommunityId(),
-          message.getCommunityChannelId(),
-        )
-      : [];
-    const activeCall = previousCalls
-      .filter((call) => call.isActive())
-      .sort((left, right) =>
-        left.getId().valueOf().localeCompare(right.getId().valueOf()),
-      )[0];
-
-    if (activeCall) {
-      activeCall.joinOrAdd(message.requesterIdentityId);
-      await this.repository.save(activeCall);
-      const lease = await this.leaseRenewer.renew(
-        activeCall,
-        message.requesterIdentityId,
+    if (message.scopeType.isCommunityChannel()) {
+      // One live call per channel: the caller signs a join instead of a start.
+      const activeCall = await this.repository.findActiveByCommunityChannel(
+        message.getCommunityId(),
+        message.getCommunityChannelId(),
       );
-      await this.eventPublisher.publish([
-        ...activeCall.pullDomainEvents(),
-        ...lease.pullDomainEvents(),
-      ]);
 
-      return activeCall;
+      if (activeCall) return activeCall;
     }
 
-    const participantIds = resolvedScope.scope.isConversation()
-      ? [...resolvedScope.participantIds, ...message.invitedParticipantIds]
-      : resolvedScope.participantIds;
     const call = Call.start(
       message.requesterIdentityId,
       resolvedScope.networkId,
       resolvedScope.scope,
-      participantIds,
-      message.scopeType.isCommunityChannel()
-        ? this.nextSessionEpoch(previousCalls)
-        : undefined,
+      resolvedScope.participantIds,
+      message.nonce,
+      message.startedAt,
+      message.sessionEpoch,
     );
 
-    await this.repository.save(call);
+    await this.repository.saveStart(call, message.getProof());
     const lease = await this.leaseRenewer.renew(
       call,
       message.requesterIdentityId,

@@ -8,6 +8,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { Request } from 'express';
 
+import CallRecordRateLimiter from '../CallRecordRateLimiter';
 import { CallResource } from '../resources/CallResource';
 import { CallViewModel } from '../view-model/CallViewModel';
 
@@ -18,6 +19,10 @@ export abstract class CallRouteSupport extends Route {
   private readonly participantLeaseFinder =
     this.get<CallParticipantLeaseFinder>(CallParticipantLeaseFinder);
 
+  private readonly recordRateLimiter = this.get<CallRecordRateLimiter>(
+    CallRecordRateLimiter,
+  );
+
   private readonly callAccess =
     this.get<CallAccessAuthorizer>(CallAccessAuthorizer);
 
@@ -26,6 +31,17 @@ export abstract class CallRouteSupport extends Route {
     const participants = await this.callAccess.authorizedParticipants(call);
 
     return new CallViewModel(call, leases, participants).toResource();
+  }
+
+  /** Authenticates the requester and charges one signed record to its budget. */
+  protected async authenticateRecordAuthor(
+    request: Request,
+  ): Promise<IdentityId> {
+    const identityId = this.authenticate(request);
+
+    await this.recordRateLimiter.consume(identityId);
+
+    return identityId;
   }
 
   protected authenticate(request: Request): IdentityId {

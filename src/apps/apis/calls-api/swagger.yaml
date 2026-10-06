@@ -414,7 +414,17 @@ components:
           type: array
           items:
             type: object
-            required: [id, networkId, creatorIdentityId, createdAt, scope, status, participantIds, participants]
+            required:
+              [
+                id,
+                networkId,
+                creatorIdentityId,
+                createdAt,
+                scope,
+                status,
+                participantIds,
+                participants,
+              ]
             properties:
               id:
                 type: string

@@ -1,4 +1,3 @@
-import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { Call } from '../../domain/Call';
@@ -14,7 +13,6 @@ export default class CallLeaver {
     private readonly eventPublisher: DomainEventPublisher,
     private readonly leaseReleaser: CallParticipantLeaseReleaser,
     private readonly accessAuthorizer: CallAccessAuthorizer,
-    private readonly conversationRepository: ConversationRepository,
   ) {}
 
   public async leave(message: CallLeaveMessage): Promise<Call> {
@@ -29,21 +27,13 @@ export default class CallLeaver {
       message.participantIdentityId,
     );
 
-    const conversationId = call.getScope().getConversationId();
-    const conversation = conversationId
-      ? await this.conversationRepository.findMetadataById(conversationId)
-      : undefined;
+    call.leave(message.participantIdentityId, message.at);
 
-    if (conversationId && !conversation) {
-      throw new CallNotFoundError();
-    }
-
-    call.leave(
+    await this.repository.saveParticipant(
+      call,
       message.participantIdentityId,
-      conversation ? !conversation.isGroup() : false,
+      message.getProof(),
     );
-
-    await this.repository.save(call);
     const releasedLeases = await this.leaseReleaser.release(
       call,
       message.participantIdentityId,
