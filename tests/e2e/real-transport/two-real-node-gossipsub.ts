@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 import 'module-alias/register';
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { ConversationOperationAction } from '@app/contexts/conversations/domain/value-objects/ConversationOperationAction';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
@@ -12,6 +14,8 @@ import { randomBytes, generateKeyPairSync } from 'crypto';
 import fs from 'fs-extra';
 import path from 'path';
 import WebSocket from 'ws';
+
+import { signConversationOperation } from '../../support/signConversationOperation';
 
 type IdentityFixture = {
   authorizationRevision: number;
@@ -609,16 +613,32 @@ async function publishKeychain(
   return response.keychainExternalIdentifier;
 }
 
+/** Creates the 1:1 the way a client does: one signed `conversation_created` operation, no unsigned announce. */
 async function createOneToOneConversation(
   node: NodeRuntime,
   owner: IdentityFixture,
   participant: IdentityFixture,
   keychainExternalIdentifier: string,
 ): Promise<{ id: string }> {
+  const participantIds = [owner.id, participant.id].sort();
+  const signed = signConversationOperation({
+    action: ConversationOperationAction.CONVERSATION_CREATED.valueOf(),
+    args: { participantIds, type: 'one-to-one' },
+    conversationId: ConversationId.deterministic(
+      owner.id,
+      participant.id,
+      NETWORK_ID,
+    ).valueOf(),
+    createdAt: Date.now(),
+    networkId: NETWORK_ID,
+    parents: [],
+    signer: owner,
+  });
   const body = {
     keychainExternalIdentifier,
     networkId: NETWORK_ID,
-    participantIds: [owner.id, participant.id],
+    operation: signed.body,
+    participantIds,
     type: 'one-to-one',
   };
 
