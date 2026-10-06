@@ -552,6 +552,12 @@ under a victim head) and that the gated nodes never serve them.
 
 #### Deferred: node-authored collections
 
+The design that authenticates these four stores (user-signed records per
+store, derived state instead of replicated state, record shapes, admission,
+migration and the node-trust model that the design avoids) is in
+[`docs/design/node-written-collections.md`](design/node-written-collections.md)
+(#361). The behavior below is current until each slice lands.
+
 `calls`, `contentReplication`, `notifications` and the `conversations` metadata
 document are written by the node with no user key to sign them, and they are
 not forced into the signed path. A malicious peer can currently do the
