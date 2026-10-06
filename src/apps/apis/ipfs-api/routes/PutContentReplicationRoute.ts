@@ -3,7 +3,14 @@ import ContentReplicationRegistrar from '@app/contexts/content-replication/appli
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { Body, JsonController, Param, Put, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  JsonController,
+  Param,
+  Put,
+  Req,
+  Res,
+} from 'routing-controllers';
 
 import { PutContentReplicationBody } from '../bodies/PutContentReplicationBody';
 import { PutContentReplicationRequest } from '../requests/PutContentReplicationRequest';
