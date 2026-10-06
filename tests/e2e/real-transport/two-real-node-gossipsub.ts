@@ -16,6 +16,10 @@ import path from 'path';
 import WebSocket from 'ws';
 
 import { signConversationOperation } from '../../support/signConversationOperation';
+import {
+  signNotificationInvitation,
+  signNotificationState,
+} from '../../support/signNotification';
 
 type IdentityFixture = {
   authorizationRevision: number;
@@ -199,6 +203,13 @@ async function main(): Promise<void> {
       nodeAKeychain,
     );
     await waitForConversation(nodeB, nodeBIdentity, conversation.id);
+    await runNotificationLifecycle(
+      nodeA,
+      nodeB,
+      nodeAIdentity,
+      nodeBIdentity,
+      conversation.id,
+    );
 
     const call = await request<CallResponse>(
       nodeA,
@@ -689,6 +700,104 @@ async function changeGroup(
  * Group lifecycle over real HTTP and real gossip: A creates a group with B,
  * promotes B, B leaves from its own node, and both nodes fold the same roster.
  */
+/** An inviter-signed invitation replicates to the recipient, who accepts it with a recipient-signed state record. */
+async function runNotificationLifecycle(
+  nodeA: NodeRuntime,
+  nodeB: NodeRuntime,
+  inviter: IdentityFixture,
+  recipient: IdentityFixture,
+  conversationId: string,
+): Promise<void> {
+  const nonce = randomBytes(16).toString('hex');
+  const signed = signNotificationInvitation({
+    encryptedKey: 'e2e-encrypted-conversation-key',
+    nonce,
+    recipientIdentityId: recipient.id,
+    signer: inviter,
+    subjectId: conversationId,
+    type: 'conversation_invitation',
+  });
+  const body = {
+    conversationId,
+    encryptedConversationKey: 'e2e-encrypted-conversation-key',
+    inviterIdentityId: inviter.id,
+    mutation: signed.body.mutation,
+    nonce,
+    recipientIdentityId: recipient.id,
+    type: 'conversation_invitation',
+  };
+  let unsignedStatus = 0;
+
+  try {
+    await request(
+      nodeA,
+      'POST',
+      '/notifications/',
+      { ...body, mutation: undefined },
+      inviter,
+    );
+  } catch (error) {
+    unsignedStatus = isHttpRequestError(error) ? error.response.status : 0;
+  }
+
+  if (unsignedStatus !== 400) {
+    throw new Error(`Unsigned invitation got ${unsignedStatus}, not 400`);
+  }
+
+  const created = await request<{ id: string }>(
+    nodeA,
+    'POST',
+    '/notifications/',
+    body,
+    inviter,
+  );
+
+  if (created.id !== signed.payload.id) {
+    throw new Error(`Invitation id ${created.id} is not ${signed.payload.id}`);
+  }
+
+  const listed = async (): Promise<{ id: string; state: string }[]> =>
+    (
+      await request<{ results?: { id: string; state: string }[] }>(
+        nodeB,
+        'GET',
+        '/notifications/',
+        undefined,
+        recipient,
+      )
+    ).results ?? [];
+
+  await waitFor(
+    async () =>
+      (await listed()).some(
+        (n) => n.id === created.id && n.state === 'pending',
+      ),
+    'node-b to receive the signed invitation',
+  );
+
+  const state = signNotificationState({
+    notificationId: created.id,
+    read: true,
+    signer: recipient,
+    state: 'accepted',
+  });
+
+  await request(
+    nodeB,
+    'PATCH',
+    `/notifications/${encodeURIComponent(created.id)}`,
+    { mutation: state.proof.toPrimitives(), state: 'accepted' },
+    recipient,
+  );
+  await waitFor(
+    async () =>
+      (await listed()).some(
+        (n) => n.id === created.id && n.state === 'accepted',
+      ),
+    'node-b to list the accepted invitation',
+  );
+}
+
 async function runGroupLifecycle(
   nodeA: NodeRuntime,
   nodeB: NodeRuntime,
