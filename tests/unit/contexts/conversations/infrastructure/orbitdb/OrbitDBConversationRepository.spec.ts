@@ -1,14 +1,16 @@
 /* eslint-disable @typescript-eslint/require-await */
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
+import { ConversationOperation } from '@app/contexts/conversations/domain/operations/ConversationOperation';
+import { ConversationOperationAction } from '@app/contexts/conversations/domain/value-objects/ConversationOperationAction';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageSendOptions } from '@app/contexts/conversations/domain/value-objects/MessageSendOptions';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
-import OrbitDBConversationMapper from '@app/contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBConversationMapper';
 import OrbitDBConversationMessageMapper from '@app/contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBConversationMessageMapper';
 import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -17,9 +19,9 @@ import { messageProof } from '../../support/messageProof';
 
 describe('OrbitDBConversationRepository', () => {
   const heads = new Map<string, Record<string, unknown>>();
-  const conversationDocuments: Record<string, unknown>[] = [];
+  const operationDocuments: Record<string, unknown>[] = [];
   const messageDocuments: Record<string, unknown>[] = [];
-  let conversationsQuery: jest.Mock;
+  let operationsQuery: jest.Mock;
   let headsPut: jest.Mock;
   let messagesQuery: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
@@ -28,11 +30,11 @@ describe('OrbitDBConversationRepository', () => {
 
   beforeEach(async () => {
     heads.clear();
-    conversationDocuments.splice(0);
+    operationDocuments.splice(0);
     messageDocuments.splice(0);
     mother = await ConversationMother.create();
-    conversationsQuery = jest.fn(async (matcher) =>
-      conversationDocuments.filter(matcher),
+    operationsQuery = jest.fn(async (matcher) =>
+      operationDocuments.filter(matcher),
     );
     headsPut = jest.fn(async (key, value) => {
       heads.set(key as string, value as Record<string, unknown>);
@@ -45,13 +47,13 @@ describe('OrbitDBConversationRepository', () => {
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
     void registry.register(mother.networkId.valueOf(), {
-      conversations: {
+      conversationOperations: {
         put: jest.fn(async (document) => {
-          upsertDocument(conversationDocuments, document);
+          upsertDocument(operationDocuments, document);
 
           return 'ok';
         }),
-        query: conversationsQuery,
+        query: operationsQuery,
       },
       heads: {
         all: jest.fn(async () =>
@@ -74,7 +76,6 @@ describe('OrbitDBConversationRepository', () => {
     } as never);
     repository = new OrbitDBConversationRepository(
       registry,
-      new OrbitDBConversationMapper(),
       new OrbitDBConversationMessageMapper(),
     );
   });
@@ -84,7 +85,7 @@ describe('OrbitDBConversationRepository', () => {
   });
 
   it('should save and read conversations with messages from OrbitDB', async () => {
-    const conversation = mother.build();
+    const conversation = await seeded(mother.build());
     const firstMessage = conversation.sendMessage(
       mother.author,
       new EncryptedMessagePayload('first'),
@@ -131,7 +132,7 @@ describe('OrbitDBConversationRepository', () => {
   });
 
   it('should compute unread counts from OrbitDB read markers', async () => {
-    const conversation = mother.build();
+    const conversation = await seeded(mother.build());
     const firstMessage = conversation.sendMessage(
       mother.author,
       new EncryptedMessagePayload('first'),
@@ -165,7 +166,7 @@ describe('OrbitDBConversationRepository', () => {
   });
 
   it('should mark an external timestamped message id as read without querying messages', async () => {
-    const conversation = mother.build();
+    const conversation = await seeded(mother.build());
 
     await repository.save(conversation, proofsOf(conversation));
     messagesQuery.mockClear();
@@ -195,7 +196,7 @@ describe('OrbitDBConversationRepository', () => {
   });
 
   it('should mark an external timestamped message id as read with known network without reading heads', async () => {
-    const conversation = mother.build();
+    const conversation = await seeded(mother.build());
     const messageId = new MessageId(
       `${conversation.getId().valueOf()}:1781121453305:client`,
     );
@@ -232,7 +233,7 @@ describe('OrbitDBConversationRepository', () => {
   });
 
   it('should not wait for replicated read marker head writes', async () => {
-    const conversation = mother.build();
+    const conversation = await seeded(mother.build());
     const messageId = new MessageId(
       `${conversation.getId().valueOf()}:1781121453305:client`,
     );
@@ -269,12 +270,14 @@ describe('OrbitDBConversationRepository', () => {
 
   it('should count unread messages for several conversations from message indexes', async () => {
     const secondAuthor = await ConversationMother.generateIdentityId();
-    const firstConversation = mother.build();
-    const secondConversation = new ConversationMother(
-      secondAuthor,
-      mother.recipient,
-      mother.networkId,
-    ).build();
+    const firstConversation = await seeded(mother.build());
+    const secondConversation = await seeded(
+      new ConversationMother(
+        secondAuthor,
+        mother.recipient,
+        mother.networkId,
+      ).build(),
+    );
 
     firstConversation.sendMessage(
       mother.author,
@@ -303,10 +306,10 @@ describe('OrbitDBConversationRepository', () => {
   });
 
   it('should find participant conversations from heads after they are indexed', async () => {
-    const conversation = mother.build();
+    const conversation = await seeded(mother.build());
 
     await repository.save(conversation, proofsOf(conversation));
-    conversationsQuery.mockClear();
+    operationsQuery.mockClear();
 
     const participantConversations = await repository.findByParticipant(
       mother.author,
@@ -314,11 +317,11 @@ describe('OrbitDBConversationRepository', () => {
     );
 
     expect(participantConversations).toHaveLength(1);
-    expect(conversationsQuery).not.toHaveBeenCalled();
+    expect(operationsQuery).not.toHaveBeenCalled();
   });
 
   it('should hide target messages after saving a deletion', async () => {
-    const conversation = mother.build();
+    const conversation = await seeded(mother.build());
     const target = conversation.sendMessage(
       mother.author,
       new EncryptedMessagePayload('target'),
@@ -349,7 +352,7 @@ describe('OrbitDBConversationRepository', () => {
   });
 
   it('should reject saving a new message without a proof', async () => {
-    const conversation = mother.build();
+    const conversation = await seeded(mother.build());
 
     conversation.sendMessage(
       mother.author,
@@ -365,7 +368,7 @@ describe('OrbitDBConversationRepository', () => {
   });
 
   it('should store the proof next to the signed message fields', async () => {
-    const conversation = mother.build();
+    const conversation = await seeded(mother.build());
     const sent = conversation.sendMessage(
       mother.author,
       new EncryptedMessagePayload('signed'),
@@ -391,7 +394,7 @@ describe('OrbitDBConversationRepository', () => {
   });
 
   it('should not hide a message deleted by a different author', async () => {
-    const conversation = mother.build();
+    const conversation = await seeded(mother.build());
     const target = conversation.sendMessage(
       mother.author,
       new EncryptedMessagePayload('target'),
@@ -422,7 +425,7 @@ describe('OrbitDBConversationRepository', () => {
   });
 
   it('should not rebuild a replicated message index when saving', async () => {
-    const conversation = mother.build();
+    const conversation = await seeded(mother.build());
 
     for (let index = 0; index < 5; index += 1) {
       conversation.sendMessage(
@@ -452,6 +455,28 @@ describe('OrbitDBConversationRepository', () => {
 
     expect(messageIndexReads).toHaveLength(0);
   });
+
+  /** Stores the signed creation of a conversation, the only thing that makes it exist. */
+  async function seeded<T extends Conversation>(conversation: T): Promise<T> {
+    const genesis = ConversationOperation.create({
+      action: ConversationOperationAction.CONVERSATION_CREATED,
+      args: {
+        participantIds: conversation
+          .getParticipantIds()
+          .map((participantId) => participantId.valueOf()),
+        type: 'one-to-one',
+      },
+      authorIdentityId: conversation.getCreatorId() as IdentityId,
+      conversationId: conversation.getId(),
+      createdAt: 1780000000000,
+      networkId: conversation.getNetworkId(),
+      parents: [],
+    });
+
+    await repository.saveOperation(genesis, messageProof(genesis.getId()));
+
+    return conversation;
+  }
 });
 
 function readMarkerFromCache(

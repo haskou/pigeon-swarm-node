@@ -250,10 +250,17 @@ describe('Call', () => {
   });
 
   it('keeps a two-member group call active until the last joined participant leaves', () => {
-    const conversation = GroupConversation.create(
+    const conversation = new GroupConversation(
+      ConversationId.deriveGroup(
+        networkId.valueOf(),
+        creator.valueOf(),
+        'nonce',
+      ),
+      networkId,
       new GroupConversationName('Two-member group'),
       [creator, recipient],
-      networkId,
+      [],
+      creator,
     );
     const call = Call.start(
       creator,

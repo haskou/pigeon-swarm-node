@@ -1,5 +1,7 @@
 import { ConversationMustHaveTwoDifferentParticipantsError } from '@app/contexts/conversations/domain/errors/ConversationMustHaveTwoDifferentParticipantsError';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { ConversationType } from '@app/contexts/conversations/domain/value-objects/ConversationType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { UUID } from '@haskou/value-objects';
@@ -17,32 +19,30 @@ describe('OneToOneConversation', () => {
     secondParticipant = await ConversationMother.generateIdentityId();
   });
 
-  it('should create a deterministic id from the sorted participant ids', () => {
+  it('should keep the deterministic id regardless of the participant order', () => {
     const conversation = new ConversationMother(
       firstParticipant,
       secondParticipant,
     )
       .withNetworkId(networkId)
       .build();
-    const reversed = OneToOneConversation.create(
-      secondParticipant,
-      firstParticipant,
-      networkId,
-    );
+    const reversed = new ConversationMother(secondParticipant, firstParticipant)
+      .withNetworkId(networkId)
+      .build();
 
     expect(conversation.toPrimitives().id).toBe(reversed.toPrimitives().id);
-    expect(conversation.toPrimitives().participantIds).toEqual([
-      firstParticipant.valueOf(),
-      secondParticipant.valueOf(),
-    ]);
+    expect(conversation.toPrimitives().participantIds).toEqual(
+      reversed.toPrimitives().participantIds,
+    );
   });
 
   it('should restore a one-to-one conversation from primitives', () => {
-    const conversation = OneToOneConversation.create(
+    const conversation = new ConversationMother(
       firstParticipant,
       secondParticipant,
-      networkId,
-    );
+    )
+      .withNetworkId(networkId)
+      .build();
 
     const restored = OneToOneConversation.fromPrimitives(
       conversation.toPrimitives(),
@@ -52,8 +52,18 @@ describe('OneToOneConversation', () => {
   });
 
   it('should reject conversations with the same participant twice', () => {
-    expect(() =>
-      OneToOneConversation.create(firstParticipant, firstParticipant, networkId),
+    expect(
+      () =>
+        new OneToOneConversation(
+          ConversationId.deterministic(
+            firstParticipant,
+            secondParticipant,
+            networkId,
+          ),
+          networkId,
+          ConversationType.ONE_TO_ONE,
+          [firstParticipant, firstParticipant],
+        ),
     ).toThrow(ConversationMustHaveTwoDifferentParticipantsError);
   });
 });

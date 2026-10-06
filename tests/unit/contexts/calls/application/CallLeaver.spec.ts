@@ -11,6 +11,8 @@ import CommunityRepository from '@app/contexts/communities/domain/repositories/C
 import { GroupConversation } from '@app/contexts/conversations/domain/GroupConversation';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { ConversationType } from '@app/contexts/conversations/domain/value-objects/ConversationType';
 import { GroupConversationName } from '@app/contexts/conversations/domain/value-objects/GroupConversationName';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -29,14 +31,30 @@ describe('CallLeaver', () => {
   it.each(['group', 'one-to-one'] as const)(
     'uses the actual %s conversation type for a two-participant departure',
     async (type) => {
+      const participants = [creator, recipient];
       const conversation =
         type === 'group'
-          ? GroupConversation.create(
-              new GroupConversationName('Two-member group'),
-              [creator, recipient],
+          ? new GroupConversation(
+              ConversationId.deriveGroup(
+                networkId.valueOf(),
+                creator.valueOf(),
+                'nonce',
+              ),
               networkId,
+              new GroupConversationName('Two-member group'),
+              participants,
+              [],
+              creator,
             )
-          : OneToOneConversation.create(creator, recipient, networkId);
+          : new OneToOneConversation(
+              ConversationId.deterministic(creator, recipient, networkId),
+              networkId,
+              ConversationType.ONE_TO_ONE,
+              participants,
+              undefined,
+              [],
+              creator,
+            );
       const call = Call.start(
         creator,
         networkId,

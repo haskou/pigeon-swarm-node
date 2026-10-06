@@ -1,4 +1,6 @@
 export interface ConversationResource {
+  adminIds: string[];
+  creatorId?: string;
   id: string;
   name?: string;
   networkId: string;

@@ -1,5 +1,4 @@
-import { GroupConversationCreateMessage } from '@app/contexts/conversations/application/create-group/messages/GroupConversationCreateMessage';
-import { OneToOneConversationCreateMessage } from '@app/contexts/conversations/application/create-one-to-one/messages/OneToOneConversationCreateMessage';
+import { ConversationCreateMessage } from '@app/contexts/conversations/application/create-conversation/messages/ConversationCreateMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { PostConversationBody } from '../bodies/PostConversationBody';
@@ -10,19 +9,15 @@ export class PostConversationRequest {
     private readonly ownerIdentityId: IdentityId,
   ) {}
 
-  public getGroupMessage(): GroupConversationCreateMessage {
-    return new GroupConversationCreateMessage(this.ownerIdentityId.valueOf(), {
+  public getMessage(): ConversationCreateMessage {
+    return new ConversationCreateMessage(this.ownerIdentityId.valueOf(), {
       keychainExternalIdentifier: this.body.keychainExternalIdentifier,
-      name: this.body.name ?? '',
+      name: this.body.name,
       networkId: this.body.networkId,
+      nonce: this.body.nonce,
+      operation: this.body.operation,
       participantIds: this.body.participantIds,
+      type: this.body.type,
     });
-  }
-
-  public getOneToOneMessage(): OneToOneConversationCreateMessage {
-    return new OneToOneConversationCreateMessage(
-      this.ownerIdentityId.valueOf(),
-      this.body,
-    );
   }
 }

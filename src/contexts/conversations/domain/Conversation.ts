@@ -46,6 +46,8 @@ export class Conversation extends AggregateRoot {
       primitives.messages.map((message) =>
         MessageFactory.fromPrimitives(message),
       ),
+      primitives.creatorId ? new IdentityId(primitives.creatorId) : undefined,
+      (primitives.adminIds ?? []).map((adminId) => new IdentityId(adminId)),
     );
   }
 
@@ -56,6 +58,8 @@ export class Conversation extends AggregateRoot {
     private readonly participants: IdentityId[],
     private readonly name: GroupConversationName | undefined = undefined,
     private readonly messages: Message[] = [],
+    private readonly creatorId: IdentityId | undefined = undefined,
+    private readonly adminIds: IdentityId[] = [],
   ) {
     super();
   }
@@ -340,8 +344,22 @@ export class Conversation extends AggregateRoot {
     );
   }
 
+  public getAdminIds(): IdentityId[] {
+    return [...this.adminIds];
+  }
+
+  public getCreatorId(): IdentityId | undefined {
+    return this.creatorId;
+  }
+
+  public isAdmin(identityId: IdentityId): boolean {
+    return this.adminIds.some((admin) => admin.isEqual(identityId));
+  }
+
   public toPrimitives() {
     return {
+      adminIds: this.adminIds.map((admin) => admin.valueOf()),
+      creatorId: this.creatorId?.valueOf(),
       id: this.id.valueOf(),
       messages: this.messages.map((message) => message.toPrimitives()),
       name: this.name?.valueOf(),

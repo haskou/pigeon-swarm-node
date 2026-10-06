@@ -320,7 +320,6 @@ Event contracts used by frontend:
 
 | Event type                                            | Aggregate id      | Attributes used by clients/routing                                                                                         |
 | ----------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `conversations.v1.conversation.was_created`           | conversation id   | `networkId`, `participantIds`                                                                                              |
 | `conversations.v1.message.was_sent`                   | conversation id   | `messageId`, `authorId`, `networkId`, `participantIds`                                                                     |
 | `conversations.v1.message.was_edited`                 | conversation id   | `messageId`, `targetMessageId`, `networkId`, `participantIds`                                                              |
 | `conversations.v1.message.was_deleted`                | conversation id   | `messageId`, `targetMessageId`, `networkId`, `participantIds`                                                              |
@@ -1615,6 +1614,11 @@ Implemented:
 POST /conversations
 ```
 
+A conversation is not a replicated document: its roster is the deterministic fold
+of the operations its members signed (see *Signed conversation operations*). Creating
+one stores the signed genesis `conversation_created`. The node never signs for a
+user and there is no unsigned fallback.
+
 1to1 request:
 
 ```json
@@ -1622,7 +1626,12 @@ POST /conversations
   "type": "one-to-one",
   "participantIds": ["<authenticatedIdentityId>", "<participantIdentityId>"],
   "networkId": "<networkId>",
-  "keychainExternalIdentifier": "<externalIdentifier>"
+  "keychainExternalIdentifier": "<externalIdentifier>",
+  "operation": {
+    "createdAt": 1773848829055,
+    "parents": [],
+    "mutation": { "...": "SignedPublicMutation" }
+  }
 }
 ```
 
@@ -1632,39 +1641,59 @@ Standalone group request:
 {
   "type": "group",
   "name": "Project room",
+  "nonce": "<random client string>",
   "participantIds": [
     "<authenticatedIdentityId>",
     "<participantIdentityId>",
     "<anotherParticipantIdentityId>"
   ],
   "networkId": "<networkId>",
-  "keychainExternalIdentifier": "<externalIdentifier>"
+  "keychainExternalIdentifier": "<externalIdentifier>",
+  "operation": {
+    "createdAt": 1773848829055,
+    "parents": [],
+    "mutation": { "...": "SignedPublicMutation" }
+  }
 }
 ```
+
+`name` and `nonce` are required for `group` and ignored for `one-to-one`. The node
+builds the participant list as the authenticated identity plus `participantIds`,
+deduplicated and sorted ascending, and rebuilds the genesis from it: the signature
+only verifies if the client signed exactly that list.
 
 Response:
 
 ```json
 {
-  "id": "one-to-one:<deterministic-id>",
+  "id": "group:<base64url sha256>",
   "name": "Project room",
   "networkId": "<networkId>",
   "participantIds": ["<authenticatedIdentityId>", "<participantIdentityId>"],
-  "type": "one-to-one",
+  "adminIds": [],
+  "creatorId": "<authenticatedIdentityId>",
+  "type": "group",
   "unreadCount": 0
 }
 ```
 
+`ConversationResource` carries `adminIds` (the admins, never including the creator)
+and `creatorId` (the author of the genesis). `participantIds` is the folded roster.
+
 Implemented:
 
-- create the one-to-one conversation for the participant pair
-- create standalone group conversations with a client-provided `name` and N
-  explicit participants
+- create the one-to-one conversation for the participant pair; a 1:1 id is the
+  same for both participants, so whoever creates it second receives the existing
+  conversation unchanged
+- create standalone group conversations with a client-provided `name`, a client
+  `nonce` and N explicit participants
 - require the conversation network id; messages and sync for this conversation
   are published only through that network
 - validate that the keychain candidate belongs to the authenticated identity
-- persist conversation metadata in OrbitDB replicated metadata
-- publish `ConversationWasCreatedEvent`
+- validate the roster rules of the genesis before storing anything
+- persist the signed `conversation_created` record in the `conversationOperations`
+  OrbitDB store; the node announces nothing else, and the local participant index is
+  rebuilt from the folded state
 
 Standalone group conversations are different from future community channels:
 groups use explicit `participantIds`, while community channel access will be
@@ -1830,6 +1859,196 @@ Implemented:
 - require the authenticated identity to be a conversation participant
 - return messages whose `replyToMessageId` points to the requested root message
 - order replies from oldest to newest
+
+### Signed conversation operations
+
+A conversation is not a replicated document: its roster (members, admins, creator)
+is the deterministic fold of the operations its members signed, so a peer cannot
+forge a participant, an admin or a removal. The node never signs for a user and has
+no unsigned fallback. A route that creates or changes a conversation takes an
+`operation` body field:
+
+```json
+{
+  "operation": {
+    "createdAt": 1773848829055,
+    "parents": ["<digest from GET /conversations/{id}/frontier>"],
+    "mutation": { "...": "SignedPublicMutation" }
+  }
+}
+```
+
+`mutation` signs the operation record (store `conversationOperations`, `kind: "put"`,
+`sequence` 0, `predecessor` null, signer = the authenticated identity). The record
+has exactly these nine fields, no more and no fewer:
+
+```json
+{
+  "id": "conversation:<conversationId>:op:<digest>",
+  "scopeType": "conversation_operation",
+  "conversationId": "<conversationId>",
+  "networkId": "<networkId>",
+  "authorIdentityId": "<identityId>",
+  "action": "member_added",
+  "args": { "identityId": "<identityId>" },
+  "parents": ["<digest>"],
+  "createdAt": 1773848829055
+}
+```
+
+**Digest and ids.** `<digest>` is the base64url (no padding, 43 characters) sha256 of
+the canonical (RFC 8785, `canonicalize`) JSON of the record **without `id`**. The
+record id is `conversation:<conversationId>:op:<digest>`, and the proof's `recordId`
+is that id. `payloadDigest` is the same base64url sha256 of the canonical record
+**with** `id` (what `PublicMutationProof.digestOf` computes). `parents` is sorted
+ascending, unique, at most 64 digests, and is the same array in the record and in
+`operation.parents` (the genesis has `[]`).
+
+**Proof and signing bytes.** `mutation` is the proof body plus its signature:
+
+```json
+{
+  "version": 1,
+  "store": "conversationOperations",
+  "kind": "put",
+  "operationId": "<random base64url>",
+  "recordId": "conversation:<conversationId>:op:<digest>",
+  "payloadDigest": "<base64url sha256 of canonical record with id>",
+  "predecessor": null,
+  "sequence": 0,
+  "author": { "identityId": "<identityId>", "deviceCredential": "<credential>" },
+  "signature": "<Ed25519 signature by the device key, as the crypto library emits it>"
+}
+```
+
+The device signs the UTF-8 bytes `"pigeon:public-mutation:v1\n" +
+canonicalize(body-without-signature)`, the same signing content as every other
+public mutation and as the community operations. Identity ids are the base64
+public key without PEM headers.
+
+**Conversation id.**
+
+- Group: `group:` + base64url(sha256(canonicalize({ "creatorIdentityId", "networkId",
+  "nonce" }))) with the creator's identity id, the network id and the client `nonce`.
+  The id commits to its creator, so nobody can claim an existing group id.
+- 1:1: `one-to-one:` + hex sha256 of `<first>:<second>:<networkId>`, where `first`
+  and `second` are the two identity ids sorted ascending (plain string order). It is
+  the same for both participants.
+
+The genesis must carry exactly the id derived from its own args.
+
+**Frontier.** The client reads `frontier` from `GET /conversations/{conversationId}/frontier`
+immediately before signing and sends it as the sorted `parents`. The genesis has
+none. The node rebuilds the operation from the path conversation, the authenticated
+actor, the action of the endpoint, the `args` it derives from the other body fields,
+and `createdAt` and `parents`; the signature only verifies if the client signed
+exactly that. An operation whose author lacks the permission in the roster folded
+from `parents`, or that names an unknown parent, is rejected. Operations are applied
+in a total order (parents first, lowest digest first among concurrent ones) and
+each is authorized again at that point, so concurrent conflicting changes converge
+on every node.
+
+| Route | action | `args` |
+| --- | --- | --- |
+| `POST /conversations` (group) | `conversation_created` | `{type: "group", name, nonce, participantIds}` |
+| `POST /conversations` (1:1) | `conversation_created` | `{type: "one-to-one", participantIds}` |
+| `POST /conversations/{id}/members` | `member_added` | `{identityId}` |
+| `DELETE /conversations/{id}/members/{identityId}` | `member_removed` | `{identityId}` |
+| `DELETE /conversations/{id}/members/me` | `member_left` | `{}` |
+| `PUT /conversations/{id}/admins/{identityId}` | `admin_promoted` | `{identityId}` |
+| `DELETE /conversations/{id}/admins/{identityId}` | `admin_demoted` | `{identityId}` |
+
+Each `args` accepts exactly the listed keys (an extra or missing key is refused).
+`participantIds` of a genesis is strictly ascending, unique and includes the
+author: a group has 2 to 256 entries, a 1:1 exactly 2. The author of `member_left`
+is the leaving identity, taken from the authenticated headers, so its `args` is
+empty.
+
+**Roster rules** (applied identically when a route admits an operation and when
+every node folds it):
+
+- The creator (author of the genesis) is always a member and never an admin.
+- `member_added`: by the creator or an admin, the target is not yet a member, the
+  group has fewer than 256 members.
+- `member_removed`: by the creator or an admin; the target is a member, is not the
+  creator and is not the author (nobody removes themselves; they leave); removing an
+  admin is only allowed to the creator.
+- `member_left`: by any member except the creator.
+- `admin_promoted`: only by the creator; the target is a member, not the creator and
+  not already an admin. `admin_demoted`: only by the creator; the target is an admin.
+- A 1:1 is immutable: it accepts its genesis and refuses every other operation.
+- Messages, pins, reactions and calls authorize against the folded roster (1:1 from
+  the signed genesis); a removed member loses access.
+
+**Limits.** `args` is at most 4096 bytes of JSON, a group has at most 256 members and
+an identity other than the creator signs at most 1000 operations per conversation
+(the creator is exempt). They are decided from the signed operation and its causal
+past, so every node agrees. A route that would exceed one answers `409` with code
+`ConversationOperationLimitExceededError` (`Conversation operation limit exceeded`)
+and stores nothing; an operation another author signed concurrently beyond the quota
+is skipped by the fold on every node without any error.
+
+**Errors.** A malformed record, wrong args, a wrong id, a mismatching signature
+author, an unknown parent or any violated roster rule answers `409` with code
+`InvalidConversationOperationError` (`Invalid conversation operation`). An unknown
+conversation answers `ConversationNotFoundError`.
+
+**Worked examples** (all use `X-Identity-Id`, `X-Timestamp` and `X-Signature` like
+every route; `operation` is built as above, with `action` and `args` of the row):
+
+```text
+POST /conversations                                  action conversation_created
+  parents []                                         args {"name":"Project room","nonce":"n-1","participantIds":["<A>","<B>"],"type":"group"}
+POST /conversations/{id}/members   {"identityId":"<C>"}   action member_added   args {"identityId":"<C>"}
+DELETE /conversations/{id}/members/<C>                    action member_removed args {"identityId":"<C>"}
+DELETE /conversations/{id}/members/me                     action member_left    args {}
+PUT /conversations/{id}/admins/<B>                        action admin_promoted args {"identityId":"<B>"}
+DELETE /conversations/{id}/admins/<B>                     action admin_demoted  args {"identityId":"<B>"}
+```
+
+For the first line the creator `<A>` signs the record
+
+```json
+{"action":"conversation_created","args":{"name":"Project room","nonce":"n-1","participantIds":["<A>","<B>"],"type":"group"},"authorIdentityId":"<A>","conversationId":"group:<sha256>","createdAt":1773848829055,"networkId":"<N>","parents":[],"scopeType":"conversation_operation"}
+```
+
+(keys shown in canonical order), computes `digest` of that JSON, adds
+`"id":"conversation:group:<sha256>:op:<digest>"`, builds the proof over the record
+with `id`, and sends `type: "group"`, `name`, `nonce`, `participantIds: ["<B>"]`
+(or both), `networkId`, `keychainExternalIdentifier` and `operation`. A reference
+signer lives in `tests/support/signConversationOperation.ts`.
+
+Fixed, byte-exact test vectors (keys, ids, digests, signing content, signatures for
+every action, including a unicode group name and a two-parent operation) live in
+[`tests/fixtures/conversation-operation-vectors.json`](../tests/fixtures/conversation-operation-vectors.json);
+a unit spec recomputes every value with the real domain code, so a client signer can
+assert it reproduces them.
+
+### Conversation members and admins
+
+Each route below carries `{ "operation": { "createdAt", "parents", "mutation" } }`
+(see *Signed conversation operations*), is authenticated with the signed HTTP
+headers, and answers the updated `ConversationResource`.
+
+```http
+POST   /conversations/{conversationId}/members            body: { "identityId": "<identityId>", "operation": {...} }
+DELETE /conversations/{conversationId}/members/me         body: { "operation": {...} }
+DELETE /conversations/{conversationId}/members/{identityId} body: { "operation": {...} }
+PUT    /conversations/{conversationId}/admins/{identityId}  body: { "operation": {...} }
+DELETE /conversations/{conversationId}/admins/{identityId}  body: { "operation": {...} }
+GET    /conversations/{conversationId}/frontier
+```
+
+Implemented:
+
+- add a member (`member_added`), remove one (`member_removed`), leave
+  (`member_left`), promote (`admin_promoted`) and demote (`admin_demoted`)
+- refuse with `404` an unknown conversation and with `409` any change the roster
+  rules or limits do not allow (`Invalid conversation operation`,
+  `Conversation operation limit exceeded`); nothing is stored on refusal
+- `GET .../frontier` is member-only and returns `{ "frontier": ["<digest>"] }`, the
+  sorted digests no other operation names as parent: the `parents` of the next
+  signed operation
 
 ### Conversation drafts
 

@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
@@ -5,7 +6,10 @@ import {
   IsNotEmpty,
   IsString,
   ValidateIf,
+  ValidateNested,
 } from 'class-validator';
+
+import { ConversationOperationBody } from './ConversationOperationBody';
 
 export class PostConversationBody {
   @IsString()
@@ -21,8 +25,17 @@ export class PostConversationBody {
   @IsNotEmpty()
   public readonly name?: string;
 
+  @ValidateIf((body: PostConversationBody) => body.type === 'group')
+  @IsString()
+  @IsNotEmpty()
+  public readonly nonce?: string;
+
+  @Type(() => ConversationOperationBody)
+  @ValidateNested()
+  public readonly operation: ConversationOperationBody;
+
   @IsArray()
-  @ArrayMinSize(2)
+  @ArrayMinSize(1)
   @IsString({ each: true })
   public readonly participantIds: string[];
 

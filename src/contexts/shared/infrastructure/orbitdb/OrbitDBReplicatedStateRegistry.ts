@@ -33,7 +33,7 @@ export default class OrbitDBReplicatedStateRegistry {
     [
       'calls',
       'communityOperations',
-      'conversations',
+      'conversationOperations',
       'identities',
       'contentReplication',
       'keychains',
@@ -53,7 +53,7 @@ export default class OrbitDBReplicatedStateRegistry {
   // per-index record identity or freshness rules here.
   private static readonly INDEX_HEAD_COLLECTION_NAMES = new Set([
     'communityOperations',
-    'conversations',
+    'conversationOperations',
     'messages',
     'moderationLogs',
     'notificationSettings',
@@ -1600,8 +1600,8 @@ export default class OrbitDBReplicatedStateRegistry {
       return `community-operation-index:${related.value}`;
     }
 
-    if (related.storeName === 'conversations') {
-      return `conversation:${related.value}`;
+    if (related.storeName === 'conversationOperations') {
+      return `conversation-operation-index:${related.value}`;
     }
 
     if (related.storeName === 'identities') {
@@ -1663,7 +1663,7 @@ export default class OrbitDBReplicatedStateRegistry {
     const conversationId = this.stringValue(document, 'conversationId');
 
     if (conversationId) {
-      return { storeName: 'conversations', value: conversationId };
+      return { storeName: 'conversationOperations', value: conversationId };
     }
 
     const payload = document.payload;

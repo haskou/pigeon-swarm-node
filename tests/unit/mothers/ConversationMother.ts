@@ -1,3 +1,5 @@
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { ConversationType } from '@app/contexts/conversations/domain/value-objects/ConversationType';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -51,10 +53,16 @@ export class ConversationMother {
   }
 
   public build(): OneToOneConversation {
-    return OneToOneConversation.create(
-      this.author,
-      this.recipient,
+    return new OneToOneConversation(
+      ConversationId.deterministic(this.author, this.recipient, this.networkId),
       this.networkId,
+      ConversationType.ONE_TO_ONE,
+      [this.author, this.recipient].sort((left, right) =>
+        left.valueOf() < right.valueOf() ? -1 : 1,
+      ),
+      undefined,
+      [],
+      this.author,
     );
   }
 }

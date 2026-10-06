@@ -24,7 +24,7 @@ export class OrbitDBPrivateNetworkStores {
 
   public readonly calls: OrbitDBDatabase;
   public readonly communityOperations: OrbitDBDatabase;
-  public readonly conversations: OrbitDBDatabase;
+  public readonly conversationOperations: OrbitDBDatabase;
   public readonly heads: OrbitDBDatabase;
   public readonly identities: OrbitDBDatabase;
   public readonly contentReplication: OrbitDBDatabase;
@@ -167,10 +167,10 @@ export class OrbitDBPrivateNetworkStores {
         'documents/content-replication',
         AccessController,
       ),
-      conversations: await this.openDocumentsStore(
+      conversationOperations: await this.openDocumentsStore(
         orbitdb,
         networkId,
-        'documents/conversations',
+        'documents/conversation-operations',
         AccessController,
       ),
       heads,
@@ -253,7 +253,7 @@ export class OrbitDBPrivateNetworkStores {
   private constructor(stores: OrbitDBPrivateNetworkStoreSet) {
     this.calls = stores.calls;
     this.communityOperations = stores.communityOperations;
-    this.conversations = stores.conversations;
+    this.conversationOperations = stores.conversationOperations;
     this.heads = stores.heads;
     this.identities = stores.identities;
     this.contentReplication = stores.contentReplication;
@@ -291,7 +291,7 @@ export class OrbitDBPrivateNetworkStores {
       calls: this.calls.address,
       communityOperations: this.communityOperations.address,
       contentReplication: this.contentReplication.address,
-      conversations: this.conversations.address,
+      conversationOperations: this.conversationOperations.address,
       heads: this.heads.address,
       identities: this.identities.address,
       keychains: this.keychains.address,
@@ -320,7 +320,7 @@ export class OrbitDBPrivateNetworkStores {
       { database: this.calls, name: 'calls' },
       { database: this.communityOperations, name: 'communityOperations' },
       { database: this.contentReplication, name: 'contentReplication' },
-      { database: this.conversations, name: 'conversations' },
+      { database: this.conversationOperations, name: 'conversationOperations' },
       { database: this.heads, name: 'heads' },
       { database: this.identities, name: 'identities' },
       { database: this.keychains, name: 'keychains' },

@@ -403,7 +403,7 @@ Signed public mutations (pins, reactions and the other governed collections):
   `proof`, so ids, scope (community/channel/message) and author are bound.
 - Community and conversation reaction events carry the proof as `mutationProof`;
   consumers pass it to the repository, which re-verifies it. Conversation records
-  use `scopeType: "conversation"`; the author must be a conversation participant.
+  use `scopeType: "conversation"`; the author must be a participant of the roster folded from the signed `conversationOperations`.
   Policies are looked up by collection and `scopeType`, so a record whose scope
   type has no policy in a governed collection is rejected.
 - `notificationSettings` documents (public scopes only) are governed the same way
@@ -490,7 +490,7 @@ protects the collection and what a malicious peer can still do.
 | `calls` | `OrbitDBCallDocumentReplicator` | none | Unsigned, deferred |
 | `contentReplication` (heads and replica claims) | `OrbitDBContentReplicationRepository`, `OrbitDBContentReplicaClaimRepository` | none | Unsigned, deferred |
 | `notifications` | `OrbitDBNotificationRepository` | none | Unsigned, deferred |
-| `conversations` (metadata and participant indexes) | `OrbitDBConversationRepository`, `OrbitDBConversationIndex` | none | Unsigned, deferred |
+| `conversationOperations` | `OrbitDBConversationRepository` | `ConversationOperationMutationPolicy` through `PublicMutationGate`; roster folded from the signed operations (#370) | Signed |
 
 #### Keychains
 
@@ -558,8 +558,7 @@ migration and the node-trust model that the design avoids) is in
 [`docs/design/node-written-collections.md`](design/node-written-collections.md)
 (#361). The behavior below is current until each slice lands.
 
-`calls`, `contentReplication`, `notifications` and the `conversations` metadata
-document are written by the node with no user key to sign them, and they are
+`calls`, `contentReplication` and `notifications` are written by the node with no user key to sign them, and they are
 not forced into the signed path. A malicious peer can currently do the
 following, and each needs a node-identity trust model (which node keys are
 trusted for a network) that is a product decision, because `NodeId` is an
@@ -575,10 +574,11 @@ unsigned UUID and the shared libp2p peer key is not bound to an identity:
 - `notifications`: forge notifications for any recipient, including fake
   invitations carrying an attacker `encryptedConversationKey`; overwrite or
   hide the recipient index; flip state; flood.
-- `conversations`: overwrite `conversation:<id>` with a higher `updatedAt` to
-  add the attacker to `participantIds` or remove real members, and forge the
-  participant indexes. Metadata has no creator field and feeds call and message
-  authority, so it needs a signed creation record before it can be gated.
+
+Conversation metadata is no longer unsigned: the roster is the fold of client-signed
+`conversationOperations` (gate policy `ConversationOperationMutationPolicy`), there
+is no pubsub conversation announce, and the participant index is rebuilt locally
+from the folded state, never replicated.
 
 Protected and private communities stay on the local repository and never enter
 the public path.

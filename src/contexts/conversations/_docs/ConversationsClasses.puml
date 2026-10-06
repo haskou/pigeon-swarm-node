@@ -30,9 +30,29 @@ package "conversations.domain" {
   class MessageSendOptions <<ValueObject>>
   class MessageEditOptions <<ValueObject>>
 
-  class ConversationWasCreatedEvent {
-    +eventName(): string
+  class ConversationOperation <<ValueObject>> {
+    +id: conversation:<conversationId>:op:<digest>
+    +action: ConversationOperationAction
+    +parents: string[]
+    +isGenesis(): boolean
   }
+
+  class ConversationOperationAction <<Enum>>
+  class ConversationOperationApplier
+  class ConversationOperationArgumentReader
+  class ConversationOperationLimits
+  class ConversationRoster {
+    +addMember(actor, identityId): void
+    +removeMember(actor, identityId): void
+    +leave(actor): void
+    +promoteAdmin(actor, identityId): void
+    +demoteAdmin(actor, identityId): void
+  }
+  class ConversationStateFold {
+    +rosterAfter(operations, candidate): ConversationRoster
+  }
+  class InvalidConversationOperationError
+  class ConversationOperationLimitExceededError
 
   abstract class Message <<Entity>> {
     -metadata: MessageMetadata
@@ -141,8 +161,14 @@ MessageEdited --> MessageId
   MessageReaction --> MessageReactionEmoji
   ConversationRepository --> Conversation
   MessageReactionRepository --> MessageReaction
-  OneToOneConversation ..> ConversationWasCreatedEvent
-  GroupConversation ..> ConversationWasCreatedEvent
+  ConversationStateFold ..> ConversationOperation
+  ConversationStateFold ..> ConversationOperationApplier
+  ConversationOperationApplier --> ConversationRoster
+  ConversationOperationApplier ..> ConversationOperationArgumentReader
+  ConversationOperation ..> ConversationOperationLimits
+  ConversationOperation --> ConversationOperationAction
+  ConversationRoster ..> InvalidConversationOperationError
+  ConversationOperationLimits ..> ConversationOperationLimitExceededError
   Conversation ..> ConversationMessageWasSentEvent
   Conversation ..> ConversationMessageWasEditedEvent
   Conversation ..> ConversationMessageWasDeletedEvent
@@ -152,12 +178,16 @@ MessageEdited --> MessageId
 }
 
 package "conversations.application" {
-  class OneToOneConversationCreator {
-    +create(command): Promise<OneToOneConversation>
+  class ConversationCreator {
+    +create(message: ConversationCreateMessage): Promise<Conversation>
   }
 
-  class GroupConversationCreator {
-    +create(command): Promise<GroupConversation>
+  class ConversationMemberChanger {
+    +change(message: ConversationMemberChangeMessage): Promise<Conversation>
+  }
+
+  class ConversationFrontierFinder {
+    +find(id: ConversationId, requester: IdentityId): Promise<string[]>
   }
 
   class MessageSender {
@@ -225,10 +255,9 @@ package "conversations.application" {
     +publish(domainEvents): Promise<void>
   }
 
-  OneToOneConversationCreator --> ConversationRepository
-  OneToOneConversationCreator --> DomainEventPublisher
-  GroupConversationCreator --> ConversationRepository
-  GroupConversationCreator --> DomainEventPublisher
+  ConversationCreator --> ConversationRepository
+  ConversationMemberChanger --> ConversationRepository
+  ConversationFrontierFinder --> ConversationRepository
   MessageSender --> ConversationRepository
   MessageSender --> PollRepository
   MessageSender --> DomainEventPublisher
@@ -295,25 +324,22 @@ package "conversations.infrastructure" {
     -emoji: string
     -createdAt: number
   }
-  class OrbitDBConversationDocument {
-    -id: string
-    -type: string
-    -networkId: string
-    -participantIds: string[]
-    -createdAt: number
-  }
+  class ConversationOperationMutationPolicy
 
   class Libp2pGossipsubMessageBusAdapter
 
   note right of OrbitDBConversationRepository
-    Reconstitutes and persists the Conversation
-    aggregate from OrbitDB replicated documents.
+    Folds the Conversation roster from the signed
+    conversationOperations store; the participant
+    index is local. Writes go through
+    ConversationOperationMutationPolicy.
     Message storage and read markers are
     replicated projections, not storage documents.
   end note
 
   OrbitDBConversationRepository ..|> ConversationRepository
-  OrbitDBConversationRepository --> OrbitDBConversationDocument
+  OrbitDBConversationRepository ..> ConversationOperationMutationPolicy
+  OrbitDBConversationRepository ..> ConversationStateFold
   OrbitDBConversationRepository --> OrbitDBConversationMessageDocument
   OrbitDBConversationRepository ..> IpfsMessageDocument
   OrbitDBMessageReactionRepository ..|> MessageReactionRepository

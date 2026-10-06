@@ -192,7 +192,7 @@ function createStores(): {
     calls,
     communityOperations,
     contentReplication,
-    conversations: createStore(),
+    conversationOperations: createStore(),
     heads,
     identities,
     keychains,

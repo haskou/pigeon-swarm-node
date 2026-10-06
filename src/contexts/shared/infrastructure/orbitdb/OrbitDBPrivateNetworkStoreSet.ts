@@ -4,7 +4,7 @@ import { OrbitDBInstance } from './OrbitDBInstance';
 export type OrbitDBPrivateNetworkStoreSet = {
   calls: OrbitDBDatabase;
   communityOperations: OrbitDBDatabase;
-  conversations: OrbitDBDatabase;
+  conversationOperations: OrbitDBDatabase;
   heads: OrbitDBDatabase;
   identities: OrbitDBDatabase;
   contentReplication: OrbitDBDatabase;
