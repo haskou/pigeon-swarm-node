@@ -3,10 +3,8 @@ import NodePeerRepository from '@app/contexts/nodes/domain/repositories/NodePeer
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { createHash } from 'crypto';
 
-import { ContentReplicaClaim } from '../../domain/ContentReplicaClaim';
 import { ContentReplication } from '../../domain/ContentReplication';
 import ContentReplicationPolicy from '../../domain/ContentReplicationPolicy';
-import ContentReplicaClaimRepository from '../../domain/repositories/ContentReplicaClaimRepository';
 import ContentReplicationRepository from '../../domain/repositories/ContentReplicationRepository';
 import { ContentReplicationStatus } from './ContentReplicationStatus';
 import { ReplicatedContentStatus } from './ReplicatedContentStatus';
@@ -16,7 +14,6 @@ export default class ContentReplicationStatusFinder {
 
   constructor(
     private readonly contentRepository: ContentReplicationRepository,
-    private readonly claimRepository: ContentReplicaClaimRepository,
     private readonly nodeRepository: NodeRepository,
     private readonly nodePeerRepository: NodePeerRepository,
     private readonly policy: ContentReplicationPolicy,
@@ -60,7 +57,6 @@ export default class ContentReplicationStatusFinder {
 
   private selectResponsibleNodeIds(
     content: ContentReplication,
-    networkId: string,
     nodeIds: string[],
   ): string[] {
     const primitives = content.toPrimitives();
@@ -68,8 +64,12 @@ export default class ContentReplicationStatusFinder {
 
     return [...nodeIds]
       .sort((firstNodeId, secondNodeId) =>
-        this.score(primitives.cid, secondNodeId, networkId).localeCompare(
-          this.score(primitives.cid, firstNodeId, networkId),
+        this.score(
+          primitives.cid,
+          secondNodeId,
+          primitives.networkId,
+        ).localeCompare(
+          this.score(primitives.cid, firstNodeId, primitives.networkId),
         ),
       )
       .slice(0, desiredReplicas)
@@ -78,66 +78,46 @@ export default class ContentReplicationStatusFinder {
 
   private buildContentStatus(
     content: ContentReplication,
-    claims: ContentReplicaClaim[],
     localNodeId: string,
     activeNodeIdsByNetwork: Map<string, string[]>,
   ): ReplicatedContentStatus {
     const primitives = content.toPrimitives();
-    const networks = primitives.networkIds.map((networkId) => {
-      const activeNodeIds = activeNodeIdsByNetwork.get(networkId) ?? [
-        localNodeId,
-      ];
-      const responsibleNodeIds = this.selectResponsibleNodeIds(
-        content,
-        networkId,
-        activeNodeIds,
-      );
-      const knownReplicaNodeIds = claims
-        .map((claim) => claim.toPrimitives())
-        .filter(
-          (claim) =>
-            claim.cid === primitives.cid && claim.networkId === networkId,
-        )
-        .map((claim) => claim.nodeId)
-        .sort();
-
-      return {
-        activeNodeCount: activeNodeIds.length,
-        desiredReplicas: this.policy.desiredReplicas(activeNodeIds.length),
-        knownReplicaNodeIds,
-        knownReplicas: knownReplicaNodeIds.length,
-        localResponsible: responsibleNodeIds.includes(localNodeId),
-        networkId,
-        releaseLocalReplica: this.policy.canReleaseLocalReplica({
-          activeNodeCount: activeNodeIds.length,
-          knownReplicaNodeIds,
-          localNodeId,
-          responsibleNodeIds,
-        }),
-        responsibleNodeIds,
-      };
-    });
+    const activeNodeIds = activeNodeIdsByNetwork.get(primitives.networkId) ?? [
+      localNodeId,
+    ];
+    const responsibleNodeIds = this.selectResponsibleNodeIds(
+      content,
+      activeNodeIds,
+    );
 
     return {
       cid: primitives.cid,
-      contentType: primitives.contentType,
       context: primitives.context,
-      createdAt: primitives.createdAt,
-      filename: primitives.filename,
-      networks,
-      ownerIdentityId: primitives.ownerIdentityId,
-      priority: primitives.priority,
+      networks: [
+        {
+          activeNodeCount: activeNodeIds.length,
+          desiredReplicas: this.policy.desiredReplicas(activeNodeIds.length),
+          localResponsible: responsibleNodeIds.includes(localNodeId),
+          networkId: primitives.networkId,
+          responsibleNodeIds,
+        },
+      ],
       sizeBytes: primitives.sizeBytes,
-      updatedAt: primitives.updatedAt,
     };
   }
 
+  /** Several owners may register the same CID in a network: it is held once. */
+  private distinct(contents: ContentReplication[]): ContentReplication[] {
+    return [
+      ...new Map(
+        contents.map((content) => [content.getId(), content]),
+      ).values(),
+    ];
+  }
+
   public async find(): Promise<ContentReplicationStatus> {
-    const contents = await this.contentRepository.findAll();
-    const [claims, localNodeId, activePeers] = await Promise.all([
-      this.claimRepository.findByCids(
-        contents.map((content) => content.getCid()),
-      ),
+    const contents = this.distinct(await this.contentRepository.findAll());
+    const [localNodeId, activePeers] = await Promise.all([
       this.localNodeId(),
       this.nodePeerRepository.findActive(
         new Date(
@@ -152,12 +132,7 @@ export default class ContentReplicationStatusFinder {
 
     return {
       contents: contents.map((content) =>
-        this.buildContentStatus(
-          content,
-          claims,
-          localNodeId,
-          activeNodeIdsByNetwork,
-        ),
+        this.buildContentStatus(content, localNodeId, activeNodeIdsByNetwork),
       ),
       localNodeId,
     };

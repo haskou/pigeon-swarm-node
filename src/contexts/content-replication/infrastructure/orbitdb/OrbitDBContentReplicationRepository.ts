@@ -1,152 +1,104 @@
 import { ContentReplication } from '@app/contexts/content-replication/domain/ContentReplication';
 import ContentReplicationRepository from '@app/contexts/content-replication/domain/repositories/ContentReplicationRepository';
 import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
-import { OrbitDBDocumentDeduplicator } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDocumentDeduplicator';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { OrbitDBContentReplicationDocument } from './documents/OrbitDBContentReplicationDocument';
 import OrbitDBContentReplicationMapper from './mappers/OrbitDBContentReplicationMapper';
 
+/**
+ * Registrations live in the gated `contentReplication` collection, one record
+ * per (network, cid). Reads go through the registry's admission, so a record
+ * that the policy refuses is never listed, whoever wrote it.
+ */
 export default class OrbitDBContentReplicationRepository extends ContentReplicationRepository {
-  private readonly documentDeduplicator: OrbitDBDocumentDeduplicator<OrbitDBContentReplicationDocument>;
-
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBContentReplicationMapper,
   ) {
     super();
-    this.documentDeduplicator =
-      new OrbitDBDocumentDeduplicator<OrbitDBContentReplicationDocument>({
-        recordId: (record) => record.cid,
-        shouldReplace: (current, candidate) =>
-          current.updatedAt < candidate.updatedAt,
-      });
   }
 
-  private numberValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): number | undefined {
-    const value = document[attribute];
+  private async liveDocuments(
+    cid?: string,
+  ): Promise<OrbitDBContentReplicationDocument[]> {
+    const records = await this.registry.queryDocuments(
+      'contentReplication',
+      (record) =>
+        record.removed !== true &&
+        record.scopeType === 'content_replication' &&
+        (cid === undefined || record.cid === cid),
+    );
 
-    return typeof value === 'number' ? value : undefined;
-  }
-
-  private stringArrayValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): string[] | undefined {
-    const value = document[attribute];
-
-    if (!Array.isArray(value)) {
-      return undefined;
-    }
-
-    return value.every((item) => typeof item === 'string') ? value : undefined;
-  }
-
-  private stringValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): string | undefined {
-    const value = document[attribute];
-
-    return typeof value === 'string' ? value : undefined;
-  }
-
-  private isCompleteDocument(
-    document: Partial<OrbitDBContentReplicationDocument>,
-  ): document is OrbitDBContentReplicationDocument {
-    return [
-      document.cid,
-      document.context,
-      document.createdAt,
-      document.id,
-      document.networkIds,
-      document.priority,
-      document.sizeBytes,
-      document.updatedAt,
-    ].every((value) => value !== undefined);
-  }
-
-  private documentFromRecord(
-    record: Record<string, unknown>,
-  ): OrbitDBContentReplicationDocument | undefined {
-    const cid = this.stringValue(record, 'cid');
-    const contentType = this.stringValue(record, 'contentType');
-    const context = this.stringValue(record, 'context');
-    const createdAt = this.numberValue(record, 'createdAt');
-    const filename = this.stringValue(record, 'filename');
-    const id = this.stringValue(record, 'id') || cid;
-    const networkIds = this.stringArrayValue(record, 'networkIds');
-    const ownerIdentityId = this.stringValue(record, 'ownerIdentityId');
-    const priority = this.stringValue(record, 'priority');
-    const sizeBytes = this.numberValue(record, 'sizeBytes');
-    const updatedAt = this.numberValue(record, 'updatedAt');
-
-    const document: Partial<OrbitDBContentReplicationDocument> = {
-      cid,
-      contentType,
-      context,
-      createdAt,
-      filename,
-      id,
-      networkIds,
-      ownerIdentityId,
-      priority: priority as OrbitDBContentReplicationDocument['priority'],
-      sizeBytes,
-      updatedAt,
-    };
-
-    return this.isCompleteDocument(document) ? document : undefined;
-  }
-
-  private headKey(cid: string): string {
-    return `content-replication:${cid}`;
-  }
-
-  public findAll(): Promise<ContentReplication[]> {
-    const documents = this.registry
-      .findCachedHeadsByPrefix('content-replication:')
-      .map((document) => this.documentFromRecord(document))
-      .filter(
-        (document): document is OrbitDBContentReplicationDocument =>
-          document !== undefined,
-      );
-
-    return Promise.resolve(
-      this.documentDeduplicator
-        .deduplicate(documents)
-        .sort((left, right) => right.updatedAt - left.updatedAt)
-        .map((document) => this.mapper.toDomain(document)),
+    return records.map(
+      (record) => record as unknown as OrbitDBContentReplicationDocument,
     );
   }
 
-  public async findByCid(
-    cid: ContentId,
-  ): Promise<ContentReplication | undefined> {
-    const cidValue = cid.valueOf();
-    const head = this.documentFromRecord(
-      (await this.registry.findHead(this.headKey(cidValue))) || {},
-    );
-
-    if (head) {
-      return this.mapper.toDomain(head);
-    }
-
-    return undefined;
-  }
-
-  public async save(content: ContentReplication): Promise<void> {
-    const document = this.mapper.toDocument(content);
-
-    await this.registry.putDocument('contentReplication', {
-      ...document,
+  private toDomain(
+    documents: OrbitDBContentReplicationDocument[],
+  ): ContentReplication[] {
+    return documents.flatMap((document) => {
+      try {
+        return [this.mapper.toDomain(document)];
+      } catch {
+        return [];
+      }
     });
-    this.registry.replicateHeadInBackground(
-      this.headKey(document.cid),
-      { ...document },
-      document.networkIds,
+  }
+
+  private async write(
+    id: string,
+    networkId: NetworkId,
+    payload: Record<string, unknown>,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    const document = PublicMutationRecord.withProof(payload, proof);
+    const stored = await this.registry.queryUnadmittedDocuments(
+      'contentReplication',
+      (record) => record.id === id,
+      [networkId.valueOf()],
+    );
+
+    PublicMutationRecord.assertNotStale(stored, document);
+    await this.registry.putDocument('contentReplication', document);
+  }
+
+  public delete(
+    ownerIdentityId: IdentityId,
+    networkId: NetworkId,
+    cid: ContentId,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    return this.write(
+      ContentReplication.idOf(networkId.valueOf(), cid.valueOf()),
+      networkId,
+      { ...this.mapper.toTombstone(ownerIdentityId, networkId, cid) },
+      proof,
+    );
+  }
+
+  public async findAll(): Promise<ContentReplication[]> {
+    return this.toDomain(await this.liveDocuments());
+  }
+
+  public async findByCid(cid: ContentId): Promise<ContentReplication[]> {
+    return this.toDomain(await this.liveDocuments(cid.valueOf()));
+  }
+
+  public save(
+    content: ContentReplication,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    return this.write(
+      content.getId(),
+      content.getNetworkId(),
+      { ...this.mapper.toDocument(content) },
+      proof,
     );
   }
 }

@@ -12,10 +12,8 @@ describe('ContentReplicationMaintenanceScheduler', () => {
   const result = (
     partial: Partial<ContentReplicationMaintenanceResult> = {},
   ): ContentReplicationMaintenanceResult => ({
-    claimedReplicas: 0,
-    failedClaims: 0,
-    failedReleases: 0,
-    releasedReplicas: 0,
+    failedReplicas: 0,
+    maintainedReplicas: 0,
     ...partial,
   });
 
@@ -31,30 +29,30 @@ describe('ContentReplicationMaintenanceScheduler', () => {
     await new ContentReplicationMaintenanceScheduler(maintainer).execute();
 
     expect(logger.debug).toHaveBeenCalledWith(
-      'Maintained content replication: claimed=0, released=0, failedClaims=0, failedReleases=0',
+      'Maintained content replication: maintained=0, failed=0',
     );
     expect(logger.info).not.toHaveBeenCalled();
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it('logs applied maintenance at info level', async () => {
-    maintainer.maintain.mockResolvedValue(result({ claimedReplicas: 1 }));
+    maintainer.maintain.mockResolvedValue(result({ maintainedReplicas: 1 }));
 
     await new ContentReplicationMaintenanceScheduler(maintainer).execute();
 
-    expect(logger.info).toHaveBeenCalledWith(
-      'Maintained content replication: claimed=1, released=0, failedClaims=0, failedReleases=0',
+    expect(logger.debug).toHaveBeenCalledWith(
+      'Maintained content replication: maintained=1, failed=0',
     );
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
   it('logs failed maintenance at warn level', async () => {
-    maintainer.maintain.mockResolvedValue(result({ failedClaims: 1 }));
+    maintainer.maintain.mockResolvedValue(result({ failedReplicas: 1 }));
 
     await new ContentReplicationMaintenanceScheduler(maintainer).execute();
 
     expect(logger.warn).toHaveBeenCalledWith(
-      'Maintained content replication: claimed=0, released=0, failedClaims=1, failedReleases=0',
+      'Maintained content replication: maintained=0, failed=1',
     );
     expect(logger.info).not.toHaveBeenCalled();
   });

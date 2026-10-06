@@ -10,14 +10,6 @@ import { Get, JsonController, Param, Res } from 'routing-controllers';
 export class GetIPFSContentRoute extends Route {
   private readonly getter = this.get<ContentGetter>(ContentGetter);
 
-  private contentDisposition(filename: string): string {
-    const asciiFilename = filename
-      .replace(/[\r\n"]/g, '')
-      .replace(/[^\x20-\x7E]/g, '_');
-
-    return `inline; filename="${asciiFilename}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
-  }
-
   @Get('/:cid')
   public async request(
     @Param('cid') cid: string,
@@ -29,13 +21,13 @@ export class GetIPFSContentRoute extends Route {
       if (content.isBinary()) {
         const binary = content.getBinaryResponse();
 
-        response.status(HttpRouteStatusEnum.OK).type(binary.contentType);
+        response
+          .status(HttpRouteStatusEnum.OK)
+          .type(binary.contentType)
+          .setHeader('X-Content-Type-Options', 'nosniff');
 
-        if (binary.filename) {
-          response.setHeader(
-            'Content-Disposition',
-            this.contentDisposition(binary.filename),
-          );
+        if (!binary.inline) {
+          response.setHeader('Content-Disposition', 'attachment');
         }
 
         return response.send(binary.bytes);
@@ -43,6 +35,7 @@ export class GetIPFSContentRoute extends Route {
 
       return response
         .status(HttpRouteStatusEnum.OK)
+        .setHeader('X-Content-Type-Options', 'nosniff')
         .json(content.getJsonResponse());
     } catch (error: unknown) {
       if (error instanceof ReplicatedContentNotFoundError) {

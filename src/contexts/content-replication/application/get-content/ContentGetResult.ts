@@ -2,13 +2,13 @@ export class ContentGetResult {
   public static binary(params: {
     bytes: Buffer;
     contentType: string;
-    filename?: string;
+    inline: boolean;
   }): ContentGetResult {
     return new ContentGetResult(
       'binary',
       params.bytes,
       params.contentType,
-      params.filename,
+      params.inline,
     );
   }
 
@@ -26,23 +26,28 @@ export class ContentGetResult {
     private readonly kind: 'binary' | 'json',
     private readonly bytes?: Buffer,
     private readonly contentType?: string,
-    private readonly filename?: string,
+    private readonly inline?: boolean,
     private readonly content?: unknown,
   ) {}
 
   public getBinaryResponse(): {
     bytes: Buffer;
     contentType: string;
-    filename?: string;
+    inline: boolean;
   } {
-    if (!this.isBinary() || !this.bytes || !this.contentType) {
+    if (
+      !this.isBinary() ||
+      !this.bytes ||
+      !this.contentType ||
+      this.inline === undefined
+    ) {
       throw new Error('Content result is not binary.');
     }
 
     return {
       bytes: this.bytes,
       contentType: this.contentType,
-      filename: this.filename,
+      inline: this.inline,
     };
   }
 

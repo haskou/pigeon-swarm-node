@@ -17,12 +17,6 @@ export default class ContentReplicationStatusSummaryUpdater {
     ).length;
   }
 
-  private releasableCount(status: ContentReplicationStatus): number {
-    return status.contents.filter((content) =>
-      content.networks.some((network) => network.releaseLocalReplica),
-    ).length;
-  }
-
   private totalSizeBytes(status: ContentReplicationStatus): number {
     return status.contents.reduce(
       (total, content) => total + content.sizeBytes,
@@ -38,7 +32,6 @@ export default class ContentReplicationStatusSummaryUpdater {
       new Integer(status.contents.length),
       new ContentSize(this.totalSizeBytes(status)),
       new Integer(this.localResponsibleCount(status)),
-      new Integer(this.releasableCount(status)),
       Timestamp.now(),
     );
 

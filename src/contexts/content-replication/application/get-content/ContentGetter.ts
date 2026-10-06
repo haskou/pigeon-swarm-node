@@ -1,16 +1,12 @@
-import ContentReplicationRepository from '@app/contexts/content-replication/domain/repositories/ContentReplicationRepository';
-
 import { ReplicatedContentNotFoundError } from '../../domain/errors/ReplicatedContentNotFoundError';
+import { ContentTypeSniffer } from '../../domain/services/ContentTypeSniffer';
 import { ContentId } from '../../domain/value-objects/ContentId';
 import ReplicatedContentStorage from '../content-storage/ReplicatedContentStorage';
 import { ContentGetResult } from './ContentGetResult';
 import { ContentGetMessage } from './messages/ContentGetMessage';
 
 export default class ContentGetter {
-  constructor(
-    private readonly contentStorage: ReplicatedContentStorage,
-    private readonly contentRepository: ContentReplicationRepository,
-  ) {}
+  constructor(private readonly contentStorage: ReplicatedContentStorage) {}
 
   private async getPublicBytes(cid: ContentId): Promise<Buffer | undefined> {
     try {
@@ -36,19 +32,6 @@ export default class ContentGetter {
     }
   }
 
-  private async metadata(cid: ContentId): Promise<{
-    contentType: string;
-    filename?: string;
-  }> {
-    const content = await this.contentRepository.findByCid(cid);
-
-    return {
-      contentType:
-        content?.getContentType().valueOf() ?? 'application/octet-stream',
-      filename: content?.getFilename()?.valueOf(),
-    };
-  }
-
   public async get(message: ContentGetMessage): Promise<ContentGetResult> {
     const isRawCid = await this.contentStorage.isRawContent(message.cid);
     const bytes = await this.getPublicBytes(message.cid);
@@ -56,7 +39,7 @@ export default class ContentGetter {
     if (bytes !== undefined) {
       return ContentGetResult.binary({
         bytes,
-        ...(await this.metadata(message.cid)),
+        ...ContentTypeSniffer.sniff(bytes),
       });
     }
 
