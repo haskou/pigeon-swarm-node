@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: Pigeon-swarm Conversations API
   version: 1.0.0
-  description: Endpoints for creating and reading conversations.
+  description: Endpoints for creating, changing (client-signed operations) and reading conversations.
 tags:
   - name: conversations
 paths:
@@ -10,7 +10,7 @@ paths:
     post:
       tags:
         - conversations
-      summary: Create conversation
+      summary: Create conversation from a client-signed conversation_created operation
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -52,6 +52,150 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConversationsResource'
+  /conversations/{conversationId}/frontier:
+    get:
+      tags:
+        - conversations
+      summary: Get the operation digests to use as parents of the next signed operation (members only)
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Sorted digests no other operation names as parent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationFrontierResource'
+  /conversations/{conversationId}/members:
+    post:
+      tags:
+        - conversations
+      summary: Add a member (member_added operation)
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostConversationMemberBody'
+      responses:
+        '200':
+          description: Updated conversation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResource'
+        '409':
+          description: InvalidConversationOperationError or ConversationOperationLimitExceededError.
+  /conversations/{conversationId}/members/me:
+    delete:
+      tags:
+        - conversations
+      summary: Leave the conversation (member_left operation)
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationSignedOperationBody'
+      responses:
+        '200':
+          description: Updated conversation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResource'
+        '409':
+          description: InvalidConversationOperationError or ConversationOperationLimitExceededError.
+  /conversations/{conversationId}/members/{identityId}:
+    delete:
+      tags:
+        - conversations
+      summary: Remove a member (member_removed operation)
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/TargetIdentityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationSignedOperationBody'
+      responses:
+        '200':
+          description: Updated conversation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResource'
+        '409':
+          description: InvalidConversationOperationError or ConversationOperationLimitExceededError.
+  /conversations/{conversationId}/admins/{identityId}:
+    put:
+      tags:
+        - conversations
+      summary: Promote a member to admin (admin_promoted operation, creator only)
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/TargetIdentityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationSignedOperationBody'
+      responses:
+        '200':
+          description: Updated conversation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResource'
+        '409':
+          description: InvalidConversationOperationError or ConversationOperationLimitExceededError.
+    delete:
+      tags:
+        - conversations
+      summary: Demote an admin (admin_demoted operation, creator only)
+      parameters:
+        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/TargetIdentityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationSignedOperationBody'
+      responses:
+        '200':
+          description: Updated conversation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationResource'
+        '409':
+          description: InvalidConversationOperationError or ConversationOperationLimitExceededError.
   /conversations/{conversationId}/messages:
     post:
       tags:
@@ -438,6 +582,12 @@ components:
       required: true
       schema:
         type: string
+    TargetIdentityId:
+      in: path
+      name: identityId
+      required: true
+      schema:
+        type: string
     XIdentityId:
       in: header
       name: X-Identity-Id
@@ -457,6 +607,57 @@ components:
       schema:
         type: string
   schemas:
+    ConversationOperationBody:
+      type: object
+      description: >-
+        Client-signed conversationOperations put. mutation signs the record
+        {id, scopeType: conversation_operation, conversationId, networkId,
+        authorIdentityId, action, args, parents, createdAt}; id is
+        conversation:<conversationId>:op:<base64url sha256 of the canonical record without id>.
+        The node rebuilds the record from the route, so the signature only verifies
+        if the client signed the same change. Signing bytes are
+        "pigeon:public-mutation:v1\n" + canonicalize(proof body without signature).
+      required:
+        - createdAt
+        - parents
+        - mutation
+      properties:
+        createdAt:
+          type: integer
+          minimum: 0
+        parents:
+          type: array
+          description: Digests from GET /conversations/{id}/frontier; empty for the genesis. Sorted ascending, unique, at most 64.
+          items:
+            type: string
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    ConversationSignedOperationBody:
+      type: object
+      required:
+        - operation
+      properties:
+        operation:
+          $ref: '#/components/schemas/ConversationOperationBody'
+    PostConversationMemberBody:
+      type: object
+      required:
+        - identityId
+        - operation
+      properties:
+        identityId:
+          type: string
+        operation:
+          $ref: '#/components/schemas/ConversationOperationBody'
+    ConversationFrontierResource:
+      type: object
+      required:
+        - frontier
+      properties:
+        frontier:
+          type: array
+          items:
+            type: string
     PostConversationBody:
       type: object
       required:
@@ -464,6 +665,7 @@ components:
         - participantIds
         - keychainExternalIdentifier
         - networkId
+        - operation
       properties:
         type:
           type: string
@@ -473,9 +675,13 @@ components:
         name:
           type: string
           description: Required when type is group. Standalone group conversation name.
+        nonce:
+          type: string
+          description: Required when type is group. The group id is group:<base64url sha256 of canonicalize({creatorIdentityId, networkId, nonce})>.
         participantIds:
           type: array
-          minItems: 2
+          minItems: 1
+          description: The node adds the authenticated identity, deduplicates and sorts; the genesis must have been signed with exactly that list (2 to 256 for groups, exactly 2 for one-to-one).
           items:
             type: string
         keychainExternalIdentifier:
@@ -483,15 +689,26 @@ components:
         networkId:
           type: string
           format: uuid
+        operation:
+          $ref: '#/components/schemas/ConversationOperationBody'
     ConversationResource:
       type: object
       required:
+        - adminIds
         - id
         - networkId
         - participantIds
         - type
         - unreadCount
       properties:
+        adminIds:
+          type: array
+          description: Admins of the folded roster; never includes the creator.
+          items:
+            type: string
+        creatorId:
+          type: string
+          description: Author of the genesis operation.
         id:
           type: string
           example: one-to-one:3bd1...
