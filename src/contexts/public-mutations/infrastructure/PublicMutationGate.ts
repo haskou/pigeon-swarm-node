@@ -32,6 +32,15 @@ export class PublicMutationGate extends OrbitDBMutationGate {
     return this.collections.has(collection);
   }
 
+  /** Public mutations are admitted per record; their heads are checked as records. */
+  public governsHead(): boolean {
+    return false;
+  }
+
+  public acceptsHead(): Promise<boolean> {
+    return Promise.resolve(true);
+  }
+
   public async accepts(
     collection: string,
     record: Record<string, unknown>,

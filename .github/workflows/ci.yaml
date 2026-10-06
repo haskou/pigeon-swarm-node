@@ -122,6 +122,10 @@ jobs:
         run: yarn test:integration:forged-community-operations
         timeout-minutes: 4
 
+      - name: Forged keychains
+        run: yarn test:integration:forged-keychains
+        timeout-minutes: 4
+
       - name: Call history
         run: yarn test:integration:call-history
         timeout-minutes: 4

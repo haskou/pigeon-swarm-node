@@ -471,17 +471,111 @@ Signed public mutations (pins, reactions and the other governed collections):
   because the community has not replicated yet is re-admitted after 2 s, 10 s
   and 60 s. Authorization lookups are coalesced for 1 s per batch.
 
-### Collections that are not signed by users
+### Replicated store audit
 
-These collections hold records written by the node itself with no user key to
-sign them, so they are not part of the signed path and are not forced into it:
-`calls` (live call state), `keychains`, `identities` and device authorization
-metadata, `contentReplication` and replica claims, `notifications`, and the
-`conversations` metadata document (rewritten by the node with a node-chosen
-`updatedAt` on every saved message). Protected and private communities stay on
-the local repository and never enter the public path. Making any of these
-user-signed needs its own redesign (for example a signed creation record for
-conversation metadata).
+Every store below lives in the private network's OrbitDB under an
+`IPFSAccessController({ write: ['*'] })`, so **any member of the network can
+append to any store**. Replicated content is trusted only after a node-side
+admission policy accepts it. The audit lists the writer, the policy that
+protects the collection and what a malicious peer can still do.
+
+| Store | Writer | Policy | Status |
+| --- | --- | --- | --- |
+| `communityOperations` | `OrbitDBCommunityRepository` | `CommunityOperationGate`, see [Community signed operations](#community-signed-operations) | Signed (#316) |
+| `messages`, `pins`, `reactions`, `requests`, `polls`, `stickerPacks`, `stickerUserLibraries`, `moderationLogs` | the community, conversation, poll, sticker and moderation repositories | `PublicMutationGate`, see [Other signed public mutations](#other-signed-public-mutations) | Signed |
+| `notificationSettings` | `OrbitDBNotificationScopeSettingsRepository` | `PublicMutationGate` (`notification_settings`, #349) | Signed |
+| `keychains` | `OrbitDBKeychainMetadataIndex` | `OrbitDBKeychainMutationGate`, see [Keychains](#keychains) | Self-authenticating (this change) |
+| `identities` (identity metadata) | `OrbitDBIdentityMetadataIndex` | identity-key signature plus canonical CID, see [Identities](#identities-and-device-authorization) | Self-authenticating, residuals listed |
+| `identities` (device authorization) | `OrbitDBDeviceAuthorizationRepository` | history replayed from the pinned genesis, see [Identity device authorization convergence](#identity-device-authorization-convergence) | Replay-validated, residual listed |
+| `calls` | `OrbitDBCallDocumentReplicator` | none | Unsigned, deferred |
+| `contentReplication` (heads and replica claims) | `OrbitDBContentReplicationRepository`, `OrbitDBContentReplicaClaimRepository` | none | Unsigned, deferred |
+| `notifications` | `OrbitDBNotificationRepository` | none | Unsigned, deferred |
+| `conversations` (metadata and participant indexes) | `OrbitDBConversationRepository`, `OrbitDBConversationIndex` | none | Unsigned, deferred |
+
+#### Keychains
+
+A keychain is already signed by its owner identity key
+(`KeychainSignatureDomainService`), but nodes used to trust the replicated
+metadata without checking it, so a forged high-version document or head shadowed
+the real keychain. `OrbitDBKeychainMutationGate` governs the `keychains`
+collection and the `keychain:` and `keychain-cid:` head keys:
+
+- the record id equals its `cid`, it is not a tombstone (`deleted` is rejected),
+  and the owner signature over the keychain verifies against `ownerIdentityId`;
+- the version shape is consistent: a first version has no `previousCid`, every
+  later version has one;
+- `cid` is the canonical json/sha256 CID of the keychain document
+  (`IpfsKeychainMapper.toDocument`), so a CID cannot be attached to different
+  content than the one it names;
+- a head is cached only under `keychain:<ownerIdentityId of the record>` or
+  `keychain-cid:<cid of the record>`, and only if the record itself passes the
+  checks, so a valid record cannot be planted under a victim's key.
+
+Head keys used to bypass record admission because heads and their derived
+aliases are cached outside the document path. `OrbitDBMutationGate` therefore
+has `governsHead`/`acceptsHead`, and the registry filters every derived head key
+through them on replicated updates, head hydration, readmission, the persisted
+head cache and reads. `PublicMutationGate` returns `false` from `governsHead`
+because its heads are index wrappers checked per record.
+Gates accumulate with `OrbitDBReplicatedStateRegistry.addMutationGate`: the
+registry composes them in `CompositeOrbitDBMutationGate`, and a record is admitted
+only when every gate that governs it accepts. `PublicMutationGateInitializer` and
+`KeychainMutationGateInitializer` each register their own gate.
+
+No request contract changes: the keychain endpoints already carry the signature.
+A malicious peer can still flood the store with validly signed junk of its own
+identity, and keychains it signs itself for its own identity remain valid.
+
+`yarn test:integration:forged-keychains` runs four real private Helia/OrbitDB
+nodes (two with the gate, one malicious without it, one ungated control). It
+checks that a valid keychain and its successor replicate, that the ungated
+control surfaces the forgeries (bad signature, wrong CID, foreign key planted
+under a victim head) and that the gated nodes never serve them.
+
+#### Identities and device authorization
+
+- Identity records are self-authenticating: the embedded identity is verified
+  against its key and the record `cid` must be the canonical CID of the
+  content, so a forged record cannot shadow another identity.
+- Device authorization history is replayed from the pinned genesis
+  (`OrbitDBDeviceAuthorizationDocumentValidator`/`DocumentMerger`), not trusted
+  as replicated. Residual: there is no trusted genesis for an identity the node
+  has never seen, so the first valid-looking history is accepted.
+- Residuals of the identity metadata that this change does not remove:
+  reference-only records without an embedded identity are accepted as
+  non-canonical candidates; `receivedAt` is chosen by the sender; remote
+  `deleted: true` tombstones are ignored when projecting;
+  an attacker can register a handle first with a valid identity of its own and
+  can flood the store. Requiring a `PublicMutationProof` signed by a device key
+  would be circular, because the device authorization it would be checked
+  against is itself part of the identity data.
+
+#### Deferred: node-authored collections
+
+`calls`, `contentReplication`, `notifications` and the `conversations` metadata
+document are written by the node with no user key to sign them, and they are
+not forced into the signed path. A malicious peer can currently do the
+following, and each needs a node-identity trust model (which node keys are
+trusted for a network) that is a product decision, because `NodeId` is an
+unsigned UUID and the shared libp2p peer key is not bound to an identity:
+
+- `calls`: a forged ringing conversation call makes holders create missed-call
+  notifications and push; a forged active channel call blocks `CallStarter`;
+  `sessionEpoch` poisoning, forged `ended` and flooding.
+- `contentReplication`: forged heads make honest nodes fetch, provide and claim
+  arbitrary CIDs (the fetch has no `maxBytes`); forged claims fake replica
+  counts; forged `withdrawnAt` removes real claims; content type and filename
+  can be overwritten.
+- `notifications`: forge notifications for any recipient, including fake
+  invitations carrying an attacker `encryptedConversationKey`; overwrite or
+  hide the recipient index; flip state; flood.
+- `conversations`: overwrite `conversation:<id>` with a higher `updatedAt` to
+  add the attacker to `participantIds` or remove real members, and forge the
+  participant indexes. Metadata has no creator field and feeds call and message
+  authority, so it needs a signed creation record before it can be gated.
+
+Protected and private communities stay on the local repository and never enter
+the public path.
 
 ## Protected control frame delivery
 

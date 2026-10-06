@@ -164,7 +164,7 @@ describe('PublicMutationGate over pins', () => {
         ),
       },
     } as never);
-    registry.useMutationGate(gate);
+    registry.addMutationGate(gate);
 
     await expect(registry.queryDocuments('pins', () => true)).resolves.toEqual([
       signed,
@@ -188,7 +188,7 @@ describe('PublicMutationGate over pins', () => {
         },
       },
     } as never);
-    registry.useMutationGate(gate);
+    registry.addMutationGate(gate);
 
     onUpdate({ payload: { key: 'pins-head', value: { pins: [signed] } } });
     await jest.advanceTimersByTimeAsync(10);

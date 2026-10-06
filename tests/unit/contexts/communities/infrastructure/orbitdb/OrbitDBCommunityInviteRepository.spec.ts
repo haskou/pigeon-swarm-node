@@ -139,7 +139,7 @@ describe('OrbitDBCommunityInviteRepository', () => {
         store: 'requests',
       }),
     );
-    registry.useMutationGate(
+    registry.addMutationGate(
       new PublicMutationGate(
         new PublicMutationVerifier({ isAuthorized: async () => true }),
         [
