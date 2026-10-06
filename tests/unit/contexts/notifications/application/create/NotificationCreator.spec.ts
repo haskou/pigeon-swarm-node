@@ -3,9 +3,26 @@ import NotificationCreator from '@app/contexts/notifications/application/create/
 import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
-import { IdentityMother } from '../../../../mothers/IdentityMother';
+import { signNotificationInvitation } from '../../../../../support/signNotification';
+
+const RECIPIENT = 'MCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=';
+const NONCE = 'notification-test-nonce-0001';
+
+type Case = [
+  'community_invitation' | 'conversation_invitation' | 'group_conversation_invitation',
+  string,
+  string,
+  'communityInvitation' | 'conversationInvitation' | 'groupConversationInvitation',
+];
+
+const cases: Case[] = [
+  ['community_invitation', '550e8400-e29b-41d4-a716-446655440020', 'encrypted-community-key', 'communityInvitation'],
+  ['conversation_invitation', 'one-to-one:notification-test', 'encrypted-conversation-key', 'conversationInvitation'],
+  ['group_conversation_invitation', 'group:notification-test', 'encrypted-group-conversation-key', 'groupConversationInvitation'],
+];
 
 describe('NotificationCreator', () => {
   let repository: MockProxy<NotificationRepository>;
@@ -18,90 +35,24 @@ describe('NotificationCreator', () => {
     creator = new NotificationCreator(repository, eventPublisher);
   });
 
-  it('should create a community invitation notification', async () => {
-    const inviterIdentityId = new IdentityMother().id;
-    const recipientIdentityId = new IdentityId(
-      'MCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=',
-    );
+  it.each(cases)('should create a %s notification with the inviter proof', async (type, subjectId, key, factory) => {
+    const deviceKeyPair = await KeyPair.generate();
+    const deviceCredential = deviceKeyPair.toPrimitives().publicKey;
+    const signer = { deviceCredential, deviceKeyPair, id: new IdentityId(deviceCredential).valueOf() };
+    const signed = signNotificationInvitation({ encryptedKey: key, nonce: NONCE, recipientIdentityId: RECIPIENT, signer, subjectId, type });
 
     const notification = await creator.create(
-      NotificationCreateMessage.communityInvitation(
-        '550e8400-e29b-41d4-a716-446655440020',
-        inviterIdentityId.valueOf(),
-        recipientIdentityId.valueOf(),
-        'encrypted-community-key',
-        'ta2dfyeYjMKesUJsgAxzYP3k4Zt6YCvgEQDQrVxhzjOPu0xVvhGHb+nYJHRBRDRl41O4gS5u2lrGCspjVD/NCg==',
-      ),
+      NotificationCreateMessage[factory](subjectId, signer.id, RECIPIENT, key, NONCE, signed.body.mutation),
     );
 
-    expect(repository.save).toHaveBeenCalledWith(notification);
+    expect(repository.saveInvitation).toHaveBeenCalledWith(notification, expect.objectContaining({}));
     expect(eventPublisher.publish).toHaveBeenCalledWith(expect.any(Array));
     expect(notification.toPrimitives()).toMatchObject({
-      payload: {
-        encryptedCommunityKey: 'encrypted-community-key',
-      },
-      recipientIdentityId: recipientIdentityId.valueOf(),
+      id: expect.stringMatching(/^invitation:[0-9a-f]{64}$/),
+      recipientIdentityId: RECIPIENT,
       state: 'pending',
       status: 'unread',
-      type: 'community_invitation',
-    });
-  });
-
-  it('should create a conversation invitation notification', async () => {
-    const inviterIdentityId = new IdentityMother().id;
-    const recipientIdentityId = new IdentityId(
-      'MCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=',
-    );
-
-    const notification = await creator.create(
-      NotificationCreateMessage.conversationInvitation(
-        'one-to-one:notification-test',
-        inviterIdentityId.valueOf(),
-        recipientIdentityId.valueOf(),
-        'encrypted-conversation-key',
-        'ta2dfyeYjMKesUJsgAxzYP3k4Zt6YCvgEQDQrVxhzjOPu0xVvhGHb+nYJHRBRDRl41O4gS5u2lrGCspjVD/NCg==',
-      ),
-    );
-
-    expect(repository.save).toHaveBeenCalledWith(notification);
-    expect(eventPublisher.publish).toHaveBeenCalledWith(expect.any(Array));
-    expect(notification.toPrimitives()).toMatchObject({
-      payload: {
-        encryptedConversationKey: 'encrypted-conversation-key',
-      },
-      recipientIdentityId: recipientIdentityId.valueOf(),
-      state: 'pending',
-      status: 'unread',
-      type: 'conversation_invitation',
-    });
-  });
-
-  it('should create a group conversation invitation notification', async () => {
-    const inviterIdentityId = new IdentityMother().id;
-    const recipientIdentityId = new IdentityId(
-      'MCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=',
-    );
-
-    const notification = await creator.create(
-      NotificationCreateMessage.groupConversationInvitation(
-        'group:notification-test',
-        inviterIdentityId.valueOf(),
-        recipientIdentityId.valueOf(),
-        'encrypted-group-conversation-key',
-        'ta2dfyeYjMKesUJsgAxzYP3k4Zt6YCvgEQDQrVxhzjOPu0xVvhGHb+nYJHRBRDRl41O4gS5u2lrGCspjVD/NCg==',
-      ),
-    );
-
-    expect(repository.save).toHaveBeenCalledWith(notification);
-    expect(eventPublisher.publish).toHaveBeenCalledWith(expect.any(Array));
-    expect(notification.toPrimitives()).toMatchObject({
-      payload: {
-        encryptedConversationKey: 'encrypted-group-conversation-key',
-      },
-      recipientIdentityId: recipientIdentityId.valueOf(),
-      state: 'pending',
-      status: 'unread',
-      type: 'group_conversation_invitation',
+      type,
     });
   });
 });

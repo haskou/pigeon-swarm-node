@@ -1,4 +1,5 @@
 import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
+import { signNotificationInvitation, signNotificationState } from '../../support/signNotification';
 import { PrivateAuthorizationRequestBodyLimit } from '@app/apps/apis/private-authorization-api/routes/PrivateAuthorizationRequestBodyLimit';
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import PigeonApplication from '@app/apps/PigeonApplication';
@@ -4221,51 +4222,76 @@ export default class Definitions {
 
   @given('I set a conversation invitation notification body')
   public async iSetAConversationInvitationNotificationBody(): Promise<void> {
-    const inviterKeyPair = await this.ensureIdentityKeyPair();
-    await this.ensureOtherIdentityKeyPair();
-
-    this.body = JSON.stringify({
-      conversationId: 'one-to-one:notification-api-conversation',
-      encryptedConversationKey: 'encrypted-conversation-key',
-      inviterIdentityId: this.ownerIdentityId?.valueOf(),
-      inviterSignature: inviterKeyPair
-        .sign('conversation-invitation')
-        .valueOf(),
-      recipientIdentityId: this.otherIdentityId?.valueOf(),
-      type: 'conversation_invitation',
-    });
+    await this.setInvitationNotificationBody(
+      'one-to-one:notification-api-conversation',
+      'encrypted-conversation-key',
+      'conversation_invitation',
+    );
   }
 
   @given('I set a community invitation notification body')
   public async iSetACommunityInvitationNotificationBody(): Promise<void> {
-    const inviterKeyPair = await this.ensureIdentityKeyPair();
-    await this.ensureOtherIdentityKeyPair();
-
-    this.body = JSON.stringify({
-      communityId: this.communityId || 'community-notification-api',
-      encryptedCommunityKey: 'encrypted-community-key',
-      inviterIdentityId: this.ownerIdentityId?.valueOf(),
-      inviterSignature: inviterKeyPair.sign('community-invitation').valueOf(),
-      recipientIdentityId: this.otherIdentityId?.valueOf(),
-      type: 'community_invitation',
-    });
+    await this.setInvitationNotificationBody(
+      this.communityId || 'community-notification-api',
+      'encrypted-community-key',
+      'community_invitation',
+    );
   }
 
   @given('I set a group conversation invitation notification body')
   public async iSetAGroupConversationInvitationNotificationBody(): Promise<void> {
+    await this.setInvitationNotificationBody(
+      'group:notification-api-conversation',
+      'encrypted-group-conversation-key',
+      'group_conversation_invitation',
+    );
+  }
+
+  private async setInvitationNotificationBody(
+    subjectId: string,
+    encryptedKey: string,
+    type:
+      | 'community_invitation'
+      | 'conversation_invitation'
+      | 'group_conversation_invitation',
+  ): Promise<void> {
     const inviterKeyPair = await this.ensureIdentityKeyPair();
     await this.ensureOtherIdentityKeyPair();
 
-    this.body = JSON.stringify({
-      conversationId: 'group:notification-api-conversation',
-      encryptedConversationKey: 'encrypted-group-conversation-key',
-      inviterIdentityId: this.ownerIdentityId?.valueOf(),
-      inviterSignature: inviterKeyPair
-        .sign('group-conversation-invitation')
-        .valueOf(),
-      recipientIdentityId: this.otherIdentityId?.valueOf(),
-      type: 'group_conversation_invitation',
+    const inviterId = this.ownerIdentityId!.valueOf();
+    const signed = signNotificationInvitation({
+      encryptedKey,
+      nonce: randomBytes(18).toString('base64url'),
+      recipientIdentityId: this.otherIdentityId!.valueOf(),
+      signer: {
+        deviceCredential: inviterId,
+        deviceKeyPair: inviterKeyPair,
+        id: inviterId,
+      },
+      subjectId,
+      type,
     });
+    const field =
+      type === 'community_invitation'
+        ? { communityId: subjectId, encryptedCommunityKey: encryptedKey }
+        : { conversationId: subjectId, encryptedConversationKey: encryptedKey };
+
+    this.body = JSON.stringify({
+      ...field,
+      inviterIdentityId: inviterId,
+      mutation: signed.body.mutation,
+      nonce: signed.body.nonce,
+      recipientIdentityId: this.otherIdentityId!.valueOf(),
+      type,
+    });
+  }
+
+  @given('I remove the mutation from the current notification body')
+  public iRemoveTheMutationFromTheCurrentNotificationBody(): void {
+    const body = JSON.parse(this.body || '{}');
+
+    delete body.mutation;
+    this.body = JSON.stringify(body);
   }
 
   @given('I sign the current notification creation request')
@@ -4699,6 +4725,24 @@ export default class Definitions {
     }
 
     const keyPair = await this.ensureOtherIdentityKeyPair();
+    const recipientId = this.otherIdentityId!.valueOf();
+    const body = JSON.parse(this.body || '{}');
+
+    if (body.mutation === undefined && body.withoutMutation !== true) {
+      body.mutation = signNotificationState({
+        notificationId: this.notificationId,
+        read: true,
+        signer: {
+          deviceCredential: recipientId,
+          deviceKeyPair: keyPair,
+          id: recipientId,
+        },
+        state: body.state,
+      }).proof.toPrimitives();
+    }
+
+    delete body.withoutMutation;
+    this.body = JSON.stringify(body);
 
     await this.signCurrentRequest(
       'PATCH',
@@ -4719,6 +4763,20 @@ export default class Definitions {
     const unrelatedIdentityId = new IdentityId(
       unrelatedKeyPair.toPrimitives().publicKey,
     );
+
+    const body = JSON.parse(this.body || '{}');
+
+    body.mutation = signNotificationState({
+      notificationId: this.notificationId,
+      read: true,
+      signer: {
+        deviceCredential: unrelatedIdentityId.valueOf(),
+        deviceKeyPair: unrelatedKeyPair,
+        id: unrelatedIdentityId.valueOf(),
+      },
+      state: body.state,
+    }).proof.toPrimitives();
+    this.body = JSON.stringify(body);
 
     await this.signCurrentRequest(
       'PATCH',
@@ -4754,6 +4812,11 @@ export default class Definitions {
     this.body = JSON.stringify({
       state: 'accepted',
     });
+  }
+
+  @given('I set a notification accepted body without mutation')
+  public iSetANotificationAcceptedBodyWithoutMutation(): void {
+    this.body = JSON.stringify({ state: 'accepted', withoutMutation: true });
   }
 
   @given('I set a notification declined body')

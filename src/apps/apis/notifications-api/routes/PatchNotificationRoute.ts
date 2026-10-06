@@ -12,6 +12,7 @@ import {
   Res,
 } from 'routing-controllers';
 
+import NotificationRecordRateLimiter from '../NotificationRecordRateLimiter';
 import { PatchNotificationBody } from '../bodies/PatchNotificationBody';
 import { PatchNotificationRequest } from '../requests/PatchNotificationRequest';
 import { NotificationViewModel } from '../view-model/NotificationViewModel';
@@ -24,6 +25,10 @@ export class PatchNotificationRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
+  private readonly rateLimiter = this.get<NotificationRecordRateLimiter>(
+    NotificationRecordRateLimiter,
+  );
+
   @Patch('/:notificationId')
   public async patchNotification(
     @Param('notificationId') notificationId: string,
@@ -33,6 +38,8 @@ export class PatchNotificationRoute extends Route {
   ): Promise<Response> {
     const recipientIdentityId =
       await this.signedRequestAuthenticator.authenticate(request);
+    await this.rateLimiter.consume(recipientIdentityId);
+
     const notification = await this.updater.update(
       new PatchNotificationRequest(
         notificationId,

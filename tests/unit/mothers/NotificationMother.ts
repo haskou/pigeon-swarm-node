@@ -2,20 +2,17 @@ import { ConversationId } from '@app/contexts/conversations/domain/value-objects
 import { ConversationInvitationPayload } from '@app/contexts/notifications/domain/ConversationInvitationPayload';
 import { Notification } from '@app/contexts/notifications/domain/Notification';
 import { EncryptedConversationKey } from '@app/contexts/notifications/domain/value-objects/EncryptedConversationKey';
-import { NotificationId } from '@app/contexts/notifications/domain/value-objects/NotificationId';
+import { InvitationNonce } from '@app/contexts/notifications/domain/value-objects/InvitationNonce';
 import { NotificationState } from '@app/contexts/notifications/domain/value-objects/NotificationState';
 import { NotificationStatus } from '@app/contexts/notifications/domain/value-objects/NotificationStatus';
 import { NotificationType } from '@app/contexts/notifications/domain/value-objects/NotificationType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
-import { Timestamp } from '@haskou/value-objects';
 
 import { IdentityMother } from './IdentityMother';
 
 export class NotificationMother {
-  public createdAt: Timestamp = new Timestamp(1773848829055);
-  public id: NotificationId = NotificationId.generate();
   public inviterIdentityId: IdentityId = new IdentityMother().id;
+  public nonce = 'notification-test-nonce-0001';
   public recipientIdentityId: IdentityId = new IdentityId(
     'MCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=',
   );
@@ -29,22 +26,21 @@ export class NotificationMother {
   }
 
   public build(): Notification {
+    const payload = new ConversationInvitationPayload(
+      new ConversationId('one-to-one:notification-test'),
+      this.inviterIdentityId,
+      this.recipientIdentityId,
+      new EncryptedConversationKey('encrypted-conversation-key'),
+      new InvitationNonce(this.nonce),
+    );
+
     return new Notification(
-      this.id,
+      payload.notificationId(),
       NotificationType.CONVERSATION_INVITATION,
       this.recipientIdentityId,
       this.status,
       this.state,
-      new ConversationInvitationPayload(
-        new ConversationId('one-to-one:notification-test'),
-        this.inviterIdentityId,
-        this.recipientIdentityId,
-        new EncryptedConversationKey('encrypted-conversation-key'),
-        new Signature(
-          'ta2dfyeYjMKesUJsgAxzYP3k4Zt6YCvgEQDQrVxhzjOPu0xVvhGHb+nYJHRBRDRl41O4gS5u2lrGCspjVD/NCg==',
-        ),
-      ),
-      this.createdAt,
+      payload,
     );
   }
 }

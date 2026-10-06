@@ -6,6 +6,7 @@ import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 
+import NotificationRecordRateLimiter from '../NotificationRecordRateLimiter';
 import { PostNotificationBody } from '../bodies/PostNotificationBody';
 import { AuthenticatedIdentityIsNotInviterError } from '../errors/AuthenticatedIdentityIsNotInviterError';
 import { PostNotificationRequest } from '../requests/PostNotificationRequest';
@@ -18,6 +19,10 @@ export class PostNotificationRoute extends Route {
 
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
+
+  private readonly rateLimiter = this.get<NotificationRecordRateLimiter>(
+    NotificationRecordRateLimiter,
+  );
 
   private assertRequesterIsInviter(
     message: NotificationCreateMessage,
@@ -39,6 +44,8 @@ export class PostNotificationRoute extends Route {
     const message = new PostNotificationRequest(body).getMessage();
 
     this.assertRequesterIsInviter(message, request);
+
+    await this.rateLimiter.consume(message.getInviterIdentityId());
 
     const notification = await this.creator.create(message);
 
