@@ -4,10 +4,11 @@ import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpReque
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
-import { generateKeyPairSync } from 'crypto';
+import { randomBytes, generateKeyPairSync } from 'crypto';
 import fs from 'fs-extra';
 import path from 'path';
 import WebSocket from 'ws';
@@ -115,6 +116,12 @@ type ConversationListResponse = {
 type MessageListResponse = {
   data?: Array<{ id: string }>;
   messages?: Array<{ id: string }>;
+};
+
+type PeersResponse = {
+  networkSynchronization: {
+    networks: Array<{ id: string }>;
+  };
 };
 
 type HttpRequestError = Error & {
@@ -432,6 +439,13 @@ async function stopNode(node: NodeRuntime): Promise<void> {
   node.process = undefined;
 }
 
+/**
+ * `POST /node/networks/` answers as soon as the network is saved; the runtime
+ * network and its replicated stores open in the background (#187). A write
+ * that needs replicated state, such as the first identity publication that
+ * provisions its device authorization, is answered `503020` until then, so
+ * the node counts as ready once it reports the network as synchronizing.
+ */
 async function addPrivateNetwork(
   node: NodeRuntime,
   networkKey: string,
@@ -441,6 +455,13 @@ async function addPrivateNetwork(
     key: networkKey,
     name: NETWORK_NAME,
   });
+  await waitFor(async () => {
+    const peers = await request<PeersResponse>(node, 'GET', '/peers/');
+
+    return peers.networkSynchronization.networks.some(
+      (network) => network.id === NETWORK_ID,
+    );
+  }, `${node.name} to open replicated state for the private network`);
 }
 
 async function publishIdentity(
@@ -619,23 +640,41 @@ async function sendConversationMessage(
 ): Promise<{ id: string }> {
   const id = MessageId.generate().valueOf();
   const createdAt = Date.now();
-  const signaturePayload = {
+  const record = {
     authorId: author.id,
     conversationId,
     createdAt,
     encryptedPayload,
     id,
     previousMessageIds,
-    replyToMessageId: undefined as string | undefined,
-    targetMessageId: undefined as string | undefined,
+    scopeType: 'conversation',
     type: MessageType.SENT.valueOf(),
   };
+  const mutationBody = {
+    author: {
+      deviceCredential: author.deviceCredential,
+      identityId: author.id,
+    },
+    kind: 'put',
+    operationId: randomBytes(16).toString('base64url'),
+    payloadDigest: PublicMutationProof.digestOf(record),
+    predecessor: null as string | null,
+    recordId: id,
+    sequence: 0,
+    store: 'messages',
+    version: 1,
+  } as const;
   const body = {
     createdAt,
     encryptedPayload,
     id,
+    mutation: PublicMutationProof.signed(
+      mutationBody,
+      author.deviceKeyPair.sign(
+        PublicMutationProof.signingContentOf(mutationBody),
+      ),
+    ).toPrimitives(),
     previousMessageIds,
-    signature: author.keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
   };
   const path = `/conversations/${encodeURIComponent(conversationId)}/messages`;
 
@@ -1182,10 +1221,12 @@ async function waitFor(
 }
 
 if (require.main === module) {
-  main().catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  });
+  main()
+    .catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    })
+    .finally(() => process.exit(process.exitCode ?? 0));
 }
 
 export {
