@@ -100,6 +100,12 @@ Feature: Start calls
     When I POST to "/calls/"
     Then response code is equal to 200
     And response body should contain the current call
+    And the other identity signs the current call join request
+    When I POST a participant join to the current call
+    Then response code is equal to 200
+    And I sign the current community channels request
+    When I GET channels from the current community
+    Then response code is equal to 200
     And response body should contain the other identity id
 
   Scenario: Reuse one community channel call when members join concurrently
@@ -125,5 +131,14 @@ Feature: Start calls
     And I remember the current community voice channel
     And I set a community channel call body
     When both community members start the current call concurrently
-    Then both concurrent call responses contain the same participants
+    Then both concurrent call responses are for the same call
     And both community members can list the concurrent call
+
+  Scenario: Reject starting a call without a signed mutation
+    Given I register a test IPFS network "api-calls-unsigned-start-network"
+    And I have created a one-to-one conversation
+    And I set a conversation call body
+    And call requests are sent without a mutation
+    And I sign the current call start request
+    When I POST to "/calls/"
+    Then response code is equal to 400

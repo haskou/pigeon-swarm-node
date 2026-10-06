@@ -106,6 +106,36 @@ describe('OrbitDBCallFold', () => {
     expect(folded?.primitives.status).toBe('missed');
   });
 
+  it('keeps a group call active when a participant left after joining', async () => {
+    const alice = await newCallSigner();
+    const bob = await newCallSigner();
+    const carol = await newCallSigner();
+    const start = signCallStart({
+      networkId: NETWORK,
+      nonce: 'fold-spec-nonce-00003',
+      participantIds: [alice.id, bob.id, carol.id],
+      scope: { conversationId: 'group:fold', type: 'conversation' },
+      signer: alice,
+      startedAt: t0,
+    });
+    const folded = OrbitDBCallFold.fold({
+      participants: new Map([
+        [
+          bob.id,
+          participantPayload({
+            at: t0 + 100,
+            callId: start.callId,
+            identityId: bob.id,
+            state: 'left',
+          }),
+        ],
+      ]),
+      start: start.payload,
+    });
+
+    expect(folded?.primitives.status).toBe('active');
+  });
+
   it('ignores an event that does not apply to the state reached', async () => {
     const alice = await newCallSigner();
     const stranger = await newCallSigner();

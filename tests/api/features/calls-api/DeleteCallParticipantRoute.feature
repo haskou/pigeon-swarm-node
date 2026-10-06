@@ -44,3 +44,16 @@ Feature: Leave call participant
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | status | active |
+
+  Scenario: Reject leaving a call without a signed mutation
+    Given I register a test IPFS network "api-calls-unsigned-leave-network"
+    And I have created a one-to-one conversation
+    And I set a conversation call body
+    And I sign the current call start request
+    When I POST to "/calls/"
+    Then response code is equal to 200
+    And I remember the current call
+    And call requests are sent without a mutation
+    And the other identity signs the current call leave request
+    When I DELETE the current call participant
+    Then response code is equal to 400

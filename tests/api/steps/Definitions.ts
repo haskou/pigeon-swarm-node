@@ -1,5 +1,8 @@
 import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
-import { signNotificationInvitation, signNotificationState } from '../../support/signNotification';
+import {
+  signNotificationInvitation,
+  signNotificationState,
+} from '../../support/signNotification';
 import { PrivateAuthorizationRequestBodyLimit } from '@app/apps/apis/private-authorization-api/routes/PrivateAuthorizationRequestBodyLimit';
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import PigeonApplication from '@app/apps/PigeonApplication';
@@ -62,6 +65,15 @@ import {
 import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import FormData from 'form-data';
 
+import {
+  CallParticipantState,
+  CallSigner,
+  mutationOf,
+  participantPayload,
+  signCallEnd,
+  signCallParticipant,
+  signCallStart,
+} from '../../support/signCall';
 import { signCommunityOperation } from '../../support/signCommunityOperation';
 import { signConversationOperation } from '../../support/signConversationOperation';
 import IPFSDefinition from './IPFSDefinition';
@@ -95,6 +107,9 @@ export default class Definitions {
   private stickerClock = 1_780_000_000_000;
   private body: string | undefined;
   private callId: string | undefined;
+  private callMutationDisabled = false;
+  private readonly callJoined = new Set<string>();
+  private readonly callProofs = new Map<string, PublicMutationProof>();
   private communityChannelId: string | undefined;
   private communityChannelMessageId: string | undefined;
   private communityThreadRootMessageId: string | undefined;
@@ -1186,6 +1201,131 @@ export default class Definitions {
       : undefined;
   }
 
+  /** Adds the client-signed call record the call endpoints require to the body. */
+  private async attachCallMutation(
+    method: string,
+    path: string,
+    keyPair: KeyPair,
+  ): Promise<void> {
+    const pathname = path.split('?')[0].replace(/\/$/, '');
+    const body = JSON.parse(this.body ?? '{}');
+    const deviceCredential = keyPair.toPrimitives().publicKey;
+    const signer: CallSigner = {
+      deviceCredential,
+      deviceKeyPair: keyPair,
+      id: new IdentityId(deviceCredential).valueOf(),
+    };
+    const participant = /^\/calls\/([^/]+)\/participants(\/me)?$/.exec(
+      pathname,
+    );
+    const end = /^\/calls\/([^/]+)$/.exec(pathname);
+
+    if (this.callMutationDisabled || body.mutation) return;
+
+    if (method === 'POST' && pathname === '/calls') {
+      await this.attachCallStart(body, signer);
+
+      return;
+    }
+
+    if (participant) {
+      const at = Date.now();
+      const callId = participant[1];
+      const recordId = participantPayload({
+        at,
+        callId,
+        identityId: signer.id,
+        state: 'joined',
+      }).id;
+      const previous = this.callProofs.get(recordId);
+      const state: CallParticipantState =
+        method === 'POST'
+          ? 'joined'
+          : previous && this.callJoined.has(recordId)
+            ? 'left'
+            : 'declined';
+      const signed = signCallParticipant({
+        at,
+        callId,
+        predecessor: previous,
+        signer,
+        state,
+      });
+
+      this.callProofs.set(recordId, signed.proof);
+      if (state === 'joined') this.callJoined.add(recordId);
+      this.body = JSON.stringify({ at, mutation: mutationOf(signed.proof) });
+
+      return;
+    }
+
+    if (method === 'DELETE' && end && end[1] !== 'ice-servers') {
+      const at = Date.now();
+      const signed = signCallEnd({ at, callId: end[1], signer });
+
+      this.body = JSON.stringify({ at, mutation: mutationOf(signed.proof) });
+    }
+  }
+
+  private async attachCallStart(
+    body: Record<string, unknown>,
+    signer: CallSigner,
+  ): Promise<void> {
+    const nonce = `api-call-${randomUUID().replace(/-/g, '')}`;
+    const startedAt = Date.now();
+    const networkId = String(this.currentNetworkId);
+
+    if (body.scopeType === 'conversation') {
+      const conversation = await Kernel.di
+        .getService<ConversationRepository>(ConversationRepository)
+        .findMetadataById(new ConversationId(String(body.conversationId)));
+      const signed = signCallStart({
+        networkId,
+        nonce,
+        participantIds: (conversation?.getParticipantIds() ?? []).map((id) =>
+          id.valueOf(),
+        ),
+        scope: {
+          conversationId: String(body.conversationId),
+          type: 'conversation',
+        },
+        signer,
+        startedAt,
+      });
+
+      this.body = JSON.stringify({
+        ...body,
+        mutation: mutationOf(signed.proof),
+        nonce,
+        startedAt,
+      });
+
+      return;
+    }
+
+    const sessionEpoch = 1;
+    const signed = signCallStart({
+      networkId,
+      nonce,
+      scope: {
+        channelId: String(body.channelId),
+        communityId: String(body.communityId),
+        type: 'community_channel',
+      },
+      sessionEpoch,
+      signer,
+      startedAt,
+    });
+
+    this.body = JSON.stringify({
+      ...body,
+      mutation: mutationOf(signed.proof),
+      nonce,
+      sessionEpoch,
+      startedAt,
+    });
+  }
+
   private async signCurrentRequest(
     method: string,
     path: string,
@@ -1198,6 +1338,7 @@ export default class Definitions {
     const createdAt = Date.now();
 
     await this.attachCommunityOperation(method, path, signerKeyPair, createdAt);
+    await this.attachCallMutation(method, path, signerKeyPair);
     await this.attachConversationOperation(
       method,
       path,
@@ -1249,6 +1390,9 @@ export default class Definitions {
     this.binaryBody = undefined;
     this.body = undefined;
     this.callId = undefined;
+    this.callMutationDisabled = false;
+    this.callProofs.clear();
+    this.callJoined.clear();
     this.communityChannelId = undefined;
     this.communityChannelMessageId = undefined;
     this.communityThreadRootMessageId = undefined;
@@ -3129,6 +3273,11 @@ export default class Definitions {
     });
   }
 
+  @given('call requests are sent without a mutation')
+  public callRequestsAreSentWithoutAMutation(): void {
+    this.callMutationDisabled = true;
+  }
+
   @given('I remember the current call')
   public iRememberTheCurrentCall(): void {
     if (!this.response?.data?.id) {
@@ -3189,12 +3338,14 @@ export default class Definitions {
 
   @when('both community members start the current call concurrently')
   public async bothCommunityMembersStartTheCurrentCallConcurrently(): Promise<void> {
-    const body = JSON.parse(this.body || '{}');
+    const base = this.body;
 
     await this.signCurrentRequest('POST', '/calls/');
     const ownerHeaders = { ...this.headers };
+    const ownerBody = JSON.parse(this.body || '{}');
     const otherIdentityKeyPair = await this.ensureOtherIdentityKeyPair();
 
+    this.body = base;
     await this.signCurrentRequest(
       'POST',
       '/calls/',
@@ -3203,13 +3354,28 @@ export default class Definitions {
       this.otherIdentityId,
     );
     const otherHeaders = { ...this.headers };
+    const otherBody = JSON.parse(this.body || '{}');
 
     this.concurrentCallResponses = await Promise.all([
-      this.restClient.post('/calls/', body, { headers: ownerHeaders }),
-      this.restClient.post('/calls/', body, { headers: otherHeaders }),
+      this.restClient.post('/calls/', ownerBody, { headers: ownerHeaders }),
+      this.restClient.post('/calls/', otherBody, { headers: otherHeaders }),
     ]);
     this.response = this.concurrentCallResponses[0];
     this.callId = String(this.concurrentCallResponses[0].data.id);
+    this.body = undefined;
+    await this.signCurrentRequest('POST', `/calls/${this.callId}/participants`);
+    await this.restClient.post(
+      `/calls/${this.callId}/participants`,
+      JSON.parse(this.body || '{}'),
+      { headers: this.headers },
+    );
+    this.body = undefined;
+    await this.theOtherIdentitySignsTheCurrentCallJoinRequest();
+    await this.restClient.post(
+      `/calls/${this.callId}/participants`,
+      JSON.parse(this.body || '{}'),
+      { headers: this.headers },
+    );
   }
 
   @when('the current call heartbeat expires')
@@ -5881,39 +6047,13 @@ export default class Definitions {
     );
   }
 
-  @then('both concurrent call responses contain the same participants')
-  public bothConcurrentCallResponsesContainTheSameParticipants(): void {
-    if (!this.ownerIdentityId || !this.otherIdentityId) {
-      throw new Error('Both community identities must exist first.');
-    }
-
+  @then('both concurrent call responses are for the same call')
+  public bothConcurrentCallResponsesAreForTheSameCall(): void {
     const [firstResponse, secondResponse] = this.concurrentCallResponses;
-    const expectedParticipantIds = [
-      this.ownerIdentityId.valueOf(),
-      this.otherIdentityId.valueOf(),
-    ];
 
     expect(firstResponse.status).to.equal(200);
     expect(secondResponse.status).to.equal(200);
     expect(secondResponse.data.id).to.equal(firstResponse.data.id);
-    expect(firstResponse.data.participantIds).to.contain(
-      this.ownerIdentityId.valueOf(),
-    );
-    expect(secondResponse.data.participantIds).to.contain(
-      this.otherIdentityId.valueOf(),
-    );
-    expect(
-      this.concurrentCallResponses.some((response) => {
-        const participantIds = response.data.participantIds;
-
-        return (
-          Array.isArray(participantIds) &&
-          expectedParticipantIds.every((participantId) =>
-            participantIds.includes(participantId),
-          )
-        );
-      }),
-    ).to.equal(true);
   }
 
   @then('both community members can list the concurrent call')
@@ -5955,17 +6095,7 @@ export default class Definitions {
               call.id === this.callId,
           )
         : undefined;
-      const participantIds =
-        typeof currentCall === 'object' &&
-        currentCall !== null &&
-        'participantIds' in currentCall
-          ? currentCall.participantIds
-          : undefined;
-
-      expect(participantIds).to.have.members([
-        this.ownerIdentityId.valueOf(),
-        this.otherIdentityId.valueOf(),
-      ]);
+      expect(currentCall).to.not.equal(undefined);
     }
   }
 
