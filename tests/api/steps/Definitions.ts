@@ -84,6 +84,7 @@ export default class Definitions {
   private readonly communityRecordSequences = new Map<string, number>();
   private communityChannelType: 'text' | 'voice' = 'text';
   private communityMembershipRequest: Record<string, unknown> | undefined;
+  private replicationCid = '';
   private readonly stickerMutationSequences = new Map<string, number>();
   private readonly stickerPackDocuments = new Map<
     string,
@@ -3958,6 +3959,47 @@ export default class Definitions {
     this.binaryBody = Buffer.from(text);
     this.headers['content-type'] = contentType;
     this.headers['x-filename'] = 'avatar.png';
+  }
+
+  @given(
+    'I sign the current content replication registration for the published content',
+  )
+  public async iSignTheCurrentContentReplicationRegistration(): Promise<void> {
+    const keyPair = await this.ensureIdentityKeyPair();
+    const identityId = keyPair.toPrimitives().publicKey;
+    const cid = String(this.response?.data?.cid);
+    const networkId = String(this.currentNetworkId);
+    const payload = {
+      cid,
+      context: 'ipfs_private_upload',
+      id: `content:${networkId}:${cid}`,
+      networkId,
+      ownerIdentityId: identityId,
+      scopeType: 'content_replication',
+      sizeBytes: 5,
+    };
+
+    this.body = JSON.stringify({
+      context: payload.context,
+      mutation: this.signCommunityRecord(
+        payload,
+        keyPair,
+        undefined,
+        'contentReplication',
+      ),
+      networkId,
+      sizeBytes: payload.sizeBytes,
+    });
+    await this.ensureAuthenticatedIdentityIsPublished();
+    this.binaryBody = undefined;
+    this.headers['content-type'] = 'application/json';
+    this.replicationCid = cid;
+    await this.signCurrentRequest('PUT', `/ipfs/replication/${cid}`);
+  }
+
+  @when('I PUT the signed content replication registration')
+  public async iPUTTheSignedContentReplicationRegistration(): Promise<void> {
+    await this.iPUT(`/ipfs/replication/${this.replicationCid}`);
   }
 
   @given('I sign the current public IPFS content request')

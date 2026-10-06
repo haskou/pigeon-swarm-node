@@ -34,7 +34,7 @@
     "test:integration:network-reconfiguration": "tsx -r tsconfig-paths/register tests/e2e/real-transport/orbitdb-network-reconfiguration.ts",
     "test:integration:call-privacy": "tsx -r tsconfig-paths/register tests/e2e/real-transport/two-node-call-privacy.ts",
     "test:integration:call-history": "tsx -r tsconfig-paths/register tests/e2e/real-transport/call-participant-history.ts",
-    "test:ci": "npm-run-all test:integration:forged-public-mutations test:integration:forged-community-operations test:integration:forged-conversations test:integration:forged-keychains test:integration:call-history test:integration:call-privacy test:integration:network-reconfiguration test:unit test:api test:api:real-ipfs test:consumer test:scheduler",
+    "test:ci": "npm-run-all test:integration:forged-public-mutations test:integration:forged-community-operations test:integration:forged-conversations test:integration:forged-content-replication test:integration:forged-keychains test:integration:call-history test:integration:call-privacy test:integration:network-reconfiguration test:unit test:api test:api:real-ipfs test:consumer test:scheduler",
     "test:coverage:all": "yarn test:coverage:clean && yarn test:coverage:unit && yarn test:coverage:api && yarn test:coverage:consumer && yarn test:coverage:report",
     "test:coverage:clean": "rm -rf coverage/*",
     "test:coverage:unit": "jest --collect-coverage --runInBand && mv coverage/unit/coverage-final.json coverage/coverage-unit.json",
@@ -47,6 +47,7 @@
     "test:e2e:turn-federation": "tsx -r tsconfig-paths/register tests/e2e/turn/federated-credentials.ts",
     "test:integration:forged-public-mutations": "tsx -r tsconfig-paths/register tests/e2e/real-transport/forged-public-mutations.ts",
     "test:integration:forged-community-operations": "tsx -r tsconfig-paths/register tests/e2e/real-transport/forged-community-operations.ts",
+    "test:integration:forged-content-replication": "tsx -r tsconfig-paths/register tests/e2e/real-transport/forged-content-replication.ts",
     "test:integration:forged-conversations": "tsx -r tsconfig-paths/register tests/e2e/real-transport/forged-conversations.ts",
     "test:integration:forged-keychains": "tsx -r tsconfig-paths/register tests/e2e/real-transport/forged-keychains.ts",
     "test:integration:call-privacy:browser": "tsx -r tsconfig-paths/register tests/e2e/real-transport/two-node-call-privacy-browser.ts"

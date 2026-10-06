@@ -488,7 +488,7 @@ protects the collection and what a malicious peer can still do.
 | `identities` (identity metadata) | `OrbitDBIdentityMetadataIndex` | identity-key signature plus canonical CID, see [Identities](#identities-and-device-authorization) | Self-authenticating, residuals listed |
 | `identities` (device authorization) | `OrbitDBDeviceAuthorizationRepository` | history replayed from the pinned genesis, see [Identity device authorization convergence](#identity-device-authorization-convergence) | Replay-validated, residual listed |
 | `calls` | `OrbitDBCallDocumentReplicator` | none | Unsigned, deferred |
-| `contentReplication` (heads and replica claims) | `OrbitDBContentReplicationRepository`, `OrbitDBContentReplicaClaimRepository` | none | Unsigned, deferred |
+| `contentReplication` | `OrbitDBContentReplicationRepository` | `ContentReplicationMutationPolicy` through `PublicMutationGate`; owner-signed per `(networkId, cid)`, 1 GiB and 10000 records per identity per network (#372) | Signed |
 | `notifications` | `OrbitDBNotificationRepository` | none | Unsigned, deferred |
 | `conversationOperations` | `OrbitDBConversationRepository` | `ConversationOperationMutationPolicy` through `PublicMutationGate`; roster folded from the signed operations (#370) | Signed |
 
@@ -567,10 +567,7 @@ unsigned UUID and the shared libp2p peer key is not bound to an identity:
 - `calls`: a forged ringing conversation call makes holders create missed-call
   notifications and push; a forged active channel call blocks `CallStarter`;
   `sessionEpoch` poisoning, forged `ended` and flooding.
-- `contentReplication`: forged heads make honest nodes fetch, provide and claim
-  arbitrary CIDs (the fetch has no `maxBytes`); forged claims fake replica
-  counts; forged `withdrawnAt` removes real claims; content type and filename
-  can be overwritten.
+- `contentReplication`: now owner-signed and gated (#372). There is no local-only head index for this collection: reads and staleness checks go through the registry's gated store query, which re-admits records on read; forged heads, claims, `withdrawnAt` and content types never reach a gated node. No replica claims or pubsub replication events remain.
 - `notifications`: forge notifications for any recipient, including fake
   invitations carrying an attacker `encryptedConversationKey`; overwrite or
   hide the recipient index; flip state; flood.

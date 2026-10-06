@@ -6,36 +6,29 @@ skinparam linetype ortho
 
 package "content-replication/domain" {
   class ContentReplication <<AggregateRoot>>
-  class ContentReplicaClaim <<Entity>>
   class ContentReplicaUploadCompletion
-  class ContentReplicationPolicy <<DomainService>>
   class ContentReplicationStatusSummary <<ReadModel>>
   class ContentId <<ValueObject>>
-  class ContentFilename <<ValueObject>>
   class ContentReplicationContext <<ValueObject>>
-  class ContentReplicationMetadata <<ValueObject>>
-  class ContentReplicationPriority <<ValueObject>>
+  class ContentReplicationPolicy <<DomainService>>
   class ContentSize <<ValueObject>>
-  class ContentType <<ValueObject>>
+  class ContentReplicationLimits
 
   interface ContentReplicationRepository
-  interface ContentReplicaClaimRepository
   interface ContentReplicationStatusSummaryRepository
 
   class ContentReplicationWasRegisteredEvent <<DomainEvent>>
-  class ContentReplicationWasClaimedEvent <<DomainEvent>>
 }
 
 package "content-replication/application" {
   class ContentReplicationRegistrar
-  class ContentReplicationMetadataRegistrar
-  class ContentReplicaClaimRegistrar
+  class ContentReplicationUnregistrar
   class ContentReplicationMaintainer
+  class ContentReplicationStatusSummaryFinder
   class ContentReplicationStatusFinder
   class ContentReplicationStatus
   class ReplicatedContentStatus
   class NetworkReplicationStatus
-  class ContentReplicationStatusSummaryFinder
   class ContentGetter
   class ContentGetResult
   class ContentPublisher
@@ -43,63 +36,48 @@ package "content-replication/application" {
   class ContentUploadLimits
   class PublishedContent
   class ContentReplicationSummaryRefresher
-  class ContentReplicationStatusSummaryUpdater
   class ContentReplicationMaintenanceResult
-  class ContentNetworkReplicationStatus
   interface ReplicatedContentStorage
 }
 
 package "content-replication/infrastructure" {
   class IpfsContentStorage
   class OrbitDBContentReplicationRepository
-  class OrbitDBContentReplicaClaimRepository
+  class ContentReplicationMutationPolicy <<PublicMutationPolicy>>
   class LocalContentReplicationStatusSummaryRepository
   class LocalContentReplicationStatusSummaryDocument
 }
 
-ContentReplication *-- ContentReplicaClaim
 ContentReplication --> ContentId
 ContentReplication --> ContentReplicationContext
-ContentReplication --> ContentReplicationMetadata
-ContentReplication --> ContentReplicationPriority
-ContentReplicaClaim --> ContentId
-ContentReplicationPolicy ..> ContentReplication
 ContentReplicaUploadCompletion --> NetworkId
 
 ContentReplication ..> ContentReplicationWasRegisteredEvent
-ContentReplication ..> ContentReplicationWasClaimedEvent
 
-ContentReplicationRegistrar ..> ContentReplicationRepository
-ContentReplicationRegistrar ..> ContentReplicaClaimRepository
-ContentReplicationMetadataRegistrar ..> ContentReplicationRepository
-ContentReplicaClaimRegistrar ..> ContentReplicaClaimRepository
-ContentReplicationMaintainer ..> ContentReplicationPolicy
-ContentReplicationMaintainer ..> ContentReplicaClaimRepository
 ContentReplicationMaintainer ..> ReplicatedContentStorage
-ContentReplicationStatusFinder ..> ContentReplicationRepository
-ContentReplicationStatusFinder ..> ContentReplicaClaimRepository
-ContentReplicationStatusFinder ..> ContentReplicationStatus
-ContentReplicationStatus *-- ReplicatedContentStatus
-ReplicatedContentStatus *-- NetworkReplicationStatus
 ContentGetter ..> ReplicatedContentStorage
 ContentGetter ..> ContentReplicationRepository
 ContentGetter ..> ContentGetResult
 ContentPublisher ..> ReplicatedContentStorage
-ContentPublisher ..> ContentReplicationRegistrar
 ContentPublisher ..> ContentReplicaUploadCompletion
 ContentPublisher ..> ContentDocument
 ContentPublisher ..> PublishedContent
 ContentUploadLimits ..> ContentSize
 ContentReplicationStatusSummaryFinder ..> ContentReplicationStatusSummaryRepository
 ContentReplicationSummaryRefresher ..> ContentReplicationStatusSummaryRepository
-ContentReplicationStatusSummaryUpdater ..> ContentReplicationStatusSummaryRepository
 ContentReplicationMaintainer ..> ContentReplicationMaintenanceResult
-ContentReplicationMaintainer ..> ContentNetworkReplicationStatus
 
 IpfsContentStorage ..|> ReplicatedContentStorage
 OrbitDBContentReplicationRepository ..|> ContentReplicationRepository
-OrbitDBContentReplicaClaimRepository ..|> ContentReplicaClaimRepository
 LocalContentReplicationStatusSummaryRepository ..|> ContentReplicationStatusSummaryRepository
 LocalContentReplicationStatusSummaryRepository ..> LocalContentReplicationStatusSummaryDocument
+ContentReplicationRegistrar ..> ContentReplicationRepository
+ContentReplicationUnregistrar ..> ContentReplicationRepository
+ContentReplicationMaintainer ..> ContentReplicationPolicy
+ContentReplicationStatusFinder ..> ContentReplicationRepository
+ContentReplicationStatus *-- ReplicatedContentStatus
+ReplicatedContentStatus *-- NetworkReplicationStatus
+ContentReplicationMutationPolicy ..> ContentReplicationLimits
+OrbitDBContentReplicationRepository ..> ContentReplicationMutationPolicy : gated by
 
 @enduml

@@ -1081,12 +1081,9 @@ published yet, so clients can generate a keypair locally, sign this request, get
 a CID, and then publish the identity with `profile.picture`, `profile.banner` or
 inside an encrypted message payload.
 
-Request body is the raw binary content. Send metadata as headers:
-
-```http
-Content-Type: image/png
-X-Filename: profile-image.png
-```
+Request body is the raw binary content. `Content-Type` and `X-Filename` are
+echoed in this response only; they are not replicated and the node never trusts
+them when serving content.
 
 Response:
 
@@ -1102,11 +1099,10 @@ Response:
 Implemented:
 
 - publish public content to every configured IPFS network
-- register the returned CID in OrbitDB replication metadata
+- NOT announce replication: after the identity is published, the owner registers
+  the CID with `PUT /ipfs/replication/{cid}`
 - accept raw request bytes instead of wrapping the content in JSON/base64
 - store the binary bytes directly in IPFS
-- preserve response metadata from `Content-Type` and `X-Filename` in local
-  replication metadata
 - limit content size to 50 MiB
 - return the CID to store in signed identity profiles or posts
 
@@ -1119,21 +1115,23 @@ GET /ipfs/{cid}
 For CIDs uploaded with `POST /ipfs/public`, the response body is the original
 binary content. It is not wrapped in JSON and it is not base64 encoded.
 
-Response:
+Response headers:
 
 ```http
 HTTP/1.1 200 OK
 Content-Type: image/png
-Content-Disposition: inline; filename="profile-image.png"; filename*=UTF-8''profile-image.png
+X-Content-Type-Options: nosniff
 ```
 
-The body is the raw byte stream. `Content-Type` and `Content-Disposition` are
-resolved from the replication metadata created during upload or received through
-network sync. If metadata is unknown, the endpoint falls back to
-`application/octet-stream`. If the CID points to existing JSON content, the
-endpoint still returns that JSON document, because identities, keychains and
-private upload documents are stored as JSON. Reading a CID may populate Helia's local
-block cache, but it does not pin the content or advertise this node as a provider.
+The body is the raw byte stream. The node sniffs the bytes and serves them
+inline only when they are an allowlisted passive media type (PNG, JPEG, GIF,
+WebP, AVIF, MP4, WebM, MP3, OGG, WAV). Anything else is served as
+`application/octet-stream` with `Content-Disposition: attachment`. Neither a
+content type nor a filename is replicated, so a remote peer cannot choose them.
+If the CID points to existing JSON content, the endpoint still returns that JSON
+document, because identities, keychains and private upload documents are stored
+as JSON. Reading a CID may populate Helia's local block cache, but it does not
+pin the content or advertise this node as a provider.
 
 ### Publish private content
 
@@ -1146,12 +1144,8 @@ inspects the original private file. Clients must encrypt the file bytes locally
 before sending the request. `networkId` is the target IPFS network id where the
 encrypted document must be stored.
 
-Request body is the encrypted raw binary content. Send metadata as headers:
-
-```http
-Content-Type: application/octet-stream
-X-Filename: encrypted-photo.bin
-```
+Request body is the encrypted raw binary content. `Content-Type` and
+`X-Filename` are kept only inside the stored private document.
 
 Response:
 
@@ -1168,14 +1162,12 @@ Response:
 Implemented:
 
 - publish client-encrypted private content only to the selected IPFS network
-- register the returned CID in OrbitDB replication metadata for that network
+- NOT announce replication; register with `PUT /ipfs/replication/{cid}` once the identity is published
 - accept raw encrypted request bytes instead of wrapping the content in
   JSON/base64
 - store content as a JSON IPFS document with `encrypted: true`,
   `contentType`, base64 `encryptedData`, optional `filename`, `size`,
   `uploadedAt` and `uploadedByIdentityId`
-- preserve `X-Filename` when provided; do not send a sensitive clear-text
-  filename here if it should remain private
 - limit encrypted content size to 50 MiB
 - return the CID to place inside encrypted message payloads
 
@@ -1190,31 +1182,72 @@ Implemented:
 - read JSON content by CID from any configured IPFS network
 - return `404` when the CID is not found
 
+### Register content replication
+
+```http
+PUT /ipfs/replication/{cid}
+```
+
+Requires signed request headers. Call it only after the identity is published
+(a node never replicates a CID for an unpublished identity). Body:
+
+```json
+{
+  "networkId": "<networkId>",
+  "context": "ipfs_private_upload",
+  "sizeBytes": 2048,
+  "mutation": { "...": "PublicMutationProof primitives" }
+}
+```
+
+`context` is `ipfs_private_upload` or `ipfs_public_upload`; `sizeBytes` is
+1..52428800. Response: `204`.
+
+The replicated record is stored in the gated `contentReplication` collection:
+
+- record id: `content:<networkId>:<cid>`
+- payload (signed): `{ cid, context, id, networkId, ownerIdentityId,
+  scopeType: "content_replication", sizeBytes }`, with `scopeType` exactly
+  `content_replication` and `ownerIdentityId` the signing identity
+- `mutation` is a `PublicMutationProof` with `store: "contentReplication"`,
+  `kind: "put"`, `recordId` = the record id and `payloadDigest` = the digest of
+  the payload without `proof`; the client signs
+  `signingContentOf(body)` with its device key
+- admission: the owner must belong to `networkId`; per identity and network the
+  node admits at most 1 GiB (`CONTENT_REPLICATION_QUOTA_BYTES`) and 10000 records
+  (`CONTENT_REPLICATION_MAX_RECORDS_PER_IDENTITY`). The budget is
+  deterministic: records sort by id and the first ones that fit are admitted
+- only a record that passes the gate is ever fetched or provided, and the fetch
+  is capped at the declared `sizeBytes`
+
+Byte-exact vectors (ids, digests and signing content) are in
+`tests/fixtures/content-replication-vectors.json`.
+
+### Withdraw content replication
+
+```http
+DELETE /ipfs/replication/{cid}
+```
+
+Same body with `kind: "delete"` and a tombstone payload `{ cid, id, networkId,
+ownerIdentityId, removed: true, scopeType: "content_replication" }`, signed by
+the owner. Response: `204`.
+
 ### Get content replication status
 
 ```http
 GET /ipfs/replication/status
 ```
 
-Requires signed request headers. This endpoint reports a precomputed local
-replication summary. It does not return known CIDs and does not calculate
-replica responsibility during the request.
+Requires signed request headers. Reports a precomputed local summary; it does
+not return CIDs.
 
-The summary is refreshed when local uploads register replication metadata, when
-network-scoped pubsub replication/claim events are consumed, and when the
-background maintenance scheduler runs.
-
-The current policy is intentionally conservative:
-
-- with 1 to 5 active nodes in a network, every active node remains responsible
-  for every known CID
+- with 1 to 5 active nodes in a network, every active node is responsible for
+  every registered CID
 - with more than 5 active nodes, desired replicas are the larger of 5 nodes or
   40% of active nodes, capped by the active node count
-- responsibility is selected deterministically from `networkId`, `cid` and
-  `nodeId`, so nodes can independently agree who should keep a CID
-- the background maintenance job only releases local replicas when the network
-  has more than 5 active nodes, the local node is not responsible for that CID,
-  and every responsible node has already claimed that replica
+- responsibility is deterministic from `networkId`, `cid` and `nodeId`
+- there are no replica claims and nodes never release a replica
 
 Response:
 
@@ -1225,26 +1258,10 @@ Response:
     "contentCount": 42,
     "totalSizeBytes": 104857600,
     "localResponsibleCount": 38,
-    "releasableCount": 3,
     "updatedAt": 1770000000000
   }
 }
 ```
-
-Implemented:
-
-- track CIDs created through `POST /ipfs/public` and `POST /ipfs/{networkId}`
-- track CIDs announced by other nodes, even before this node claims a local
-  replica
-- record replica claims when a local or remote node announces that it has a CID
-- derive active node counts from node heartbeat peer metadata
-- keep generous replica margins to avoid losing half the data when there are
-  only a few nodes
-- periodically pin missing local responsibilities and release safe extra local
-  replicas
-- pin and advertise only content published by this node or replicas explicitly
-  assigned to it; ordinary IPFS and OrbitDB reads do not create replica ownership
-- keep per-CID responsibility data internal to the maintenance scheduler
 
 ## Link Preview HTTP API
 

@@ -126,6 +126,10 @@ jobs:
         run: yarn test:integration:forged-conversations
         timeout-minutes: 4
 
+      - name: Forged content replication
+        run: yarn test:integration:forged-content-replication
+        timeout-minutes: 4
+
       - name: Forged keychains
         run: yarn test:integration:forged-keychains
         timeout-minutes: 4

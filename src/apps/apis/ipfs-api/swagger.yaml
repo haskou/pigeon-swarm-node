@@ -66,7 +66,7 @@ paths:
           description: CID of the IPFS content.
       responses:
         '200':
-          description: Public binary content or JSON content found. Public binary responses use the uploaded Content-Type when replication metadata is known and include inline Content-Disposition when X-Filename was provided.
+          description: Public binary content or JSON content found. Bytes are sniffed: allowlisted passive media is served inline with its sniffed type, anything else as application/octet-stream with Content-Disposition attachment. X-Content-Type-Options: nosniff is always set.
           content:
             application/octet-stream:
               schema:
@@ -91,7 +91,7 @@ paths:
       tags:
         - ipfs
       summary: Publish public content to IPFS
-      description: Accepts raw request bytes, stores them directly as public IPFS bytes without JSON/base64 wrapping, preserves Content-Type and X-Filename in replication metadata, and returns the CID to reference from identities, messages, or posts.
+      description: Accepts raw request bytes, stores them directly as public IPFS bytes without JSON/base64 wrapping, does not announce replication (use PUT /ipfs/replication/{cid} after the identity is published), and returns the CID to reference from identities, messages, or posts.
       security:
         - signedRequest: []
       parameters:
@@ -125,12 +125,79 @@ paths:
           description: Invalid signed request.
         '413':
           description: Public content is too large.
+  /ipfs/replication/{cid}:
+    put:
+      tags:
+        - ipfs
+      summary: Register owner-signed content replication
+      description: Call only after the identity is published. Body carries networkId, context (ipfs_private_upload or ipfs_public_upload), sizeBytes (1..52428800) and a PublicMutationProof for the contentReplication store. Subject to a per identity per network quota.
+      security:
+        - signedRequest: []
+      parameters:
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [networkId, context, sizeBytes, mutation]
+              properties:
+                networkId:
+                  type: string
+                context:
+                  type: string
+                  enum: [ipfs_private_upload, ipfs_public_upload]
+                sizeBytes:
+                  type: number
+                mutation:
+                  type: object
+      responses:
+        '204':
+          description: Registered.
+        '400':
+          description: Invalid or refused mutation.
+        '401':
+          description: Invalid signed request.
+    delete:
+      tags:
+        - ipfs
+      summary: Withdraw owner-signed content replication
+      security:
+        - signedRequest: []
+      parameters:
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [networkId, mutation]
+              properties:
+                networkId:
+                  type: string
+                mutation:
+                  type: object
+      responses:
+        '204':
+          description: Withdrawn.
+        '401':
+          description: Invalid signed request.
   /ipfs/replication/status:
     get:
       tags:
         - ipfs
       summary: Get local content replication status
-      description: Returns the precomputed local content replication summary. The endpoint does not list known CIDs or calculate replica responsibility on demand; uploads, pubsub replication events and the maintenance scheduler refresh the summary document.
+      description: Returns the precomputed local content replication summary. The endpoint does not list known CIDs or calculate replica responsibility on demand; registrations and the maintenance scheduler refresh the summary document.
       security:
         - signedRequest: []
       responses:
@@ -217,7 +284,6 @@ components:
       required:
         - contentCount
         - localResponsibleCount
-        - releasableCount
         - totalSizeBytes
         - updatedAt
       properties:
@@ -227,9 +293,6 @@ components:
         localResponsibleCount:
           type: number
           example: 38
-        releasableCount:
-          type: number
-          example: 3
         totalSizeBytes:
           type: number
           example: 104857600
