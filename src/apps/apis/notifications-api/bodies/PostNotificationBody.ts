@@ -1,4 +1,10 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  IsIn,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class PostNotificationBody {
   @IsOptional()
@@ -31,7 +37,10 @@ export class PostNotificationBody {
 
   @IsString()
   @IsNotEmpty()
-  public readonly inviterSignature: string;
+  public readonly nonce: string;
+
+  @IsObject()
+  public readonly mutation: Record<string, unknown>;
 
   @IsString()
   @IsIn([

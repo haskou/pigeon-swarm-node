@@ -33,7 +33,7 @@ describe('CallTimeoutScheduler', () => {
       publish: jest.fn().mockResolvedValue(undefined),
     };
     const notificationRepository = {
-      save: jest.fn().mockResolvedValue(undefined),
+      saveMissedCall: jest.fn().mockResolvedValue(undefined),
     };
     const scheduler = new CallTimeoutScheduler(
       callRepository as unknown as CallRepository,
@@ -45,7 +45,7 @@ describe('CallTimeoutScheduler', () => {
     await scheduler.execute();
 
     expect(callRepository.save).toHaveBeenCalledWith(call);
-    expect(notificationRepository.save).toHaveBeenCalledTimes(1);
+    expect(notificationRepository.saveMissedCall).toHaveBeenCalledTimes(1);
     expect(eventPublisher.publish).toHaveBeenCalledTimes(2);
     expect(call.toPrimitives().status).toBe('missed');
   });
@@ -68,7 +68,7 @@ describe('CallTimeoutScheduler', () => {
       publish: jest.fn().mockResolvedValue(undefined),
     };
     const notificationRepository = {
-      save: jest.fn().mockResolvedValue(undefined),
+      saveMissedCall: jest.fn().mockResolvedValue(undefined),
     };
     const scheduler = new CallTimeoutScheduler(
       callRepository as unknown as CallRepository,
@@ -80,7 +80,7 @@ describe('CallTimeoutScheduler', () => {
     await scheduler.execute();
 
     expect(callRepository.save).not.toHaveBeenCalled();
-    expect(notificationRepository.save).not.toHaveBeenCalled();
+    expect(notificationRepository.saveMissedCall).not.toHaveBeenCalled();
     expect(eventPublisher.publish).not.toHaveBeenCalled();
     expect(call.toPrimitives().status).toBe('active');
   });

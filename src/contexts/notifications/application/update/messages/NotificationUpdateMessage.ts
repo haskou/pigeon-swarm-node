@@ -1,3 +1,4 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { NotificationId } from '../../../domain/value-objects/NotificationId';
@@ -12,9 +13,14 @@ export class NotificationUpdateMessage {
     notificationId: string,
     recipientIdentityId: string,
     state: string,
+    private readonly mutation: Record<string, unknown>,
   ) {
     this.notificationId = new NotificationId(notificationId);
     this.recipientIdentityId = new IdentityId(recipientIdentityId);
     this.state = new NotificationState(state);
+  }
+
+  public getProof(): PublicMutationProof {
+    return PublicMutationProof.fromPrimitives(this.mutation);
   }
 }

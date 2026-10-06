@@ -1,9 +1,10 @@
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { PrimitiveOf } from '@haskou/value-objects';
 
 import { EncryptedCommunityKey } from './value-objects/EncryptedCommunityKey';
+import { InvitationNonce } from './value-objects/InvitationNonce';
+import { NotificationId } from './value-objects/NotificationId';
 
 export class CommunityInvitationPayload {
   public static fromPrimitives(
@@ -14,7 +15,7 @@ export class CommunityInvitationPayload {
       new IdentityId(primitives.inviterIdentityId),
       new IdentityId(primitives.recipientIdentityId),
       new EncryptedCommunityKey(primitives.encryptedCommunityKey),
-      new Signature(primitives.inviterSignature),
+      new InvitationNonce(primitives.nonce),
     );
   }
 
@@ -23,11 +24,24 @@ export class CommunityInvitationPayload {
     private readonly inviterIdentityId: IdentityId,
     private readonly recipientIdentityId: IdentityId,
     private readonly encryptedCommunityKey: EncryptedCommunityKey,
-    private readonly inviterSignature: Signature,
+    private readonly nonce: InvitationNonce,
   ) {}
+
+  public getInviterIdentityId(): IdentityId {
+    return this.inviterIdentityId;
+  }
 
   public getRecipientIdentityId(): IdentityId {
     return this.recipientIdentityId;
+  }
+
+  public notificationId(): NotificationId {
+    return NotificationId.invitation(
+      this.inviterIdentityId.valueOf(),
+      this.recipientIdentityId.valueOf(),
+      this.communityId.valueOf(),
+      this.nonce.valueOf(),
+    );
   }
 
   public toPrimitives() {
@@ -35,7 +49,7 @@ export class CommunityInvitationPayload {
       communityId: this.communityId.valueOf(),
       encryptedCommunityKey: this.encryptedCommunityKey.valueOf(),
       inviterIdentityId: this.inviterIdentityId.valueOf(),
-      inviterSignature: this.inviterSignature.valueOf(),
+      nonce: this.nonce.valueOf(),
       recipientIdentityId: this.recipientIdentityId.valueOf(),
     };
   }

@@ -26,6 +26,8 @@ import NodeNetworkSynchronizationMonitor from '../contexts/nodes/application/fin
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
 import NotificationScopeSettingsRepository from '../contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
 import NotificationScopeSettingsRepositoryRouter from '../contexts/notification-settings/infrastructure/NotificationScopeSettingsRepositoryRouter';
+import NotificationRepository from '../contexts/notifications/domain/repositories/NotificationRepository';
+import NotificationRepositoryRouter from '../contexts/notifications/infrastructure/NotificationRepositoryRouter';
 import IdentityPresenceRepository from '../contexts/presence/domain/repositories/IdentityPresenceRepository';
 import InMemoryIdentityPresenceRepository from '../contexts/presence/infrastructure/memory/InMemoryIdentityPresenceRepository';
 import { PrivateControlMutationAuthorizer } from '../contexts/private-authorization/application/accept-operation/PrivateControlMutationAuthorizer';
@@ -250,6 +252,10 @@ export default class PigeonApplication {
         {
           token: NotificationScopeSettingsRepository,
           useClass: NotificationScopeSettingsRepositoryRouter,
+        },
+        {
+          token: NotificationRepository,
+          useClass: NotificationRepositoryRouter,
         },
       ],
     });

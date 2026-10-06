@@ -36,3 +36,11 @@ Feature: Post notification route
     And another identity signs the current notification creation request
     When I POST to "/notifications/"
     Then response code is equal to 403
+
+  Scenario: Reject an invitation without the inviter mutation
+    Given I am an anonymous user
+    And I set a conversation invitation notification body
+    And I remove the mutation from the current notification body
+    And I sign the current notification creation request
+    When I POST to "/notifications/"
+    Then response code is equal to 400

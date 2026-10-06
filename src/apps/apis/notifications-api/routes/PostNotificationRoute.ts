@@ -8,6 +8,7 @@ import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 
 import { PostNotificationBody } from '../bodies/PostNotificationBody';
 import { AuthenticatedIdentityIsNotInviterError } from '../errors/AuthenticatedIdentityIsNotInviterError';
+import NotificationRecordRateLimiter from '../NotificationRecordRateLimiter';
 import { PostNotificationRequest } from '../requests/PostNotificationRequest';
 import { NotificationViewModel } from '../view-model/NotificationViewModel';
 
@@ -18,6 +19,10 @@ export class PostNotificationRoute extends Route {
 
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
+
+  private readonly rateLimiter = this.get<NotificationRecordRateLimiter>(
+    NotificationRecordRateLimiter,
+  );
 
   private assertRequesterIsInviter(
     message: NotificationCreateMessage,
@@ -39,6 +44,8 @@ export class PostNotificationRoute extends Route {
     const message = new PostNotificationRequest(body).getMessage();
 
     this.assertRequesterIsInviter(message, request);
+
+    await this.rateLimiter.consume(message.getInviterIdentityId());
 
     const notification = await this.creator.create(message);
 

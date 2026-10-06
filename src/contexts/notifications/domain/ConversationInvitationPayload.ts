@@ -1,9 +1,10 @@
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { PrimitiveOf } from '@haskou/value-objects';
 
 import { EncryptedConversationKey } from './value-objects/EncryptedConversationKey';
+import { InvitationNonce } from './value-objects/InvitationNonce';
+import { NotificationId } from './value-objects/NotificationId';
 
 export class ConversationInvitationPayload {
   public static fromPrimitives(
@@ -14,7 +15,7 @@ export class ConversationInvitationPayload {
       new IdentityId(primitives.inviterIdentityId),
       new IdentityId(primitives.recipientIdentityId),
       new EncryptedConversationKey(primitives.encryptedConversationKey),
-      new Signature(primitives.inviterSignature),
+      new InvitationNonce(primitives.nonce),
     );
   }
 
@@ -23,11 +24,24 @@ export class ConversationInvitationPayload {
     private readonly inviterIdentityId: IdentityId,
     private readonly recipientIdentityId: IdentityId,
     private readonly encryptedConversationKey: EncryptedConversationKey,
-    private readonly inviterSignature: Signature,
+    private readonly nonce: InvitationNonce,
   ) {}
+
+  public getInviterIdentityId(): IdentityId {
+    return this.inviterIdentityId;
+  }
 
   public getRecipientIdentityId(): IdentityId {
     return this.recipientIdentityId;
+  }
+
+  public notificationId(): NotificationId {
+    return NotificationId.invitation(
+      this.inviterIdentityId.valueOf(),
+      this.recipientIdentityId.valueOf(),
+      this.conversationId.valueOf(),
+      this.nonce.valueOf(),
+    );
   }
 
   public toPrimitives() {
@@ -35,7 +49,7 @@ export class ConversationInvitationPayload {
       conversationId: this.conversationId.valueOf(),
       encryptedConversationKey: this.encryptedConversationKey.valueOf(),
       inviterIdentityId: this.inviterIdentityId.valueOf(),
-      inviterSignature: this.inviterSignature.valueOf(),
+      nonce: this.nonce.valueOf(),
       recipientIdentityId: this.recipientIdentityId.valueOf(),
     };
   }

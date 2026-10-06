@@ -35,3 +35,11 @@ Feature: Patch notification route
     And another identity signs the current notification patch request
     When I PATCH the current notification
     Then response code is equal to 409
+
+  Scenario: Reject a notification update without the recipient mutation
+    Given I am an anonymous user
+    And I have created a conversation invitation notification
+    And I set a notification accepted body without mutation
+    And the notification recipient signs the current notification patch request
+    When I PATCH the current notification
+    Then response code is equal to 400

@@ -4,10 +4,19 @@ import NotificationRepository from '@app/contexts/notifications/domain/repositor
 import { NotificationRecipientMismatchError } from '@app/contexts/notifications/domain/errors/NotificationRecipientMismatchError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
+import { signNotificationState, NotificationSigner } from '../../../../../support/signNotification';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 import { NotificationMother } from '../../../../mothers/NotificationMother';
+
+async function signer(): Promise<NotificationSigner> {
+  const deviceKeyPair = await KeyPair.generate();
+  const deviceCredential = deviceKeyPair.toPrimitives().publicKey;
+
+  return { deviceCredential, deviceKeyPair, id: new IdentityId(deviceCredential).valueOf() };
+}
 
 describe('NotificationUpdater', () => {
   let repository: MockProxy<NotificationRepository>;
@@ -21,10 +30,13 @@ describe('NotificationUpdater', () => {
   });
 
   it('should accept a notification as the recipient', async () => {
-    const recipientIdentityId = new IdentityMother().id;
+    const recipient = await signer();
+    const recipientIdentityId = new IdentityId(recipient.id);
     const notification = new NotificationMother()
       .withRecipientIdentityId(recipientIdentityId)
       .build();
+    const id = notification.toPrimitives().id;
+    const { proof } = signNotificationState({ notificationId: id, read: true, signer: recipient, state: 'accepted' });
 
     repository.findById.mockResolvedValue(notification);
 
@@ -33,10 +45,11 @@ describe('NotificationUpdater', () => {
         notification.toPrimitives().id,
         recipientIdentityId.valueOf(),
         'accepted',
+        proof.toPrimitives() as unknown as Record<string, unknown>,
       ),
     );
 
-    expect(repository.save).toHaveBeenCalledWith(notification);
+    expect(repository.saveState).toHaveBeenCalledWith(notification, expect.objectContaining({}));
     expect(eventPublisher.publish).toHaveBeenCalledWith(expect.any(Array));
     expect(notification.toPrimitives()).toMatchObject({
       state: 'accepted',
@@ -60,6 +73,7 @@ describe('NotificationUpdater', () => {
           notification.toPrimitives().id,
           otherIdentityId.valueOf(),
           'declined',
+          {},
         ),
       ),
     ).rejects.toBeInstanceOf(NotificationRecipientMismatchError);

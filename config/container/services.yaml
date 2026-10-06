@@ -151,7 +151,7 @@ services:
     @contexts/notification-settings/infrastructure/NotificationScopeSettingsRepositoryRouter
   contexts/notification-settings/domain/services/NotificationScopeAccessAuthorizer: >-
     @contexts/notification-settings/infrastructure/CommunityNotificationScopeAccessAuthorizer
-  contexts/notifications/domain/repositories/NotificationRepository: '@contexts/notifications/infrastructure/orbitdb/OrbitDBNotificationRepository'
+  contexts/notifications/domain/repositories/NotificationRepository: '@contexts/notifications/infrastructure/NotificationRepositoryRouter'
   contexts/notifications/infrastructure/orbitdb/mappers/OrbitDBNotificationMapper:
     class: >-
       /contexts/notifications/infrastructure/orbitdb/mappers/OrbitDBNotificationMapper
@@ -265,6 +265,10 @@ services:
       - '@apps/apis/link-previews-api/services/LinkPreviewCacheRepository'
   apps/apis/link-previews-api/services/LinkPreviewRateLimiter:
     class: /apps/apis/link-previews-api/services/LinkPreviewRateLimiter
+    arguments:
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+  apps/apis/notifications-api/NotificationRecordRateLimiter:
+    class: /apps/apis/notifications-api/NotificationRecordRateLimiter
     arguments:
       - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
   apps/consumers/private-authorization-consumer/PrivateAuthorizationFrameConsumer:
@@ -548,6 +552,11 @@ services:
     class: /contexts/notifications/application/find/NotificationsFinder
     arguments:
       - '@contexts/notifications/domain/repositories/NotificationRepository'
+  contexts/notifications/infrastructure/local-db/LocalNotificationRepository:
+    class: >-
+      /contexts/notifications/infrastructure/local-db/LocalNotificationRepository
+    arguments:
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
   contexts/polls/application/find/PollFinder:
     class: /contexts/polls/application/find/PollFinder
     arguments:
@@ -756,6 +765,13 @@ services:
     arguments:
       - '@apps/apis/calls-api/CallRelayRecordRegistry'
       - '@apps/apis/calls-api/CallRelayRecordSigner'
+  apps/initializers/public-mutations/NotificationMutationPolicies:
+    class: /apps/initializers/public-mutations/NotificationMutationPolicies
+    arguments:
+      - >-
+        @contexts/notifications/infrastructure/orbitdb/policies/NotificationInvitationMutationPolicy
+      - >-
+        @contexts/notifications/infrastructure/orbitdb/policies/NotificationStateMutationPolicy
   apps/runtimes/call-turn-configuration-runtime/CallTurnConfigurationRuntime:
     class: >-
       /apps/runtimes/call-turn-configuration-runtime/CallTurnConfigurationRuntime
@@ -1132,6 +1148,12 @@ services:
     arguments:
       - '@contexts/notifications/domain/repositories/NotificationRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/notifications/infrastructure/orbitdb/policies/NotificationStateMutationPolicy:
+    class: >-
+      /contexts/notifications/infrastructure/orbitdb/policies/NotificationStateMutationPolicy
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/polls/application/authorize-poll-scope/PollScopeAuthorizer:
     class: /contexts/polls/application/authorize-poll-scope/PollScopeAuthorizer
     arguments:
@@ -1621,6 +1643,14 @@ services:
       - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
       - '@contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry'
     parent: contexts/nodes/domain/services/NodeNetworkDataCleaner
+  contexts/notifications/infrastructure/NotificationRepositoryRouter:
+    class: /contexts/notifications/infrastructure/NotificationRepositoryRouter
+    arguments:
+      - >-
+        @contexts/notifications/infrastructure/orbitdb/OrbitDBNotificationRepository
+      - >-
+        @contexts/notifications/infrastructure/local-db/LocalNotificationRepository
+    parent: contexts/notifications/domain/repositories/NotificationRepository
   contexts/notifications/infrastructure/orbitdb/OrbitDBNotificationRepository:
     class: >-
       /contexts/notifications/infrastructure/orbitdb/OrbitDBNotificationRepository
@@ -1629,6 +1659,13 @@ services:
       - >-
         @contexts/notifications/infrastructure/orbitdb/mappers/OrbitDBNotificationMapper
     parent: contexts/notifications/domain/repositories/NotificationRepository
+  contexts/notifications/infrastructure/orbitdb/policies/NotificationInvitationMutationPolicy:
+    class: >-
+      /contexts/notifications/infrastructure/orbitdb/policies/NotificationInvitationMutationPolicy
+    arguments:
+      - '@contexts/conversations/domain/repositories/ConversationRepository'
+      - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/private-authorization/infrastructure/local-db/LocalPrivateAuthorizationRepository:
     class: >-
       /contexts/private-authorization/infrastructure/local-db/LocalPrivateAuthorizationRepository
@@ -2399,6 +2436,7 @@ services:
       - '@apps/initializers/public-mutations/StickerMutationPolicies'
       - '@apps/initializers/public-mutations/PollMutationPolicies'
       - '@apps/initializers/public-mutations/ContentReplicationMutationPolicies'
+      - '@apps/initializers/public-mutations/NotificationMutationPolicies'
   shared/infrastructure/http/HttpClient: '@shared/infrastructure/http/FetchHttpClient'
   shared/infrastructure/logs/Log: '@shared/infrastructure/logs/WinstonLogger'
   shared/infrastructure/messageBus/MessageBusAdapter: '@shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter'

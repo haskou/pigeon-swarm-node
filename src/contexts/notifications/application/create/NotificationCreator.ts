@@ -22,7 +22,7 @@ export default class NotificationCreator {
         Notification.groupConversationInvitation(payload),
     });
 
-    await this.repository.save(notification);
+    await this.repository.saveInvitation(notification, message.getProof());
     await this.eventPublisher.publish(notification.pullDomainEvents());
 
     return notification;

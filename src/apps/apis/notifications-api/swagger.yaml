@@ -110,7 +110,7 @@ components:
         - inviterIdentityId
         - recipientIdentityId
         - encryptedConversationKey
-        - inviterSignature
+        - nonce
       properties:
         conversationId:
           type: string
@@ -120,8 +120,9 @@ components:
           type: string
         encryptedConversationKey:
           type: string
-        inviterSignature:
+        nonce:
           type: string
+          description: Client-generated base64url nonce (16-128 chars) the invitation id is derived from.
     CommunityInvitationPayload:
       type: object
       required:
@@ -129,7 +130,7 @@ components:
         - inviterIdentityId
         - recipientIdentityId
         - encryptedCommunityKey
-        - inviterSignature
+        - nonce
       properties:
         communityId:
           type: string
@@ -139,8 +140,9 @@ components:
           type: string
         encryptedCommunityKey:
           type: string
-        inviterSignature:
+        nonce:
           type: string
+          description: Client-generated base64url nonce (16-128 chars) the invitation id is derived from.
     MissedCallPayload:
       type: object
       required:
@@ -168,7 +170,6 @@ components:
         - status
         - state
         - payload
-        - createdAt
       properties:
         id:
           type: string
@@ -192,8 +193,6 @@ components:
             - pending
             - accepted
             - declined
-        createdAt:
-          type: integer
         payload:
           oneOf:
             - $ref: '#/components/schemas/CommunityInvitationPayload'
@@ -215,7 +214,11 @@ components:
             - type: object
               required:
                 - type
+                - mutation
               properties:
+                mutation:
+                  type: object
+                  description: Inviter-signed PublicMutationProof (store notifications, kind put, scopeType notification_invitation).
                 type:
                   type: string
                   enum:
@@ -225,7 +228,11 @@ components:
             - type: object
               required:
                 - type
+                - mutation
               properties:
+                mutation:
+                  type: object
+                  description: Inviter-signed PublicMutationProof (store notifications, kind put, scopeType notification_invitation).
                 type:
                   type: string
                   enum:
@@ -235,7 +242,11 @@ components:
             - type: object
               required:
                 - type
+                - mutation
               properties:
+                mutation:
+                  type: object
+                  description: Inviter-signed PublicMutationProof (store notifications, kind put, scopeType notification_invitation).
                 type:
                   type: string
                   enum:
@@ -244,7 +255,11 @@ components:
       type: object
       required:
         - state
+        - mutation
       properties:
+        mutation:
+          type: object
+          description: Recipient-signed PublicMutationProof for the notification-state record.
         state:
           type: string
           enum:

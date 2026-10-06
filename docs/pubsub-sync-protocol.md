@@ -489,7 +489,7 @@ protects the collection and what a malicious peer can still do.
 | `identities` (device authorization) | `OrbitDBDeviceAuthorizationRepository` | history replayed from the pinned genesis, see [Identity device authorization convergence](#identity-device-authorization-convergence) | Replay-validated, residual listed |
 | `calls` | `OrbitDBCallDocumentReplicator` | none | Unsigned, deferred |
 | `contentReplication` | `OrbitDBContentReplicationRepository` | `ContentReplicationMutationPolicy` through `PublicMutationGate`; owner-signed per `(networkId, cid)`, 1 GiB and 10000 records per identity per network (#372) | Signed |
-| `notifications` | `OrbitDBNotificationRepository` | none | Unsigned, deferred |
+| `notifications` | `OrbitDBNotificationRepository` | `NotificationInvitationMutationPolicy` and `NotificationStateMutationPolicy` through `PublicMutationGate`, plus `OrbitDBNotificationHeadMutationGate` for `notification:` heads (#371) | Signed |
 | `conversationOperations` | `OrbitDBConversationRepository` | `ConversationOperationMutationPolicy` through `PublicMutationGate`; roster folded from the signed operations (#370) | Signed |
 
 #### Keychains
@@ -558,7 +558,7 @@ migration and the node-trust model that the design avoids) is in
 [`docs/design/node-written-collections.md`](design/node-written-collections.md)
 (#361). The behavior below is current until each slice lands.
 
-`calls`, `contentReplication` and `notifications` are written by the node with no user key to sign them, and they are
+`calls` and `contentReplication` are written by the node with no user key to sign them, and they are
 not forced into the signed path. A malicious peer can currently do the
 following, and each needs a node-identity trust model (which node keys are
 trusted for a network) that is a product decision, because `NodeId` is an
@@ -568,14 +568,22 @@ unsigned UUID and the shared libp2p peer key is not bound to an identity:
   notifications and push; a forged active channel call blocks `CallStarter`;
   `sessionEpoch` poisoning, forged `ended` and flooding.
 - `contentReplication`: now owner-signed and gated (#372). There is no local-only head index for this collection: reads and staleness checks go through the registry's gated store query, which re-admits records on read; forged heads, claims, `withdrawnAt` and content types never reach a gated node. No replica claims or pubsub replication events remain.
-- `notifications`: forge notifications for any recipient, including fake
-  invitations carrying an attacker `encryptedConversationKey`; overwrite or
-  hide the recipient index; flip state; flood.
 
 Conversation metadata is no longer unsigned: the roster is the fold of client-signed
 `conversationOperations` (gate policy `ConversationOperationMutationPolicy`), there
 is no pubsub conversation announce, and the participant index is rebuilt locally
 from the folded state, never replicated.
+
+Notifications are no longer unsigned (#371). An invitation is a `notification_invitation`
+record signed by the inviter, admitted only when the signed conversation or community
+state allows the inviter (and, for conversations, the recipient); its id is derived
+from inviter, recipient, subject and nonce. Accept, decline and read are
+`notification_state` records signed by the recipient, one record per state, with
+terminal states absorbing. Heads are `notification:<recordId>` and must match the
+record id; `notification-recipient-index:<id>` heads are refused and the recipient list
+is rebuilt locally. Missed-call notifications are derived on each node from its own
+call state, stored in a local database and never replicated. The 30 records per
+minute per identity cap is enforced on the write path.
 
 Protected and private communities stay on the local repository and never enter
 the public path.
