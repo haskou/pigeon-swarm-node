@@ -143,7 +143,7 @@ export default class OrbitDBCallRepository extends CallRepository {
       nonce: primitives.nonce,
       participantIds: call.getScope().isCommunityChannel()
         ? []
-        : primitives.participantIds,
+        : [...primitives.participantIds].sort(),
       scope: call.getScope().isCommunityChannel()
         ? {
             channelId: scope.channelId,
