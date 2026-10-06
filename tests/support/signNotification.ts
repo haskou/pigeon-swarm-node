@@ -1,5 +1,5 @@
-import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { NotificationId } from '@app/contexts/notifications/domain/value-objects/NotificationId';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { randomBytes } from 'node:crypto';
 
@@ -15,7 +15,10 @@ export interface InvitationInput {
   recipientIdentityId: string;
   signer: NotificationSigner;
   subjectId: string;
-  type: 'community_invitation' | 'conversation_invitation' | 'group_conversation_invitation';
+  type:
+    | 'community_invitation'
+    | 'conversation_invitation'
+    | 'group_conversation_invitation';
 }
 
 /** Signs any record as a `notifications` put, even one the policy must refuse. */
@@ -26,7 +29,10 @@ export function signNotificationRecord(
   predecessor: string | null = null,
 ): PublicMutationProof {
   const body = {
-    author: { deviceCredential: signer.deviceCredential, identityId: signer.id },
+    author: {
+      deviceCredential: signer.deviceCredential,
+      identityId: signer.id,
+    },
     kind: 'put',
     operationId: randomBytes(16).toString('base64url'),
     payloadDigest: PublicMutationProof.digestOf(payload),
@@ -43,7 +49,9 @@ export function signNotificationRecord(
   );
 }
 
-export function invitationPayload(input: InvitationInput): Record<string, unknown> & { id: string } {
+export function invitationPayload(
+  input: InvitationInput,
+): Record<string, unknown> & { id: string } {
   return {
     encryptedKey: input.encryptedKey,
     id: NotificationId.invitation(
@@ -61,7 +69,11 @@ export function invitationPayload(input: InvitationInput): Record<string, unknow
   };
 }
 
-export function signNotificationInvitation(input: InvitationInput) {
+export function signNotificationInvitation(input: InvitationInput): {
+  body: Record<string, unknown> & { mutation: Record<string, unknown> };
+  payload: Record<string, unknown> & { id: string };
+  proof: PublicMutationProof;
+} {
   const payload = invitationPayload(input);
   const proof = signNotificationRecord(payload, input.signer);
 
@@ -86,7 +98,7 @@ export function statePayload(
   read: boolean,
 ): Record<string, unknown> & { id: string } {
   return {
-    id: `notification-state:${notificationId}`,
+    id: `notification-state:${notificationId}:${state}`,
     notificationId,
     read,
     recipientIdentityId,
@@ -101,9 +113,18 @@ export function signNotificationState(input: {
   read: boolean;
   signer: NotificationSigner;
   state: string;
-}) {
-  const payload = statePayload(input.notificationId, input.signer.id, input.state, input.read);
-  const previous = input.predecessor?.toPrimitives() as { sequence: number } | undefined;
+}): {
+  payload: Record<string, unknown> & { id: string };
+  proof: PublicMutationProof;
+} {
+  const payload = statePayload(
+    input.notificationId,
+    input.signer.id,
+    input.state,
+    input.read,
+  );
+  const previous = input.predecessor?.toPrimitives() as
+    { sequence: number } | undefined;
   const proof = signNotificationRecord(
     payload,
     input.signer,

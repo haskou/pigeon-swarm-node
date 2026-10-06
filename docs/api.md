@@ -741,7 +741,8 @@ Implemented:
 The node runs a call timeout scheduler once per minute for calls scoped to
 conversations. Ringing participants that have not joined before the timeout are
 marked as `missed`; the call status becomes `missed`; and each missed
-participant receives an unread `missed_call` notification.
+participant receives an unread `missed_call` notification. Missed-call notifications are
+local and derived on each node and are never replicated.
 
 Implemented:
 
@@ -4176,7 +4177,10 @@ Implemented:
 POST /notifications
 ```
 
-Request:
+An invitation is a replicated record signed by the inviter. The node never signs
+for a user and has no unsigned fallback; `inviterSignature` and `createdAt` no
+longer exist. The body carries the invitation fields, a client-chosen `nonce`
+(`^[A-Za-z0-9_-]{16,128}$`) and the `mutation`:
 
 ```json
 {
@@ -4185,24 +4189,14 @@ Request:
   "inviterIdentityId": "<aliceIdentityId>",
   "recipientIdentityId": "<bobIdentityId>",
   "encryptedConversationKey": "<encryptedForBob>",
-  "inviterSignature": "<inviterSignature>"
+  "nonce": "<random 16-128 chars>",
+  "mutation": { "...": "SignedPublicMutation" }
 }
 ```
 
-Group conversation invitation request:
-
-```json
-{
-  "type": "group_conversation_invitation",
-  "conversationId": "group:<deterministic-id>",
-  "inviterIdentityId": "<aliceIdentityId>",
-  "recipientIdentityId": "<bobIdentityId>",
-  "encryptedConversationKey": "<encryptedForBob>",
-  "inviterSignature": "<inviterSignature>"
-}
-```
-
-Community invitation request:
+`group_conversation_invitation` has the same shape with a `group:<id>`
+`conversationId`. A community invitation uses `communityId` and
+`encryptedCommunityKey` instead:
 
 ```json
 {
@@ -4211,21 +4205,46 @@ Community invitation request:
   "inviterIdentityId": "<aliceIdentityId>",
   "recipientIdentityId": "<bobIdentityId>",
   "encryptedCommunityKey": "<encryptedForBob>",
-  "inviterSignature": "<inviterSignature>"
+  "nonce": "<random 16-128 chars>",
+  "mutation": { "...": "SignedPublicMutation" }
 }
 ```
+
+Byte-exact contract (vectors in
+[`tests/fixtures/notification-vectors.json`](../tests/fixtures/notification-vectors.json),
+checked by `NotificationVectors.spec.ts`):
+
+- notification id: `"invitation:" + hex(sha256(utf8(canonicalize({inviterIdentityId, nonce, recipientIdentityId, subjectId}))))`,
+  where `subjectId` is the conversation id or the community id. The node derives
+  it; a client never sends it.
+- signed payload (RFC 8785 canonical JSON): `{encryptedKey, id, inviterIdentityId, nonce, recipientIdentityId, scopeType: "notification_invitation", subjectId, type}`.
+  `encryptedKey` is the value of `encryptedConversationKey` or `encryptedCommunityKey`.
+- `mutation`: a `put` proof with `store: "notifications"`, `recordId` = the
+  notification id, `predecessor: null`, `sequence: 0`, `payloadDigest` =
+  `base64url(sha256(utf8(canonicalize(payload))))`, signed with the shared
+  `pigeon:public-mutation:v1\n` signing content; the author is the inviter.
+- admission (every node, on replication too): the inviter must be the proof
+  author; for conversation and group invitations both inviter and recipient must
+  be participants in the signed conversation state; for community invitations the
+  inviter must be allowed to create invites in the signed community state.
 
 Implemented:
 
 - require signed request auth from the inviter
-- persist the notification in OrbitDB replicated metadata
+- persist the record in OrbitDB as a signed `notifications` record, replicated
+  under the head key `notification:<id>`
 - store encrypted key material as opaque payload only
 - keep private keys and decrypted conversation keys out of the backend
-- group conversation invitations use the same encrypted conversation key payload
-  as 1to1 invitations; the `type` tells the client which UX to show
-- `missed_call` notifications are not client-created; the call timeout
-  scheduler creates them when ringing participants time out in conversation
-  calls
+- `missed_call` notifications are never client-created and never replicated: the
+  call timeout scheduler writes them only to the node's local database with the id
+  `missed-call:<callId>:<recipientIdentityId>`, and `GET /notifications` merges
+  them with the replicated invitations
+- rate cap: at most `NOTIFICATIONS_RECORD_RATE_LIMIT_PER_MINUTE` (default 30)
+  notification records per identity per minute, enforced on the write path
+  (`429`, code `429020`); the replication gate cannot rate-limit
+  deterministically
+- `notification-recipient-index:<id>` heads are no longer replicated and are
+  refused by the gate; the recipient list is rebuilt locally from the records
 
 ### Update a notification
 
@@ -4233,27 +4252,30 @@ Implemented:
 PATCH /notifications/{notificationId}
 ```
 
-Accept request:
-
 ```json
 {
-  "state": "accepted"
+  "state": "accepted",
+  "mutation": { "...": "SignedPublicMutation" }
 }
 ```
 
-Decline request:
+`state` is `accepted` or `declined`. The record is signed by the recipient:
 
-```json
-{
-  "state": "declined"
-}
-```
+- payload: `{id: "notification-state:<notificationId>:<state>", notificationId, read: true, recipientIdentityId, scopeType: "notification_state", state}`
+- `mutation`: a `put` proof with `store: "notifications"`, `recordId` = the
+  payload `id`, `predecessor: null`, `sequence: 0`; the author is the recipient
+- one record exists per state, so a later record never overwrites an earlier one.
+  Terminal states are absorbing: `declined` is refused once `accepted` exists,
+  and a read mark never goes back. If a recipient signs both, every node resolves
+  to `accepted`.
 
 Implemented:
 
 - require signed request auth from the recipient
-- allow recipient-only accept and decline
+- allow recipient-only accept and decline; the author must be the invitation
+  recipient
 - mark accepted or declined notifications as read
+- same write-path rate cap as creation, counted per recipient
 
 ## Notification Settings HTTP API
 

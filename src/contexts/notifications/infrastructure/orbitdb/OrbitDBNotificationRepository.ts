@@ -44,13 +44,16 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
   private async stateOf(
     notificationId: string,
   ): Promise<OrbitDBNotificationStateDocument | undefined> {
-    const [state] = await this.query(
+    const states = await this.query(
       'notification_state',
-      (document) =>
-        document.id === OrbitDBNotificationMapper.stateId(notificationId),
+      (document) => document.notificationId === notificationId,
     );
 
-    return state ? this.payloadOf(state) : undefined;
+    return OrbitDBNotificationMapper.strongest(
+      states.map((state) =>
+        this.payloadOf<OrbitDBNotificationStateDocument>(state),
+      ),
+    );
   }
 
   private async write(
@@ -103,12 +106,20 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
     const matches = (document: Record<string, unknown>): boolean =>
       document.recipientIdentityId === recipient;
     const invitations = await this.query('notification_invitation', matches);
+    const stateDocuments = (
+      await this.query('notification_state', matches)
+    ).map((record) => this.payloadOf<OrbitDBNotificationStateDocument>(record));
     const states = new Map(
-      (await this.query('notification_state', matches)).map((record) => {
-        const state = this.payloadOf<OrbitDBNotificationStateDocument>(record);
-
-        return [state.notificationId, state];
-      }),
+      [...new Set(stateDocuments.map((state) => state.notificationId))].map(
+        (notificationId) => [
+          notificationId,
+          OrbitDBNotificationMapper.strongest(
+            stateDocuments.filter(
+              (state) => state.notificationId === notificationId,
+            ),
+          )!,
+        ],
+      ),
     );
     const ordered = this.order(
       invitations.map((record) => {

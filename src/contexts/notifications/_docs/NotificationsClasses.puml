@@ -11,7 +11,6 @@ package "notifications" {
       -status: NotificationStatus
       -state: NotificationState
       -payload: ConversationInvitationPayload | CommunityInvitationPayload | MissedCallPayload
-      -createdAt: Timestamp
       +accept(): void
       +decline(): void
       +isRecipient(identityId: IdentityId): boolean
@@ -21,8 +20,11 @@ package "notifications" {
     note right of Notification
       status: unread | read
       state: pending | accepted | declined
-      Missed call notifications are created by the
-      call timeout scheduler.
+      Invitations are replicated as records signed by
+      the inviter; state changes are signed by the
+      recipient. Missed call notifications are created
+      by the call timeout scheduler, stay local and
+      are never replicated.
     end note
 
     class ConversationInvitationPayload {
@@ -30,7 +32,7 @@ package "notifications" {
       -inviterIdentityId: IdentityId
       -recipientIdentityId: IdentityId
       -encryptedConversationKey: EncryptedConversationKey
-      -inviterSignature: Signature
+      -nonce: InvitationNonce
       +toPrimitives(): object
     }
 
@@ -39,7 +41,7 @@ package "notifications" {
       -inviterIdentityId: IdentityId
       -recipientIdentityId: IdentityId
       -encryptedCommunityKey: EncryptedCommunityKey
-      -inviterSignature: Signature
+      -nonce: InvitationNonce
       +toPrimitives(): object
     }
 
@@ -60,7 +62,9 @@ package "notifications" {
     class NotificationRepository <interface> {
       +findById(notificationId: NotificationId): Promise<Notification?>
       +findByRecipient(recipientIdentityId: IdentityId, limit: number, beforeNotificationId?: NotificationId): Promise<Notification[]>
-      +save(notification: Notification): Promise<void>
+      +saveInvitation(notification: Notification, proof: PublicMutationProof): Promise<void>
+      +saveState(notification: Notification, proof: PublicMutationProof): Promise<void>
+      +saveMissedCall(notification: Notification): Promise<void>
     }
 
     Notification *--> ConversationInvitationPayload
@@ -92,12 +96,26 @@ package "notifications" {
 
   package "infrastructure" {
     class OrbitDBNotificationRepository {
-      +findById(notificationId: NotificationId): Promise<Notification?>
-      +findByRecipient(recipientIdentityId: IdentityId, limit: number, beforeNotificationId?: NotificationId): Promise<Notification[]>
-      +save(notification: Notification): Promise<void>
+      +saveInvitation(notification: Notification, proof: PublicMutationProof): Promise<void>
+      +saveState(notification: Notification, proof: PublicMutationProof): Promise<void>
     }
 
-    OrbitDBNotificationRepository ..|> NotificationRepository
+    class LocalNotificationRepository {
+      +saveMissedCall(notification: Notification): Promise<void>
+    }
+
+    class NotificationRepositoryRouter {
+      +findById(notificationId: NotificationId): Promise<Notification?>
+      +findByRecipient(recipientIdentityId: IdentityId, limit: number, beforeNotificationId?: NotificationId): Promise<Notification[]>
+    }
+
+    class NotificationInvitationMutationPolicy
+    class NotificationStateMutationPolicy
+    class OrbitDBNotificationHeadMutationGate
+
+    NotificationRepositoryRouter ..|> NotificationRepository
+    NotificationRepositoryRouter --> OrbitDBNotificationRepository
+    NotificationRepositoryRouter --> LocalNotificationRepository
   }
 }
 

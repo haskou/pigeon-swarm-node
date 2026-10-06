@@ -4,14 +4,17 @@ import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/serv
 import { PublicMutationExpectation } from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { AsyncLocalStorage } from 'node:async_hooks';
 
-import { NotificationState } from '../../../domain/value-objects/NotificationState';
 import { NotificationId } from '../../../domain/value-objects/NotificationId';
+import { NotificationState } from '../../../domain/value-objects/NotificationState';
 
 /**
- * The state of an invitation (accepted, declined, read) is signed by its
- * recipient. A resolved state is absorbing and `read` never goes back to false.
+ * The state of an invitation (read, accepted, declined) is signed by its
+ * recipient, one record per state so a later record never overwrites an earlier
+ * one. A resolved state is absorbing: declined is refused once accepted exists
+ * and a read mark is refused once either resolution exists. Both records are
+ * signed by the recipient, so a conflict is the recipient contradicting
+ * themselves; every node then resolves to accepted.
  */
 export default class NotificationStateMutationPolicy extends PublicMutationPolicy {
   private static readonly STATES = new NotificationState(
@@ -25,19 +28,28 @@ export default class NotificationStateMutationPolicy extends PublicMutationPolic
     { booleans: ['read'] },
   );
 
-  /** Re-entrancy guard: admitting the stored predecessor must not look for its own predecessor. */
-  private readonly checking = new AsyncLocalStorage<Set<string>>();
-
   public readonly collection = 'notifications';
 
   public readonly scopeType = 'notification_state';
+
+  public static idOf(notificationId: string, state: string): string {
+    return `notification-state:${notificationId}:${state}`;
+  }
 
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
   }
 
-  public static idOf(notificationId: string): string {
-    return `notification-state:${notificationId}`;
+  private exists(notificationId: string, states: string[]): Promise<boolean> {
+    return this.registry
+      .queryDocuments(
+        this.collection,
+        (document) =>
+          document.scopeType === 'notification_state' &&
+          document.notificationId === notificationId &&
+          states.includes(document.state as string),
+      )
+      .then((documents) => documents.length > 0);
   }
 
   public expectationOf(
@@ -51,7 +63,11 @@ export default class NotificationStateMutationPolicy extends PublicMutationPolic
         record.state as string,
       ) ||
       record.id !==
-        NotificationStateMutationPolicy.idOf(record.notificationId as string) ||
+        NotificationStateMutationPolicy.idOf(
+          record.notificationId as string,
+          record.state as string,
+        ) ||
+      record.read !== true ||
       !(record.notificationId as string).startsWith(
         NotificationId.INVITATION_PREFIX,
       )
@@ -72,62 +88,36 @@ export default class NotificationStateMutationPolicy extends PublicMutationPolic
     };
   }
 
-  private find(
-    id: string,
-    scopeType: string,
-  ): Promise<Record<string, unknown> | undefined> {
-    return this.registry
-      .queryDocuments(
-        this.collection,
-        (document) => document.id === id && document.scopeType === scopeType,
-      )
-      .then(([document]) => document);
-  }
-
-  private assertAbsorbing(
-    record: Record<string, unknown>,
-    previous: Record<string, unknown> | undefined,
-  ): void {
-    if (!previous) return;
-
-    const resolved = previous.state !== NotificationState.PENDING.valueOf();
-
-    if (
-      (resolved && record.state !== previous.state) ||
-      (previous.read === true && record.read !== true)
-    ) {
-      throw new InvalidPublicMutationError();
-    }
-  }
-
   public async assertPermitted(
     record: Record<string, unknown>,
     authorIdentityId: string,
     isDeletion: boolean,
   ): Promise<void> {
     const notificationId = record.notificationId as string;
-    const active = this.checking.getStore();
 
     if (isDeletion || record.recipientIdentityId !== authorIdentityId) {
       throw new InvalidPublicMutationError();
     }
 
-    const invitation = await this.find(
-      notificationId,
-      'notification_invitation',
+    const [invitation] = await this.registry.queryDocuments(
+      this.collection,
+      (document) =>
+        document.id === notificationId &&
+        document.scopeType === 'notification_invitation',
     );
 
     if (invitation?.recipientIdentityId !== authorIdentityId) {
       throw new InvalidPublicMutationError();
     }
 
-    if (active?.has(notificationId)) return;
+    const stronger: Record<string, string[]> = {
+      accepted: [],
+      declined: ['accepted'],
+      pending: ['accepted', 'declined'],
+    };
 
-    const guard = new Set(active).add(notificationId);
-    const previous = await this.checking.run(guard, () =>
-      this.find(record.id as string, 'notification_state'),
-    );
-
-    this.assertAbsorbing(record, previous);
+    if (await this.exists(notificationId, stronger[record.state as string])) {
+      throw new InvalidPublicMutationError();
+    }
   }
 }

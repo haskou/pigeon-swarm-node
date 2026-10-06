@@ -6,8 +6,20 @@ import { OrbitDBNotificationStateDocument } from '../documents/OrbitDBNotificati
 type InvitationPayload = Record<string, string>;
 
 export default class OrbitDBNotificationMapper {
-  public static stateId(notificationId: string): string {
-    return `notification-state:${notificationId}`;
+  /** One record per state: a later state never overwrites an earlier one in the store. */
+  public static stateId(notificationId: string, state: string): string {
+    return `notification-state:${notificationId}:${state}`;
+  }
+
+  /** Accepted outranks declined outranks pending, on every node. */
+  public static strongest(
+    states: OrbitDBNotificationStateDocument[],
+  ): OrbitDBNotificationStateDocument | undefined {
+    const rank = ['pending', 'declined', 'accepted'];
+
+    return [...states].sort(
+      (left, right) => rank.indexOf(right.state) - rank.indexOf(left.state),
+    )[0];
   }
 
   public toInvitationDocument(
@@ -35,9 +47,9 @@ export default class OrbitDBNotificationMapper {
     const primitives = notification.toPrimitives();
 
     return {
-      id: OrbitDBNotificationMapper.stateId(primitives.id),
+      id: OrbitDBNotificationMapper.stateId(primitives.id, primitives.state),
       notificationId: primitives.id,
-      read: primitives.status === 'read',
+      read: true,
       recipientIdentityId: primitives.recipientIdentityId,
       scopeType: 'notification_state',
       state: primitives.state,

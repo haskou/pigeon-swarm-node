@@ -1,0 +1,400 @@
+{
+  "algorithms": {
+    "canonicalization": "RFC 8785 JSON Canonicalization Scheme (npm package canonicalize)",
+    "deviceCredential": "mutation.author.deviceCredential is the base64 SPKI public key of the signing device, here the identity key acting as its first device",
+    "invitationId": "\"invitation:\" + hex(sha256(utf8(canonicalize({inviterIdentityId, nonce, recipientIdentityId, subjectId}))))",
+    "missedCallId": "\"missed-call:\" + callId + \":\" + recipientIdentityId (local, derived, never replicated, never signed)",
+    "payloadDigest": "base64url(sha256(utf8(canonicalize(payload))))",
+    "signature": "ed25519 over utf8(signingContent), standard base64 with padding (88 characters)",
+    "signingContent": "\"pigeon:public-mutation:v1\\n\" + canonicalize(mutationBody), mutationBody being the mutation without its signature",
+    "stateId": "\"notification-state:\" + notificationId + \":\" + state; one record per state, read is always true",
+    "predecessor": "null for the first record of an id; every vector here is the first record of its id so sequence is 0"
+  },
+  "cases": [
+    {
+      "derived": {
+        "mutation": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+            "identityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY="
+          },
+          "kind": "put",
+          "operationId": "vector-invite-conv-0001",
+          "payloadDigest": "PkLEurIkcAohJ6fDn7w8EKOVmmIwnhY47dQevQuuvnI",
+          "predecessor": null,
+          "recordId": "invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0",
+          "sequence": 0,
+          "store": "notifications",
+          "version": 1,
+          "signature": "5w5+TyB3hwwEsGm3cCv8ZaoVYUAnxC02i/bhB9f/3U6w0ASuH2BZUAp/B4Q0qE+NMIwymPsL8tfuUc1uu0F7Ag=="
+        },
+        "mutationBody": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+            "identityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY="
+          },
+          "kind": "put",
+          "operationId": "vector-invite-conv-0001",
+          "payloadDigest": "PkLEurIkcAohJ6fDn7w8EKOVmmIwnhY47dQevQuuvnI",
+          "predecessor": null,
+          "recordId": "invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0",
+          "sequence": 0,
+          "store": "notifications",
+          "version": 1
+        },
+        "payload": {
+          "encryptedKey": "encrypted-conversation-key",
+          "id": "invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0",
+          "inviterIdentityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+          "nonce": "vector-nonce-conversation-0001",
+          "recipientIdentityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
+          "scopeType": "notification_invitation",
+          "subjectId": "one-to-one:0f1e2d3c4b5a69788796a5b4c3d2e1f00112233445566778899aabbccddeeff0",
+          "type": "conversation_invitation"
+        },
+        "payloadCanonical": "{\"encryptedKey\":\"encrypted-conversation-key\",\"id\":\"invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0\",\"inviterIdentityId\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\",\"nonce\":\"vector-nonce-conversation-0001\",\"recipientIdentityId\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\",\"scopeType\":\"notification_invitation\",\"subjectId\":\"one-to-one:0f1e2d3c4b5a69788796a5b4c3d2e1f00112233445566778899aabbccddeeff0\",\"type\":\"conversation_invitation\"}",
+        "payloadDigest": "PkLEurIkcAohJ6fDn7w8EKOVmmIwnhY47dQevQuuvnI",
+        "signature": "5w5+TyB3hwwEsGm3cCv8ZaoVYUAnxC02i/bhB9f/3U6w0ASuH2BZUAp/B4Q0qE+NMIwymPsL8tfuUc1uu0F7Ag==",
+        "signingContent": "pigeon:public-mutation:v1\n{\"author\":{\"deviceCredential\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\",\"identityId\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\"},\"kind\":\"put\",\"operationId\":\"vector-invite-conv-0001\",\"payloadDigest\":\"PkLEurIkcAohJ6fDn7w8EKOVmmIwnhY47dQevQuuvnI\",\"predecessor\":null,\"recordId\":\"invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0\",\"sequence\":0,\"store\":\"notifications\",\"version\":1}",
+        "idPreimage": "{\"inviterIdentityId\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\",\"nonce\":\"vector-nonce-conversation-0001\",\"recipientIdentityId\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\",\"subjectId\":\"one-to-one:0f1e2d3c4b5a69788796a5b4c3d2e1f00112233445566778899aabbccddeeff0\"}",
+        "requestBody": {
+          "conversationId": "one-to-one:0f1e2d3c4b5a69788796a5b4c3d2e1f00112233445566778899aabbccddeeff0",
+          "encryptedConversationKey": "encrypted-conversation-key",
+          "inviterIdentityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+          "mutation": {
+            "author": {
+              "deviceCredential": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+              "identityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY="
+            },
+            "kind": "put",
+            "operationId": "vector-invite-conv-0001",
+            "payloadDigest": "PkLEurIkcAohJ6fDn7w8EKOVmmIwnhY47dQevQuuvnI",
+            "predecessor": null,
+            "recordId": "invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0",
+            "sequence": 0,
+            "store": "notifications",
+            "version": 1,
+            "signature": "5w5+TyB3hwwEsGm3cCv8ZaoVYUAnxC02i/bhB9f/3U6w0ASuH2BZUAp/B4Q0qE+NMIwymPsL8tfuUc1uu0F7Ag=="
+          },
+          "nonce": "vector-nonce-conversation-0001",
+          "recipientIdentityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
+          "type": "conversation_invitation"
+        }
+      },
+      "name": "conversation_invitation",
+      "input": {
+        "encryptedKey": "encrypted-conversation-key",
+        "nonce": "vector-nonce-conversation-0001",
+        "subjectId": "one-to-one:0f1e2d3c4b5a69788796a5b4c3d2e1f00112233445566778899aabbccddeeff0",
+        "type": "conversation_invitation"
+      }
+    },
+    {
+      "derived": {
+        "mutation": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+            "identityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY="
+          },
+          "kind": "put",
+          "operationId": "vector-invite-group-0002",
+          "payloadDigest": "XFfMHv9UKSzDRnNz3LuJimGOz4G3CzPoDxSCKdbVYLo",
+          "predecessor": null,
+          "recordId": "invitation:3ad029ae66d46c1f742063e2739f8b9f1dae93da4a599cac623779e91a96a6ac",
+          "sequence": 0,
+          "store": "notifications",
+          "version": 1,
+          "signature": "/lf7VgmXKRsZ+ro5hao2ExVkwCzHI0EIvmu48JLeWb1WcPXP5cUgWCUI7nCIM+40UbbowjoqXgXq+KVQ8hFlDw=="
+        },
+        "mutationBody": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+            "identityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY="
+          },
+          "kind": "put",
+          "operationId": "vector-invite-group-0002",
+          "payloadDigest": "XFfMHv9UKSzDRnNz3LuJimGOz4G3CzPoDxSCKdbVYLo",
+          "predecessor": null,
+          "recordId": "invitation:3ad029ae66d46c1f742063e2739f8b9f1dae93da4a599cac623779e91a96a6ac",
+          "sequence": 0,
+          "store": "notifications",
+          "version": 1
+        },
+        "payload": {
+          "encryptedKey": "encrypted-group-conversation-key",
+          "id": "invitation:3ad029ae66d46c1f742063e2739f8b9f1dae93da4a599cac623779e91a96a6ac",
+          "inviterIdentityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+          "nonce": "vector-nonce-group-conv-0002",
+          "recipientIdentityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
+          "scopeType": "notification_invitation",
+          "subjectId": "group:vector-group-id",
+          "type": "group_conversation_invitation"
+        },
+        "payloadCanonical": "{\"encryptedKey\":\"encrypted-group-conversation-key\",\"id\":\"invitation:3ad029ae66d46c1f742063e2739f8b9f1dae93da4a599cac623779e91a96a6ac\",\"inviterIdentityId\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\",\"nonce\":\"vector-nonce-group-conv-0002\",\"recipientIdentityId\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\",\"scopeType\":\"notification_invitation\",\"subjectId\":\"group:vector-group-id\",\"type\":\"group_conversation_invitation\"}",
+        "payloadDigest": "XFfMHv9UKSzDRnNz3LuJimGOz4G3CzPoDxSCKdbVYLo",
+        "signature": "/lf7VgmXKRsZ+ro5hao2ExVkwCzHI0EIvmu48JLeWb1WcPXP5cUgWCUI7nCIM+40UbbowjoqXgXq+KVQ8hFlDw==",
+        "signingContent": "pigeon:public-mutation:v1\n{\"author\":{\"deviceCredential\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\",\"identityId\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\"},\"kind\":\"put\",\"operationId\":\"vector-invite-group-0002\",\"payloadDigest\":\"XFfMHv9UKSzDRnNz3LuJimGOz4G3CzPoDxSCKdbVYLo\",\"predecessor\":null,\"recordId\":\"invitation:3ad029ae66d46c1f742063e2739f8b9f1dae93da4a599cac623779e91a96a6ac\",\"sequence\":0,\"store\":\"notifications\",\"version\":1}",
+        "idPreimage": "{\"inviterIdentityId\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\",\"nonce\":\"vector-nonce-group-conv-0002\",\"recipientIdentityId\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\",\"subjectId\":\"group:vector-group-id\"}",
+        "requestBody": {
+          "conversationId": "group:vector-group-id",
+          "encryptedConversationKey": "encrypted-group-conversation-key",
+          "inviterIdentityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+          "mutation": {
+            "author": {
+              "deviceCredential": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+              "identityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY="
+            },
+            "kind": "put",
+            "operationId": "vector-invite-group-0002",
+            "payloadDigest": "XFfMHv9UKSzDRnNz3LuJimGOz4G3CzPoDxSCKdbVYLo",
+            "predecessor": null,
+            "recordId": "invitation:3ad029ae66d46c1f742063e2739f8b9f1dae93da4a599cac623779e91a96a6ac",
+            "sequence": 0,
+            "store": "notifications",
+            "version": 1,
+            "signature": "/lf7VgmXKRsZ+ro5hao2ExVkwCzHI0EIvmu48JLeWb1WcPXP5cUgWCUI7nCIM+40UbbowjoqXgXq+KVQ8hFlDw=="
+          },
+          "nonce": "vector-nonce-group-conv-0002",
+          "recipientIdentityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
+          "type": "group_conversation_invitation"
+        }
+      },
+      "name": "group_conversation_invitation",
+      "input": {
+        "encryptedKey": "encrypted-group-conversation-key",
+        "nonce": "vector-nonce-group-conv-0002",
+        "subjectId": "group:vector-group-id",
+        "type": "group_conversation_invitation"
+      }
+    },
+    {
+      "derived": {
+        "mutation": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+            "identityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY="
+          },
+          "kind": "put",
+          "operationId": "vector-invite-comm-0003",
+          "payloadDigest": "ciiUTs7I-4Jc4yzHYiNt6S_tnFM5jiqdlm44_A4bLqE",
+          "predecessor": null,
+          "recordId": "invitation:00a654034d13c458fadda3307665a34aa547404bfbd1974b89a318b0f472b5e7",
+          "sequence": 0,
+          "store": "notifications",
+          "version": 1,
+          "signature": "2414DoN35ZhPrKXRbPxCLWV/sbr2yX1Z8e+XyPVNw6gmzgaJ3f710jZUxvGu+5Rjo4bp3lEatEsqCZTy9UltDQ=="
+        },
+        "mutationBody": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+            "identityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY="
+          },
+          "kind": "put",
+          "operationId": "vector-invite-comm-0003",
+          "payloadDigest": "ciiUTs7I-4Jc4yzHYiNt6S_tnFM5jiqdlm44_A4bLqE",
+          "predecessor": null,
+          "recordId": "invitation:00a654034d13c458fadda3307665a34aa547404bfbd1974b89a318b0f472b5e7",
+          "sequence": 0,
+          "store": "notifications",
+          "version": 1
+        },
+        "payload": {
+          "encryptedKey": "encrypted-community-key",
+          "id": "invitation:00a654034d13c458fadda3307665a34aa547404bfbd1974b89a318b0f472b5e7",
+          "inviterIdentityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+          "nonce": "vector-nonce-community-0003",
+          "recipientIdentityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
+          "scopeType": "notification_invitation",
+          "subjectId": "550e8400-e29b-41d4-a716-446655440020",
+          "type": "community_invitation"
+        },
+        "payloadCanonical": "{\"encryptedKey\":\"encrypted-community-key\",\"id\":\"invitation:00a654034d13c458fadda3307665a34aa547404bfbd1974b89a318b0f472b5e7\",\"inviterIdentityId\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\",\"nonce\":\"vector-nonce-community-0003\",\"recipientIdentityId\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\",\"scopeType\":\"notification_invitation\",\"subjectId\":\"550e8400-e29b-41d4-a716-446655440020\",\"type\":\"community_invitation\"}",
+        "payloadDigest": "ciiUTs7I-4Jc4yzHYiNt6S_tnFM5jiqdlm44_A4bLqE",
+        "signature": "2414DoN35ZhPrKXRbPxCLWV/sbr2yX1Z8e+XyPVNw6gmzgaJ3f710jZUxvGu+5Rjo4bp3lEatEsqCZTy9UltDQ==",
+        "signingContent": "pigeon:public-mutation:v1\n{\"author\":{\"deviceCredential\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\",\"identityId\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\"},\"kind\":\"put\",\"operationId\":\"vector-invite-comm-0003\",\"payloadDigest\":\"ciiUTs7I-4Jc4yzHYiNt6S_tnFM5jiqdlm44_A4bLqE\",\"predecessor\":null,\"recordId\":\"invitation:00a654034d13c458fadda3307665a34aa547404bfbd1974b89a318b0f472b5e7\",\"sequence\":0,\"store\":\"notifications\",\"version\":1}",
+        "idPreimage": "{\"inviterIdentityId\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\",\"nonce\":\"vector-nonce-community-0003\",\"recipientIdentityId\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\",\"subjectId\":\"550e8400-e29b-41d4-a716-446655440020\"}",
+        "requestBody": {
+          "communityId": "550e8400-e29b-41d4-a716-446655440020",
+          "encryptedCommunityKey": "encrypted-community-key",
+          "inviterIdentityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+          "mutation": {
+            "author": {
+              "deviceCredential": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+              "identityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY="
+            },
+            "kind": "put",
+            "operationId": "vector-invite-comm-0003",
+            "payloadDigest": "ciiUTs7I-4Jc4yzHYiNt6S_tnFM5jiqdlm44_A4bLqE",
+            "predecessor": null,
+            "recordId": "invitation:00a654034d13c458fadda3307665a34aa547404bfbd1974b89a318b0f472b5e7",
+            "sequence": 0,
+            "store": "notifications",
+            "version": 1,
+            "signature": "2414DoN35ZhPrKXRbPxCLWV/sbr2yX1Z8e+XyPVNw6gmzgaJ3f710jZUxvGu+5Rjo4bp3lEatEsqCZTy9UltDQ=="
+          },
+          "nonce": "vector-nonce-community-0003",
+          "recipientIdentityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
+          "type": "community_invitation"
+        }
+      },
+      "name": "community_invitation",
+      "input": {
+        "encryptedKey": "encrypted-community-key",
+        "nonce": "vector-nonce-community-0003",
+        "subjectId": "550e8400-e29b-41d4-a716-446655440020",
+        "type": "community_invitation"
+      }
+    },
+    {
+      "derived": {
+        "mutation": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
+            "identityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U="
+          },
+          "kind": "put",
+          "operationId": "vector-state-accept-01",
+          "payloadDigest": "FmibJF_g8Z6oWj31lgqFnKvVj_aXw-0HsjQokxkNOFo",
+          "predecessor": null,
+          "recordId": "notification-state:invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0:accepted",
+          "sequence": 0,
+          "store": "notifications",
+          "version": 1,
+          "signature": "k4jNCTVu2zfWE8WUz5vQrXjY3yxMbQKlVlqUdAWJYwYpGwa5qo4L+xmJp/k2+ezEurY14DmwMwtd/0qvl2N3Aw=="
+        },
+        "mutationBody": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
+            "identityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U="
+          },
+          "kind": "put",
+          "operationId": "vector-state-accept-01",
+          "payloadDigest": "FmibJF_g8Z6oWj31lgqFnKvVj_aXw-0HsjQokxkNOFo",
+          "predecessor": null,
+          "recordId": "notification-state:invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0:accepted",
+          "sequence": 0,
+          "store": "notifications",
+          "version": 1
+        },
+        "payload": {
+          "id": "notification-state:invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0:accepted",
+          "notificationId": "invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0",
+          "read": true,
+          "recipientIdentityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
+          "scopeType": "notification_state",
+          "state": "accepted"
+        },
+        "payloadCanonical": "{\"id\":\"notification-state:invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0:accepted\",\"notificationId\":\"invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0\",\"read\":true,\"recipientIdentityId\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\",\"scopeType\":\"notification_state\",\"state\":\"accepted\"}",
+        "payloadDigest": "FmibJF_g8Z6oWj31lgqFnKvVj_aXw-0HsjQokxkNOFo",
+        "signature": "k4jNCTVu2zfWE8WUz5vQrXjY3yxMbQKlVlqUdAWJYwYpGwa5qo4L+xmJp/k2+ezEurY14DmwMwtd/0qvl2N3Aw==",
+        "signingContent": "pigeon:public-mutation:v1\n{\"author\":{\"deviceCredential\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\",\"identityId\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\"},\"kind\":\"put\",\"operationId\":\"vector-state-accept-01\",\"payloadDigest\":\"FmibJF_g8Z6oWj31lgqFnKvVj_aXw-0HsjQokxkNOFo\",\"predecessor\":null,\"recordId\":\"notification-state:invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0:accepted\",\"sequence\":0,\"store\":\"notifications\",\"version\":1}",
+        "requestBody": {
+          "mutation": {
+            "author": {
+              "deviceCredential": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
+              "identityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U="
+            },
+            "kind": "put",
+            "operationId": "vector-state-accept-01",
+            "payloadDigest": "FmibJF_g8Z6oWj31lgqFnKvVj_aXw-0HsjQokxkNOFo",
+            "predecessor": null,
+            "recordId": "notification-state:invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0:accepted",
+            "sequence": 0,
+            "store": "notifications",
+            "version": 1,
+            "signature": "k4jNCTVu2zfWE8WUz5vQrXjY3yxMbQKlVlqUdAWJYwYpGwa5qo4L+xmJp/k2+ezEurY14DmwMwtd/0qvl2N3Aw=="
+          },
+          "state": "accepted"
+        }
+      },
+      "name": "state_accepted",
+      "input": {
+        "notificationId": "invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0",
+        "state": "accepted"
+      }
+    },
+    {
+      "derived": {
+        "mutation": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
+            "identityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U="
+          },
+          "kind": "put",
+          "operationId": "vector-state-declin-01",
+          "payloadDigest": "UXSbUC8QCMq94nBKNl2L_w09pxXRV3ONaX2s2c1c8_I",
+          "predecessor": null,
+          "recordId": "notification-state:invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0:declined",
+          "sequence": 0,
+          "store": "notifications",
+          "version": 1,
+          "signature": "dnNs922zamKJ3aTeH6ct4PnOyHmrDOTcS7+lJFeGRD1PjcvcaDgbqEap3aUzCYA3Wnh0u6dYKSH7GgIbpXSICw=="
+        },
+        "mutationBody": {
+          "author": {
+            "deviceCredential": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
+            "identityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U="
+          },
+          "kind": "put",
+          "operationId": "vector-state-declin-01",
+          "payloadDigest": "UXSbUC8QCMq94nBKNl2L_w09pxXRV3ONaX2s2c1c8_I",
+          "predecessor": null,
+          "recordId": "notification-state:invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0:declined",
+          "sequence": 0,
+          "store": "notifications",
+          "version": 1
+        },
+        "payload": {
+          "id": "notification-state:invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0:declined",
+          "notificationId": "invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0",
+          "read": true,
+          "recipientIdentityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
+          "scopeType": "notification_state",
+          "state": "declined"
+        },
+        "payloadCanonical": "{\"id\":\"notification-state:invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0:declined\",\"notificationId\":\"invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0\",\"read\":true,\"recipientIdentityId\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\",\"scopeType\":\"notification_state\",\"state\":\"declined\"}",
+        "payloadDigest": "UXSbUC8QCMq94nBKNl2L_w09pxXRV3ONaX2s2c1c8_I",
+        "signature": "dnNs922zamKJ3aTeH6ct4PnOyHmrDOTcS7+lJFeGRD1PjcvcaDgbqEap3aUzCYA3Wnh0u6dYKSH7GgIbpXSICw==",
+        "signingContent": "pigeon:public-mutation:v1\n{\"author\":{\"deviceCredential\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\",\"identityId\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\"},\"kind\":\"put\",\"operationId\":\"vector-state-declin-01\",\"payloadDigest\":\"UXSbUC8QCMq94nBKNl2L_w09pxXRV3ONaX2s2c1c8_I\",\"predecessor\":null,\"recordId\":\"notification-state:invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0:declined\",\"sequence\":0,\"store\":\"notifications\",\"version\":1}",
+        "requestBody": {
+          "mutation": {
+            "author": {
+              "deviceCredential": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
+              "identityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U="
+            },
+            "kind": "put",
+            "operationId": "vector-state-declin-01",
+            "payloadDigest": "UXSbUC8QCMq94nBKNl2L_w09pxXRV3ONaX2s2c1c8_I",
+            "predecessor": null,
+            "recordId": "notification-state:invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0:declined",
+            "sequence": 0,
+            "store": "notifications",
+            "version": 1,
+            "signature": "dnNs922zamKJ3aTeH6ct4PnOyHmrDOTcS7+lJFeGRD1PjcvcaDgbqEap3aUzCYA3Wnh0u6dYKSH7GgIbpXSICw=="
+          },
+          "state": "declined"
+        }
+      },
+      "name": "state_declined",
+      "input": {
+        "notificationId": "invitation:b0edf9f538eb63886eb5ad4708ca03244cc9ef7bc3a6805f2d1f490871a6dba0",
+        "state": "declined"
+      }
+    }
+  ],
+  "description": "Signed notification invitation and recipient state vectors. Keys derive from sha256(\"pigeon-vector:<name>\") as an Ed25519 seed. Regenerate only with a protocol version bump.",
+  "keys": {
+    "inviter": {
+      "identityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIAjOklVKC0hPEQpsvu6LmLf+dFU3SpsBcqhXpdFg8LDR\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\n-----END PUBLIC KEY-----\n",
+      "seedHex": "08ce92554a0b484f110a6cbeee8b98b7fe7455374a9b0172a857a5d160f0b0d1"
+    },
+    "recipient": {
+      "identityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIFUl3f7LG/YyFysPS2cprU6Lx2w3P8hK989RG+O+Fwv/\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\n-----END PUBLIC KEY-----\n",
+      "seedHex": "5525ddfecb1bf632172b0f4b6729ad4e8bc76c373fc84af7cf511be3be170bff"
+    }
+  }
+}
