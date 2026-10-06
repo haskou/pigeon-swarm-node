@@ -12,6 +12,8 @@ import { CommunityInviteToken } from '@app/contexts/communities/domain/value-obj
 import { CommunityModerationLogId } from '@app/contexts/communities/domain/value-objects/CommunityModerationLogId';
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
@@ -60,6 +62,7 @@ import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import FormData from 'form-data';
 
 import { signCommunityOperation } from '../../support/signCommunityOperation';
+import { signConversationOperation } from '../../support/signConversationOperation';
 import IPFSDefinition from './IPFSDefinition';
 import RestClient from './RestClient';
 import { RestResponse } from './RestResponse';
@@ -105,6 +108,9 @@ export default class Definitions {
   private identityDeviceOwnerKeyPair: KeyPair | undefined;
   private identityRecoveryKeyPair: KeyPair | undefined;
   private identityDeviceTargetKeyPair: KeyPair | undefined;
+
+  private signedConversationRequest:
+    { method: string; path: string } | undefined;
 
   private conversationId: string | undefined;
   private currentNetworkId: string | undefined;
@@ -1032,6 +1038,152 @@ export default class Definitions {
     this.body = JSON.stringify({ ...body, operation: signed.body });
   }
 
+  private async conversationFrontier(
+    conversationId: string,
+  ): Promise<string[]> {
+    return Kernel.di
+      .getService<ConversationRepository>(ConversationRepository)
+      .findFrontier(new ConversationId(conversationId));
+  }
+
+  /** Adds the client-signed conversation operation to a conversation mutation body. */
+  private async attachConversationOperation(
+    method: string,
+    path: string,
+    keyPair: KeyPair,
+    createdAt: number,
+  ): Promise<void> {
+    const body = JSON.parse(this.body ?? '{}');
+    const pathname = path.split('?')[0];
+    const actorIdentityId = new IdentityId(
+      keyPair.toPrimitives().publicKey,
+    ).valueOf();
+    const signer = {
+      deviceCredential: keyPair.toPrimitives().publicKey,
+      deviceKeyPair: keyPair,
+      id: actorIdentityId,
+    };
+
+    if (body.operation) {
+      return;
+    }
+
+    const genesis =
+      method === 'POST' && pathname === '/conversations/'
+        ? this.conversationGenesis(body, actorIdentityId)
+        : undefined;
+    const rule = genesis ?? this.conversationChange(method, pathname, body);
+
+    if (!rule) {
+      return;
+    }
+
+    const signed = signConversationOperation({
+      action: rule.action,
+      args: rule.args,
+      conversationId: rule.conversationId,
+      createdAt,
+      networkId: genesis
+        ? String(body.networkId)
+        : String(this.currentNetworkId),
+      parents: genesis
+        ? []
+        : await this.conversationFrontier(rule.conversationId),
+      signer,
+    });
+
+    this.body = JSON.stringify({
+      ...body,
+      ...(genesis?.nonce ? { nonce: genesis.nonce } : {}),
+      operation: signed.body,
+    });
+  }
+
+  private conversationGenesis(
+    body: Record<string, unknown>,
+    actorIdentityId: string,
+  ): {
+    action: string;
+    args: Record<string, unknown>;
+    conversationId: string;
+    nonce?: string;
+  } {
+    const networkId = String(body.networkId);
+    const participantIds = [
+      ...new Set([
+        actorIdentityId,
+        ...((body.participantIds as string[] | undefined) ?? []),
+      ]),
+    ].sort();
+
+    if (body.type !== 'group') {
+      return {
+        action: 'conversation_created',
+        args: { participantIds, type: 'one-to-one' },
+        conversationId: ConversationId.deterministic(
+          participantIds[0],
+          participantIds[1] ?? participantIds[0],
+          networkId,
+        ).valueOf(),
+      };
+    }
+
+    const nonce = randomUUID().replace(/-/g, '');
+
+    return {
+      action: 'conversation_created',
+      args: { name: body.name, nonce, participantIds, type: 'group' },
+      conversationId: ConversationId.deriveGroup(
+        networkId,
+        actorIdentityId,
+        nonce,
+      ).valueOf(),
+      nonce,
+    };
+  }
+
+  private conversationChange(
+    method: string,
+    pathname: string,
+    body: Record<string, unknown>,
+  ):
+    | { action: string; args: Record<string, unknown>; conversationId: string }
+    | undefined {
+    const member = /^\/conversations\/([^/]+)\/members(?:\/([^/]+))?$/.exec(
+      pathname,
+    );
+    const admin = /^\/conversations\/([^/]+)\/admins\/([^/]+)$/.exec(pathname);
+
+    if (member) {
+      const conversationId = decodeURIComponent(member[1]);
+      const target = member[2] && decodeURIComponent(member[2]);
+
+      if (method === 'POST') {
+        return {
+          action: 'member_added',
+          args: { identityId: body.identityId },
+          conversationId,
+        };
+      }
+
+      return target === 'me'
+        ? { action: 'member_left', args: {}, conversationId }
+        : {
+            action: 'member_removed',
+            args: { identityId: target },
+            conversationId,
+          };
+    }
+
+    return admin
+      ? {
+          action: method === 'PUT' ? 'admin_promoted' : 'admin_demoted',
+          args: { identityId: decodeURIComponent(admin[2]) },
+          conversationId: decodeURIComponent(admin[1]),
+        }
+      : undefined;
+  }
+
   private async signCurrentRequest(
     method: string,
     path: string,
@@ -1044,6 +1196,12 @@ export default class Definitions {
     const createdAt = Date.now();
 
     await this.attachCommunityOperation(method, path, signerKeyPair, createdAt);
+    await this.attachConversationOperation(
+      method,
+      path,
+      signerKeyPair,
+      createdAt,
+    );
     this.attachCommunityModerationLog(method, path, signerKeyPair, createdAt);
     const verifier = new SignedHttpRequestVerifier();
     const signedRequestPayload = verifier.getCanonicalPayload(
@@ -2845,6 +3003,62 @@ export default class Definitions {
   @given('I have created a two-member group conversation')
   public async iHaveCreatedATwoMemberGroupConversation(): Promise<void> {
     await this.createGroupConversation(2);
+  }
+
+  @given('I set a conversation member body for a new identity')
+  public async iSetAConversationMemberBodyForANewIdentity(): Promise<void> {
+    const keyPair = await KeyPair.generate();
+
+    this.body = JSON.stringify({
+      identityId: new IdentityId(keyPair.toPrimitives().publicKey).valueOf(),
+    });
+  }
+
+  @given('I set a conversation member body for the other identity')
+  public async iSetAConversationMemberBodyForTheOtherIdentity(): Promise<void> {
+    await this.ensureOtherIdentityKeyPair();
+
+    this.body = JSON.stringify({
+      identityId: this.otherIdentityId?.valueOf(),
+    });
+  }
+
+  /** `{other}` in the path stands for the other identity; the body is kept for POST only. */
+  @given(
+    'the {word} signs a {word} request to the current conversation path {string}',
+  )
+  public async theIdentitySignsAConversationRequest(
+    signer: string,
+    method: string,
+    suffix: string,
+  ): Promise<void> {
+    if (!this.conversationId) {
+      throw new Error('Conversation must be created first.');
+    }
+
+    const isOther = signer === 'other';
+    const keyPair = await (isOther
+      ? this.ensureOtherIdentityKeyPair()
+      : this.ensureIdentityKeyPair());
+    const identityIds = {
+      '{other}': this.otherIdentityId?.valueOf() ?? '',
+      '{owner}': this.ownerIdentityId?.valueOf() ?? '',
+    };
+    const path = Object.entries(identityIds).reduce(
+      (current, [token, identityId]) =>
+        current.replace(token, encodeURIComponent(identityId)),
+      `/conversations/${this.conversationId}${suffix}`,
+    );
+
+    this.body = method === 'POST' ? this.body : undefined;
+    this.signedConversationRequest = { method, path };
+    await this.signCurrentRequest(
+      method,
+      path,
+      String(Date.now()),
+      keyPair,
+      isOther ? this.otherIdentityId : undefined,
+    );
   }
 
   private async createGroupConversation(
@@ -5428,6 +5642,25 @@ export default class Definitions {
       `/identities/${encodeURIComponent(this.createdIdentityId)}`,
       this.headers,
     );
+  }
+
+  @when('I send the signed conversation request')
+  public async iSendTheSignedConversationRequest(): Promise<void> {
+    if (!this.signedConversationRequest) {
+      throw new Error('A conversation request must be signed first.');
+    }
+
+    const { method, path } = this.signedConversationRequest;
+    const body = this.body && JSON.parse(this.body);
+    const options = { headers: this.headers };
+    const senders: Record<string, () => Promise<RestResponse>> = {
+      DELETE: () => this.restClient.delete(path, body, options),
+      GET: () => this.restClient.get(path, options.headers),
+      POST: () => this.restClient.post(path, body, options),
+      PUT: () => this.restClient.put(path, body, options),
+    };
+
+    this.response = await senders[method]();
   }
 
   @when('I DELETE {string}')

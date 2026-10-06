@@ -52,18 +52,23 @@ import { PostCommunityVoiceChannelRoute } from '@app/apps/apis/communities-api/r
 import { PutCommunityChannelDraftRoute } from '@app/apps/apis/communities-api/routes/PutCommunityChannelDraftRoute';
 import { PutCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/PutCommunityChannelMessageRoute';
 import { PutCommunityMemberRolesRoute } from '@app/apps/apis/communities-api/routes/PutCommunityMemberRolesRoute';
+import { DeleteConversationAdminRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationAdminRoute';
 import { DeleteConversationDraftRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationDraftRoute';
+import { DeleteConversationMemberRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMemberRoute';
 import { DeleteConversationMessagePinRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMessagePinRoute';
 import { DeleteConversationMessageReactionRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMessageReactionRoute';
 import { DeleteConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMessageRoute';
 import { GetConversationDraftsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationDraftsRoute';
+import { GetConversationFrontierRoute } from '@app/apps/apis/conversations-api/routes/GetConversationFrontierRoute';
 import { GetConversationMessagePinsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationMessagePinsRoute';
 import { GetConversationMessagesRoute } from '@app/apps/apis/conversations-api/routes/GetConversationMessagesRoute';
 import { GetConversationsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationsRoute';
+import { PostConversationMemberRoute } from '@app/apps/apis/conversations-api/routes/PostConversationMemberRoute';
 import { PostConversationMessagePinRoute } from '@app/apps/apis/conversations-api/routes/PostConversationMessagePinRoute';
 import { PostConversationMessageReactionRoute } from '@app/apps/apis/conversations-api/routes/PostConversationMessageReactionRoute';
 import { PostConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/PostConversationMessageRoute';
 import { PostConversationRoute } from '@app/apps/apis/conversations-api/routes/PostConversationRoute';
+import { PutConversationAdminRoute } from '@app/apps/apis/conversations-api/routes/PutConversationAdminRoute';
 import { PutConversationDraftRoute } from '@app/apps/apis/conversations-api/routes/PutConversationDraftRoute';
 import { PutConversationMessageRoute } from '@app/apps/apis/conversations-api/routes/PutConversationMessageRoute';
 import { PutConversationMessagesReadUntilRoute } from '@app/apps/apis/conversations-api/routes/PutConversationMessagesReadUntilRoute';
@@ -166,6 +171,11 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PutConversationMessagesReadUntilRoute,
   PutConversationMessageRoute,
   GetConversationMessagesRoute,
+  GetConversationFrontierRoute,
+  PostConversationMemberRoute,
+  DeleteConversationMemberRoute,
+  PutConversationAdminRoute,
+  DeleteConversationAdminRoute,
   GetContentReplicationStatusRoute,
   GetIPFSContentRoute,
   PostPublicIPFSContentRoute,
