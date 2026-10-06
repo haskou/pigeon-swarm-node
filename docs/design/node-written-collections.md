@@ -10,7 +10,7 @@ without any signature (`write: '*'`):
 | Store | Writer | Head keys |
 | --- | --- | --- |
 | `conversations` (metadata) | `OrbitDBConversationRepository`, `OrbitDBConversationIndex` | `conversation:<id>`, `conversation-participant-index:<identityId>` |
-| `calls` | `OrbitDBCallDocumentReplicator` | none (document log) |
+| `calls` | `OrbitDBCallRepository` | none (signed event log, no heads) |
 | `notifications` | `OrbitDBNotificationRepository` | `notification:<id>`, `notification-recipient-index:<identityId>` |
 | `contentReplication` (heads and replica claims) | `OrbitDBContentReplicationRepository`, `OrbitDBContentReplicaClaimRepository` | `content-replication:<cid>`, `content-replica-claim:<cid>:<networkId>:<nodeId>` |
 
@@ -488,6 +488,16 @@ first as its own commit inside this slice because it closes the arbitrary-size
 fetch without any client change.
 
 ## Slice 4: calls
+
+> Implemented (#373). Where the text below differs, the implementation wins:
+> remote `calls.v1.*` lifecycle events are kept on the gossip topics but treated as
+> claims. `CallEventAttestor` rebuilds each event from locally admitted records and
+> waits up to 5 s (256 waiters at most) for a late record; unsupported claims are
+> dropped, so push, WebSocket and missed-call logic act on admitted records only.
+> Call heads (`call:`, `call-participant:`, `call-end:`) are not replicated; records
+> reach other nodes through the gated `calls` store. The fold treats a `left` record
+> as implying the join it replaces. See [the calls API](../api.md#signed-call-events)
+> and [the synchronization contract](../pubsub-sync-protocol.md).
 
 ### Threat today
 

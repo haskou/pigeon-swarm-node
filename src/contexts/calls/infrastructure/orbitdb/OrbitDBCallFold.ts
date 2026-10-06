@@ -68,8 +68,23 @@ export class OrbitDBCallFold {
 
     const identityId = new IdentityId(event.identityId as string);
 
-    if (event.state === 'joined') call.join(identityId, at);
-    else call.leave(identityId, at);
+    if (event.state === 'joined') {
+      call.join(identityId, at);
+
+      return;
+    }
+
+    if (event.state === 'left') {
+      // The left record replaces the joined one of the same participant, so the
+      // join it follows (required by the policy) is implied.
+      try {
+        call.join(identityId, at);
+      } catch {
+        // Already joined or not joinable: the leave below decides.
+      }
+    }
+
+    call.leave(identityId, at);
   }
 
   public static fold(

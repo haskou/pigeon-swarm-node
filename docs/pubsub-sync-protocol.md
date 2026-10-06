@@ -107,36 +107,42 @@ absent. `identityId`, `ownerNodeId`, `preferenceUpdatedAt`, `selectedStatus`,
 
 ## Durable call state convergence
 
-Conversation call snapshots in the private network's OrbitDB `calls` store merge each
-participant independently. A later snapshot for one participant cannot overwrite
-another participant's newer join or departure. Participant revisions use the
-latest join, leave, decline or missed timestamp. Equal timestamps use a stable
-status order: left, missed, declined, joined, then ringing. Ended and missed calls remain
-terminal when active snapshots arrive later; ended takes precedence over missed.
+Calls are a signed event log (#373), not replicated documents. The `calls` store
+holds three kinds of records, each signed by the user it speaks for and admitted by
+`PublicMutationGate`: `call_start` (`call:<callId>`, signed by the creator),
+`call_participant` (`call-participant:<callId>:<identityId>`, signed by the
+participant, one record per call and identity with a rising `sequence`) and
+`call_end` (`call-end:<callId>`, signed by the ender). The call id derives from
+creator and nonce, so nobody can claim another identity's call. The byte-exact
+contract is in [the calls API](api.md#signed-call-events).
+
+Every node folds the admitted records into the call (`OrbitDBCallFold`): participant
+and end events apply sorted by claimed time and record id, never by arrival order, and
+an event that does not apply to the state reached so far is inert. The same records
+therefore fold to the same call on every node in any arrival order. A call still
+active after `CALLS_MAX_DURATION_MS` (default 12 hours) is derived as ended.
+Timeouts and `missed` are local state derived from the signed start and are never
+replicated. `CallTimeoutScheduler` writes nothing replicated.
+
+Concurrent community starts for one voice channel are all admitted; every node keeps
+the one with the lowest start `payloadDigest` and treats the others as superseded.
+A community start carries a `sessionEpoch` that may exceed the highest epoch already
+admitted for the channel by one at most, so a forged huge epoch is refused.
 
 A fresh call projection replays the store's causal log history, including earlier
-snapshots hidden by the document index. Incremental replay stops at previously
-processed heads. Each new subscriber receives its own initial history, and
-initialization waits for that subscriber to finish processing it. Missing log
+records hidden by the document index. Incremental replay stops at previously
+processed heads. Initialization waits for the initial history, and missing log
 ancestors fail initialization instead of presenting partial call state as ready.
-Each history replay stages its changes until completion, retaining the previous
-complete query state in the meantime. Failed replays discard only their own
-staged changes and restore the previous traversal frontier so a retry can read
-the same entries again. Overlapping successful replays remain visible.
+Failed replays discard only their own staged changes and restore the previous
+traversal frontier so a retry can read the same entries again.
 
-When merging recovers state missing from an incoming snapshot, the existing
-coalescing call writer persists the combined document to the same network store.
-Repairs are scheduled after replay completes; identical merged snapshots and
-gossip-only projection updates do not schedule another repair. Reopening the store
-therefore retains the recovered participant state. No additional pubsub event or
-heartbeat field is introduced by this repair.
+Community calls persist no participant identities in the fold: community
+participation is runtime lease state, and a signed join of a community call proves
+the identity may connect but is not replayed into a roster.
 
-Community voice documents retain only session lifecycle and scope. Participant
-arrays are empty, and creator/ender identities are omitted. Runtime participation
-is hydrated from unexpired in-memory leases. Community participant fields
-are stripped before projection and canonical repair; replaying old history cannot
-restore a participation grant. This rewrites current documents, not immutable
-blocks or copies already held by peers.
+Heads for `call:`, `call-participant:` and `call-end:` records are not replicated:
+records reach other nodes through the gated `calls` store and its history replay
+only, so there is no head gate for calls.
 
 ## Call participant leases
 
@@ -487,7 +493,7 @@ protects the collection and what a malicious peer can still do.
 | `keychains` | `OrbitDBKeychainMetadataIndex` | `OrbitDBKeychainMutationGate`, see [Keychains](#keychains) | Self-authenticating (this change) |
 | `identities` (identity metadata) | `OrbitDBIdentityMetadataIndex` | identity-key signature plus canonical CID, see [Identities](#identities-and-device-authorization) | Self-authenticating, residuals listed |
 | `identities` (device authorization) | `OrbitDBDeviceAuthorizationRepository` | history replayed from the pinned genesis, see [Identity device authorization convergence](#identity-device-authorization-convergence) | Replay-validated, residual listed |
-| `calls` | `OrbitDBCallDocumentReplicator` | none | Unsigned, deferred |
+| `calls` | `OrbitDBCallRepository` | `CallStartMutationPolicy`, `CallParticipantMutationPolicy` and `CallEndMutationPolicy` through `PublicMutationGate` (#373) | Signed |
 | `contentReplication` | `OrbitDBContentReplicationRepository` | `ContentReplicationMutationPolicy` through `PublicMutationGate`; owner-signed per `(networkId, cid)`, 1 GiB and 10000 records per identity per network (#372) | Signed |
 | `notifications` | `OrbitDBNotificationRepository` | `NotificationInvitationMutationPolicy` and `NotificationStateMutationPolicy` through `PublicMutationGate`, plus `OrbitDBNotificationHeadMutationGate` for `notification:` heads (#371) | Signed |
 | `conversationOperations` | `OrbitDBConversationRepository` | `ConversationOperationMutationPolicy` through `PublicMutationGate`; roster folded from the signed operations (#370) | Signed |
@@ -558,15 +564,11 @@ migration and the node-trust model that the design avoids) is in
 [`docs/design/node-written-collections.md`](design/node-written-collections.md)
 (#361). The behavior below is current until each slice lands.
 
-`calls` and `contentReplication` are written by the node with no user key to sign them, and they are
-not forced into the signed path. A malicious peer can currently do the
+`contentReplication` was written by the node with no user key to sign it and was not forced into the signed path. A malicious peer can currently do the
 following, and each needs a node-identity trust model (which node keys are
 trusted for a network) that is a product decision, because `NodeId` is an
 unsigned UUID and the shared libp2p peer key is not bound to an identity:
 
-- `calls`: a forged ringing conversation call makes holders create missed-call
-  notifications and push; a forged active channel call blocks `CallStarter`;
-  `sessionEpoch` poisoning, forged `ended` and flooding.
 - `contentReplication`: now owner-signed and gated (#372). There is no local-only head index for this collection: reads and staleness checks go through the registry's gated store query, which re-admits records on read; forged heads, claims, `withdrawnAt` and content types never reach a gated node. No replica claims or pubsub replication events remain.
 
 Conversation metadata is no longer unsigned: the roster is the fold of client-signed
@@ -584,6 +586,20 @@ record id; `notification-recipient-index:<id>` heads are refused and the recipie
 is rebuilt locally. Missed-call notifications are derived on each node from its own
 call state, stored in a local database and never replicated. The 30 records per
 minute per identity cap is enforced on the write path.
+
+Calls are no longer unsigned (#373); see [Durable call state convergence](#durable-call-state-convergence).
+Gossiped `calls.v1.*` lifecycle events (`call.started`, `participant.joined|left|declined|missed`,
+`call.ended`, `call.missed`) are only claims. The receiving node
+(`WebSocketEventHub.publishFromNetwork` and `SendPushNotificationWhenCallStarted`) hands each
+claim to `CallEventAttestor`, which rebuilds the event from its own admitted call state
+(`CallEventAttestation`) and publishes only that rebuilt event: the call must exist, still be
+active for `started`, be ended for `ended`, and the participant state must match for
+`participant.*` and `call.missed`. A claim that arrives before its record waits up to 5 seconds
+(at most 256 waiters) for the projection, then is dropped. So a forged ringing call creates no
+missed-call notification, no push and no WebSocket event on a gated node, a forged active
+channel call does not block `CallStarter`, and `calls.v1.signal.sent`, leases and snapshots are
+unchanged. The call write path is capped at `CALLS_RECORD_RATE_LIMIT_PER_MINUTE` (default 30)
+records per identity per minute (`429`, code `429021`).
 
 Protected and private communities stay on the local repository and never enter
 the public path.
@@ -684,11 +700,8 @@ retroactively. Current peers still observe transient participation gossip and
 session scope; this protocol does not provide traffic-analysis resistance or
 hide participation from an actively logging node.
 
-Community call documents carry a positive `sessionEpoch` for new sessions.
-Concurrent starts derive one UUID from the private network, community, channel
-and epoch; they do not select a random ID independently. Start/reuse decisions
-use one scope-history snapshot. After explicit termination the next epoch is
-one greater than the largest known epoch, independent of clock order. A replica missing newer history may select an
-older epoch, which remains subject to its replicated termination; this is not
-consensus or automatic reconciliation of duplicate sessions. The epoch
-stays in node-to-node records and is not added to the browser live contract.
+Community call starts carry a positive signed `sessionEpoch`. Concurrent starts for the
+same channel are all admitted and resolved by the lowest start `payloadDigest` on every
+node; the superseded start is inert. The epoch is bounded at one above the highest
+epoch already admitted for the channel. The epoch stays in node-to-node records and is
+not added to the browser live contract.

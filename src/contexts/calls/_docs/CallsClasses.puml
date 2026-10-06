@@ -158,6 +158,8 @@ package "calls" {
 
   note right of Call
     Community sessions persist lifecycle and scope only.
+    Calls are derived from user-signed call_start, call_participant and call_end
+    records (#373); gossiped lifecycle events are attested against them.
     Conversation calls retain participant history in OrbitDB.
     Participant heartbeat leases remain in memory and replicate through gossip.
     They do not publish media or signalling payloads to IPFS.
@@ -168,10 +170,24 @@ package "calls" {
 
 package "calls/infrastructure" {
   class OrbitDBCallRepository
+  class OrbitDBCallProjection
+  class OrbitDBCallFold
+  class CallStartMutationPolicy
+  class CallParticipantMutationPolicy
+  class CallEndMutationPolicy
+  class CallEventAttestor
+  class CallEventAttestation
   class InMemoryCallParticipantLeaseRepository
   class InMemoryCallSignalDeliveryRepository
 
   OrbitDBCallRepository ..|> CallRepository
+  OrbitDBCallRepository --> OrbitDBCallProjection : derives calls
+  OrbitDBCallProjection --> OrbitDBCallFold : folds admitted records
+  CallStartMutationPolicy ..> OrbitDBCallRepository : gates call_start
+  CallParticipantMutationPolicy ..> OrbitDBCallRepository : gates call_participant
+  CallEndMutationPolicy ..> OrbitDBCallRepository : gates call_end
+  CallEventAttestor --> CallRepository : attests gossiped lifecycle events
+  CallEventAttestor --> CallEventAttestation
   OrbitDBCallRepository --> CallParticipantLeaseRepository : hydrates community presence
   InMemoryCallParticipantLeaseRepository ..|> CallParticipantLeaseRepository
   InMemoryCallSignalDeliveryRepository ..|> CallSignalDeliveryRepository
