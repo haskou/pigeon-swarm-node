@@ -15,6 +15,12 @@ import fs from 'fs-extra';
 import path from 'path';
 import WebSocket from 'ws';
 
+import {
+  callIdOf,
+  mutationOf,
+  signCallParticipant,
+  signCallStart,
+} from '../../support/signCall';
 import { signConversationOperation } from '../../support/signConversationOperation';
 import {
   signNotificationInvitation,
@@ -211,16 +217,31 @@ async function main(): Promise<void> {
       conversation.id,
     );
 
+    const callNonce = `e2e-call-${randomBytes(12).toString('hex')}`;
+    const callStartedAt = Date.now();
+    const signedStart = signCallStart({
+      networkId: NETWORK_ID,
+      nonce: callNonce,
+      participantIds: [nodeAIdentity.id, nodeBIdentity.id].sort(),
+      scope: { conversationId: conversation.id, type: 'conversation' },
+      signer: nodeAIdentity,
+      startedAt: callStartedAt,
+    });
     const call = await request<CallResponse>(
       nodeA,
       'POST',
       '/calls/',
       {
         conversationId: conversation.id,
+        mutation: mutationOf(signedStart.proof),
+        nonce: callNonce,
         scopeType: 'conversation',
+        startedAt: callStartedAt,
       },
       nodeAIdentity,
     );
+    if (call.id !== callIdOf(nodeAIdentity.id, callNonce))
+      throw new Error('The node must derive the call id from the signed nonce');
     await waitForCallParticipantConnection(
       nodeB,
       nodeBIdentity,
@@ -254,11 +275,17 @@ async function main(): Promise<void> {
       );
     }
 
+    const signedJoin = signCallParticipant({
+      at: Date.now(),
+      callId: call.id,
+      signer: nodeBIdentity,
+      state: 'joined',
+    });
     await request<CallResponse>(
       nodeB,
       'POST',
       `/calls/${call.id}/participants`,
-      undefined,
+      { at: signedJoin.payload.at, mutation: mutationOf(signedJoin.proof) },
       nodeBIdentity,
     );
     await waitForCallParticipantConnection(
