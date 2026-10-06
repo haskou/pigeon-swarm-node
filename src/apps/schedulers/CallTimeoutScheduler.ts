@@ -44,7 +44,7 @@ export default class CallTimeoutScheduler extends Scheduler {
           }),
         );
 
-        await this.notificationRepository.save(notification);
+        await this.notificationRepository.saveMissedCall(notification);
         await this.eventPublisher.publish(notification.pullDomainEvents());
       }
     }

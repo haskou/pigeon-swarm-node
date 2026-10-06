@@ -1,12 +1,13 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
-import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
+import { PrimitiveOf } from '@haskou/value-objects';
 
 import { CommunityInvitationPayload } from './CommunityInvitationPayload';
 import { ConversationInvitationPayload } from './ConversationInvitationPayload';
 import { NotificationWasAcceptedEvent } from './events/NotificationWasAcceptedEvent';
 import { NotificationWasCreatedEvent } from './events/NotificationWasCreatedEvent';
 import { NotificationWasDeclinedEvent } from './events/NotificationWasDeclinedEvent';
+import { NotificationAlreadyResolvedError } from './errors/NotificationAlreadyResolvedError';
 import { MissedCallPayload } from './MissedCallPayload';
 import { NotificationId } from './value-objects/NotificationId';
 import { NotificationState } from './value-objects/NotificationState';
@@ -47,17 +48,14 @@ export class Notification extends AggregateRoot {
 
   public static communityInvitation(
     payload: CommunityInvitationPayload,
-    createdAt: Timestamp = Timestamp.now(),
-    id: NotificationId = NotificationId.generate(),
   ): Notification {
     const notification = new Notification(
-      id,
+      payload.notificationId(),
       NotificationType.COMMUNITY_INVITATION,
       payload.getRecipientIdentityId(),
       NotificationStatus.UNREAD,
       NotificationState.PENDING,
       payload,
-      createdAt,
     );
 
     return Notification.recordCreated(notification);
@@ -65,17 +63,14 @@ export class Notification extends AggregateRoot {
 
   public static conversationInvitation(
     payload: ConversationInvitationPayload,
-    createdAt: Timestamp = Timestamp.now(),
-    id: NotificationId = NotificationId.generate(),
   ): Notification {
     const notification = new Notification(
-      id,
+      payload.notificationId(),
       NotificationType.CONVERSATION_INVITATION,
       payload.getRecipientIdentityId(),
       NotificationStatus.UNREAD,
       NotificationState.PENDING,
       payload,
-      createdAt,
     );
 
     return Notification.recordCreated(notification);
@@ -83,17 +78,14 @@ export class Notification extends AggregateRoot {
 
   public static groupConversationInvitation(
     payload: ConversationInvitationPayload,
-    createdAt: Timestamp = Timestamp.now(),
-    id: NotificationId = NotificationId.generate(),
   ): Notification {
     const notification = new Notification(
-      id,
+      payload.notificationId(),
       NotificationType.GROUP_CONVERSATION_INVITATION,
       payload.getRecipientIdentityId(),
       NotificationStatus.UNREAD,
       NotificationState.PENDING,
       payload,
-      createdAt,
     );
 
     return Notification.recordCreated(notification);
@@ -101,17 +93,14 @@ export class Notification extends AggregateRoot {
 
   public static missedCall(
     payload: MissedCallPayload,
-    createdAt: Timestamp = Timestamp.now(),
-    id: NotificationId = NotificationId.generate(),
   ): Notification {
     const notification = new Notification(
-      id,
+      payload.notificationId(),
       NotificationType.MISSED_CALL,
       payload.getRecipientIdentityId(),
       NotificationStatus.UNREAD,
       NotificationState.PENDING,
       payload,
-      createdAt,
     );
 
     return Notification.recordCreated(notification);
@@ -127,7 +116,6 @@ export class Notification extends AggregateRoot {
       new NotificationStatus(primitives.status),
       new NotificationState(primitives.state),
       Notification.payloadFromPrimitives(primitives.payload),
-      new Timestamp(primitives.createdAt),
     );
   }
 
@@ -141,7 +129,6 @@ export class Notification extends AggregateRoot {
       | CommunityInvitationPayload
       | ConversationInvitationPayload
       | MissedCallPayload,
-    private readonly createdAt: Timestamp,
   ) {
     super();
   }
@@ -160,13 +147,21 @@ export class Notification extends AggregateRoot {
     );
   }
 
+  private assertPending(): void {
+    if (!this.state.isEqual(NotificationState.PENDING)) {
+      throw new NotificationAlreadyResolvedError();
+    }
+  }
+
   public accept(): void {
+    this.assertPending();
     this.state = NotificationState.ACCEPTED;
     this.status = NotificationStatus.READ;
     this.recordUpdated(NotificationWasAcceptedEvent);
   }
 
   public decline(): void {
+    this.assertPending();
     this.state = NotificationState.DECLINED;
     this.status = NotificationStatus.READ;
     this.recordUpdated(NotificationWasDeclinedEvent);
@@ -180,17 +175,16 @@ export class Notification extends AggregateRoot {
     return this.recipientIdentityId.isEqual(identityId);
   }
 
+  public getId(): NotificationId {
+    return this.id;
+  }
+
   public markAsRead(): void {
     this.status = NotificationStatus.READ;
   }
 
-  public markAsUnread(): void {
-    this.status = NotificationStatus.UNREAD;
-  }
-
   public toPrimitives() {
     return {
-      createdAt: this.createdAt.valueOf(),
       id: this.id.valueOf(),
       payload: this.payload.toPrimitives(),
       recipientIdentityId: this.recipientIdentityId.valueOf(),

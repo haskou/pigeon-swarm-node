@@ -37,6 +37,10 @@ export const pigeonEnvironmentSchema = {
     type: 'number',
   },
   LOG_LEVEL: { type: 'string' },
+  NOTIFICATIONS_RECORD_RATE_LIMIT_PER_MINUTE: {
+    defaultValue: 30,
+    type: 'number',
+  },
   LOG_URL: { defaultValue: 'logs', type: 'string' },
   NODE_ENV: { defaultValue: 'local', type: 'string' },
   PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS: { type: 'number' },

@@ -41,7 +41,7 @@ export default class NotificationUpdater {
 
     this.updateState(notification, message);
 
-    await this.repository.save(notification);
+    await this.repository.saveState(notification, message.getProof());
     await this.eventPublisher.publish(notification.pullDomainEvents());
 
     return notification;

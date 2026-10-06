@@ -1,5 +1,6 @@
 import { CommunityInvitationPayload } from '@app/contexts/notifications/domain/CommunityInvitationPayload';
 import { ConversationInvitationPayload } from '@app/contexts/notifications/domain/ConversationInvitationPayload';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { NotificationType } from '@app/contexts/notifications/domain/value-objects/NotificationType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
@@ -12,7 +13,8 @@ export class NotificationCreateMessage {
     inviterIdentityId: string,
     recipientIdentityId: string,
     encryptedCommunityKey: string,
-    inviterSignature: string,
+    nonce: string,
+    mutation: Record<string, unknown>,
   ): NotificationCreateMessage {
     return new NotificationCreateMessage({
       inviterIdentityId: new IdentityId(inviterIdentityId),
@@ -21,9 +23,10 @@ export class NotificationCreateMessage {
         communityId,
         encryptedCommunityKey,
         inviterIdentityId,
-        inviterSignature,
+        nonce,
         recipientIdentityId,
       }),
+      mutation,
       type: NotificationType.COMMUNITY_INVITATION,
     });
   }
@@ -33,7 +36,8 @@ export class NotificationCreateMessage {
     inviterIdentityId: string,
     recipientIdentityId: string,
     encryptedConversationKey: string,
-    inviterSignature: string,
+    nonce: string,
+    mutation: Record<string, unknown>,
   ): NotificationCreateMessage {
     return new NotificationCreateMessage({
       inviterIdentityId: new IdentityId(inviterIdentityId),
@@ -42,9 +46,10 @@ export class NotificationCreateMessage {
         conversationId,
         encryptedConversationKey,
         inviterIdentityId,
-        inviterSignature,
+        nonce,
         recipientIdentityId,
       }),
+      mutation,
       type: NotificationType.CONVERSATION_INVITATION,
     });
   }
@@ -54,7 +59,8 @@ export class NotificationCreateMessage {
     inviterIdentityId: string,
     recipientIdentityId: string,
     encryptedConversationKey: string,
-    inviterSignature: string,
+    nonce: string,
+    mutation: Record<string, unknown>,
   ): NotificationCreateMessage {
     return new NotificationCreateMessage({
       inviterIdentityId: new IdentityId(inviterIdentityId),
@@ -63,9 +69,10 @@ export class NotificationCreateMessage {
         conversationId,
         encryptedConversationKey,
         inviterIdentityId,
-        inviterSignature,
+        nonce,
         recipientIdentityId,
       }),
+      mutation,
       type: NotificationType.GROUP_CONVERSATION_INVITATION,
     });
   }
@@ -73,6 +80,10 @@ export class NotificationCreateMessage {
   private constructor(
     private readonly payload: NotificationCreateMessagePayload,
   ) {}
+
+  public getProof(): PublicMutationProof {
+    return PublicMutationProof.fromPrimitives(this.payload.mutation);
+  }
 
   public getInviterIdentityId(): IdentityId {
     return this.payload.inviterIdentityId;

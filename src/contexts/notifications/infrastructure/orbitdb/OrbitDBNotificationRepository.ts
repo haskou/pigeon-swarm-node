@@ -1,158 +1,97 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { Notification } from '../../domain/Notification';
 import NotificationRepository from '../../domain/repositories/NotificationRepository';
 import { NotificationId } from '../../domain/value-objects/NotificationId';
-import { OrbitDBNotificationDocument } from './documents/OrbitDBNotificationDocument';
+import { OrbitDBNotificationInvitationDocument } from './documents/OrbitDBNotificationInvitationDocument';
+import { OrbitDBNotificationStateDocument } from './documents/OrbitDBNotificationStateDocument';
 import OrbitDBNotificationMapper from './mappers/OrbitDBNotificationMapper';
 
+/**
+ * Replicated notifications: inviter-signed invitation records and
+ * recipient-signed state records. The per-recipient list is never replicated;
+ * it is rebuilt from the admitted records of the store.
+ */
 export default class OrbitDBNotificationRepository extends NotificationRepository {
-  private readonly notificationIndex: OrbitDBHeadIndex<OrbitDBNotificationDocument>;
-
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBNotificationMapper,
   ) {
     super();
-    this.notificationIndex = new OrbitDBHeadIndex(this.registry, {
-      collectionName: 'notifications',
-      documentFromRecord: (record) => this.documentFromRecord(record),
-      recordId: (record) =>
-        typeof record.id === 'string' ? record.id : undefined,
-    });
   }
 
-  private numberValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): number | undefined {
-    const value = document[attribute];
-
-    return typeof value === 'number' ? value : undefined;
+  private headKey(recordId: string): string {
+    return `notification:${recordId}`;
   }
 
-  private stringValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): string | undefined {
-    const value = document[attribute];
-
-    return typeof value === 'string' ? value : undefined;
-  }
-
-  private isPayload(
-    value: unknown,
-  ): value is OrbitDBNotificationDocument['payload'] {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-  }
-
-  private documentFromRecord(
-    record: Record<string, unknown>,
-  ): OrbitDBNotificationDocument | undefined {
-    const createdAt = this.numberValue(record, 'createdAt');
-    const id = this.stringValue(record, 'id');
-    const payload = record.payload;
-    const recipientIdentityId = this.stringValue(record, 'recipientIdentityId');
-    const state = this.stringValue(record, 'state');
-    const status = this.stringValue(record, 'status');
-    const type = this.stringValue(record, 'type');
-
-    if (
-      !createdAt ||
-      !id ||
-      !this.isPayload(payload) ||
-      !recipientIdentityId ||
-      !state ||
-      !status ||
-      !type
-    ) {
-      return undefined;
-    }
-
-    return {
-      createdAt,
-      id,
-      payload,
-      recipientIdentityId,
-      state: state as OrbitDBNotificationDocument['state'],
-      status: status as OrbitDBNotificationDocument['status'],
-      type: type as OrbitDBNotificationDocument['type'],
-    };
-  }
-
-  private headKey(notificationId: string): string {
-    return `notification:${notificationId}`;
-  }
-
-  private recipientIndexHeadKey(recipientIdentityId: string): string {
-    return `notification-recipient-index:${recipientIdentityId}`;
-  }
-
-  private async findRecipientIndexedDocuments(
-    recipientIdentityId: IdentityId,
-  ): Promise<OrbitDBNotificationDocument[]> {
-    return (
-      (await this.notificationIndex.find(
-        this.recipientIndexHeadKey(recipientIdentityId.valueOf()),
-      )) ?? []
+  private async query(
+    scopeType: string,
+    matches: (document: Record<string, unknown>) => boolean,
+  ): Promise<Record<string, unknown>[]> {
+    return this.registry.queryDocuments(
+      'notifications',
+      (document) => document.scopeType === scopeType && matches(document),
     );
   }
 
-  private cachedRecipientIndexedDocuments(
-    recipientIdentityId: string,
-  ): OrbitDBNotificationDocument[] {
-    return (
-      this.notificationIndex.documentsFromHead(
-        this.registry.findCachedHead(
-          this.recipientIndexHeadKey(recipientIdentityId),
-        ),
-      ) ?? []
-    );
+  private payloadOf<T>(document: Record<string, unknown>): T {
+    return PublicMutationRecord.payloadOf(document) as T;
   }
 
-  private replicateHeadsInBackground(
-    document: OrbitDBNotificationDocument,
-  ): void {
-    this.registry.replicateHeadInBackground(this.headKey(document.id), {
+  private async stateOf(
+    notificationId: string,
+  ): Promise<OrbitDBNotificationStateDocument | undefined> {
+    const [state] = await this.query(
+      'notification_state',
+      (document) =>
+        document.id === OrbitDBNotificationMapper.stateId(notificationId),
+    );
+
+    return state ? this.payloadOf(state) : undefined;
+  }
+
+  private async write(
+    payload: Record<string, unknown> & { id: string },
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    const document = PublicMutationRecord.withProof(payload, proof);
+
+    PublicMutationRecord.assertNotStale(
+      await this.query(
+        payload.scopeType as string,
+        (stored) => stored.id === payload.id,
+      ),
+      document,
+    );
+    await this.registry.putDocument('notifications', document);
+    this.registry.replicateHeadInBackground(this.headKey(payload.id), {
       ...document,
     });
-
-    const recipientDocuments = this.cachedRecipientIndexedDocuments(
-      document.recipientIdentityId,
-    );
-    const notifications = this.notificationIndex.deduplicate([
-      ...recipientDocuments,
-      document,
-    ]);
-
-    this.notificationIndex.replicateDocumentsInBackground(
-      this.recipientIndexHeadKey(document.recipientIdentityId),
-      {
-        id: this.recipientIndexHeadKey(document.recipientIdentityId),
-        recipientIdentityId: document.recipientIdentityId,
-      },
-      notifications,
-    );
   }
 
-  private async findHead(
-    notificationId: NotificationId,
-  ): Promise<OrbitDBNotificationDocument | undefined> {
-    const document = await this.registry.findHead(
-      this.headKey(notificationId.valueOf()),
+  private order(notifications: Notification[]): Notification[] {
+    return notifications.sort((left, right) =>
+      right.getId().valueOf().localeCompare(left.getId().valueOf()),
     );
-
-    return document ? this.documentFromRecord(document) : undefined;
   }
 
   public async findById(
     notificationId: NotificationId,
   ): Promise<Notification | undefined> {
-    const head = await this.findHead(notificationId);
+    const [invitation] = await this.query(
+      'notification_invitation',
+      (document) => document.id === notificationId.valueOf(),
+    );
 
-    return head ? this.mapper.toDomain(head) : undefined;
+    if (!invitation) return undefined;
+
+    return this.mapper.toDomain(
+      this.payloadOf<OrbitDBNotificationInvitationDocument>(invitation),
+      await this.stateOf(notificationId.valueOf()),
+    );
   }
 
   public async findByRecipient(
@@ -160,32 +99,52 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
     limit: number,
     beforeNotificationId?: NotificationId,
   ): Promise<Notification[]> {
-    const indexedDocuments =
-      await this.findRecipientIndexedDocuments(recipientIdentityId);
-    const documents = indexedDocuments;
-    const beforeNotification = beforeNotificationId
-      ? await this.findById(beforeNotificationId)
-      : undefined;
-    const beforeDocument = beforeNotification
-      ? this.mapper.toDocument(beforeNotification)
-      : undefined;
+    const recipient = recipientIdentityId.valueOf();
+    const matches = (document: Record<string, unknown>): boolean =>
+      document.recipientIdentityId === recipient;
+    const invitations = await this.query('notification_invitation', matches);
+    const states = new Map(
+      (await this.query('notification_state', matches)).map((record) => {
+        const state =
+          this.payloadOf<OrbitDBNotificationStateDocument>(record);
 
-    return this.notificationIndex
-      .deduplicate(documents)
-      .filter((document) =>
-        beforeDocument ? document.createdAt < beforeDocument.createdAt : true,
-      )
-      .sort((left, right) => right.createdAt - left.createdAt)
-      .slice(0, limit)
-      .map((document) => this.mapper.toDomain(document));
+        return [state.notificationId, state];
+      }),
+    );
+    const ordered = this.order(
+      invitations.map((record) => {
+        const invitation =
+          this.payloadOf<OrbitDBNotificationInvitationDocument>(record);
+
+        return this.mapper.toDomain(invitation, states.get(invitation.id));
+      }),
+    );
+    const start = beforeNotificationId
+      ? ordered.findIndex(
+          (notification) => notification.getId().isEqual(beforeNotificationId),
+        ) + 1
+      : 0;
+
+    return ordered.slice(start, start + limit);
   }
 
-  public async save(notification: Notification): Promise<void> {
-    const document = this.mapper.toDocument(notification);
+  public async saveInvitation(
+    notification: Notification,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    await this.write(this.mapper.toInvitationDocument(notification), proof);
+  }
 
-    await this.registry.putDocument('notifications', {
-      ...document,
-    });
-    this.replicateHeadsInBackground(document);
+  public saveMissedCall(): Promise<void> {
+    return Promise.reject(
+      new Error('Missed calls are local and are never replicated.'),
+    );
+  }
+
+  public async saveState(
+    notification: Notification,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    await this.write(this.mapper.toStateDocument(notification), proof);
   }
 }

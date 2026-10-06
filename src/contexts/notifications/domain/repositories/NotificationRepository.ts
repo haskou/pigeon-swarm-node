@@ -1,3 +1,4 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Notification } from '../Notification';
@@ -14,5 +15,18 @@ export default abstract class NotificationRepository {
     beforeNotificationId?: NotificationId,
   ): Promise<Notification[]>;
 
-  public abstract save(notification: Notification): Promise<void>;
+  /** Replicates the inviter-signed invitation record. */
+  public abstract saveInvitation(
+    notification: Notification,
+    proof: PublicMutationProof,
+  ): Promise<void>;
+
+  /** Local, derived and never replicated. */
+  public abstract saveMissedCall(notification: Notification): Promise<void>;
+
+  /** Replicates the recipient-signed state record. */
+  public abstract saveState(
+    notification: Notification,
+    proof: PublicMutationProof,
+  ): Promise<void>;
 }

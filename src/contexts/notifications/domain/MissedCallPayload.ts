@@ -2,6 +2,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
 import { MissedCallId } from './value-objects/MissedCallId';
+import { NotificationId } from './value-objects/NotificationId';
 
 export class MissedCallPayload {
   public static fromPrimitives(primitives: {
@@ -27,6 +28,13 @@ export class MissedCallPayload {
 
   public getRecipientIdentityId(): IdentityId {
     return this.recipientIdentityId;
+  }
+
+  public notificationId(): NotificationId {
+    return NotificationId.missedCall(
+      this.callId.valueOf(),
+      this.recipientIdentityId.valueOf(),
+    );
   }
 
   public toPrimitives() {

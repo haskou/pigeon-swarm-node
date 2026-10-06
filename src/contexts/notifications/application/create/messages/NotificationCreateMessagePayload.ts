@@ -10,6 +10,8 @@ export class NotificationCreateMessagePayload {
     | 'conversation_invitation'
     | 'group_conversation_invitation';
 
+  public readonly mutation!: Record<string, unknown>;
+
   public readonly payload!:
     CommunityInvitationPayload | ConversationInvitationPayload;
 
