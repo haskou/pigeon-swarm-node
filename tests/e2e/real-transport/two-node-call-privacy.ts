@@ -10,10 +10,17 @@ import { PublicMutationProof } from '@app/contexts/public-mutations/domain/Publi
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Timestamp } from '@haskou/value-objects';
 import assert from 'node:assert/strict';
-import { generateKeyPairSync } from 'node:crypto';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 import WebSocket from 'ws';
 
+import {
+  callIdOf,
+  mutationOf,
+  signCallEnd,
+  signCallParticipant,
+  signCallStart,
+} from '../../support/signCall';
 import { signCommunityOperation } from '../../support/signCommunityOperation';
 import {
   addPrivateNetwork,
@@ -124,6 +131,103 @@ async function heartbeat(
   });
   assert.equal(response.status, 204, 'Heartbeat must return no live snapshot');
   assert.equal(await response.text(), '');
+}
+
+const participantProofs = new Map<string, PublicMutationProof>();
+const callCreators = new Map<string, IdentityFixture>();
+
+async function signedJoin(
+  node: NodeRuntime,
+  identity: IdentityFixture,
+  callId: string,
+  state: 'joined' | 'left',
+): Promise<void> {
+  const key = `${callId}:${identity.id}`;
+  const signed = signCallParticipant({
+    at: Date.now(),
+    callId,
+    predecessor: participantProofs.get(key),
+    signer: identity,
+    state,
+  });
+
+  participantProofs.set(key, signed.proof);
+  await request(
+    node,
+    state === 'joined' ? 'POST' : 'DELETE',
+    `/calls/${callId}/participants${state === 'joined' ? '' : '/me'}`,
+    { at: signed.payload.at, mutation: mutationOf(signed.proof) },
+    identity,
+  );
+}
+
+/** Starts a channel session; when one is live the node returns it, and the caller joins it. */
+async function startChannelCall(
+  node: NodeRuntime,
+  identity: IdentityFixture,
+  scope: { channelId: string; communityId: string; scopeType: string },
+  sessionEpoch: number,
+): Promise<LiveCall> {
+  const nonce = `privacy-${randomBytes(12).toString('hex')}`;
+  const startedAt = Date.now();
+  const signed = signCallStart({
+    networkId: NETWORK_ID,
+    nonce,
+    scope: {
+      channelId: scope.channelId,
+      communityId: scope.communityId,
+      type: 'community_channel',
+    },
+    sessionEpoch,
+    signer: identity,
+    startedAt,
+  });
+
+  callCreators.set(callIdOf(identity.id, nonce), identity);
+
+  return request<LiveCall>(
+    node,
+    'POST',
+    '/calls/',
+    {
+      ...scope,
+      mutation: mutationOf(signed.proof),
+      nonce,
+      sessionEpoch,
+      startedAt,
+    },
+    identity,
+  );
+}
+
+async function startAndJoin(
+  node: NodeRuntime,
+  identity: IdentityFixture,
+  scope: { channelId: string; communityId: string; scopeType: string },
+  sessionEpoch: number,
+): Promise<LiveCall> {
+  const call = await startChannelCall(node, identity, scope, sessionEpoch);
+
+  await signedJoin(node, identity, call.id, 'joined');
+
+  return call;
+}
+
+async function endCall(
+  node: NodeRuntime,
+  callId: string,
+  fallback: IdentityFixture,
+): Promise<void> {
+  const creator = callCreators.get(callId) ?? fallback;
+  const signed = signCallEnd({ at: Date.now(), callId, signer: creator });
+
+  await request(
+    node,
+    'DELETE',
+    `/calls/${callId}`,
+    { at: signed.payload.at, mutation: mutationOf(signed.proof) },
+    creator,
+  );
 }
 
 async function startIsolatedNodes(
@@ -467,17 +571,55 @@ async function main(): Promise<void> {
       nodes.map((node, index) => socket(node, identities[index])),
     );
     sockets.push(...streams.map((stream) => stream.ws));
-    const started = await Promise.all(
-      nodes.map((node, index) =>
-        request<LiveCall>(node, 'POST', '/calls/', scope, identities[index]),
-      ),
-    );
-    assert.equal(
-      started[0].id,
-      started[1].id,
-      'Concurrent fresh starts must select one channel session',
-    );
-    let callId = started[0].id;
+    let epoch = 1;
+    const concurrentSession = async (): Promise<string> => {
+      const candidates = (
+        await Promise.all(
+          nodes.map((node, index) =>
+            startChannelCall(node, identities[index], scope, epoch),
+          ),
+        )
+      ).map((call) => call.id);
+      let winner = '';
+
+      await waitFor(async () => {
+        const active = new Set<string>();
+
+        for (const candidate of candidates)
+          for (const [index, node] of nodes.entries()) {
+            const response = await fetch(`${node.baseUrl}/calls/${candidate}`, {
+              headers: signHeaders(
+                identities[index],
+                'GET',
+                `/calls/${candidate}`,
+                {},
+              ),
+              signal: AbortSignal.timeout(10000),
+            });
+            const body = response.ok
+              ? ((await response.json()) as LiveCall)
+              : undefined;
+
+            if (body?.status === 'active') active.add(`${candidate}:${index}`);
+          }
+        const winners = candidates.filter(
+          (candidate) =>
+            active.has(`${candidate}:0`) && active.has(`${candidate}:1`),
+        );
+
+        winner = winners[0] ?? '';
+
+        return new Set(winners).size === 1;
+      }, 'concurrent starts converge on one channel session');
+      await Promise.all(
+        nodes.map((node, index) =>
+          signedJoin(node, identities[index], winner, 'joined'),
+        ),
+      );
+
+      return winner;
+    };
+    let callId = await concurrentSession();
     const converge = async (expected: string[]): Promise<void> => {
       await waitFor(async () => {
         const snapshots = await Promise.all(
@@ -508,19 +650,13 @@ async function main(): Promise<void> {
     for (let cycle = 0; cycle < 2; cycle++) {
       await Promise.all(
         nodes.map((node, index) =>
-          request(
-            node,
-            'DELETE',
-            `/calls/${callId}/participants/me`,
-            undefined,
-            identities[index],
-          ),
+          signedJoin(node, identities[index], callId, 'left'),
         ),
       );
       await converge([]);
       await Promise.all(
         nodes.map((node, index) =>
-          request(node, 'POST', '/calls/', scope, identities[index]),
+          signedJoin(node, identities[index], callId, 'joined'),
         ),
       );
       await converge(identities.map((identity) => identity.id));
@@ -566,13 +702,8 @@ async function main(): Promise<void> {
     );
     await converge(identities.map((identity) => identity.id));
     const previousCallId = callId;
-    await request(
-      nodes[0],
-      'DELETE',
-      `/calls/${callId}`,
-      undefined,
-      identities[0],
-    );
+    await endCall(nodes[0], callId, identities[0]);
+    epoch += 1;
     await waitFor(async () => {
       const ended = await request<LiveCall>(
         nodes[1],
@@ -584,22 +715,12 @@ async function main(): Promise<void> {
 
       return ended.status === 'ended';
     }, 'explicit session termination replication');
-    const restarted = await Promise.all(
-      nodes.map((node, index) =>
-        request<LiveCall>(node, 'POST', '/calls/', scope, identities[index]),
-      ),
-    );
-    assert.equal(
-      restarted[0].id,
-      restarted[1].id,
-      'Concurrent restarts must select the same next session',
-    );
+    callId = await concurrentSession();
     assert.notEqual(
-      restarted[0].id,
+      callId,
       previousCallId,
       'An ended session must not be resurrected',
     );
-    callId = restarted[0].id;
     await converge(identities.map((identity) => identity.id));
     streams[0].ws.close();
     const reconnected = await socket(nodes[0], identities[0]);
@@ -655,14 +776,8 @@ async function main(): Promise<void> {
     }, 'revoked access on both nodes');
     await pause(1000);
     const frameBoundary = streams[1].frames.length;
-    await request(
-      nodes[0],
-      'DELETE',
-      `/calls/${callId}/participants/me`,
-      undefined,
-      identities[0],
-    );
-    await request(nodes[0], 'POST', '/calls/', scope, identities[0]);
+    await signedJoin(nodes[0], identities[0], callId, 'left');
+    await signedJoin(nodes[0], identities[0], callId, 'joined');
     await pause(3000);
     assert.equal(
       streams[1].ws.readyState,
