@@ -2,7 +2,7 @@
 
 The private relay mesh must recover useful traffic, not merely report connected
 peers. Run `yarn test:e2e:real-transport:private-relay-mesh` from the backend
-repository. This scenario is included in `test:e2e:real-transport:ci`.
+repository. This scenario is included in `test:e2e:real-transport`.
 
 The deployment repository additionally exercises the complete application image
 with automatic discovery, signed HTTP operations and authenticated WebSocket

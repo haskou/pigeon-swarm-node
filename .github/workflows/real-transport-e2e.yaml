@@ -14,9 +14,7 @@ permissions:
   packages: read
 
 # One step per script, each with a timeout, so a hang names the script.
-# `workflow_dispatch` additionally runs the conversation script, which is not
-# part of the deterministic pull request set (`yarn test:e2e:real-transport`
-# is the local equivalent of all of it).
+# `yarn test:e2e:real-transport` is the local equivalent of all of them.
 jobs:
   real-transport:
     name: Real transport scripts
@@ -32,7 +30,6 @@ jobs:
         uses: ./.github/actions/setup-workspace
 
       - name: Conversation
-        if: github.event_name == 'workflow_dispatch'
         run: yarn test:e2e:real-transport:conversation
         timeout-minutes: 5
 
