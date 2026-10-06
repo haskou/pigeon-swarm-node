@@ -364,6 +364,7 @@ async function main(): Promise<void> {
   await control.repository!.saveParticipant(
     call,
     new IdentityId(alice.id),
+    new Timestamp(startedAt + 1000),
     joined.proof,
   );
   await until('join reached every node', async () => {

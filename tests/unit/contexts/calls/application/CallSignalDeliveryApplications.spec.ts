@@ -74,10 +74,7 @@ describe('Call signal delivery applications', () => {
     const repository = new InMemoryCallSignalDeliveryRepository();
     const eventPublisher = mock<DomainEventPublisher>();
     const registrar = new CallSignalDeliveryRegistrar(repository);
-    const acknowledger = new CallSignalAcknowledger(
-      repository,
-      eventPublisher,
-    );
+    const acknowledger = new CallSignalAcknowledger(repository, eventPublisher);
 
     jest.spyOn(Date, 'now').mockReturnValue(1_770_000_000_500);
     await registrar.register(registerMessage());
@@ -95,10 +92,7 @@ describe('Call signal delivery applications', () => {
     const repository = new InMemoryCallSignalDeliveryRepository();
     const eventPublisher = mock<DomainEventPublisher>();
     const registrar = new CallSignalDeliveryRegistrar(repository);
-    const acknowledger = new CallSignalAcknowledger(
-      repository,
-      eventPublisher,
-    );
+    const acknowledger = new CallSignalAcknowledger(repository, eventPublisher);
     const message = new CallSignalAcknowledgeMessage(
       signalId,
       recipientIdentityId,
@@ -157,9 +151,8 @@ describe('Call signal delivery applications', () => {
 
     expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
     expect(
-      (
-        await repository.findById(new CallSignalId(signalId))
-      )?.toPrimitives().attempt,
+      (await repository.findById(new CallSignalId(signalId)))?.toPrimitives()
+        .attempt,
     ).toBe(2);
   });
 
@@ -188,7 +181,8 @@ describe('Call signal delivery applications', () => {
       senderIdentity,
       new NetworkId(networkId),
       CallScope.conversation(new ConversationId('one-to-one:signal-test')),
-      [recipientIdentity], ...callStartArgs(),
+      [recipientIdentity],
+      ...callStartArgs(),
     );
 
     callRepository.findById.mockResolvedValue(call);

@@ -29,7 +29,8 @@ describe('CallAccessAuthorizer', () => {
       identity,
       network,
       CallScope.conversation(new ConversationId('conversation-1')),
-      [identity], ...callStartArgs(),
+      [identity],
+      ...callStartArgs(),
     );
     const conversation = mock<Conversation>();
     conversations.findMetadataById.mockResolvedValue(conversation);
@@ -51,7 +52,8 @@ describe('CallAccessAuthorizer', () => {
         new CommunityId('community-1'),
         new CommunityChannelId('voice-1'),
       ),
-      [identity], ...callStartArgs(),
+      [identity],
+      ...callStartArgs(),
     );
     const community = mock<Community>();
     communities.findById.mockResolvedValue(community);

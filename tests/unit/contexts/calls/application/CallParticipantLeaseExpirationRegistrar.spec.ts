@@ -38,7 +38,9 @@ describe('CallParticipantLeaseExpirationRegistrar', () => {
     expect(repository.purgeDisconnectedBefore).toHaveBeenCalledTimes(1);
     expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
     expect(localPublisher.publish).toHaveBeenCalledTimes(1);
-    expect(localPublisher.publish.mock.calls[0][0].at(-1)?.attributes.ownerNodeId).toBe(remoteNodeId.valueOf());
+    expect(
+      localPublisher.publish.mock.calls[0][0].at(-1)?.attributes.ownerNodeId,
+    ).toBe(remoteNodeId.valueOf());
   });
 });
 

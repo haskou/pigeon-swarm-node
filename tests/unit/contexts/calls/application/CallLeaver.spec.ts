@@ -99,6 +99,7 @@ describe('CallLeaver', () => {
         result,
         recipient,
         expect.anything(),
+        expect.anything(),
       );
       expect(publisher.publish).toHaveBeenCalledWith([
         expect.any(CallParticipantLeftEvent),

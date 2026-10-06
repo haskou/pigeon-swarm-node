@@ -39,7 +39,9 @@ describe('Call application use cases', () => {
     mutation = await sampleMutation();
   });
   const authorizer = mock<CallAccessAuthorizer>();
-  beforeEach(() => { authorizer.canAccess.mockResolvedValue(true); });
+  beforeEach(() => {
+    authorizer.canAccess.mockResolvedValue(true);
+  });
   it('ActiveCallsFinder delegates the participant lookup', async () => {
     const repository = mock<CallRepository>();
     const calls = [mock<Call>()];
@@ -57,7 +59,9 @@ describe('Call application use cases', () => {
     const repository = mock<CallRepository>();
     const calls = [mock<Call>()];
 
-    calls[0].getScope.mockReturnValue(CallScope.conversation(new ConversationId("conversation-1")));
+    calls[0].getScope.mockReturnValue(
+      CallScope.conversation(new ConversationId('conversation-1')),
+    );
     repository.findByParticipant.mockResolvedValue(calls);
 
     await expect(
@@ -70,7 +74,9 @@ describe('Call application use cases', () => {
   it('CallFinder returns a call visible to the requester', async () => {
     const repository = mock<CallRepository>();
     const call = mock<Call>();
-    call.getScope.mockReturnValue(CallScope.conversation(new ConversationId('conversation')));
+    call.getScope.mockReturnValue(
+      CallScope.conversation(new ConversationId('conversation')),
+    );
 
     repository.findById.mockResolvedValue(call);
     call.hasParticipant.mockReturnValue(true);
@@ -85,7 +91,9 @@ describe('Call application use cases', () => {
   it('CallFinder hides calls from non-participants', async () => {
     const repository = mock<CallRepository>();
     const call = mock<Call>();
-    call.getScope.mockReturnValue(CallScope.conversation(new ConversationId('conversation')));
+    call.getScope.mockReturnValue(
+      CallScope.conversation(new ConversationId('conversation')),
+    );
 
     repository.findById.mockResolvedValue(call);
     call.hasParticipant.mockReturnValue(false);
@@ -101,7 +109,9 @@ describe('Call application use cases', () => {
     const repository = mock<CallRepository>();
     const access = mock<CallAccessAuthorizer>();
     const call = mock<Call>();
-    call.getScope.mockReturnValue(CallScope.conversation(new ConversationId('conversation')));
+    call.getScope.mockReturnValue(
+      CallScope.conversation(new ConversationId('conversation')),
+    );
     repository.findById.mockResolvedValue(call);
     repository.findActiveByParticipant.mockResolvedValue([call]);
     repository.findByParticipant.mockResolvedValue([call]);
@@ -109,12 +119,33 @@ describe('Call application use cases', () => {
     access.assertAccess.mockRejectedValue(new CallNotFoundError());
     access.canAccess.mockResolvedValue(false);
 
-    await expect(new CallFinder(repository, access).find(new CallFindMessage(callId, participantIdentityId))).rejects.toBeInstanceOf(CallNotFoundError);
-    await expect(new ActiveCallsFinder(repository, access).find(new ActiveCallsFindMessage(participantIdentityId))).resolves.toEqual([]);
-    await expect(new CallHistoryFinder(repository, access).find(new CallHistoryFindMessage(participantIdentityId))).resolves.toEqual([]);
+    await expect(
+      new CallFinder(repository, access).find(
+        new CallFindMessage(callId, participantIdentityId),
+      ),
+    ).rejects.toBeInstanceOf(CallNotFoundError);
+    await expect(
+      new ActiveCallsFinder(repository, access).find(
+        new ActiveCallsFindMessage(participantIdentityId),
+      ),
+    ).resolves.toEqual([]);
+    await expect(
+      new CallHistoryFinder(repository, access).find(
+        new CallHistoryFindMessage(participantIdentityId),
+      ),
+    ).resolves.toEqual([]);
     const events = mock<DomainEventPublisher>();
     const leases = mock<CallParticipantLeaseRenewer>();
-    await expect(new CallJoiner(repository, events, leases, access).join(new CallJoinMessage(callId, participantIdentityId, mutation, 1_770_000_000_000))).rejects.toBeInstanceOf(CallNotFoundError);
+    await expect(
+      new CallJoiner(repository, events, leases, access).join(
+        new CallJoinMessage(
+          callId,
+          participantIdentityId,
+          mutation,
+          1_770_000_000_000,
+        ),
+      ),
+    ).rejects.toBeInstanceOf(CallNotFoundError);
     expect(repository.saveParticipant).not.toHaveBeenCalled();
     expect(leases.renew).not.toHaveBeenCalled();
     expect(events.publish).not.toHaveBeenCalled();
@@ -140,7 +171,9 @@ describe('Call application use cases', () => {
     const repository = mock<CallRepository>();
     const eventPublisher = mock<DomainEventPublisher>();
     const call = mock<Call>();
-    call.getScope.mockReturnValue(CallScope.conversation(new ConversationId('conversation')));
+    call.getScope.mockReturnValue(
+      CallScope.conversation(new ConversationId('conversation')),
+    );
     const events = [mock<DomainEvent>()];
 
     repository.findById.mockResolvedValue(call);
@@ -148,7 +181,12 @@ describe('Call application use cases', () => {
 
     await expect(
       new CallEnder(repository, eventPublisher, authorizer).end(
-        new CallEndMessage(callId, participantIdentityId, mutation, 1_770_000_000_000),
+        new CallEndMessage(
+          callId,
+          participantIdentityId,
+          mutation,
+          1_770_000_000_000,
+        ),
       ),
     ).resolves.toBe(call);
     expect(call.end).toHaveBeenCalledTimes(1);
@@ -161,7 +199,9 @@ describe('Call application use cases', () => {
     const eventPublisher = mock<DomainEventPublisher>();
     const leaseRenewer = mock<CallParticipantLeaseRenewer>();
     const call = mock<Call>();
-    call.getScope.mockReturnValue(CallScope.conversation(new ConversationId('conversation')));
+    call.getScope.mockReturnValue(
+      CallScope.conversation(new ConversationId('conversation')),
+    );
     const lease = mock<CallParticipantLease>();
 
     repository.findById.mockResolvedValue(call);
@@ -171,11 +211,21 @@ describe('Call application use cases', () => {
 
     await expect(
       new CallJoiner(repository, eventPublisher, leaseRenewer, authorizer).join(
-        new CallJoinMessage(callId, participantIdentityId, mutation, 1_770_000_000_000),
+        new CallJoinMessage(
+          callId,
+          participantIdentityId,
+          mutation,
+          1_770_000_000_000,
+        ),
       ),
     ).resolves.toBe(call);
     expect(call.join).toHaveBeenCalledTimes(1);
-    expect(repository.saveParticipant).toHaveBeenCalledWith(call, expect.anything(), expect.anything());
+    expect(repository.saveParticipant).toHaveBeenCalledWith(
+      call,
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
     expect(leaseRenewer.renew).toHaveBeenCalledWith(call, expect.any(Object));
     expect(eventPublisher.publish).toHaveBeenCalledWith([]);
   });
@@ -185,7 +235,9 @@ describe('Call application use cases', () => {
     const eventPublisher = mock<DomainEventPublisher>();
     const leaseReleaser = mock<CallParticipantLeaseReleaser>();
     const call = mock<Call>();
-    call.getScope.mockReturnValue(CallScope.conversation(new ConversationId('conversation')));
+    call.getScope.mockReturnValue(
+      CallScope.conversation(new ConversationId('conversation')),
+    );
     const lease = mock<CallParticipantLease>();
 
     repository.findById.mockResolvedValue(call);
@@ -205,33 +257,76 @@ describe('Call application use cases', () => {
         eventPublisher,
         leaseReleaser,
         authorizer,
-      ).leave(new CallLeaveMessage(callId, participantIdentityId, mutation, 1_770_000_000_000)),
+      ).leave(
+        new CallLeaveMessage(
+          callId,
+          participantIdentityId,
+          mutation,
+          1_770_000_000_000,
+        ),
+      ),
     ).resolves.toBe(call);
     expect(call.leave).toHaveBeenCalledTimes(1);
-    expect(repository.saveParticipant).toHaveBeenCalledWith(call, expect.anything(), expect.anything());
-    expect(leaseReleaser.release).toHaveBeenCalledWith(call, expect.any(Object));
+    expect(repository.saveParticipant).toHaveBeenCalledWith(
+      call,
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(leaseReleaser.release).toHaveBeenCalledWith(
+      call,
+      expect.any(Object),
+    );
     expect(eventPublisher.publish).toHaveBeenCalledWith([]);
   });
 
   it.each([
-    ['CallEnder', (repository: CallRepository) =>
-      new CallEnder(repository, mock<DomainEventPublisher>(), authorizer).end(
-        new CallEndMessage(callId, participantIdentityId, mutation, 1_770_000_000_000),
-      )],
-    ['CallJoiner', (repository: CallRepository) =>
-      new CallJoiner(
-        repository,
-        mock<DomainEventPublisher>(),
-        mock<CallParticipantLeaseRenewer>(),
-        authorizer,
-      ).join(new CallJoinMessage(callId, participantIdentityId, mutation, 1_770_000_000_000))],
-    ['CallLeaver', (repository: CallRepository) =>
-      new CallLeaver(
-        repository,
-        mock<DomainEventPublisher>(),
-        mock<CallParticipantLeaseReleaser>(),
-        authorizer,
-      ).leave(new CallLeaveMessage(callId, participantIdentityId, mutation, 1_770_000_000_000))],
+    [
+      'CallEnder',
+      (repository: CallRepository) =>
+        new CallEnder(repository, mock<DomainEventPublisher>(), authorizer).end(
+          new CallEndMessage(
+            callId,
+            participantIdentityId,
+            mutation,
+            1_770_000_000_000,
+          ),
+        ),
+    ],
+    [
+      'CallJoiner',
+      (repository: CallRepository) =>
+        new CallJoiner(
+          repository,
+          mock<DomainEventPublisher>(),
+          mock<CallParticipantLeaseRenewer>(),
+          authorizer,
+        ).join(
+          new CallJoinMessage(
+            callId,
+            participantIdentityId,
+            mutation,
+            1_770_000_000_000,
+          ),
+        ),
+    ],
+    [
+      'CallLeaver',
+      (repository: CallRepository) =>
+        new CallLeaver(
+          repository,
+          mock<DomainEventPublisher>(),
+          mock<CallParticipantLeaseReleaser>(),
+          authorizer,
+        ).leave(
+          new CallLeaveMessage(
+            callId,
+            participantIdentityId,
+            mutation,
+            1_770_000_000_000,
+          ),
+        ),
+    ],
   ])('%s rejects a missing call', async (_name, run) => {
     const repository = mock<CallRepository>();
 

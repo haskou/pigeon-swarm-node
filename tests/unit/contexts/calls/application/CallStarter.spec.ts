@@ -145,13 +145,13 @@ describe('CallStarter', () => {
   it('starts a community channel call with only the requester joined', async () => {
     const repository = mock<CallRepository>();
     repository.findActiveByCommunityChannel.mockResolvedValue(undefined);
-    const { starter } = build(
-      repository,
-      undefined,
-      communityRepositoryFor(),
-    );
+    const { starter } = build(repository, undefined, communityRepositoryFor());
     const message = startMessage(
-      { channelId: 'voice-1', communityId: 'community-1', type: 'community_channel' },
+      {
+        channelId: 'voice-1',
+        communityId: 'community-1',
+        type: 'community_channel',
+      },
       1,
     );
 
@@ -183,7 +183,11 @@ describe('CallStarter', () => {
 
     const call = await starter.start(
       startMessage(
-        { channelId: 'voice-1', communityId: 'community-1', type: 'community_channel' },
+        {
+          channelId: 'voice-1',
+          communityId: 'community-1',
+          type: 'community_channel',
+        },
         1,
       ),
     );
@@ -198,15 +202,15 @@ describe('CallStarter', () => {
     // empty and the requester's own signed start is stored.
     const repository = mock<CallRepository>();
     repository.findActiveByCommunityChannel.mockResolvedValue(undefined);
-    const { starter } = build(
-      repository,
-      undefined,
-      communityRepositoryFor(),
-    );
+    const { starter } = build(repository, undefined, communityRepositoryFor());
 
     await starter.start(
       startMessage(
-        { channelId: 'voice-1', communityId: 'community-1', type: 'community_channel' },
+        {
+          channelId: 'voice-1',
+          communityId: 'community-1',
+          type: 'community_channel',
+        },
         1,
       ),
     );
@@ -222,7 +226,10 @@ describe('CallStarter', () => {
 
     await expect(
       starter.start(
-        startMessage({ conversationId: 'one-to-one:none', type: 'conversation' }),
+        startMessage({
+          conversationId: 'one-to-one:none',
+          type: 'conversation',
+        }),
       ),
     ).rejects.toThrow();
     expect(repository.saveStart).not.toHaveBeenCalled();

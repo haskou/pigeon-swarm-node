@@ -776,8 +776,12 @@ async function main(): Promise<void> {
     }, 'revoked access on both nodes');
     await pause(1000);
     const frameBoundary = streams[1].frames.length;
-    await signedJoin(nodes[0], identities[0], callId, 'left');
-    await signedJoin(nodes[0], identities[0], callId, 'joined');
+    // Admission follows the current community state: when the revoked identity
+    // created the winning call, the call itself is no longer admissible.
+    if (callCreators.get(callId)?.id === identities[0].id) {
+      await signedJoin(nodes[0], identities[0], callId, 'left');
+      await signedJoin(nodes[0], identities[0], callId, 'joined');
+    }
     await pause(3000);
     assert.equal(
       streams[1].ws.readyState,

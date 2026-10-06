@@ -49,11 +49,13 @@ describe('call mutation policies', () => {
         [alice, bob].map((id) => ({ valueOf: () => id })),
       isGroup: () => false,
     };
+    const query = jest.fn(
+      (_s: string, m: (d: Record<string, unknown>) => boolean) =>
+        Promise.resolve(docs.filter(m)),
+    );
     registry = {
-      queryDocuments: jest.fn(
-        (_s: string, m: (d: Record<string, unknown>) => boolean) =>
-          Promise.resolve(docs.filter(m)),
-      ),
+      queryDocuments: query,
+      queryUnadmittedDocuments: query,
     } as unknown as OrbitDBReplicatedStateRegistry;
     const community = {
       authorizeVoiceChannelCall: () => {
