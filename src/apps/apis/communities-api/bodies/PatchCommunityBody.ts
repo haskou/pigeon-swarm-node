@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
+  IsObject,
   IsOptional,
   IsString,
   ValidateNested,
@@ -32,10 +33,12 @@ export class PatchCommunityBody {
   @IsString()
   public readonly name: string;
 
+  @IsObject()
   @Type(() => CommunityModerationLogBody)
   @ValidateNested()
   public readonly moderationLog: CommunityModerationLogBody;
 
+  @IsObject()
   @Type(() => CommunityOperationBody)
   @ValidateNested()
   public readonly operation: CommunityOperationBody;

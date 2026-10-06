@@ -7,6 +7,7 @@ export class PostCommunityInviteAcceptBody {
   @IsObject()
   public readonly mutation: Record<string, unknown>;
 
+  @IsObject()
   @Type(() => CommunityOperationBody)
   @ValidateNested()
   public readonly operation: CommunityOperationBody;
