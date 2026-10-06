@@ -1,3 +1,4 @@
+import { callStartArgs } from '../../../../support/signCall';
 import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import { Timestamp } from '@haskou/value-objects';
 import { CallViewModel } from '@app/apps/apis/calls-api/view-model/CallViewModel';
@@ -29,7 +30,7 @@ describe('call participant lease replication', () => {
     const consumer = new RegisterCallParticipantLeaseWhenUpdated(mock<DomainEventConsumer>(), repository);
     const clock = jest.spyOn(Date, 'now').mockReturnValue(1000);
     try {
-      const call = Call.start(creator, networkId, CallScope.conversation(new ConversationId('one-to-one:stale-replay')), [invitee]);
+      const call = Call.start(creator, networkId, CallScope.conversation(new ConversationId('one-to-one:stale-replay')), [invitee], ...callStartArgs());
       const lease = CallParticipantLease.connect(call.getId(), invitee, secondNodeId, networkId, call.getParticipantIds());
       const [joined] = lease.pullDomainEvents();
       await consumer.handler(joined);
@@ -52,7 +53,7 @@ describe('call participant lease replication', () => {
     const consumer = new RegisterCallParticipantLeaseWhenUpdated(mock<DomainEventConsumer>(), repository);
     const clock = jest.spyOn(Date, 'now').mockReturnValue(1000);
     try {
-      const call = Call.start(creator, networkId, CallScope.conversation(new ConversationId('one-to-one:delayed-timeout')), [invitee]);
+      const call = Call.start(creator, networkId, CallScope.conversation(new ConversationId('one-to-one:delayed-timeout')), [invitee], ...callStartArgs());
       const lease = CallParticipantLease.connect(call.getId(), invitee, secondNodeId, networkId, call.getParticipantIds());
       lease.pullDomainEvents();
       clock.mockReturnValue(121000);
@@ -68,7 +69,7 @@ describe('call participant lease replication', () => {
   it('notifies local clients when an unchanged owner heartbeat restores a locally expired lease', async () => {
     const repository = new InMemoryCallParticipantLeaseRepository();
     const consumer = new RegisterCallParticipantLeaseWhenUpdated(mock<DomainEventConsumer>(), repository);
-    const call = Call.start(creator, networkId, CallScope.conversation(new ConversationId('one-to-one:lease-recovery')), [invitee]);
+    const call = Call.start(creator, networkId, CallScope.conversation(new ConversationId('one-to-one:lease-recovery')), [invitee], ...callStartArgs());
     jest.spyOn(Date, 'now').mockReturnValue(1000);
     const owner = CallParticipantLease.connect(call.getId(), invitee, secondNodeId, networkId, call.getParticipantIds(), [], new Timestamp(100));
     const [initial] = owner.pullDomainEvents();
@@ -104,7 +105,7 @@ describe('call participant lease replication', () => {
       creator,
       networkId,
       CallScope.conversation(new ConversationId('one-to-one:cross-node-call')),
-      [invitee],
+      [invitee], ...callStartArgs(),
     );
     const creatorLease = CallParticipantLease.connect(
       call.getId(),

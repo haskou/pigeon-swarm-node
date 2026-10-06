@@ -1,3 +1,4 @@
+import { callStartArgs } from '../../../support/signCall';
 import CallTimeoutScheduler from '@app/apps/schedulers/CallTimeoutScheduler';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
@@ -23,16 +24,17 @@ describe('CallTimeoutScheduler', () => {
       creator,
       new NetworkId('550e8400-e29b-41d4-a716-446655440000'),
       CallScope.conversation(new ConversationId('one-to-one:call-timeout')),
-      [recipient],
+      [recipient], ...callStartArgs(),
     );
     const callRepository = {
       findTimedOutRingingCalls: jest.fn().mockResolvedValue([call]),
-      save: jest.fn().mockResolvedValue(undefined),
+      markTimedOut: jest.fn().mockResolvedValue(undefined),
     };
     const eventPublisher = {
       publish: jest.fn().mockResolvedValue(undefined),
     };
     const notificationRepository = {
+      findById: jest.fn().mockResolvedValue(undefined),
       saveMissedCall: jest.fn().mockResolvedValue(undefined),
     };
     const scheduler = new CallTimeoutScheduler(
@@ -44,7 +46,7 @@ describe('CallTimeoutScheduler', () => {
     call.pullDomainEvents();
     await scheduler.execute();
 
-    expect(callRepository.save).toHaveBeenCalledWith(call);
+    expect(callRepository.markTimedOut).toHaveBeenCalledWith(call);
     expect(notificationRepository.saveMissedCall).toHaveBeenCalledTimes(1);
     expect(eventPublisher.publish).toHaveBeenCalledTimes(2);
     expect(call.toPrimitives().status).toBe('missed');
@@ -58,16 +60,17 @@ describe('CallTimeoutScheduler', () => {
         new CommunityId('6a038fd206de460039b0d923'),
         new CommunityChannelId('6a038fd206de460039b0d924'),
       ),
-      [recipient],
+      [recipient], ...callStartArgs(),
     );
     const callRepository = {
       findTimedOutRingingCalls: jest.fn().mockResolvedValue([call]),
-      save: jest.fn().mockResolvedValue(undefined),
+      markTimedOut: jest.fn().mockResolvedValue(undefined),
     };
     const eventPublisher = {
       publish: jest.fn().mockResolvedValue(undefined),
     };
     const notificationRepository = {
+      findById: jest.fn().mockResolvedValue(undefined),
       saveMissedCall: jest.fn().mockResolvedValue(undefined),
     };
     const scheduler = new CallTimeoutScheduler(
@@ -79,7 +82,7 @@ describe('CallTimeoutScheduler', () => {
     call.pullDomainEvents();
     await scheduler.execute();
 
-    expect(callRepository.save).not.toHaveBeenCalled();
+    expect(callRepository.markTimedOut).not.toHaveBeenCalled();
     expect(notificationRepository.saveMissedCall).not.toHaveBeenCalled();
     expect(eventPublisher.publish).not.toHaveBeenCalled();
     expect(call.toPrimitives().status).toBe('active');

@@ -1,3 +1,4 @@
+import { callStartArgs } from '../../../../support/signCall';
 import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import CallSignalAcknowledger from '@app/contexts/calls/application/acknowledge-signal/CallSignalAcknowledger';
 import { CallSignalAcknowledgeMessage } from '@app/contexts/calls/application/acknowledge-signal/messages/CallSignalAcknowledgeMessage';
@@ -187,7 +188,7 @@ describe('Call signal delivery applications', () => {
       senderIdentity,
       new NetworkId(networkId),
       CallScope.conversation(new ConversationId('one-to-one:signal-test')),
-      [recipientIdentity],
+      [recipientIdentity], ...callStartArgs(),
     );
 
     callRepository.findById.mockResolvedValue(call);

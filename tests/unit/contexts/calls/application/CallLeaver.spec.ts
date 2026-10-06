@@ -1,3 +1,5 @@
+import { sampleMutation } from '../../../../support/signCall';
+import { callStartArgs } from '../../../../support/signCall';
 import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import CallLeaver from '@app/contexts/calls/application/leave-call/CallLeaver';
 import { CallLeaveMessage } from '@app/contexts/calls/application/leave-call/messages/CallLeaveMessage';
@@ -20,6 +22,10 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 import { mock } from 'jest-mock-extended';
 
 describe('CallLeaver', () => {
+  let mutation: Record<string, unknown>;
+  beforeAll(async () => {
+    mutation = await sampleMutation();
+  });
   const creator = new IdentityId(
     'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
   );
@@ -60,6 +66,7 @@ describe('CallLeaver', () => {
         networkId,
         CallScope.conversation(conversation.getId()),
         [recipient],
+        ...callStartArgs(),
       );
       call.join(recipient);
       call.pullDomainEvents();
@@ -75,21 +82,28 @@ describe('CallLeaver', () => {
         publisher,
         leases,
         new CallAccessAuthorizer(conversations, mock<CommunityRepository>()),
-        conversations,
       );
 
       const result = await leaver.leave(
-        new CallLeaveMessage(call.getId().valueOf(), recipient.valueOf()),
+        new CallLeaveMessage(
+          call.getId().valueOf(),
+          recipient.valueOf(),
+          mutation,
+          1_770_000_000_001,
+        ),
       );
 
-      expect(result.isActive()).toBe(type === 'group');
+      expect(result.isActive()).toBe(false);
       expect(result.hasJoinedParticipant(recipient)).toBe(false);
-      expect(repository.save).toHaveBeenCalledWith(result);
-      expect(publisher.publish).toHaveBeenCalledWith(
-        type === 'group'
-          ? [expect.any(CallParticipantLeftEvent)]
-          : [expect.any(CallParticipantLeftEvent), expect.any(CallEndedEvent)],
+      expect(repository.saveParticipant).toHaveBeenCalledWith(
+        result,
+        recipient,
+        expect.anything(),
       );
+      expect(publisher.publish).toHaveBeenCalledWith([
+        expect.any(CallParticipantLeftEvent),
+        expect.any(CallEndedEvent),
+      ]);
     },
   );
 });

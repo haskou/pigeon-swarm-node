@@ -1,3 +1,4 @@
+import { callStartArgs } from '../../../../support/signCall';
 import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
@@ -28,7 +29,7 @@ describe('CallAccessAuthorizer', () => {
       identity,
       network,
       CallScope.conversation(new ConversationId('conversation-1')),
-      [identity],
+      [identity], ...callStartArgs(),
     );
     const conversation = mock<Conversation>();
     conversations.findMetadataById.mockResolvedValue(conversation);
@@ -50,7 +51,7 @@ describe('CallAccessAuthorizer', () => {
         new CommunityId('community-1'),
         new CommunityChannelId('voice-1'),
       ),
-      [identity],
+      [identity], ...callStartArgs(),
     );
     const community = mock<Community>();
     communities.findById.mockResolvedValue(community);

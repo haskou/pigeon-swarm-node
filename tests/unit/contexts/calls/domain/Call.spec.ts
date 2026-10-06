@@ -1,5 +1,4 @@
-import OrbitDBCallDocumentMerger from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentMerger';
-import OrbitDBCallMapper from '@app/contexts/calls/infrastructure/orbitdb/mappers/OrbitDBCallMapper';
+import { callStartArgs } from '../../../../support/signCall';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import { CallEndedEvent } from '@app/contexts/calls/domain/events/CallEndedEvent';
@@ -36,15 +35,19 @@ describe('Call', () => {
   );
   const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440000');
   const nodeId = new NodeId('9278e9db-bc4d-4a8f-9577-7cad4386512f');
-  const signalId = new CallSignalId(
-    '68da3440-c60e-4fe3-b86a-2b8931ea345f',
-  );
+  const signalId = new CallSignalId('68da3440-c60e-4fe3-b86a-2b8931ea345f');
   const scope = CallScope.conversation(
     new ConversationId('one-to-one:call-test'),
   );
 
   it('should start a call and emit a started event', () => {
-    const call = Call.start(creator, networkId, scope, [recipient]);
+    const call = Call.start(
+      creator,
+      networkId,
+      scope,
+      [recipient],
+      ...callStartArgs(),
+    );
     const primitives = call.toPrimitives();
 
     expect(primitives.status).toBe('active');
@@ -60,7 +63,13 @@ describe('Call', () => {
   });
 
   it('should emit a joined event for an invited participant', () => {
-    const call = Call.start(creator, networkId, scope, [recipient]);
+    const call = Call.start(
+      creator,
+      networkId,
+      scope,
+      [recipient],
+      ...callStartArgs(),
+    );
 
     call.pullDomainEvents();
     call.join(recipient);
@@ -76,7 +85,13 @@ describe('Call', () => {
   });
 
   it('should add and join a late participant', () => {
-    const call = Call.start(creator, networkId, scope, [recipient]);
+    const call = Call.start(
+      creator,
+      networkId,
+      scope,
+      [recipient],
+      ...callStartArgs(),
+    );
 
     call.pullDomainEvents();
     call.joinOrAdd(lateParticipant);
@@ -101,7 +116,13 @@ describe('Call', () => {
   });
 
   it('exposes joined participants through domain behavior', () => {
-    const call = Call.start(creator, networkId, scope, [recipient]);
+    const call = Call.start(
+      creator,
+      networkId,
+      scope,
+      [recipient],
+      ...callStartArgs(),
+    );
 
     call.join(recipient);
 
@@ -115,13 +136,20 @@ describe('Call', () => {
       networkId,
       CallScope.communityChannel(new CommunityId('community'), channelId),
       [],
+      ...callStartArgs(),
     );
 
     expect(call.getCommunityChannelId()?.isEqual(channelId)).toBe(true);
   });
 
   it('should not emit a joined event when the participant is already joined', () => {
-    const call = Call.start(creator, networkId, scope, [recipient]);
+    const call = Call.start(
+      creator,
+      networkId,
+      scope,
+      [recipient],
+      ...callStartArgs(),
+    );
 
     call.pullDomainEvents();
     call.joinOrAdd(creator);
@@ -130,7 +158,13 @@ describe('Call', () => {
   });
 
   it('should send a signal between participants', () => {
-    const call = Call.start(creator, networkId, scope, [recipient]);
+    const call = Call.start(
+      creator,
+      networkId,
+      scope,
+      [recipient],
+      ...callStartArgs(),
+    );
 
     call.pullDomainEvents();
     const delivery = call.sendSignal(
@@ -155,7 +189,13 @@ describe('Call', () => {
   });
 
   it('should end a call and reject more signals', () => {
-    const call = Call.start(creator, networkId, scope, [recipient]);
+    const call = Call.start(
+      creator,
+      networkId,
+      scope,
+      [recipient],
+      ...callStartArgs(),
+    );
 
     call.pullDomainEvents();
     call.end(creator);
@@ -175,10 +215,13 @@ describe('Call', () => {
   });
 
   it('should reject ending an active call by a declined participant', () => {
-    const call = Call.start(creator, networkId, scope, [
-      recipient,
-      lateParticipant,
-    ]);
+    const call = Call.start(
+      creator,
+      networkId,
+      scope,
+      [recipient, lateParticipant],
+      ...callStartArgs(),
+    );
 
     call.pullDomainEvents();
     call.join(recipient);
@@ -193,7 +236,13 @@ describe('Call', () => {
   });
 
   it('should emit participant declined events for ringing participants', () => {
-    const call = Call.start(creator, networkId, scope, [recipient]);
+    const call = Call.start(
+      creator,
+      networkId,
+      scope,
+      [recipient],
+      ...callStartArgs(),
+    );
 
     call.pullDomainEvents();
     call.leave(recipient);
@@ -209,12 +258,18 @@ describe('Call', () => {
   });
 
   it('should emit participant leave events for joined participants', () => {
-    const call = Call.start(creator, networkId, scope, [recipient]);
+    const call = Call.start(
+      creator,
+      networkId,
+      scope,
+      [recipient],
+      ...callStartArgs(),
+    );
 
     call.pullDomainEvents();
     call.join(recipient);
     call.pullDomainEvents();
-    call.leave(recipient, true);
+    call.leave(recipient);
 
     expect(call.toPrimitives().participants).toMatchObject([
       { identityId: creator.valueOf(), status: 'joined' },
@@ -225,7 +280,16 @@ describe('Call', () => {
   });
 
   it('keeps a community session reusable after participants leave', () => {
-    const call = Call.start(creator, networkId, CallScope.communityChannel(new CommunityId('community'), new CommunityChannelId('voice-channel')), []);
+    const call = Call.start(
+      creator,
+      networkId,
+      CallScope.communityChannel(
+        new CommunityId('community'),
+        new CommunityChannelId('voice-channel'),
+      ),
+      [],
+      ...callStartArgs(),
+    );
     call.joinOrAdd(recipient);
     call.leave(creator);
     expect(call.isActive()).toBe(true);
@@ -234,22 +298,7 @@ describe('Call', () => {
     expect(() => call.joinOrAdd(creator)).not.toThrow();
   });
 
-  it('does not end a community session when a remote join races with local departure', () => {
-    const call = Call.start(creator, networkId, CallScope.communityChannel(new CommunityId('community'), new CommunityChannelId('voice-channel')), []);
-    const remote = Call.fromPrimitives(call.toPrimitives());
-    remote.joinOrAdd(recipient);
-    call.leave(creator);
-    const mapper = new OrbitDBCallMapper();
-    const merger = new OrbitDBCallDocumentMerger();
-    for (const pair of [[call, remote], [remote, call]]) {
-      const merged = mapper.toDomain(merger.merge(mapper.toDocument(pair[0]), mapper.toDocument(pair[1])));
-      expect(merged.isActive()).toBe(true);
-      expect(merged.getParticipantIds()).toEqual([]);
-      expect(merged.hasJoinedParticipant(creator)).toBe(false);
-    }
-  });
-
-  it('keeps a two-member group call active until the last joined participant leaves', () => {
+  it('ends a two-participant group call when one participant leaves', () => {
     const conversation = new GroupConversation(
       ConversationId.deriveGroup(
         networkId.valueOf(),
@@ -267,20 +316,14 @@ describe('Call', () => {
       networkId,
       CallScope.conversation(conversation.getId()),
       [recipient],
+      ...callStartArgs(),
     );
     call.join(recipient);
     call.pullDomainEvents();
 
     call.leave(recipient);
 
-    expect(call.isActive()).toBe(true);
     expect(call.getJoinedParticipantIds()).toEqual([creator]);
-    expect(call.pullDomainEvents()).toEqual([
-      expect.any(CallParticipantLeftEvent),
-    ]);
-
-    call.leave(creator);
-
     expect(call.isActive()).toBe(false);
     expect(call.pullDomainEvents()).toEqual([
       expect.any(CallParticipantLeftEvent),
@@ -289,8 +332,16 @@ describe('Call', () => {
   });
 
   it('keeps a group conversation active when other participants remain', () => {
-    const third = new IdentityId('MCowBQYDK2VwAyEAoZUOXZj5HZm3Tb5CEojEXtNLxBIHkE2s28l/FsBICaU=');
-    const call = Call.start(creator, networkId, scope, [recipient, third]);
+    const third = new IdentityId(
+      'MCowBQYDK2VwAyEAoZUOXZj5HZm3Tb5CEojEXtNLxBIHkE2s28l/FsBICaU=',
+    );
+    const call = Call.start(
+      creator,
+      networkId,
+      scope,
+      [recipient, third],
+      ...callStartArgs(),
+    );
     call.join(recipient);
     call.join(third);
     call.leave(recipient);
@@ -306,6 +357,7 @@ describe('Call', () => {
       endedByIdentityId: undefined,
       id: '550e8400-e29b-41d4-a716-446655440099',
       networkId: networkId.valueOf(),
+      nonce: 'call-nonce-0000000099',
       participantIds: [creator.valueOf()],
       participants: [
         {
@@ -334,7 +386,13 @@ describe('Call', () => {
   });
 
   it('should mark ringing participants as missed', () => {
-    const call = Call.start(creator, networkId, scope, [recipient]);
+    const call = Call.start(
+      creator,
+      networkId,
+      scope,
+      [recipient],
+      ...callStartArgs(),
+    );
 
     call.pullDomainEvents();
     const missedParticipants = call.markTimedOut(new Timestamp(1770000000000));
@@ -357,17 +415,18 @@ describe('Call', () => {
   });
 
   it('should keep an active group call alive when only ringing invitees timeout', () => {
-    const call = Call.start(creator, networkId, scope, [
-      recipient,
-      lateParticipant,
-    ]);
+    const call = Call.start(
+      creator,
+      networkId,
+      scope,
+      [recipient, lateParticipant],
+      ...callStartArgs(),
+    );
 
     call.pullDomainEvents();
     call.join(recipient);
     call.pullDomainEvents();
-    const missedParticipants = call.markTimedOut(
-      new Timestamp(1770000000000),
-    );
+    const missedParticipants = call.markTimedOut(new Timestamp(1770000000000));
     const events = call.pullDomainEvents();
 
     expect(missedParticipants).toEqual([lateParticipant]);

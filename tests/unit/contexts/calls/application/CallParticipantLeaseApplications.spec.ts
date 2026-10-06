@@ -1,3 +1,4 @@
+import { callStartArgs } from '../../../../support/signCall';
 import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import CallParticipantLeaseReleaser from '@app/contexts/calls/application/release-participant-lease/CallParticipantLeaseReleaser';
 import CallParticipantHeartbeatRecorder from '@app/contexts/calls/application/record-participant-heartbeat/CallParticipantHeartbeatRecorder';
@@ -51,7 +52,7 @@ describe('call participant lease application services', () => {
       ),
     );
 
-    expect(callRepository.save).not.toHaveBeenCalled();
+    expect(callRepository.saveParticipant).not.toHaveBeenCalled();
     expect(leaseRenewer.renew).toHaveBeenCalledWith(call, creator, []);
     expect(eventPublisher.publish).toHaveBeenCalledWith([]);
   });
@@ -164,7 +165,7 @@ describe('call participant lease application services', () => {
       creator,
       networkId,
       CallScope.conversation(new ConversationId('one-to-one:lease-apps')),
-      [],
+      [], ...callStartArgs(),
     );
   }
 });
