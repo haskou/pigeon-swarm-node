@@ -6,6 +6,7 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 
 import { Community } from '../../domain/Community';
 import { CommunityOperation } from '../../domain/operations/CommunityOperation';
+import { CommunityOperationLimits } from '../../domain/operations/CommunityOperationLimits';
 import { CommunityOperationPrimitives } from '../../domain/operations/CommunityOperationPrimitives';
 import { CommunityState } from '../../domain/operations/CommunityState';
 import { CommunityStateFold } from '../../domain/operations/CommunityStateFold';
@@ -150,6 +151,34 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
   }
 
   /** Every community whose operations are cached locally, newest first. */
+  /** Fails with the limit error a client can show, before the write is refused deeper down. */
+  private assertWithinQuota(
+    communityId: string,
+    records: Record<string, unknown>[],
+    operation: CommunityOperation,
+  ): void {
+    const author = operation.getAuthorIdentityId().valueOf();
+
+    if (
+      !CommunityOperationLimits.isAuthorQuotaReached(
+        records.filter(
+          (record) =>
+            PublicMutationRecord.payloadOf(record).authorIdentityId === author,
+        ).length,
+      )
+    ) {
+      return;
+    }
+
+    CommunityOperationLimits.assertAuthorQuota(
+      CommunityStateFold.closureOf(
+        this.operationsOf(communityId, records),
+        operation.getParents(),
+      ),
+      operation,
+    );
+  }
+
   private cachedCommunities(): Community[] {
     return this.registry
       .findCachedHeadsByPrefix(OrbitDBCommunityRepository.HEAD_PREFIX)
@@ -241,12 +270,16 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     await this.publicStorageGuard.runWhilePublic(
       operation.getCommunityId(),
       async () => {
+        const records = await this.operationIndex.findRecords(key);
+
         PublicMutationRecord.assertNotStale(
-          (await this.operationIndex.findRecords(key)).filter(
-            (stored) => stored.id === payload.id,
-          ),
+          records.filter((stored) => stored.id === payload.id),
           document,
         );
+
+        if (!operation.isGenesis()) {
+          this.assertWithinQuota(payload.communityId, records, operation);
+        }
         await this.registry.putDocument('communityOperations', document, [
           payload.networkId,
         ]);

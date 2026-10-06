@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { CommunityOperation } from '@app/contexts/communities/domain/operations/CommunityOperation';
 import { CommunityStateFold } from '@app/contexts/communities/domain/operations/CommunityStateFold';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityOperationAction } from '@app/contexts/communities/domain/value-objects/CommunityOperationAction';
@@ -7,6 +8,7 @@ import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure
 import CommunityOperationMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityOperationMutationPolicy';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
 import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
@@ -34,6 +36,7 @@ import { isDeepStrictEqual } from 'node:util';
 import {
   CommunityOperationSigner,
   signCommunityOperation,
+  signCommunityOperationRecord,
   SignedCommunityOperation,
 } from '../../support/signCommunityOperation';
 import { teardownAndExit } from './RealTransportTeardown';
@@ -474,6 +477,31 @@ async function main(): Promise<void> {
     ledger[1].proof,
   );
   const replayed = record(ledger[2]);
+  // The owner really signs an update whose avatar is far above the size limit
+  // of the arguments: the domain refuses to build it, so the record is made by hand.
+  const oversizedContent = {
+    action: action('COMMUNITY_UPDATED').valueOf(),
+    args: {
+      avatar: 'x'.repeat(10_000),
+      description: 'Oversized',
+      name: 'Oversized',
+    },
+    authorIdentityId: owner.id,
+    communityId: communityId.valueOf(),
+    createdAt: clock++,
+    networkId,
+    parents: forgedFrontier,
+    scopeType: 'community_operation',
+  };
+  const oversizedId = CommunityOperation.recordIdOf(
+    communityId.valueOf(),
+    PublicMutationProof.digestOf(oversizedContent),
+  );
+  const oversizedPayload = { ...oversizedContent, id: oversizedId };
+  const oversizedUpdate = PublicMutationRecord.withProof(
+    oversizedPayload,
+    signCommunityOperationRecord(oversizedPayload, owner),
+  );
   const forgedRecords = [
     tombstone,
     ...unauthorized.map(record),
@@ -481,6 +509,7 @@ async function main(): Promise<void> {
     copiedScope,
     swappedProof,
     replayed,
+    oversizedUpdate,
   ];
 
   for (const forged of forgedRecords)
@@ -524,7 +553,7 @@ async function main(): Promise<void> {
     );
   }
   console.log(
-    'PASS forged tombstone, roles, bans, joins, copied scope, swapped proof and replay rejected on every replica',
+    'PASS forged tombstone, roles, bans, joins, copied scope, swapped proof, replay and oversized arguments rejected on every replica',
   );
 
   stage = 'concurrent partitions converge by the total order';

@@ -6,6 +6,7 @@ import { InvalidCommunityOperationError } from '../errors/InvalidCommunityOperat
 import { CommunityId } from '../value-objects/CommunityId';
 import { CommunityOperationAction } from '../value-objects/CommunityOperationAction';
 import { CommunityOperationArguments } from './CommunityOperationArguments';
+import { CommunityOperationLimits } from './CommunityOperationLimits';
 import { CommunityOperationPrimitives } from './CommunityOperationPrimitives';
 
 /**
@@ -61,8 +62,11 @@ export class CommunityOperation {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       throw new InvalidCommunityOperationError();
     }
+    const args = value as CommunityOperationArguments;
 
-    return value as CommunityOperationArguments;
+    CommunityOperationLimits.assertArguments(args);
+
+    return args;
   }
 
   private static parents(value: unknown): string[] {

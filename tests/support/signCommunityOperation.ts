@@ -26,6 +26,32 @@ export interface SignedCommunityOperation {
   proof: PublicMutationProof;
 }
 
+/** Signs any record as a `communityOperations` put, even one the domain would refuse to build. */
+export function signCommunityOperationRecord(
+  payload: { id: string } & Record<string, unknown>,
+  signer: CommunityOperationSigner,
+): PublicMutationProof {
+  const body = {
+    author: {
+      deviceCredential: signer.deviceCredential,
+      identityId: signer.id,
+    },
+    kind: 'put',
+    operationId: randomBytes(16).toString('base64url'),
+    payloadDigest: PublicMutationProof.digestOf(payload),
+    predecessor: null as string | null,
+    recordId: payload.id,
+    sequence: 0,
+    store: 'communityOperations',
+    version: 1,
+  } as const;
+
+  return PublicMutationProof.signed(
+    body,
+    signer.deviceKeyPair.sign(PublicMutationProof.signingContentOf(body)),
+  );
+}
+
 /**
  * Builds and signs a `communityOperations` put the way a client does: the
  * payload is the operation, the proof binds it to the signer's device.
@@ -48,24 +74,9 @@ export function signCommunityOperation(input: {
     networkId: new NetworkId(input.networkId),
     parents: input.parents,
   });
-  const payload = operation.toPrimitives();
-  const body = {
-    author: {
-      deviceCredential: input.signer.deviceCredential,
-      identityId: input.signer.id,
-    },
-    kind: 'put',
-    operationId: randomBytes(16).toString('base64url'),
-    payloadDigest: PublicMutationProof.digestOf(payload),
-    predecessor: null as string | null,
-    recordId: operation.getId(),
-    sequence: 0,
-    store: 'communityOperations',
-    version: 1,
-  } as const;
-  const proof = PublicMutationProof.signed(
-    body,
-    input.signer.deviceKeyPair.sign(PublicMutationProof.signingContentOf(body)),
+  const proof = signCommunityOperationRecord(
+    operation.toPrimitives(),
+    input.signer,
   );
 
   return {

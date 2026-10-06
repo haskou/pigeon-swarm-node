@@ -485,6 +485,14 @@ package "communities/domain" {
     + sorted(): CommunityOperation[]
   }
 
+  class CommunityOperationLimits {
+    + MAX_ARGUMENT_BYTES: number
+    + MAX_OPERATIONS_PER_AUTHOR: number
+    + assertArguments(args): void
+    + isAuthorQuotaReached(count): boolean
+    + assertAuthorQuota(past, candidate): void
+  }
+
   class CommunityStateFold {
     + fold(operations): CommunityState
   }
@@ -500,7 +508,8 @@ package "communities/domain" {
     Total order = topological over parents,
     ties broken by lower digest. Every operation is
     re-authorized against its causal past when applied;
-    one that was not allowed then is skipped.
+    one that was not allowed then is skipped, and so is
+    one past the author quota (the founder has none).
     The last member leaving is the tombstone.
   end note
 
@@ -615,6 +624,9 @@ CommunityChannelMessageReaction --> CommunityId
   CommunityOperationApplier ..> CommunityOperation
   CommunityOperationApplier ..> Community
   CommunityOperationLedger ..> CommunityOperation
+  CommunityOperationLedger ..> CommunityOperationLimits : author quota
+  CommunityStateFold ..> CommunityOperationLimits : skips over quota
+  CommunityOperation ..> CommunityOperationLimits : args size
   CommunityStateFold ..> CommunityOperationLedger
   CommunityStateFold ..> CommunityOperationApplier
   CommunityStateFold ..> CommunityState
