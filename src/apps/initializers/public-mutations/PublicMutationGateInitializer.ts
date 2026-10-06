@@ -1,5 +1,5 @@
-import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 import { OrbitDBNotificationHeadMutationGate } from '@app/contexts/notifications/infrastructure/orbitdb/OrbitDBNotificationHeadMutationGate';
+import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 import { PublicMutationGate } from '@app/contexts/public-mutations/infrastructure/PublicMutationGate';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 

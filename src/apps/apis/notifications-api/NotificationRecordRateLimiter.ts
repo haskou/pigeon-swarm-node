@@ -6,9 +6,9 @@ import { NotificationRecordRateLimitExceededError } from './errors/NotificationR
 
 /** Caps the replicated notification records one identity may author per minute. */
 export default class NotificationRecordRateLimiter {
+  private static readonly NAMESPACE = 'notification_record_rate_limits';
   public static readonly DEFAULT_LIMIT_PER_MINUTE = 30;
   public static readonly WINDOW_MS = 60_000;
-  private static readonly NAMESPACE = 'notification_record_rate_limits';
 
   constructor(private readonly database: EmbeddedLocalDatabase) {}
 

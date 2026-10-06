@@ -10,6 +10,16 @@ export default class LocalNotificationRepository {
 
   constructor(private readonly database: EmbeddedLocalDatabase) {}
 
+  private toDomain(document: Record<string, unknown>): Notification {
+    const { _id, ...primitives } = document;
+
+    void _id;
+
+    return Notification.fromPrimitives(
+      primitives as Parameters<typeof Notification.fromPrimitives>[0],
+    );
+  }
+
   public async findById(id: NotificationId): Promise<Notification | undefined> {
     const document = await this.database.findOne(
       LocalNotificationRepository.NAMESPACE,
@@ -40,16 +50,6 @@ export default class LocalNotificationRepository {
       {
         ...primitives,
       },
-    );
-  }
-
-  private toDomain(document: Record<string, unknown>): Notification {
-    const { _id, ...primitives } = document;
-
-    void _id;
-
-    return Notification.fromPrimitives(
-      primitives as Parameters<typeof Notification.fromPrimitives>[0],
     );
   }
 }

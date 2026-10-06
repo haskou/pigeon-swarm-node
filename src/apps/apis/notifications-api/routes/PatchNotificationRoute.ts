@@ -12,8 +12,8 @@ import {
   Res,
 } from 'routing-controllers';
 
-import NotificationRecordRateLimiter from '../NotificationRecordRateLimiter';
 import { PatchNotificationBody } from '../bodies/PatchNotificationBody';
+import NotificationRecordRateLimiter from '../NotificationRecordRateLimiter';
 import { PatchNotificationRequest } from '../requests/PatchNotificationRequest';
 import { NotificationViewModel } from '../view-model/NotificationViewModel';
 

@@ -1,6 +1,6 @@
-import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
@@ -61,6 +61,44 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
     super();
   }
 
+  private async assertCommunityInviter(
+    record: Record<string, unknown>,
+    authorIdentityId: string,
+  ): Promise<void> {
+    const community = await this.communities.get(
+      record.subjectId as string,
+      () =>
+        this.communityRepository.findById(
+          new CommunityId(record.subjectId as string),
+        ),
+    );
+
+    if (!community) throw new InvalidPublicMutationError();
+    community.assertCanCreateInvite(new IdentityId(authorIdentityId));
+  }
+
+  private async assertConversationParticipants(
+    record: Record<string, unknown>,
+    authorIdentityId: string,
+  ): Promise<void> {
+    const conversation = await this.conversations.get(
+      record.subjectId as string,
+      () =>
+        this.conversationRepository.findMetadataById(
+          new ConversationId(record.subjectId as string),
+        ),
+    );
+
+    if (
+      !conversation?.hasParticipant(new IdentityId(authorIdentityId)) ||
+      !conversation.hasParticipant(
+        new IdentityId(record.recipientIdentityId as string),
+      )
+    ) {
+      throw new InvalidPublicMutationError();
+    }
+  }
+
   private isCommunity(record: Record<string, unknown>): boolean {
     return record.type === NotificationType.COMMUNITY_INVITATION.valueOf();
   }
@@ -106,44 +144,6 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
         store: this.collection,
       };
     } catch {
-      throw new InvalidPublicMutationError();
-    }
-  }
-
-  private async assertCommunityInviter(
-    record: Record<string, unknown>,
-    authorIdentityId: string,
-  ): Promise<void> {
-    const community = await this.communities.get(
-      record.subjectId as string,
-      () =>
-        this.communityRepository.findById(
-          new CommunityId(record.subjectId as string),
-        ),
-    );
-
-    if (!community) throw new InvalidPublicMutationError();
-    community.assertCanCreateInvite(new IdentityId(authorIdentityId));
-  }
-
-  private async assertConversationParticipants(
-    record: Record<string, unknown>,
-    authorIdentityId: string,
-  ): Promise<void> {
-    const conversation = await this.conversations.get(
-      record.subjectId as string,
-      () =>
-        this.conversationRepository.findMetadataById(
-          new ConversationId(record.subjectId as string),
-        ),
-    );
-
-    if (
-      !conversation?.hasParticipant(new IdentityId(authorIdentityId)) ||
-      !conversation.hasParticipant(
-        new IdentityId(record.recipientIdentityId as string),
-      )
-    ) {
       throw new InvalidPublicMutationError();
     }
   }

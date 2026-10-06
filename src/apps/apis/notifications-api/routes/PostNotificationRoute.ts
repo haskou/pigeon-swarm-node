@@ -6,9 +6,9 @@ import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 
-import NotificationRecordRateLimiter from '../NotificationRecordRateLimiter';
 import { PostNotificationBody } from '../bodies/PostNotificationBody';
 import { AuthenticatedIdentityIsNotInviterError } from '../errors/AuthenticatedIdentityIsNotInviterError';
+import NotificationRecordRateLimiter from '../NotificationRecordRateLimiter';
 import { PostNotificationRequest } from '../requests/PostNotificationRequest';
 import { NotificationViewModel } from '../view-model/NotificationViewModel';
 

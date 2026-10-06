@@ -4,10 +4,10 @@ import { PrimitiveOf } from '@haskou/value-objects';
 
 import { CommunityInvitationPayload } from './CommunityInvitationPayload';
 import { ConversationInvitationPayload } from './ConversationInvitationPayload';
+import { NotificationAlreadyResolvedError } from './errors/NotificationAlreadyResolvedError';
 import { NotificationWasAcceptedEvent } from './events/NotificationWasAcceptedEvent';
 import { NotificationWasCreatedEvent } from './events/NotificationWasCreatedEvent';
 import { NotificationWasDeclinedEvent } from './events/NotificationWasDeclinedEvent';
-import { NotificationAlreadyResolvedError } from './errors/NotificationAlreadyResolvedError';
 import { MissedCallPayload } from './MissedCallPayload';
 import { NotificationId } from './value-objects/NotificationId';
 import { NotificationState } from './value-objects/NotificationState';
