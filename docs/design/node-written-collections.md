@@ -74,7 +74,7 @@ recommended design does not need it.
   not the causal revision (#362). Every slice below inherits that residual and
   is not blocked by it, but should adopt the #362 fix when it lands.
 
-## Slice 1: conversation metadata
+## Slice 1: conversations
 
 ### Threat today
 
@@ -93,120 +93,147 @@ recommended design does not need it.
   the message, pin and reaction policies call `findMetadataById` +
   `hasParticipant`. Forged metadata therefore grants read/write authority over
   messages, pins, reactions and calls of the victim conversation.
-- Membership is immutable today: only `GroupConversationCreator` and
-  `OneToOneConversationCreator` mutate participants; there is no add/remove
-  participant use case.
+- Group membership does not change today (there is no add/remove/leave use
+  case), but the owner requires it to: groups gain roles and membership changes.
+
+### Owner decisions for this slice
+
+- **1:1 conversations are immutable.** Deterministic id, exactly two
+  participants, one creation record signed by one of the two.
+- **Group conversations change over time.** Roles are the creator, admins named
+  by the creator, and members. The creator and admins add members; the creator
+  and admins remove members (only the creator removes an admin); only the creator
+  promotes or demotes admins; any member can leave by themselves. The creator
+  can neither leave nor be removed, so a group never becomes empty.
+- **Groups are modelled like communities (#357):** the state of a group is the
+  deterministic fold of client-device-signed operations, never a replicated
+  document. Every operation is authorized against the folded state of its
+  causal past (residual: device authorization is still evaluated at the current
+  head, #362).
 
 ### Mechanism
 
-A **user-signed, immutable creation record** replaces the unsigned document.
-No node trust.
+One signed operation log per conversation, in a new replicated store
+`conversationOperations` that replaces the unsigned `conversations` store.
+A 1:1 conversation is a log that holds only its genesis operation; every other
+operation on it is refused, which makes it immutable without a second code path.
 
-- Collection `conversations`, new policy `scopeType: 'conversation_record'`.
-- One record per conversation, `recordId == conversationId`, `kind: put`,
-  `sequence: 0`, `predecessor: null`. Deletions and sequence > 0 are rejected
-  (membership is immutable; if participant changes are added later they become
-  a version chain with the same gate).
-- The author is the creator (`authorIdentityId == creatorIdentityId`).
+A parallel `ConversationOperation` family (operation, ledger, fold, limits,
+argument reader, applier) is built in the conversations context instead of
+generalising the community classes. The community classes are bound to the
+`Community` aggregate, `CommunityId.derive`, `scopeType: community_operation`,
+the `communityId` field and ids of the form `community:<id>:op:<hash>`;
+generalising them would churn a security-critical, vector-pinned wire format.
+The invariants are identical and everything that is not community-specific is
+reused unchanged: `PublicMutationProof`, `PublicMutationPolicy`,
+`PublicMutationRecordShape`, `PublicMutationGate`, `OrbitDBHeadIndex`,
+`registerHeadRecordMerger` and the #365 limits (arguments at most 4096 bytes,
+1000 operations per author, creator exempt).
 
 ### Record shape and canonical signing
 
 ```jsonc
 {
-  "id": "group:<hash> | one-to-one:<hash>",
-  "type": "group | one-to-one",
+  "action": "conversation_created | member_added | member_removed | member_left | admin_promoted | admin_demoted",
+  "args": { /* per action, see below */ },
+  "authorIdentityId": "<identityId>",
+  "conversationId": "group:<hash> | one-to-one:<hash>",
+  "createdAt": 1770000000000,          // author-claimed, informational only
+  "id": "conversation:<conversationId>:op:<digest>",
   "networkId": "<networkId>",
-  "creatorIdentityId": "<identityId>",
-  "participantIds": ["<identityId>", "..."],   // sorted, unique, includes the creator
-  "name": "<optional, groups only>",
-  "nonce": "<base64url, groups only>",
-  "createdAt": 1770000000000,                  // creator-claimed, informational only
-  "mutation": { /* PublicMutationProof, canonical per #316 */ }
+  "parents": ["<digest>", "..."],      // strictly ascending, empty only for genesis
+  "scopeType": "conversation_operation",
+  "mutation": { /* PublicMutationProof */ }
 }
 ```
 
-Canonicalization and signature are exactly `PublicMutationRecord.withProof`:
-`payloadDigest = sha256(canonicalize(record without proof))`, device signature
-over `pigeon:public-mutation:v1\n` + canonical proof body. Removed fields:
-`updatedAt`, `receivedAt`, `lastEventId`, `lastEventType` (they become
-local-only, derived from the message store; they never travel).
+Canonicalization, digest and signature are exactly those of
+`PublicMutationRecord.withProof`. Removed fields: `updatedAt`, `receivedAt`,
+`lastEventId`, `lastEventType` (local-only, derived from the message store).
 
-Id binding (policy recomputes it, rejects on mismatch):
+| Action | Args | Authorization (against the folded past) |
+| --- | --- | --- |
+| `conversation_created` | group: `{type: 'group', nonce, name, participantIds}`; 1:1: `{type: 'one-to-one', participantIds}` | genesis, see below |
+| `member_added` | `{identityId}` | author is creator or admin; target not a member; member cap |
+| `member_removed` | `{identityId}` | author is creator or admin; target is a member and not the creator; removing an admin needs the creator |
+| `member_left` | `{}` | author is a member and not the creator |
+| `admin_promoted` | `{identityId}` | author is the creator; target is a member |
+| `admin_demoted` | `{identityId}` | author is the creator; target is an admin |
 
-- group: `group:` + base64url(sha256(`creatorIdentityId` `:` `nonce`))[0..22).
-  The id includes the creator, so a record by another author cannot claim it.
-  Replaces random `ShortId`.
+Genesis id binding (policy recomputes it, rejects on mismatch):
+
+- group: `group:` + base64url(sha256(canonicalize({creatorIdentityId,
+  networkId, nonce}))). The id commits to the creator, so nobody can claim an
+  existing id. The client generates the nonce. Replaces random `ShortId`.
 - one-to-one: `ConversationId.deterministic(a, b, networkId)` over the two
-  `participantIds` (already `one-to-one:` + sha256 of the sorted
-  `a:b:networkId`). The author must be `a` or `b`.
+  `participantIds`; the author is `a` or `b`; no nonce, no name.
 
 ### Admission policy (`assertPermitted`)
 
-1. Shape valid; `id` recomputes; `creatorIdentityId == author`.
-2. `participantIds` unique, creator included; one-to-one has exactly two; group
-   has `>= 2`; size cap (reuse the existing group member cap).
-3. `networkId` is a network of the creator identity (`identity.getNetworkIds()`).
-   Participants need not be known locally (they may live on other nodes).
-4. `name` bounded by the existing name value object.
+1. Shape valid; operation id recomputes; genesis if and only if `parents` is empty.
+2. Genesis: id binding above; `participantIds` sorted, unique and includes the
+   author; group has between 2 and the group member cap, 1:1 exactly 2;
+   `name` bounded by `GroupConversationName`.
+3. Other operations: every parent is known (else refused and retried by the
+   registry), the author is authorized by the state folded from the parents,
+   arguments at most 4096 bytes, per-author quota (creator exempt).
+4. `networkId` is a network of the author identity. Participants need not be
+   known locally.
+5. No deletions, no `removed` tombstones.
 
-Head gating: `conversation:<id>` heads carry the signed record and are governed
-via `governsHead/acceptsHead` (head key must equal `conversation:<record.id>`
-and the record must pass the checks), as the keychain gate does. The
-`conversation-participant-index:<identityId>` head is **not replicated**: each
-node rebuilds the participant index locally from admitted records, so it
-cannot be forged or shadowed. `RegisterConversationWhenAnnounced` is removed
-(the pubsub announce no longer creates metadata; the replicated record is the
-only source).
+Head gating: heads `conversation-operation-index:<conversationId>` carry only
+admitted operation records (the registry re-admits records per head). The old
+`conversation:<id>` and `conversation-participant-index:<identityId>` heads no
+longer exist: each node rebuilds the participant index locally from folded
+state. `RegisterConversationWhenAnnounced`, `ConversationRegistrar` and the
+unsigned `ConversationWasCreatedEvent` announce are removed.
 
 ### Order and convergence
 
-Immutable, content-addressed id: all nodes converge on the same record
-regardless of arrival order. Two records for one id can only come from the same
-creator (id includes the creator); the lower digest wins by `winsOver`, and the
-creator only hurts themselves. Message/pin/reaction/call policies depend on the
-conversation record; a message arriving before its conversation is rejected and
-re-evaluated by the registry loop within a batch. Cross-batch risk: a message
-batch admitted before the conversation record is dropped; the test below covers
-the order and the implementation must either requeue or hydrate the conversation
-first (the existing message path has the same dependency today).
+State is the Kahn-ordered fold of the operations (lowest digest first among the
+ready ones), each authorized against the prefix it builds on; an operation that
+its prefix does not authorize is skipped, so every replica folds the same
+membership whatever order operations arrive in. Concurrent add/remove of the
+same member converges by digest order. Message, pin, reaction, poll and call
+policies read membership from this fold (1:1: from the genesis); a message that
+arrives before its conversation is refused and re-admitted by the registry.
 
 ### UI/API contract changes
 
-- `POST /conversations` gains a required `mutation: SignedPublicMutation`
-  produced by the client device key (as `POST .../messages` already does).
-  The node holds no user key, so the client must sign. The signed HTTP
-  headers continue to authenticate the request only.
-- Group ids are no longer random `ShortId`. The client must know the final id
-  before signing, so the client generates the `nonce` and sends it with the
-  signed record; the node only validates it.
-- Response shape unchanged. Update `docs/api.md` ("Create a conversation"),
-  both swagger files, and `docs/pubsub-sync-protocol.md` (audit table, the
-  `conversations` row becomes signed, new "Conversation records" section).
+- `POST /conversations` gains a required client-device-signed `mutation` over
+  the genesis operation. The node holds no user key, so the client builds the
+  operation (including the group nonce and therefore the id) and signs it.
+- New signed endpoints for group operations (add member, remove member, leave,
+  promote admin, demote admin) plus `GET /conversations/:id/frontier`, modelled
+  on the community operation endpoints.
+- `docs/api.md` documents the byte-exact canonical signing input and
+  `tests/fixtures/conversation-operation-vectors.json` pins test vectors. Update
+  both swagger files and `docs/pubsub-sync-protocol.md` (audit table, new
+  "Conversation operations" section).
 
 ### Tests required
 
-- Unit: policy accept; reject wrong author, id mismatch, creator not in
-  participants, wrong participant count, foreign network, `sequence > 0`,
-  deletion, extra fields; deterministic 1:1 recomputation; group id includes
-  creator.
-- Unit: `findByParticipant` and participant index derive only from admitted
-  records; forged `updatedAt` cannot replace.
-- Unit/integration: message, pin, reaction and `CallAccessAuthorizer`
-  decisions use the signed record; a forged conversation grants nothing.
-- Real transport e2e `forged-conversations` in the style of `forged-keychains`:
-  honest gated nodes, one malicious ungated node, one ungated control. Forgeries:
-  higher-`updatedAt` replacement adding the attacker, removed members, foreign
-  head key planted under a victim head, forged participant index, forged pubsub
-  announce. Gated nodes never serve them; valid creation replicates.
+- Unit: genesis accept; reject wrong id binding, author not a participant,
+  wrong participant count, foreign network, extra fields; forged add by a
+  non-admin, forged removal by a non-admin, admin-demotion rules (only the
+  creator; an admin cannot remove an admin), leave (a member leaves; the creator
+  cannot), 1:1 refuses every further operation; argument-size and quota limits.
+- Unit: shuffled arrival orders fold to the same state; vectors spec.
+- Unit/integration: message, pin, reaction, poll and `CallAccessAuthorizer`
+  decisions use the folded state; a forged conversation grants nothing.
+- Real transport e2e `forged-conversations` on three nodes in the style of
+  `forged-keychains`: honest gated nodes, one malicious ungated node, one
+  ungated control. Forgeries: forged operations by a non-member and by a
+  non-admin, foreign head key planted under a victim head, forged participant
+  index, forged pubsub announce. `two-real-node-gossipsub` is updated to the new
+  contract. A smoke test runs on a real node.
 - Cucumber: create group/1:1 with and without `mutation`.
 
 ### Migration
 
-Drop the `conversations` store contents and the participant-index head keys;
-messages in old conversations become unreachable without a record. No data
-migration (no production data). Remove `updatedAt`/`receivedAt`/`lastEvent*`
-from the document, mapper, `OrbitDBConversationIndex.shouldReplace` and
-`RegisterConversationWhenAnnounced`.
+Drop the `conversations` store and the `conversation:*` and
+`conversation-participant-index:*` head keys; messages in old conversations
+become unreachable. No data migration (no production data).
 
 ## Slice 2: notifications
 
@@ -667,7 +694,7 @@ security input there.
 
 | Rank | Slice | Value | Effort | Why this order |
 | --- | --- | --- | --- | --- |
-| 1 | Conversation metadata | Very high: it is the authority root for messages, pins, reactions and calls; forging it is a takeover | Medium: one policy, id derivation, `mutation` on `POST /conversations`, head gate | Everything else depends on admitted conversation records |
+| 1 | Conversations | Very high: it is the authority root for messages, pins, reactions and calls; forging it is a takeover | Large: signed operation log for groups (roles, add/remove/leave), immutable signed 1:1 genesis, `mutation` on `POST /conversations` | Everything else depends on admitted conversation state |
 | 2 | Notifications | High: fake invitation with an attacker key breaks confidentiality; forged push | Small-medium: two policies, verify the already-stored signature intent, missed-call becomes local | Depends only on slice 1 |
 | 3 | Content replication | Medium-high: arbitrary fetch and pin (disk/bandwidth), data-loss via claims, content-type overwrite | Small for `maxBytes` and claim removal, medium for signed registration | The `maxBytes` commit is the cheapest protection in the whole issue |
 | 4 | Calls | Medium-high: forged ringing/push, channel blocking, epoch poisoning | Large: new event log, derived state machine, three endpoints, client changes | Needs slice 1; largest rewrite |
@@ -679,7 +706,7 @@ slice 2; slice 3 remainder; slice 4.
 
 | # | Decision | Recommendation |
 | --- | --- | --- |
-| D1 | Conversation membership authority: creator-signed only, or each participant co-signs an acceptance | Creator-signed, immutable membership. Acceptance requires a new participant-state feature that does not exist; revisit when add/remove participant is designed |
+| D1 | Conversation membership authority | Owner decision: 1:1 conversations are immutable (signed genesis); groups are a deterministic fold of client-signed operations with roles (creator, admins named by the creator, members) and self-leave, modelled on communities |
 | D2 | Accept the client contract change that user actions carry a client-device-signed `mutation` (conversation creation, call start/join/leave/end, notification create/update, content replication registration) | Yes: it is the only way to authenticate without node trust, and messages already work this way |
 | D3 | Accept new id formats derived from creator and nonce (group, call, invitation) | Yes: needed so a lower-digest forger cannot claim another author's id; clean cutover |
 | D4 | Missed-call notifications become local, derived, and not shared across a user's nodes | Yes: the alternative needs node trust |
