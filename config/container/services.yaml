@@ -1708,6 +1708,13 @@ services:
       - '@apps/apis/calls-api/CallRelayRecordDiscovery'
       - '@apps/apis/calls-api/CallRelayRecordSigner'
       - '@apps/apis/calls-api/FederatedCallRelayCredentials'
+  apps/initializers/keychains/KeychainMutationGateInitializer:
+    class: /apps/initializers/keychains/KeychainMutationGateInitializer
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/keychains/domain/services/KeychainSignatureDomainService'
+      - '@contexts/keychains/infrastructure/ipfs/mappers/IpfsKeychainMapper'
+      - '@contexts/shared/infrastructure/ipfs/IPFS'
   apps/initializers/public-mutations/ConversationMutationPolicies:
     class: /apps/initializers/public-mutations/ConversationMutationPolicies
     arguments:

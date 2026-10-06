@@ -1,9 +1,11 @@
 import { OrbitDBEntry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBEntry';
+import { OrbitDBMutationGate } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import OrbitDBReplicatedHeadCache, {
   OrbitDBReplicatedHeadCacheEntry,
 } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCache';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { mock } from 'jest-mock-extended';
 
 type Entry = {
   key?: string;
@@ -1118,6 +1120,50 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         cid: 'keychain-v2',
         version: 2,
       }),
+    );
+  });
+
+  it('never caches or serves a replicated head the mutation gate rejects', async () => {
+    const gate = mock<OrbitDBMutationGate>();
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const firstNetwork = createStores();
+
+    gate.governs.mockReturnValue(false);
+    gate.governsHead.mockImplementation((key) => key.startsWith('keychain:'));
+    gate.acceptsHead.mockImplementation((_key, record) =>
+      Promise.resolve(record.cid !== 'forged'),
+    );
+    registry.addMutationGate(gate);
+    await registry.register('network-1', firstNetwork.stores);
+    firstNetwork.heads.emitUpdate({
+      payload: {
+        key: 'keychain:identity-1',
+        value: {
+          cid: 'forged',
+          ownerIdentityId: 'identity-1',
+          receivedAt: 200,
+          version: 99,
+        },
+      },
+    });
+    firstNetwork.heads.emitUpdate({
+      payload: {
+        key: 'keychain:identity-2',
+        value: {
+          cid: 'signed',
+          ownerIdentityId: 'identity-2',
+          receivedAt: 200,
+          version: 1,
+        },
+      },
+    });
+    await flushPromises();
+
+    await expect(
+      registry.findHead('keychain:identity-1'),
+    ).resolves.toBeUndefined();
+    await expect(registry.findHead('keychain:identity-2')).resolves.toEqual(
+      expect.objectContaining({ cid: 'signed' }),
     );
   });
 

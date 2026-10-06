@@ -203,7 +203,7 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
   for (const store of Object.values(replica.stores))
     store.events.on('error', () => undefined);
   replica.registry = new OrbitDBReplicatedStateRegistry();
-  replica.registry.useMutationGate(gate);
+  replica.registry.addMutationGate(gate);
   replica.pins = new OrbitDBCommunityChannelMessagePinRepository(
     replica.registry,
     new PrivateCommunityPublicStorageGuard(

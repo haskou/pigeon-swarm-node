@@ -20,7 +20,7 @@ export default class PublicMutationGateInitializer {
   ) {}
 
   public ensure(): Promise<void> {
-    this.registry.useMutationGate(
+    this.registry.addMutationGate(
       new PublicMutationGate(this.verifier, [
         ...this.communityChannels.all(),
         ...this.communityGovernance.all(),

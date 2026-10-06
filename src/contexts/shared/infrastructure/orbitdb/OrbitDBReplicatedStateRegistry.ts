@@ -4,6 +4,7 @@ import { pigeonEnvironment } from '@app/shared/infrastructure/environment/Pigeon
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import Kernel from '@haskou/ddd-kernel';
 
+import { CompositeOrbitDBMutationGate } from './CompositeOrbitDBMutationGate';
 import LocalOrbitDBReplicatedHeadCache from './LocalOrbitDBReplicatedHeadCache';
 import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBDocumentHistory } from './OrbitDBDocumentHistory';
@@ -291,13 +292,50 @@ export default class OrbitDBReplicatedStateRegistry {
     return degraded ? { ...admitted, updatedAt: 0 } : admitted;
   }
 
-  private cacheReadmittedHead(
+  /**
+   * A head is cached under its own key and under aliases derived from its
+   * content, so a replicated head could otherwise be planted under the key of
+   * any record. Keys a gate governs only receive heads the gate accepts.
+   */
+  private async admittedHeadKeys(
+    keys: string[],
+    value: Record<string, unknown>,
+  ): Promise<string[]> {
+    const gate = this.mutationGate;
+
+    if (!gate) return keys;
+    const admitted: string[] = [];
+
+    for (const key of keys) {
+      if (!gate.governsHead(key)) {
+        admitted.push(key);
+        continue;
+      }
+
+      try {
+        if (await gate.acceptsHead(key, value)) admitted.push(key);
+      } catch {
+        Kernel.logger.warn?.(
+          `Rejected unauthenticated replicated head: key=${key}`,
+        );
+      }
+    }
+
+    return admitted;
+  }
+
+  private async cacheReadmittedHead(
     networkId: string,
     headKey: string,
     value: Record<string, unknown>,
     persist: boolean = true,
-  ): void {
-    for (const key of this.headKeyDeriver.cachedKeys(headKey, value)) {
+  ): Promise<void> {
+    const keys = await this.admittedHeadKeys(
+      this.headKeyDeriver.cachedKeys(headKey, value),
+      value,
+    );
+
+    for (const key of keys) {
       const cachedHead = this.cacheReplicatedHead(networkId, key, value);
 
       if (cachedHead && persist) {
@@ -706,7 +744,12 @@ export default class OrbitDBReplicatedStateRegistry {
       this.cacheReadmittedHead(networkId, recordKey, readmitted),
     );
 
-    for (const key of this.headKeyDeriver.cachedKeys(record.key, value)) {
+    const keys = await this.admittedHeadKeys(
+      this.headKeyDeriver.cachedKeys(record.key, value),
+      value,
+    );
+
+    for (const key of keys) {
       const cachedHead = this.cacheReplicatedHead(networkId, key, value);
 
       if (cachedHead) {
@@ -1058,8 +1101,8 @@ export default class OrbitDBReplicatedStateRegistry {
       return;
     }
 
-    const apply = (record: Record<string, unknown>): void => {
-      for (const key of this.headKeysFromUpdate(networkId, entry, record)) {
+    const apply = (record: Record<string, unknown>, keys: string[]): void => {
+      for (const key of keys) {
         const cachedHead = this.cacheReplicatedHead(networkId, key, record);
 
         if (cachedHead) {
@@ -1069,7 +1112,22 @@ export default class OrbitDBReplicatedStateRegistry {
       }
     };
 
-    apply(this.mutationGate ? await this.admitHead(received, apply) : received);
+    if (!this.mutationGate) {
+      apply(received, this.headKeysFromUpdate(networkId, entry, received));
+
+      return;
+    }
+
+    const gated = async (record: Record<string, unknown>): Promise<void> =>
+      apply(
+        record,
+        await this.admittedHeadKeys(
+          this.headKeysFromUpdate(networkId, entry, record),
+          record,
+        ),
+      );
+
+    await gated(await this.admitHead(received, gated));
   }
 
   private isMergeableHeadKey(key: unknown): key is string {
@@ -1210,7 +1268,7 @@ export default class OrbitDBReplicatedStateRegistry {
           this.cacheReadmittedHead(networkId, headKey, readmitted),
         );
 
-        this.cacheReadmittedHead(networkId, headKey, value, false);
+        await this.cacheReadmittedHead(networkId, headKey, value, false);
       }
 
       if (heads.length > 0) {
@@ -1725,7 +1783,10 @@ export default class OrbitDBReplicatedStateRegistry {
       const stored = this.recordValue(await stores.heads.get?.(key));
       const directRecord = stored && (await this.admitHead(stored));
 
-      if (directRecord) {
+      if (
+        directRecord &&
+        (await this.admittedHeadKeys([key], directRecord)).length > 0
+      ) {
         const cachedHead = this.cacheReplicatedHead(
           networkId,
           key,
@@ -1917,8 +1978,11 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
-  public useMutationGate(gate: OrbitDBMutationGate): void {
-    this.mutationGate = gate;
+  /** Gates accumulate: a record is admitted only if every gate that governs it accepts. */
+  public addMutationGate(gate: OrbitDBMutationGate): void {
+    this.mutationGate = this.mutationGate
+      ? new CompositeOrbitDBMutationGate([this.mutationGate, gate])
+      : gate;
   }
 
   public async putDocument(

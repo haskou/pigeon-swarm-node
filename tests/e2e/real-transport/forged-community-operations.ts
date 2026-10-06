@@ -126,7 +126,7 @@ async function open(replica: Replica): Promise<void> {
     store.events.on('error', () => undefined);
   const registry = new OrbitDBReplicatedStateRegistry();
 
-  registry.useMutationGate(
+  registry.addMutationGate(
     new PublicMutationGate(new PublicMutationVerifier(authorization), [
       new CommunityOperationMutationPolicy(registry),
     ]),
