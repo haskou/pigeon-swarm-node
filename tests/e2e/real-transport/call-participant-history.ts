@@ -1,13 +1,7 @@
 import 'reflect-metadata';
-import OrbitDBCallMapper from '@app/contexts/calls/infrastructure/orbitdb/mappers/OrbitDBCallMapper';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
-import { OrbitDBCallDocument } from '@app/contexts/calls/infrastructure/orbitdb/documents/OrbitDBCallDocument';
-import OrbitDBCallDocumentMerger from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentMerger';
-import OrbitDBCallDocumentReplicator from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallDocumentReplicator';
 import OrbitDBCallProjection from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallProjection';
-import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
-import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
@@ -17,90 +11,22 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-const creatorIdentityId =
-  'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=';
-const participantIdentityId =
-  'MCowBQYDK2VwAyEAwRhK+CGU7bzgh7bzBS8SIn3jGiI7i4AqA9KX6niQ2pc=';
-const callId = '550e8400-e29b-41d4-a716-446655440001';
+import {
+  newCallSigner,
+  signCallParticipant,
+  signCallStart,
+} from '../../support/signCall';
+
 const networkId = '550e8400-e29b-41d4-a716-446655440002';
-const createdAt = 1_780_000_000_000;
-
-function snapshot(
-  rejoinedIdentityId: string,
-  updatedAt: number,
-): OrbitDBCallDocument {
-  return {
-    createdAt,
-    creatorIdentityId,
-    id: callId,
-    networkId,
-    participantIds: [creatorIdentityId, participantIdentityId],
-    participants: [creatorIdentityId, participantIdentityId].map(
-      (identityId) =>
-        identityId === rejoinedIdentityId
-          ? { identityId, joinedAt: updatedAt, status: 'joined' }
-          : {
-              identityId,
-              joinedAt: createdAt,
-              leftAt: createdAt + 100,
-              status: 'left',
-            },
-    ),
-    scope: {
-      channelId: undefined,
-      communityId: undefined,
-      conversationId: 'conversation-1',
-      type: 'conversation',
-    },
-    status: 'active',
-    updatedAt,
-  };
-}
-
-function assertBothJoined(document: OrbitDBCallDocument | undefined): void {
-  assert.ok(document, 'Call must be projected');
-  assert.deepEqual(
-    document.participants
-      .map(({ identityId, joinedAt, status }) => ({
-        identityId,
-        joinedAt,
-        status,
-      }))
-      .sort((left, right) => (left.identityId < right.identityId ? -1 : 1)),
-    [
-      {
-        identityId: creatorIdentityId,
-        joinedAt: createdAt + 200,
-        status: 'joined',
-      },
-      {
-        identityId: participantIdentityId,
-        joinedAt: createdAt + 210,
-        status: 'joined',
-      },
-    ].sort((left, right) => (left.identityId < right.identityId ? -1 : 1)),
-    'Fresh projection must recover both rejoins from the actual OrbitDB log history',
-  );
-  const call = new OrbitDBCallMapper().toDomain(document);
-  for (const identityId of [creatorIdentityId, participantIdentityId]) {
-    call.assertParticipantCanHeartbeat(new IdentityId(identityId));
-  }
-}
 
 async function project(
   stores: OrbitDBPrivateNetworkStores,
-  registry = new OrbitDBReplicatedStateRegistry(),
 ): Promise<OrbitDBCallProjection> {
+  const registry = new OrbitDBReplicatedStateRegistry();
+
   await registry.register(networkId, stores);
-  const projection = new OrbitDBCallProjection(
-    registry,
-    new OrbitDBCallDocumentMerger(),
-    new OrbitDBCallDocumentReplicator(registry),
-    new PrivateCommunityPublicStorageGuard(
-      { findScope: () => Promise.resolve(undefined) } as never,
-      new PrivateAuthorizationStorageCoordinator(),
-    ),
-  );
+  const projection = new OrbitDBCallProjection(registry);
+
   await projection.start();
 
   return projection;
@@ -138,83 +64,71 @@ async function main(): Promise<void> {
     getId: (): string => networkId,
     getPeerId: (): string => 'offline-call-history-peer',
   } as unknown as IPFSNetwork;
+  const creator = await newCallSigner();
+  const peer = await newCallSigner();
+  const createdAt = Date.now() - 60_000;
+  const start = signCallStart({
+    networkId,
+    nonce: 'call-history-nonce-0001',
+    participantIds: [creator.id, peer.id].sort(),
+    scope: { conversationId: 'one-to-one:history', type: 'conversation' },
+    signer: creator,
+    startedAt: createdAt,
+  });
+  const statuses = (
+    call:
+      { participants: { identityId: string; status: string }[] } | undefined,
+  ): Record<string, string> =>
+    Object.fromEntries(
+      (call?.participants ?? []).map((p) => [p.identityId, p.status]),
+    );
   let stores: OrbitDBPrivateNetworkStores | undefined;
   try {
     stores = await OrbitDBPrivateNetworkStores.open(network);
-    const first = snapshot(creatorIdentityId, createdAt + 200);
-    const second = snapshot(participantIdentityId, createdAt + 210);
-    const firstHash = await stores.calls.put!(JSON.parse(JSON.stringify(first)));
-    await stores.calls.put!(JSON.parse(JSON.stringify(second)));
-    const heads = await stores.calls.log!.heads();
-    assert.equal(heads.length, 1);
-    assert.ok(
-      (heads[0] as unknown as { next: string[] }).next.includes(firstHash),
+    await stores.calls.put!(
+      PublicMutationRecord.withProof(start.payload, start.proof),
     );
-    const canonical = await stores.calls.all!();
-    assert.equal(canonical.length, 1);
-    assert.deepEqual((canonical[0].value as OrbitDBCallDocument).participants, second.participants);
+    // Creator leaves and rejoins; the peer joins: both end joined.
+    const left = signCallParticipant({
+      at: createdAt + 100,
+      callId: start.callId,
+      signer: creator,
+      state: 'left',
+    });
+    const rejoined = signCallParticipant({
+      at: createdAt + 200,
+      callId: start.callId,
+      predecessor: left.proof,
+      signer: creator,
+      state: 'joined',
+    });
+    const peerJoined = signCallParticipant({
+      at: createdAt + 210,
+      callId: start.callId,
+      signer: peer,
+      state: 'joined',
+    });
 
-    const registry = new OrbitDBReplicatedStateRegistry();
-    const projection = await project(stores, registry);
-    assertBothJoined(await projection.findById(new CallId(callId)));
+    for (const record of [left, rejoined, peerJoined])
+      await stores.calls.put!(
+        PublicMutationRecord.withProof(record.payload, record.proof),
+      );
+    const expected = { [creator.id]: 'joined', [peer.id]: 'joined' };
+    const projection = await project(stores);
+    const first = await projection.findById(new CallId(start.callId));
 
-    const deadline = Date.now() + 2000;
-    let persisted: OrbitDBCallDocument | undefined;
-    do {
-      const record = (await stores.calls.get!(callId)) as
-        { value: OrbitDBCallDocument } | undefined;
-      persisted = record?.value;
-
-      if (
-        persisted?.participants.every(
-          (participant) => participant.status === 'joined',
-        )
-      )
-        break;
-      await new Promise<void>((resolve) => setImmediate(resolve));
-    } while (Date.now() < deadline);
-    assertBothJoined(persisted);
-
-    const communityCallId = '550e8400-e29b-41d4-a716-446655440099';
-    const attributedCommunity: OrbitDBCallDocument = {
-      ...first,
-      id: communityCallId,
-      scope: { type: 'community_channel', communityId: 'community-1', channelId: 'channel-1', conversationId: undefined },
-    };
-    await stores.calls.put!(JSON.parse(JSON.stringify(attributedCommunity)));
-    const communityProjection = await project(stores);
-    const projectedCommunity = await communityProjection.findById(new CallId(communityCallId));
-    assert.ok(projectedCommunity);
-    assert.deepEqual(projectedCommunity.participants, []);
-    assert.deepEqual(projectedCommunity.participantIds, []);
-    assert.equal(projectedCommunity.creatorIdentityId, undefined);
-    const repairDeadline = Date.now() + 2000;
-    let communityRecord: OrbitDBCallDocument | undefined;
-    do {
-      const record = await stores.calls.get!(communityCallId) as { value: OrbitDBCallDocument } | undefined;
-      communityRecord = record?.value;
-      if (communityRecord?.participantIds.length === 0 && !communityRecord.creatorIdentityId) break;
-      await new Promise<void>((resolve) => setImmediate(resolve));
-    } while (Date.now() < repairDeadline);
-    assert.ok(communityRecord);
-    for (const id of [creatorIdentityId, participantIdentityId]) assert.ok(!JSON.stringify(communityRecord).includes(id));
+    assert.deepEqual(statuses(first), expected);
 
     await stores.stop();
     stores = await OrbitDBPrivateNetworkStores.open(network);
-    const headsBeforeReplay = await stores.calls.log!.heads();
-    await registry.register(networkId, stores);
-    await new Promise<void>((resolve) => setTimeout(resolve, 100));
-    assert.deepEqual(await stores.calls.log!.heads(), headsBeforeReplay, 'Re-registering repaired history must not append another repair');
     const reopened = await project(stores);
-    assertBothJoined(await reopened.findById(new CallId(callId)));
-    const reopenedCommunity = await reopened.findById(new CallId(communityCallId));
-    assert.deepEqual(reopenedCommunity?.participants, []);
-    assert.deepEqual(reopenedCommunity?.participantIds, []);
-    await new Promise<void>((resolve) => setTimeout(resolve, 100));
-    assert.deepEqual(await stores.calls.log!.heads(), headsBeforeReplay, 'Reopening repaired history must not append another repair');
-    console.log(
-      'PASS: conversation rejoins retained after reopen; community attribution repaired and not restored',
+
+    assert.deepEqual(
+      statuses(await reopened.findById(new CallId(start.callId))),
+      expected,
+      'A fresh projection must recover both rejoins from the OrbitDB log history',
     );
+    console.log('PASS: signed conversation rejoins retained after reopen');
   } finally {
     await stores?.stop();
     await rm(root, { force: true, recursive: true });
