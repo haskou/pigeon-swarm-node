@@ -324,14 +324,6 @@ async function main(): Promise<void> {
   } as const;
   const participantIds = [owner.id, alice.id, bob.id].sort();
   const startedAt = Date.now();
-  const start = signCallStart({
-    networkId,
-    nonce: NONCE(1),
-    participantIds,
-    scope,
-    signer: owner,
-    startedAt,
-  });
   const call = Call.start(
     new IdentityId(owner.id),
     new NetworkId(networkId),
@@ -341,6 +333,14 @@ async function main(): Promise<void> {
     new Timestamp(startedAt),
   );
 
+  const start = signCallStart({
+    networkId,
+    nonce: NONCE(1),
+    participantIds: call.toPrimitives().participantIds,
+    scope,
+    signer: owner,
+    startedAt,
+  });
   assert.equal(call.getId().valueOf(), start.callId);
   await honest.repository!.saveStart(call, start.proof);
   const callId = new CallId(start.callId);
