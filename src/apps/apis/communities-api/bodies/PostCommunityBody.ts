@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   IsBoolean,
   IsIn,
+  IsObject,
   IsOptional,
   IsString,
   ValidateNested,
@@ -38,6 +39,7 @@ export class PostCommunityBody {
   @IsString()
   public readonly nonce: string;
 
+  @IsObject()
   @Type(() => CommunityOperationBody)
   @ValidateNested()
   public readonly operation: CommunityOperationBody;

@@ -20,6 +20,7 @@ export class PostCommunityMemberBody {
   @IsObject()
   public readonly mutation: Record<string, unknown>;
 
+  @IsObject()
   @Type(() => CommunityModerationLogBody)
   @ValidateNested()
   public readonly moderationLog: CommunityModerationLogBody;

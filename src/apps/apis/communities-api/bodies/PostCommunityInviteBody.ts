@@ -37,6 +37,7 @@ export class PostCommunityInviteBody {
   @IsString()
   public readonly nonce: string;
 
+  @IsObject()
   @Type(() => CommunityModerationLogBody)
   @ValidateNested()
   public readonly moderationLog: CommunityModerationLogBody;

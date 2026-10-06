@@ -7,6 +7,7 @@ export class DeleteNotificationScopeSettingsBody {
   @IsObject()
   public readonly mutation: Record<string, unknown>;
 
+  @IsObject()
   @Type(() => NotificationScopeBody)
   @ValidateNested()
   public readonly scope: NotificationScopeBody;

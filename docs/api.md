@@ -1988,7 +1988,10 @@ past, so every node agrees. A route that would exceed one answers `409` with cod
 and stores nothing; an operation another author signed concurrently beyond the quota
 is skipped by the fold on every node without any error.
 
-**Errors.** A malformed record, wrong args, a wrong id, a mismatching signature
+**Errors.** A body whose signed `operation` (or, on community routes, `operation` /
+`moderationLog`) is missing, not an object or lacks `createdAt`, `parents` or `mutation`
+is rejected before any signature check with `400` (validation error); it never
+reaches the use case. A malformed record, wrong args, a wrong id, a mismatching signature
 author, an unknown parent or any violated roster rule answers `409` with code
 `InvalidConversationOperationError` (`Invalid conversation operation`). An unknown
 conversation answers `ConversationNotFoundError`.

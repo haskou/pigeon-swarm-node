@@ -1,5 +1,10 @@
 import { Type } from 'class-transformer';
-import { IsNotEmpty, IsString, ValidateNested } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsObject,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 
 import { ConversationOperationBody } from './ConversationOperationBody';
 
@@ -8,6 +13,7 @@ export class PostConversationMemberBody {
   @IsNotEmpty()
   public readonly identityId: string;
 
+  @IsObject()
   @Type(() => ConversationOperationBody)
   @ValidateNested()
   public readonly operation: ConversationOperationBody;

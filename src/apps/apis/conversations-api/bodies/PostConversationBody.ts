@@ -4,6 +4,7 @@ import {
   IsArray,
   IsIn,
   IsNotEmpty,
+  IsObject,
   IsString,
   ValidateIf,
   ValidateNested,
@@ -30,6 +31,7 @@ export class PostConversationBody {
   @IsNotEmpty()
   public readonly nonce?: string;
 
+  @IsObject()
   @Type(() => ConversationOperationBody)
   @ValidateNested()
   public readonly operation: ConversationOperationBody;

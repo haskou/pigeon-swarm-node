@@ -32,6 +32,7 @@ export class PutNotificationScopeSettingsBody {
   @IsIn(notificationLevels)
   public readonly notificationLevel: string;
 
+  @IsObject()
   @Type(() => NotificationScopeBody)
   @ValidateNested()
   public readonly scope: NotificationScopeBody;
