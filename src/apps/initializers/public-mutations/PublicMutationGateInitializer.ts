@@ -4,6 +4,7 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 
 import CommunityChannelMutationPolicies from './CommunityChannelMutationPolicies';
 import CommunityGovernanceMutationPolicies from './CommunityGovernanceMutationPolicies';
+import ContentReplicationMutationPolicies from './ContentReplicationMutationPolicies';
 import ConversationMutationPolicies from './ConversationMutationPolicies';
 import PollMutationPolicies from './PollMutationPolicies';
 import StickerMutationPolicies from './StickerMutationPolicies';
@@ -17,6 +18,7 @@ export default class PublicMutationGateInitializer {
     private readonly conversations: ConversationMutationPolicies,
     private readonly stickers: StickerMutationPolicies,
     private readonly polls: PollMutationPolicies,
+    private readonly contentReplications: ContentReplicationMutationPolicies,
   ) {}
 
   public ensure(): Promise<void> {
@@ -27,6 +29,7 @@ export default class PublicMutationGateInitializer {
         ...this.conversations.all(),
         ...this.stickers.all(),
         ...this.polls.all(),
+        ...this.contentReplications.all(),
       ]),
     );
 

@@ -1,6 +1,10 @@
 import { ContentReplication } from '@app/contexts/content-replication/domain/ContentReplication';
+import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
 import { OrbitDBContentReplicationDocument } from '../documents/OrbitDBContentReplicationDocument';
+import { OrbitDBContentReplicationTombstone } from '../documents/OrbitDBContentReplicationTombstone';
 
 export default class OrbitDBContentReplicationMapper {
   public toDocument(
@@ -10,16 +14,12 @@ export default class OrbitDBContentReplicationMapper {
 
     return {
       cid: primitives.cid,
-      contentType: primitives.contentType,
       context: primitives.context,
-      createdAt: primitives.createdAt,
-      filename: primitives.filename,
-      id: primitives.cid,
-      networkIds: primitives.networkIds,
+      id: content.getId(),
+      networkId: primitives.networkId,
       ownerIdentityId: primitives.ownerIdentityId,
-      priority: primitives.priority,
+      scopeType: 'content_replication',
       sizeBytes: primitives.sizeBytes,
-      updatedAt: primitives.updatedAt,
     };
   }
 
@@ -28,15 +28,25 @@ export default class OrbitDBContentReplicationMapper {
   ): ContentReplication {
     return ContentReplication.fromPrimitives({
       cid: document.cid,
-      contentType: document.contentType,
       context: document.context,
-      createdAt: document.createdAt,
-      filename: document.filename,
-      networkIds: document.networkIds,
+      networkId: document.networkId,
       ownerIdentityId: document.ownerIdentityId,
-      priority: document.priority,
       sizeBytes: document.sizeBytes,
-      updatedAt: document.updatedAt,
     });
+  }
+
+  public toTombstone(
+    ownerIdentityId: IdentityId,
+    networkId: NetworkId,
+    cid: ContentId,
+  ): OrbitDBContentReplicationTombstone {
+    return {
+      cid: cid.valueOf(),
+      id: ContentReplication.idOf(networkId.valueOf(), cid.valueOf()),
+      networkId: networkId.valueOf(),
+      ownerIdentityId: ownerIdentityId.valueOf(),
+      removed: true,
+      scopeType: 'content_replication',
+    };
   }
 }

@@ -1,34 +1,31 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
+import { assert, PrimitiveOf } from '@haskou/value-objects';
 
-import { ContentFilename } from './value-objects/ContentFilename';
+import { maxContentSizeBytes } from '../application/publish-content/ContentUploadLimits';
+import { InvalidContentReplicationSizeError } from './errors/InvalidContentReplicationSizeError';
 import { ContentId } from './value-objects/ContentId';
 import { ContentReplicationContext } from './value-objects/ContentReplicationContext';
-import { ContentReplicationMetadata } from './value-objects/ContentReplicationMetadata';
-import { ContentReplicationPriority } from './value-objects/ContentReplicationPriority';
-import { ContentType } from './value-objects/ContentType';
+import { ContentSize } from './value-objects/ContentSize';
 
+/**
+ * The intent of one identity to keep one CID replicated in one network. It is
+ * the owner's signed statement; the bytes and their type are never part of it.
+ */
 export class ContentReplication {
-  private updatedAt: Timestamp;
-
   public static create(
     cid: ContentId,
+    networkId: NetworkId,
     context: ContentReplicationContext,
-    networkIds: NetworkId[],
-    metadata: ContentReplicationMetadata,
-    ownerIdentityId: IdentityId | undefined,
-    priority: ContentReplicationPriority,
-    createdAt: Timestamp = Timestamp.now(),
+    sizeBytes: ContentSize,
+    ownerIdentityId: IdentityId,
   ): ContentReplication {
     return new ContentReplication(
       cid,
+      networkId,
       context,
-      networkIds,
-      metadata,
+      sizeBytes,
       ownerIdentityId,
-      priority,
-      createdAt,
     );
   }
 
@@ -37,87 +34,64 @@ export class ContentReplication {
   ): ContentReplication {
     return new ContentReplication(
       new ContentId(primitives.cid),
+      new NetworkId(primitives.networkId),
       new ContentReplicationContext(primitives.context),
-      primitives.networkIds.map((networkId) => new NetworkId(networkId)),
-      ContentReplicationMetadata.fromPrimitives(
-        primitives.sizeBytes,
-        primitives.contentType,
-        primitives.filename,
-      ),
-      primitives.ownerIdentityId
-        ? new IdentityId(primitives.ownerIdentityId)
-        : undefined,
-      new ContentReplicationPriority(primitives.priority),
-      new Timestamp(primitives.createdAt),
-    ).withUpdatedAt(new Timestamp(primitives.updatedAt));
+      new ContentSize(primitives.sizeBytes),
+      new IdentityId(primitives.ownerIdentityId),
+    );
+  }
+
+  /** Identifier of the replicated record: one per network and CID. */
+  public static idOf(networkId: string, cid: string): string {
+    return `content:${networkId}:${cid}`;
   }
 
   constructor(
     private readonly cid: ContentId,
+    private readonly networkId: NetworkId,
     private readonly context: ContentReplicationContext,
-    private readonly networkIds: NetworkId[],
-    private metadata: ContentReplicationMetadata,
-    private readonly ownerIdentityId: IdentityId | undefined,
-    private readonly priority: ContentReplicationPriority,
-    private readonly createdAt: Timestamp,
+    private readonly sizeBytes: ContentSize,
+    private readonly ownerIdentityId: IdentityId,
   ) {
-    this.updatedAt = createdAt;
-  }
-
-  private withUpdatedAt(updatedAt: Timestamp): ContentReplication {
-    this.updatedAt = updatedAt;
-
-    return this;
+    assert(
+      Number.isSafeInteger(sizeBytes.valueOf()) &&
+        sizeBytes.valueOf() >= 1 &&
+        sizeBytes.valueOf() <= maxContentSizeBytes,
+      new InvalidContentReplicationSizeError(sizeBytes.valueOf()),
+    );
   }
 
   public getCid(): ContentId {
     return this.cid;
   }
 
-  public getNetworkIds(): NetworkId[] {
-    return [...this.networkIds];
+  public getContext(): ContentReplicationContext {
+    return this.context;
   }
 
-  public addNetworkIds(networkIds: NetworkId[]): void {
-    for (const networkId of networkIds) {
-      const alreadyRegistered = this.networkIds.some((registeredNetworkId) =>
-        registeredNetworkId.isEqual(networkId),
-      );
-
-      if (!alreadyRegistered) {
-        this.networkIds.push(networkId);
-      }
-    }
+  public getId(): string {
+    return ContentReplication.idOf(this.networkId.valueOf(), this.cid.valueOf());
   }
 
-  public getContentType(): ContentType {
-    return this.metadata.getContentType();
+  public getNetworkId(): NetworkId {
+    return this.networkId;
   }
 
-  public getFilename(): ContentFilename | undefined {
-    return this.metadata.getFilename();
+  public getOwnerIdentityId(): IdentityId {
+    return this.ownerIdentityId;
   }
 
-  public updateMetadata(metadata: ContentReplicationMetadata): void {
-    this.metadata = metadata;
-  }
-
-  public touch(updatedAt: Timestamp = Timestamp.now()): void {
-    this.updatedAt = updatedAt;
+  public getSizeBytes(): ContentSize {
+    return this.sizeBytes;
   }
 
   public toPrimitives() {
     return {
       cid: this.cid.valueOf(),
-      contentType: this.metadata.getContentType().valueOf(),
       context: this.context.valueOf(),
-      createdAt: this.createdAt.valueOf(),
-      filename: this.metadata.getFilename()?.valueOf(),
-      networkIds: this.networkIds.map((networkId) => networkId.valueOf()),
-      ownerIdentityId: this.ownerIdentityId?.valueOf(),
-      priority: this.priority.valueOf(),
-      sizeBytes: this.metadata.getSizeBytes().valueOf(),
-      updatedAt: this.updatedAt.valueOf(),
+      networkId: this.networkId.valueOf(),
+      ownerIdentityId: this.ownerIdentityId.valueOf(),
+      sizeBytes: this.sizeBytes.valueOf(),
     };
   }
 }

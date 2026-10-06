@@ -19,7 +19,6 @@ export default class LocalContentReplicationStatusSummaryRepository extends Cont
       typeof document._id === 'string' &&
       typeof document.contentCount === 'number' &&
       typeof document.localResponsibleCount === 'number' &&
-      typeof document.releasableCount === 'number' &&
       typeof document.totalSizeBytes === 'number' &&
       typeof document.updatedAt === 'number'
     );
@@ -34,7 +33,6 @@ export default class LocalContentReplicationStatusSummaryRepository extends Cont
       _id: primitives.localNodeId,
       contentCount: primitives.contentCount,
       localResponsibleCount: primitives.localResponsibleCount,
-      releasableCount: primitives.releasableCount,
       totalSizeBytes: primitives.totalSizeBytes,
       updatedAt: primitives.updatedAt,
     };
@@ -47,7 +45,6 @@ export default class LocalContentReplicationStatusSummaryRepository extends Cont
       contentCount: document.contentCount,
       localNodeId: document._id,
       localResponsibleCount: document.localResponsibleCount,
-      releasableCount: document.releasableCount,
       totalSizeBytes: document.totalSizeBytes,
       updatedAt: document.updatedAt,
     });

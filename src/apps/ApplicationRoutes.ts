@@ -77,10 +77,12 @@ import { PostIdentityRoute } from '@app/apps/apis/identities-api/routes/PostIden
 import { PutIdentityRoute } from '@app/apps/apis/identities-api/routes/PutIdentityRoute';
 import { GetDeviceAuthorizationRoute } from '@app/apps/apis/identity-devices-api/routes/GetDeviceAuthorizationRoute';
 import { PostDeviceAuthorizationTransitionRoute } from '@app/apps/apis/identity-devices-api/routes/PostDeviceAuthorizationTransitionRoute';
+import { DeleteContentReplicationRoute } from '@app/apps/apis/ipfs-api/routes/DeleteContentReplicationRoute';
 import { GetContentReplicationStatusRoute } from '@app/apps/apis/ipfs-api/routes/GetContentReplicationStatusRoute';
 import { GetIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/GetIPFSContentRoute';
 import { PostNetworkIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/PostNetworkIPFSContentRoute';
 import { PostPublicIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/PostPublicIPFSContentRoute';
+import { PutContentReplicationRoute } from '@app/apps/apis/ipfs-api/routes/PutContentReplicationRoute';
 import { GetKeychainRoute } from '@app/apps/apis/keychains-api/routes/GetKeychainRoute';
 import { PostKeychainRoute } from '@app/apps/apis/keychains-api/routes/PostKeychainRoute';
 import { PostLinkPreviewRoute } from '@app/apps/apis/link-previews-api/routes/PostLinkPreviewRoute';
@@ -177,6 +179,8 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PutConversationAdminRoute,
   DeleteConversationAdminRoute,
   GetContentReplicationStatusRoute,
+  PutContentReplicationRoute,
+  DeleteContentReplicationRoute,
   GetIPFSContentRoute,
   PostPublicIPFSContentRoute,
   PostNetworkIPFSContentRoute,

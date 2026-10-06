@@ -1,9 +1,8 @@
-export interface OrbitDBContentReplicationDocument {
+export interface OrbitDBContentReplicationTombstone {
   cid: string;
-  context: string;
   id: string;
   networkId: string;
   ownerIdentityId: string;
+  removed: true;
   scopeType: 'content_replication';
-  sizeBytes: number;
 }

@@ -17,8 +17,6 @@ import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities
 import SynchronizeIdentityWhenUpdated from '@app/apps/consumers/pubsub/identities/SynchronizeIdentityWhenUpdated';
 import ProvisionDeviceAuthorizationWhenIdentityCreated from '@app/apps/consumers/pubsub/identity-devices/ProvisionDeviceAuthorizationWhenIdentityCreated';
 import ProvisionDeviceAuthorizationWhenIdentityUpdated from '@app/apps/consumers/pubsub/identity-devices/ProvisionDeviceAuthorizationWhenIdentityUpdated';
-import RegisterContentReplicaClaimWhenClaimed from '@app/apps/consumers/pubsub/ipfs/RegisterContentReplicaClaimWhenClaimed';
-import RegisterContentReplicationWhenRegistered from '@app/apps/consumers/pubsub/ipfs/RegisterContentReplicationWhenRegistered';
 import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenPublished';
 import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
@@ -55,8 +53,6 @@ export const applicationConsumers: ApplicationServiceClass<Consumer>[] = [
   RegisterCommunityChannelMessageEditionWhenAnnounced,
   RegisterCommunityReactionWhenAdded,
   RegisterCommunityReactionWhenRemoved,
-  RegisterContentReplicaClaimWhenClaimed,
-  RegisterContentReplicationWhenRegistered,
   RegisterIdentityPresenceWhenUpdated,
   SendPushNotificationWhenConversationMessageSent,
   SendPushNotificationWhenCommunityMessageSent,

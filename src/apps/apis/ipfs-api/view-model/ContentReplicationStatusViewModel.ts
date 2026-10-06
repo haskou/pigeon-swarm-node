@@ -13,7 +13,6 @@ export class ContentReplicationStatusViewModel {
       summary: {
         contentCount: primitives.contentCount,
         localResponsibleCount: primitives.localResponsibleCount,
-        releasableCount: primitives.releasableCount,
         totalSizeBytes: primitives.totalSizeBytes,
         updatedAt: primitives.updatedAt,
       },

@@ -72,16 +72,10 @@ services:
   contexts/content-replication/domain/ContentReplicationPolicy:
     class: /contexts/content-replication/domain/ContentReplicationPolicy
     arguments: []
-  contexts/content-replication/domain/repositories/ContentReplicaClaimRepository: >-
-    @contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicaClaimRepository
   contexts/content-replication/domain/repositories/ContentReplicationRepository: >-
     @contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicationRepository
   contexts/content-replication/domain/repositories/ContentReplicationStatusSummaryRepository: >-
     @contexts/content-replication/infrastructure/local-db/LocalContentReplicationStatusSummaryRepository
-  contexts/content-replication/infrastructure/orbitdb/mappers/OrbitDBContentReplicaClaimMapper:
-    class: >-
-      /contexts/content-replication/infrastructure/orbitdb/mappers/OrbitDBContentReplicaClaimMapper
-    arguments: []
   contexts/content-replication/infrastructure/orbitdb/mappers/OrbitDBContentReplicationMapper:
     class: >-
       /contexts/content-replication/infrastructure/orbitdb/mappers/OrbitDBContentReplicationMapper
@@ -285,6 +279,11 @@ services:
     arguments:
       - >-
         @contexts/communities/domain/repositories/CommunityChannelMessageRepository
+  apps/initializers/public-mutations/ContentReplicationMutationPolicies:
+    class: /apps/initializers/public-mutations/ContentReplicationMutationPolicies
+    arguments:
+      - >-
+        @contexts/content-replication/infrastructure/orbitdb/policies/ContentReplicationMutationPolicy
   apps/runtimes/ipfs-runtime/IPFSRuntime:
     class: /apps/runtimes/ipfs-runtime/IPFSRuntime
     arguments:
@@ -382,6 +381,11 @@ services:
       /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessageIndex
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+  contexts/content-replication/application/get-content/ContentGetter:
+    class: /contexts/content-replication/application/get-content/ContentGetter
+    arguments:
+      - >-
+        @contexts/content-replication/application/content-storage/ReplicatedContentStorage
   contexts/content-replication/application/update-status-summary/ContentReplicationStatusSummaryUpdater:
     class: >-
       /contexts/content-replication/application/update-status-summary/ContentReplicationStatusSummaryUpdater
@@ -915,13 +919,12 @@ services:
       - >-
         @contexts/content-replication/domain/repositories/ContentReplicationStatusSummaryRepository
       - '@contexts/nodes/domain/repositories/NodeRepository'
-  contexts/content-replication/application/get-content/ContentGetter:
-    class: /contexts/content-replication/application/get-content/ContentGetter
+  contexts/content-replication/application/publish-content/ContentPublisher:
+    class: /contexts/content-replication/application/publish-content/ContentPublisher
     arguments:
       - >-
         @contexts/content-replication/application/content-storage/ReplicatedContentStorage
-      - >-
-        @contexts/content-replication/domain/repositories/ContentReplicationRepository
+      - '@contexts/identities/domain/repositories/IdentityRepository'
   contexts/content-replication/application/refresh-status-summary/ContentReplicationSummaryRefresher:
     class: >-
       /contexts/content-replication/application/refresh-status-summary/ContentReplicationSummaryRefresher
@@ -930,17 +933,9 @@ services:
         @contexts/content-replication/application/find-status/ContentReplicationStatusFinder
       - >-
         @contexts/content-replication/application/update-status-summary/ContentReplicationStatusSummaryUpdater
-  contexts/content-replication/application/register-claim/ContentReplicaClaimRegistrar:
+  contexts/content-replication/application/unregister-content/ContentReplicationUnregistrar:
     class: >-
-      /contexts/content-replication/application/register-claim/ContentReplicaClaimRegistrar
-    arguments:
-      - >-
-        @contexts/content-replication/domain/repositories/ContentReplicaClaimRepository
-      - >-
-        @contexts/content-replication/application/refresh-status-summary/ContentReplicationSummaryRefresher
-  contexts/content-replication/application/register-content/ContentReplicationMetadataRegistrar:
-    class: >-
-      /contexts/content-replication/application/register-content/ContentReplicationMetadataRegistrar
+      /contexts/content-replication/application/unregister-content/ContentReplicationUnregistrar
     arguments:
       - >-
         @contexts/content-replication/domain/repositories/ContentReplicationRepository
@@ -1327,18 +1322,6 @@ services:
       - '@shared/infrastructure/messageBus/DomainEventConsumer'
       - >-
         @contexts/identities/application/register-candidate/IdentityCandidateRegistrar
-  apps/consumers/pubsub/ipfs/RegisterContentReplicaClaimWhenClaimed:
-    class: /apps/consumers/pubsub/ipfs/RegisterContentReplicaClaimWhenClaimed
-    arguments:
-      - '@shared/infrastructure/messageBus/DomainEventConsumer'
-      - >-
-        @contexts/content-replication/application/register-claim/ContentReplicaClaimRegistrar
-  apps/consumers/pubsub/ipfs/RegisterContentReplicationWhenRegistered:
-    class: /apps/consumers/pubsub/ipfs/RegisterContentReplicationWhenRegistered
-    arguments:
-      - '@shared/infrastructure/messageBus/DomainEventConsumer'
-      - >-
-        @contexts/content-replication/application/register-content/ContentReplicationMetadataRegistrar
   apps/consumers/pubsub/keychains/RegisterKeychainWhenPublished:
     class: /apps/consumers/pubsub/keychains/RegisterKeychainWhenPublished
     arguments:
@@ -1524,15 +1507,25 @@ services:
       - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
       - '@contexts/communities/domain/repositories/CommunityInviteRepository'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
-  contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicaClaimRepository:
+  contexts/content-replication/application/maintain/ContentReplicationMaintainer:
     class: >-
-      /contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicaClaimRepository
+      /contexts/content-replication/application/maintain/ContentReplicationMaintainer
     arguments:
-      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - >-
-        @contexts/content-replication/infrastructure/orbitdb/mappers/OrbitDBContentReplicaClaimMapper
-    parent: >-
-      contexts/content-replication/domain/repositories/ContentReplicaClaimRepository
+        @contexts/content-replication/application/find-status/ContentReplicationStatusFinder
+      - >-
+        @contexts/content-replication/application/content-storage/ReplicatedContentStorage
+      - >-
+        @contexts/content-replication/application/update-status-summary/ContentReplicationStatusSummaryUpdater
+  contexts/content-replication/application/register-content/ContentReplicationRegistrar:
+    class: >-
+      /contexts/content-replication/application/register-content/ContentReplicationRegistrar
+    arguments:
+      - >-
+        @contexts/content-replication/domain/repositories/ContentReplicationRepository
+      - '@contexts/identities/domain/repositories/IdentityRepository'
+      - >-
+        @contexts/content-replication/application/refresh-status-summary/ContentReplicationSummaryRefresher
   contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicationRepository:
     class: >-
       /contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicationRepository
@@ -2000,26 +1993,23 @@ services:
       - '@contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard'
     parent: >-
       contexts/communities/domain/repositories/CommunityMessageReactionRepository
-  contexts/content-replication/application/publish-content/ContentPublisher:
-    class: /contexts/content-replication/application/publish-content/ContentPublisher
-    arguments:
-      - >-
-        @contexts/content-replication/application/content-storage/ReplicatedContentStorage
-      - '@contexts/nodes/domain/repositories/NodeRepository'
-      - >-
-        @contexts/content-replication/application/register-content/ContentReplicationRegistrar
-      - '@contexts/identities/domain/repositories/IdentityRepository'
-  contexts/content-replication/application/register-content/ContentReplicationRegistrar:
+  contexts/content-replication/application/find-status/ContentReplicationStatusFinder:
     class: >-
-      /contexts/content-replication/application/register-content/ContentReplicationRegistrar
+      /contexts/content-replication/application/find-status/ContentReplicationStatusFinder
     arguments:
       - >-
         @contexts/content-replication/domain/repositories/ContentReplicationRepository
-      - >-
-        @contexts/content-replication/domain/repositories/ContentReplicaClaimRepository
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-      - >-
-        @contexts/content-replication/application/refresh-status-summary/ContentReplicationSummaryRefresher
+      - '@contexts/nodes/domain/repositories/NodeRepository'
+      - '@contexts/nodes/domain/repositories/NodePeerRepository'
+      - '@contexts/content-replication/domain/ContentReplicationPolicy'
+  contexts/content-replication/infrastructure/orbitdb/policies/ContentReplicationMutationPolicy:
+    class: >-
+      /contexts/content-replication/infrastructure/orbitdb/policies/ContentReplicationMutationPolicy
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/identities/domain/repositories/IdentityRepository'
+      - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/conversations/application/find-latest-messages/LatestMessagesFinder:
     class: >-
       /contexts/conversations/application/find-latest-messages/LatestMessagesFinder
@@ -2214,30 +2204,6 @@ services:
       - >-
         @contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator
     parent: contexts/communities/domain/repositories/CommunityRepository
-  contexts/content-replication/application/find-status/ContentReplicationStatusFinder:
-    class: >-
-      /contexts/content-replication/application/find-status/ContentReplicationStatusFinder
-    arguments:
-      - >-
-        @contexts/content-replication/domain/repositories/ContentReplicationRepository
-      - >-
-        @contexts/content-replication/domain/repositories/ContentReplicaClaimRepository
-      - '@contexts/nodes/domain/repositories/NodeRepository'
-      - '@contexts/nodes/domain/repositories/NodePeerRepository'
-      - '@contexts/content-replication/domain/ContentReplicationPolicy'
-  contexts/content-replication/application/maintain/ContentReplicationMaintainer:
-    class: >-
-      /contexts/content-replication/application/maintain/ContentReplicationMaintainer
-    arguments:
-      - >-
-        @contexts/content-replication/application/find-status/ContentReplicationStatusFinder
-      - >-
-        @contexts/content-replication/domain/repositories/ContentReplicaClaimRepository
-      - >-
-        @contexts/content-replication/application/content-storage/ReplicatedContentStorage
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-      - >-
-        @contexts/content-replication/application/update-status-summary/ContentReplicationStatusSummaryUpdater
   contexts/identities/application/publish/IdentityPublisher:
     class: /contexts/identities/application/publish/IdentityPublisher
     arguments:
@@ -2393,16 +2359,6 @@ services:
         @contexts/private-authorization/application/accept-operation/PrivateControlTransitionProcessor
       - >-
         @contexts/private-authorization/application/accept-operation/PrivateControlMutationAuthorizer
-  apps/initializers/public-mutations/PublicMutationGateInitializer:
-    class: /apps/initializers/public-mutations/PublicMutationGateInitializer
-    arguments:
-      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
-      - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
-      - '@apps/initializers/public-mutations/CommunityChannelMutationPolicies'
-      - '@apps/initializers/public-mutations/CommunityGovernanceMutationPolicies'
-      - '@apps/initializers/public-mutations/ConversationMutationPolicies'
-      - '@apps/initializers/public-mutations/StickerMutationPolicies'
-      - '@apps/initializers/public-mutations/PollMutationPolicies'
   contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationDocumentMerger:
     class: >-
       /contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationDocumentMerger
@@ -2432,6 +2388,17 @@ services:
       - '@contexts/calls/domain/repositories/CallRepository'
       - '@contexts/calls/domain/repositories/CallParticipantLeaseRepository'
       - '@contexts/calls/application/authorize-call/CallAccessAuthorizer'
+  apps/initializers/public-mutations/PublicMutationGateInitializer:
+    class: /apps/initializers/public-mutations/PublicMutationGateInitializer
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
+      - '@apps/initializers/public-mutations/CommunityChannelMutationPolicies'
+      - '@apps/initializers/public-mutations/CommunityGovernanceMutationPolicies'
+      - '@apps/initializers/public-mutations/ConversationMutationPolicies'
+      - '@apps/initializers/public-mutations/StickerMutationPolicies'
+      - '@apps/initializers/public-mutations/PollMutationPolicies'
+      - '@apps/initializers/public-mutations/ContentReplicationMutationPolicies'
   shared/infrastructure/http/HttpClient: '@shared/infrastructure/http/FetchHttpClient'
   shared/infrastructure/logs/Log: '@shared/infrastructure/logs/WinstonLogger'
   shared/infrastructure/messageBus/MessageBusAdapter: '@shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter'
@@ -2443,7 +2410,7 @@ services:
   contexts/private-authorization/application/provision-scope/PrivateGenesisProjectionAuthorizer: >-
     @contexts/communities/application/apply-private-control/PrivateCommunityGenesisAuthorizer
   contexts/public-mutations/domain/services/PublicMutationPolicy: >-
-    @contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy
+    @contexts/content-replication/infrastructure/orbitdb/policies/ContentReplicationMutationPolicy
   contexts/private-authorization/application/accept-operation/PrivateOperationDecoder: >-
     @contexts/private-authorization/infrastructure/contracts/PrivateControlOperationContract
   contexts/private-authorization/domain/services/PrivateDeviceCredentialCodec: >-

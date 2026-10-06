@@ -12,20 +12,12 @@ export default class ContentReplicationMaintenanceScheduler extends Scheduler {
   public async execute(): Promise<void> {
     const result = await this.maintainer.maintain();
     const message = [
-      `Maintained content replication: claimed=${result.claimedReplicas}`,
-      `released=${result.releasedReplicas}`,
-      `failedClaims=${result.failedClaims}`,
-      `failedReleases=${result.failedReleases}`,
+      `Maintained content replication: maintained=${result.maintainedReplicas}`,
+      `failed=${result.failedReplicas}`,
     ].join(', ');
 
-    if (result.failedClaims > 0 || result.failedReleases > 0) {
+    if (result.failedReplicas > 0) {
       Kernel.logger.warn(message);
-
-      return;
-    }
-
-    if (result.claimedReplicas > 0 || result.releasedReplicas > 0) {
-      Kernel.logger.info(message);
 
       return;
     }

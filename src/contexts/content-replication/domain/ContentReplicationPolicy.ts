@@ -22,30 +22,4 @@ export default class ContentReplicationPolicy {
       ),
     );
   }
-
-  public canReleaseLocalReplica(params: {
-    activeNodeCount: number;
-    knownReplicaNodeIds: string[];
-    localNodeId: string;
-    responsibleNodeIds: string[];
-  }): boolean {
-    if (
-      params.activeNodeCount <=
-      ContentReplicationPolicy.FULL_REPLICATION_NODE_LIMIT
-    ) {
-      return false;
-    }
-
-    if (params.responsibleNodeIds.includes(params.localNodeId)) {
-      return false;
-    }
-
-    if (!params.knownReplicaNodeIds.includes(params.localNodeId)) {
-      return false;
-    }
-
-    return params.responsibleNodeIds.every((nodeId) =>
-      params.knownReplicaNodeIds.includes(nodeId),
-    );
-  }
 }

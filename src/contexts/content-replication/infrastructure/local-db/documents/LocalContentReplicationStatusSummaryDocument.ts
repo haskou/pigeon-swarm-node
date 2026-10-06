@@ -5,7 +5,6 @@ export interface LocalContentReplicationStatusSummaryDocument extends Record<
   _id: string;
   contentCount: number;
   localResponsibleCount: number;
-  releasableCount: number;
   totalSizeBytes: number;
   updatedAt: number;
 }

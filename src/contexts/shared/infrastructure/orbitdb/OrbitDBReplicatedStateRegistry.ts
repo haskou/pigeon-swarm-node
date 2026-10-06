@@ -2041,6 +2041,37 @@ export default class OrbitDBReplicatedStateRegistry {
     return results.flat();
   }
 
+  /**
+   * Stored documents with no admission check. Only for a mutation policy that
+   * must count sibling records of its own collection, which `queryDocuments`
+   * would re-enter the gate for.
+   */
+  public async queryUnadmittedDocuments(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    matcher: (document: Record<string, unknown>) => boolean,
+    networkIds: string[] = [],
+  ): Promise<Record<string, unknown>[]> {
+    this.assertReady();
+
+    const results = await Promise.all(
+      this.networkStoreEntriesForNetworkIds(networkIds).map(
+        async ({ stores }) => {
+          const store = this.getStore(stores, storeName);
+
+          if (!store) return [];
+
+          return store.query
+            ? await store.query(matcher)
+            : (await this.allRecords(store))
+                .map((record) => record.value)
+                .filter(matcher);
+        },
+      ),
+    );
+
+    return results.flat();
+  }
+
   public async replicateDocumentInBackground(
     storeName: OrbitDBReplicatedDocumentStoreName,
     document: Record<string, unknown>,

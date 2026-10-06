@@ -10,7 +10,6 @@ export class ContentReplicationStatusSummary {
       new Integer(0),
       new ContentSize(0),
       new Integer(0),
-      new Integer(0),
       new Timestamp(0),
     );
   }
@@ -23,7 +22,6 @@ export class ContentReplicationStatusSummary {
       new Integer(primitives.contentCount),
       new ContentSize(primitives.totalSizeBytes),
       new Integer(primitives.localResponsibleCount),
-      new Integer(primitives.releasableCount),
       new Timestamp(primitives.updatedAt),
     );
   }
@@ -33,7 +31,6 @@ export class ContentReplicationStatusSummary {
     private readonly contentCount: Integer,
     private readonly totalSizeBytes: ContentSize,
     private readonly localResponsibleCount: Integer,
-    private readonly releasableCount: Integer,
     private readonly updatedAt: Timestamp,
   ) {}
 
@@ -46,7 +43,6 @@ export class ContentReplicationStatusSummary {
       contentCount: this.contentCount.valueOf(),
       localNodeId: this.localNodeId.valueOf(),
       localResponsibleCount: this.localResponsibleCount.valueOf(),
-      releasableCount: this.releasableCount.valueOf(),
       totalSizeBytes: this.totalSizeBytes.valueOf(),
       updatedAt: this.updatedAt.valueOf(),
     };

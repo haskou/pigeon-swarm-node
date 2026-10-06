@@ -21,6 +21,14 @@ export const pigeonEnvironmentSchema = {
   CALLS_TURN_URLS: { type: 'string' },
   CALLS_TURN_USERNAME: { type: 'string' },
   CONTAINER_BUILD: { defaultValue: false, type: 'boolean' },
+  CONTENT_REPLICATION_MAX_RECORDS_PER_IDENTITY: {
+    defaultValue: 10_000,
+    type: 'number',
+  },
+  CONTENT_REPLICATION_QUOTA_BYTES: {
+    defaultValue: 1024 ** 3,
+    type: 'number',
+  },
   DEBUG_NETWORK: { defaultValue: false, type: 'boolean' },
   IPFS_CONTENT_TIMEOUT_MS: { type: 'number' },
   IPFS_STORAGE_PATH: { defaultValue: './ipfs_storage', type: 'string' },
