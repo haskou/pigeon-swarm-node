@@ -1,7 +1,7 @@
 export type OrbitDBReplicatedDocumentStoreName =
   | 'calls'
   | 'communityOperations'
-  | 'conversations'
+  | 'conversationOperations'
   | 'identities'
   | 'contentReplication'
   | 'keychains'

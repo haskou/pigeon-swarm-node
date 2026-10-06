@@ -8,7 +8,6 @@ import RegisterCommunityReactionWhenAdded from '@app/apps/consumers/pubsub/commu
 import RegisterCommunityReactionWhenRemoved from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenRemoved';
 import RegisterCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageWhenAnnounced';
 import MarkMessagesReadWhenAnnounced from '@app/apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced';
-import RegisterConversationWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterConversationWhenAnnounced';
 import RegisterMessageDeletionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageDeletionWhenAnnounced';
 import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced';
 import RegisterMessageReactionWhenAdded from '@app/apps/consumers/pubsub/conversations/RegisterMessageReactionWhenAdded';
@@ -44,7 +43,6 @@ export const applicationConsumers: ApplicationServiceClass<Consumer>[] = [
   SynchronizeIdentityWhenUpdated,
   RegisterKeychainWhenPublished,
   SynchronizeKeychainWhenUpdated,
-  RegisterConversationWhenAnnounced,
   RegisterMessageWhenAnnounced,
   RegisterMessageEditionWhenAnnounced,
   RegisterMessageDeletionWhenAnnounced,

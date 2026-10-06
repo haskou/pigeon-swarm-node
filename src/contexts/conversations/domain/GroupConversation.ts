@@ -1,58 +1,20 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import { assert, PrimitiveOf } from '@haskou/value-objects';
+import { PrimitiveOf } from '@haskou/value-objects';
 
 import { Conversation } from './Conversation';
 import { Message } from './entities/messages/Message';
 import { MessageFactory } from './entities/messages/MessageFactory';
-import { GroupConversationMustHaveTwoParticipantsError } from './errors/GroupConversationMustHaveAtLeastTwoParticipantsError';
-import { ConversationWasCreatedEvent } from './events/ConversationWasCreatedEvent';
 import { ConversationId } from './value-objects/ConversationId';
 import { ConversationType } from './value-objects/ConversationType';
 import { GroupConversationName } from './value-objects/GroupConversationName';
 
+/**
+ * A group is never created or edited directly: its roster is the fold of the
+ * signed `ConversationOperation`s of its log, so it can shrink to its creator
+ * alone once everybody else left.
+ */
 export class GroupConversation extends Conversation {
-  private static hasAtLeastTwoDifferentParticipants(
-    participants: IdentityId[],
-  ): boolean {
-    const uniqueParticipants = participants.filter(
-      (participant, index) =>
-        participants.findIndex((candidate) =>
-          candidate.isEqual(participant),
-        ) === index,
-    );
-
-    return uniqueParticipants.length >= 2;
-  }
-
-  public static create(
-    name: GroupConversationName,
-    participants: IdentityId[],
-    networkId: NetworkId,
-  ): GroupConversation {
-    const conversation = new GroupConversation(
-      ConversationId.group(),
-      networkId,
-      name,
-      participants,
-    );
-
-    const primitives = conversation.toPrimitives();
-
-    conversation.record(
-      new ConversationWasCreatedEvent(primitives.id, {
-        name: primitives.name,
-        networkId: primitives.networkId,
-        participantIds: conversation
-          .getParticipantIds()
-          .map((participantId) => participantId.valueOf()),
-        type: primitives.type,
-      }),
-    );
-
-    return conversation;
-  }
-
   public static fromPrimitives(
     primitives: PrimitiveOf<Conversation>,
   ): GroupConversation {
@@ -66,6 +28,8 @@ export class GroupConversation extends Conversation {
       primitives.messages.map((message) =>
         MessageFactory.fromPrimitives(message),
       ),
+      primitives.creatorId ? new IdentityId(primitives.creatorId) : undefined,
+      (primitives.adminIds ?? []).map((adminId) => new IdentityId(adminId)),
     );
   }
 
@@ -75,12 +39,18 @@ export class GroupConversation extends Conversation {
     name: GroupConversationName,
     participants: IdentityId[],
     messages: Message[] = [],
+    creatorId: IdentityId | undefined = undefined,
+    adminIds: IdentityId[] = [],
   ) {
-    super(id, networkId, ConversationType.GROUP, participants, name, messages);
-
-    assert(
-      GroupConversation.hasAtLeastTwoDifferentParticipants(participants),
-      new GroupConversationMustHaveTwoParticipantsError(),
+    super(
+      id,
+      networkId,
+      ConversationType.GROUP,
+      participants,
+      name,
+      messages,
+      creatorId,
+      adminIds,
     );
   }
 }

@@ -6,7 +6,6 @@ import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/e
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
-import { ConversationWasCreatedEvent } from '@app/contexts/conversations/domain/events/ConversationWasCreatedEvent';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageEditOptions } from '@app/contexts/conversations/domain/value-objects/MessageEditOptions';
@@ -65,7 +64,9 @@ describe('Conversation', () => {
         messageId: message.getId().valueOf(),
         mutationProof: messageProof().toPrimitives(),
         networkId: mother.networkId.valueOf(),
-        participantIds: [author.valueOf(), recipient.valueOf()],
+        participantIds: conversation
+          .getParticipantIds()
+          .map((id) => id.valueOf()),
       });
     });
 
@@ -162,14 +163,6 @@ describe('Conversation', () => {
     });
   });
 
-  describe('create', () => {
-    it('should record a created domain event', () => {
-      expect(conversation.pullDomainEvents()).toEqual([
-        expect.any(ConversationWasCreatedEvent),
-      ]);
-    });
-  });
-
   describe('editMessage', () => {
     it('should add an edited message', () => {
       const sent = conversation.sendMessage(
@@ -198,7 +191,9 @@ describe('Conversation', () => {
         messageId: edited.getId().valueOf(),
         mutationProof: messageProof().toPrimitives(),
         networkId: mother.networkId.valueOf(),
-        participantIds: [author.valueOf(), recipient.valueOf()],
+        participantIds: conversation
+          .getParticipantIds()
+          .map((id) => id.valueOf()),
         targetMessageId: sent.getId().valueOf(),
       });
     });
@@ -301,7 +296,9 @@ describe('Conversation', () => {
         messageId: deleted.getId().valueOf(),
         mutationProof: messageProof().toPrimitives(),
         networkId: mother.networkId.valueOf(),
-        participantIds: [author.valueOf(), recipient.valueOf()],
+        participantIds: conversation
+          .getParticipantIds()
+          .map((id) => id.valueOf()),
         targetMessageId: sent.getId().valueOf(),
       });
     });

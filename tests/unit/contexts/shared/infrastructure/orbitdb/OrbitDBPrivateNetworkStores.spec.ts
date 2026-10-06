@@ -90,7 +90,7 @@ describe('OrbitDBPrivateNetworkStores', () => {
       'calls',
       'communityOperations',
       'contentReplication',
-      'conversations',
+      'conversationOperations',
       'heads',
       'identities',
       'keychains',

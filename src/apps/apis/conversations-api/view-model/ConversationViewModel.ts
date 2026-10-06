@@ -12,6 +12,8 @@ export class ConversationViewModel {
     const primitives = this.conversation.toPrimitives();
 
     return {
+      adminIds: primitives.adminIds,
+      creatorId: primitives.creatorId,
       id: primitives.id,
       name: primitives.name,
       networkId: primitives.networkId,

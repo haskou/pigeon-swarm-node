@@ -26,7 +26,7 @@ function fakeStores(): OrbitDBPrivateNetworkStores {
     calls: fakeStore(),
     communityOperations: fakeStore(),
     contentReplication: fakeStore(),
-    conversations: fakeStore(),
+    conversationOperations: fakeStore(),
     getSynchronizationStores: jest.fn().mockReturnValue([]),
     heads: fakeStore(),
     identities: fakeStore(),
@@ -168,7 +168,7 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     for (const store of [
       stores.calls,
       stores.communityOperations,
-      stores.conversations,
+      stores.conversationOperations,
       stores.identities,
       stores.keychains,
       stores.messages,

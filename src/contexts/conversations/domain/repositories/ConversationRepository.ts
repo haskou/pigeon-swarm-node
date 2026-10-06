@@ -6,6 +6,7 @@ import { Conversation } from '../Conversation';
 import { ConversationMessagesAround } from '../ConversationMessagesAround';
 import { Message } from '../entities/messages/Message';
 import { OneToOneConversation } from '../OneToOneConversation';
+import { ConversationOperation } from '../operations/ConversationOperation';
 import { ConversationId } from '../value-objects/ConversationId';
 import { MessageId } from '../value-objects/MessageId';
 
@@ -23,11 +24,25 @@ export default abstract class ConversationRepository {
     messageId: MessageId,
   ): Promise<Message | undefined>;
 
+  /**
+   * The conversations `participantId` belongs to in the folded state, newest
+   * first. The participant index is local: it is the fold of the cached logs.
+   */
   public abstract findByParticipant(
     participantId: IdentityId,
     limit: number,
     beforeConversationId?: ConversationId,
   ): Promise<Conversation[]>;
+
+  /** The operations nobody built on yet: the parents of the next operation. */
+  public abstract findFrontier(
+    conversationId: ConversationId,
+  ): Promise<string[]>;
+
+  /** Every stored operation of the conversation log, in no particular order. */
+  public abstract findOperations(
+    conversationId: ConversationId,
+  ): Promise<ConversationOperation[]>;
 
   public abstract findLatestMessages(
     conversationId: ConversationId,
@@ -83,12 +98,22 @@ export default abstract class ConversationRepository {
   ): Promise<void>;
 
   /**
-   * Persists the conversation. Every message that is new to the replicated
-   * store is written together with its client-signed proof, keyed by message
-   * id; a new message without a proof is rejected.
+   * Persists the new messages of the conversation. Every message that is new
+   * to the replicated store is written together with its client-signed proof,
+   * keyed by message id; a new message without a proof is rejected. The
+   * conversation itself (participants and roles) is never written here.
    */
   public abstract save(
     conversation: Conversation,
     proofs?: ReadonlyMap<string, PublicMutationProof>,
+  ): Promise<void>;
+
+  /**
+   * Persists one client-signed operation of a conversation log (the genesis
+   * creation record included) with its proof.
+   */
+  public abstract saveOperation(
+    operation: ConversationOperation,
+    proof: PublicMutationProof,
   ): Promise<void>;
 }

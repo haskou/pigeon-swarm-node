@@ -1,7 +1,7 @@
 export type OrbitDBPrivateNetworkStoreAddresses = {
   calls: string;
   communityOperations: string;
-  conversations: string;
+  conversationOperations: string;
   heads: string;
   identities: string;
   contentReplication: string;

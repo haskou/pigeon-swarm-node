@@ -6,42 +6,14 @@ import { Conversation } from './Conversation';
 import { Message } from './entities/messages/Message';
 import { MessageFactory } from './entities/messages/MessageFactory';
 import { ConversationMustHaveTwoDifferentParticipantsError } from './errors/ConversationMustHaveTwoDifferentParticipantsError';
-import { ConversationWasCreatedEvent } from './events/ConversationWasCreatedEvent';
 import { ConversationId } from './value-objects/ConversationId';
 import { ConversationType } from './value-objects/ConversationType';
 
+/**
+ * A 1:1 conversation is immutable: its two participants are fixed by the
+ * genesis record signed by the creator, and no operation can change them.
+ */
 export class OneToOneConversation extends Conversation {
-  public static create(
-    firstParticipant: IdentityId,
-    secondParticipant: IdentityId,
-    networkId: NetworkId,
-  ): OneToOneConversation {
-    const conversation = new OneToOneConversation(
-      ConversationId.deterministic(
-        firstParticipant,
-        secondParticipant,
-        networkId,
-      ),
-      networkId,
-      ConversationType.ONE_TO_ONE,
-      [firstParticipant, secondParticipant],
-    );
-
-    const primitives = conversation.toPrimitives();
-
-    conversation.record(
-      new ConversationWasCreatedEvent(primitives.id, {
-        networkId: primitives.networkId,
-        participantIds: conversation
-          .getParticipantIds()
-          .map((participantId) => participantId.valueOf()),
-        type: primitives.type,
-      }),
-    );
-
-    return conversation;
-  }
-
   public static fromPrimitives(
     primitives: PrimitiveOf<Conversation>,
   ): OneToOneConversation {
@@ -56,6 +28,7 @@ export class OneToOneConversation extends Conversation {
       primitives.messages.map((message) =>
         MessageFactory.fromPrimitives(message),
       ),
+      primitives.creatorId ? new IdentityId(primitives.creatorId) : undefined,
     );
   }
 
@@ -66,8 +39,9 @@ export class OneToOneConversation extends Conversation {
     participants: IdentityId[],
     name: undefined = undefined,
     messages: Message[] = [],
+    creatorId: IdentityId | undefined = undefined,
   ) {
-    super(id, networkId, type, participants, name, messages);
+    super(id, networkId, type, participants, name, messages, creatorId);
 
     assert(
       participants.length === 2 && participants[0].isNotEqual(participants[1]),
