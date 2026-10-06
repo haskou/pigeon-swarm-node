@@ -1282,13 +1282,9 @@ export default class Definitions {
       const signed = signCallStart({
         networkId,
         nonce,
-        // The node records the creator first, then the roster order.
-        participantIds: [
-          signer.id,
-          ...(conversation?.getParticipantIds() ?? [])
-            .map((id) => id.valueOf())
-            .filter((id) => id !== signer.id),
-        ],
+        participantIds: (conversation?.getParticipantIds() ?? [])
+          .map((id) => id.valueOf())
+          .sort(),
         scope: {
           conversationId: String(body.conversationId),
           type: 'conversation',

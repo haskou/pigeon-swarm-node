@@ -336,7 +336,7 @@ async function main(): Promise<void> {
   const start = signCallStart({
     networkId,
     nonce: NONCE(1),
-    participantIds: call.toPrimitives().participantIds,
+    participantIds,
     scope,
     signer: owner,
     startedAt,

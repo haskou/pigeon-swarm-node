@@ -222,7 +222,7 @@ async function main(): Promise<void> {
     const signedStart = signCallStart({
       networkId: NETWORK_ID,
       nonce: callNonce,
-      participantIds: [nodeAIdentity.id, nodeBIdentity.id],
+      participantIds: [nodeAIdentity.id, nodeBIdentity.id].sort(),
       scope: { conversationId: conversation.id, type: 'conversation' },
       signer: nodeAIdentity,
       startedAt: callStartedAt,

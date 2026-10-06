@@ -878,6 +878,10 @@ is `joined` for a join and `left` for a leave; a leave while the participant is
 still `ringing` must be signed as `declined`, which is the state the node derives
 for that request. The signed `at` is the `at` of the request.
 
+A conversation call with two or fewer participants ends when one of them leaves
+(the fold derives the end from the signed leave); a larger group call stays
+active until its last joined participant leaves or the creator ends it.
+
 Implemented:
 
 - joining requires the authenticated identity to be an allowed participant for
