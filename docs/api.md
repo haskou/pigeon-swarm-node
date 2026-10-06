@@ -2266,6 +2266,13 @@ again at that point, so concurrent conflicting changes converge on every node:
 for example a role grant by a member that a concurrent ban ordered earlier is
 skipped. The last member leaving deletes the community and nothing revives it.
 
+Limits: `args` is at most 4096 bytes of JSON and an identity signs at most 1000
+operations per community. Both are decided from the signed operation and its
+causal past, so every node agrees. A route that would exceed either answers `409`
+with code `CommunityOperationLimitExceededError` (`Community operation limit
+exceeded`) and stores nothing. An operation another author signed concurrently
+beyond that quota is skipped by the fold on every node without any error.
+
 | Route | action | `args` |
 | --- | --- | --- |
 | `POST /communities` | `community_created` | `{nonce, name, description, visibility, discoverable, autoJoinEnabled, avatar?, banner?}` |

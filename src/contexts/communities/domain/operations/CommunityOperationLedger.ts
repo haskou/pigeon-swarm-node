@@ -4,6 +4,7 @@ import { Community } from '../Community';
 import { InvalidCommunityOperationError } from '../errors/InvalidCommunityOperationError';
 import { CommunityOperation } from './CommunityOperation';
 import { CommunityOperationApplier } from './CommunityOperationApplier';
+import { CommunityOperationLimits } from './CommunityOperationLimits';
 import { CommunityStateFold } from './CommunityStateFold';
 
 /**
@@ -12,6 +13,9 @@ import { CommunityStateFold } from './CommunityStateFold';
  * the permission at that point of history, or a parent nobody has seen) is
  * refused before it is stored anywhere.
  *
+ * An identity may sign a bounded number of operations of the causal past of
+ * each new one (see `CommunityOperationLimits`): later ones are refused.
+ *
  * The state after the latest admitted operations is remembered, so a linear
  * history is admitted in constant work instead of folding it again.
  */
@@ -19,6 +23,9 @@ export class CommunityOperationLedger {
   private static readonly MAX_REMEMBERED_STATES = 64;
 
   private readonly operations = new Map<string, CommunityOperation>();
+
+  /** Admitted operations per author, whatever branch they are on. */
+  private readonly signed = new Map<string, number>();
 
   private readonly states = new Map<string, PrimitiveOf<Community>>();
 
@@ -34,6 +41,30 @@ export class CommunityOperationLedger {
     CommunityOperationApplier.apply(community, candidate);
 
     return community;
+  }
+
+  /**
+   * Only an author with a quota of operations on some branch can have it in
+   * the past of a candidate, so the past is walked for those authors alone.
+   */
+  private assertWithinQuota(candidate: CommunityOperation): void {
+    const author = candidate.getAuthorIdentityId().valueOf();
+
+    if (
+      !CommunityOperationLimits.isAuthorQuotaReached(
+        this.signed.get(author) ?? 0,
+      )
+    ) {
+      return;
+    }
+
+    CommunityOperationLimits.assertAuthorQuota(
+      CommunityStateFold.closureOf(
+        [...this.operations.values()],
+        candidate.getParents(),
+      ),
+      candidate,
+    );
   }
 
   /** The community folded from the causal past of `parents`, inclusive. */
@@ -74,11 +105,15 @@ export class CommunityOperationLedger {
   public admit(candidate: CommunityOperation): void {
     if (this.has(candidate)) return;
 
+    if (!candidate.isGenesis()) this.assertWithinQuota(candidate);
+
     const community = candidate.isGenesis()
       ? CommunityOperationApplier.create(candidate)
       : this.applyToPast(candidate);
+    const author = candidate.getAuthorIdentityId().valueOf();
 
     this.operations.set(candidate.getHash(), candidate);
+    this.signed.set(author, (this.signed.get(author) ?? 0) + 1);
     this.remember(candidate.getHash(), community);
   }
 }

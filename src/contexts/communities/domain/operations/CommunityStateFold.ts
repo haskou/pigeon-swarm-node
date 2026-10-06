@@ -4,6 +4,7 @@ import { Community } from '../Community';
 import { InvalidCommunityOperationError } from '../errors/InvalidCommunityOperationError';
 import { CommunityOperation } from './CommunityOperation';
 import { CommunityOperationApplier } from './CommunityOperationApplier';
+import { CommunityOperationLimits } from './CommunityOperationLimits';
 import { CommunityState } from './CommunityState';
 
 /**
@@ -12,6 +13,10 @@ import { CommunityState } from './CommunityState';
  * lowest digest first among concurrent ones), and each one is authorized again
  * against the state it applies to, so concurrent conflicting operations
  * converge on every node without any wall clock.
+ *
+ * An identity other than the founder (the genesis author) signs a bounded number of operations per
+ * community: the ones ordered after its quota are skipped, whether or not they
+ * were permitted.
  */
 export class CommunityStateFold {
   /** Operations whose parents are all known, deduplicated by digest. */
@@ -39,6 +44,31 @@ export class CommunityStateFold {
     }
 
     return resolvable;
+  }
+
+  /**
+   * Tells, for each operation of `ordered` taken in that order, whether its
+   * author still has quota left. The founder, who authors the genesis, has none.
+   */
+  private static quotaOf(
+    ordered: CommunityOperation[],
+  ): (operation: CommunityOperation) => boolean {
+    const signed = new Map<string, number>();
+    const founder = ordered
+      .find((operation) => operation.isGenesis())
+      ?.getAuthorIdentityId();
+
+    return (operation) => {
+      const author = operation.getAuthorIdentityId();
+      const count = signed.get(author.valueOf()) ?? 0;
+
+      signed.set(author.valueOf(), count + 1);
+
+      return (
+        !!founder?.isEqual(author) ||
+        !CommunityOperationLimits.isAuthorQuotaReached(count)
+      );
+    };
   }
 
   /** Parents first; the lowest digest first among the ready operations. */
@@ -128,11 +158,12 @@ export class CommunityStateFold {
   public static fold(operations: CommunityOperation[]): CommunityState {
     const ordered = CommunityStateFold.orderOf(operations);
     const skipped: string[] = [];
+    const withinQuota = CommunityStateFold.quotaOf(ordered);
     let community: Community | undefined;
     let deleted = false;
 
     for (const operation of ordered) {
-      if (deleted) {
+      if (!withinQuota(operation) || deleted) {
         skipped.push(operation.getHash());
         continue;
       }

@@ -299,6 +299,30 @@ a `reference` that must resolve to signed `requests` records: an accepted
 operation with an unknown parent or unreplicated evidence is not stored; its head
 is demoted and re-admitted after 2 s, 10 s and 60 s.
 
+Limits: a member that holds a valid device can sign as many operations as it likes,
+and every replica stores and folds all of them, so growth is bounded by two rules
+that depend only on the signed record and its causal past, never on the clock or the
+arrival order (`CommunityOperationLimits`):
+
+- `args` is at most 4096 bytes of JSON (`MAX_ARGUMENT_BYTES`). An operation above it
+  is not an operation: it is refused wherever a record is read (`write`, replicated
+  read, head hydration) and the client gets `CommunityOperationLimitExceededError`.
+  The `parents` bound stays 64 digests.
+- An identity other than the founder (the genesis author, trusted by construction and the one that approves every member) signs at most 1000 operations per community (`MAX_OPERATIONS_PER_AUTHOR`).
+  The ledger refuses an operation when its causal past already holds 1000 of its
+  author's operations, and the fold skips every operation of an author ordered after
+  that author's 1000th (see *Community operation fold*). Operations of other branches
+  that the author signed concurrently are invisible to admission, so the fold is the
+  rule that decides; admission is only the cheap early refusal.
+
+Operations are never pruned: any honest operation can name any stored one as parent,
+and a node that forgot it would reject the children. There is no snapshot or
+compaction, so a community stores at most 1000 operations per member that ever
+signed in it (genesis author included), each at most about 4 KiB plus the parents
+and proof; operations skipped by the fold still occupy that space. Banning or
+kicking a member does not remove what it signed, and a member that leaves and
+rejoins keeps its count.
+
 Replication: operations travel as one index head per community
 (`community-operation-index:<communityId>`) holding the operation records by id.
 Replicas author operations concurrently, so two heads of one community never
@@ -333,6 +357,10 @@ Conflict rules:
   `updatedAt` in the replicated record that could win instead.
 - An operation that names a parent no node has seen is not part of any state until
   the parent arrives.
+- An operation ordered after the 1000th operation of its author in the community is
+  skipped, permitted or not, so a flooding member only wastes its own quota; the
+  other authors' operations keep applying. The order is the same total order, so the
+  skipped set is identical on every replica whatever the arrival order.
 
 ### Trust boundaries
 
