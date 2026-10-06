@@ -304,6 +304,10 @@ services:
     arguments:
       - >-
         @contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataProjection
+  contexts/calls/application/attest-event/CallEventAttestor:
+    class: /contexts/calls/application/attest-event/CallEventAttestor
+    arguments:
+      - '@contexts/calls/domain/repositories/CallRepository'
   contexts/calls/application/expire-signal-deliveries/CallSignalDeliveryExpirationRegistrar:
     class: >-
       /contexts/calls/application/expire-signal-deliveries/CallSignalDeliveryExpirationRegistrar
@@ -1373,12 +1377,6 @@ services:
       - '@shared/infrastructure/messageBus/DomainEventConsumer'
       - '@contexts/push-notifications/application/send/PushNotificationDispatcher'
     parent: apps/consumers/pubsub/push/SendPushNotificationWhenEventReceived
-  apps/consumers/pubsub/push/SendPushNotificationWhenCallStarted:
-    class: /apps/consumers/pubsub/push/SendPushNotificationWhenCallStarted
-    arguments:
-      - '@shared/infrastructure/messageBus/DomainEventConsumer'
-      - '@contexts/push-notifications/application/send/PushNotificationDispatcher'
-    parent: apps/consumers/pubsub/push/SendPushNotificationWhenEventReceived
   apps/consumers/pubsub/push/SendPushNotificationWhenCommunityMessageSent:
     class: /apps/consumers/pubsub/push/SendPushNotificationWhenCommunityMessageSent
     arguments:
@@ -1749,6 +1747,13 @@ services:
       - '@apps/apis/calls-api/CallRelayRecordDiscovery'
       - '@apps/apis/calls-api/CallRelayRecordSigner'
       - '@apps/apis/calls-api/FederatedCallRelayCredentials'
+  apps/consumers/pubsub/push/SendPushNotificationWhenCallStarted:
+    class: /apps/consumers/pubsub/push/SendPushNotificationWhenCallStarted
+    arguments:
+      - '@shared/infrastructure/messageBus/DomainEventConsumer'
+      - '@contexts/push-notifications/application/send/PushNotificationDispatcher'
+      - '@contexts/calls/application/attest-event/CallEventAttestor'
+    parent: apps/consumers/pubsub/push/SendPushNotificationWhenEventReceived
   apps/initializers/keychains/KeychainMutationGateInitializer:
     class: /apps/initializers/keychains/KeychainMutationGateInitializer
     arguments:

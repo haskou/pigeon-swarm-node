@@ -314,6 +314,10 @@ export default class OrbitDBCallRepository extends CallRepository {
     return this.put(call, this.endRecord(call), proof);
   }
 
+  public awaitUpdate(id: CallId, timeoutMs: number): Promise<boolean> {
+    return this.callProjection.awaitUpdate(id, timeoutMs);
+  }
+
   public markTimedOut(call: Call): Promise<void> {
     this.callProjection.markTimedOut(
       call.getId(),

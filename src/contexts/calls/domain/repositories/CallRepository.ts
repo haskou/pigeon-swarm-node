@@ -57,6 +57,12 @@ export default abstract class CallRepository {
     proof: PublicMutationProof,
   ): Promise<void>;
 
+  /**
+   * Resolves true once another signed record of the call is admitted, false on
+   * timeout (or when too many callers are already waiting).
+   */
+  public abstract awaitUpdate(id: CallId, timeoutMs: number): Promise<boolean>;
+
   /** Marks a ringing call as missed on this node only; nothing replicates. */
   public abstract markTimedOut(call: Call): Promise<void>;
 }

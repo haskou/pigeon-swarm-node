@@ -420,6 +420,11 @@ export class Call extends AggregateRoot {
     return missedParticipants.map((participant) => participant.getIdentityId());
   }
 
+  /** The event attributes this call derives from its own admitted state. */
+  public toEventAttributes(): Record<string, unknown> {
+    return this.baseEventAttributes();
+  }
+
   public shouldRecordMissedCall(): boolean {
     return this.scope.isConversation();
   }

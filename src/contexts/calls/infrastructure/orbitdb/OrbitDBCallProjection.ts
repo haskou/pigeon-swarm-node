@@ -26,6 +26,8 @@ const SCOPE_TYPES = ['call_start', 'call_participant', 'call_end'];
  * derived from the records and local timeout marks on every node.
  */
 export default class OrbitDBCallProjection {
+  private static readonly MAX_WAITERS = 256;
+
   private readonly folded = new Map<string, FoldedCall>();
 
   private readonly records = new Map<string, CallRecords>();
@@ -41,6 +43,10 @@ export default class OrbitDBCallProjection {
   private readonly communityChannelCallIds = new Map<string, Set<string>>();
 
   private readonly creatorScopeCallIds = new Map<string, Set<string>>();
+
+  private readonly waiters = new Map<string, Set<() => void>>();
+
+  private waiterCount = 0;
 
   private ready = false;
 
@@ -217,6 +223,17 @@ export default class OrbitDBCallProjection {
 
     this.store(callId, record);
     this.refold(callId);
+    this.notifyWaiters(callId);
+  }
+
+  private notifyWaiters(callId: string): void {
+    const waiting = this.waiters.get(callId);
+
+    if (!waiting) return;
+
+    this.waiters.delete(callId);
+
+    for (const wake of waiting) wake();
   }
 
   /** Ends a folded call that outlived the maximum duration. */
@@ -235,68 +252,48 @@ export default class OrbitDBCallProjection {
     return this.withinDuration(folded).status === 'active';
   }
 
+  private liveCalls(callIds: Set<string> | undefined): FoldedCall[] {
+    return [...(callIds ?? [])]
+      .map((id) => this.folded.get(id))
+      .filter(
+        (candidate): candidate is FoldedCall =>
+          candidate !== undefined && this.isLive(candidate),
+      );
+  }
+
+  private startedAfter(candidate: FoldedCall, other: FoldedCall): boolean {
+    const [left, right] = [candidate.primitives, other.primitives];
+
+    return (
+      left.createdAt > right.createdAt ||
+      (left.createdAt === right.createdAt && left.id > right.id)
+    );
+  }
+
+  private isLatestOfCreator(folded: FoldedCall): boolean {
+    return !this.liveCalls(
+      this.creatorScopeCallIds.get(this.creatorScopeKey(folded.primitives)),
+    ).some((candidate) => this.startedAfter(candidate, folded));
+  }
+
   /**
    * One live call per creator and scope (the latest start) and, in a community
    * channel, the live start with the lowest digest. Every other start of that
    * scope is a loser that reads as ended on every node alike.
    */
   private isSuperseded(folded: FoldedCall): boolean {
-    const { primitives } = folded;
-    const sameCreator = [
-      ...(this.creatorScopeCallIds.get(this.creatorScopeKey(primitives)) ?? []),
-    ]
-      .map((id) => this.folded.get(id))
-      .filter(
-        (candidate): candidate is FoldedCall =>
-          candidate !== undefined && this.isLive(candidate),
-      );
-    const latest = sameCreator.reduce((best, candidate) =>
-      candidate.primitives.createdAt > best.primitives.createdAt ||
-      (candidate.primitives.createdAt === best.primitives.createdAt &&
-        candidate.primitives.id > best.primitives.id)
-        ? candidate
-        : best,
-    );
+    if (!this.isLatestOfCreator(folded)) return true;
 
-    if (latest.primitives.id !== primitives.id) return true;
-
-    const channelKey = this.communityChannelKey(primitives);
+    const channelKey = this.communityChannelKey(folded.primitives);
 
     if (!channelKey) return false;
 
-    const survivors = [...(this.communityChannelCallIds.get(channelKey) ?? [])]
-      .map((id) => this.folded.get(id))
-      .filter(
-        (candidate): candidate is FoldedCall =>
-          candidate !== undefined &&
-          this.isLive(candidate) &&
-          !this.isLatestOfCreatorOnly(candidate),
-      );
-
-    return survivors.some(
+    return this.liveCalls(this.communityChannelCallIds.get(channelKey)).some(
       (candidate) =>
-        candidate.primitives.id !== primitives.id &&
+        candidate.primitives.id !== folded.primitives.id &&
+        this.isLatestOfCreator(candidate) &&
         candidate.digest < folded.digest,
     );
-  }
-
-  /** True when a newer live start of the same creator and scope replaces it. */
-  private isLatestOfCreatorOnly(folded: FoldedCall): boolean {
-    const { primitives } = folded;
-
-    return [
-      ...(this.creatorScopeCallIds.get(this.creatorScopeKey(primitives)) ?? []),
-    ]
-      .map((id) => this.folded.get(id))
-      .some(
-        (candidate) =>
-          candidate !== undefined &&
-          candidate.primitives.id !== primitives.id &&
-          this.isLive(candidate) &&
-          (candidate.primitives.createdAt > primitives.createdAt ||
-            (candidate.primitives.createdAt === primitives.createdAt &&
-              candidate.primitives.id > primitives.id)),
-      );
   }
 
   private resolve(callId: string): CallPrimitives | undefined {
@@ -333,6 +330,44 @@ export default class OrbitDBCallProjection {
       });
 
     await this.startPromise;
+  }
+
+  /**
+   * Resolves true when another signed record of the call is admitted and false
+   * on timeout or when too many waiters are pending: a bound against claims
+   * about calls that never arrive.
+   */
+  public awaitUpdate(callId: CallId, timeoutMs: number): Promise<boolean> {
+    if (this.waiterCount >= OrbitDBCallProjection.MAX_WAITERS) {
+      return Promise.resolve(false);
+    }
+
+    return new Promise<boolean>((resolve) => {
+      const key = callId.valueOf();
+      const waiting = this.waiters.get(key) ?? new Set<() => void>();
+      const waiter = {
+        timer: undefined as NodeJS.Timeout | undefined,
+        wake: (): void => {
+          clearTimeout(waiter.timer);
+          this.waiterCount--;
+          resolve(true);
+        },
+      };
+
+      waiter.timer = setTimeout(() => {
+        waiting.delete(waiter.wake);
+
+        if (waiting.size === 0 && this.waiters.get(key) === waiting) {
+          this.waiters.delete(key);
+        }
+
+        this.waiterCount--;
+        resolve(false);
+      }, timeoutMs);
+      waiting.add(waiter.wake);
+      this.waiters.set(key, waiting);
+      this.waiterCount++;
+    });
   }
 
   /** Marks a ringing call as missed on this node; nothing replicates. */
