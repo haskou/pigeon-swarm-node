@@ -11,6 +11,7 @@ import { ContentReplicationContext } from '../../domain/value-objects/ContentRep
 import ReplicatedContentStorage from '../content-storage/ReplicatedContentStorage';
 import ContentReplicationStatusFinder from '../find-status/ContentReplicationStatusFinder';
 import { ReplicatedContentStatus } from '../find-status/ReplicatedContentStatus';
+import { maxContentSizeBytes } from '../publish-content/ContentUploadLimits';
 import ContentReplicationStatusSummaryUpdater from '../update-status-summary/ContentReplicationStatusSummaryUpdater';
 import { ContentNetworkReplicationStatus } from './ContentNetworkReplicationStatus';
 import { ContentReplicationMaintenanceResult } from './ContentReplicationMaintenanceResult';
@@ -91,10 +92,16 @@ export default class ContentReplicationMaintainer {
       return 0;
     }
 
+    const maxBytes = Math.min(content.sizeBytes, maxContentSizeBytes);
+
     if (context.isReplicatedAsBytes()) {
-      await this.contentStorage.findBytesInNetwork(cid, networkId);
+      await this.contentStorage.findBytesInNetwork(cid, networkId, maxBytes);
     } else {
-      await this.contentStorage.findJSONInNetwork<unknown>(cid, networkId);
+      await this.contentStorage.findJSONInNetwork<unknown>(
+        cid,
+        networkId,
+        maxBytes,
+      );
     }
 
     await this.contentStorage.provideInNetwork(cid, networkId);

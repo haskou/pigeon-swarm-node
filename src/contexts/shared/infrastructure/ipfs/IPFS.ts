@@ -170,12 +170,13 @@ export default class IPFS {
   public async getJSONFromNetwork<T>(
     cid: IPFSId,
     networkId: string,
+    maxBytes?: number,
   ): Promise<T> {
     await this.initialize();
 
     const network = this.registry.find(networkId);
 
-    return network.getJSON<T>(cid);
+    return network.getJSON<T>(cid, undefined, maxBytes);
   }
 
   public async getJSONFromNetworks<T>(
@@ -195,12 +196,13 @@ export default class IPFS {
   public async getBytesFromNetwork(
     cid: IPFSId,
     networkId: string,
+    maxBytes?: number,
   ): Promise<Buffer> {
     await this.initialize();
 
     const network = this.registry.find(networkId);
 
-    return network.getBytes(cid);
+    return network.getBytes(cid, undefined, maxBytes);
   }
 
   public async getBytesFromNetworks(
