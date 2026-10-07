@@ -4580,9 +4580,24 @@ Implemented:
   `missed-call:<callId>:<recipientIdentityId>`, and `GET /notifications` merges
   them with the replicated invitations
 - rate cap: at most `NOTIFICATIONS_RECORD_RATE_LIMIT_PER_MINUTE` (default 30)
-  notification records per identity per minute, enforced on the write path
-  (`429`, code `429020`); the replication gate cannot rate-limit
-  deterministically
+  notification records per identity per minute, enforced on the write path of
+  the local node (`429`, code `429020`). A per-minute window cannot be enforced
+  by the replication gate, because notification records carry no signed time
+  and nodes that receive the same records at different moments would admit
+  different ones
+- replication quota: the gate bounds what it keeps per author instead. It
+  admits at most `NOTIFICATIONS_MAX_INVITATIONS_PER_IDENTITY` (default 10000)
+  invitations per inviter and `NOTIFICATIONS_MAX_STATES_PER_IDENTITY` (default
+  30000) state records per recipient. The budget is deterministic: the genuine
+  records of one author sort by id and the first ones that fit are admitted, so
+  the verdict depends only on the stored records, never on arrival order. Only
+  records whose proof verifies for their own payload count, so a forged record
+  cannot use up another identity's quota. A validly signed record that the
+  policy refuses for another reason still counts against its author. A
+  malicious replica can therefore still publish up to the quota for every
+  identity it controls, and identity creation is not yet bounded (see
+  haskou/pigeon-swarm-node#384); the quota only caps what any single identity
+  can make an honest node retain
 - `notification-recipient-index:<id>` heads are no longer replicated and are
   refused by the gate; the recipient list is rebuilt locally from the records
 
@@ -4615,7 +4630,8 @@ Implemented:
 - allow recipient-only accept and decline; the author must be the invitation
   recipient
 - mark accepted or declined notifications as read
-- same write-path rate cap as creation, counted per recipient
+- same write-path rate cap as creation, counted per recipient, and the state
+  records of one recipient count against the replication quota above
 
 ## Notification Settings HTTP API
 

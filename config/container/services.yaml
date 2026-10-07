@@ -1169,6 +1169,7 @@ services:
       /contexts/notifications/infrastructure/orbitdb/policies/NotificationStateMutationPolicy
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/polls/application/authorize-poll-scope/PollScopeAuthorizer:
     class: /contexts/polls/application/authorize-poll-scope/PollScopeAuthorizer
@@ -1678,6 +1679,8 @@ services:
     arguments:
       - '@contexts/conversations/domain/repositories/ConversationRepository'
       - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/private-authorization/infrastructure/local-db/LocalPrivateAuthorizationRepository:
     class: >-

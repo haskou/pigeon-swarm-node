@@ -7,20 +7,34 @@ import { ConversationId } from '@app/contexts/conversations/domain/value-objects
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain/PublicMutationRecordShape';
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
-import { PublicMutationExpectation } from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
+import PublicMutationVerifier, {
+  PublicMutationExpectation,
+} from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 import { ShortLivedLookup } from '@app/contexts/public-mutations/infrastructure/ShortLivedLookup';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
+import { NotificationReplicationLimits } from '../../../domain/NotificationReplicationLimits';
 import { EncryptedCommunityKey } from '../../../domain/value-objects/EncryptedCommunityKey';
 import { EncryptedConversationKey } from '../../../domain/value-objects/EncryptedConversationKey';
 import { InvitationNonce } from '../../../domain/value-objects/InvitationNonce';
 import { NotificationId } from '../../../domain/value-objects/NotificationId';
 import { NotificationType } from '../../../domain/value-objects/NotificationType';
+import { GenuineRecordQuota } from './GenuineRecordQuota';
 
 /**
  * An invitation is admitted only when its inviter signed it, its id is derived
- * from the inviter, recipient, subject and nonce, and the signed community or
- * conversation state lets the inviter invite that recipient.
+ * from the inviter, recipient, subject and nonce, the signed community or
+ * conversation state lets the inviter invite that recipient, and the inviter is
+ * still within the invitation quota.
+ *
+ * Invitations carry no signed time, and a node only sees them when they reach
+ * it, so a per-minute window would admit different records on different
+ * nodes. The replication gate bounds the total instead: the genuine
+ * invitations of one inviter are ordered by id and only the first
+ * `limits.maxInvitations` are admitted. The verdict depends only on the set of
+ * stored records, so every node reaches the same one whatever order they
+ * arrived in. The per-minute rate cap stays a local write-path control.
  */
 export default class NotificationInvitationMutationPolicy extends PublicMutationPolicy {
   private static readonly TYPES = [
@@ -45,11 +59,15 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
 
   private readonly communities = new ShortLivedLookup<Community | undefined>();
 
+  private readonly quota: GenuineRecordQuota;
+
   private readonly conversations = new ShortLivedLookup<
     Conversation | undefined
   >();
 
   public readonly collection = 'notifications';
+
+  public limits = NotificationReplicationLimits.fromEnvironment();
 
   public readonly scopeType = 'notification_invitation';
 
@@ -57,8 +75,11 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
     private readonly conversationRepository: ConversationRepository,
     /** Reads the public store directly: the policy runs inside the community storage lock. */
     private readonly communityRepository: OrbitDBCommunityRepository,
+    registry: OrbitDBReplicatedStateRegistry,
+    verifier: PublicMutationVerifier,
   ) {
     super();
+    this.quota = new GenuineRecordQuota(this.collection, registry, verifier);
   }
 
   private async assertCommunityInviter(
@@ -161,6 +182,13 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
       } else {
         await this.assertConversationParticipants(record, authorIdentityId);
       }
+
+      await this.quota.assertWithin(record, {
+        authorField: 'inviterIdentityId',
+        expectationOf: (payload) => this.expectationOf(payload),
+        limit: this.limits.maxInvitations,
+        scopeType: this.scopeType,
+      });
     } catch {
       throw new InvalidPublicMutationError();
     }
