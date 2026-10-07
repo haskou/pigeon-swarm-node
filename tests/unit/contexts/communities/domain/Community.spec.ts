@@ -221,6 +221,45 @@ describe('Community', () => {
     });
   });
 
+  it('notifies a banned member with a member.was_left event so their session drops the community', () => {
+    const community = createCommunity();
+    community.pullDomainEvents();
+
+    community.addMember(owner, member);
+    community.pullDomainEvents();
+    community.banMember(owner, member);
+
+    const events = community.pullDomainEvents();
+
+    expect(community.toPrimitives()).toMatchObject({
+      bannedMemberIds: [member.valueOf()],
+      memberIds: [owner.valueOf()],
+    });
+    expect(events.map((event) => event.constructor)).toEqual([
+      CommunityWasUpdatedEvent,
+      CommunityMemberWasLeftEvent,
+    ]);
+    expect(events[1].attributes).toMatchObject({
+      actorIdentityId: owner.valueOf(),
+      community: { bannedMemberIds: [member.valueOf()] },
+      identityId: member.valueOf(),
+      memberIds: [owner.valueOf()],
+    });
+  });
+
+  it('does not emit member.was_left when banning an identity that is not a member', () => {
+    const community = createCommunity();
+    community.pullDomainEvents();
+
+    community.banMember(owner, member);
+
+    const events = community.pullDomainEvents();
+
+    expect(events.map((event) => event.constructor)).toEqual([
+      CommunityWasUpdatedEvent,
+    ]);
+  });
+
   it('does not allow the owner to leave while other members remain', () => {
     const community = createCommunity();
 

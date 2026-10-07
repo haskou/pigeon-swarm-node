@@ -3435,6 +3435,10 @@ Implemented:
 - store banned identities in `bannedMemberIds`
 - prevent banned identities from requesting to join or accepting invite links
 - publish `communities.v1.community.was_updated`
+- when the banned identity was a member, also publish
+  `communities.v1.member.was_left` with the updated community, the banned
+  `identityId` and the `actorIdentityId`, so the banned member's own sessions
+  (which are no longer in `memberIds`) drop the community in real time
 
 ### List community moderation log
 
@@ -3895,6 +3899,7 @@ Other metadata events:
 - `communities.v1.community.was_updated`: full `community`
 - `communities.v1.member.was_added`: `identityId` and full updated `community`
 - `communities.v1.member.was_left`: `identityId` and full updated `community`
+  (also emitted for kick, leave and for the ban of a current member)
 - `communities.v1.membership_request.was_created`: `request`, `requestId`,
   `identityId`, `creatorIdentityId`
 - `communities.v1.membership_request.was_accepted`: same request payload after
