@@ -35,6 +35,7 @@ export class DeleteCommunityMemberByIdRoute extends CommunityRouteSupport {
         communityId,
         actorIdentityId.valueOf(),
         identityId,
+        body.moderationLog,
         body.operation,
       ),
     );

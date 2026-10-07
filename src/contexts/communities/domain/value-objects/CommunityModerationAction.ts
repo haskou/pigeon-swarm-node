@@ -9,6 +9,7 @@ const communityModerationActions = {
   INVITATION_CREATED: 'invitation_created',
   INVITE_LINK_CREATED: 'invite_link_created',
   MEMBER_BANNED: 'member_banned',
+  MEMBER_KICKED: 'member_kicked',
   MEMBER_ROLES_UPDATED: 'member_roles_updated',
   MEMBER_UNBANNED: 'member_unbanned',
   MEMBERSHIP_REQUEST_ACCEPTED: 'membership_request_accepted',
@@ -51,6 +52,10 @@ export class CommunityModerationAction extends Enum<string> {
 
   public static readonly MEMBER_BANNED = new CommunityModerationAction(
     communityModerationActions.MEMBER_BANNED,
+  );
+
+  public static readonly MEMBER_KICKED = new CommunityModerationAction(
+    communityModerationActions.MEMBER_KICKED,
   );
 
   public static readonly MEMBER_ROLES_UPDATED = new CommunityModerationAction(
