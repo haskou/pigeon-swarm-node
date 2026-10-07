@@ -536,6 +536,18 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
           revisionOf(2),
         ),
       );
+      const identity = mock<Identity>();
+      identity.getNetworkIds.mockReturnValue(genesis.getNetworkIds());
+      identity.getInitialDeviceCredential.mockReturnValue(
+        genesis.getCredentials()[0],
+      );
+      identity.getRecoveryAuthority.mockReturnValue(
+        genesis.getRecoveryAuthority(),
+      );
+      identity.getVersion.mockReturnValue(new IdentityVersion(1));
+      first.identityRepository.findFreshCandidateReferencesById.mockResolvedValue(
+        [new IdentityCandidate(genesisExternalIdentifier, identity)],
+      );
       const restarted = new OrbitDBDeviceAuthorizationRepository(
         first.registry,
         new DeviceAuthorizationPolicy(),
