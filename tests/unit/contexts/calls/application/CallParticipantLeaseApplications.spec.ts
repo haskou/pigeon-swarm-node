@@ -1,3 +1,4 @@
+import { callStartArgs } from '../../../../support/signCall';
 import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import CallParticipantLeaseReleaser from '@app/contexts/calls/application/release-participant-lease/CallParticipantLeaseReleaser';
 import CallParticipantHeartbeatRecorder from '@app/contexts/calls/application/record-participant-heartbeat/CallParticipantHeartbeatRecorder';
@@ -51,7 +52,7 @@ describe('call participant lease application services', () => {
       ),
     );
 
-    expect(callRepository.save).not.toHaveBeenCalled();
+    expect(callRepository.saveParticipant).not.toHaveBeenCalled();
     expect(leaseRenewer.renew).toHaveBeenCalledWith(call, creator, []);
     expect(eventPublisher.publish).toHaveBeenCalledWith([]);
   });
@@ -61,10 +62,7 @@ describe('call participant lease application services', () => {
     const repository = new InMemoryCallParticipantLeaseRepository();
     const nodeRepository = mock<NodeRepository>();
     nodeRepository.loadLocalNodeId.mockResolvedValue(nodeId);
-    const renewer = new CallParticipantLeaseRenewer(
-      repository,
-      nodeRepository,
-    );
+    const renewer = new CallParticipantLeaseRenewer(repository, nodeRepository);
     const releaser = new CallParticipantLeaseReleaser(
       repository,
       nodeRepository,
@@ -85,15 +83,11 @@ describe('call participant lease application services', () => {
     const call = activeCall();
     const repository = new InMemoryCallParticipantLeaseRepository();
     const nodeRepository = mock<NodeRepository>();
-    const renewer = new CallParticipantLeaseRenewer(
-      repository,
-      nodeRepository,
-    );
-    const mediaConnection =
-      CallParticipantMediaConnection.fromPrimitives({
-        remoteIdentityId: participant.valueOf(),
-        state: 'connected',
-      });
+    const renewer = new CallParticipantLeaseRenewer(repository, nodeRepository);
+    const mediaConnection = CallParticipantMediaConnection.fromPrimitives({
+      remoteIdentityId: participant.valueOf(),
+      state: 'connected',
+    });
 
     nodeRepository.loadLocalNodeId.mockResolvedValue(nodeId);
     await renewer.renew(call, creator);
@@ -118,13 +112,31 @@ describe('call participant lease application services', () => {
     nodes.loadLocalNodeId.mockResolvedValue(nodeId);
     const renewer = new CallParticipantLeaseRenewer(repository, nodes);
     await renewer.renew(call, creator);
-    await repository.save(CallParticipantLease.connect(call.getId(), creator,
-      new NodeId('550e8400-e29b-41d4-a716-446655440013'), networkId, [creator]));
-    await new CallParticipantLeaseReleaser(repository, nodes).release(call, creator);
-    await expect(renewer.renewExisting(call, creator)).rejects.toThrow('Call not found');
+    await repository.save(
+      CallParticipantLease.connect(
+        call.getId(),
+        creator,
+        new NodeId('550e8400-e29b-41d4-a716-446655440013'),
+        networkId,
+        [creator],
+      ),
+    );
+    await new CallParticipantLeaseReleaser(repository, nodes).release(
+      call,
+      creator,
+    );
+    await expect(renewer.renewExisting(call, creator)).rejects.toThrow(
+      'Call not found',
+    );
     const leases = await repository.findByCallIds([call.getId()]);
-    expect(leases.find((lease) => lease.belongsToNode(nodeId))!.hasParticipationGrant()).toBe(false);
-    expect(leases.filter((lease) => !lease.belongsToNode(nodeId))[0].isConnected()).toBe(true);
+    expect(
+      leases
+        .find((lease) => lease.belongsToNode(nodeId))!
+        .hasParticipationGrant(),
+    ).toBe(false);
+    expect(
+      leases.filter((lease) => !lease.belongsToNode(nodeId))[0].isConnected(),
+    ).toBe(true);
     await expect(renewer.renew(call, creator)).resolves.toBeDefined();
   });
 
@@ -136,14 +148,20 @@ describe('call participant lease application services', () => {
     const renewer = new CallParticipantLeaseRenewer(repository, nodes);
     await renewer.renew(call, creator);
     const find = repository.findByCallIds.bind(repository);
-    jest.spyOn(repository, 'findByCallIds').mockImplementationOnce(async (ids) => {
-      const stale = await find(ids);
-      const left = CallParticipantLease.fromPrimitives(stale[0].toPrimitives());
-      left.leave();
-      await repository.save(left);
-      return stale;
-    });
-    await expect(renewer.renewExisting(call, creator)).rejects.toThrow('Call not found');
+    jest
+      .spyOn(repository, 'findByCallIds')
+      .mockImplementationOnce(async (ids) => {
+        const stale = await find(ids);
+        const left = CallParticipantLease.fromPrimitives(
+          stale[0].toPrimitives(),
+        );
+        left.leave();
+        await repository.save(left);
+        return stale;
+      });
+    await expect(renewer.renewExisting(call, creator)).rejects.toThrow(
+      'Call not found',
+    );
     expect((await find([call.getId()]))[0].hasParticipationGrant()).toBe(false);
   });
 
@@ -154,9 +172,22 @@ describe('call participant lease application services', () => {
     const leases = new InMemoryCallParticipantLeaseRepository();
     const nodes = mock<NodeRepository>();
     nodes.loadLocalNodeId.mockResolvedValue(nodeId);
-    const recorder = new CallParticipantHeartbeatRecorder(calls, new CallParticipantLeaseRenewer(leases, nodes), mock<DomainEventPublisher>(), mock<CallAccessAuthorizer>());
-    await recorder.record(new CallParticipantHeartbeatRecordMessage(call.getId().valueOf(), creator.valueOf(), []));
-    expect((await leases.findByCallIds([call.getId()]))[0].isConnected()).toBe(true);
+    const recorder = new CallParticipantHeartbeatRecorder(
+      calls,
+      new CallParticipantLeaseRenewer(leases, nodes),
+      mock<DomainEventPublisher>(),
+      mock<CallAccessAuthorizer>(),
+    );
+    await recorder.record(
+      new CallParticipantHeartbeatRecordMessage(
+        call.getId().valueOf(),
+        creator.valueOf(),
+        [],
+      ),
+    );
+    expect((await leases.findByCallIds([call.getId()]))[0].isConnected()).toBe(
+      true,
+    );
   });
 
   function activeCall(): Call {
@@ -165,6 +196,7 @@ describe('call participant lease application services', () => {
       networkId,
       CallScope.conversation(new ConversationId('one-to-one:lease-apps')),
       [],
+      ...callStartArgs(),
     );
   }
 });

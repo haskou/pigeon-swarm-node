@@ -1,4 +1,6 @@
 import { CallViewModel } from '@app/apps/apis/calls-api/view-model/CallViewModel';
+import CallEventAttestor from '@app/contexts/calls/application/attest-event/CallEventAttestor';
+import { CallEventAttestation } from '@app/contexts/calls/domain/CallEventAttestation';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Kernel from '@haskou/ddd-kernel';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
@@ -49,6 +51,8 @@ export class WebSocketEventHub {
     new ConversationCallEventRealtimeMapper();
 
   private clientMessageHandler?: WebSocketClientMessageHandler;
+
+  private callEventAttestor?: CallEventAttestor;
 
   private liveCallRevision = 0;
 
@@ -683,6 +687,10 @@ export class WebSocketEventHub {
     this.clients.clear();
   }
 
+  public setCallEventAttestor(attestor: CallEventAttestor): void {
+    this.callEventAttestor = attestor;
+  }
+
   public setClientMessageHandler(handler: WebSocketClientMessageHandler): void {
     this.clientMessageHandler = handler;
   }
@@ -734,6 +742,27 @@ export class WebSocketEventHub {
         type: 'domain_event',
       });
     });
+  }
+
+  /**
+   * Events that arrived from the network. Call lifecycle events are claims by
+   * other nodes and reach clients only once this node's own admitted signed
+   * records derive the same transition.
+   */
+  public publishFromNetwork(events: DomainEvent[]): void {
+    for (const event of events) {
+      if (!CallEventAttestation.isLifecycleEvent(event)) {
+        this.publish([event]);
+        continue;
+      }
+
+      void this.callEventAttestor
+        ?.attest(event)
+        .then((attested) => attested && this.publish([attested]))
+        .catch(() => {
+          Kernel.logger?.error('WebSocket call event attestation failed');
+        });
+    }
   }
 
   public publish(events: DomainEvent[]): void {

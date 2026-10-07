@@ -25,9 +25,9 @@ export default class CallEnder {
       message.participantIdentityId,
     );
 
-    call.end(message.participantIdentityId);
+    call.end(message.participantIdentityId, message.at);
 
-    await this.repository.save(call);
+    await this.repository.saveEnd(call, message.getProof());
     await this.eventPublisher.publish(call.pullDomainEvents());
 
     return call;

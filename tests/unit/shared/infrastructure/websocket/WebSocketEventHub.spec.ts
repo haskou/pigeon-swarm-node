@@ -1,3 +1,4 @@
+import { callStartArgs } from '../../../../support/signCall';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
@@ -956,7 +957,7 @@ function authorizeCallAudience(hub: WebSocketEventHub): void {
   const handler = buildClientMessageHandler();
   handler.findCallAudience = jest.fn().mockImplementation(async (_callId: string, recipientIds: string[]) => {
     const creator = new IdentityId(recipientIds.at(-1) ?? 'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=');
-    const call = Call.start(creator, new NetworkId('550e8400-e29b-41d4-a716-446655440000'), CallScope.conversation(new ConversationId('conversation-1')), recipientIds.map((identityId) => new IdentityId(identityId)));
+    const call = Call.start(creator, new NetworkId('550e8400-e29b-41d4-a716-446655440000'), CallScope.conversation(new ConversationId('conversation-1')), recipientIds.map((identityId) => new IdentityId(identityId)), ...callStartArgs());
     return { call, leases: [], participants: call.getParticipantIds(), recipientIds };
   });
   hub.setClientMessageHandler(handler);

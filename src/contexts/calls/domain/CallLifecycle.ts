@@ -3,11 +3,8 @@ import { Timestamp } from '@haskou/value-objects';
 import { CallStatus, CallStatusEnum } from './value-objects/CallStatus';
 
 export class CallLifecycle {
-  public static active(): CallLifecycle {
-    return new CallLifecycle(
-      new CallStatus(CallStatusEnum.ACTIVE),
-      Timestamp.now(),
-    );
+  public static active(startedAt: Timestamp): CallLifecycle {
+    return new CallLifecycle(new CallStatus(CallStatusEnum.ACTIVE), startedAt);
   }
 
   constructor(
@@ -17,15 +14,21 @@ export class CallLifecycle {
     private endedByIdentityId?: string,
   ) {}
 
-  public end(endedByIdentityId: string): void {
+  public end(endedByIdentityId: string, at: Timestamp = Timestamp.now()): void {
     this.status = new CallStatus(CallStatusEnum.ENDED);
-    this.endedAt = Timestamp.now();
+    this.endedAt = at;
     this.endedByIdentityId = endedByIdentityId;
   }
 
-  public miss(): void {
+  /** Hides a call that outlived its limits: ended, but by nobody. */
+  public expire(at: Timestamp): void {
+    this.status = new CallStatus(CallStatusEnum.ENDED);
+    this.endedAt = at;
+  }
+
+  public miss(at: Timestamp = Timestamp.now()): void {
     this.status = new CallStatus(CallStatusEnum.MISSED);
-    this.endedAt = Timestamp.now();
+    this.endedAt = at;
   }
 
   public getCreatedAt(): Timestamp {

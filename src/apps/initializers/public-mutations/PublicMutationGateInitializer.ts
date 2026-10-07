@@ -3,6 +3,7 @@ import PublicMutationVerifier from '@app/contexts/public-mutations/domain/servic
 import { PublicMutationGate } from '@app/contexts/public-mutations/infrastructure/PublicMutationGate';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
+import CallMutationPolicies from './CallMutationPolicies';
 import CommunityChannelMutationPolicies from './CommunityChannelMutationPolicies';
 import CommunityGovernanceMutationPolicies from './CommunityGovernanceMutationPolicies';
 import ContentReplicationMutationPolicies from './ContentReplicationMutationPolicies';
@@ -22,6 +23,7 @@ export default class PublicMutationGateInitializer {
     private readonly polls: PollMutationPolicies,
     private readonly contentReplications: ContentReplicationMutationPolicies,
     private readonly notifications: NotificationMutationPolicies,
+    private readonly calls: CallMutationPolicies,
   ) {}
 
   public ensure(): Promise<void> {
@@ -33,6 +35,7 @@ export default class PublicMutationGateInitializer {
       ...this.polls.all(),
       ...this.contentReplications.all(),
       ...this.notifications.all(),
+      ...this.calls.all(),
     ]);
 
     this.registry.addMutationGate(gate);

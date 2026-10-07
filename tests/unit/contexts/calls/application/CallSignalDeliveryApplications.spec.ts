@@ -1,3 +1,4 @@
+import { callStartArgs } from '../../../../support/signCall';
 import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import CallSignalAcknowledger from '@app/contexts/calls/application/acknowledge-signal/CallSignalAcknowledger';
 import { CallSignalAcknowledgeMessage } from '@app/contexts/calls/application/acknowledge-signal/messages/CallSignalAcknowledgeMessage';
@@ -73,10 +74,7 @@ describe('Call signal delivery applications', () => {
     const repository = new InMemoryCallSignalDeliveryRepository();
     const eventPublisher = mock<DomainEventPublisher>();
     const registrar = new CallSignalDeliveryRegistrar(repository);
-    const acknowledger = new CallSignalAcknowledger(
-      repository,
-      eventPublisher,
-    );
+    const acknowledger = new CallSignalAcknowledger(repository, eventPublisher);
 
     jest.spyOn(Date, 'now').mockReturnValue(1_770_000_000_500);
     await registrar.register(registerMessage());
@@ -94,10 +92,7 @@ describe('Call signal delivery applications', () => {
     const repository = new InMemoryCallSignalDeliveryRepository();
     const eventPublisher = mock<DomainEventPublisher>();
     const registrar = new CallSignalDeliveryRegistrar(repository);
-    const acknowledger = new CallSignalAcknowledger(
-      repository,
-      eventPublisher,
-    );
+    const acknowledger = new CallSignalAcknowledger(repository, eventPublisher);
     const message = new CallSignalAcknowledgeMessage(
       signalId,
       recipientIdentityId,
@@ -156,9 +151,8 @@ describe('Call signal delivery applications', () => {
 
     expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
     expect(
-      (
-        await repository.findById(new CallSignalId(signalId))
-      )?.toPrimitives().attempt,
+      (await repository.findById(new CallSignalId(signalId)))?.toPrimitives()
+        .attempt,
     ).toBe(2);
   });
 
@@ -188,6 +182,7 @@ describe('Call signal delivery applications', () => {
       new NetworkId(networkId),
       CallScope.conversation(new ConversationId('one-to-one:signal-test')),
       [recipientIdentity],
+      ...callStartArgs(),
     );
 
     callRepository.findById.mockResolvedValue(call);

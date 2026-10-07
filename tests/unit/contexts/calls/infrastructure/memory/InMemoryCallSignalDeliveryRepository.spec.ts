@@ -60,10 +60,7 @@ describe('InMemoryCallSignalDeliveryRepository', () => {
       pending.toPrimitives(),
     );
 
-    pending.acknowledge(
-      recipientIdentityId,
-      new Timestamp(1_770_000_000_500),
-    );
+    pending.acknowledge(recipientIdentityId, new Timestamp(1_770_000_000_500));
     delayedRetry.retry(new Timestamp(1_770_000_001_000));
     await repository.save(pending);
     await repository.save(delayedRetry);

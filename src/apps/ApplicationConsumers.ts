@@ -1,7 +1,6 @@
 import RegisterCallParticipantLeaseWhenUpdated from '@app/apps/consumers/pubsub/calls/RegisterCallParticipantLeaseWhenUpdated';
 import RegisterCallSignalAcknowledgement from '@app/apps/consumers/pubsub/calls/RegisterCallSignalAcknowledgement';
 import RegisterCallSignalWhenSent from '@app/apps/consumers/pubsub/calls/RegisterCallSignalWhenSent';
-import RegisterCallWhenStarted from '@app/apps/consumers/pubsub/calls/RegisterCallWhenStarted';
 import DeleteCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pubsub/communities/DeleteCommunityChannelMessageWhenAnnounced';
 import RegisterCommunityChannelMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageEditionWhenAnnounced';
 import RegisterCommunityReactionWhenAdded from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenAdded';
@@ -34,7 +33,6 @@ export const applicationConsumers: ApplicationServiceClass<Consumer>[] = [
   RegisterCallParticipantLeaseWhenUpdated,
   RegisterCallSignalWhenSent,
   RegisterCallSignalAcknowledgement,
-  RegisterCallWhenStarted,
   RegisterIdentityWhenPublished,
   ProvisionDeviceAuthorizationWhenIdentityCreated,
   ProvisionDeviceAuthorizationWhenIdentityUpdated,

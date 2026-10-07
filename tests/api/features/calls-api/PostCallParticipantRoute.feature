@@ -47,3 +47,16 @@ Feature: Join call participant
     When I POST a participant heartbeat to the current call
     Then response code is equal to 409
     And response body should contain "InvalidCallParticipantMediaConnectionError"
+
+  Scenario: Reject joining a call without a signed mutation
+    Given I register a test IPFS network "api-calls-unsigned-join-network"
+    And I have created a one-to-one conversation
+    And I set a conversation call body
+    And I sign the current call start request
+    When I POST to "/calls/"
+    Then response code is equal to 200
+    And I remember the current call
+    And call requests are sent without a mutation
+    And the other identity signs the current call join request
+    When I POST a participant join to the current call
+    Then response code is equal to 400

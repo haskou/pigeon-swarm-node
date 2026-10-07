@@ -15,9 +15,7 @@ import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { Timestamp } from '@haskou/value-objects';
 
 describe('CallSignalDelivery', () => {
-  const signalId = new CallSignalId(
-    '68da3440-c60e-4fe3-b86a-2b8931ea345f',
-  );
+  const signalId = new CallSignalId('68da3440-c60e-4fe3-b86a-2b8931ea345f');
   const callId = new CallId('550e8400-e29b-41d4-a716-446655440000');
   const ownerNodeId = new NodeId('9278e9db-bc4d-4a8f-9577-7cad4386512f');
   const networkId = new NetworkId('f8955c6e-39b1-42cc-8182-42ef86982b4e');
@@ -31,12 +29,10 @@ describe('CallSignalDelivery', () => {
   function send(at: number = 1_770_000_000_000): CallSignalDelivery {
     return CallSignalDelivery.send(
       signalId,
-      new CallSignalDeliveryRoute(
-        callId,
-        ownerNodeId,
-        networkId,
-        [senderIdentityId, recipientIdentityId],
-      ),
+      new CallSignalDeliveryRoute(callId, ownerNodeId, networkId, [
+        senderIdentityId,
+        recipientIdentityId,
+      ]),
       new CallSignal(
         senderIdentityId,
         recipientIdentityId,
@@ -117,9 +113,9 @@ describe('CallSignalDelivery', () => {
   it('rejects acknowledgement from another identity', () => {
     const delivery = send();
 
-    expect(() =>
-      delivery.acknowledge(senderIdentityId),
-    ).toThrow(CallSignalRecipientMismatchError);
+    expect(() => delivery.acknowledge(senderIdentityId)).toThrow(
+      CallSignalRecipientMismatchError,
+    );
   });
 
   it('expires without accepting acknowledgements or retries', () => {

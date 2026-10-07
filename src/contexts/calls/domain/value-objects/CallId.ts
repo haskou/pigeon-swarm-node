@@ -1,28 +1,20 @@
-import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { UUID } from '@haskou/value-objects';
 import { createHash } from 'node:crypto';
 
-import { CallSessionEpoch } from './CallSessionEpoch';
+import { CallNonce } from './CallNonce';
 
 export class CallId extends UUID {
-  public static communitySession(
-    networkId: NetworkId,
-    communityId: CommunityId,
-    channelId: CommunityChannelId,
-    epoch: CallSessionEpoch,
+  /**
+   * The call id is bound to the creator and a client nonce, so nobody can
+   * pre-register or squat the id of a call another identity will start.
+   */
+  public static fromStart(
+    creatorIdentityId: IdentityId,
+    nonce: CallNonce,
   ): CallId {
     const bytes = createHash('sha256')
-      .update(
-        JSON.stringify([
-          'pigeon-community-call-v1',
-          networkId.valueOf(),
-          communityId.valueOf(),
-          channelId.valueOf(),
-          epoch.valueOf(),
-        ]),
-      )
+      .update(`${creatorIdentityId.valueOf()}:${nonce.valueOf()}`)
       .digest()
       .subarray(0, 16);
     bytes[6] = (bytes[6] % 16) + 128;
@@ -32,9 +24,5 @@ export class CallId extends UUID {
     return new CallId(
       `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`,
     );
-  }
-
-  public static generate(): CallId {
-    return new CallId(UUID.generate().valueOf());
   }
 }

@@ -121,7 +121,7 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
         ),
       );
 
-      webSocketEventHub.publish([event]);
+      webSocketEventHub.publishFromNetwork([event]);
     });
   }
 
@@ -157,7 +157,7 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
         ),
       );
 
-      webSocketEventHub.publish([event]);
+      webSocketEventHub.publishFromNetwork([event]);
     });
   }
 

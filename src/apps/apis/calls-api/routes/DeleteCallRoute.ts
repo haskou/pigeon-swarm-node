@@ -2,8 +2,16 @@ import CallEnder from '@app/contexts/calls/application/end-call/CallEnder';
 import { CallEndMessage } from '@app/contexts/calls/application/end-call/messages/CallEndMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  Delete,
+  JsonController,
+  Param,
+  Req,
+  Res,
+} from 'routing-controllers';
 
+import { CallMutationBody } from '../bodies/CallMutationBody';
 import { CallRouteSupport } from './CallRouteSupport';
 
 @JsonController('/calls')
@@ -13,12 +21,18 @@ export class DeleteCallRoute extends CallRouteSupport {
   @Delete('/:callId')
   public async endCall(
     @Param('callId') callId: string,
+    @Body() body: CallMutationBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const participantIdentityId = await this.authenticate(request);
+    const participantIdentityId = await this.authenticateRecordAuthor(request);
     const call = await this.ender.end(
-      new CallEndMessage(callId, participantIdentityId.valueOf()),
+      new CallEndMessage(
+        callId,
+        participantIdentityId.valueOf(),
+        body.mutation,
+        body.at,
+      ),
     );
 
     return response

@@ -21,39 +21,39 @@ import { CallParticipantLeftEvent } from './events/CallParticipantLeftEvent';
 import { CallParticipantMissedEvent } from './events/CallParticipantMissedEvent';
 import { CallStartedEvent } from './events/CallStartedEvent';
 import { CallId } from './value-objects/CallId';
+import { CallNonce } from './value-objects/CallNonce';
 import { CallSessionEpoch } from './value-objects/CallSessionEpoch';
 import { CallSignalId } from './value-objects/CallSignalId';
 import { CallSignalType } from './value-objects/CallSignalType';
 import { CallStatus } from './value-objects/CallStatus';
 
 export class Call extends AggregateRoot {
+  /** A call between two identities ends as soon as either one departs. */
+  public static readonly ONE_TO_ONE_PARTICIPANTS = 2;
+
   public static start(
     creatorIdentityId: IdentityId,
     networkId: NetworkId,
     scope: CallScope,
     participantIds: IdentityId[],
+    nonce: CallNonce,
+    startedAt: Timestamp,
     sessionEpoch?: CallSessionEpoch,
   ): Call {
     const participants = [
-      CallParticipant.joined(creatorIdentityId),
+      CallParticipant.joined(creatorIdentityId, startedAt),
       ...participantIds
         .filter((participant) => participant.isNotEqual(creatorIdentityId))
         .map((participant) => CallParticipant.ringing(participant)),
     ];
     const call = new Call(
-      sessionEpoch && scope.isCommunityChannel()
-        ? CallId.communitySession(
-            networkId,
-            scope.getCommunityId()!,
-            scope.getCommunityChannelId()!,
-            sessionEpoch,
-          )
-        : CallId.generate(),
+      CallId.fromStart(creatorIdentityId, nonce),
+      nonce,
       networkId,
       scope,
-      scope.isConversation() ? creatorIdentityId : undefined,
+      creatorIdentityId,
       participants,
-      CallLifecycle.active(),
+      CallLifecycle.active(startedAt),
       sessionEpoch,
     );
 
@@ -65,11 +65,10 @@ export class Call extends AggregateRoot {
   public static fromPrimitives(primitives: PrimitiveOf<Call>): Call {
     return new Call(
       new CallId(primitives.id),
+      new CallNonce(primitives.nonce),
       new NetworkId(primitives.networkId),
       CallScope.fromPrimitives(primitives.scope),
-      primitives.scope.type === 'conversation'
-        ? new IdentityId(primitives.creatorIdentityId!)
-        : undefined,
+      new IdentityId(primitives.creatorIdentityId!),
       primitives.participants.map((participant) =>
         CallParticipant.fromPrimitives(participant),
       ),
@@ -87,9 +86,10 @@ export class Call extends AggregateRoot {
 
   constructor(
     private readonly id: CallId,
+    private readonly nonce: CallNonce,
     private readonly networkId: NetworkId,
     private readonly scope: CallScope,
-    private readonly creatorIdentityId: IdentityId | undefined,
+    private readonly creatorIdentityId: IdentityId,
     private readonly participants: CallParticipant[],
     private readonly lifecycle: CallLifecycle,
     private readonly sessionEpoch?: CallSessionEpoch,
@@ -104,7 +104,7 @@ export class Call extends AggregateRoot {
   private createStartedEvent(): CallStartedEvent {
     return new CallStartedEvent(this.id.valueOf(), {
       ...this.baseEventAttributes(),
-      creatorIdentityId: this.creatorIdentityId?.valueOf(),
+      creatorIdentityId: this.creatorIdentityId.valueOf(),
     });
   }
 
@@ -132,10 +132,10 @@ export class Call extends AggregateRoot {
     };
   }
 
-  private endIfNoReceiversRemain(): void {
+  private endIfNoReceiversRemain(at: Timestamp): void {
     const hasReceiver = this.participants.some(
       (participant) =>
-        participant.getIdentityId().isNotEqual(this.creatorIdentityId!) &&
+        participant.getIdentityId().isNotEqual(this.creatorIdentityId) &&
         participant.canReceiveSignal(),
     );
 
@@ -143,7 +143,7 @@ export class Call extends AggregateRoot {
       return;
     }
 
-    this.lifecycle.miss();
+    this.lifecycle.miss(at);
     this.record(
       new CallMissedEvent(this.id.valueOf(), {
         ...this.baseEventAttributes(),
@@ -159,17 +159,17 @@ export class Call extends AggregateRoot {
   private hasActiveReceiver(): boolean {
     return this.participants.some(
       (participant) =>
-        participant.getIdentityId().isNotEqual(this.creatorIdentityId!) &&
+        participant.getIdentityId().isNotEqual(this.creatorIdentityId) &&
         participant.isActiveReceiver(),
     );
   }
 
-  public join(identityId: IdentityId): void {
+  public join(identityId: IdentityId, at: Timestamp = Timestamp.now()): void {
     this.assertActive();
     const participant = this.findParticipant(identityId);
 
     assert(participant, new CallParticipantNotFoundError());
-    participant.join();
+    participant.join(at);
     this.record(
       new CallParticipantJoinedEvent(this.id.valueOf(), {
         ...this.baseEventAttributes(),
@@ -178,7 +178,10 @@ export class Call extends AggregateRoot {
     );
   }
 
-  public joinOrAdd(identityId: IdentityId): void {
+  public joinOrAdd(
+    identityId: IdentityId,
+    at: Timestamp = Timestamp.now(),
+  ): void {
     this.assertActive();
     const participant = this.findParticipant(identityId);
 
@@ -187,9 +190,9 @@ export class Call extends AggregateRoot {
     }
 
     if (participant) {
-      participant.join();
+      participant.join(at);
     } else {
-      this.participants.push(CallParticipant.joined(identityId));
+      this.participants.push(CallParticipant.joined(identityId, at));
     }
 
     this.record(
@@ -200,33 +203,33 @@ export class Call extends AggregateRoot {
     );
   }
 
-  public leave(identityId: IdentityId, endOnDeparture = false): void {
+  public leave(identityId: IdentityId, at: Timestamp = Timestamp.now()): void {
     this.assertActive();
     const participant = this.findParticipant(identityId);
 
     assert(participant, new CallParticipantNotFoundError());
 
     if (participant.isRinging()) {
-      participant.decline();
+      participant.decline(at);
       this.record(
         new CallParticipantDeclinedEvent(this.id.valueOf(), {
           ...this.baseEventAttributes(),
           declinedIdentityId: identityId.valueOf(),
         }),
       );
-      this.endIfNoReceiversRemain();
+      this.endIfNoReceiversRemain(at);
 
       return;
     }
 
-    participant.leave();
+    participant.leave(at);
 
     if (
       this.scope.isConversation() &&
-      (endOnDeparture ||
+      (this.participants.length <= Call.ONE_TO_ONE_PARTICIPANTS ||
         !this.participants.some((candidate) => candidate.isJoined()))
     ) {
-      this.lifecycle.end(identityId.valueOf());
+      this.lifecycle.end(identityId.valueOf(), at);
     }
 
     this.record(
@@ -243,18 +246,37 @@ export class Call extends AggregateRoot {
     }
   }
 
-  public end(identityId: IdentityId): void {
+  public end(identityId: IdentityId, at: Timestamp = Timestamp.now()): void {
     this.assertActive();
     const participant = this.findParticipant(identityId);
 
-    assert(participant?.isJoined(), new CallParticipantNotFoundError());
-    this.lifecycle.end(identityId.valueOf());
+    assert(
+      this.scope.isCommunityChannel()
+        ? this.creatorIdentityId.isEqual(identityId)
+        : participant?.isJoined(),
+      new CallParticipantNotFoundError(),
+    );
+    this.lifecycle.end(identityId.valueOf(), at);
     this.record(
       new CallEndedEvent(this.id.valueOf(), {
         ...this.baseEventAttributes(),
         endedByIdentityId: identityId.valueOf(),
       }),
     );
+  }
+
+  /** Applies a signed end record: any participant the policy admitted may end. */
+  public endFromRecord(identityId: IdentityId, at: Timestamp): void {
+    if (!this.isActive()) return;
+
+    this.lifecycle.end(identityId.valueOf(), at);
+  }
+
+  /** Ends a call that outlived its limits or lost its channel to another call. */
+  public expire(at: Timestamp): void {
+    if (!this.isActive()) return;
+
+    this.lifecycle.expire(at);
   }
 
   public sendSignal(
@@ -359,6 +381,14 @@ export class Call extends AggregateRoot {
     );
   }
 
+  public getCreatorIdentityId(): IdentityId {
+    return this.creatorIdentityId;
+  }
+
+  public getNonce(): CallNonce {
+    return this.nonce;
+  }
+
   public markTimedOut(timeout: Timestamp): IdentityId[] {
     this.assertActive();
     const missedParticipants = this.participants.filter((participant) =>
@@ -376,7 +406,7 @@ export class Call extends AggregateRoot {
     }
 
     if (missedParticipants.length > 0 && !this.hasActiveReceiver()) {
-      this.lifecycle.miss();
+      this.lifecycle.miss(timeout);
       this.record(
         new CallMissedEvent(this.id.valueOf(), {
           ...this.baseEventAttributes(),
@@ -390,6 +420,11 @@ export class Call extends AggregateRoot {
     return missedParticipants.map((participant) => participant.getIdentityId());
   }
 
+  /** The event attributes this call derives from its own admitted state. */
+  public toEventAttributes(): Record<string, unknown> {
+    return this.baseEventAttributes();
+  }
+
   public shouldRecordMissedCall(): boolean {
     return this.scope.isConversation();
   }
@@ -401,11 +436,12 @@ export class Call extends AggregateRoot {
 
     return {
       createdAt: this.lifecycle.getCreatedAt().valueOf(),
-      creatorIdentityId: this.creatorIdentityId?.valueOf(),
+      creatorIdentityId: this.creatorIdentityId.valueOf(),
       endedAt: this.lifecycle.getEndedAt()?.valueOf(),
       endedByIdentityId: this.lifecycle.getEndedByIdentityId(),
       id: this.id.valueOf(),
       networkId: this.networkId.valueOf(),
+      nonce: this.nonce.valueOf(),
       participantIds: participants.map((participant) => participant.identityId),
       participants,
       scope: this.scope.toPrimitives(),

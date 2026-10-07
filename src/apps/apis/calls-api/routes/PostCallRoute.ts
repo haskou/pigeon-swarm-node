@@ -17,15 +17,18 @@ export class PostCallRoute extends CallRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const creatorIdentityId = await this.authenticate(request);
+    const creatorIdentityId = await this.authenticateRecordAuthor(request);
     const call = await this.starter.start(
       new CallStartMessage(
         creatorIdentityId.valueOf(),
         body.scopeType,
+        body.mutation,
+        body.nonce,
+        body.startedAt,
         body.conversationId,
         body.communityId,
         body.channelId,
-        body.invitedParticipantIds,
+        body.sessionEpoch,
       ),
     );
 

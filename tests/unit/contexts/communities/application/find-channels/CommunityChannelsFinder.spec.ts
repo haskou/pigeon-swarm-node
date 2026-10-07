@@ -1,3 +1,4 @@
+import { callStartArgs } from '../../../../../support/signCall';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
@@ -60,7 +61,7 @@ describe('CommunityChannelsFinder voice presence', () => {
         owner,
         networkId,
         CallScope.communityChannel(community.getId(), channel.getId()),
-        [owner, member],
+        [owner, member], ...callStartArgs(),
       );
     const connect = (
       call: Call,

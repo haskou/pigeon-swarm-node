@@ -1,3 +1,4 @@
+import { callStartArgs } from '../../../../support/signCall';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { CallViewModel } from '@app/apps/apis/calls-api/view-model/CallViewModel';
 import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
@@ -39,7 +40,7 @@ function startCall() {
       new CommunityId('community-1'),
       new CommunityChannelId('voice-1'),
     ),
-    [],
+    [], ...callStartArgs(),
   );
 }
 
@@ -61,7 +62,7 @@ describe('live call privacy', () => {
       creator,
       network,
       CallScope.conversation(new ConversationId('conversation-1')),
-      [other],
+      [other], ...callStartArgs(),
     );
     direct.end(creator);
     const directResource = new CallViewModel(direct, [], []).toResource();

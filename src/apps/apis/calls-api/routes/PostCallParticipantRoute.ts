@@ -2,8 +2,16 @@ import CallJoiner from '@app/contexts/calls/application/join-call/CallJoiner';
 import { CallJoinMessage } from '@app/contexts/calls/application/join-call/messages/CallJoinMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { JsonController, Param, Post, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  JsonController,
+  Param,
+  Post,
+  Req,
+  Res,
+} from 'routing-controllers';
 
+import { CallMutationBody } from '../bodies/CallMutationBody';
 import { CallRouteSupport } from './CallRouteSupport';
 
 @JsonController('/calls')
@@ -13,12 +21,18 @@ export class PostCallParticipantRoute extends CallRouteSupport {
   @Post('/:callId/participants')
   public async joinCall(
     @Param('callId') callId: string,
+    @Body() body: CallMutationBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const participantIdentityId = await this.authenticate(request);
+    const participantIdentityId = await this.authenticateRecordAuthor(request);
     const call = await this.joiner.join(
-      new CallJoinMessage(callId, participantIdentityId.valueOf()),
+      new CallJoinMessage(
+        callId,
+        participantIdentityId.valueOf(),
+        body.mutation,
+        body.at,
+      ),
     );
 
     return response

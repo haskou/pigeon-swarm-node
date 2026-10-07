@@ -12,6 +12,7 @@ import Scheduler from '@haskou/ddd-kernel/scheduler';
 import path from 'path';
 import { getMetadataArgsStorage } from 'routing-controllers';
 
+import CallEventAttestor from '../contexts/calls/application/attest-event/CallEventAttestor';
 import CallParticipantLeaseRepository from '../contexts/calls/domain/repositories/CallParticipantLeaseRepository';
 import CallSignalDeliveryRepository from '../contexts/calls/domain/repositories/CallSignalDeliveryRepository';
 import InMemoryCallParticipantLeaseRepository from '../contexts/calls/infrastructure/memory/InMemoryCallParticipantLeaseRepository';
@@ -280,6 +281,9 @@ export default class PigeonApplication {
       this.kernel.di.getService<WebSocketClientMessageHandler>(
         WebSocketClientMessageHandler,
       ),
+    );
+    webSocketEventHub.setCallEventAttestor(
+      this.kernel.di.getService<CallEventAttestor>(CallEventAttestor),
     );
     webSocketEventHub.setNetworkSynchronizationStatusProvider(() =>
       networkSynchronizationMonitor.read().toPrimitives(),

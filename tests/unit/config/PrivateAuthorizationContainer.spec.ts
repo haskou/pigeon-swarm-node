@@ -63,9 +63,6 @@ describe('private authorization container wiring', () => {
     const [, callRepository] = service(
       'calls/infrastructure/orbitdb/OrbitDBCallRepository',
     );
-    const [, callProjection] = service(
-      'calls/infrastructure/orbitdb/OrbitDBCallProjection',
-    );
     const [, communityRepository] = service(
       'communities/infrastructure/orbitdb/OrbitDBCommunityRepository',
     );
@@ -76,7 +73,6 @@ describe('private authorization container wiring', () => {
     expect(guard.arguments).toContain(`@${coordinatorId}`);
     expect(authorizationRepository.arguments).toContain(`@${coordinatorId}`);
     expect(callRepository.arguments).toContain(`@${guardId}`);
-    expect(callProjection.arguments).toContain(`@${guardId}`);
     expect(communityRepository.arguments).toContain(`@${guardId}`);
     expect(communityRouter.arguments).toContain(`@${coordinatorId}`);
   });

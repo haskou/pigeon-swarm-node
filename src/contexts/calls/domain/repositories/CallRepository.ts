@@ -1,6 +1,7 @@
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -33,11 +34,39 @@ export default abstract class CallRepository {
   public abstract findById(id: CallId): Promise<Call | undefined>;
   public abstract findByParticipant(participantId: IdentityId): Promise<Call[]>;
 
-  public abstract registerReplica(call: Call): Promise<void>;
-
   public abstract findTimedOutRingingCalls(
     timeoutThreshold: Timestamp,
   ): Promise<Call[]>;
 
-  public abstract save(call: Call): Promise<void>;
+  /** Persists the creator-signed start record of the call. */
+  public abstract saveStart(
+    call: Call,
+    proof: PublicMutationProof,
+  ): Promise<void>;
+
+  /**
+   * Persists the signed state of one participant (joined, left or declined)
+   * at the signed time `at`, which may differ from the time the call state holds.
+   */
+  public abstract saveParticipant(
+    call: Call,
+    identityId: IdentityId,
+    at: Timestamp,
+    proof: PublicMutationProof,
+  ): Promise<void>;
+
+  /** Persists the signed end record of the call. */
+  public abstract saveEnd(
+    call: Call,
+    proof: PublicMutationProof,
+  ): Promise<void>;
+
+  /**
+   * Resolves true once another signed record of the call is admitted, false on
+   * timeout (or when too many callers are already waiting).
+   */
+  public abstract awaitUpdate(id: CallId, timeoutMs: number): Promise<boolean>;
+
+  /** Marks a ringing call as missed on this node only; nothing replicates. */
+  public abstract markTimedOut(call: Call): Promise<void>;
 }

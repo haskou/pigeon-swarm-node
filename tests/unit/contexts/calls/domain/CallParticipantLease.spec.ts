@@ -25,13 +25,23 @@ describe('CallParticipantLease', () => {
   it('does not revive an expired participation grant when a delayed scheduler disconnects it', () => {
     const clock = jest.spyOn(Date, 'now').mockReturnValue(1000);
     try {
-      const lease = CallParticipantLease.connect(callId, identityId, nodeId, networkId, [identityId]);
+      const lease = CallParticipantLease.connect(
+        callId,
+        identityId,
+        nodeId,
+        networkId,
+        [identityId],
+      );
       expect(lease.hasParticipationGrant()).toBe(true);
       clock.mockReturnValue(121000);
       expect(lease.hasParticipationGrant()).toBe(false);
       lease.disconnect();
       expect(lease.hasParticipationGrant()).toBe(false);
-      expect(CallParticipantLease.fromPrimitives(lease.toPrimitives()).hasParticipationGrant()).toBe(false);
+      expect(
+        CallParticipantLease.fromPrimitives(
+          lease.toPrimitives(),
+        ).hasParticipationGrant(),
+      ).toBe(false);
       lease.renew([identityId]);
       expect(lease.hasParticipationGrant()).toBe(true);
     } finally {
@@ -109,11 +119,10 @@ describe('CallParticipantLease', () => {
   });
 
   it('accepts media reports for participants added after the lease was created', () => {
-    const mediaConnection =
-      CallParticipantMediaConnection.fromPrimitives({
-        remoteIdentityId: remoteIdentityId.valueOf(),
-        state: 'connected',
-      });
+    const mediaConnection = CallParticipantMediaConnection.fromPrimitives({
+      remoteIdentityId: remoteIdentityId.valueOf(),
+      state: 'connected',
+    });
     const lease = CallParticipantLease.connect(
       callId,
       identityId,
@@ -142,11 +151,10 @@ describe('CallParticipantLease', () => {
   });
 
   it('replaces the routing roster instead of accumulating departed participants', () => {
-    const mediaConnection =
-      CallParticipantMediaConnection.fromPrimitives({
-        remoteIdentityId: remoteIdentityId.valueOf(),
-        state: 'connected',
-      });
+    const mediaConnection = CallParticipantMediaConnection.fromPrimitives({
+      remoteIdentityId: remoteIdentityId.valueOf(),
+      state: 'connected',
+    });
     const lease = CallParticipantLease.connect(
       callId,
       identityId,
@@ -166,11 +174,7 @@ describe('CallParticipantLease', () => {
     });
 
     expect(() =>
-      lease.renew(
-        [identityId],
-        [mediaConnection],
-        new Timestamp(300),
-      ),
+      lease.renew([identityId], [mediaConnection], new Timestamp(300)),
     ).toThrow(InvalidCallParticipantMediaConnectionError);
   });
 

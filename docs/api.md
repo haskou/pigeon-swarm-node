@@ -590,6 +590,205 @@ published over TCP for IPFS and UDP for TURN. The node-to-node relay discovery
 protocol is documented in
 [Calls TURN Relay Discovery](calls-turn-relay-discovery.md).
 
+### Signed call events
+
+A call is not a document that a node edits: it is derived on every node from
+three kinds of replicated records in the `calls` collection, each **signed by
+the user it speaks for**. The node holds no user key and has no unsigned
+fallback. The UI builds the record, the proof and the signature; the node
+rebuilds the record from the request and the node's own state, and the signature
+only verifies if the client signed exactly those bytes. A call, a participant
+state or an end that no admitted record supports does not exist on any node.
+Byte-exact vectors live in
+[`tests/fixtures/call-event-vectors.json`](../tests/fixtures/call-event-vectors.json)
+and are checked by the `CallEventVectors` unit spec.
+
+| Record | id | Author | Written by |
+| --- | --- | --- | --- |
+| `call_start` | `call:<callId>` | the creator | `POST /calls` |
+| `call_participant` | `call-participant:<callId>:<identityId>` | the participant | `POST /calls/{callId}/participants`, `DELETE /calls/{callId}/participants/me` |
+| `call_end` | `call-end:<callId>` | the ender | `DELETE /calls/{callId}` |
+
+**Call id.** The id is derived, never chosen: the first 16 bytes of
+`sha256(utf8(creatorIdentityId + ":" + nonce))`, with byte 6 replaced by
+`(byte6 % 16) + 128` and byte 8 by `(byte8 % 64) + 128`, written as lowercase hex
+`8-4-4-4-12`. The client `nonce` matches `^[A-Za-z0-9_-]{16,128}$`. Nobody can
+claim the id of a call another identity started, because the id commits to the
+creator.
+
+**Records.** Each record is signed as the canonical (RFC 8785, npm
+`canonicalize`) JSON of exactly these fields; an extra or missing field is
+refused.
+
+`call_start`, conversation scope. `participantIds` are exactly the participants
+of the admitted conversation, sorted ascending:
+
+```json
+{
+  "callId": "<callId>",
+  "creatorIdentityId": "<identityId>",
+  "id": "call:<callId>",
+  "networkId": "<networkId>",
+  "nonce": "<nonce>",
+  "participantIds": ["<identityId>", "<identityId>"],
+  "scope": { "conversationId": "<conversationId>", "type": "conversation" },
+  "scopeType": "call_start",
+  "startedAt": 1770000000000
+}
+```
+
+`call_start`, community voice channel scope. `participantIds` is the empty array
+(community membership is read from the signed community state) and `sessionEpoch`
+is a positive integer:
+
+```json
+{
+  "callId": "<callId>",
+  "creatorIdentityId": "<identityId>",
+  "id": "call:<callId>",
+  "networkId": "<networkId>",
+  "nonce": "<nonce>",
+  "participantIds": [],
+  "scope": { "channelId": "<voiceChannelId>", "communityId": "<communityId>", "type": "community_channel" },
+  "scopeType": "call_start",
+  "sessionEpoch": 1,
+  "startedAt": 1770000000000
+}
+```
+
+`call_participant`, `state` is `joined`, `left` or `declined`:
+
+```json
+{
+  "at": 1770000003000,
+  "callId": "<callId>",
+  "id": "call-participant:<callId>:<identityId>",
+  "identityId": "<identityId>",
+  "scopeType": "call_participant",
+  "state": "joined"
+}
+```
+
+`call_end`:
+
+```json
+{
+  "at": 1770000010000,
+  "callId": "<callId>",
+  "endedByIdentityId": "<identityId>",
+  "id": "call-end:<callId>",
+  "scopeType": "call_end"
+}
+```
+
+**Proof and signing bytes.** `mutation` is a `put` proof with `store: "calls"`,
+`recordId` = the record `id`, `payloadDigest` =
+`base64url(sha256(utf8(canonicalize(record))))` (43 characters, no padding) and
+`author` = `{ identityId, deviceCredential }` of the authoring identity. The
+device signs the UTF-8 bytes `"pigeon:public-mutation:v1\n" +
+canonicalize(mutation-without-signature)` with Ed25519; `signature` is standard
+base64 with padding (88 characters). `call_start` and `call_end` are written at
+`sequence` 0 with `predecessor: null`. A participant state is one record per call
+and identity: the first state is `sequence` 0, each later state carries
+`sequence + 1` and `predecessor` = `base64url(sha256(utf8(canonicalize(previous
+complete mutation including its signature))))`. A participant that signs a state
+from a stale `sequence` (for example on a second device) gets 409
+`StalePublicMutationError` with `details: { sequence, digest }` and re-signs with
+`sequence + 1` and `predecessor` = that `digest`.
+
+Conversation call start vector (`conversation_call_start`; creator key
+`creator`, nonce `vector-call-nonce-conv-0001`; the signed JSON is the
+`mutation` of the case):
+
+```json
+{
+  "author": {
+    "deviceCredential": "MCowBQYDK2VwAyEASrJUZSKSpoUb1mzjaHv/CP8FfO1fcxQ9nYfWajQJN04=",
+    "identityId": "MCowBQYDK2VwAyEASrJUZSKSpoUb1mzjaHv/CP8FfO1fcxQ9nYfWajQJN04="
+  },
+  "kind": "put",
+  "operationId": "vector-call-start-conv-1",
+  "payloadDigest": "ZzXF4bm_zD6jHQ-YnPNQMf80YKnCoQYQsibpr-51bEo",
+  "predecessor": null,
+  "recordId": "call:1bc97a47-5707-80fe-a156-e7a31b96526b",
+  "sequence": 0,
+  "store": "calls",
+  "version": 1,
+  "signature": "BKTNXLTrW90plz3K0f46anNIyEk4aWwOs0Pdalv7npgJBcNgeaBQYQnnLq5rLHPmFiQgcZeQboaIcbCMYi7tCQ=="
+}
+```
+
+Participant (`call_participant_left_after_joined`, second state of the callee,
+`sequence` 1, `predecessor` = the digest of the complete `joined` mutation):
+
+```json
+{
+  "author": {
+    "deviceCredential": "MCowBQYDK2VwAyEAfYssPUn3veVeeSuo+92MJ4MsOfqv+40KRIz0zEc9U+0=",
+    "identityId": "MCowBQYDK2VwAyEAfYssPUn3veVeeSuo+92MJ4MsOfqv+40KRIz0zEc9U+0="
+  },
+  "kind": "put",
+  "operationId": "vector-call-leave-1",
+  "payloadDigest": "mTkCz7Xxe960HrYGCXIUc_CUjs5zANvj0KmBeeN1TNw",
+  "predecessor": "06avtbVgtPcXYB1eleqUgWHst9T37l5b-DLNpp2R1ls",
+  "recordId": "call-participant:1bc97a47-5707-80fe-a156-e7a31b96526b:MCowBQYDK2VwAyEAfYssPUn3veVeeSuo+92MJ4MsOfqv+40KRIz0zEc9U+0=",
+  "sequence": 1,
+  "store": "calls",
+  "version": 1,
+  "signature": "rieIMc6BB433o+O3z6qVUiIC1Kk4xRHiVey6TAdzPBA7jImA/50kJdYBgoWEMrgmjHTON63YLrOId4dBChvKDQ=="
+}
+```
+
+End (`call_end`):
+
+```json
+{
+  "author": {
+    "deviceCredential": "MCowBQYDK2VwAyEASrJUZSKSpoUb1mzjaHv/CP8FfO1fcxQ9nYfWajQJN04=",
+    "identityId": "MCowBQYDK2VwAyEASrJUZSKSpoUb1mzjaHv/CP8FfO1fcxQ9nYfWajQJN04="
+  },
+  "kind": "put",
+  "operationId": "vector-call-end-1",
+  "payloadDigest": "VatorKBP1hUhjuuCPOxdI6LAyP9LdYSRPoYIWrcpf7s",
+  "predecessor": null,
+  "recordId": "call-end:1bc97a47-5707-80fe-a156-e7a31b96526b",
+  "sequence": 0,
+  "store": "calls",
+  "version": 1,
+  "signature": "4q4sH1TvmwQQYh5nkNKYq0yR8b1DI715zKRgyvTswPbIfZyyeFuYWh/yS1L2cz0/Tez/RrHDhRNAO2spQTzcCw=="
+}
+```
+
+**Admission** (every node, on write and on replication):
+
+- `call_start`: the creator is the proof author; the id derives from creator and
+  nonce; `startedAt` is not more than 10 minutes in the future. A conversation
+  start must carry exactly the participants of the signed conversation state,
+  the creator among them, and for a one-to-one conversation exactly two. A
+  community start needs a current signed permission to connect to that voice
+  channel and a `sessionEpoch` of at most one above the highest epoch of the
+  starts already admitted for that channel, so an attacker cannot poison the
+  channel with a huge epoch.
+- `call_participant`: the identity is the proof author; the admitted start
+  exists; the identity takes part in the signed conversation, or may connect to
+  the community voice channel.
+- `call_end`: the author is the creator, or any participant of a conversation
+  call. A community call is ended by its creator only; everybody else leaves.
+- A record whose claimed time (`startedAt`, `at`) lies more than 10 minutes
+  ahead of the node clock is refused.
+- Rate cap: at most `CALLS_RECORD_RATE_LIMIT_PER_MINUTE` (default 30) call records
+  per identity per minute, enforced on the write path (`429`, code `429021`);
+  the replication gate cannot rate-limit deterministically.
+
+**Derived state.** Every node folds the same admitted records into the same call,
+independent of arrival order: participant and end events apply sorted by their
+claimed time `at`, then record id; an event that does not apply to the state
+reached so far (for example a join after the end) is inert. A call that is still
+active after `CALLS_MAX_DURATION_MS` (default 12 hours) since its start is
+derived as ended, locally and deterministically. Timeouts (`missed`) are local
+state and never become replicated records. The full wire contract of the gate is
+in [the synchronization contract](pubsub-sync-protocol.md).
+
 ### Start call
 
 ```http
@@ -601,7 +800,10 @@ Conversation call request:
 ```json
 {
   "scopeType": "conversation",
-  "conversationId": "<conversationId>"
+  "conversationId": "<conversationId>",
+  "nonce": "<random 16-128 chars>",
+  "startedAt": 1770000000000,
+  "mutation": { "...": "SignedPublicMutation (call_start)" }
 }
 ```
 
@@ -609,35 +811,49 @@ Community channel call request:
 
 ```json
 {
-  "pollId": "<pollId>",
-  "createdAt": 1780000000000,
-  "mutation": { "...": "SignedPublicMutation" },
   "scopeType": "community_channel",
   "communityId": "<communityId>",
-  "channelId": "<voiceChannelId>"
+  "channelId": "<voiceChannelId>",
+  "sessionEpoch": 1,
+  "nonce": "<random 16-128 chars>",
+  "startedAt": 1770000000000,
+  "mutation": { "...": "SignedPublicMutation (call_start)" }
 }
 ```
+
+The body fields become the signed `call_start` record above (`startedAt` is the
+record `startedAt`; the node adds `networkId`, `callId`, `id`, `creatorIdentityId`
+from the authenticated identity and the signed conversation or community state).
+`invitedParticipantIds` no longer exists: conversation calls ring exactly the
+participants of the signed conversation.
 
 Implemented:
 
 - one-to-one calls use an existing one-to-one conversation id
 - group calls use an existing group conversation id
 - community channel calls use an existing community voice channel id
-- `invitedParticipantIds` is only used for conversation calls; community
-  channel calls start with the authenticated caller and add other identities
-  only when they join the active voice-channel call
-- community channel call start is idempotent by `(communityId, channelId)`:
-  when an active call already exists for that voice channel, `POST /calls`
-  returns the existing call instead of creating a second one
-- when returning an existing community channel call, the authenticated caller is
-  joined or added as a joined participant when needed
+- community channel call start is idempotent by `(communityId, channelId)`: when
+  a live call already exists for that voice channel, `POST /calls` returns that
+  call with HTTP 200 **and stores no start**. The authenticated caller is not yet
+  part of it: the client then signs and posts a join
+  (`POST /calls/{callId}/participants`). The node does not join anyone on the
+  caller's behalf
+- if two nodes start a call in the same community channel concurrently, both
+  starts are admitted and every node keeps the one with the lowest start
+  `payloadDigest`; the other is superseded and its creator joins the winner
+- a start never ends or blocks on a call that no admitted record supports
 - caller must be a conversation participant or community member
-- start emits `calls.v1.call.started` to the current call participants
-- the creator starts as `joined`; explicit conversation invitees start as
+- start emits `calls.v1.call.started` to the current call participants, from
+  the locally admitted record
+- the creator starts as `joined`; every other conversation participant starts as
   `ringing`
 - community channel calls are voice-channel presence state; they do not create
   chat timeline `call_event` items and do not generate missed-call
   notifications
+- errors: HTTP 400 when the body is not a valid start; `InvalidPublicMutationError`
+  when the proof does not match the record, the derived call id or the signed
+  scope; 409 `StalePublicMutationError` for a stale proof; 429 code `429021`
+  when the rate cap is exceeded
 
 ### Join and leave call
 
@@ -646,6 +862,25 @@ POST /calls/{callId}/participants
 POST /calls/{callId}/participants/me/heartbeat
 DELETE /calls/{callId}/participants/me
 ```
+
+`POST /calls/{callId}/participants` and `DELETE /calls/{callId}/participants/me`
+carry the claimed time and the signed participant record:
+
+```json
+{
+  "at": 1770000003000,
+  "mutation": { "...": "SignedPublicMutation (call_participant)" }
+}
+```
+
+The heartbeat route is unchanged and carries no signed record. The signed `state`
+is `joined` for a join and `left` for a leave; a leave while the participant is
+still `ringing` must be signed as `declined`, which is the state the node derives
+for that request. The signed `at` is the `at` of the request.
+
+A conversation call with two or fewer participants ends when one of them leaves
+(the fold derives the end from the signed leave); a larger group call stays
+active until its last joined participant leaves or the creator ends it.
 
 Implemented:
 
@@ -685,6 +920,8 @@ Implemented:
 - joins emit `calls.v1.participant.joined`
 - leaves emit `calls.v1.participant.left`
 - declines emit `calls.v1.participant.declined`
+- errors: `CallNotFoundError` for an unknown call, 409 `StalePublicMutationError`
+  for a stale proof, 429 code `429021` when the rate cap is exceeded
 
 ### End call
 
@@ -692,10 +929,35 @@ Implemented:
 DELETE /calls/{callId}
 ```
 
+```json
+{
+  "at": 1770000010000,
+  "mutation": { "...": "SignedPublicMutation (call_end)" }
+}
+```
+
 Implemented:
 
-- only an active call participant can end the call
-- ending the call emits `calls.v1.call.ended` to the current participants
+- only an active call participant can end the call; a community call is ended by
+  its creator only
+- the signed `call_end` record is admitted on every node, which then derives the
+  call as ended
+- ending the call emits `calls.v1.call.ended` to the current participants, from
+  the locally admitted record
+- errors as for joining and leaving
+
+### Realtime call events
+
+`calls.v1.*` lifecycle events (`call.started`, `participant.joined|left|declined|missed`,
+`call.ended`, `call.missed`) gossip between nodes for fast delivery, but a
+gossiped event is only a **claim**. A node does not forward it to WebSockets, does not
+send a push notification for it and does not derive missed-call or timeline state
+from it until its own admitted signed records support it: the node rebuilds the
+event from its local call state and publishes that rebuilt event, or drops the
+claim. A claim that arrives before its record is held for up to 5 seconds
+(replication can lag the gossip) and dropped when the record does not appear.
+`calls.v1.signal.sent`, participant leases and `snapshot_changed` are not lifecycle
+claims and are unchanged.
 
 ### Send WebRTC signal
 
@@ -746,7 +1008,7 @@ local and derived on each node and are never replicated.
 
 Implemented:
 
-- missed participant state is persisted in replicated call state
+- missed participant state is derived locally from the signed start and never replicated
 - missed calls stay available through `GET /calls/history`
 - timeout emits `calls.v1.participant.missed`
 - timeout emits `calls.v1.call.missed`

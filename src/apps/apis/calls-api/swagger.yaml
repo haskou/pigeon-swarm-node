@@ -23,12 +23,20 @@ paths:
         - calls
       summary: Start a call
       description: |
-        Conversation calls create a new call. Community channel calls are
-        idempotent by (communityId, channelId): if the voice channel already
-        has an active call, the API returns that call and joins/adds the
-        authenticated caller when needed. New community channel calls start
-        with the authenticated caller only; other identities become
-        participants when they join the active voice-channel call.
+        The creator signs the start (`call_start` record in the replicated `calls`
+        collection); the node never signs for a user. The call id is derived from
+        the creator and the client `nonce`: the first 16 bytes of
+        sha256(`<creatorIdentityId>:<nonce>`) as a UUID, with record id
+        `call:<callId>`. Every node derives the call state from the admitted
+        signed records only.
+
+        Conversation calls create a new call with exactly the participants of the
+        signed conversation. For a community channel the API returns the active
+        call WITHOUT storing a start when the channel already has a live call
+        (the client then signs a join with `POST /calls/{callId}/participants`);
+        otherwise the signed start (with `sessionEpoch`) is stored. The node
+        enforces one live call per channel: concurrent starts resolve to the one
+        with the lowest start payload digest on every node.
       requestBody:
         required: true
         content:
@@ -42,6 +50,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CallResource'
+        '400':
+          description: The signed start does not match the request, the call id derivation or the signed conversation or community state.
+        '429':
+          description: Call record rate limit exceeded (code 429021, CALLS_RECORD_RATE_LIMIT_PER_MINUTE records per identity per minute).
   /calls/{callId}:
     get:
       tags:
@@ -63,8 +75,15 @@ paths:
       tags:
         - calls
       summary: End a call
+      description: The ender signs a `call_end` record (`call-end:<callId>`). A conversation call may be ended by any participant; a community call only by its creator.
       parameters:
         - $ref: '#/components/parameters/CallId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallMutationBody'
       responses:
         '200':
           description: Call ended.
@@ -72,6 +91,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CallResource'
+        '429':
+          description: Call record rate limit exceeded (code 429021).
   /calls/ice-servers:
     get:
       tags:
@@ -103,8 +124,15 @@ paths:
       tags:
         - calls
       summary: Join an active call
+      description: The participant signs a `call_participant` record with state `joined` (`call-participant:<callId>:<identityId>`). Joining the live call of a community channel is how a caller who received the active call from `POST /calls` takes part.
       parameters:
         - $ref: '#/components/parameters/CallId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallMutationBody'
       responses:
         '200':
           description: Call joined.
@@ -112,13 +140,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CallResource'
+        '429':
+          description: Call record rate limit exceeded (code 429021).
   /calls/{callId}/participants/me:
     delete:
       tags:
         - calls
       summary: Leave an active call
+      description: The participant signs a `call_participant` record with state `left`, or `declined` while still ringing (the record state follows the participant's current state on the node). Leaving a one-to-one call ends it for everybody.
       parameters:
         - $ref: '#/components/parameters/CallId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CallMutationBody'
       responses:
         '200':
           description: Call left.
@@ -126,6 +163,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CallResource'
+        '429':
+          description: Call record rate limit exceeded (code 429021).
   /calls/{callId}/participants/me/heartbeat:
     post:
       tags:
@@ -212,10 +251,26 @@ components:
           type: string
         relayProtocol:
           type: string
+    CallMutationBody:
+      type: object
+      required:
+        - at
+        - mutation
+      properties:
+        at:
+          type: integer
+          minimum: 0
+          description: Epoch milliseconds the participant claims for the record. Must not be more than 10 minutes in the future.
+        mutation:
+          type: object
+          description: Participant-signed PublicMutationProof (store calls, kind put, record call_participant or call_end). See docs/api.md for the byte-exact contract.
     PostCallBody:
       type: object
       required:
         - scopeType
+        - nonce
+        - startedAt
+        - mutation
       properties:
         scopeType:
           type: string
@@ -233,11 +288,21 @@ components:
           type: string
           format: uuid
           description: Required when scopeType is community_channel. Must be a community voice channel.
-        invitedParticipantIds:
-          type: array
-          description: Optional extra recipients for conversation call start events. Ignored for community channel calls, whose participants are derived from community members.
-          items:
-            type: string
+        sessionEpoch:
+          type: integer
+          minimum: 1
+          description: Required when scopeType is community_channel. At most one above the highest epoch known for the channel.
+        nonce:
+          type: string
+          pattern: '^[A-Za-z0-9_-]{16,128}$'
+          description: Client-chosen nonce. The call id derives from the creator and this nonce.
+        startedAt:
+          type: integer
+          minimum: 0
+          description: Epoch milliseconds the creator claims for the start. Must not be more than 10 minutes in the future.
+        mutation:
+          type: object
+          description: Creator-signed PublicMutationProof (store calls, kind put, record call_start). See docs/api.md for the byte-exact contract.
     PostCallSignalBody:
       type: object
       required:
@@ -414,7 +479,17 @@ components:
           type: array
           items:
             type: object
-            required: [id, networkId, creatorIdentityId, createdAt, scope, status, participantIds, participants]
+            required:
+              [
+                id,
+                networkId,
+                creatorIdentityId,
+                createdAt,
+                scope,
+                status,
+                participantIds,
+                participants,
+              ]
             properties:
               id:
                 type: string

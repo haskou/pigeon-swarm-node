@@ -1,105 +1,108 @@
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import { Timestamp } from '@haskou/value-objects';
 import { isDeepStrictEqual } from 'node:util';
 
-import { OrbitDBCallDocument } from './documents/OrbitDBCallDocument';
-import OrbitDBCallDocumentMerger from './OrbitDBCallDocumentMerger';
-import OrbitDBCallDocumentReplicator from './OrbitDBCallDocumentReplicator';
-import OrbitDBCallHistoryReplay from './OrbitDBCallHistoryReplay';
+import {
+  CallPrimitives,
+  CallRecords,
+  FoldedCall,
+  OrbitDBCallFold,
+} from './OrbitDBCallFold';
 
+const SCOPE_TYPES = ['call_start', 'call_participant', 'call_end'];
+
+/**
+ * Folds the admitted signed call records into call state and keeps the lookup
+ * indexes. Nothing here replicates: status, participants and missed marks are
+ * derived from the records and local timeout marks on every node.
+ */
 export default class OrbitDBCallProjection {
-  private readonly activeCallIds = new Set<string>();
+  private static readonly MAX_WAITERS = 256;
+
+  private readonly folded = new Map<string, FoldedCall>();
+
+  private readonly records = new Map<string, CallRecords>();
+
+  private readonly timedOut = new Map<string, number>();
+
+  private readonly participantCallIds = new Map<string, Set<string>>();
+
+  private readonly conversationCallIds = new Map<string, Set<string>>();
 
   private readonly communityCallIds = new Map<string, Set<string>>();
 
   private readonly communityChannelCallIds = new Map<string, Set<string>>();
 
-  private readonly conversationCallIds = new Map<string, Set<string>>();
+  private readonly creatorScopeCallIds = new Map<string, Set<string>>();
 
-  private readonly documents = new Map<string, OrbitDBCallDocument>();
+  private readonly waiters = new Map<string, Set<() => void>>();
 
-  private readonly participantCallIds = new Map<string, Set<string>>();
-
-  private readonly bootstrapRepairs = new Map<string, OrbitDBCallDocument>();
+  private waiterCount = 0;
 
   private ready = false;
 
-  private readonly historyReplays = new Map<object, OrbitDBCallHistoryReplay>();
-
   private startPromise?: Promise<void>;
 
-  constructor(
-    private readonly registry: OrbitDBReplicatedStateRegistry,
-    private readonly merger: OrbitDBCallDocumentMerger,
-    private readonly replicator: OrbitDBCallDocumentReplicator,
-    private readonly publicStorageGuard: PrivateCommunityPublicStorageGuard,
-  ) {}
+  private static maxDurationMs(): number {
+    return pigeonEnvironment().CALLS_MAX_DURATION_MS;
+  }
 
-  private replicateRepair(document: OrbitDBCallDocument): void {
-    const communityId = document.scope.communityId;
+  constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {}
 
-    if (document.scope.type === 'community_channel' && communityId) {
-      this.publicStorageGuard.runInBackgroundWhilePublic(
-        new CommunityId(communityId),
-        () => this.replicator.replicate(document),
+  private assertReady(): void {
+    if (!this.ready) throw new ReplicatedStateNotReadyError();
+  }
+
+  private callIdOf(record: Record<string, unknown>): string | undefined {
+    return typeof record.callId === 'string' ? record.callId : undefined;
+  }
+
+  private isRecord(record: Record<string, unknown>): boolean {
+    return (
+      SCOPE_TYPES.includes(record.scopeType as string) &&
+      typeof record.id === 'string' &&
+      this.callIdOf(record) !== undefined
+    );
+  }
+
+  private keep(
+    current: Record<string, unknown> | undefined,
+    candidate: Record<string, unknown>,
+  ): Record<string, unknown> {
+    return !current ||
+      PublicMutationRecord.replaces(current, candidate) !== false
+      ? candidate
+      : current;
+  }
+
+  private store(callId: string, record: Record<string, unknown>): void {
+    const records = this.records.get(callId) ?? {
+      participants: new Map<string, Record<string, unknown>>(),
+    };
+
+    if (record.scopeType === 'call_start') {
+      records.start = this.keep(records.start, record);
+    } else if (record.scopeType === 'call_end') {
+      records.end = this.keep(records.end, record);
+    } else {
+      const identityId = record.identityId as string;
+
+      records.participants.set(
+        identityId,
+        this.keep(records.participants.get(identityId), record),
       );
-
-      return;
     }
 
-    void this.replicator.replicate(document);
-  }
-
-  private hasCallIdentityFields(document: Record<string, unknown>): boolean {
-    return (
-      typeof document.id === 'string' &&
-      typeof document.createdAt === 'number' &&
-      typeof document.networkId === 'string'
-    );
-  }
-
-  private hasCallStateFields(document: Record<string, unknown>): boolean {
-    return (
-      Array.isArray(document.participantIds) &&
-      Array.isArray(document.participants) &&
-      typeof document.scope === 'object' &&
-      document.scope !== null &&
-      typeof document.status === 'string'
-    );
-  }
-
-  private hasValidScope(document: Record<string, unknown>): boolean {
-    const scope = document.scope as Record<string, unknown>;
-
-    return scope.type === 'community_channel'
-      ? typeof scope.communityId === 'string' &&
-          typeof scope.channelId === 'string' &&
-          scope.conversationId === undefined
-      : scope.type === 'conversation' &&
-          typeof scope.conversationId === 'string' &&
-          scope.communityId === undefined &&
-          scope.channelId === undefined;
-  }
-
-  private isDocument(
-    document: Record<string, unknown>,
-  ): document is OrbitDBCallDocument {
-    return (
-      this.hasCallIdentityFields(document) &&
-      this.hasCallStateFields(document) &&
-      this.hasValidScope(document) &&
-      ((document.scope as OrbitDBCallDocument['scope']).type ===
-        'community_channel' ||
-        typeof document.creatorIdentityId === 'string')
-    );
+    this.records.set(callId, records);
   }
 
   private addToIndex(
@@ -107,9 +110,7 @@ export default class OrbitDBCallProjection {
     key: string | undefined,
     callId: string,
   ): void {
-    if (!key) {
-      return;
-    }
+    if (!key) return;
 
     const callIds = index.get(key) ?? new Set<string>();
 
@@ -122,230 +123,281 @@ export default class OrbitDBCallProjection {
     key: string | undefined,
     callId: string,
   ): void {
-    if (!key) {
-      return;
-    }
+    if (!key) return;
 
     const callIds = index.get(key);
 
     callIds?.delete(callId);
 
-    if (callIds?.size === 0) {
-      index.delete(key);
-    }
+    if (callIds?.size === 0) index.delete(key);
   }
 
-  private communityChannelKey(
-    document: OrbitDBCallDocument,
-  ): string | undefined {
-    if (!document.scope.communityId || !document.scope.channelId) {
-      return undefined;
-    }
+  private communityChannelKey(primitives: CallPrimitives): string | undefined {
+    const { channelId, communityId } = primitives.scope;
 
-    return `${document.scope.communityId}:${document.scope.channelId}`;
+    return communityId && channelId ? `${communityId}:${channelId}` : undefined;
   }
 
-  private index(document: OrbitDBCallDocument): void {
-    if (document.status === 'active') {
-      this.activeCallIds.add(document.id);
+  private creatorScopeKey(primitives: CallPrimitives): string {
+    const { channelId, communityId, conversationId } = primitives.scope;
+
+    return `${primitives.creatorIdentityId}:${conversationId ?? `${communityId}:${channelId}`}`;
+  }
+
+  private applyIndexes(
+    primitives: CallPrimitives,
+    action: (
+      index: Map<string, Set<string>>,
+      key: string | undefined,
+      callId: string,
+    ) => void,
+  ): void {
+    for (const participantId of primitives.participantIds) {
+      action(this.participantCallIds, participantId, primitives.id);
     }
 
-    for (const participantId of document.participantIds) {
-      this.addToIndex(this.participantCallIds, participantId, document.id);
-    }
-
-    this.addToIndex(
+    action(
       this.conversationCallIds,
-      document.scope.conversationId,
-      document.id,
+      primitives.scope.conversationId,
+      primitives.id,
     );
-    this.addToIndex(
-      this.communityCallIds,
-      document.scope.communityId,
-      document.id,
-    );
-    this.addToIndex(
+    action(this.communityCallIds, primitives.scope.communityId, primitives.id);
+    action(
       this.communityChannelCallIds,
-      this.communityChannelKey(document),
-      document.id,
+      this.communityChannelKey(primitives),
+      primitives.id,
+    );
+    action(
+      this.creatorScopeCallIds,
+      this.creatorScopeKey(primitives),
+      primitives.id,
     );
   }
 
-  private unindex(document: OrbitDBCallDocument): void {
-    this.activeCallIds.delete(document.id);
+  private refold(callId: string): void {
+    const previous = this.folded.get(callId);
+    const next = OrbitDBCallFold.fold(
+      this.records.get(callId)!,
+      this.timedOut.get(callId),
+    );
 
-    for (const participantId of document.participantIds) {
-      this.removeFromIndex(this.participantCallIds, participantId, document.id);
+    if (isDeepStrictEqual(previous, next)) return;
+
+    if (previous) {
+      this.applyIndexes(previous.primitives, (index, key, id) =>
+        this.removeFromIndex(index, key, id),
+      );
     }
 
-    this.removeFromIndex(
-      this.conversationCallIds,
-      document.scope.conversationId,
-      document.id,
-    );
-    this.removeFromIndex(
-      this.communityCallIds,
-      document.scope.communityId,
-      document.id,
-    );
-    this.removeFromIndex(
-      this.communityChannelCallIds,
-      this.communityChannelKey(document),
-      document.id,
-    );
+    if (next) {
+      this.folded.set(callId, next);
+      this.applyIndexes(next.primitives, (index, key, id) =>
+        this.addToIndex(index, key, id),
+      );
+    } else {
+      this.folded.delete(callId);
+    }
+
+    this.publishWithPeers(next ?? previous);
   }
 
-  private documentsByIds(callIds: Iterable<string>): OrbitDBCallDocument[] {
-    return [...callIds]
-      .map((callId) => this.documents.get(callId))
+  private publishWithPeers(folded: FoldedCall | undefined): void {
+    if (!folded) return;
+
+    const { primitives } = folded;
+    const peers = new Set<string>([
+      primitives.id,
+      ...(this.creatorScopeCallIds.get(this.creatorScopeKey(primitives)) ?? []),
+      ...(this.communityChannelCallIds.get(
+        this.communityChannelKey(primitives) ?? '',
+      ) ?? []),
+    ]);
+
+    for (const callId of peers) webSocketEventHub.publishCallSnapshot(callId);
+  }
+
+  private project(record: Record<string, unknown>): void {
+    if (!this.isRecord(record)) return;
+
+    const callId = this.callIdOf(record)!;
+
+    this.store(callId, record);
+    this.refold(callId);
+    this.notifyWaiters(callId);
+  }
+
+  private notifyWaiters(callId: string): void {
+    const waiting = this.waiters.get(callId);
+
+    if (!waiting) return;
+
+    this.waiters.delete(callId);
+
+    for (const wake of waiting) wake();
+  }
+
+  /** Ends a folded call that outlived the maximum duration. */
+  private withinDuration(folded: FoldedCall): CallPrimitives {
+    const { primitives } = folded;
+    const expiresAt =
+      primitives.createdAt + OrbitDBCallProjection.maxDurationMs();
+
+    return primitives.status === 'active' &&
+      expiresAt <= Timestamp.now().valueOf()
+      ? { ...primitives, endedAt: expiresAt, status: 'ended' }
+      : primitives;
+  }
+
+  private isLive(folded: FoldedCall): boolean {
+    return this.withinDuration(folded).status === 'active';
+  }
+
+  private liveCalls(callIds: Set<string> | undefined): FoldedCall[] {
+    return [...(callIds ?? [])]
+      .map((id) => this.folded.get(id))
       .filter(
-        (document): document is OrbitDBCallDocument => document !== undefined,
+        (candidate): candidate is FoldedCall =>
+          candidate !== undefined && this.isLive(candidate),
       );
   }
 
-  private projectRecord(
-    document: Record<string, unknown>,
-    persistRepair: boolean,
-    scope?: object,
-  ): void {
-    if (!this.isDocument(document)) {
-      return;
-    }
+  private startedAfter(candidate: FoldedCall, other: FoldedCall): boolean {
+    const [left, right] = [candidate.primitives, other.primitives];
 
-    const replay = scope ? this.historyReplays.get(scope) : undefined;
-
-    if (persistRepair && replay) {
-      this.stageRecord(document, replay);
-
-      return;
-    }
-
-    const current = this.documents.get(document.id);
-    const incoming = this.merger.merge(undefined, document);
-    const merged = this.merger.merge(current, incoming);
-
-    if (!isDeepStrictEqual(current, merged)) {
-      if (current) {
-        this.unindex(current);
-      }
-
-      this.documents.set(document.id, merged);
-      this.index(merged);
-      webSocketEventHub.publishCallSnapshot(merged.id);
-    }
-
-    if (persistRepair) this.scheduleRepair(merged, document);
+    return (
+      left.createdAt > right.createdAt ||
+      (left.createdAt === right.createdAt && left.id > right.id)
+    );
   }
 
-  private stageRecord(
-    document: OrbitDBCallDocument,
-    replay: OrbitDBCallHistoryReplay,
-  ): void {
-    const incoming = this.merger.merge(undefined, document);
-    const current =
-      replay.documents.get(document.id) ?? this.documents.get(document.id);
-
-    replay.documents.set(document.id, this.merger.merge(current, incoming));
-    replay.incoming.set(document.id, document);
+  private isLatestOfCreator(folded: FoldedCall): boolean {
+    return !this.liveCalls(
+      this.creatorScopeCallIds.get(this.creatorScopeKey(folded.primitives)),
+    ).some((candidate) => this.startedAfter(candidate, folded));
   }
 
-  private finishHistoryReplay(scope: object, success: boolean): void {
-    const replay = this.historyReplays.get(scope);
+  /**
+   * One live call per creator and scope (the latest start) and, in a community
+   * channel, the live start with the lowest digest. Every other start of that
+   * scope is a loser that reads as ended on every node alike.
+   */
+  private isSuperseded(folded: FoldedCall): boolean {
+    if (!this.isLatestOfCreator(folded)) return true;
 
-    this.historyReplays.delete(scope);
+    const channelKey = this.communityChannelKey(folded.primitives);
 
-    if (success && replay) {
-      for (const document of replay.documents.values()) {
-        this.projectRecord(document, false);
-        this.scheduleRepair(
-          this.documents.get(document.id)!,
-          replay.incoming.get(document.id)!,
-        );
-      }
-    }
+    if (!channelKey) return false;
 
-    this.flushRepairs();
+    return this.liveCalls(this.communityChannelCallIds.get(channelKey)).some(
+      (candidate) =>
+        candidate.primitives.id !== folded.primitives.id &&
+        this.isLatestOfCreator(candidate) &&
+        candidate.digest < folded.digest,
+    );
   }
 
-  private scheduleRepair(
-    merged: OrbitDBCallDocument,
-    incoming: OrbitDBCallDocument,
-  ): void {
-    if (!this.ready || this.historyReplays.size > 0) {
-      if (isDeepStrictEqual(merged, incoming)) {
-        this.bootstrapRepairs.delete(incoming.id);
-      } else {
-        this.bootstrapRepairs.set(incoming.id, merged);
-      }
-    } else if (!isDeepStrictEqual(merged, incoming)) {
-      this.replicateRepair(merged);
+  private resolve(callId: string): CallPrimitives | undefined {
+    const folded = this.folded.get(callId);
+
+    if (!folded) return undefined;
+
+    const primitives = this.withinDuration(folded);
+
+    if (primitives.status === 'active' && this.isSuperseded(folded)) {
+      return {
+        ...primitives,
+        endedAt: Math.max(primitives.createdAt, Timestamp.now().valueOf()),
+        status: 'ended',
+      };
     }
+
+    return primitives;
   }
 
-  private assertReady(): void {
-    if (!this.ready) {
-      throw new ReplicatedStateNotReadyError();
-    }
-  }
-
-  private flushRepairs(): void {
-    if (!this.ready || this.historyReplays.size > 0) return;
-
-    for (const document of this.bootstrapRepairs.values()) {
-      this.replicateRepair(document);
-    }
-
-    this.bootstrapRepairs.clear();
+  private resolveAll(callIds: Iterable<string>): CallPrimitives[] {
+    return [...callIds]
+      .map((callId) => this.resolve(callId))
+      .filter((primitives): primitives is CallPrimitives => !!primitives);
   }
 
   public async start(): Promise<void> {
     this.startPromise ??= this.registry
-      .onDocumentUpdated(
-        'calls',
-        (document, scope) => this.projectRecord(document, true, scope),
-        {
-          historyObserver: {
-            finished: (scope, success) =>
-              this.finishHistoryReplay(scope, success),
-            started: (scope) => {
-              this.historyReplays.set(scope, new OrbitDBCallHistoryReplay());
-            },
-          },
-          includeHistory: true,
-        },
-      )
+      .onDocumentUpdated('calls', (record) => this.project(record), {
+        includeHistory: true,
+      })
       .then(() => {
         this.ready = true;
-
-        this.flushRepairs();
       });
 
     await this.startPromise;
   }
 
-  public project(document: OrbitDBCallDocument): void {
-    this.assertReady();
-    this.projectRecord(document, false);
+  /**
+   * Resolves true when another signed record of the call is admitted and false
+   * on timeout or when too many waiters are pending: a bound against claims
+   * about calls that never arrive.
+   */
+  public awaitUpdate(callId: CallId, timeoutMs: number): Promise<boolean> {
+    if (this.waiterCount >= OrbitDBCallProjection.MAX_WAITERS) {
+      return Promise.resolve(false);
+    }
+
+    return new Promise<boolean>((resolve) => {
+      const key = callId.valueOf();
+      const waiting = this.waiters.get(key) ?? new Set<() => void>();
+      const waiter = {
+        timer: undefined as NodeJS.Timeout | undefined,
+        wake: (): void => {
+          clearTimeout(waiter.timer);
+          this.waiterCount--;
+          resolve(true);
+        },
+      };
+
+      waiter.timer = setTimeout(() => {
+        waiting.delete(waiter.wake);
+
+        if (waiting.size === 0 && this.waiters.get(key) === waiting) {
+          this.waiters.delete(key);
+        }
+
+        this.waiterCount--;
+        resolve(false);
+      }, timeoutMs);
+      waiting.add(waiter.wake);
+      this.waiters.set(key, waiting);
+      this.waiterCount++;
+    });
   }
 
-  public findById(id: CallId): Promise<OrbitDBCallDocument | undefined> {
+  /** Marks a ringing call as missed on this node; nothing replicates. */
+  public markTimedOut(callId: CallId, at: number): void {
     this.assertReady();
 
-    return Promise.resolve(this.documents.get(id.valueOf()));
+    if (!this.records.has(callId.valueOf())) return;
+
+    this.timedOut.set(callId.valueOf(), at);
+    this.refold(callId.valueOf());
+  }
+
+  public findById(id: CallId): Promise<CallPrimitives | undefined> {
+    this.assertReady();
+
+    return Promise.resolve(this.resolve(id.valueOf()));
   }
 
   public findActiveByParticipant(
     participantId: IdentityId,
-  ): Promise<OrbitDBCallDocument[]> {
+  ): Promise<CallPrimitives[]> {
     this.assertReady();
 
     return Promise.resolve(
-      this.documentsByIds(
+      this.resolveAll(
         this.participantCallIds.get(participantId.valueOf()) ?? [],
       ).filter(
-        (document) =>
-          document.status === 'active' &&
-          document.participants.some(
+        (primitives) =>
+          primitives.status === 'active' &&
+          primitives.participants.some(
             (participant) =>
               participant.identityId === participantId.valueOf() &&
               ['joined', 'ringing'].includes(participant.status),
@@ -354,23 +406,23 @@ export default class OrbitDBCallProjection {
     );
   }
 
-  public findActiveCommunityCalls(): Promise<OrbitDBCallDocument[]> {
+  public findActiveCommunityCalls(): Promise<CallPrimitives[]> {
     this.assertReady();
 
     return Promise.resolve(
-      this.documentsByIds(this.activeCallIds).filter(
-        (document) => document.scope.type === 'community_channel',
-      ),
+      this.resolveAll(
+        [...this.communityCallIds.values()].flatMap((ids) => [...ids]),
+      ).filter((primitives) => primitives.status === 'active'),
     );
   }
 
   public findByParticipant(
     participantId: IdentityId,
-  ): Promise<OrbitDBCallDocument[]> {
+  ): Promise<CallPrimitives[]> {
     this.assertReady();
 
     return Promise.resolve(
-      this.documentsByIds(
+      this.resolveAll(
         this.participantCallIds.get(participantId.valueOf()) ?? [],
       ),
     );
@@ -378,11 +430,11 @@ export default class OrbitDBCallProjection {
 
   public findByConversationId(
     conversationId: ConversationId,
-  ): Promise<OrbitDBCallDocument[]> {
+  ): Promise<CallPrimitives[]> {
     this.assertReady();
 
     return Promise.resolve(
-      this.documentsByIds(
+      this.resolveAll(
         this.conversationCallIds.get(conversationId.valueOf()) ?? [],
       ).sort((left, right) => left.createdAt - right.createdAt),
     );
@@ -391,11 +443,11 @@ export default class OrbitDBCallProjection {
   public findByCommunityChannel(
     communityId: CommunityId,
     channelId: CommunityChannelId,
-  ): Promise<OrbitDBCallDocument[]> {
+  ): Promise<CallPrimitives[]> {
     this.assertReady();
 
     return Promise.resolve(
-      this.documentsByIds(
+      this.resolveAll(
         this.communityChannelCallIds.get(
           `${communityId.valueOf()}:${channelId.valueOf()}`,
         ) ?? [],
@@ -406,28 +458,23 @@ export default class OrbitDBCallProjection {
   public async findActiveByCommunityChannel(
     communityId: CommunityId,
     channelId: CommunityChannelId,
-  ): Promise<OrbitDBCallDocument | undefined> {
-    this.assertReady();
-
+  ): Promise<CallPrimitives | undefined> {
     return (await this.findByCommunityChannel(communityId, channelId)).find(
-      (document) => document.status === 'active',
+      (primitives) => primitives.status === 'active',
     );
   }
 
   public findActiveByCommunity(
     communityId: CommunityId,
-  ): Promise<OrbitDBCallDocument[]> {
+  ): Promise<CallPrimitives[]> {
     this.assertReady();
 
     return Promise.resolve(
-      this.documentsByIds(
-        this.communityCallIds.get(communityId.valueOf()) ?? [],
-      )
+      this.resolveAll(this.communityCallIds.get(communityId.valueOf()) ?? [])
         .filter(
-          (document) =>
-            document.status === 'active' &&
-            document.scope.type === 'community_channel' &&
-            document.scope.communityId === communityId.valueOf(),
+          (primitives) =>
+            primitives.status === 'active' &&
+            primitives.scope.type === 'community_channel',
         )
         .sort((left, right) => left.createdAt - right.createdAt),
     );
@@ -435,15 +482,15 @@ export default class OrbitDBCallProjection {
 
   public findTimedOutRingingCalls(
     timeoutThreshold: Timestamp,
-  ): Promise<OrbitDBCallDocument[]> {
+  ): Promise<CallPrimitives[]> {
     this.assertReady();
 
     return Promise.resolve(
-      this.documentsByIds(this.activeCallIds).filter(
-        (document) =>
-          document.status === 'active' &&
-          document.createdAt <= timeoutThreshold.valueOf() &&
-          document.participants.some(
+      this.resolveAll(this.folded.keys()).filter(
+        (primitives) =>
+          primitives.status === 'active' &&
+          primitives.createdAt <= timeoutThreshold.valueOf() &&
+          primitives.participants.some(
             (participant) => participant.status === 'ringing',
           ),
       ),

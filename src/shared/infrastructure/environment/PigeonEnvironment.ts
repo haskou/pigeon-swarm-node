@@ -3,6 +3,8 @@ import { Kernel, KernelEnvironment } from '@haskou/ddd-kernel';
 export const pigeonEnvironmentSchema = {
   API_PORT: { defaultValue: 8080, type: 'number' },
   CALLS_ICE_TRANSPORT_POLICY: { type: 'string' },
+  CALLS_MAX_DURATION_MS: { defaultValue: 43_200_000, type: 'number' },
+  CALLS_RECORD_RATE_LIMIT_PER_MINUTE: { defaultValue: 30, type: 'number' },
   CALLS_SIGNAL_RATE_LIMIT_PER_MINUTE: {
     defaultValue: 120,
     type: 'number',
