@@ -1,6 +1,6 @@
 import 'reflect-metadata';
-import { Identity } from '@app/contexts/identities/domain/Identity';
 import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
+import { Identity } from '@app/contexts/identities/domain/Identity';
 import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
 import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { Profile } from '@app/contexts/identities/domain/Profile';
