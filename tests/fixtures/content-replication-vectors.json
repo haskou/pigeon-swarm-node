@@ -15,7 +15,8 @@
       "proofBody": {
         "author": {
           "deviceCredential": "device-credential",
-          "identityId": "MCowBQYDK2VwAyEAowner0000000000000000000000000000000000000="
+          "identityId": "MCowBQYDK2VwAyEAowner0000000000000000000000000000000000000=",
+          "authorizationRevision": 0
         },
         "kind": "put",
         "operationId": "AAAAAAAAAAAAAAAAAAAAAA",
@@ -24,9 +25,9 @@
         "recordId": "content:550e8400-e29b-41d4-a716-446655440001:bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
         "sequence": 0,
         "store": "contentReplication",
-        "version": 1
+        "version": 2
       },
-      "signingContent": "pigeon:public-mutation:v1\n{\"author\":{\"deviceCredential\":\"device-credential\",\"identityId\":\"MCowBQYDK2VwAyEAowner0000000000000000000000000000000000000=\"},\"kind\":\"put\",\"operationId\":\"AAAAAAAAAAAAAAAAAAAAAA\",\"payloadDigest\":\"dlTzFQtbXTL6PPvUsUHAWyfyCamzd2odmdP2wI0lx9Q\",\"predecessor\":null,\"recordId\":\"content:550e8400-e29b-41d4-a716-446655440001:bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku\",\"sequence\":0,\"store\":\"contentReplication\",\"version\":1}"
+      "signingContent": "pigeon:public-mutation:v2\n{\"author\":{\"authorizationRevision\":0,\"deviceCredential\":\"device-credential\",\"identityId\":\"MCowBQYDK2VwAyEAowner0000000000000000000000000000000000000=\"},\"kind\":\"put\",\"operationId\":\"AAAAAAAAAAAAAAAAAAAAAA\",\"payloadDigest\":\"dlTzFQtbXTL6PPvUsUHAWyfyCamzd2odmdP2wI0lx9Q\",\"predecessor\":null,\"recordId\":\"content:550e8400-e29b-41d4-a716-446655440001:bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku\",\"sequence\":0,\"store\":\"contentReplication\",\"version\":2}"
     },
     {
       "name": "withdraw",
@@ -41,7 +42,8 @@
       "proofBody": {
         "author": {
           "deviceCredential": "device-credential",
-          "identityId": "MCowBQYDK2VwAyEAowner0000000000000000000000000000000000000="
+          "identityId": "MCowBQYDK2VwAyEAowner0000000000000000000000000000000000000=",
+          "authorizationRevision": 0
         },
         "kind": "delete",
         "operationId": "AAAAAAAAAAAAAAAAAAAAAA",
@@ -50,9 +52,9 @@
         "recordId": "content:550e8400-e29b-41d4-a716-446655440001:bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku",
         "sequence": 0,
         "store": "contentReplication",
-        "version": 1
+        "version": 2
       },
-      "signingContent": "pigeon:public-mutation:v1\n{\"author\":{\"deviceCredential\":\"device-credential\",\"identityId\":\"MCowBQYDK2VwAyEAowner0000000000000000000000000000000000000=\"},\"kind\":\"delete\",\"operationId\":\"AAAAAAAAAAAAAAAAAAAAAA\",\"payloadDigest\":\"Lq_ME0LI13oIytJlxyVBmbFWi3oOyXqUt-0CiOHQNhA\",\"predecessor\":null,\"recordId\":\"content:550e8400-e29b-41d4-a716-446655440001:bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku\",\"sequence\":0,\"store\":\"contentReplication\",\"version\":1}"
+      "signingContent": "pigeon:public-mutation:v2\n{\"author\":{\"authorizationRevision\":0,\"deviceCredential\":\"device-credential\",\"identityId\":\"MCowBQYDK2VwAyEAowner0000000000000000000000000000000000000=\"},\"kind\":\"delete\",\"operationId\":\"AAAAAAAAAAAAAAAAAAAAAA\",\"payloadDigest\":\"Lq_ME0LI13oIytJlxyVBmbFWi3oOyXqUt-0CiOHQNhA\",\"predecessor\":null,\"recordId\":\"content:550e8400-e29b-41d4-a716-446655440001:bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku\",\"sequence\":0,\"store\":\"contentReplication\",\"version\":2}"
     }
   ]
 }

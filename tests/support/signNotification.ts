@@ -30,6 +30,7 @@ export function signNotificationRecord(
 ): PublicMutationProof {
   const body = {
     author: {
+      authorizationRevision: 0,
       deviceCredential: signer.deviceCredential,
       identityId: signer.id,
     },
@@ -40,7 +41,7 @@ export function signNotificationRecord(
     recordId: payload.id,
     sequence,
     store: 'notifications',
-    version: 1,
+    version: 2,
   } as const;
 
   return PublicMutationProof.signed(

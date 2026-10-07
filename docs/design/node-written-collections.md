@@ -52,7 +52,7 @@ recommended design does not need it.
 - `PublicMutationProof` (`src/contexts/public-mutations/domain/PublicMutationProof.ts`):
   `{version, operationId, kind, store, recordId, predecessor, sequence,
   payloadDigest, author{identityId, deviceCredential}, signature}`; signing
-  content is `pigeon:public-mutation:v1\n` + canonical body; `winsOver` is
+  content is `pigeon:public-mutation:v2\n` + canonical body; `winsOver` is
   higher `sequence`, then lower digest.
 - `PublicMutationGate` takes `PublicMutationPolicy[]` keyed by
   `collection\nscopeType`. A policy supplies `expectationOf(record)`

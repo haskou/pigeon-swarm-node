@@ -6,7 +6,7 @@ export function messageProof(
   identityId = 'identity-id',
 ): PublicMutationProof {
   return PublicMutationProof.fromPrimitives({
-    author: { deviceCredential: 'device-credential', identityId },
+    author: { authorizationRevision: 0, deviceCredential: 'device-credential', identityId },
     kind: 'put',
     operationId: 'op-messages-0'.padEnd(22, '0'),
     payloadDigest: PublicMutationProof.digestOf({ recordId }),
@@ -16,6 +16,6 @@ export function messageProof(
     signature:
       'lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==',
     store: 'messages',
-    version: 1,
+    version: 2,
   });
 }

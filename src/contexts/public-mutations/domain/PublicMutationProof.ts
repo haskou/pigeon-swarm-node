@@ -18,7 +18,7 @@ export class PublicMutationProof {
   private static readonly MAX_TEXT = 1024;
   private static readonly OPERATION_ID = /^[A-Za-z0-9_-]{22,64}$/;
   private static readonly DIGEST = /^[A-Za-z0-9_-]{43}$/;
-  private static readonly DOMAIN = 'pigeon:public-mutation:v1\n';
+  private static readonly DOMAIN = 'pigeon:public-mutation:v2\n';
 
   private static exact(
     value: unknown,
@@ -73,11 +73,15 @@ export class PublicMutationProof {
 
   private static author(value: unknown): PublicMutationAuthorPrimitives {
     const author = PublicMutationProof.exact(value, [
+      'authorizationRevision',
       'identityId',
       'deviceCredential',
     ]);
 
     return {
+      authorizationRevision: PublicMutationProof.counter(
+        author.authorizationRevision,
+      ),
       deviceCredential: PublicMutationProof.text(author.deviceCredential),
       identityId: PublicMutationProof.text(author.identityId),
     };
@@ -116,7 +120,7 @@ export class PublicMutationProof {
       'signature',
     ]);
 
-    if (proof.version !== 1) {
+    if (proof.version !== 2) {
       throw new InvalidPublicMutationError();
     }
 
@@ -150,7 +154,7 @@ export class PublicMutationProof {
           recordId: PublicMutationProof.text(proof.recordId),
           sequence,
           store: PublicMutationProof.text(proof.store),
-          version: 1,
+          version: 2,
         },
         new Signature(PublicMutationProof.text(proof.signature)),
       );

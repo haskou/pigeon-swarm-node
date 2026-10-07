@@ -33,6 +33,7 @@ export function signConversationOperationRecord(
 ): PublicMutationProof {
   const body = {
     author: {
+      authorizationRevision: 0,
       deviceCredential: signer.deviceCredential,
       identityId: signer.id,
     },
@@ -43,7 +44,7 @@ export function signConversationOperationRecord(
     recordId: payload.id,
     sequence: 0,
     store: 'conversationOperations',
-    version: 1,
+    version: 2,
   } as const;
 
   return PublicMutationProof.signed(

@@ -1167,6 +1167,55 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     );
   });
 
+  it('re-admits a head whose record claims an authorization revision the node has not replicated yet', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+    try {
+      const gate = mock<OrbitDBMutationGate>();
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const firstNetwork = createStores();
+      let authorizationHeadReplicated = false;
+
+      gate.governs.mockImplementation(
+        (collection) => collection === 'communityOperations',
+      );
+      gate.governsHead.mockReturnValue(false);
+      gate.accepts.mockImplementation(() =>
+        Promise.resolve(authorizationHeadReplicated),
+      );
+      registry.addMutationGate(gate);
+      await registry.register('network-1', firstNetwork.stores);
+      firstNetwork.heads.emitUpdate({
+        payload: {
+          key: 'community:community-1',
+          value: {
+            communityOperations: [{ id: 'operation-1' }],
+            id: 'community-1',
+            updatedAt: 10,
+          },
+        },
+      });
+      await jest.advanceTimersByTimeAsync(0);
+
+      await expect(registry.findHead('community:community-1')).resolves.toEqual(
+        expect.not.objectContaining({
+          communityOperations: [{ id: 'operation-1' }],
+        }),
+      );
+
+      authorizationHeadReplicated = true;
+      await jest.advanceTimersByTimeAsync(2_000);
+
+      await expect(registry.findHead('community:community-1')).resolves.toEqual(
+        expect.objectContaining({
+          communityOperations: [{ id: 'operation-1' }],
+        }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('does not replace a newer cached head with an older replicated update', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();

@@ -1,9 +1,11 @@
 import { CommunityOperationLedger } from '@app/contexts/communities/domain/operations/CommunityOperationLedger';
+import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 import { CommunityOperationAction } from '@app/contexts/communities/domain/value-objects/CommunityOperationAction';
 
 import {
   alice,
   ban,
+  communityId,
   genesis,
   join,
   mallory,
@@ -86,5 +88,61 @@ describe('CommunityOperationLedger', () => {
     ledger.admit(left);
 
     expect(() => ledger.admit(join([left], alice))).toThrow();
+  });
+
+  describe('demotion racing a moderation action across a partition', () => {
+    const created = genesis();
+    const joinedAlice = join([created], alice);
+    const joinedMallory = join([joinedAlice], mallory);
+    const roleId = CommunityRoleId.derive(
+      communityId.valueOf(),
+      owner.valueOf(),
+      3,
+    ).valueOf();
+    const moderator = operation(
+      CommunityOperationAction.ROLE_CREATED,
+      owner,
+      { name: 'moderator', permissions: ['ban_members'], roleId },
+      [joinedMallory],
+      3,
+    );
+    const promote = operation(
+      CommunityOperationAction.MEMBER_ROLES_UPDATED,
+      owner,
+      { identityId: alice.valueOf(), roleIds: [roleId] },
+      [moderator],
+    );
+    const demote = operation(
+      CommunityOperationAction.MEMBER_ROLES_UPDATED,
+      owner,
+      { identityId: alice.valueOf(), roleIds: [] },
+      [promote],
+    );
+    const history = [created, joinedAlice, joinedMallory, moderator, promote];
+
+    it('still admits, whichever side arrives first, a ban authored while the moderator was one', () => {
+      const banWhileModerator = ban([promote], mallory, alice);
+
+      for (const arrival of [
+        [demote, banWhileModerator],
+        [banWhileModerator, demote],
+      ]) {
+        const ledger = new CommunityOperationLedger();
+
+        history.forEach((entry) => ledger.admit(entry));
+
+        expect(() =>
+          arrival.forEach((entry) => ledger.admit(entry)),
+        ).not.toThrow();
+      }
+    });
+
+    it('refuses a ban that builds on the demotion', () => {
+      const ledger = new CommunityOperationLedger();
+
+      [...history, demote].forEach((entry) => ledger.admit(entry));
+
+      expect(() => ledger.admit(ban([demote], mallory, alice))).toThrow();
+    });
   });
 });

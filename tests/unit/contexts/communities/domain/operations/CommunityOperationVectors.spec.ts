@@ -181,6 +181,7 @@ describe('Community operation vectors', () => {
       );
       expect(derived.mutationBody).toEqual({
         author: {
+          authorizationRevision: 0,
           deviceCredential: signer.identityId,
           identityId: signer.identityId,
         },
@@ -191,10 +192,10 @@ describe('Community operation vectors', () => {
         recordId: derived.recordId,
         sequence: 0,
         store: 'communityOperations',
-        version: 1,
+        version: 2,
       });
       expect(derived.signingContent).toBe(
-        `pigeon:public-mutation:v1\n${canonicalize(derived.mutationBody)}`,
+        `pigeon:public-mutation:v2\n${canonicalize(derived.mutationBody)}`,
       );
       expect(derived.mutation).toEqual({
         ...derived.mutationBody,

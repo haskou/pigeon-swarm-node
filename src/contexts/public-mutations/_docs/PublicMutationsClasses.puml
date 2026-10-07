@@ -1,0 +1,42 @@
+@startuml PublicMutationsClasses
+title Public mutations context (causal device authorization, #362)
+
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+package "public-mutations/domain" {
+  class PublicMutationProof <<ValueObject>> {
+    +version: 2
+    +author: identityId, deviceCredential, authorizationRevision
+    +signingContent(): "pigeon:public-mutation:v2\n" + canonical body
+  }
+  class PublicMutationVerifier <<DomainService>>
+  interface PublicMutationAuthorAuthorization {
+    +isAuthorized(author): Promise<boolean>
+  }
+}
+
+package "public-mutations/infrastructure" {
+  class PublicMutationGate
+  class DeviceAuthorizationPublicMutationAuthorization
+  class ShortLivedLookup
+}
+
+package "identity-devices/domain" {
+  class DeviceAuthorizationTimeline <<ValueObject>> {
+    +hasReached(revision): boolean
+    +isAuthorizedAt(credential, revision): boolean
+  }
+  interface DeviceAuthorizationRepository {
+    +findTimeline(identityId): Promise<DeviceAuthorizationTimeline>
+  }
+}
+
+PublicMutationGate ..> PublicMutationVerifier
+PublicMutationVerifier ..> PublicMutationProof
+PublicMutationVerifier ..> PublicMutationAuthorAuthorization
+DeviceAuthorizationPublicMutationAuthorization ..|> PublicMutationAuthorAuthorization
+DeviceAuthorizationPublicMutationAuthorization ..> ShortLivedLookup
+DeviceAuthorizationPublicMutationAuthorization ..> DeviceAuthorizationRepository
+DeviceAuthorizationRepository ..> DeviceAuthorizationTimeline
+@enduml

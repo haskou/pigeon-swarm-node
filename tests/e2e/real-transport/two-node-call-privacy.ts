@@ -411,6 +411,7 @@ async function main(): Promise<void> {
     };
     const channelLogBody = {
       author: {
+        authorizationRevision: 0,
         deviceCredential: identities[0].deviceCredential,
         identityId: identities[0].id,
       },
@@ -421,7 +422,7 @@ async function main(): Promise<void> {
       recordId: channelLogPayload.id,
       sequence: 0,
       store: 'moderationLogs',
-      version: 1,
+      version: 2,
     } as const;
     const channelOperation = signCommunityOperation({
       action: 'channel_created',
@@ -485,6 +486,7 @@ async function main(): Promise<void> {
     ): Record<string, unknown> => {
       const body = {
         author: {
+          authorizationRevision: 0,
           deviceCredential: identities[1].deviceCredential,
           identityId: requesterId,
         },
@@ -496,7 +498,7 @@ async function main(): Promise<void> {
         recordId: joinRecord.id,
         sequence,
         store: 'requests',
-        version: 1,
+        version: 2,
       } as const;
 
       return PublicMutationProof.signed(

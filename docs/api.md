@@ -70,6 +70,58 @@ Implemented:
   node
 - Cucumber scenarios for invalid and stale signed requests
 
+## Public mutation proof (authorization revision)
+
+Every client-signed record (`SignedPublicMutation`) is a proof body plus its
+signature:
+
+```json
+{
+  "version": 2,
+  "store": "<store>",
+  "kind": "put",
+  "operationId": "<random base64url, 22 characters>",
+  "recordId": "<record id>",
+  "payloadDigest": "<base64url sha256 of the canonical record>",
+  "predecessor": null,
+  "sequence": 0,
+  "author": {
+    "identityId": "<identityId>",
+    "deviceCredential": "<signing device public key>",
+    "authorizationRevision": 3
+  },
+  "signature": "<Ed25519 signature, standard base64 with padding>"
+}
+```
+
+The device signs the UTF-8 bytes `"pigeon:public-mutation:v2\n" +
+canonicalize(body-without-signature)` (RFC 8785). `version` is exactly `2`;
+version `1` proofs and the `pigeon:public-mutation:v1\n` domain are rejected
+(`InvalidPublicMutationError`) and there is no fallback. The decoder is strict:
+unknown fields are rejected.
+
+`author.authorizationRevision` is a non-negative safe integer: the `revision` of
+the identity's device-authorization chain (`GET /identity-devices/authorization`)
+that the signing device observed when it signed. It is inside the signed body.
+Nodes evaluate the signing device against the authorization chain **at that
+revision**, not at the current head:
+
+- a device is accepted iff the chain state with the greatest revision `<=` the
+  claimed one contains the device and the claimed revision is not above the head
+  the node has replicated;
+- a record signed before a revocation stays valid when it is delivered after the
+  revocation (late delivery, partition heal, sync from scratch, restart);
+- a revoked device cannot claim the revocation revision or any later one;
+- a claimed revision above the node's head is refused until the chain
+  replicates (the node retries replicated records) and a revision below the
+  latest recovery checkpoint is refused;
+- timestamps inside the record are never used for authorization.
+
+A client reads `revision` immediately before signing and uses that value. Byte
+exact signing vectors for every store are in `tests/fixtures/*-vectors.json`
+(`author.authorizationRevision: 0`, `version: 2`). The design, threat model and
+the chosen bound are in `docs/design/causal-device-authorization.md`.
+
 ## Path Parameters
 
 Path parameters must be percent-encoded with `encodeURIComponent` before being
@@ -684,8 +736,11 @@ is a positive integer:
 **Proof and signing bytes.** `mutation` is a `put` proof with `store: "calls"`,
 `recordId` = the record `id`, `payloadDigest` =
 `base64url(sha256(utf8(canonicalize(record))))` (43 characters, no padding) and
-`author` = `{ identityId, deviceCredential }` of the authoring identity. The
-device signs the UTF-8 bytes `"pigeon:public-mutation:v1\n" +
+`author` = `{ identityId, deviceCredential, authorizationRevision }` of the authoring
+identity (`authorizationRevision` is the `revision` of
+`GET /identity-devices/authorization` the device observed when it signed; see
+[Public mutation proof](#public-mutation-proof-authorization-revision)). The
+device signs the UTF-8 bytes `"pigeon:public-mutation:v2\n" +
 canonicalize(mutation-without-signature)` with Ed25519; `signature` is standard
 base64 with padding (88 characters). `call_start` and `call_end` are written at
 `sequence` 0 with `predecessor: null`. A participant state is one record per call
@@ -703,6 +758,7 @@ Conversation call start vector (`conversation_call_start`; creator key
 ```json
 {
   "author": {
+    "authorizationRevision": 0,
     "deviceCredential": "MCowBQYDK2VwAyEASrJUZSKSpoUb1mzjaHv/CP8FfO1fcxQ9nYfWajQJN04=",
     "identityId": "MCowBQYDK2VwAyEASrJUZSKSpoUb1mzjaHv/CP8FfO1fcxQ9nYfWajQJN04="
   },
@@ -713,8 +769,8 @@ Conversation call start vector (`conversation_call_start`; creator key
   "recordId": "call:1bc97a47-5707-80fe-a156-e7a31b96526b",
   "sequence": 0,
   "store": "calls",
-  "version": 1,
-  "signature": "BKTNXLTrW90plz3K0f46anNIyEk4aWwOs0Pdalv7npgJBcNgeaBQYQnnLq5rLHPmFiQgcZeQboaIcbCMYi7tCQ=="
+  "version": 2,
+  "signature": "3r6O92fx+YigDIdiumwvZvy/iDU3XmGRC1rTfDUEGP/OAvCuQRmgq9yFR8Hs9VIPwfKMcCkiLHzuVLPo1/jrCQ=="
 }
 ```
 
@@ -724,18 +780,19 @@ Participant (`call_participant_left_after_joined`, second state of the callee,
 ```json
 {
   "author": {
+    "authorizationRevision": 0,
     "deviceCredential": "MCowBQYDK2VwAyEAfYssPUn3veVeeSuo+92MJ4MsOfqv+40KRIz0zEc9U+0=",
     "identityId": "MCowBQYDK2VwAyEAfYssPUn3veVeeSuo+92MJ4MsOfqv+40KRIz0zEc9U+0="
   },
   "kind": "put",
   "operationId": "vector-call-leave-1",
   "payloadDigest": "mTkCz7Xxe960HrYGCXIUc_CUjs5zANvj0KmBeeN1TNw",
-  "predecessor": "06avtbVgtPcXYB1eleqUgWHst9T37l5b-DLNpp2R1ls",
+  "predecessor": "cM6VHQ0tYtKm0PaY7ura82i_L5P9UarD-HSYbjnnHa4",
   "recordId": "call-participant:1bc97a47-5707-80fe-a156-e7a31b96526b:MCowBQYDK2VwAyEAfYssPUn3veVeeSuo+92MJ4MsOfqv+40KRIz0zEc9U+0=",
   "sequence": 1,
   "store": "calls",
-  "version": 1,
-  "signature": "rieIMc6BB433o+O3z6qVUiIC1Kk4xRHiVey6TAdzPBA7jImA/50kJdYBgoWEMrgmjHTON63YLrOId4dBChvKDQ=="
+  "version": 2,
+  "signature": "f1kE3Weq3Q1/TvS2X6y0j8r4Ya9DkyV09meQXUPJKGrsTehsDSXnaMKroV/brnJvdFetxqjC9RGUfQbX4tTWBQ=="
 }
 ```
 
@@ -744,6 +801,7 @@ End (`call_end`):
 ```json
 {
   "author": {
+    "authorizationRevision": 0,
     "deviceCredential": "MCowBQYDK2VwAyEASrJUZSKSpoUb1mzjaHv/CP8FfO1fcxQ9nYfWajQJN04=",
     "identityId": "MCowBQYDK2VwAyEASrJUZSKSpoUb1mzjaHv/CP8FfO1fcxQ9nYfWajQJN04="
   },
@@ -754,8 +812,8 @@ End (`call_end`):
   "recordId": "call-end:1bc97a47-5707-80fe-a156-e7a31b96526b",
   "sequence": 0,
   "store": "calls",
-  "version": 1,
-  "signature": "4q4sH1TvmwQQYh5nkNKYq0yR8b1DI715zKRgyvTswPbIfZyyeFuYWh/yS1L2cz0/Tez/RrHDhRNAO2spQTzcCw=="
+  "version": 2,
+  "signature": "XNCfA9/Z4OkqYwrMM83mLdrGy4hpKm7q9LZ5wkvd2n8EImYN4CmJlavqRTHGvZwCpJqG8M7afM+EtRSmsDbqAg=="
 }
 ```
 
@@ -2188,7 +2246,7 @@ ascending, unique, at most 64 digests, and is the same array in the record and i
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "store": "conversationOperations",
   "kind": "put",
   "operationId": "<random base64url>",
@@ -2196,12 +2254,12 @@ ascending, unique, at most 64 digests, and is the same array in the record and i
   "payloadDigest": "<base64url sha256 of canonical record with id>",
   "predecessor": null,
   "sequence": 0,
-  "author": { "identityId": "<identityId>", "deviceCredential": "<credential>" },
+  "author": { "identityId": "<identityId>", "deviceCredential": "<credential>", "authorizationRevision": 0 },
   "signature": "<Ed25519 signature by the device key, as the crypto library emits it>"
 }
 ```
 
-The device signs the UTF-8 bytes `"pigeon:public-mutation:v1\n" +
+The device signs the UTF-8 bytes `"pigeon:public-mutation:v2\n" +
 canonicalize(body-without-signature)`, the same signing content as every other
 public mutation and as the community operations. Identity ids are the base64
 public key without PEM headers.
@@ -4484,7 +4542,7 @@ checked by `NotificationVectors.spec.ts`):
 - `mutation`: a `put` proof with `store: "notifications"`, `recordId` = the
   notification id, `predecessor: null`, `sequence: 0`, `payloadDigest` =
   `base64url(sha256(utf8(canonicalize(payload))))`, signed with the shared
-  `pigeon:public-mutation:v1\n` signing content; the author is the inviter.
+  `pigeon:public-mutation:v2\n` signing content; the author is the inviter.
 - admission (every node, on replication too): the inviter must be the proof
   author; for conversation and group invitations both inviter and recipient must
   be participants in the signed conversation state; for community invitations the
