@@ -65,6 +65,7 @@ describe('PublicMutationGate over pins', () => {
     const device = await KeyPair.generate();
     const body = {
       author: {
+        authorizationRevision: 0,
         deviceCredential: device.toPrimitives().publicKey,
         identityId: author,
       },
@@ -75,7 +76,7 @@ describe('PublicMutationGate over pins', () => {
       recordId: id,
       sequence,
       store: 'pins',
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationRecord.withProof(
@@ -228,6 +229,7 @@ describe('PublicMutationGate over conversation pins', () => {
     const device = await KeyPair.generate();
     const body = {
       author: {
+        authorizationRevision: 0,
         deviceCredential: device.toPrimitives().publicKey,
         identityId: author,
       },
@@ -238,7 +240,7 @@ describe('PublicMutationGate over conversation pins', () => {
       recordId: payload.id as string,
       sequence: 0,
       store: 'pins',
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationRecord.withProof(
@@ -325,6 +327,7 @@ describe('PublicMutationGate over notification settings', () => {
     const device = await KeyPair.generate();
     const body = {
       author: {
+        authorizationRevision: 0,
         deviceCredential: device.toPrimitives().publicKey,
         identityId: signer,
       },
@@ -335,7 +338,7 @@ describe('PublicMutationGate over notification settings', () => {
       recordId: payload.id as string,
       sequence: 0,
       store: 'notificationSettings',
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationRecord.withProof(
@@ -488,6 +491,7 @@ describe('PublicMutationGate over stickers', () => {
     const device = await KeyPair.generate();
     const body = {
       author: {
+        authorizationRevision: 0,
         deviceCredential: device.toPrimitives().publicKey,
         identityId: signer,
       },
@@ -498,7 +502,7 @@ describe('PublicMutationGate over stickers', () => {
       recordId: payload.id as string,
       sequence: 0,
       store,
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationRecord.withProof(
@@ -716,6 +720,7 @@ describe('PublicMutationGate over community invites and requests', () => {
     const device = await KeyPair.generate();
     const body = {
       author: {
+        authorizationRevision: 0,
         deviceCredential: device.toPrimitives().publicKey,
         identityId: author,
       },
@@ -726,7 +731,7 @@ describe('PublicMutationGate over community invites and requests', () => {
       recordId: payload.id as string,
       sequence: 1,
       store: 'requests',
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationRecord.withProof(
@@ -888,6 +893,7 @@ describe('PublicMutationGate over polls', () => {
     const device = await KeyPair.generate();
     const body = {
       author: {
+        authorizationRevision: 0,
         deviceCredential: device.toPrimitives().publicKey,
         identityId: author,
       },
@@ -898,7 +904,7 @@ describe('PublicMutationGate over polls', () => {
       recordId: payload.id as string,
       sequence: 1,
       store: 'polls',
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationRecord.withProof(
@@ -1106,6 +1112,7 @@ describe('PublicMutationGate over community channel messages', () => {
     const device = await KeyPair.generate();
     const body = {
       author: {
+        authorizationRevision: 0,
         deviceCredential: device.toPrimitives().publicKey,
         identityId,
       },
@@ -1116,7 +1123,7 @@ describe('PublicMutationGate over community channel messages', () => {
       recordId: id,
       sequence,
       store: 'messages',
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationRecord.withProof(
@@ -1232,6 +1239,7 @@ describe('PublicMutationGate over community moderation logs', () => {
     const device = await KeyPair.generate();
     const body = {
       author: {
+        authorizationRevision: 0,
         deviceCredential: device.toPrimitives().publicKey,
         identityId: author,
       },
@@ -1242,7 +1250,7 @@ describe('PublicMutationGate over community moderation logs', () => {
       recordId: payload.id as string,
       sequence: 1,
       store: 'moderationLogs',
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationRecord.withProof(

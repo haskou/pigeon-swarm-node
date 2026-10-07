@@ -368,7 +368,7 @@ export default class Definitions {
     const next = sequence ?? this.communityRecordSequences.get(recordId) ?? 0;
     const identityId = keyPair.toPrimitives().publicKey;
     const proofBody = {
-      author: { deviceCredential: identityId, identityId },
+      author: { authorizationRevision: 0, deviceCredential: identityId, identityId },
       kind: 'put',
       operationId: `api-community-${next}-${recordId}`
         .replace(/[^A-Za-z0-9]/g, '')
@@ -380,7 +380,7 @@ export default class Definitions {
       recordId,
       sequence: next,
       store,
-      version: 1,
+      version: 2,
     } as const;
 
     if (sequence === undefined) {
@@ -3052,7 +3052,7 @@ export default class Definitions {
         : { ...document, removed: true };
     const sequence = kind === 'put' ? 0 : 1;
     const proofBody = {
-      author: { deviceCredential: identityId, identityId },
+      author: { authorizationRevision: 0, deviceCredential: identityId, identityId },
       kind,
       operationId: `api-reaction-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -3061,7 +3061,7 @@ export default class Definitions {
       recordId,
       sequence,
       store: 'reactions',
-      version: 1,
+      version: 2,
     } as const;
     const proof = PublicMutationProof.signed(
       proofBody,
@@ -3748,7 +3748,7 @@ export default class Definitions {
     const keyPair = await this.ensureIdentityKeyPair();
     const identityId = keyPair.toPrimitives().publicKey;
     const proofBody = {
-      author: { deviceCredential: identityId, identityId },
+      author: { authorizationRevision: 0, deviceCredential: identityId, identityId },
       kind,
       operationId: `api-community-message-${kind}-${sequence}-${randomUUID()}`
         .replace(/[^A-Za-z0-9_-]/g, '-')
@@ -3761,7 +3761,7 @@ export default class Definitions {
       recordId: payload.id as string,
       sequence,
       store: 'messages',
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationProof.signed(
@@ -3781,7 +3781,7 @@ export default class Definitions {
       scopeType: 'conversation',
     };
     const proofBody = {
-      author: { deviceCredential: identityId, identityId },
+      author: { authorizationRevision: 0, deviceCredential: identityId, identityId },
       kind: 'put',
       operationId: `api-conversation-message-${fields.id}`
         .replace(/[^A-Za-z0-9_-]/g, '-')
@@ -3792,7 +3792,7 @@ export default class Definitions {
       recordId: fields.id,
       sequence: 0,
       store: 'messages',
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationProof.signed(
@@ -3821,7 +3821,7 @@ export default class Definitions {
     const recordId = String(payload.id);
     const sequence = this.stickerMutationSequences.get(recordId) ?? 0;
     const proofBody = {
-      author: { deviceCredential: identityId, identityId },
+      author: { authorizationRevision: 0, deviceCredential: identityId, identityId },
       kind,
       operationId: `api-sticker-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -3832,7 +3832,7 @@ export default class Definitions {
       recordId,
       sequence,
       store,
-      version: 1,
+      version: 2,
     } as const;
 
     this.stickerMutationSequences.set(recordId, sequence + 1);
@@ -3948,7 +3948,7 @@ export default class Definitions {
           }
         : { ...base, removed: true };
     const proofBody = {
-      author: { deviceCredential: identityId, identityId },
+      author: { authorizationRevision: 0, deviceCredential: identityId, identityId },
       kind,
       operationId: `api-notification-settings-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -3959,7 +3959,7 @@ export default class Definitions {
       recordId,
       sequence,
       store: 'notificationSettings',
-      version: 1,
+      version: 2,
     } as const;
     const proof = PublicMutationProof.signed(
       proofBody,
@@ -4006,7 +4006,7 @@ export default class Definitions {
         : { ...document, removed: true };
     const sequence = kind === 'put' ? 0 : 1;
     const proofBody = {
-      author: { deviceCredential: identityId, identityId },
+      author: { authorizationRevision: 0, deviceCredential: identityId, identityId },
       kind,
       operationId: `api-conversation-reaction-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -4015,7 +4015,7 @@ export default class Definitions {
       recordId,
       sequence,
       store: 'reactions',
-      version: 1,
+      version: 2,
     } as const;
     const proof = PublicMutationProof.signed(
       proofBody,

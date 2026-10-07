@@ -2,6 +2,7 @@ import IdentityRepository from '@app/contexts/identities/domain/repositories/Ide
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
+import { DeviceAuthorizationTimeline } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTimeline';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
 import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
@@ -29,6 +30,8 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   private static readonly HEAD_PREFIX = 'device-authorization:';
 
   private static readonly LOCAL_NAMESPACE = 'identity_device_authorizations';
+
+  private readonly replayer: OrbitDBDeviceAuthorizationReplayer;
 
   private readonly lock: OrbitDBDeviceAuthorizationIdentityLock;
 
@@ -62,6 +65,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       sources,
     );
 
+    this.replayer = replayer;
     this.lock = new OrbitDBDeviceAuthorizationIdentityLock();
     this.routing = new OrbitDBDeviceAuthorizationRouting(
       identityRepository,
@@ -211,29 +215,64 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     });
   }
 
-  public async find(
+  /** The stored document of the identity, provisioned from its genesis when absent. */
+  private async resolveDocument(
     identityId: IdentityId,
-  ): Promise<DeviceAuthorization | undefined> {
-    return this.lock.run(identityId, async () => {
-      const trustedGenesis =
-        await this.routing.resolveTrustedGenesis(identityId);
+  ): Promise<OrbitDBDeviceAuthorizationDocument | undefined> {
+    const trustedGenesis = await this.routing.resolveTrustedGenesis(identityId);
 
-      if (!trustedGenesis) {
+    if (!trustedGenesis) {
+      return undefined;
+    }
+
+    const candidate = await this.readHead(identityId);
+    const document =
+      candidate &&
+      this.validator.isDocument(candidate) &&
+      this.genesisMatcher.hasTrustedGenesis(candidate, trustedGenesis)
+        ? candidate
+        : this.factory.toDocument(trustedGenesis, []);
+
+    return document !== candidate ? this.save(document) : document;
+  }
+
+  public find(identityId: IdentityId): Promise<DeviceAuthorization | undefined> {
+    return this.lock.run(identityId, async () => {
+      const document = await this.resolveDocument(identityId);
+
+      return document
+        ? DeviceAuthorization.fromPrimitives(document.authorization)
+        : undefined;
+    });
+  }
+
+  public findTimeline(
+    identityId: IdentityId,
+  ): Promise<DeviceAuthorizationTimeline | undefined> {
+    return this.lock.run(identityId, async () => {
+      const document = await this.resolveDocument(identityId);
+
+      if (!document) {
         return undefined;
       }
 
-      const candidate = await this.readHead(identityId);
-      const document =
-        candidate &&
-        this.validator.isDocument(candidate) &&
-        this.genesisMatcher.hasTrustedGenesis(candidate, trustedGenesis)
-          ? candidate
-          : this.factory.toDocument(trustedGenesis, []);
+      if (document.overflow) {
+        return new DeviceAuthorizationTimeline([
+          DeviceAuthorization.fromPrimitives(document.authorization),
+        ]);
+      }
 
-      const resolved =
-        document !== candidate ? await this.save(document) : document;
-
-      return DeviceAuthorization.fromPrimitives(resolved.authorization);
+      return new DeviceAuthorizationTimeline(
+        this.replayer.statesOf(
+          document.checkpoint
+            ? this.replayer.authorizationFromCheckpoint(
+                DeviceAuthorization.fromPrimitives(document.genesis),
+                document.checkpoint,
+              )
+            : DeviceAuthorization.fromPrimitives(document.genesis),
+          document.history,
+        ),
+      );
     });
   }
 

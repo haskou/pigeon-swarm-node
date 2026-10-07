@@ -417,6 +417,200 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     });
   });
 
+  describe('timeline', () => {
+    const credentialOf = (key: KeyPair): DeviceCredential =>
+      DeviceCredential.fromString(key.toPrimitives().publicKey);
+    const revisionOf = (value: number): DeviceAuthorizationRevision =>
+      new DeviceAuthorizationRevision(value);
+
+    it('answers for the revision a record claims, not for the head', async () => {
+      const { genesis, identityId, owner } = await fixture();
+      const phone = await KeyPair.generate();
+      const laptop = await KeyPair.generate();
+      const { repository } = repositoryFixture();
+      await provisionAuthorization(repository, genesis);
+      await repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000001',
+          '10000000-0000-4000-8000-000000000001',
+        ),
+      );
+      await repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          laptop,
+          '00000000-0000-4000-8000-000000000002',
+          '10000000-0000-4000-8000-000000000002',
+          revisionOf(1),
+        ),
+      );
+      await repository.compareAndApply(
+        await revocation(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000003',
+          revisionOf(2),
+        ),
+      );
+
+      const timeline = await repository.findTimeline(identityId);
+
+      expect(timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(0))).toBe(
+        false,
+      );
+      expect(timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(1))).toBe(
+        true,
+      );
+      expect(timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(2))).toBe(
+        true,
+      );
+      expect(timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(3))).toBe(
+        false,
+      );
+      expect(
+        timeline?.isAuthorizedAt(credentialOf(laptop), revisionOf(2)),
+      ).toBe(true);
+      expect(
+        timeline?.isAuthorizedAt(credentialOf(laptop), revisionOf(3)),
+      ).toBe(true);
+      expect(timeline?.isAuthorizedAt(credentialOf(owner), revisionOf(3))).toBe(
+        true,
+      );
+      expect(timeline?.isAuthorizedAt(credentialOf(owner), revisionOf(0))).toBe(
+        true,
+      );
+    });
+
+    it('never trusts a revision the head has not reached yet', async () => {
+      const { genesis, identityId, owner } = await fixture();
+      const { repository } = repositoryFixture();
+      await provisionAuthorization(repository, genesis);
+
+      const timeline = await repository.findTimeline(identityId);
+
+      expect(timeline?.isAuthorizedAt(credentialOf(owner), revisionOf(0))).toBe(
+        true,
+      );
+      expect(timeline?.isAuthorizedAt(credentialOf(owner), revisionOf(1))).toBe(
+        false,
+      );
+      expect(timeline?.hasReached(revisionOf(1))).toBe(false);
+    });
+
+    it('replays the same timeline after a restart', async () => {
+      const { genesis, identityId, owner } = await fixture();
+      const phone = await KeyPair.generate();
+      const laptop = await KeyPair.generate();
+      const first = repositoryFixture();
+      await provisionAuthorization(first.repository, genesis);
+      await first.repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000001',
+          '10000000-0000-4000-8000-000000000001',
+        ),
+      );
+      await first.repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          laptop,
+          '00000000-0000-4000-8000-000000000002',
+          '10000000-0000-4000-8000-000000000002',
+          revisionOf(1),
+        ),
+      );
+      await first.repository.compareAndApply(
+        await revocation(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000003',
+          revisionOf(2),
+        ),
+      );
+      const restarted = new OrbitDBDeviceAuthorizationRepository(
+        first.registry,
+        new DeviceAuthorizationPolicy(),
+        first.identityRepository,
+        first.networkRegistry,
+        first.database,
+      );
+
+      const before = await first.repository.findTimeline(identityId);
+      const after = await restarted.findTimeline(identityId);
+
+      for (const key of [owner, phone, laptop]) {
+        for (const revision of [0, 1, 2, 3, 4]) {
+          expect(
+            after?.isAuthorizedAt(credentialOf(key), revisionOf(revision)),
+          ).toBe(
+            before?.isAuthorizedAt(credentialOf(key), revisionOf(revision)),
+          );
+        }
+      }
+      expect(after?.isAuthorizedAt(credentialOf(phone), revisionOf(2))).toBe(
+        true,
+      );
+      expect(after?.isAuthorizedAt(credentialOf(phone), revisionOf(3))).toBe(
+        false,
+      );
+    });
+
+    it('refuses revisions below the recovery checkpoint that replaced them', async () => {
+      const { genesis, identityId, owner, recovery } = await fixture();
+      const phone = await KeyPair.generate();
+      const recovered = await KeyPair.generate();
+      const { repository } = repositoryFixture();
+      await provisionAuthorization(repository, genesis);
+      await repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000001',
+          '10000000-0000-4000-8000-000000000001',
+        ),
+      );
+      const unsigned = DeviceAuthorizationTransition.recovery(
+        identityId,
+        new DeviceAuthorizationOperationId(
+          '00000000-0000-4000-8000-000000000002',
+        ),
+        revisionOf(1),
+        credentialOf(recovered),
+      );
+      const proven = unsigned.provePossession(
+        recovered.sign(unsigned.getProofOfPossessionPayload()),
+      );
+      await repository.compareAndApply(
+        proven.authorizeRecovery(recovery.sign(proven.getSigningPayload())),
+      );
+
+      const timeline = await repository.findTimeline(identityId);
+
+      expect(
+        timeline?.isAuthorizedAt(credentialOf(recovered), revisionOf(2)),
+      ).toBe(true);
+      expect(timeline?.isAuthorizedAt(credentialOf(owner), revisionOf(0))).toBe(
+        false,
+      );
+      expect(timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(1))).toBe(
+        false,
+      );
+      expect(timeline?.isAuthorizedAt(credentialOf(owner), revisionOf(2))).toBe(
+        false,
+      );
+    });
+  });
+
   it('converges at the sibling limit and drops stale branches after recovery', async () => {
     const { genesis, identityId, owner, recovery } = await fixture();
     const first = repositoryFixture();

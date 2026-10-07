@@ -382,7 +382,7 @@ async function main(): Promise<void> {
     payload: Record<string, unknown>,
   ): PublicMutationProof => {
     const body = {
-      author: { deviceCredential: author, identityId: author },
+      author: { authorizationRevision: 0, deviceCredential: author, identityId: author },
       kind,
       operationId: `forged-e2e-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -391,7 +391,7 @@ async function main(): Promise<void> {
       recordId: id,
       sequence,
       store: 'pins',
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationProof.signed(
@@ -498,7 +498,7 @@ async function main(): Promise<void> {
     payload: Record<string, unknown>,
   ): PublicMutationProof => {
     const body = {
-      author: { deviceCredential: author, identityId: author },
+      author: { authorizationRevision: 0, deviceCredential: author, identityId: author },
       kind,
       operationId: `forged-conv-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -507,7 +507,7 @@ async function main(): Promise<void> {
       recordId: conversationPinId,
       sequence,
       store: 'pins',
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationProof.signed(
@@ -593,7 +593,7 @@ async function main(): Promise<void> {
     payload: Record<string, unknown>,
   ): PublicMutationProof => {
     const body = {
-      author: { deviceCredential: author, identityId: author },
+      author: { authorizationRevision: 0, deviceCredential: author, identityId: author },
       kind,
       operationId: `forged-settings-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -602,7 +602,7 @@ async function main(): Promise<void> {
       recordId: settingsId,
       sequence,
       store: 'notificationSettings',
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationProof.signed(
@@ -688,7 +688,7 @@ async function main(): Promise<void> {
     payload: Record<string, unknown>,
   ): PublicMutationProof => {
     const body = {
-      author: { deviceCredential: author, identityId: author },
+      author: { authorizationRevision: 0, deviceCredential: author, identityId: author },
       kind,
       operationId: `forged-invite-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -697,7 +697,7 @@ async function main(): Promise<void> {
       recordId: inviteToken.valueOf(),
       sequence,
       store: 'requests',
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationProof.signed(
@@ -744,7 +744,7 @@ async function main(): Promise<void> {
     scopeType: 'community_moderation_log',
   };
   const logBody = {
-    author: { deviceCredential: author, identityId: author },
+    author: { authorizationRevision: 0, deviceCredential: author, identityId: author },
     kind: 'put',
     operationId: 'forged-moderation-log-0'.padEnd(22, '0'),
     payloadDigest: PublicMutationProof.digestOf(logPayload),
@@ -752,7 +752,7 @@ async function main(): Promise<void> {
     recordId: logPayload.id,
     sequence: 0,
     store: 'moderationLogs',
-    version: 1,
+    version: 2,
   } as const;
   const logProof = PublicMutationProof.signed(
     logBody,
@@ -817,7 +817,7 @@ async function main(): Promise<void> {
     payload: Record<string, unknown>,
   ): PublicMutationProof => {
     const body = {
-      author: { deviceCredential: author, identityId: author },
+      author: { authorizationRevision: 0, deviceCredential: author, identityId: author },
       kind,
       operationId: `forged-poll-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -826,7 +826,7 @@ async function main(): Promise<void> {
       recordId,
       sequence,
       store: 'polls',
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationProof.signed(
@@ -949,7 +949,7 @@ async function main(): Promise<void> {
     payload: Record<string, unknown>,
   ): PublicMutationProof => {
     const body = {
-      author: { deviceCredential: author, identityId: author },
+      author: { authorizationRevision: 0, deviceCredential: author, identityId: author },
       kind,
       operationId: `forged-message-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -958,7 +958,7 @@ async function main(): Promise<void> {
       recordId: payload.id as string,
       sequence,
       store: 'messages',
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationProof.signed(
@@ -1034,7 +1034,7 @@ async function main(): Promise<void> {
     payload: Record<string, unknown>,
   ): PublicMutationProof => {
     const body = {
-      author: { deviceCredential: author, identityId: author },
+      author: { authorizationRevision: 0, deviceCredential: author, identityId: author },
       kind,
       operationId: `forged-sticker-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -1043,7 +1043,7 @@ async function main(): Promise<void> {
       recordId: payload.id as string,
       sequence,
       store,
-      version: 1,
+      version: 2,
     } as const;
 
     return PublicMutationProof.signed(

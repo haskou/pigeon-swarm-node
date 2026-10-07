@@ -2,7 +2,7 @@ import { PublicMutationAuthorPrimitives } from './PublicMutationAuthorPrimitives
 import { PublicMutationKind } from './PublicMutationKind';
 
 export interface PublicMutationBodyPrimitives {
-  version: 1;
+  version: 2;
   operationId: string;
   kind: PublicMutationKind;
   store: string;

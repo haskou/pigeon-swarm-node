@@ -102,7 +102,7 @@ function sign(
   recordId = payload.id,
 ): PublicMutationProof {
   const body = {
-    author: { deviceCredential: signer.credential, identityId: signer.id },
+    author: { authorizationRevision: 0, deviceCredential: signer.credential, identityId: signer.id },
     kind,
     operationId: randomBytes(16).toString('base64url'),
     payloadDigest: PublicMutationProof.digestOf(payload),
@@ -110,7 +110,7 @@ function sign(
     recordId,
     sequence: 0,
     store: 'contentReplication',
-    version: 1,
+    version: 2,
   } as const;
 
   return PublicMutationProof.signed(

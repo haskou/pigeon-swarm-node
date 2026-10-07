@@ -126,6 +126,7 @@ export default class OrbitDBDeviceAuthorizationReplayer {
       number,
       OrbitDBDeviceAuthorizationTransitionRecord[]
     >,
+    states?: DeviceAuthorization[],
   ): OrbitDBDeviceAuthorizationReplay {
     const records =
       recordsByRevision.get(authorization.getRevision().valueOf()) ?? [];
@@ -166,7 +167,8 @@ export default class OrbitDBDeviceAuthorizationReplayer {
       checkpoint !== undefined,
       new InvalidDeviceAuthorizationTransitionError(),
     );
-    const replay = this.replayFrom(checkpoint, recordsByRevision);
+    states?.push(checkpoint);
+    const replay = this.replayFrom(checkpoint, recordsByRevision, states);
 
     return {
       authorization: replay.authorization,
@@ -197,6 +199,21 @@ export default class OrbitDBDeviceAuthorizationReplayer {
     const recordsByRevision = this.transitionRecordsByRevision(history);
 
     return this.replayFrom(genesis, recordsByRevision);
+  }
+
+  /**
+   * Every state of the replay, from `base` (the genesis or a recovery
+   * checkpoint) to the head, in ascending revision order.
+   */
+  public statesOf(
+    base: DeviceAuthorization,
+    history: OrbitDBDeviceAuthorizationTransitionRecord[],
+  ): DeviceAuthorization[] {
+    const states = [base];
+
+    this.replayFrom(base, this.transitionRecordsByRevision(history), states);
+
+    return states;
   }
 
   public authorizationFromCheckpoint(

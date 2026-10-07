@@ -16,6 +16,7 @@ describe('PublicMutationVerifier', () => {
     overrides: Partial<PublicMutationBodyPrimitives> = {},
   ): PublicMutationBodyPrimitives => ({
     author: {
+      authorizationRevision: 0,
       deviceCredential: device.toPrimitives().publicKey,
       identityId: 'author',
     },
@@ -26,7 +27,7 @@ describe('PublicMutationVerifier', () => {
     recordId: 'reaction-1',
     sequence: 1,
     store: 'reactions',
-    version: 1,
+    version: 2,
     ...overrides,
   });
   const sign = (value: PublicMutationBodyPrimitives): PublicMutationProof =>

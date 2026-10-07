@@ -15,6 +15,7 @@ export async function signedMutation(options: {
   device ??= await KeyPair.generate();
   const body = {
     author: {
+      authorizationRevision: 0,
       deviceCredential: device.toPrimitives().publicKey,
       identityId: options.identityId,
     },
@@ -28,7 +29,7 @@ export async function signedMutation(options: {
     recordId: options.recordId,
     sequence: options.sequence,
     store: options.store,
-    version: 1,
+    version: 2,
   } as const;
 
   return PublicMutationProof.signed(

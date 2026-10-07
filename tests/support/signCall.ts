@@ -59,6 +59,7 @@ export function signCallRecord(
 ): PublicMutationProof {
   const body = {
     author: {
+      authorizationRevision: 0,
       deviceCredential: signer.deviceCredential,
       identityId: signer.id,
     },
@@ -69,7 +70,7 @@ export function signCallRecord(
     recordId: payload.id,
     sequence,
     store: 'calls',
-    version: 1,
+    version: 2,
   } as const;
 
   return PublicMutationProof.signed(

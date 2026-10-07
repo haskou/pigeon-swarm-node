@@ -975,6 +975,7 @@ async function sendConversationMessage(
   };
   const mutationBody = {
     author: {
+      authorizationRevision: 0,
       deviceCredential: author.deviceCredential,
       identityId: author.id,
     },
@@ -985,7 +986,7 @@ async function sendConversationMessage(
     recordId: id,
     sequence: 0,
     store: 'messages',
-    version: 1,
+    version: 2,
   } as const;
   const body = {
     createdAt,

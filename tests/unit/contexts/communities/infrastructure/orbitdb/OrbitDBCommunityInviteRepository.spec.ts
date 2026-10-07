@@ -163,6 +163,7 @@ describe('OrbitDBCommunityInviteRepository', () => {
     const device = await KeyPair.generate();
     const body = {
       author: {
+        authorizationRevision: 0,
         deviceCredential: device.toPrimitives().publicKey,
         identityId: otherIdentityId.valueOf(),
       },
@@ -173,7 +174,7 @@ describe('OrbitDBCommunityInviteRepository', () => {
       recordId: payload.id,
       sequence: 0,
       store: 'requests',
-      version: 1,
+      version: 2,
     } as const;
 
     await expect(
