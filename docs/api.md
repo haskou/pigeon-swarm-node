@@ -3268,14 +3268,17 @@ Implemented:
 DELETE /communities/{communityId}/members/{identityId}/kick
 ```
 
-Body: `{ "operation": { "createdAt", "parents", "mutation" } }`, signing
-`member_kicked` with `args` `{identityId: <target>}`.
+Body: `{ "moderationLog": { "createdAt", "mutation" }, "operation": {
+"createdAt", "parents", "mutation" } }`, the operation signing `member_kicked`
+with `args` `{identityId: <target>}` (see "Signed moderation log entries").
 
 Implemented:
 
 - require signed request auth from the community owner or a member with
   `manage_members`
 - `identityId` must be URL-encoded
+- record a signed `member_kicked` moderation log entry (target: member,
+  `identityId`; details `{}`) before the operation is stored
 - remove the target identity from `memberIds`
 - publish `communities.v1.member.was_left` with the updated community and
   `actorIdentityId`
@@ -3482,7 +3485,7 @@ Implemented:
   `role_updated`, `role_deleted`, `member_roles_updated`,
   `invitation_created`, `invite_link_created`,
   `membership_request_accepted`, `membership_request_declined`,
-  `member_banned`, `member_unbanned` and `message_deleted`
+  `member_banned`, `member_unbanned`, `member_kicked` and `message_deleted`
 
 ### Signed moderation log entries
 
@@ -3537,6 +3540,7 @@ match what was signed and the actor holds the permission for the action.
 | `PUT .../members/{identityId}/roles` | `member_roles_updated` | member, `identityId` | `{roleIds}` |
 | `POST .../bans` | `member_banned` | member, banned `identityId` | `{reason}` |
 | `DELETE .../bans/{identityId}` | `member_unbanned` | member, `identityId` | `{}` |
+| `DELETE .../members/{identityId}/kick` | `member_kicked` | member, `identityId` | `{}` |
 | `POST .../invites` | `invite_link_created` | invite, invite `token` | `{encryptedCommunityKeyStored, expiresAt, maxUses}` |
 | `POST .../members` | `invitation_created` | membership_request, request id | `{identityId}` (the invited identity) |
 | `PATCH /communities/membership-requests/{requestId}` | `membership_request_accepted` or `membership_request_declined` | membership_request, `requestId` | `{identityId, type}` of the request |
@@ -3549,15 +3553,15 @@ operation.createdAt]))`, first 24 hex characters). The id in the log target is
 the id the node assigns. The log is an audit trail with its own signature; the
 community state comes only from the signed community operation that every one
 of these routes also takes (see "Signed community operations"). The `DELETE`
-routes for channel, role and ban take
+routes for channel, role, ban and member kick take
 `{ "moderationLog": { "createdAt", "mutation" }, "operation": { ... } }`.
 
 Permissions checked against the signed actor: channel actions need
 `manage_channels`, role and member-role actions `manage_roles`, bans
-`ban_members`, invitations `create_invites`, request decisions
-`approve_members`/`reject_members` (invitations are decided by the invited
-identity), `community_updated` the owner, and `message_deleted` the message
-author or `manage_messages`.
+`ban_members`, kicks `manage_members`, invitations `create_invites`, request
+decisions `approve_members`/`reject_members` (invitations are decided by the
+invited identity), `community_updated` the owner, and `message_deleted` the
+message author or `manage_messages`.
 
 ### List community channels
 
@@ -3697,8 +3701,8 @@ Member role replacement body:
 }
 ```
 
-`DELETE` role, channel and ban routes take the same `moderationLog` and
-`operation` fields as their only body. A role creation signs `role_created` with
+`DELETE` role, channel, ban and member kick routes take the same
+`moderationLog` and `operation` fields as their only body. A role creation signs `role_created` with
 the derived `roleId`; the other routes sign the action in the table above.
 
 Implemented:

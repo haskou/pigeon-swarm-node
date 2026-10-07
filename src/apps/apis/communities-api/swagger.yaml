@@ -473,7 +473,7 @@ paths:
       tags:
         - communities
       summary: Kick a member from a private community
-      description: Requires the community owner or a member with manage_members. This removes the target from memberIds but does not ban them.
+      description: Requires the community owner or a member with manage_members. This removes the target from memberIds but does not ban them. The kick is recorded in the moderation log.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path
@@ -1455,6 +1455,7 @@ components:
         - invitation_created
         - invite_link_created
         - member_banned
+        - member_kicked
         - member_roles_updated
         - member_unbanned
         - membership_request_accepted
@@ -2103,12 +2104,15 @@ components:
           $ref: '#/components/schemas/CommunityOperationBody'
     DeleteCommunityMemberKickBody:
       type: object
-      description: Kicking signs member_kicked with args identityId = the target identity from the path.
+      description: Kicking signs member_kicked with args identityId = the target identity from the path, and records a member_kicked moderation log entry (target member = the path identity, details {}).
       required:
         - operation
+        - moderationLog
       properties:
         operation:
           $ref: '#/components/schemas/CommunityOperationBody'
+        moderationLog:
+          $ref: '#/components/schemas/CommunityModerationLogBody'
     CommunityOperationBody:
       type: object
       description: Client-signed community operation. The community is the deterministic fold of the operations its members signed, so peers cannot forge roles, bans, memberships, settings or deletion. The mutation signs {id 'community:<communityId>:op:<digest>', scopeType 'community_operation', communityId, networkId, authorIdentityId, action, args, parents, createdAt} in store communityOperations, kind put, sequence 0, predecessor null, signer = the authenticated identity. digest is base64url(sha256(canonicalize(payload without id))). authorIdentityId and args.identityId are the base64 public key without PEM headers. The node rebuilds the payload from the path, the actor, the endpoint action, the args derived from the other body fields, createdAt and parents, so the signature only verifies if the client signed exactly that. parents are the sorted frontier read from GET /communities/{communityId} immediately before signing (empty for the genesis). An operation whose author lacks the permission in the history named by parents, or that names an unknown parent, is rejected. Limits (409 CommunityOperationLimitExceededError): args is at most 4096 bytes of JSON and an identity signs at most 1000 operations per community; later operations of an author are skipped by every node.

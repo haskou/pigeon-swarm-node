@@ -1465,12 +1465,6 @@ services:
       - >-
         @contexts/communities/domain/repositories/CommunityChannelMessageRepository
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
-  contexts/communities/application/kick-member/CommunityMemberKicker:
-    class: /contexts/communities/application/kick-member/CommunityMemberKicker
-    arguments:
-      - '@contexts/communities/application/find-community/CommunityFinder'
-      - '@contexts/communities/domain/repositories/CommunityRepository'
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/communities/application/leave-community/CommunityLeaver:
     class: /contexts/communities/application/leave-community/CommunityLeaver
     arguments:
@@ -1951,6 +1945,14 @@ services:
       - '@contexts/communities/application/find-community/CommunityFinder'
       - >-
         @contexts/communities/domain/repositories/CommunityMembershipRequestRepository
+      - '@shared/infrastructure/messageBus/DomainEventPublisher'
+      - >-
+        @contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder
+  contexts/communities/application/kick-member/CommunityMemberKicker:
+    class: /contexts/communities/application/kick-member/CommunityMemberKicker
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
       - >-
         @contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder

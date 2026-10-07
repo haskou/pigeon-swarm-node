@@ -39,7 +39,7 @@ const operationCases: [string, BodyClass, string[]][] = [
   [
     'DeleteCommunityMemberKickBody',
     DeleteCommunityMemberKickBody,
-    ['operation'],
+    ['operation', 'moderationLog'],
   ],
   [
     'DeleteCommunityRoleBody',

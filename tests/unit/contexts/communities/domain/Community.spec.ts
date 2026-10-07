@@ -1,6 +1,7 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityProfile } from '@app/contexts/communities/domain/entities/profile/CommunityProfile';
 import { CommunitySettings } from '@app/contexts/communities/domain/entities/profile/CommunitySettings';
+import { CommunityPermissionDeniedError } from '@app/contexts/communities/domain/errors/CommunityPermissionDeniedError';
 import { CommunityRequestActorMismatchError } from '@app/contexts/communities/domain/errors/CommunityRequestActorMismatchError';
 import { CommunityChannelWasCreatedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasCreatedEvent';
 import { CommunityChannelWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelWasDeletedEvent';
@@ -384,6 +385,27 @@ describe('Community', () => {
           {},
         ),
       ).toThrow();
+    });
+  });
+
+  describe('kick moderation log permission', () => {
+    it('lets the owner record a kick and rejects a plain member', () => {
+      const community = createCommunity();
+
+      expect(() =>
+        community.assertCanRecordModerationAction(
+          owner,
+          CommunityModerationAction.MEMBER_KICKED,
+          {},
+        ),
+      ).not.toThrow();
+      expect(() =>
+        community.assertCanRecordModerationAction(
+          member,
+          CommunityModerationAction.MEMBER_KICKED,
+          {},
+        ),
+      ).toThrow(CommunityPermissionDeniedError);
     });
   });
 

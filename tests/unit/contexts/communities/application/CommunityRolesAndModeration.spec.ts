@@ -485,11 +485,12 @@ describe('Community role and moderation use cases', () => {
     expectRejected();
   });
 
-  it('kicks a member from the signed operation', async () => {
+  it('kicks a member and records the moderation action', async () => {
     const message = new CommunityMemberKickMessage(
       COMMUNITY_ID,
       OWNER_ID,
       ALICE_ID,
+      moderationLog,
       signedOperation,
     );
 
@@ -497,6 +498,7 @@ describe('Community role and moderation use cases', () => {
       communityFinder,
       communityRepository,
       eventPublisher,
+      moderationLogRecorder,
     ).kick(message);
 
     expect(result).toBe(community);
@@ -504,6 +506,16 @@ describe('Community role and moderation use cases', () => {
     expectSaved(message, CommunityOperationAction.MEMBER_KICKED, {
       identityId: ALICE_ID,
     });
+    expect(moderationLogRecorder.record).toHaveBeenCalledWith(
+      community,
+      message.actorIdentityId,
+      CommunityModerationAction.MEMBER_KICKED,
+      expect.any(CommunityModerationTarget),
+      message.moderationLog,
+    );
+    const [, , , target] = moderationLogRecorder.record.mock.calls[0];
+
+    expect(target.toPrimitives()).toEqual({ id: ALICE_ID, type: 'member' });
     expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
   });
 
@@ -512,6 +524,7 @@ describe('Community role and moderation use cases', () => {
       COMMUNITY_ID,
       MALLORY_ID,
       ALICE_ID,
+      moderationLog,
       signedOperation,
     );
 
@@ -520,6 +533,7 @@ describe('Community role and moderation use cases', () => {
         communityFinder,
         communityRepository,
         eventPublisher,
+        moderationLogRecorder,
       ).kick(message),
     ).rejects.toThrow(CommunityPermissionDeniedError);
     expectRejected();

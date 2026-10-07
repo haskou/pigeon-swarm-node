@@ -494,9 +494,9 @@ Signed public mutations (pins, reactions and the other governed collections):
   target.id, createdAt]))`, immutable (tombstones are always rejected; the
   unsigned per-community tombstones on community deletion are gone). Admission
   checks the derived id and that the actor holds the permission for the action
-  in the current community (channels, roles, bans, invites, request decisions,
-  owner for profile updates, message author or manage messages for message
-  deletions). Heads are index wrappers under collection `moderationLogs`.
+  in the current community (channels, roles, bans, kicks with manage members,
+  invites, request decisions, owner for profile updates, message author or
+  manage messages for message deletions). Heads are index wrappers under collection `moderationLogs`.
 - Every node verifies on write, on replicated read, on head hydration and on the
   persisted head cache: signature, scope binding, the device in the identity's
   device authorization chain at the claimed revision, and the community permission (pin needs

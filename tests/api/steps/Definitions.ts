@@ -585,6 +585,15 @@ export default class Definitions {
         }),
       ],
       [
+        'DELETE',
+        /^\/communities\/[^/]+\/members\/([^/]+)\/kick$/,
+        (match) => ({
+          action: 'member_kicked',
+          details: {},
+          target: member(decodeURIComponent(match[1])),
+        }),
+      ],
+      [
         'POST',
         /^\/communities\/[^/]+\/invites$/,
         () => ({
@@ -2375,6 +2384,21 @@ export default class Definitions {
     await this.signCurrentRequest(
       'POST',
       `/communities/${this.communityId}/bans`,
+    );
+  }
+
+  @given('I sign the current community kick request for another identity')
+  public async iSignTheCurrentCommunityKickRequestForAnotherIdentity(): Promise<void> {
+    if (!this.communityId || !this.otherIdentityId) {
+      throw new Error('Community and kicked identity must be available first.');
+    }
+
+    this.body = '{}';
+    await this.signCurrentRequest(
+      'DELETE',
+      `/communities/${this.communityId}/members/${encodeURIComponent(
+        this.otherIdentityId.valueOf(),
+      )}/kick`,
     );
   }
 
@@ -5385,6 +5409,21 @@ export default class Definitions {
       `/communities/${this.communityId}/bans/${encodeURIComponent(
         this.otherIdentityId.valueOf(),
       )}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I DELETE the kick for another identity from the current community')
+  public async iDELETETheKickForAnotherIdentityFromTheCurrentCommunity(): Promise<void> {
+    if (!this.communityId || !this.otherIdentityId) {
+      throw new Error('Community and kicked identity must be available first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/communities/${this.communityId}/members/${encodeURIComponent(
+        this.otherIdentityId.valueOf(),
+      )}/kick`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );

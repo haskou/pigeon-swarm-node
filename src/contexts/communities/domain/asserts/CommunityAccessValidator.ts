@@ -217,6 +217,7 @@ export class CommunityAccessValidator {
     const manageChannels = (): void => this.assertCanManageChannels(actor);
     const manageRoles = (): void => this.assertCanManageRoles(actor);
     const banMembers = (): void => this.assertCanBanMembers(actor);
+    const manageMembers = (): void => this.assertCanManageMembers(actor);
     const createInvite = (): void => this.assertCanCreateInvite(actor);
     const requirements: Record<string, () => void> = {
       [CommunityModerationAction.CHANNEL_CREATED.valueOf()]: manageChannels,
@@ -229,6 +230,7 @@ export class CommunityAccessValidator {
       [CommunityModerationAction.INVITATION_CREATED.valueOf()]: createInvite,
       [CommunityModerationAction.INVITE_LINK_CREATED.valueOf()]: createInvite,
       [CommunityModerationAction.MEMBER_BANNED.valueOf()]: banMembers,
+      [CommunityModerationAction.MEMBER_KICKED.valueOf()]: manageMembers,
       [CommunityModerationAction.MEMBER_ROLES_UPDATED.valueOf()]: manageRoles,
       [CommunityModerationAction.MEMBER_UNBANNED.valueOf()]: banMembers,
       [CommunityModerationAction.MEMBERSHIP_REQUEST_ACCEPTED.valueOf()]: () =>
