@@ -10,7 +10,7 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 import { NotificationReplicationLimits } from '../../../domain/NotificationReplicationLimits';
 import { NotificationId } from '../../../domain/value-objects/NotificationId';
 import { NotificationState } from '../../../domain/value-objects/NotificationState';
-import GenuineRecordQuota from './GenuineRecordQuota';
+import { GenuineRecordQuota } from './GenuineRecordQuota';
 
 /**
  * The state of an invitation (read, accepted, declined) is signed by its

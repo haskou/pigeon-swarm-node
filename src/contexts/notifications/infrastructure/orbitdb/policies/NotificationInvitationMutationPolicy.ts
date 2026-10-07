@@ -20,7 +20,7 @@ import { EncryptedConversationKey } from '../../../domain/value-objects/Encrypte
 import { InvitationNonce } from '../../../domain/value-objects/InvitationNonce';
 import { NotificationId } from '../../../domain/value-objects/NotificationId';
 import { NotificationType } from '../../../domain/value-objects/NotificationType';
-import GenuineRecordQuota from './GenuineRecordQuota';
+import { GenuineRecordQuota } from './GenuineRecordQuota';
 
 /**
  * An invitation is admitted only when its inviter signed it, its id is derived

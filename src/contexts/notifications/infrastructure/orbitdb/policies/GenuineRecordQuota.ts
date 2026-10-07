@@ -32,7 +32,7 @@ export interface GenuineRecordQuotaRule {
  * Only records whose proof verifies for their own payload count, so a forged
  * record cannot use up another identity's quota.
  */
-export default class GenuineRecordQuota {
+export class GenuineRecordQuota {
   private static readonly MAX_VERIFIED_DIGESTS = 100_000;
 
   /** Proofs already verified while counting, keyed by proof and payload digest. */
