@@ -95,6 +95,37 @@ describe('PublicMutationVerifier', () => {
     );
   });
 
+  it('hands the signed authorization revision to the authorization check', async () => {
+    await verifier.verify(
+      sign(
+        body({
+          author: {
+            authorizationRevision: 7,
+            deviceCredential: device.toPrimitives().publicKey,
+            identityId: 'author',
+          },
+        }),
+      ),
+      expectation,
+    );
+
+    expect(authorization.isAuthorized).toHaveBeenLastCalledWith(
+      expect.objectContaining({ authorizationRevision: 7 }),
+    );
+  });
+
+  it('rejects a proof whose authorization revision was changed after signing', async () => {
+    const proof = sign(body());
+    const forged = PublicMutationProof.fromPrimitives({
+      ...proof.toPrimitives(),
+      author: { ...proof.toPrimitives().author, authorizationRevision: 5 },
+    });
+
+    await expect(verifier.verify(forged, expectation)).rejects.toThrow(
+      InvalidPublicMutationError,
+    );
+  });
+
   it('rejects revoked or unknown devices', async () => {
     authorization.isAuthorized.mockResolvedValue(false);
 
@@ -106,8 +137,26 @@ describe('PublicMutationVerifier', () => {
   it('rejects unsupported versions, extra fields and inconsistent causality', () => {
     const valid = sign(body()).toPrimitives();
 
+    for (const version of [1, 3]) {
+      expect(() =>
+        PublicMutationProof.fromPrimitives({ ...valid, version } as never),
+      ).toThrow(InvalidPublicMutationError);
+    }
+    for (const authorizationRevision of [-1, 1.5, '1', undefined]) {
+      expect(() =>
+        PublicMutationProof.fromPrimitives({
+          ...valid,
+          author: { ...valid.author, authorizationRevision },
+        } as never),
+      ).toThrow(InvalidPublicMutationError);
+    }
+    const { authorizationRevision: _revision, ...unbound } = valid.author;
+
     expect(() =>
-      PublicMutationProof.fromPrimitives({ ...valid, version: 2 }),
+      PublicMutationProof.fromPrimitives({
+        ...valid,
+        author: unbound,
+      } as never),
     ).toThrow(InvalidPublicMutationError);
     expect(() =>
       PublicMutationProof.fromPrimitives({ ...valid, deletedAt: 1 }),

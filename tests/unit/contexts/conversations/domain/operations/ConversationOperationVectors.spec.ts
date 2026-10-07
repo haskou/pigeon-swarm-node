@@ -198,7 +198,7 @@ describe('Conversation operation vectors', () => {
         version: 2,
       });
       expect(derived.signingContent).toBe(
-        `pigeon:public-mutation:v1\n${canonicalize(derived.mutationBody)}`,
+        `pigeon:public-mutation:v2\n${canonicalize(derived.mutationBody)}`,
       );
       expect(derived.mutation).toEqual({
         ...derived.mutationBody,
