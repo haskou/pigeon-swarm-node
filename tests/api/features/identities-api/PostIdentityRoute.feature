@@ -115,3 +115,14 @@ Feature: Post identity route
     And I sign the current identity update request
     When I PUT the created identity
     Then response code is equal to 400
+
+  Scenario: Reject identity publications above the per-identity rate limit
+    Given I am an anonymous user
+    And identity publications are limited to 1 per minute
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
+    And I set a client-signed identity body with name "flooder" and handle "flooder"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    When I POST to "/identities/"
+    Then response code is equal to 429
+    And response body should contain "429040"

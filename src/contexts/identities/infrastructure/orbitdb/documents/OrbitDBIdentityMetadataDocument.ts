@@ -5,13 +5,11 @@ export interface OrbitDBIdentityMetadataDocument extends Record<
   unknown
 > {
   cid: string;
-  deleted?: boolean;
   handle?: string;
   id: string;
-  identity?: IdentityPrimitives;
+  identity: IdentityPrimitives;
   identityId: string;
   networkIds?: string[];
   previousCid: string | undefined;
-  receivedAt: number;
   version: number;
 }

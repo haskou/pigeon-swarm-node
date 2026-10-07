@@ -11,8 +11,7 @@ export default class MetadataIdentityNetworkRepository extends IdentityNetworkRe
 
   public async findByIdentityId(identityId: IdentityId): Promise<NetworkId[]> {
     const records = await this.metadataIndex.findByIdentityId(identityId);
-    const latest = records.find(({ identity }) => identity !== undefined);
 
-    return latest?.identity?.getNetworkIds() ?? [];
+    return records[0]?.identity.getNetworkIds() ?? [];
   }
 }

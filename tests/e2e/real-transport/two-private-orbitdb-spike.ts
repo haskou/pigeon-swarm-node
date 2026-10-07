@@ -555,12 +555,10 @@ async function writeReplicatedDocuments(
   await stores.identities.put?.({
     cid: identityCid,
     handle: 'hasko',
-    id: IDENTITY_ID,
+    id: identityCid,
     identity: identityPrimitives,
     identityId: IDENTITY_ID,
-    lastEventId: 'identity-event-hasko-v2',
     networkIds: [NETWORK_ID],
-    receivedAt: 2,
     version: 2,
   });
   await stores.keychains.put?.({
@@ -666,7 +664,7 @@ async function assertQueryViability(
   identityCid: string,
 ): Promise<void> {
   await waitFor(async () => {
-    const identity = await getDocumentValue(stores.identities, IDENTITY_ID);
+    const identity = await getDocumentValue(stores.identities, identityCid);
 
     return identity?.cid === identityCid ? true : undefined;
   }, 'latest identity replication');

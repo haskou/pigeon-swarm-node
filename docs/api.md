@@ -1767,6 +1767,11 @@ GET /identities/{reference}
 `reference` is a percent-encoded identity id or a lowercase profile handle
 without `@`. Identity ids must use `encodeURIComponent(identityId)`.
 
+A handle resolves to its owner only: among identities whose latest version
+claims it, the one with the earliest signed `timestamp` (ties broken by the
+lowest identity id). Other claimants are never returned for that handle, on any
+node. The identity id stays the authoritative reference.
+
 Response:
 
 ```json
@@ -1847,6 +1852,11 @@ Undefined optional properties are omitted before signing. Handles must already
 be normalized. Current requests reject `encryptedKeyPair`,
 `encryptedPrivateKey`, `encryptedMasterKey` and `masterKeyDerivation`.
 
+At most `IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE` (default 30, `0` disables)
+identity publications are accepted per identity per minute, on `POST /identities`
+and `PUT /identities/{identityId}` together; the next one is refused with `429`,
+code `429040`.
+
 ### Update identity
 
 ```http
@@ -1857,7 +1867,8 @@ Updates use the same signed public shape and add
 `previousIdentityExternalIdentifier`. They may update public profile data and
 add networks, but cannot remove a previously joined network or replace the
 pinned genesis credential commitment or recovery authority. The node validates
-the complete previous-publication chain before publishing the new CID.
+the complete previous-publication chain before publishing the new CID. The same
+`429` / `429040` publication cap applies.
 
 ## Keychain HTTP API
 

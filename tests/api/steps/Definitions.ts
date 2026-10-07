@@ -1440,6 +1440,11 @@ export default class Definitions {
   }
 
   @after()
+  public restoreIdentityPublicationLimit(): void {
+    delete process.env.IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE;
+  }
+
+  @after()
   public async cleanupScenarioStorage(): Promise<void> {
     const database = Kernel.di.getService<EmbeddedLocalDatabase>(
       EmbeddedLocalDatabase,
@@ -1743,6 +1748,11 @@ export default class Definitions {
   @given('I sign the current private authorization operation request')
   public async iSignTheCurrentPrivateAuthorizationOperationRequest(): Promise<void> {
     await this.signCurrentRequest('POST', '/private-authorization/operations');
+  }
+
+  @given('identity publications are limited to {int} per minute')
+  public identityPublicationsAreLimitedToPerMinute(limit: number): void {
+    process.env.IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE = String(limit);
   }
 
   @given(

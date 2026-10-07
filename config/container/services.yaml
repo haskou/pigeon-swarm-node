@@ -96,6 +96,9 @@ services:
     class: >-
       /contexts/identities/domain/services/IdentityCandidateValidationDomainService
     arguments: []
+  contexts/identities/domain/services/IdentityHandleOwnershipDomainService:
+    class: /contexts/identities/domain/services/IdentityHandleOwnershipDomainService
+    arguments: []
   contexts/identities/domain/services/IdentityResolutionDomainService:
     class: /contexts/identities/domain/services/IdentityResolutionDomainService
     arguments: []
@@ -248,6 +251,10 @@ services:
       - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
   apps/apis/calls-api/CallSignalRateLimiter:
     class: /apps/apis/calls-api/CallSignalRateLimiter
+    arguments:
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+  apps/apis/identities-api/IdentityPublishRateLimiter:
+    class: /apps/apis/identities-api/IdentityPublishRateLimiter
     arguments:
       - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
   apps/apis/link-previews-api/services/LinkPreviewCacheRepository:
@@ -764,6 +771,11 @@ services:
     arguments:
       - '@apps/apis/calls-api/CallRelayRecordRegistry'
       - '@apps/apis/calls-api/CallRelayRecordSigner'
+  apps/initializers/identities/IdentityMutationGateInitializer:
+    class: /apps/initializers/identities/IdentityMutationGateInitializer
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/shared/infrastructure/ipfs/IPFS'
   apps/initializers/public-mutations/NotificationMutationPolicies:
     class: /apps/initializers/public-mutations/NotificationMutationPolicies
     arguments:

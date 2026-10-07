@@ -15,6 +15,7 @@ import {
 } from 'routing-controllers';
 
 import { PutIdentityBody } from '../bodies/PutIdentityBody';
+import IdentityPublishRateLimiter from '../IdentityPublishRateLimiter';
 import { PutIdentityRequest } from '../requests/PutIdentityRequest';
 import { IdentityViewModel } from '../view-model/IdentityViewModel';
 
@@ -25,6 +26,10 @@ export class PutIdentityRoute extends Route {
 
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
+
+  private readonly rateLimiter = this.get<IdentityPublishRateLimiter>(
+    IdentityPublishRateLimiter,
+  );
 
   @Put('/:identityId')
   public async updateIdentity(
@@ -48,6 +53,8 @@ export class PutIdentityRoute extends Route {
     ) {
       throw new IdentityUpdateRequesterMismatchError();
     }
+
+    await this.rateLimiter.consume(authenticatedIdentityId);
 
     const candidate = await this.identityPublisher.publish(
       new PutIdentityRequest(body).getIdentityPublishMessage(),

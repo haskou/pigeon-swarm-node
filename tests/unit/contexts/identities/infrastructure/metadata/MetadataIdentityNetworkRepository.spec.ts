@@ -18,26 +18,14 @@ describe('MetadataIdentityNetworkRepository', () => {
     const mother = new IdentityMother();
     const identity = mother.build();
     const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440000');
-    const attackerNetworkId = new NetworkId(
-      '550e8400-e29b-41d4-a716-446655440999',
-    );
 
     metadataIndex.findByIdentityId.mockResolvedValue([
-      {
-        cid: 'bafyunsigned',
-        identityId: mother.id.valueOf(),
-        networkIds: [attackerNetworkId.valueOf()],
-        previousCid: 'bafyprevious',
-        receivedAt: 2,
-        version: 2,
-      },
       {
         cid: 'bafyidentity',
         identity,
         identityId: mother.id.valueOf(),
         networkIds: [networkId.valueOf()],
         previousCid: undefined,
-        receivedAt: 1,
         version: 1,
       },
     ]);

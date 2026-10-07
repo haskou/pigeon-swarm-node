@@ -152,7 +152,6 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       return document;
     }
 
-    await this.registry.putDocument('identities', document, networkIds);
     await this.registry.putHead(
       this.headKey(authorization.getIdentityId()),
       document,
