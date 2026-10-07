@@ -45,6 +45,14 @@ export const pigeonEnvironmentSchema = {
   LOG_LEVEL: { type: 'string' },
   LOG_URL: { defaultValue: 'logs', type: 'string' },
   NODE_ENV: { defaultValue: 'local', type: 'string' },
+  NOTIFICATIONS_MAX_INVITATIONS_PER_IDENTITY: {
+    defaultValue: 10_000,
+    type: 'number',
+  },
+  NOTIFICATIONS_MAX_STATES_PER_IDENTITY: {
+    defaultValue: 30_000,
+    type: 'number',
+  },
   NOTIFICATIONS_RECORD_RATE_LIMIT_PER_MINUTE: {
     defaultValue: 30,
     type: 'number',

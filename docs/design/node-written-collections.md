@@ -311,6 +311,19 @@ field is redundant with the device-signed proof and is removed from the payload
 - Heads: `notification:<id>` governed like the conversation head; the
   `notification-recipient-index:<identityId>` head is not replicated and is
   rebuilt locally from admitted records.
+- Flood bound: notification records carry no signed time, so a per-minute
+  window is not a deterministic admission rule: two nodes that receive the same
+  records at different moments would admit different ones. The gate bounds the
+  retained records per author instead. The genuine invitations of one inviter
+  (`NOTIFICATIONS_MAX_INVITATIONS_PER_IDENTITY`, default 10000) and the genuine
+  states of one recipient (`NOTIFICATIONS_MAX_STATES_PER_IDENTITY`, default
+  30000) are ordered by id and only the first ones that fit are admitted. Only
+  records whose proof verifies for their own payload count, a refused but
+  validly signed record still counts, and the verdict depends only on the set
+  of stored records, never on arrival order. The 30 records per minute cap
+  stays a write-path control of the local node. A malicious replica can still
+  fill each identity's quota, and mint identities freely until identity creation
+  is bounded (haskou/pigeon-swarm-node#384).
 
 ### Order and convergence
 
@@ -724,7 +737,7 @@ slice 2; slice 3 remainder; slice 4.
 | D6 | Call liveness on crash: graceful `left` is signed by the client; crashed calls end by lease expiry locally plus a maximum call duration | 12 h maximum duration, configurable |
 | D7 | Keep node-attested replica claims and release of extra replicas, or remove them | Remove; no node-trust model is introduced and the cost is storage on non-responsible uploaders |
 | D8 | Stop replicating content type and filename; serve sniffed allowlisted type or `application/octet-stream` attachment | Yes |
-| D9 | Numeric limits: per-identity-per-network replication quota, group member cap, call/notification rate caps | Quota 1 GiB per identity per network, keep the existing group cap, 30 records/minute/identity for call and notification records; all configurable |
+| D9 | Numeric limits: per-identity-per-network replication quota, group member cap, call/notification rate caps | Quota 1 GiB per identity per network, keep the existing group cap, 30 records/minute/identity for call and notification records on the write path, plus a deterministic retained-record quota per author at the notification gate (10000 invitations, 30000 states); all configurable |
 | D10 | Whether to replicate invitations at all vs private control-frame delivery only | Keep replication of signed invitations (offline recipients need them) |
 | D11 | Whether to build a node-trust model now | No; if D7 flips or distributed replication needs sybil-resistant counts, implement option A with `NodeBinding` |
 | D12 | Public uploads of an unpublished identity: register replication only after the identity is published | Yes: until then the content stays only on the uploading node |

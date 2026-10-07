@@ -6,6 +6,7 @@ import OrbitDBConversationRepository from '@app/contexts/conversations/infrastru
 import ConversationMessageMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageMutationPolicy';
 import ConversationOperationMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationOperationMutationPolicy';
 import { Notification } from '@app/contexts/notifications/domain/Notification';
+import { NotificationReplicationLimits } from '@app/contexts/notifications/domain/NotificationReplicationLimits';
 import { NotificationId } from '@app/contexts/notifications/domain/value-objects/NotificationId';
 import OrbitDBNotificationMapper from '@app/contexts/notifications/infrastructure/orbitdb/mappers/OrbitDBNotificationMapper';
 import OrbitDBNotificationRepository from '@app/contexts/notifications/infrastructure/orbitdb/OrbitDBNotificationRepository';
@@ -65,8 +66,14 @@ type Replica = {
   registry?: OrbitDBReplicatedStateRegistry;
   conversations?: OrbitDBConversationRepository;
   repository?: OrbitDBNotificationRepository;
+  policies?: {
+    invitations: NotificationInvitationMutationPolicy;
+    states: NotificationStateMutationPolicy;
+  };
 };
 
+const INVITATION_QUOTA = 3;
+const STATE_QUOTA = 2;
 const networkId = randomUUID();
 const nodes: Replica[] = [];
 const authorized = new Set<string>();
@@ -143,18 +150,31 @@ async function open(replica: Replica): Promise<void> {
     new OrbitDBConversationMessageMapper(),
   );
 
-  if (replica.gated)
+  const verifier = new PublicMutationVerifier(authorization);
+
+  if (replica.gated) {
+    const states = new NotificationStateMutationPolicy(registry, verifier);
+    const invitations = new NotificationInvitationMutationPolicy(
+      conversations,
+      undefined as never,
+      registry,
+      verifier,
+    );
+
+    invitations.limits = new NotificationReplicationLimits(
+      INVITATION_QUOTA,
+      NotificationReplicationLimits.DEFAULT_MAX_STATES,
+    );
+    replica.policies = { invitations, states };
     registry.addMutationGate(
-      new PublicMutationGate(new PublicMutationVerifier(authorization), [
+      new PublicMutationGate(verifier, [
         new ConversationOperationMutationPolicy(),
         new ConversationMessageMutationPolicy(conversations),
-        new NotificationInvitationMutationPolicy(
-          conversations,
-          undefined as never,
-        ),
-        new NotificationStateMutationPolicy(registry),
+        invitations,
+        states,
       ]),
     );
+  }
   replica.registry = registry;
   replica.conversations = conversations;
   replica.repository = new OrbitDBNotificationRepository(
@@ -555,6 +575,223 @@ async function main(): Promise<void> {
   );
   console.log(
     'PASS forged key under another inviter, id mismatch, inviter or recipient outside the conversation, unknown conversation, state by a non recipient, state out of a terminal state, state of an unknown notification and recipient-index heads rejected',
+  );
+
+  stage = 'invitations over the inviter quota are held back';
+  // The owner already holds one admitted invitation, plus the validly signed
+  // one for a recipient outside the group that the previous stage planted: it
+  // is refused for its recipient, yet it still counts against its inviter's
+  // own quota. The control node, which has no gate, publishes five more
+  // genuine ones, newest id first, so the honest node sees the order that
+  // would favour a first-come quota.
+  const flood = await Promise.all(
+    [10, 11, 12, 13, 14].map(async (index) => {
+      const recipient = index % 2 === 0 ? alice : bob;
+      const key = `encrypted-key-${index}`;
+      const signedInvitation = signNotificationInvitation({
+        encryptedKey: key,
+        nonce: NONCE(index),
+        recipientIdentityId: recipient.id,
+        signer: owner,
+        subjectId: subject,
+        type: 'group_conversation_invitation',
+      });
+
+      return {
+        id: signedInvitation.payload.id,
+        invitation: invitationNotification(
+          owner.id,
+          recipient.id,
+          subject,
+          NONCE(index),
+          key,
+        ),
+        proof: signedInvitation.proof,
+      };
+    }),
+  );
+  const refused = make(owner, outsider.id, subject, NONCE(5)).id;
+  const countedIds = [id, refused, ...flood.map((value) => value.id)].sort();
+  const expectedVisible = countedIds
+    .slice(0, INVITATION_QUOTA)
+    .filter((value) => value !== refused);
+  const overQuota = countedIds.slice(INVITATION_QUOTA);
+
+  assert.ok(
+    countedIds.length > INVITATION_QUOTA && overQuota.length > 0,
+    'The owner must hold more signed invitations than the quota',
+  );
+  assert.ok(
+    expectedVisible.length > 0,
+    'The quota must leave at least one invitation visible',
+  );
+  for (const value of flood.sort((left, right) =>
+    left.id < right.id ? 1 : -1,
+  ))
+    await control.repository!.saveInvitation(value.invitation, value.proof);
+  await until('every genuine invitation reached the raw stores', async () => {
+    for (const replica of [honest, control]) {
+      const stored = await replica.stores!.notifications.query!((value) =>
+        countedIds.includes(value.id as string),
+      );
+
+      if (stored.length !== countedIds.length) return false;
+    }
+
+    return true;
+  });
+  const visibleIdsOn = async (replica: Replica): Promise<string[]> =>
+    (
+      await Promise.all(
+        [alice, bob].map((recipient) =>
+          replica.repository!.findByRecipient(new IdentityId(recipient.id), 50),
+        ),
+      )
+    )
+      .flat()
+      .map((value) => value.toPrimitives().id)
+      .sort();
+
+  await until(
+    'honest node keeps exactly the first ids of the quota',
+    async () => {
+      return (
+        JSON.stringify(await visibleIdsOn(honest)) ===
+        JSON.stringify(expectedVisible)
+      );
+    },
+  );
+  await pause(3000);
+  assert.deepEqual(
+    await visibleIdsOn(honest),
+    expectedVisible,
+    'The honest node must expose only the first invitations of the inviter by id',
+  );
+  for (const hidden of overQuota)
+    assert.equal(
+      await honest.repository!.findById(new NotificationId(hidden)),
+      undefined,
+      `${hidden} is over the inviter quota and must not be admitted`,
+    );
+  assert.deepEqual(
+    (await visibleIdsOn(control)).filter((value) => countedIds.includes(value)),
+    countedIds.filter((value) => value !== refused),
+    'The ungated control node must expose every genuine invitation, otherwise the test proves nothing',
+  );
+  console.log(
+    `PASS ${countedIds.length} signed invitations from one inviter: the honest node admits only the first ${INVITATION_QUOTA} by id whatever order they arrived in`,
+  );
+
+  stage = 'recipient states over the recipient quota are held back';
+  // Bob already signed three states: the accepted one and two that the
+  // forged stage planted (a transition out of a terminal state, and a state
+  // for an unknown notification). They are refused, yet they still count
+  // against his own quota. Alice invites him three more times and he accepts
+  // each one on the ungated control node. With room for two states, at most
+  // two of the six can ever be admitted, so at least one of the new ones must
+  // be held back whichever way the ids sort.
+  honest.policies!.states.limits = new NotificationReplicationLimits(
+    INVITATION_QUOTA,
+    STATE_QUOTA,
+  );
+  const invited = [20, 21, 22].map((index) => {
+    const key = `encrypted-key-${index}`;
+    const signedInvitation = signNotificationInvitation({
+      encryptedKey: key,
+      nonce: NONCE(index),
+      recipientIdentityId: bob.id,
+      signer: alice,
+      subjectId: subject,
+      type: 'group_conversation_invitation',
+    });
+    const notification = invitationNotification(
+      alice.id,
+      bob.id,
+      subject,
+      NONCE(index),
+      key,
+    );
+    const signedState = signNotificationState({
+      notificationId: signedInvitation.payload.id,
+      read: true,
+      signer: bob,
+      state: 'accepted',
+    });
+
+    return {
+      id: signedInvitation.payload.id,
+      invitation: notification,
+      invitationProof: signedInvitation.proof,
+      state: signedState,
+    };
+  });
+
+  for (const value of invited)
+    await control.repository!.saveInvitation(
+      value.invitation,
+      value.invitationProof,
+    );
+  await until('alice invitations reached the honest node', async () => {
+    for (const value of invited)
+      if (!(await honest.repository!.findById(new NotificationId(value.id))))
+        return false;
+
+    return true;
+  });
+  for (const value of invited)
+    await control.repository!.saveState(
+      stateNotification(value.invitation, 'accepted', true),
+      value.state.proof,
+    );
+  const bobStateIds = [
+    accepted.payload.id,
+    out.payload.id,
+    forgedState.payload.id,
+    ...invited.map((value) => value.state.payload.id),
+  ].sort();
+  const admittedStateIds = new Set(bobStateIds.slice(0, STATE_QUOTA));
+  const heldBack = invited.filter(
+    (value) => !admittedStateIds.has(value.state.payload.id),
+  );
+
+  assert.ok(
+    heldBack.length > 0,
+    'At least one new state must fall outside the recipient quota',
+  );
+  await until('every signed state reached the raw stores', async () => {
+    for (const replica of [honest, control]) {
+      const stored = await replica.stores!.notifications.query!((value) =>
+        bobStateIds.includes(value.id as string),
+      );
+
+      if (stored.length !== bobStateIds.length) return false;
+    }
+
+    return true;
+  });
+  await pause(3000);
+  for (const value of invited) {
+    const expected = admittedStateIds.has(value.state.payload.id)
+      ? 'accepted'
+      : 'pending';
+    const stateOn = async (replica: Replica): Promise<string | undefined> =>
+      (
+        await replica.repository!.findById(new NotificationId(value.id))
+      )?.toPrimitives().state;
+
+    assert.equal(
+      await stateOn(honest),
+      expected,
+      `${value.state.payload.id} must be ${expected} on the honest node`,
+    );
+    assert.equal(
+      await stateOn(control),
+      'accepted',
+      'The ungated control node must hold every state, otherwise the test proves nothing',
+    );
+  }
+  console.log(
+    `PASS ${bobStateIds.length} signed states from one recipient: the honest node admits only the first ${STATE_QUOTA} by id, ${heldBack.length} of the 3 new ones stay pending`,
   );
 }
 

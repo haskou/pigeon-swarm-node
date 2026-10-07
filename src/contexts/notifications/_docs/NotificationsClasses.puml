@@ -112,10 +112,15 @@ package "notifications" {
     class NotificationInvitationMutationPolicy
     class NotificationStateMutationPolicy
     class OrbitDBNotificationHeadMutationGate
+    class GenuineRecordQuota {
+      +assertWithin(record, rule): Promise<void>
+    }
 
     NotificationRepositoryRouter ..|> NotificationRepository
     NotificationRepositoryRouter --> OrbitDBNotificationRepository
     NotificationRepositoryRouter --> LocalNotificationRepository
+    NotificationInvitationMutationPolicy --> GenuineRecordQuota
+    NotificationStateMutationPolicy --> GenuineRecordQuota
   }
 }
 

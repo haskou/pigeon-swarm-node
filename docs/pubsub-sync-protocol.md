@@ -651,7 +651,13 @@ terminal states absorbing. Heads are `notification:<recordId>` and must match th
 record id; `notification-recipient-index:<id>` heads are refused and the recipient list
 is rebuilt locally. Missed-call notifications are derived on each node from its own
 call state, stored in a local database and never replicated. The 30 records per
-minute per identity cap is enforced on the write path.
+minute per identity cap is enforced on the write path of the local node. The gate
+bounds what it keeps per author deterministically: the genuine invitations of one
+inviter (`NOTIFICATIONS_MAX_INVITATIONS_PER_IDENTITY`, default 10000) and the
+genuine states of one recipient (`NOTIFICATIONS_MAX_STATES_PER_IDENTITY`, default
+30000) sort by id and only the first ones that fit are admitted, whatever order
+they arrived in. A malicious replica can still publish up to the quota for each
+identity it controls.
 
 Calls are no longer unsigned (#373); see [Durable call state convergence](#durable-call-state-convergence).
 Gossiped `calls.v1.*` lifecycle events (`call.started`, `participant.joined|left|declined|missed`,
