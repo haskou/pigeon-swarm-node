@@ -741,6 +741,8 @@ export class Community extends AggregateRoot {
       !this.ownerIdentityId.isEqual(member),
       new CommunityOwnerMismatchError(),
     );
+    const wasMember = this.membership.isMember(member);
+
     this.membership.ban(member);
     this.record(
       new CommunityWasUpdatedEvent(this.id.valueOf(), {
@@ -748,6 +750,17 @@ export class Community extends AggregateRoot {
         community: this.toPrimitives(),
       }),
     );
+
+    if (wasMember) {
+      this.record(
+        new CommunityMemberWasLeftEvent(this.id.valueOf(), {
+          ...this.eventAttributes(),
+          actorIdentityId: actor.valueOf(),
+          community: this.toPrimitives(),
+          identityId: member.valueOf(),
+        }),
+      );
+    }
   }
 
   public unbanMember(actor: IdentityId, member: IdentityId): void {
