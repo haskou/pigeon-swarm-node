@@ -170,6 +170,27 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     return saved;
   }
 
+  /** The stored document of the identity, provisioned from its genesis when absent. */
+  private async resolveDocument(
+    identityId: IdentityId,
+  ): Promise<OrbitDBDeviceAuthorizationDocument | undefined> {
+    const trustedGenesis = await this.routing.resolveTrustedGenesis(identityId);
+
+    if (!trustedGenesis) {
+      return undefined;
+    }
+
+    const candidate = await this.readHead(identityId);
+    const document =
+      candidate &&
+      this.validator.isDocument(candidate) &&
+      this.genesisMatcher.hasTrustedGenesis(candidate, trustedGenesis)
+        ? candidate
+        : this.factory.toDocument(trustedGenesis, []);
+
+    return document !== candidate ? this.save(document) : document;
+  }
+
   public compareAndApply(
     transition: DeviceAuthorizationTransition,
   ): Promise<DeviceAuthorization> {
@@ -215,28 +236,9 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     });
   }
 
-  /** The stored document of the identity, provisioned from its genesis when absent. */
-  private async resolveDocument(
+  public find(
     identityId: IdentityId,
-  ): Promise<OrbitDBDeviceAuthorizationDocument | undefined> {
-    const trustedGenesis = await this.routing.resolveTrustedGenesis(identityId);
-
-    if (!trustedGenesis) {
-      return undefined;
-    }
-
-    const candidate = await this.readHead(identityId);
-    const document =
-      candidate &&
-      this.validator.isDocument(candidate) &&
-      this.genesisMatcher.hasTrustedGenesis(candidate, trustedGenesis)
-        ? candidate
-        : this.factory.toDocument(trustedGenesis, []);
-
-    return document !== candidate ? this.save(document) : document;
-  }
-
-  public find(identityId: IdentityId): Promise<DeviceAuthorization | undefined> {
+  ): Promise<DeviceAuthorization | undefined> {
     return this.lock.run(identityId, async () => {
       const document = await this.resolveDocument(identityId);
 

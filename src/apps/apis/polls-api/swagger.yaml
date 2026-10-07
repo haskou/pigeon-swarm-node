@@ -202,7 +202,7 @@ components:
           $ref: '#/components/schemas/SignedPublicMutation'
     SignedPublicMutation:
       type: object
-      description: Client-signed intent for a replicated public record. The node holds no user private keys, so the UI signs it. payloadDigest commits to the record without its proof; author.deviceCredential must be an authorized device of author.identityId in its current device authorization head. The winner of concurrent mutations is the higher sequence, then the lower digest; no wall clock is used.
+      description: Client-signed intent for a replicated public record. The node holds no user private keys, so the UI signs it. payloadDigest commits to the record without its proof; author.deviceCredential must be an authorized device of author.identityId in its device-authorization chain at author.authorizationRevision (not the current head; see docs/design/causal-device-authorization.md). The winner of concurrent mutations is the higher sequence, then the lower digest; no wall clock is used.
       required:
         - version
         - operationId
@@ -217,7 +217,7 @@ components:
       properties:
         version:
           type: integer
-          enum: [1]
+          enum: [2]
         operationId:
           type: string
         kind:
@@ -238,12 +238,16 @@ components:
           minimum: 0
         author:
           type: object
-          required: [identityId, deviceCredential]
+          required: [identityId, deviceCredential, authorizationRevision]
           properties:
             identityId:
               type: string
             deviceCredential:
               type: string
+            authorizationRevision:
+              type: integer
+              minimum: 0
+              description: Revision of the author's device-authorization chain (GET /identity-devices/authorization) observed when signing. The device is checked against the chain at this revision, not the current head.
         signature:
           type: string
     Poll:

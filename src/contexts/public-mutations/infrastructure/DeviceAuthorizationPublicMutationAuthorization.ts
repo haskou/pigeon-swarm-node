@@ -32,7 +32,9 @@ export default class DeviceAuthorizationPublicMutationAuthorization extends Publ
 
     return (
       timeline?.isAuthorizedAt(
-        DeviceCredential.fromIdentityId(new IdentityId(author.deviceCredential)),
+        DeviceCredential.fromIdentityId(
+          new IdentityId(author.deviceCredential),
+        ),
         new DeviceAuthorizationRevision(author.authorizationRevision),
       ) ?? false
     );

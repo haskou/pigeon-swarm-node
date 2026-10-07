@@ -292,7 +292,8 @@ createdAt)`.
 
 Admission: every node checks an operation on write, on replicated read and on head
 hydration. `PublicMutationVerifier` checks the signature, the device in the
-identity's current device authorization head, and the binding of id, scope and
+identity's device authorization chain at the revision the proof claims (see
+[Causal device authorization](#causal-device-authorization)), and the binding of id, scope and
 author to the payload digest. `CommunityOperationMutationPolicy` then applies the
 operation to the state of its causal past in a per-community ledger and refuses it
 when the author lacked the permission at that point of history. A
@@ -368,14 +369,51 @@ Conflict rules:
   other authors' operations keep applying. The order is the same total order, so the
   skipped set is identical on every replica whatever the arrival order.
 
+### Causal device authorization
+
+Issue #362. `PublicMutationProof` is version 2: the signed `author` carries
+`authorizationRevision`, the revision of the author's device-authorization chain
+that the device observed when it signed, and the signing content is
+`pigeon:public-mutation:v2\n` + canonical body. The version 1 proof and its
+domain are rejected; there is no legacy path. `PublicMutationVerifier` asks
+`DeviceAuthorizationTimeline.isAuthorizedAt(device, revision)`, a pure function
+of the proof and the replayed chain: the device is accepted iff the revision is
+not above the replicated head, not below the replay base (genesis or latest
+recovery checkpoint) and the greatest chain state at or below it contains the
+device. Consequences, identical on every node and independent of arrival order,
+wall clock and restarts:
+
+- a record signed while the device was authorized stays valid after the device
+  is revoked, however late it is delivered (partition heal, resync, restart);
+- a revoked device cannot claim the revocation revision or later: the
+  revocation transition is the frontier, no separate field exists;
+- a revision above the local head is not yet verifiable: the record is refused
+  and the head re-admitted (2 s, 10 s, 60 s) once the chain replicates;
+- payload timestamps never take part, so a fake `createdAt` does not help.
+
+Chosen bound: the whole interval in which the device was authorized
+(`N < revocation revision`), no wall-clock grace window, because a window would
+make the verdict depend on when a node first saw the record. Recovery discards
+the pre-checkpoint chain, so earlier records of pre-recovery devices become
+unverifiable. Threat model, rejected alternatives and the restart behaviour are
+in `docs/design/causal-device-authorization.md`.
+
+Residual: community and conversation **operations** are evaluated against the
+state folded from their causal past, but the permissions of channel messages,
+pins, reactions, invites, membership requests and polls are evaluated against
+the community or conversation state folded at admission, not at a causal
+frontier. A later demotion can therefore still make a node refuse such a record
+that another node admitted earlier.
+
 ### Trust boundaries
 
 The signed operation is the only source of community state: a replicated head or
 document is never read as a community. `moderationLogs` stay a separate audit
-trail with their own signature, written by the same request. Device authorization
-and the `requests` records that justify a join are evaluated against the current
-heads when the operation is admitted, so an operation whose evidence has not
-replicated yet is re-admitted later (see the limits above). The stores still
+trail with their own signature, written by the same request. The `requests` records
+that justify a join are evaluated against the current heads when the operation is
+admitted, and its signing device against the authorization chain at the claimed
+revision, so an operation whose evidence or claimed authorization revision has
+not replicated yet is re-admitted later (see the limits above). The stores still
 reveal community metadata to their readers; this work neither establishes E2EE nor
 hides the social graph from an authorized or compromised node. Protected and
 private communities keep their local repository and never enter this path.
@@ -404,7 +442,8 @@ Signed public mutations (pins, reactions and the other governed collections):
 
 - Each `pins`/`reactions` document carries a `proof` (`PublicMutationProof`): version,
   `operationId`, `kind` (`put`|`delete`), `store`, `recordId`, `payloadDigest`,
-  `predecessor`, `sequence`, `author { identityId, deviceCredential }` and an
+  `predecessor`, `sequence`, `author { identityId, deviceCredential,
+  authorizationRevision }` and an
   Ed25519 signature by the device. `payloadDigest` covers the document without
   `proof`, so ids, scope (community/channel/message) and author are bound.
 - Community and conversation reaction events carry the proof as `mutationProof`;
@@ -460,7 +499,7 @@ Signed public mutations (pins, reactions and the other governed collections):
   deletions). Heads are index wrappers under collection `moderationLogs`.
 - Every node verifies on write, on replicated read, on head hydration and on the
   persisted head cache: signature, scope binding, the device in the identity's
-  current device authorization head, and the community permission (pin needs
+  device authorization chain at the claimed revision, and the community permission (pin needs
   manage messages; reaction needs channel access). Records that fail are ignored
   and logged by collection only.
 - Winner rule, independent of wall clocks: higher `sequence`, then lower proof
@@ -471,9 +510,12 @@ Signed public mutations (pins, reactions and the other governed collections):
   demoted to `updatedAt: 0` and cannot replace an admitted head.
 - The unsigned reaction cascade tombstones on channel/community deletion are gone;
   the node cannot sign on behalf of users.
-- Limits: device authorization is checked against the current head (historical
-  revisions are not evaluated), and so are community permissions, so records of
-  a member who later lost the permission stop being admitted. A head rejected
+- Limits: device authorization is evaluated at the revision the proof claims
+  ([Causal device authorization](#causal-device-authorization)), but community
+  permissions of these records (pin, reaction, moderation log, invite, request,
+  poll, channel message) are still evaluated against the community state folded
+  at admission, not at a causal frontier, so records of a member who later lost
+  the permission stop being admitted. A head rejected
   because the community has not replicated yet is re-admitted after 2 s, 10 s
   and 60 s. Authorization lookups are coalesced for 1 s per batch.
 

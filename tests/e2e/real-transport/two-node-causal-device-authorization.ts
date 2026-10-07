@@ -244,7 +244,7 @@ function proofOf(
     kind: 'put' as const,
     operationId: randomBytes(16).toString('base64url'),
     payloadDigest: PublicMutationProof.digestOf(payload),
-    predecessor: null,
+    predecessor: null as string | null,
     recordId: payload.id,
     sequence: 0,
     store: 'fixtures',

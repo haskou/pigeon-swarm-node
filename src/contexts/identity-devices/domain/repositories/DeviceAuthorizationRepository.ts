@@ -3,8 +3,8 @@ import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/I
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { DeviceAuthorization } from '../DeviceAuthorization';
-import { DeviceAuthorizationTransition } from '../DeviceAuthorizationTransition';
 import { DeviceAuthorizationTimeline } from '../DeviceAuthorizationTimeline';
+import { DeviceAuthorizationTransition } from '../DeviceAuthorizationTransition';
 
 export abstract class DeviceAuthorizationRepository {
   public abstract compareAndApply(

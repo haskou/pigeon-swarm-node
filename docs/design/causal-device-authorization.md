@@ -27,11 +27,11 @@ recomputed whenever a record is admitted or read, so:
 | Community operation permission (`CommunityOperationLedger.admit`) | `CommunityStateFold` of `closureOf(parents)`; unknown parents are refused | yes |
 | Conversation operation permission (`ConversationOperationLedger.admit`) | `ConversationStateFold` of `closureOf(parents)`; unknown parents are refused | yes |
 | Device authorization of **every** signed record, operations included | the current head of the author's identity | **no** |
-| Community / conversation permission of non-operation records (channel messages, moderation log, invites, polls, pins, reactions) | the current folded community or conversation state | no (see [Residuals](#residuals)) |
+| Community / conversation permission of non-operation records (channel messages, moderation log, invites, polls, pins, reactions) | the current folded community or conversation state | no, evaluated at admission (see [Residuals](#residuals)) |
 
 Operation ledgers are in memory; after a restart they are rebuilt by the
 registry replaying the stored records, whatever the order. Unknown parents are
-refused and retried, so the rebuild converges. This is covered by tests below.
+refused and retried, so the rebuild converges.
 
 ## Mechanism
 
@@ -203,14 +203,34 @@ There is no legacy path: version 1 proofs are rejected by the strict decoder.
 ## Residuals
 
 - **Non-operation community / conversation records** (channel messages,
-  moderation log, invites, membership requests, polls, pins, reactions) still
-  check scope permissions (membership, role) against the *current* folded state
-  of the community or conversation, not the state at which the author signed.
-  Binding those to a causal frontier of the operation log is tracked as the
-  second stage of #362 below.
+  moderation log, invites, membership requests, polls, pins, reactions) check
+  scope permissions (membership, role) against the community or conversation
+  state folded **at admission**, not at a causal frontier. Their device
+  authorization is causal (this change); their permission is not. A later
+  demotion can therefore still make a node refuse such a record that another
+  node admitted earlier. Closing it needs a causal frontier carried inside
+  those records, which is a separate contract change and deliberately not part
+  of #362.
 - **Recovery** discards the pre-checkpoint chain, so earlier records of
   pre-recovery devices become unverifiable. Carrying a compact credential
   interval summary through checkpoints would keep them valid; it is not done
   because it changes the replicated authorization document shape.
 - **Backdating inside the authorized interval** (threat 3) cannot be bounded
   further without a trusted clock.
+
+## Verification
+
+- Unit: `DeviceAuthorizationTimeline`, `OrbitDBDeviceAuthorizationRepository`
+  timeline (replay, restart), `DeviceAuthorizationPublicMutationAuthorization`
+  (late delivery, backdating at and after the revocation, not-yet-enrolled,
+  unreached revision then healed, shuffled state order),
+  `PublicMutationVerifier` (version and revision decoding, tampered revision),
+  `CommunityOperationLedger` (demotion racing a moderation action across a
+  partition, shuffled arrival), registry re-admission of a head whose claimed
+  revision is not replicated yet, and the byte-exact vectors in
+  `tests/fixtures/*-vectors.json`.
+- Real transport: `yarn test:integration:causal-device-authorization` (two real
+  private Helia/OrbitDB replicas: partitioned authorization history, healing,
+  late delivery, backdating, unreplicated revision and a restart; in `test:ci`).
+  The existing `forged-*`, `two-real-node-gossipsub` and call scripts keep
+  covering the admission gates end to end.
