@@ -118,7 +118,13 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   private async readHead(
     identityId: IdentityId,
   ): Promise<Record<string, unknown> | undefined> {
-    const replicated = await this.registry.findHead(this.headKey(identityId));
+    const key = this.headKey(identityId);
+    let replicated = await this.registry.findHead(key);
+
+    if (!replicated) {
+      await this.registry.rehydrateHead(key);
+      replicated = await this.registry.findHead(key);
+    }
 
     if (replicated) {
       return replicated;
@@ -152,7 +158,6 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       return document;
     }
 
-    await this.registry.putDocument('identities', document, networkIds);
     await this.registry.putHead(
       this.headKey(authorization.getIdentityId()),
       document,

@@ -69,7 +69,6 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       },
     );
     registry.findHead.mockImplementation(() => Promise.resolve(head));
-    registry.putDocument.mockResolvedValue();
     registry.putHead.mockImplementation((_key, value) => {
       head = head && merger ? merger(head, value) : value;
 
@@ -127,6 +126,44 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       new IdentityVersion(version),
       externalIdentifier,
     );
+  }
+
+  function identityOf(
+    genesis: DeviceAuthorization,
+    options: {
+      networkIds?: NetworkId[];
+      previous?: IdentityExternalIdentifier;
+      timestamp?: number;
+      version?: number;
+    } = {},
+  ): MockProxy<Identity> {
+    const identity = mock<Identity>();
+    const version = options.version ?? 1;
+
+    identity.getNetworkIds.mockReturnValue(
+      options.networkIds ?? genesis.getNetworkIds(),
+    );
+    identity.getInitialDeviceCredential.mockReturnValue(
+      genesis.getCredentials()[0],
+    );
+    identity.getRecoveryAuthority.mockReturnValue(
+      genesis.getRecoveryAuthority(),
+    );
+    identity.getVersion.mockReturnValue(new IdentityVersion(version));
+    identity.isIdentifiedBy.mockReturnValue(true);
+    identity.isFirstVersion.mockReturnValue(version === 1);
+    identity.hasNoPreviousReference.mockReturnValue(version === 1);
+    identity.hasInitialAuthorizationRevision.mockReturnValue(true);
+    identity.getPreviousReference.mockReturnValue(options.previous);
+    identity.isNextVersionAfter.mockReturnValue(true);
+    identity.usesSameGenesisAuthorizationAs.mockReturnValue(true);
+    identity.doesNotRollbackAuthorizationFrom.mockReturnValue(true);
+    identity.keepsNetworksFrom.mockReturnValue(true);
+    identity.toPrimitives.mockReturnValue({
+      timestamp: options.timestamp ?? 1,
+    } as ReturnType<Identity['toPrimitives']>);
+
+    return identity;
   }
 
   function enrollment(
@@ -195,12 +232,10 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const applied = await repository.compareAndApply(transition);
 
     expect(applied.getRevision().valueOf()).toBe(1);
-    expect(registry.putDocument).toHaveBeenLastCalledWith(
-      'identities',
-      expect.objectContaining({
-        id: `device-authorization:${identityId.valueOf()}`,
-        identityId: identityId.valueOf(),
-      }),
+    expect(registry.putDocument).not.toHaveBeenCalled();
+    expect(registry.putHead).toHaveBeenLastCalledWith(
+      `device-authorization:${identityId.valueOf()}`,
+      expect.objectContaining({ identityId: identityId.valueOf() }),
       expect.any(Array),
     );
     await expect(repository.compareAndApply(transition)).rejects.toThrow();
@@ -227,11 +262,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
     await provisionAuthorization(repository, authorization);
 
-    expect(registry.putDocument).toHaveBeenCalledWith(
-      'identities',
-      expect.any(Object),
-      ['550e8400-e29b-41d4-a716-446655440000'],
-    );
+    expect(registry.putDocument).not.toHaveBeenCalled();
     expect(registry.putHead).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(Object),
@@ -536,15 +567,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
           revisionOf(2),
         ),
       );
-      const identity = mock<Identity>();
-      identity.getNetworkIds.mockReturnValue(genesis.getNetworkIds());
-      identity.getInitialDeviceCredential.mockReturnValue(
-        genesis.getCredentials()[0],
-      );
-      identity.getRecoveryAuthority.mockReturnValue(
-        genesis.getRecoveryAuthority(),
-      );
-      identity.getVersion.mockReturnValue(new IdentityVersion(1));
+      const identity = identityOf(genesis);
       first.identityRepository.findFreshCandidateReferencesById.mockResolvedValue(
         [new IdentityCandidate(genesisExternalIdentifier, identity)],
       );
@@ -1657,10 +1680,11 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const siblingEnrollment = provenSiblingEnrollment.authorize(
       owner.sign(provenSiblingEnrollment.getSigningPayload()),
     );
-    local.registry.putDocument.mockImplementationOnce(() => {
+    const mergeHead = local.registry.putHead.getMockImplementation();
+    local.registry.putHead.mockImplementationOnce((key, value, networkIds) => {
       local.setHead(remoteHead ?? {});
 
-      return Promise.resolve();
+      return mergeHead?.(key, value, networkIds) ?? Promise.resolve();
     });
 
     const applied = await local.repository.compareAndApply(siblingEnrollment);
@@ -2117,15 +2141,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       RecoveryAuthority.fromString(attackerRecovery.toPrimitives().publicKey),
     );
     const { identityRepository, repository, setHead } = repositoryFixture();
-    const identity = mock<Identity>();
-    identity.getNetworkIds.mockReturnValue(genesis.getNetworkIds());
-    identity.getInitialDeviceCredential.mockReturnValue(
-      genesis.getCredentials()[0],
-    );
-    identity.getRecoveryAuthority.mockReturnValue(
-      genesis.getRecoveryAuthority(),
-    );
-    identity.getVersion.mockReturnValue(new IdentityVersion(1));
+    const identity = identityOf(genesis);
     identityRepository.findFreshCandidateReferencesById.mockResolvedValue([
       new IdentityCandidate(genesisExternalIdentifier, identity),
     ]);
@@ -2141,6 +2157,96 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const restored = await repository.find(identityId);
 
     expect(restored?.toPrimitives()).toEqual(genesis.toPrimitives());
+  });
+
+  it('does not adopt a replicated head with an attacker genesis for an identity it has not verified', async () => {
+    const { genesis, identityId } = await fixture();
+    const attackerRecovery = await KeyPair.generate();
+    const forgedGenesis = DeviceAuthorization.genesis(
+      identityId,
+      genesis.getNetworkIds(),
+      DeviceCredential.fromIdentityId(identityId),
+      RecoveryAuthority.fromString(attackerRecovery.toPrimitives().publicKey),
+    );
+    const attacker = repositoryFixture();
+    await provisionAuthorization(attacker.repository, forgedGenesis);
+    const forgedHead = attacker.getHead() as Record<string, unknown>;
+    const victim = repositoryFixture();
+
+    expect(victim.getMerger()?.(undefined, forgedHead)).toBeUndefined();
+
+    victim.identityRepository.findFreshCandidateReferencesById.mockResolvedValue(
+      [new IdentityCandidate(genesisExternalIdentifier, identityOf(genesis))],
+    );
+    await victim.repository.find(identityId);
+
+    expect(victim.getMerger()?.(undefined, forgedHead)).toBeUndefined();
+    expect(
+      (
+        victim.getMerger()?.(undefined, victim.getHead() ?? {}) as {
+          genesis?: unknown;
+        }
+      ).genesis,
+    ).toEqual(genesis.toPrimitives());
+  });
+
+  it('merges the persisted head that was refused before the genesis was verified', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const target = await KeyPair.generate();
+    const source = repositoryFixture();
+    await provisionAuthorization(source.repository, genesis);
+    await source.repository.compareAndApply(
+      await enrollment(
+        identityId,
+        owner,
+        target,
+        '00000000-0000-4000-8000-000000000001',
+        '10000000-0000-4000-8000-000000000001',
+      ),
+    );
+    const persisted = source.getHead() as Record<string, unknown>;
+    const restarted = repositoryFixture();
+    let rehydrated = false;
+    restarted.registry.findHead.mockImplementation(() =>
+      Promise.resolve(rehydrated ? persisted : undefined),
+    );
+    restarted.registry.rehydrateHead.mockImplementation(() => {
+      rehydrated = true;
+
+      return Promise.resolve();
+    });
+    restarted.identityRepository.findFreshCandidateReferencesById.mockResolvedValue(
+      [new IdentityCandidate(genesisExternalIdentifier, identityOf(genesis))],
+    );
+
+    const restored = await restarted.repository.find(identityId);
+
+    expect(restarted.registry.rehydrateHead).toHaveBeenCalledWith(
+      `device-authorization:${identityId.valueOf()}`,
+    );
+    expect(restored?.getRevision().valueOf()).toBe(1);
+    expect(restarted.registry.putHead).not.toHaveBeenCalled();
+  });
+
+  it('derives the genesis from version 1 even when the latest identity candidate differs', async () => {
+    const { genesis, identityId } = await fixture();
+    const latestNetworkId = '550e8400-e29b-41d4-a716-446655440001';
+    const { identityRepository, repository } = repositoryFixture();
+    const latest = identityOf(genesis, {
+      networkIds: [...genesis.getNetworkIds(), new NetworkId(latestNetworkId)],
+      previous: genesisExternalIdentifier,
+      version: 2,
+    });
+    identityRepository.findByExternalIdentifier.mockResolvedValue(
+      identityOf(genesis),
+    );
+    identityRepository.findFreshCandidateReferencesById.mockResolvedValue([
+      new IdentityCandidate(new IdentityExternalIdentifier('bafy-v2'), latest),
+    ]);
+
+    const found = await repository.find(identityId);
+
+    expect(found?.getNetworkIds()).toEqual(genesis.getNetworkIds());
   });
 
   it('returns a concurrently merged checkpoint when repairing an untrusted head', async () => {
@@ -2271,22 +2377,21 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         '10000000-0000-4000-8000-000000000001',
       ),
     );
-    const identity = mock<Identity>();
-    identity.getNetworkIds.mockReturnValue([
-      ...genesis.getNetworkIds(),
-      new NetworkId(expandedNetworkId),
-    ]);
-    identity.getInitialDeviceCredential.mockReturnValue(
-      genesis.getCredentials()[0],
+    const expanded = identityOf(genesis, {
+      networkIds: [
+        ...genesis.getNetworkIds(),
+        new NetworkId(expandedNetworkId),
+      ],
+      previous: genesisExternalIdentifier,
+      version: 2,
+    });
+    identityRepository.findByExternalIdentifier.mockResolvedValue(
+      identityOf(genesis),
     );
-    identity.getRecoveryAuthority.mockReturnValue(
-      genesis.getRecoveryAuthority(),
-    );
-    identity.getVersion.mockReturnValue(new IdentityVersion(2));
     identityRepository.findFreshCandidateReferencesById.mockResolvedValue([
       new IdentityCandidate(
         new IdentityExternalIdentifier('bafy-expanded'),
-        identity,
+        expanded,
       ),
     ]);
     const revocation = DeviceAuthorizationTransition.revocation(

@@ -533,8 +533,8 @@ protects the collection and what a malicious peer can still do.
 | `messages`, `pins`, `reactions`, `requests`, `polls`, `stickerPacks`, `stickerUserLibraries`, `moderationLogs` | the community, conversation, poll, sticker and moderation repositories | `PublicMutationGate`, see [Other signed public mutations](#other-signed-public-mutations) | Signed |
 | `notificationSettings` | `OrbitDBNotificationScopeSettingsRepository` | `PublicMutationGate` (`notification_settings`, #349) | Signed |
 | `keychains` | `OrbitDBKeychainMetadataIndex` | `OrbitDBKeychainMutationGate`, see [Keychains](#keychains) | Self-authenticating (this change) |
-| `identities` (identity metadata) | `OrbitDBIdentityMetadataIndex` | identity-key signature plus canonical CID, see [Identities](#identities-and-device-authorization) | Self-authenticating, residuals listed |
-| `identities` (device authorization) | `OrbitDBDeviceAuthorizationRepository` | history replayed from the pinned genesis, see [Identity device authorization convergence](#identity-device-authorization-convergence) | Replay-validated, residual listed |
+| `identities` (identity metadata) | `OrbitDBIdentityMetadataIndex` | identity-key signature plus canonical CID, see [Identities](#identities-and-device-authorization) | Self-authenticating (#361), see [design](design/identity-authentication.md) |
+| `identities` (device authorization) | `OrbitDBDeviceAuthorizationRepository` | history replayed from the pinned genesis, see [Identity device authorization convergence](#identity-device-authorization-convergence) | Replay-validated from a self-certified genesis (#361) |
 | `calls` | `OrbitDBCallRepository` | `CallStartMutationPolicy`, `CallParticipantMutationPolicy` and `CallEndMutationPolicy` through `PublicMutationGate` (#373) | Signed |
 | `contentReplication` | `OrbitDBContentReplicationRepository` | `ContentReplicationMutationPolicy` through `PublicMutationGate`; owner-signed per `(networkId, cid)`, 1 GiB and 10000 records per identity per network (#372) | Signed |
 | `notifications` | `OrbitDBNotificationRepository` | `NotificationInvitationMutationPolicy` and `NotificationStateMutationPolicy` through `PublicMutationGate`, plus `OrbitDBNotificationHeadMutationGate` for `notification:` heads (#371) | Signed |
@@ -582,21 +582,45 @@ under a victim head) and that the gated nodes never serve them.
 
 #### Identities and device authorization
 
-- Identity records are self-authenticating: the embedded identity is verified
-  against its key and the record `cid` must be the canonical CID of the
-  content, so a forged record cannot shadow another identity.
-- Device authorization history is replayed from the pinned genesis
-  (`OrbitDBDeviceAuthorizationDocumentValidator`/`DocumentMerger`), not trusted
-  as replicated. Residual: there is no trusted genesis for an identity the node
-  has never seen, so the first valid-looking history is accepted.
-- Residuals of the identity metadata that this change does not remove:
-  reference-only records without an embedded identity are accepted as
-  non-canonical candidates; `receivedAt` is chosen by the sender; remote
-  `deleted: true` tombstones are ignored when projecting;
-  an attacker can register a handle first with a valid identity of its own and
-  can flood the store. Requiring a `PublicMutationProof` signed by a device key
-  would be circular, because the device authorization it would be checked
-  against is itself part of the identity data.
+`OrbitDBIdentityMutationGate` governs the whole `identities` collection and the
+`identity:` and `identity-handle:` head keys. Design and limits:
+[Identity authentication](design/identity-authentication.md).
+
+- An identity record is admitted only when it embeds the identity, the
+  embedded identity verifies against its own id (the identity id is the public
+  key), `id` equals `cid`, `cid` is the canonical CID of the identity document
+  and every redundant field (`identityId`, `handle`, `networkIds`, `version`,
+  `previousCid`) repeats the signed value. Reference-only records, `receivedAt`,
+  `deleted` and unknown keys are rejected; a record is at most 64 KiB and an
+  identity names at most 32 networks.
+- Head keys are bound to the signed identity: `identity:<id>` and
+  `identity-handle:<handle>` accept only a record whose signed id or handle
+  produces that key, so a valid record cannot be planted under a victim's key.
+- Ordering is `version` descending, then `cid` ascending. Nothing sender
+  chosen takes part, and no replicated tombstone exists.
+- A handle belongs to the identity with the smallest `(claimedAt, identityId)`
+  among identities whose latest version claims it. `claimedAt` is the minimum
+  signed `timestamp` of that identity's retained versions claiming the handle.
+  The result does not depend on arrival order, and claimants are never evicted,
+  because an eviction would make the owner depend on history. A node keeps at
+  most 64 versions per identity, and `POST /identities` and
+  `PUT /identities/{identityId}` are capped at
+  `IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE` (default 30) per identity per minute
+  (`429`, code `429040`).
+- Device authorization history is replayed from a genesis derived from the
+  verified identity chain, so an identity the node has never seen has a trusted
+  genesis too (see [Identity device authorization convergence](#identity-device-authorization-convergence)).
+  A `device-authorization:` head whose genesis the node cannot verify yet (the
+  identity is not known, for instance right after a restart) is refused rather
+  than cached; once the genesis is verified the head is merged again from the
+  persisted heads history (`OrbitDBReplicatedStateRegistry.rehydrateHead`), so
+  no history is lost and no forged head is ever served.
+- Not solved: the signer chooses the timestamp, so the holder of an identity
+  key can backdate a claim; many valid identities cannot be prevented without
+  an admission authority; the identity id remains the authoritative reference
+  and a handle is only a claim; the identity-key holder can fork its own genesis.
+  Requiring a `PublicMutationProof` would be circular, because the device
+  authorization it is checked against is part of the identity data.
 
 #### Deferred: node-authored collections
 

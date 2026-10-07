@@ -304,6 +304,62 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     registry.clear();
   });
 
+  it('merges the persisted history of a head its merger refused while it could not judge it', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { heads, stores } = createStores();
+    const key = 'device-authorization:history';
+    const first = { members: ['owner', 'alice'] };
+    const second = { members: ['owner', 'bob'] };
+    const ancestor: OrbitDBEntry = {
+      hash: 'first',
+      next: [],
+      payload: { key, value: first },
+    };
+    const latest: OrbitDBEntry = {
+      hash: 'second',
+      next: ['first'],
+      payload: { key: 'unrelated', value: { members: ['mallory'] } },
+    };
+    const head: OrbitDBEntry = {
+      hash: 'third',
+      next: ['second'],
+      payload: { key, value: second },
+    };
+    let judged = false;
+    heads.all.mockResolvedValue([{ key, value: second }]);
+    heads.get.mockResolvedValue(second);
+    heads.log = {
+      get: async (hash) =>
+        ({ first: ancestor, second: latest })[hash as 'first' | 'second'],
+      heads: jest.fn(async () => [head]),
+    };
+    registry.registerHeadRecordMerger(
+      'device-authorization:',
+      (current, candidate) =>
+        judged
+          ? {
+              members: [
+                ...new Set([
+                  ...((current?.members as string[]) ?? []),
+                  ...(candidate.members as string[]),
+                ]),
+              ].sort(),
+            }
+          : current,
+    );
+    await registry.register('network-1', stores);
+
+    await expect(registry.findHead(key)).resolves.toBeUndefined();
+
+    judged = true;
+    await registry.rehydrateHead(key);
+
+    await expect(registry.findHead(key)).resolves.toEqual({
+      members: ['alice', 'bob', 'owner'],
+    });
+    registry.clear();
+  });
+
   it('replays call history for each new subscriber without resetting existing subscribers', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const { calls, stores } = createStores();

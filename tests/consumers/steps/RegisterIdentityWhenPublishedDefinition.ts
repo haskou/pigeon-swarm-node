@@ -189,23 +189,6 @@ export default class RegisterIdentityWhenPublishedDefinition {
     this.externalIdentifier = candidate.getExternalIdentifier();
   }
 
-  @given('the local identity registration metadata is missing')
-  public async theLocalIdentityRegistrationMetadataIsMissing(): Promise<void> {
-    if (!this.identity) {
-      throw new Error('Identity is not initialized.');
-    }
-
-    const metadataIndex = Kernel.di.getService<IdentityMetadataIndex>(
-      IdentityMetadataIndex,
-    );
-
-    if (!this.externalIdentifier) {
-      throw new Error('Identity external identifier is not initialized.');
-    }
-
-    await metadataIndex.deleteByExternalIdentifier(this.externalIdentifier);
-  }
-
   @then('the published identity should be registered locally')
   public async thePublishedIdentityShouldBeRegisteredLocally(): Promise<void> {
     await this.waitUntilIdentityIsRegistered();

@@ -1,4 +1,7 @@
+import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentityCandidate } from '@app/contexts/identities/domain/IdentityCandidate';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import IdentityCandidateValidationDomainService from '@app/contexts/identities/domain/services/IdentityCandidateValidationDomainService';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
@@ -7,10 +10,31 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { assert } from '@haskou/value-objects';
 
+interface GenesisIdentity {
+  externalIdentifier: IdentityExternalIdentifier;
+  identity: Identity;
+}
+
 export default class OrbitDBDeviceAuthorizationRouting {
-  private readonly trustedGenesisByIdentity = new Map<
+  private static readonly MAX_GENESIS_MEMO = 1024;
+
+  private readonly validator = new IdentityCandidateValidationDomainService();
+
+  /** Derived from the verified version-1 identity; authoritative. */
+  private readonly verifiedGenesisByIdentity = new Map<
     string,
     DeviceAuthorization
+  >();
+
+  /** Provisioned locally from an already validated chain; never replaces a verified genesis. */
+  private readonly provisionedGenesisByIdentity = new Map<
+    string,
+    DeviceAuthorization
+  >();
+
+  private readonly genesisIdentityByCandidate = new Map<
+    string,
+    GenesisIdentity
   >();
 
   private readonly routingNetworkIdsByIdentity = new Map<string, string[]>();
@@ -58,6 +82,100 @@ export default class OrbitDBDeviceAuthorizationRouting {
     );
   }
 
+  private rememberRouting(
+    identityId: string,
+    networkIds: string[],
+    identityVersion: IdentityVersion,
+    identityExternalIdentifier: IdentityExternalIdentifier,
+  ): void {
+    const currentVersion = this.routingVersionByIdentity.get(identityId);
+
+    if (
+      currentVersion &&
+      !this.shouldReplaceRoutingNetworks(
+        identityId,
+        currentVersion,
+        identityVersion,
+        identityExternalIdentifier,
+      )
+    ) {
+      return;
+    }
+
+    this.routingNetworkIdsByIdentity.set(identityId, networkIds);
+    this.routingVersionByIdentity.set(identityId, identityVersion);
+    this.routingExternalIdentifierByIdentity.set(
+      identityId,
+      identityExternalIdentifier,
+    );
+  }
+
+  private async genesisIdentityOf(
+    identityId: IdentityId,
+    candidate: IdentityCandidate,
+  ): Promise<GenesisIdentity | undefined> {
+    const key = candidate.getExternalIdentifier().valueOf();
+    const memoized = this.genesisIdentityByCandidate.get(key);
+
+    if (memoized) {
+      return memoized;
+    }
+
+    let root: GenesisIdentity = {
+      externalIdentifier: candidate.getExternalIdentifier(),
+      identity: candidate.getIdentity(),
+    };
+    const isValid = await this.validator.isValidChainFor(
+      identityId,
+      candidate.getIdentity(),
+      async (externalIdentifier) => {
+        const previous =
+          await this.identityRepository.findByExternalIdentifier(
+            externalIdentifier,
+          );
+
+        if (previous) {
+          root = { externalIdentifier, identity: previous };
+        }
+
+        return previous;
+      },
+    );
+
+    if (!isValid || !root.identity.isFirstVersion()) {
+      return undefined;
+    }
+
+    if (
+      this.genesisIdentityByCandidate.size >=
+      OrbitDBDeviceAuthorizationRouting.MAX_GENESIS_MEMO
+    ) {
+      const [oldest] = this.genesisIdentityByCandidate.keys();
+
+      this.genesisIdentityByCandidate.delete(oldest);
+    }
+
+    this.genesisIdentityByCandidate.set(key, root);
+
+    return root;
+  }
+
+  private isEarlierGenesis(
+    left: GenesisIdentity,
+    right: GenesisIdentity,
+  ): boolean {
+    const leftTimestamp = left.identity.toPrimitives().timestamp;
+    const rightTimestamp = right.identity.toPrimitives().timestamp;
+
+    if (leftTimestamp !== rightTimestamp) {
+      return leftTimestamp < rightTimestamp;
+    }
+
+    return (
+      left.externalIdentifier.valueOf() < right.externalIdentifier.valueOf()
+    );
+  }
+
   public isPrivateNetwork(networkId: string): boolean {
     return this.networkRegistry
       .getAll()
@@ -65,7 +183,10 @@ export default class OrbitDBDeviceAuthorizationRouting {
   }
 
   public trustedGenesis(identityId: string): DeviceAuthorization | undefined {
-    return this.trustedGenesisByIdentity.get(identityId);
+    return (
+      this.verifiedGenesisByIdentity.get(identityId) ??
+      this.provisionedGenesisByIdentity.get(identityId)
+    );
   }
 
   public routableNetworkIds(authorization: DeviceAuthorization): string[] {
@@ -102,28 +223,17 @@ export default class OrbitDBDeviceAuthorizationRouting {
     identityExternalIdentifier: IdentityExternalIdentifier,
   ): void {
     const identityId = authorization.getIdentityId().valueOf();
-    const currentVersion = this.routingVersionByIdentity.get(identityId);
-    const candidateNetworkIds = this.networkIds(authorization);
 
-    if (
-      currentVersion &&
-      !this.shouldReplaceRoutingNetworks(
-        identityId,
-        currentVersion,
-        identityVersion,
-        identityExternalIdentifier,
-      )
-    ) {
-      return;
-    }
-
-    this.routingNetworkIdsByIdentity.set(identityId, candidateNetworkIds);
-    this.routingVersionByIdentity.set(identityId, identityVersion);
-    this.routingExternalIdentifierByIdentity.set(
+    this.rememberRouting(
       identityId,
+      this.networkIds(authorization),
+      identityVersion,
       identityExternalIdentifier,
     );
-    this.trustedGenesisByIdentity.set(identityId, authorization);
+
+    if (!this.provisionedGenesisByIdentity.has(identityId)) {
+      this.provisionedGenesisByIdentity.set(identityId, authorization);
+    }
   }
 
   public forget(
@@ -143,41 +253,72 @@ export default class OrbitDBDeviceAuthorizationRouting {
       this.routingNetworkIdsByIdentity.delete(key);
       this.routingVersionByIdentity.delete(key);
       this.routingExternalIdentifierByIdentity.delete(key);
-      this.trustedGenesisByIdentity.delete(key);
+      this.provisionedGenesisByIdentity.delete(key);
     }
   }
 
+  /**
+   * The genesis of an identity is derived from its verified version-1
+   * identity. Among several valid version-1 forks the earliest signed one
+   * wins, then the lowest external identifier. When the repository does not
+   * know the identity at all, only a genesis verified earlier or provisioned by
+   * the local publisher (after its own chain validation) is returned; an
+   * identity whose candidates all fail validation yields no genesis.
+   */
   public async resolveTrustedGenesis(
     identityId: IdentityId,
   ): Promise<DeviceAuthorization | undefined> {
-    const cached = this.trustedGenesisByIdentity.get(identityId.valueOf());
-
     try {
-      const [candidate] =
+      const candidates =
         await this.identityRepository.findFreshCandidateReferencesById(
           identityId,
         );
 
-      assert(
-        candidate !== undefined,
-        new InvalidDeviceAuthorizationTransitionError(),
+      if (candidates.length === 0) {
+        return this.trustedGenesis(identityId.valueOf());
+      }
+
+      const roots = (
+        await Promise.all(
+          candidates.map((candidate) =>
+            this.genesisIdentityOf(identityId, candidate),
+          ),
+        )
+      ).filter((root): root is GenesisIdentity => root !== undefined);
+      const genesisIdentity = roots.reduce<GenesisIdentity | undefined>(
+        (best, root) =>
+          !best || this.isEarlierGenesis(root, best) ? root : best,
+        undefined,
       );
-      const identity = candidate.getIdentity();
+
+      if (!genesisIdentity) {
+        return undefined;
+      }
+
+      const { identity } = genesisIdentity;
       const genesis = DeviceAuthorization.genesis(
         identityId,
         identity.getNetworkIds(),
         identity.getInitialDeviceCredential(),
         identity.getRecoveryAuthority(),
       );
-      this.remember(
-        genesis,
-        identity.getVersion(),
-        candidate.getExternalIdentifier(),
+      const [latest] = candidates;
+
+      this.verifiedGenesisByIdentity.set(identityId.valueOf(), genesis);
+      this.rememberRouting(
+        identityId.valueOf(),
+        latest
+          .getIdentity()
+          .getNetworkIds()
+          .map((networkId) => networkId.valueOf())
+          .sort(),
+        latest.getIdentity().getVersion(),
+        latest.getExternalIdentifier(),
       );
 
       return genesis;
     } catch {
-      return cached;
+      return this.trustedGenesis(identityId.valueOf());
     }
   }
 }

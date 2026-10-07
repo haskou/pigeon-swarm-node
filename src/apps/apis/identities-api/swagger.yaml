@@ -24,11 +24,13 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IdentityResource'
+        '429':
+          description: Identity publication rate limit exceeded (code 429040, IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE publications per identity per minute).
   /identities/{reference}:
     get:
       tags:
         - identities
-      summary: Get latest known identity
+      summary: Get latest known identity (a handle resolves only to its owner, the earliest signed claim)
       parameters:
         - in: path
           name: reference
@@ -83,6 +85,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IdentityResource'
+        '429':
+          description: Identity publication rate limit exceeded (code 429040).
 components:
   schemas:
     PostIdentityBody:

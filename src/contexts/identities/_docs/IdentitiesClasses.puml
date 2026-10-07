@@ -163,12 +163,22 @@ package "identities.infrastructure" {
     -version: number
     -previousCid?: string
     -networkIds: string[]
-    -receivedAt: number
+  }
+
+  class IdentityHandleOwnershipDomainService {
+    +rank(candidates, handle): IdentityCandidate[]
+    +owner(candidates, handle): IdentityCandidate
+  }
+
+  class OrbitDBIdentityMutationGate {
+    +governs(collection): boolean
+    +accepts(collection, record): Promise<boolean>
+    +governsHead(key): boolean
+    +acceptsHead(key, record): Promise<boolean>
   }
 
   interface IdentityMetadataIndex {
     +save(identity, externalIdentifier): Promise<void>
-    +deleteByExternalIdentifier(externalIdentifier): Promise<void>
     +findByIdentityId(identityId): Promise<IdentityMetadataRecord[]>
     +findByHandle(handle): Promise<IdentityMetadataRecord[]>
     +findLatestByNetworkId(networkId): Promise<IdentityMetadataRecord[]>
@@ -202,6 +212,8 @@ package "identities.infrastructure" {
   IpfsIdentityRepository ..|> IdentityRepository
   MetadataIdentityNetworkRepository ..|> IdentityNetworkRepository
   OrbitDBIdentityMetadataIndex ..|> IdentityMetadataIndex
+  OrbitDBIdentityMetadataIndex --> IdentityHandleOwnershipDomainService
+  IpfsIdentityRepository --> IdentityHandleOwnershipDomainService
   IpfsIdentityRepository --> IpfsIdentityDocument
   IpfsIdentityRepository --> IdentityMetadataIndex
   MetadataIdentityNetworkRepository --> IdentityMetadataIndex

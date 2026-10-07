@@ -23,17 +23,22 @@ export default class OrbitDBDeviceAuthorizationDocumentMerger {
     private readonly validator: OrbitDBDeviceAuthorizationDocumentValidator,
   ) {}
 
+  /**
+   * A device-authorization head is adopted only when its genesis equals the
+   * genesis derived from the verified version-1 identity. Heads of identities
+   * whose genesis is not known yet are not adopted.
+   */
   private conflictsWithTrustedGenesis(
     document: OrbitDBDeviceAuthorizationDocument,
   ): boolean {
     const trusted = this.routing.trustedGenesis(document.identityId);
 
-    return Boolean(
-      trusted &&
+    return (
+      !trusted ||
       !this.genesisMatcher.sameAuthorizationGenesis(
         document.genesis,
         trusted.toPrimitives(),
-      ),
+      )
     );
   }
 

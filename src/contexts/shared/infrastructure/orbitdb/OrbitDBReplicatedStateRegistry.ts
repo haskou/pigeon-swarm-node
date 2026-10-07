@@ -1155,6 +1155,24 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
+  private async hydrateHeadKeyHistory(
+    networkId: string,
+    store: OrbitDBDatabase,
+    key: string,
+  ): Promise<void> {
+    if (!store.log?.get) return;
+
+    for await (const entry of new OrbitDBHeadHistoryReader(
+      store.log,
+    ).entries()) {
+      const { value } = entry.payload ?? {};
+
+      if (entry.payload?.key === key && this.isRecord(value)) {
+        await this.hydrateHeadRecord(networkId, { key, value });
+      }
+    }
+  }
+
   private async hydrateHeadCache(
     networkId: string,
     stores: OrbitDBPrivateNetworkStores,
@@ -2114,6 +2132,21 @@ export default class OrbitDBReplicatedStateRegistry {
     this.assertReady();
 
     return this.findStoredHead(key);
+  }
+
+  /**
+   * Offers every persisted entry of a head key to its merger again. A merger
+   * can refuse a head it cannot judge yet (the genesis of its identity is not
+   * verified); once that is known the refused history is merged from the log.
+   */
+  public async rehydrateHead(key: string): Promise<void> {
+    this.assertReady();
+
+    for (const [networkId, { heads }] of this.storesByNetworkId) {
+      if (await heads.get?.(key)) {
+        await this.hydrateHeadKeyHistory(networkId, heads, key);
+      }
+    }
   }
 
   public findCachedHeadsByPrefix(

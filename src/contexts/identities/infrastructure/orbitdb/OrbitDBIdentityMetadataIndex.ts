@@ -1,5 +1,7 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentityCandidate } from '@app/contexts/identities/domain/IdentityCandidate';
 import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
+import IdentityHandleOwnershipDomainService from '@app/contexts/identities/domain/services/IdentityHandleOwnershipDomainService';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
 import IpfsIdentityMapper from '@app/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
@@ -13,18 +15,16 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 import { OrbitDBIdentityMetadataDocument } from './documents/OrbitDBIdentityMetadataDocument';
 
 export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex {
-  private static readonly MAX_CANDIDATES_PER_IDENTITY = 64;
+  public static readonly MAX_CANDIDATES_PER_IDENTITY = 64;
 
   private readonly candidatesByIdentityId = new Map<
     string,
     Map<string, IdentityMetadataRecord>
   >();
 
-  private readonly canonicalCandidatesByIdentityId = new Map<
-    string,
-    Map<string, IdentityMetadataRecord>
-  >();
-
+  private readonly claimantsByHandle = new Map<string, Set<string>>();
+  private readonly handlesByIdentityId = new Map<string, Set<string>>();
+  private readonly ownership = new IdentityHandleOwnershipDomainService();
   private readonly mapper = new IpfsIdentityMapper();
 
   constructor(
@@ -32,70 +32,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     private readonly ipfsManager: IPFS,
   ) {
     super();
-  }
-
-  private isStringArray(value: unknown): value is string[] {
-    return (
-      Array.isArray(value) && value.every((item) => typeof item === 'string')
-    );
-  }
-
-  private isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
-  }
-
-  private stringValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): string | undefined {
-    const value = document[attribute];
-
-    return typeof value === 'string' ? value : undefined;
-  }
-
-  private numberValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): number | undefined {
-    const value = document[attribute];
-
-    return typeof value === 'number' ? value : undefined;
-  }
-
-  private identityIdFrom(
-    document: Record<string, unknown>,
-  ): string | undefined {
-    const identityId = this.stringValue(document, 'identityId');
-    const embeddedIdentityId = this.isRecord(document.identity)
-      ? this.stringValue(document.identity, 'id')
-      : undefined;
-    const projectedIdentityId = this.isProjectedIdentityRecord(document)
-      ? this.stringValue(document, 'id')
-      : undefined;
-
-    if (identityId && embeddedIdentityId && identityId !== embeddedIdentityId) {
-      return undefined;
-    }
-
-    return identityId || embeddedIdentityId || projectedIdentityId;
-  }
-
-  private isProjectedIdentityRecord(
-    document: Record<string, unknown>,
-  ): boolean {
-    return (
-      Boolean(this.stringValue(document, 'cid')) &&
-      Boolean(this.stringValue(document, 'id')) &&
-      Boolean(this.stringValue(document, 'lastEventId'))
-    );
-  }
-
-  private networkIdsFrom(
-    document: Record<string, unknown>,
-  ): string[] | undefined {
-    return this.isStringArray(document.networkIds)
-      ? document.networkIds
-      : undefined;
   }
 
   private identityFrom(
@@ -117,42 +53,45 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   private toRecord(
     document: Record<string, unknown>,
   ): IdentityMetadataRecord | undefined {
-    const cid = this.stringValue(document, 'cid');
     const identity = this.identityFrom(document);
-    const identityId = this.identityIdFrom(document);
 
-    if (!cid || !identityId || document.deleted === true) {
+    if (typeof document.cid !== 'string' || !identity) {
       return undefined;
     }
 
+    const primitives = identity.toPrimitives();
+
     return {
-      cid,
-      handle: this.stringValue(document, 'handle'),
+      cid: document.cid,
+      handle: primitives.profile.handle,
       identity,
-      identityId,
-      networkIds: this.networkIdsFrom(document),
-      previousCid: this.stringValue(document, 'previousCid'),
-      receivedAt: this.numberValue(document, 'receivedAt') || 0,
-      version: this.numberValue(document, 'version') || 0,
+      identityId: primitives.id,
+      networkIds: primitives.networks,
+      previousCid: primitives.previousIdentityExternalIdentifier,
+      version: primitives.version,
     };
   }
 
   private toStorageDocument(
     record: IdentityMetadataRecord,
-    deleted: boolean = false,
   ): OrbitDBIdentityMetadataDocument {
     return {
       cid: record.cid,
-      deleted,
       handle: record.handle,
-      id: record.identityId,
-      identity: record.identity?.toPrimitives(),
+      id: record.cid,
+      identity: record.identity.toPrimitives(),
       identityId: record.identityId,
       networkIds: record.networkIds,
       previousCid: record.previousCid,
-      receivedAt: record.receivedAt,
       version: record.version,
     };
+  }
+
+  private toCandidate(record: IdentityMetadataRecord): IdentityCandidate {
+    return new IdentityCandidate(
+      new IdentityExternalIdentifier(record.cid),
+      record.identity,
+    );
   }
 
   private deduplicateDocuments(
@@ -170,56 +109,34 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   private sortByFreshness(
     documents: IdentityMetadataRecord[],
   ): IdentityMetadataRecord[] {
-    return [...documents].sort(
-      (left, right) =>
-        right.version - left.version ||
-        left.cid.localeCompare(right.cid) ||
-        right.receivedAt - left.receivedAt,
-    );
+    return [...documents].sort((left, right) => {
+      if (left.version !== right.version) {
+        return right.version - left.version;
+      }
+
+      if (left.cid === right.cid) return 0;
+
+      return left.cid < right.cid ? -1 : 1;
+    });
   }
 
   private identityHeadKey(identityId: string): string {
     return `identity:${identityId}`;
   }
 
-  private handleHeadKey(handle: string): string {
-    return `identity-handle:${handle}`;
+  private retainedRecords(identityId?: string): IdentityMetadataRecord[] {
+    if (identityId) {
+      return [...(this.candidatesByIdentityId.get(identityId)?.values() ?? [])];
+    }
+
+    return [...this.candidatesByIdentityId.values()].flatMap((candidates) => [
+      ...candidates.values(),
+    ]);
   }
 
   private async findCachedCandidateRecords(
     identityId?: string,
   ): Promise<IdentityMetadataRecord[]> {
-    if (identityId) {
-      return [...(this.candidatesByIdentityId.get(identityId)?.values() ?? [])];
-    }
-
-    const retained = [...this.candidatesByIdentityId.values()].flatMap(
-      (candidates) => [...candidates.values()],
-    );
-    const projected = (
-      await Promise.all(
-        this.registry
-          .findCachedHeadsByPrefix('identity:')
-          .map((document) => this.verifiedRecord(document)),
-      )
-    ).filter(
-      (document): document is IdentityMetadataRecord => document !== undefined,
-    );
-
-    return [...retained, ...projected];
-  }
-
-  private async findCachedCanonicalCandidateRecords(
-    identityId?: string,
-  ): Promise<IdentityMetadataRecord[]> {
-    const retained = identityId
-      ? [
-          ...(this.canonicalCandidatesByIdentityId.get(identityId)?.values() ??
-            []),
-        ]
-      : [...this.canonicalCandidatesByIdentityId.values()].flatMap(
-          (candidates) => [...candidates.values()],
-        );
     const projected = (
       await Promise.all(
         this.registry
@@ -232,7 +149,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
         (!identityId || document.identityId === identityId),
     );
 
-    return [...retained, ...projected];
+    return [...this.retainedRecords(identityId), ...projected];
   }
 
   private async verifiedRecord(
@@ -240,12 +157,8 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   ): Promise<IdentityMetadataRecord | undefined> {
     const record = this.toRecord(document);
 
-    if (!record?.identity) {
-      return undefined;
-    }
-
-    return (await this.hasCanonicalEmbeddedIdentity(record))
-      ? this.deriveSignedMetadata(record)
+    return record && (await this.hasCanonicalIdentity(record))
+      ? record
       : undefined;
   }
 
@@ -257,13 +170,9 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     return document ? this.verifiedRecord(document) : undefined;
   }
 
-  private async hasCanonicalEmbeddedIdentity(
+  private async hasCanonicalIdentity(
     record: IdentityMetadataRecord,
   ): Promise<boolean> {
-    if (!record.identity) {
-      return false;
-    }
-
     try {
       const calculatedCid = await this.ipfsManager.calculateJSONId(
         this.mapper.toDocument(record.identity),
@@ -275,176 +184,111 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     }
   }
 
-  private deriveSignedMetadata(
-    record: IdentityMetadataRecord,
-  ): IdentityMetadataRecord {
-    if (!record.identity) {
-      return record;
-    }
-
-    const primitives = record.identity.toPrimitives();
-
-    return {
-      ...record,
-      handle: primitives.profile.handle,
-      identityId: primitives.id,
-      networkIds: primitives.networks,
-      previousCid: primitives.previousIdentityExternalIdentifier,
-      version: primitives.version,
-    };
-  }
-
-  private retainCandidates(
-    candidates: Map<string, IdentityMetadataRecord>,
-    canonicalCandidates: Map<string, IdentityMetadataRecord>,
-  ): void {
-    const ordered = this.sortByFreshness([...candidates.values()]);
-    const canonical = this.sortByFreshness([...canonicalCandidates.values()]);
-    const references = ordered.filter(
-      ({ cid }) => !canonicalCandidates.has(cid),
-    );
-    const retained = [...canonical, ...references].slice(
+  private retainCandidates(candidates: Map<string, IdentityMetadataRecord>) {
+    const retained = this.sortByFreshness([...candidates.values()]).slice(
       0,
       OrbitDBIdentityMetadataIndex.MAX_CANDIDATES_PER_IDENTITY,
     );
-    const retainedCids = new Set(retained.map(({ cid }) => cid));
 
     candidates.clear();
     retained.forEach((candidate) => candidates.set(candidate.cid, candidate));
-    [...canonicalCandidates.keys()]
-      .filter((cid) => !retainedCids.has(cid))
-      .forEach((cid) => canonicalCandidates.delete(cid));
   }
 
-  private async addCandidate(
-    candidates: Map<string, IdentityMetadataRecord>,
-    canonicalCandidates: Map<string, IdentityMetadataRecord>,
-    record: IdentityMetadataRecord,
-    locallyVerified: boolean,
-  ): Promise<boolean> {
-    const canonical =
-      locallyVerified || (await this.hasCanonicalEmbeddedIdentity(record));
+  private releaseHandle(identityId: string, handle: string): void {
+    const claimants = this.claimantsByHandle.get(handle);
 
-    if (record.identity && !canonical) {
-      return false;
+    claimants?.delete(identityId);
+
+    if (claimants?.size === 0) {
+      this.claimantsByHandle.delete(handle);
     }
 
-    if (!canonical && canonicalCandidates.has(record.cid)) {
-      return false;
-    }
-
-    const acceptedRecord = canonical
-      ? this.deriveSignedMetadata(record)
-      : record;
-
-    candidates.set(acceptedRecord.cid, acceptedRecord);
-
-    if (canonical) {
-      canonicalCandidates.set(acceptedRecord.cid, acceptedRecord);
-    }
-
-    return true;
+    this.handlesByIdentityId.get(identityId)?.delete(handle);
   }
 
-  private removeCandidate(
-    candidates: Map<string, IdentityMetadataRecord>,
-    canonicalCandidates: Map<string, IdentityMetadataRecord>,
-    cid: string,
-    locallyVerified: boolean,
-  ): boolean {
-    if (!locallyVerified) {
-      return false;
+  private refreshHandleClaims(identityId: string): void {
+    const claimed = new Set(
+      this.retainedRecords(identityId)
+        .map(({ handle }) => handle)
+        .filter((handle): handle is string => handle !== undefined),
+    );
+
+    for (const handle of this.handlesByIdentityId.get(identityId) ?? []) {
+      if (!claimed.has(handle)) {
+        this.releaseHandle(identityId, handle);
+      }
     }
 
-    candidates.delete(cid);
-    canonicalCandidates.delete(cid);
+    this.handlesByIdentityId.set(identityId, claimed);
 
-    return true;
+    for (const handle of claimed) {
+      const claimants = this.claimantsByHandle.get(handle) ?? new Set<string>();
+
+      claimants.add(identityId);
+      this.claimantsByHandle.set(handle, claimants);
+    }
+  }
+
+  private claimantCandidates(handle: string): IdentityCandidate[] {
+    return [...(this.claimantsByHandle.get(handle) ?? [])]
+      .flatMap((identityId) => this.retainedRecords(identityId))
+      .map((record) => this.toCandidate(record));
   }
 
   private async projectPersistedDocument(
     document: Record<string, unknown>,
     locallyVerified: boolean,
   ): Promise<void> {
-    const cid = this.stringValue(document, 'cid');
-    const identityId = this.identityIdFrom(document);
+    const record = this.toRecord(document);
 
-    if (!cid || !identityId) {
+    if (
+      !record ||
+      !(locallyVerified || (await this.hasCanonicalIdentity(record)))
+    ) {
       return;
     }
 
     const candidates =
-      this.candidatesByIdentityId.get(identityId) ??
-      new Map<string, IdentityMetadataRecord>();
-    const canonicalCandidates =
-      this.canonicalCandidatesByIdentityId.get(identityId) ??
+      this.candidatesByIdentityId.get(record.identityId) ??
       new Map<string, IdentityMetadataRecord>();
 
-    this.candidatesByIdentityId.set(identityId, candidates);
-    this.canonicalCandidatesByIdentityId.set(identityId, canonicalCandidates);
-    const record = this.toRecord(document);
+    this.candidatesByIdentityId.set(record.identityId, candidates);
+    candidates.set(record.cid, record);
+    this.retainCandidates(candidates);
+    this.refreshHandleClaims(record.identityId);
 
-    const accepted = record
-      ? await this.addCandidate(
-          candidates,
-          canonicalCandidates,
-          record,
-          locallyVerified,
-        )
-      : this.removeCandidate(
-          candidates,
-          canonicalCandidates,
-          cid,
-          locallyVerified,
-        );
+    const retained = candidates.get(record.cid);
 
-    if (!accepted) return;
-
-    this.retainCandidates(candidates, canonicalCandidates);
-    const acceptedRecord = candidates.get(cid);
-    const projectedDocument = acceptedRecord
-      ? this.toStorageDocument(acceptedRecord)
-      : document;
-
-    this.registry.cacheHeadLocally(
-      this.identityHeadKey(identityId),
-      projectedDocument,
-    );
-  }
-
-  private async findCachedRecordsByHandle(
-    handle: string,
-  ): Promise<IdentityMetadataRecord[]> {
-    return (await this.findCachedCanonicalCandidateRecords()).filter(
-      (document) => document.handle === handle,
-    );
+    if (retained) {
+      this.registry.cacheHeadLocally(
+        this.identityHeadKey(record.identityId),
+        this.toStorageDocument(retained),
+      );
+    }
   }
 
   public async findAll(): Promise<IdentityMetadataRecord[]> {
-    return this.deduplicateDocuments(
-      await this.findCachedCanonicalCandidateRecords(),
-    );
+    return this.deduplicateDocuments(await this.findCachedCandidateRecords());
   }
 
   public findAllCanonical(): Promise<IdentityMetadataRecord[]> {
-    const canonical = [
-      ...this.canonicalCandidatesByIdentityId.values(),
-    ].flatMap((candidates) => [...candidates.values()]);
-
-    return Promise.resolve(this.deduplicateDocuments(canonical));
+    return Promise.resolve(this.deduplicateDocuments(this.retainedRecords()));
   }
 
-  public async findByHandle(
+  public findByHandle(
     handle: ProfileHandle,
   ): Promise<IdentityMetadataRecord[]> {
-    const key = this.handleHeadKey(handle.valueOf());
-    const head = await this.findHead(key);
-    const matchingHead = head?.handle === handle.valueOf() ? head : undefined;
+    const owner = this.ownership.owner(
+      this.claimantCandidates(handle.valueOf()),
+      handle,
+    );
+    const record = owner
+      ? this.retainedRecords(owner.getIdentity().toPrimitives().id).find(
+          ({ cid }) => cid === owner.getExternalIdentifier().valueOf(),
+        )
+      : undefined;
 
-    return this.deduplicateDocuments([
-      ...(matchingHead ? [matchingHead] : []),
-      ...(await this.findCachedRecordsByHandle(handle.valueOf())),
-    ]);
+    return Promise.resolve(record ? [record] : []);
   }
 
   public async findByIdentityId(
@@ -458,7 +302,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
 
     return this.deduplicateDocuments([
       ...(matchingHead ? [matchingHead] : []),
-      ...(await this.findCachedCanonicalCandidateRecords(identityId.valueOf())),
+      ...(await this.findCachedCandidateRecords(identityId.valueOf())),
     ]);
   }
 
@@ -466,10 +310,8 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     networkId: NetworkId,
   ): Promise<IdentityMetadataRecord[]> {
     const documents = this.sortByFreshness(
-      (await this.findCachedCandidateRecords()).filter(
-        (document): document is IdentityMetadataRecord =>
-          document.identity !== undefined &&
-          document.networkIds?.includes(networkId.valueOf()),
+      (await this.findCachedCandidateRecords()).filter((document) =>
+        document.networkIds?.includes(networkId.valueOf()),
       ),
     );
     const latestDocuments = new Map<string, IdentityMetadataRecord>();
@@ -495,7 +337,6 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       identityId: primitives.id,
       networkIds: primitives.networks,
       previousCid: primitives.previousIdentityExternalIdentifier,
-      receivedAt: Date.now(),
       version: primitives.version,
     };
 
@@ -509,22 +350,5 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     document: Record<string, unknown>,
   ): Promise<void> {
     await this.projectPersistedDocument(document, false);
-  }
-
-  public async deleteByExternalIdentifier(
-    externalIdentifier: IdentityExternalIdentifier,
-  ): Promise<void> {
-    const documents = (await this.findAll()).filter(
-      (document) => document.cid === externalIdentifier.valueOf(),
-    );
-
-    await Promise.all(
-      documents.map(async (document) => {
-        const tombstone = this.toStorageDocument(document, true);
-
-        await this.registry.putDocument('identities', tombstone);
-        await this.projectPersistedDocument(tombstone, true);
-      }),
-    );
   }
 }

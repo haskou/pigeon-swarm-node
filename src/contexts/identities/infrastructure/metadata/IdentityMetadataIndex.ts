@@ -7,10 +7,6 @@ import { ProfileHandle } from '../../domain/value-objects/ProfileHandle';
 import { IdentityMetadataRecord } from './IdentityMetadataRecord';
 
 export default abstract class IdentityMetadataIndex {
-  public abstract deleteByExternalIdentifier(
-    externalIdentifier: IdentityExternalIdentifier,
-  ): Promise<void>;
-
   public abstract findAll(): Promise<IdentityMetadataRecord[]>;
 
   public abstract findAllCanonical(): Promise<IdentityMetadataRecord[]>;

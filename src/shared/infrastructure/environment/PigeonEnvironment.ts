@@ -32,6 +32,10 @@ export const pigeonEnvironmentSchema = {
     type: 'number',
   },
   DEBUG_NETWORK: { defaultValue: false, type: 'boolean' },
+  IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE: {
+    defaultValue: 30,
+    type: 'number',
+  },
   IPFS_CONTENT_TIMEOUT_MS: { type: 'number' },
   IPFS_STORAGE_PATH: { defaultValue: './ipfs_storage', type: 'string' },
   LINK_PREVIEW_RATE_LIMIT_PER_MINUTE: {

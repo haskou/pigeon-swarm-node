@@ -7,6 +7,7 @@ import { Identity } from '../../domain/Identity';
 import { IdentityCandidate } from '../../domain/IdentityCandidate';
 import IdentityRepository from '../../domain/repositories/IdentityRepository';
 import IdentityCandidateValidationDomainService from '../../domain/services/IdentityCandidateValidationDomainService';
+import IdentityHandleOwnershipDomainService from '../../domain/services/IdentityHandleOwnershipDomainService';
 import { IdentityExternalIdentifier } from '../../domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '../../domain/value-objects/ProfileHandle';
 import IdentityMetadataIndex from '../metadata/IdentityMetadataIndex';
@@ -21,6 +22,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   private readonly HANDLE_ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-handle-';
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-';
   private readonly validator = new IdentityCandidateValidationDomainService();
+  private readonly ownership = new IdentityHandleOwnershipDomainService();
   private readonly identityByCid = new Map<string, Identity>();
   private readonly activeRemoteCandidateRefreshes = new Set<string>();
 
@@ -34,15 +36,10 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
   private async findValidMetadata(
     id: IdentityId,
-    requireEmbeddedIdentity: boolean = false,
   ): Promise<IdentityMetadataRecord[]> {
     try {
-      const metadata = await this.metadataIndex.findByIdentityId(id);
-
       return this.deduplicateMetadata(
-        requireEmbeddedIdentity
-          ? metadata.filter(({ identity }) => identity !== undefined)
-          : metadata,
+        await this.metadataIndex.findByIdentityId(id),
       );
     } catch {
       return [];
@@ -58,12 +55,15 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       deduplicated.set(`${document.identityId}:${document.cid}`, document);
     }
 
-    return [...deduplicated.values()].sort(
-      (left, right) =>
-        right.version - left.version ||
-        left.cid.localeCompare(right.cid) ||
-        right.receivedAt - left.receivedAt,
-    );
+    return [...deduplicated.values()].sort((left, right) => {
+      if (left.version !== right.version) {
+        return right.version - left.version;
+      }
+
+      if (left.cid === right.cid) return 0;
+
+      return left.cid < right.cid ? -1 : 1;
+    });
   }
 
   private latestMetadataByIdentity(
@@ -82,18 +82,6 @@ export default class IpfsIdentityRepository extends IdentityRepository {
 
   private routingNetworkIdsFrom(document: IdentityMetadataRecord): string[] {
     return [...new Set(document.networkIds ?? [])];
-  }
-
-  private routingHandleFrom(
-    document: IdentityMetadataRecord,
-  ): string | undefined {
-    if (document.handle) {
-      return document.handle;
-    }
-
-    return document.identity
-      ? this.mapper.toDocument(document.identity).profile.handle
-      : undefined;
   }
 
   private async saveMetadata(identity: Identity, cid: IPFSId): Promise<void> {
@@ -221,19 +209,13 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     try {
       const id = new IdentityId(metadata.identityId);
       const cid = new IPFSId(metadata.cid);
-      const hasEmbeddedIdentity = metadata.identity !== undefined;
-      const candidate =
-        metadata.identity ||
-        (await this.getIdentityFromCid(cid, metadata.networkIds));
+      const candidate = metadata.identity;
+      const calculatedCid = await this.ipfsManager.calculateJSONId(
+        this.mapper.toDocument(candidate),
+      );
 
-      if (hasEmbeddedIdentity) {
-        const calculatedCid = await this.ipfsManager.calculateJSONId(
-          this.mapper.toDocument(candidate),
-        );
-
-        if (!calculatedCid.isEqual(cid)) {
-          return undefined;
-        }
+      if (!calculatedCid.isEqual(cid)) {
+        return undefined;
       }
 
       const isValid = await this.validator.isValidChainFor(
@@ -247,10 +229,6 @@ export default class IpfsIdentityRepository extends IdentityRepository {
         this.identityByCid.delete(cid.valueOf());
 
         return undefined;
-      }
-
-      if (!hasEmbeddedIdentity) {
-        await this.saveMetadata(candidate, cid);
       }
 
       return candidate;
@@ -295,9 +273,8 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       return undefined;
     }
 
-    const identityId = new IdentityId(metadata.identityId);
     const isValid = await this.validator.isValidChainFor(
-      identityId,
+      new IdentityId(metadata.identityId),
       identity,
       (previousExternalIdentifier) =>
         this.findPreviousIdentity(
@@ -536,17 +513,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     metadata: IdentityMetadataRecord[],
   ): Promise<IdentityCandidate | undefined> {
     for (const document of metadata) {
-      const identity =
-        document.identity || this.identityByCid.get(document.cid);
-
-      if (!identity && !document.previousCid) {
-        continue;
-      }
-
-      const candidate = await this.findCandidateReferenceFromMetadata({
-        ...document,
-        ...(identity ? { identity } : {}),
-      });
+      const candidate = await this.findCandidateReferenceFromMetadata(document);
 
       if (candidate?.hasHandle(handle)) {
         return candidate;
@@ -560,7 +527,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     id: IdentityId,
     awaitRemoteCandidates: boolean,
   ): Promise<IdentityCandidate[]> {
-    const metadata = await this.findValidMetadata(id, awaitRemoteCandidates);
+    const metadata = await this.findValidMetadata(id);
     const localCandidates =
       await this.findCandidateReferencesFromMetadata(metadata);
     const knownCids = new Set(
@@ -619,8 +586,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       handle,
       new Set(metadata.map((document) => document.cid)),
     );
-    const [remoteCandidate] =
-      this.sortCandidateReferencesByFreshness(remoteCandidates);
+    const remoteCandidate = this.ownership.owner(remoteCandidates, handle);
 
     if (remoteCandidate) {
       return remoteCandidate;
@@ -740,7 +706,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
           connectedNetworkIds.has(documentNetworkId) &&
           (!networkId || documentNetworkId === networkId),
       );
-      const handle = this.routingHandleFrom(document);
+      const handle = document.handle;
 
       if (networkIds.length === 0) {
         continue;
