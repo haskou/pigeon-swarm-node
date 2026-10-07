@@ -2190,6 +2190,44 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     ).toEqual(genesis.toPrimitives());
   });
 
+  it('merges the persisted head that was refused before the genesis was verified', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const target = await KeyPair.generate();
+    const source = repositoryFixture();
+    await provisionAuthorization(source.repository, genesis);
+    await source.repository.compareAndApply(
+      await enrollment(
+        identityId,
+        owner,
+        target,
+        '00000000-0000-4000-8000-000000000001',
+        '10000000-0000-4000-8000-000000000001',
+      ),
+    );
+    const persisted = source.getHead() as Record<string, unknown>;
+    const restarted = repositoryFixture();
+    let rehydrated = false;
+    restarted.registry.findHead.mockImplementation(() =>
+      Promise.resolve(rehydrated ? persisted : undefined),
+    );
+    restarted.registry.rehydrateHead.mockImplementation(() => {
+      rehydrated = true;
+
+      return Promise.resolve();
+    });
+    restarted.identityRepository.findFreshCandidateReferencesById.mockResolvedValue(
+      [new IdentityCandidate(genesisExternalIdentifier, identityOf(genesis))],
+    );
+
+    const restored = await restarted.repository.find(identityId);
+
+    expect(restarted.registry.rehydrateHead).toHaveBeenCalledWith(
+      `device-authorization:${identityId.valueOf()}`,
+    );
+    expect(restored?.getRevision().valueOf()).toBe(1);
+    expect(restarted.registry.putHead).not.toHaveBeenCalled();
+  });
+
   it('derives the genesis from version 1 even when the latest identity candidate differs', async () => {
     const { genesis, identityId } = await fixture();
     const latestNetworkId = '550e8400-e29b-41d4-a716-446655440001';

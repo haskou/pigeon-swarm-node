@@ -3,9 +3,11 @@ import { Identity } from '@app/contexts/identities/domain/Identity';
 import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
 import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
 import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
+import { Profile } from '@app/contexts/identities/domain/Profile';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
+import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import IpfsIdentityMapper from '@app/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import OrbitDBIdentityMetadataIndex from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex';
 import OrbitDBIdentityMetadataProjection from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataProjection';
@@ -191,13 +193,13 @@ async function signedIdentity(
     id: new IdentityId(signer.id.toPrimitives().publicKey).valueOf(),
     networks: [networkId],
     previousIdentityExternalIdentifier: options.previousCid,
-    profile: {
-      banner: '',
-      biography: '',
-      handle: options.handle,
-      name: 'Fixture',
-      picture: '',
-    },
+    profile: new Profile(
+      new ProfileName('Fixture'),
+      undefined,
+      undefined,
+      undefined,
+      options.handle ? new ProfileHandle(options.handle) : undefined,
+    ).toPrimitives(),
     recoveryAuthority: signer.recovery.toPrimitives().publicKey,
     timestamp: options.timestamp,
     version: options.version,
@@ -253,9 +255,8 @@ function metadataDocument(
     ...overrides,
   };
 
-  return Object.fromEntries(
-    Object.entries(document).filter(([, value]) => value !== undefined),
-  );
+  /** JSON round trip: IPLD cannot encode the `undefined` primitives. */
+  return JSON.parse(JSON.stringify(document)) as Record<string, unknown>;
 }
 
 async function versionsOf(

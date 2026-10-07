@@ -89,6 +89,12 @@ lowest CID. This lives in `OrbitDBDeviceAuthorizationRouting`. The vestigial
 write of device authorization documents into the `identities` store is removed,
 so the identity gate governs the whole collection.
 
+The merger refuses a `device-authorization:` head while the genesis is not
+verified (the identity has not been seen, e.g. just after a restart). The
+refusal is not a loss: the heads store keeps the entries, and the repository
+reads a missing head through `OrbitDBReplicatedStateRegistry.rehydrateHead`,
+which merges the persisted history of that key once the genesis is known.
+
 ## Order and convergence
 
 Every decision depends only on the set of admitted records: gate admission is a

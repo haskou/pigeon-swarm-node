@@ -610,6 +610,11 @@ under a victim head) and that the gated nodes never serve them.
 - Device authorization history is replayed from a genesis derived from the
   verified identity chain, so an identity the node has never seen has a trusted
   genesis too (see [Identity device authorization convergence](#identity-device-authorization-convergence)).
+  A `device-authorization:` head whose genesis the node cannot verify yet (the
+  identity is not known, for instance right after a restart) is refused rather
+  than cached; once the genesis is verified the head is merged again from the
+  persisted heads history (`OrbitDBReplicatedStateRegistry.rehydrateHead`), so
+  no history is lost and no forged head is ever served.
 - Not solved: the signer chooses the timestamp, so the holder of an identity
   key can backdate a claim; many valid identities cannot be prevented without
   an admission authority; the identity id remains the authoritative reference
