@@ -17,6 +17,7 @@ import { OrbitDBHistoryReplayObserver } from './OrbitDBHistoryReplayObserver';
 import { OrbitDBMutationGate } from './OrbitDBMutationGate';
 import { OrbitDBPendingHeadReconciliation } from './OrbitDBPendingHeadReconciliation';
 import { OrbitDBPrivateNetworkStores } from './OrbitDBPrivateNetworkStores';
+import { OrbitDBRecordReadmission } from './OrbitDBRecordReadmission';
 import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
 import OrbitDBReplicatedHeadCache from './OrbitDBReplicatedHeadCache';
 import OrbitDBReplicatedHeadKeyDeriver from './OrbitDBReplicatedHeadKeyDeriver';
@@ -67,8 +68,6 @@ export default class OrbitDBReplicatedStateRegistry {
   ]);
 
   private static readonly HYDRATION_BATCH_SIZE = 16;
-
-  private static readonly READMISSION_DELAYS_MS = [2_000, 10_000, 60_000];
 
   private readonly storesByNetworkId = new Map<
     string,
@@ -146,6 +145,8 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private readonly headWriteQueues = new Map<string, Promise<void>>();
 
+  private readonly readmissions = new OrbitDBRecordReadmission();
+
   private headCache?: OrbitDBReplicatedHeadCache;
 
   private mutationGate?: OrbitDBMutationGate;
@@ -188,11 +189,13 @@ export default class OrbitDBReplicatedStateRegistry {
         async (value, scope) => {
           const document = this.recordValue(value);
 
-          if (document && (await this.admitRecord(storeName, document))) {
-            await this.notifyBootstrappedDocument(
-              this.documentUpdateListeners.get(storeName) ?? new Set(),
-              document,
-              scope,
+          if (document) {
+            await this.offerDocument(storeName, store, document, () =>
+              this.notifyBootstrappedDocument(
+                this.documentUpdateListeners.get(storeName) ?? new Set(),
+                document,
+                scope,
+              ),
             );
           }
         },
@@ -370,7 +373,7 @@ export default class OrbitDBReplicatedStateRegistry {
     onReadmitted: (admitted: Record<string, unknown>) => void,
     attempt: number,
   ): void {
-    const delay = OrbitDBReplicatedStateRegistry.READMISSION_DELAYS_MS[attempt];
+    const delay = OrbitDBRecordReadmission.DELAYS_MS[attempt];
 
     if (delay === undefined) return;
     const timer = setTimeout(() => {
@@ -440,14 +443,22 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private async notifyDocumentUpdated(
     storeName: OrbitDBReplicatedDocumentStoreName,
+    store: OrbitDBDatabase,
     value: unknown,
   ): Promise<void> {
     const document = this.recordValue(value);
 
-    if (!document || !(await this.admitRecord(storeName, document))) {
-      return;
+    if (document) {
+      await this.offerDocument(storeName, store, document, () =>
+        this.notifyDocumentListeners(storeName, document),
+      );
     }
+  }
 
+  private notifyDocumentListeners(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    document: Record<string, unknown>,
+  ): void {
     for (const listener of this.documentUpdateListeners.get(storeName) ?? []) {
       void Promise.resolve(listener(document)).catch((error) => {
         Kernel.logger.warn?.(
@@ -455,6 +466,36 @@ export default class OrbitDBReplicatedStateRegistry {
         );
       });
     }
+  }
+
+  private isRegisteredStore(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    store: OrbitDBDatabase,
+  ): boolean {
+    for (const stores of this.storesByNetworkId.values()) {
+      if (this.getStore(stores, storeName) === store) return true;
+    }
+
+    return false;
+  }
+
+  private async offerDocument(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    store: OrbitDBDatabase,
+    document: Record<string, unknown>,
+    deliver: () => void | Promise<void>,
+  ): Promise<void> {
+    if (await this.admitRecord(storeName, document)) {
+      await deliver();
+
+      return;
+    }
+
+    this.readmissions.schedule(
+      () => this.admitRecord(storeName, document),
+      deliver,
+      () => this.isRegisteredStore(storeName, store),
+    );
   }
 
   private headSignature(heads: OrbitDBEntry[] | undefined): string | undefined {
@@ -603,7 +644,8 @@ export default class OrbitDBReplicatedStateRegistry {
       const history = this.documentHistory(storeName, store);
 
       if (history) this.refreshDocumentHistory(history);
-      else void this.notifyDocumentUpdated(storeName, entry.payload?.value);
+      else
+        void this.notifyDocumentUpdated(storeName, store, entry.payload?.value);
     });
     store.events?.on?.('join', (_peerId, heads) => {
       const history = this.documentHistory(storeName, store);
@@ -692,8 +734,10 @@ export default class OrbitDBReplicatedStateRegistry {
         async (value, scope) => {
           const document = this.recordValue(value);
 
-          if (document && (await this.admitRecord(storeName, document))) {
-            await listener(document, scope);
+          if (document) {
+            await this.offerDocument(storeName, store, document, () =>
+              listener(document, scope),
+            );
           }
         },
         () => (observer ? [observer] : []),

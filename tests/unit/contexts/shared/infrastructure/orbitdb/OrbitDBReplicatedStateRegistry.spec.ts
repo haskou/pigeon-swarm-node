@@ -5,7 +5,7 @@ import OrbitDBReplicatedHeadCache, {
   OrbitDBReplicatedHeadCacheEntry,
 } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCache';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { mock } from 'jest-mock-extended';
+import { mock, MockProxy } from 'jest-mock-extended';
 
 type Entry = {
   key?: string;
@@ -1270,6 +1270,168 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  describe('replicated documents the mutation gate rejected', () => {
+    const gateOf = (
+      collection: string,
+      accepts: () => boolean,
+    ): MockProxy<OrbitDBMutationGate> => {
+      const gate = mock<OrbitDBMutationGate>();
+
+      gate.governs.mockImplementation((name) => name === collection);
+      gate.governsHead.mockReturnValue(false);
+      gate.accepts.mockImplementation(() => Promise.resolve(accepts()));
+
+      return gate;
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('offers a replayed call record again once the authorization it rests on replicates', async () => {
+      let memberReplicated = false;
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { calls, stores } = createStores();
+      const projected: unknown[] = [];
+
+      calls.log = {
+        get: async () => undefined,
+        heads: jest.fn(async (): Promise<OrbitDBEntry[]> => [
+          {
+            hash: 'first',
+            next: [],
+            payload: { value: { id: 'call-start' } },
+          },
+        ]),
+      };
+      registry.addMutationGate(gateOf('calls', () => memberReplicated));
+      await registry.register('network-1', stores);
+      await registry.onDocumentUpdated(
+        'calls',
+        (document) => {
+          projected.push(document.id);
+        },
+        { includeHistory: true },
+      );
+
+      expect(projected).toEqual([]);
+
+      memberReplicated = true;
+      await jest.advanceTimersByTimeAsync(2_000);
+
+      expect(projected).toEqual(['call-start']);
+      registry.clear();
+    });
+
+    it('offers an updated document again once the authorization it rests on replicates', async () => {
+      let memberReplicated = false;
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { identities, stores } = createStores();
+      const projected: unknown[] = [];
+
+      registry.addMutationGate(gateOf('identities', () => memberReplicated));
+      await registry.register('network-1', stores);
+      await registry.onDocumentUpdated('identities', (document) => {
+        projected.push(document.id);
+      });
+      identities.emitUpdate({
+        payload: { key: 'identity-1', value: { id: 'identity-1' } },
+      });
+      await jest.advanceTimersByTimeAsync(0);
+
+      expect(projected).toEqual([]);
+
+      memberReplicated = true;
+      await jest.advanceTimersByTimeAsync(2_000);
+
+      expect(projected).toEqual(['identity-1']);
+      registry.clear();
+    });
+
+    it('gives up on a document that stays rejected after the last attempt', async () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { identities, stores } = createStores();
+      const gate = gateOf('identities', () => false);
+      const projected: unknown[] = [];
+
+      registry.addMutationGate(gate);
+      await registry.register('network-1', stores);
+      await registry.onDocumentUpdated('identities', (document) => {
+        projected.push(document.id);
+      });
+      identities.emitUpdate({
+        payload: { key: 'identity-1', value: { id: 'identity-1' } },
+      });
+      await jest.advanceTimersByTimeAsync(2_000 + 10_000 + 60_000);
+
+      expect(gate.accepts).toHaveBeenCalledTimes(4);
+
+      await jest.advanceTimersByTimeAsync(600_000);
+
+      expect(gate.accepts).toHaveBeenCalledTimes(4);
+      expect(projected).toEqual([]);
+      registry.clear();
+    });
+
+    it('never projects a re-admitted document of a store that is no longer registered', async () => {
+      let memberReplicated = false;
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { identities, stores } = createStores();
+      const projected: unknown[] = [];
+
+      registry.addMutationGate(gateOf('identities', () => memberReplicated));
+      await registry.register('network-1', stores);
+      await registry.onDocumentUpdated('identities', (document) => {
+        projected.push(document.id);
+      });
+      identities.emitUpdate({
+        payload: { key: 'identity-1', value: { id: 'identity-1' } },
+      });
+      await jest.advanceTimersByTimeAsync(0);
+      registry.clear();
+
+      memberReplicated = true;
+      await jest.advanceTimersByTimeAsync(2_000);
+
+      expect(projected).toEqual([]);
+    });
+
+    it('bounds how many rejected documents wait to be offered again', async () => {
+      let memberReplicated = false;
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { identities, stores } = createStores();
+      const flood = 1_000;
+      const projected: unknown[] = [];
+
+      registry.addMutationGate(gateOf('identities', () => memberReplicated));
+      await registry.register('network-1', stores);
+      await registry.onDocumentUpdated('identities', (document) => {
+        projected.push(document.id);
+      });
+
+      for (let index = 0; index < flood; index++) {
+        identities.emitUpdate({
+          payload: {
+            key: `identity-${index}`,
+            value: { id: `identity-${index}` },
+          },
+        });
+      }
+
+      await jest.advanceTimersByTimeAsync(0);
+      memberReplicated = true;
+      await jest.advanceTimersByTimeAsync(2_000);
+
+      expect(projected.length).toBeGreaterThan(0);
+      expect(projected.length).toBeLessThan(flood);
+      registry.clear();
+    });
   });
 
   it('does not replace a newer cached head with an older replicated update', async () => {
