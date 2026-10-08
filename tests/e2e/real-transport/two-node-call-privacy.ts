@@ -63,8 +63,70 @@ type Peers = {
     networks: Array<{ id: string; state: string }>;
   };
 };
+const FETCH_TIMEOUT_MS = 10000;
 const pause = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms));
+
+async function timedFetch(
+  step: string,
+  node: NodeRuntime,
+  endpoint: string,
+  init: RequestInit,
+): Promise<Response> {
+  try {
+    return await fetch(`${node.baseUrl}${endpoint}`, {
+      ...init,
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw new Error(
+      `${step}: ${init.method ?? 'GET'} ${endpoint} on ${node.baseUrl} failed within ${FETCH_TIMEOUT_MS} ms (${error instanceof Error ? error.message : String(error)})`,
+      { cause: error },
+    );
+  }
+}
+
+async function describeNetworkSynchronization(
+  nodes: NodeRuntime[],
+): Promise<string> {
+  const states = await Promise.all(
+    nodes.map(async (node) => {
+      try {
+        const peers = await request<Peers>(node, 'GET', '/peers/');
+
+        return `${node.name} ${JSON.stringify(peers.networkSynchronization.networks)}`;
+      } catch (error) {
+        return `${node.name} /peers/ unavailable (${error instanceof Error ? error.message : String(error)})`;
+      }
+    }),
+  );
+
+  return states.join(' | ');
+}
+
+/**
+ * Polls `predicate` until it holds. `predicate` reports what it saw through
+ * `observe`, so a timeout names the step and the last observed state of both
+ * nodes instead of a bare "Timed out".
+ */
+async function waitForObserved(
+  nodes: NodeRuntime[],
+  label: string,
+  predicate: (observe: (observation: string) => void) => Promise<boolean>,
+): Promise<void> {
+  let lastObservation = 'not polled yet';
+
+  await waitFor(
+    () =>
+      predicate((observation) => {
+        lastObservation = observation;
+      }),
+    label,
+    undefined,
+    async () =>
+      `${lastObservation}; ${await describeNetworkSynchronization(nodes)}`,
+  );
+}
 
 function minimal(call: LiveCall): void {
   assert.ok(!('creatorIdentityId' in call));
@@ -120,15 +182,19 @@ async function heartbeat(
 ): Promise<void> {
   const endpoint = `/calls/${callId}/participants/me/heartbeat`;
   const body: { mediaConnections: unknown[] } = { mediaConnections: [] };
-  const response = await fetch(`${node.baseUrl}${endpoint}`, {
-    body: JSON.stringify(body),
-    headers: {
-      'content-type': 'application/json',
-      ...signHeaders(identity, 'POST', endpoint, body),
+  const response = await timedFetch(
+    `heartbeat of call ${callId}`,
+    node,
+    endpoint,
+    {
+      body: JSON.stringify(body),
+      headers: {
+        'content-type': 'application/json',
+        ...signHeaders(identity, 'POST', endpoint, body),
+      },
+      method: 'POST',
     },
-    method: 'POST',
-    signal: AbortSignal.timeout(10000),
-  });
+  );
   assert.equal(response.status, 204, 'Heartbeat must return no live snapshot');
   assert.equal(await response.text(), '');
 }
@@ -334,19 +400,27 @@ async function main(): Promise<void> {
     );
     await Promise.all(
       nodes.map((node, index) =>
-        waitFor(async () => {
-          try {
-            await request(
-              node,
-              'GET',
-              `/identities/${encodeURIComponent(identities[1 - index].id)}`,
-            );
+        waitForObserved(
+          nodes,
+          `remote identity replication on ${node.name}`,
+          async (observe) => {
+            try {
+              await request(
+                node,
+                'GET',
+                `/identities/${encodeURIComponent(identities[1 - index].id)}`,
+              );
 
-            return true;
-          } catch {
-            return false;
-          }
-        }, 'remote identity replication'),
+              return true;
+            } catch (error) {
+              observe(
+                `GET identity ${identities[1 - index].id} -> ${error instanceof Error ? error.message : String(error)}`,
+              );
+
+              return false;
+            }
+          },
+        ),
       ),
     );
     console.log('Fixture identities replicated');
@@ -508,7 +582,7 @@ async function main(): Promise<void> {
         ),
       ).toPrimitives() as unknown as Record<string, unknown>;
     };
-    await waitFor(async () => {
+    await waitForObserved(nodes, 'community replication', async (observe) => {
       try {
         const replicated = await request<{ frontier: string[] }>(
           nodes[1],
@@ -545,30 +619,42 @@ async function main(): Promise<void> {
         );
 
         return true;
-      } catch {
+      } catch (error) {
+        observe(
+          `join community ${community.id} on ${nodes[1].name} -> ${error instanceof Error ? error.message : String(error)}`,
+        );
+
         return false;
       }
-    }, 'community replication');
+    });
     const scope = {
       channelId: channel.id,
       communityId: community.id,
       scopeType: 'community_channel',
     };
-    await waitFor(async () => {
-      const replicated = await request<{
-        voiceChannels: Array<{ id: string }>;
-      }>(
-        nodes[1],
-        'GET',
-        `/communities/${community.id}`,
-        undefined,
-        identities[1],
-      );
+    await waitForObserved(
+      nodes,
+      'voice channel replication',
+      async (observe) => {
+        const replicated = await request<{
+          voiceChannels: Array<{ id: string }>;
+        }>(
+          nodes[1],
+          'GET',
+          `/communities/${community.id}`,
+          undefined,
+          identities[1],
+        );
 
-      return replicated.voiceChannels.some(
-        (candidate) => candidate.id === channel.id,
-      );
-    }, 'voice channel replication');
+        observe(
+          `voice channels on ${nodes[1].name}: ${JSON.stringify(replicated.voiceChannels.map((candidate) => candidate.id))}, expected ${channel.id}`,
+        );
+
+        return replicated.voiceChannels.some(
+          (candidate) => candidate.id === channel.id,
+        );
+      },
+    );
     const streams = await Promise.all(
       nodes.map((node, index) => socket(node, identities[index])),
     );
@@ -584,35 +670,50 @@ async function main(): Promise<void> {
       ).map((call) => call.id);
       let winner = '';
 
-      await waitFor(async () => {
-        const active = new Set<string>();
+      await waitForObserved(
+        nodes,
+        'concurrent starts converge on one channel session',
+        async (observe) => {
+          const active = new Set<string>();
+          const observations: string[] = [];
 
-        for (const candidate of candidates)
-          for (const [index, node] of nodes.entries()) {
-            const response = await fetch(`${node.baseUrl}/calls/${candidate}`, {
-              headers: signHeaders(
-                identities[index],
-                'GET',
+          for (const candidate of candidates)
+            for (const [index, node] of nodes.entries()) {
+              const response = await timedFetch(
+                `concurrent starts converge on one channel session (${candidate})`,
+                node,
                 `/calls/${candidate}`,
-                {},
-              ),
-              signal: AbortSignal.timeout(10000),
-            });
-            const body = response.ok
-              ? ((await response.json()) as LiveCall)
-              : undefined;
+                {
+                  headers: signHeaders(
+                    identities[index],
+                    'GET',
+                    `/calls/${candidate}`,
+                    {},
+                  ),
+                },
+              );
+              const body = response.ok
+                ? ((await response.json()) as LiveCall)
+                : undefined;
 
-            if (body?.status === 'active') active.add(`${candidate}:${index}`);
-          }
-        const winners = candidates.filter(
-          (candidate) =>
-            active.has(`${candidate}:0`) && active.has(`${candidate}:1`),
-        );
+              observations.push(
+                `call ${candidate} on ${node.name}: status=${String(body?.status)}, http=${response.status}`,
+              );
+              observe(observations.join('; '));
 
-        winner = winners[0] ?? '';
+              if (body?.status === 'active')
+                active.add(`${candidate}:${index}`);
+            }
+          const winners = candidates.filter(
+            (candidate) =>
+              active.has(`${candidate}:0`) && active.has(`${candidate}:1`),
+          );
 
-        return new Set(winners).size === 1;
-      }, 'concurrent starts converge on one channel session');
+          winner = winners[0] ?? '';
+
+          return new Set(winners).size === 1;
+        },
+      );
       await Promise.all(
         nodes.map((node, index) =>
           signedJoin(node, identities[index], winner, 'joined'),
@@ -623,30 +724,37 @@ async function main(): Promise<void> {
     };
     let callId = await concurrentSession();
     const converge = async (expected: string[]): Promise<void> => {
-      await waitFor(async () => {
-        const snapshots = await Promise.all(
-          nodes.map((node, index) =>
-            request<LiveCall>(
-              node,
-              'GET',
-              `/calls/${callId}`,
-              undefined,
-              identities[index],
+      await waitForObserved(
+        nodes,
+        'two-node live membership convergence',
+        async (observe) => {
+          const snapshots = await Promise.all(
+            nodes.map((node, index) =>
+              request<LiveCall>(
+                node,
+                'GET',
+                `/calls/${callId}`,
+                undefined,
+                identities[index],
+              ),
             ),
-          ),
-        );
-        snapshots.forEach(minimal);
+          );
+          snapshots.forEach(minimal);
+          observe(
+            `connected participants per node: ${JSON.stringify(snapshots.map((snapshot) => snapshot.participants.filter((p) => p.connected).map((p) => p.identityId)))}, expected ${JSON.stringify(expected)}`,
+          );
 
-        return snapshots.every(
-          (snapshot) =>
-            JSON.stringify(
-              snapshot.participants
-                .filter((p) => p.connected)
-                .map((p) => p.identityId)
-                .sort(),
-            ) === JSON.stringify([...expected].sort()),
-        );
-      }, 'two-node live membership convergence');
+          return snapshots.every(
+            (snapshot) =>
+              JSON.stringify(
+                snapshot.participants
+                  .filter((p) => p.connected)
+                  .map((p) => p.identityId)
+                  .sort(),
+              ) === JSON.stringify([...expected].sort()),
+          );
+        },
+      );
     };
     await converge(identities.map((identity) => identity.id));
     for (let cycle = 0; cycle < 2; cycle++) {
@@ -765,9 +873,8 @@ async function main(): Promise<void> {
         nodes.map(async (node) => {
           const endpoint = `/calls/${callId}`;
 
-          return fetch(`${node.baseUrl}${endpoint}`, {
+          return timedFetch('revoked access on both nodes', node, endpoint, {
             headers: signHeaders(identities[1], 'GET', endpoint, {}),
-            signal: AbortSignal.timeout(10000),
           });
         }),
       );
