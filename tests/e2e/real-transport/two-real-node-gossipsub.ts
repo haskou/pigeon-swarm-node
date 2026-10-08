@@ -1528,20 +1528,44 @@ async function waitFor(
   predicate: () => Promise<boolean> | boolean,
   label: string,
   timeoutMs: number = WAIT_TIMEOUT_MS,
+  describeState?: () => Promise<string> | string,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
 
   while (Date.now() < deadline) {
-    if (await predicate()) {
+    let satisfied: boolean;
+
+    try {
+      satisfied = await predicate();
+    } catch (error) {
+      throw new Error(
+        `Failed while waiting for ${label}: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
+      );
+    }
+
+    if (satisfied) {
       return;
     }
 
-    await new Promise((resolve) => {
-      setTimeout(resolve, 500);
-    });
+    const { promise, resolve } = Promise.withResolvers<void>();
+
+    setTimeout(resolve, 500);
+    await promise;
   }
 
-  throw new Error(`Timed out waiting for ${label}`);
+  const state = describeState
+    ? await Promise.resolve()
+        .then(describeState)
+        .catch(
+          (error: unknown) =>
+            `state unavailable (${error instanceof Error ? error.message : String(error)})`,
+        )
+    : undefined;
+
+  throw new Error(
+    `Timed out waiting for ${label} after ${timeoutMs} ms${state === undefined ? '' : `; last observed state: ${state}`}`,
+  );
 }
 
 if (require.main === module) {
