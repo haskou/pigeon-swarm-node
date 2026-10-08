@@ -2454,17 +2454,25 @@ services:
       - '@contexts/calls/domain/repositories/CallRepository'
       - '@contexts/calls/domain/repositories/CallParticipantLeaseRepository'
       - '@contexts/calls/application/authorize-call/CallAccessAuthorizer'
+  apps/initializers/public-mutations/CommunityMutationPolicies:
+    class: /apps/initializers/public-mutations/CommunityMutationPolicies
+    arguments:
+      - '@apps/initializers/public-mutations/CommunityChannelMutationPolicies'
+      - '@apps/initializers/public-mutations/CommunityGovernanceMutationPolicies'
+  apps/initializers/public-mutations/ContentMutationPolicies:
+    class: /apps/initializers/public-mutations/ContentMutationPolicies
+    arguments:
+      - '@apps/initializers/public-mutations/StickerMutationPolicies'
+      - '@apps/initializers/public-mutations/PollMutationPolicies'
+      - '@apps/initializers/public-mutations/ContentReplicationMutationPolicies'
   apps/initializers/public-mutations/PublicMutationGateInitializer:
     class: /apps/initializers/public-mutations/PublicMutationGateInitializer
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
-      - '@apps/initializers/public-mutations/CommunityChannelMutationPolicies'
-      - '@apps/initializers/public-mutations/CommunityGovernanceMutationPolicies'
+      - '@apps/initializers/public-mutations/CommunityMutationPolicies'
       - '@apps/initializers/public-mutations/ConversationMutationPolicies'
-      - '@apps/initializers/public-mutations/StickerMutationPolicies'
-      - '@apps/initializers/public-mutations/PollMutationPolicies'
-      - '@apps/initializers/public-mutations/ContentReplicationMutationPolicies'
+      - '@apps/initializers/public-mutations/ContentMutationPolicies'
       - '@apps/initializers/public-mutations/NotificationMutationPolicies'
       - '@apps/initializers/public-mutations/CallMutationPolicies'
   shared/infrastructure/http/HttpClient: '@shared/infrastructure/http/FetchHttpClient'

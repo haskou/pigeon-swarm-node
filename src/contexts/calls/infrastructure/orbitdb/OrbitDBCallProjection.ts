@@ -11,12 +11,10 @@ import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocke
 import { Timestamp } from '@haskou/value-objects';
 import { isDeepStrictEqual } from 'node:util';
 
-import {
-  CallPrimitives,
-  CallRecords,
-  FoldedCall,
-  OrbitDBCallFold,
-} from './OrbitDBCallFold';
+import { CallPrimitives } from './CallPrimitives';
+import { CallRecords } from './CallRecords';
+import { FoldedCall } from './FoldedCall';
+import { OrbitDBCallFold } from './OrbitDBCallFold';
 
 const SCOPE_TYPES = ['call_start', 'call_participant', 'call_end'];
 

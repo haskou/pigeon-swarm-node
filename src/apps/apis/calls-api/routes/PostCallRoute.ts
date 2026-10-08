@@ -21,13 +21,15 @@ export class PostCallRoute extends CallRouteSupport {
     const call = await this.starter.start(
       new CallStartMessage(
         creatorIdentityId.valueOf(),
-        body.scopeType,
+        {
+          channelId: body.channelId,
+          communityId: body.communityId,
+          conversationId: body.conversationId,
+          type: body.scopeType,
+        },
         body.mutation,
         body.nonce,
         body.startedAt,
-        body.conversationId,
-        body.communityId,
-        body.channelId,
         body.sessionEpoch,
       ),
     );

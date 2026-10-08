@@ -7,20 +7,8 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Timestamp } from '@haskou/value-objects';
 
-export type CallPrimitives = ReturnType<Call['toPrimitives']>;
-
-/** The admitted signed records that describe one call. */
-export interface CallRecords {
-  end?: Record<string, unknown>;
-  participants: Map<string, Record<string, unknown>>;
-  start?: Record<string, unknown>;
-}
-
-export interface FoldedCall {
-  /** Digest of the signed start payload; the tie-break between community starts. */
-  digest: string;
-  primitives: CallPrimitives;
-}
+import { CallRecords } from './CallRecords';
+import { FoldedCall } from './FoldedCall';
 
 /**
  * Derives the state of a call from its signed records only. Same records in

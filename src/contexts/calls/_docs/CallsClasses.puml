@@ -29,10 +29,9 @@ package "calls" {
 
   package "domain" {
     class Call <AggregateRoot> {
-      -id: CallId
+      -origin: CallOrigin
       -networkId: NetworkId
       -scope: CallScope
-      -creatorIdentityId?: IdentityId
       -participants: CallParticipant[]
       -lifecycle: CallLifecycle
       +join(identityId: IdentityId): void
@@ -42,6 +41,12 @@ package "calls" {
       +sendSignal(signalId: CallSignalId, ownerNodeId: NodeId, senderIdentityId: IdentityId, recipientIdentityId: IdentityId, signalType: CallSignalType, payload: unknown): CallSignalDelivery
       +markTimedOut(timeout: Timestamp): IdentityId[]
       +toPrimitives(): object
+    }
+
+    class CallOrigin {
+      -id: CallId
+      -creatorIdentityId?: IdentityId
+      -nonce?: CallNonce
     }
 
     class CallParticipant {

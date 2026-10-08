@@ -59,13 +59,18 @@ describe('CallStarter', () => {
 
     return new CallStartMessage(
       signer.id,
-      scope.type,
+      {
+        channelId:
+          scope.type === 'community_channel' ? scope.channelId : undefined,
+        communityId:
+          scope.type === 'community_channel' ? scope.communityId : undefined,
+        conversationId:
+          scope.type === 'conversation' ? scope.conversationId : undefined,
+        type: scope.type,
+      },
       mutationOf(proof),
       nonce,
       1_770_000_000_000,
-      scope.type === 'conversation' ? scope.conversationId : undefined,
-      scope.type === 'community_channel' ? scope.communityId : undefined,
-      scope.type === 'community_channel' ? scope.channelId : undefined,
       sessionEpoch,
     );
   };
