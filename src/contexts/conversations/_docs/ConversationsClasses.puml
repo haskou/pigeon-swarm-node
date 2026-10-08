@@ -10,6 +10,7 @@ package "conversations.domain" {
     -name?: GroupConversationName
     -participants: IdentityId[]
     -messages: Message[]
+    -admins: ConversationAdmins
     -createdAt: Timestamp
     +hasParticipant(identityId: IdentityId): boolean
     +record(message: Message): void
@@ -27,6 +28,10 @@ package "conversations.domain" {
 
   class ConversationType <<ValueObject>>
   class GroupConversationName <<ValueObject>>
+  class ConversationAdmins <<ValueObject>> {
+    -creatorId?: IdentityId
+    -adminIds: IdentityId[]
+  }
   class MessageSendOptions <<ValueObject>>
   class MessageEditOptions <<ValueObject>>
 

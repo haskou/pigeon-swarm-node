@@ -6,6 +6,7 @@ import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { CallLifecycle } from './CallLifecycle';
+import { CallOrigin } from './CallOrigin';
 import { CallParticipant } from './CallParticipant';
 import { CallScope } from './CallScope';
 import { CallSignal } from './CallSignal';
@@ -47,11 +48,9 @@ export class Call extends AggregateRoot {
         .map((participant) => CallParticipant.ringing(participant)),
     ];
     const call = new Call(
-      CallId.fromStart(creatorIdentityId, nonce),
-      nonce,
+      CallOrigin.start(creatorIdentityId, nonce),
       networkId,
       scope,
-      creatorIdentityId,
       participants,
       CallLifecycle.active(startedAt),
       sessionEpoch,
@@ -64,11 +63,13 @@ export class Call extends AggregateRoot {
 
   public static fromPrimitives(primitives: PrimitiveOf<Call>): Call {
     return new Call(
-      new CallId(primitives.id),
-      new CallNonce(primitives.nonce),
+      new CallOrigin(
+        new CallId(primitives.id),
+        new IdentityId(primitives.creatorIdentityId!),
+        new CallNonce(primitives.nonce),
+      ),
       new NetworkId(primitives.networkId),
       CallScope.fromPrimitives(primitives.scope),
-      new IdentityId(primitives.creatorIdentityId!),
       primitives.participants.map((participant) =>
         CallParticipant.fromPrimitives(participant),
       ),
@@ -85,11 +86,9 @@ export class Call extends AggregateRoot {
   }
 
   constructor(
-    private readonly id: CallId,
-    private readonly nonce: CallNonce,
+    private readonly origin: CallOrigin,
     private readonly networkId: NetworkId,
     private readonly scope: CallScope,
-    private readonly creatorIdentityId: IdentityId,
     private readonly participants: CallParticipant[],
     private readonly lifecycle: CallLifecycle,
     private readonly sessionEpoch?: CallSessionEpoch,
@@ -102,9 +101,9 @@ export class Call extends AggregateRoot {
   }
 
   private createStartedEvent(): CallStartedEvent {
-    return new CallStartedEvent(this.id.valueOf(), {
+    return new CallStartedEvent(this.origin.getId().valueOf(), {
       ...this.baseEventAttributes(),
-      creatorIdentityId: this.creatorIdentityId.valueOf(),
+      creatorIdentityId: this.origin.getCreatorIdentityId().valueOf(),
     });
   }
 
@@ -135,7 +134,9 @@ export class Call extends AggregateRoot {
   private endIfNoReceiversRemain(at: Timestamp): void {
     const hasReceiver = this.participants.some(
       (participant) =>
-        participant.getIdentityId().isNotEqual(this.creatorIdentityId) &&
+        participant
+          .getIdentityId()
+          .isNotEqual(this.origin.getCreatorIdentityId()) &&
         participant.canReceiveSignal(),
     );
 
@@ -145,7 +146,7 @@ export class Call extends AggregateRoot {
 
     this.lifecycle.miss(at);
     this.record(
-      new CallMissedEvent(this.id.valueOf(), {
+      new CallMissedEvent(this.origin.getId().valueOf(), {
         ...this.baseEventAttributes(),
         missedIdentityIds: [],
       }),
@@ -159,7 +160,9 @@ export class Call extends AggregateRoot {
   private hasActiveReceiver(): boolean {
     return this.participants.some(
       (participant) =>
-        participant.getIdentityId().isNotEqual(this.creatorIdentityId) &&
+        participant
+          .getIdentityId()
+          .isNotEqual(this.origin.getCreatorIdentityId()) &&
         participant.isActiveReceiver(),
     );
   }
@@ -171,7 +174,7 @@ export class Call extends AggregateRoot {
     assert(participant, new CallParticipantNotFoundError());
     participant.join(at);
     this.record(
-      new CallParticipantJoinedEvent(this.id.valueOf(), {
+      new CallParticipantJoinedEvent(this.origin.getId().valueOf(), {
         ...this.baseEventAttributes(),
         joinedIdentityId: identityId.valueOf(),
       }),
@@ -196,7 +199,7 @@ export class Call extends AggregateRoot {
     }
 
     this.record(
-      new CallParticipantJoinedEvent(this.id.valueOf(), {
+      new CallParticipantJoinedEvent(this.origin.getId().valueOf(), {
         ...this.baseEventAttributes(),
         joinedIdentityId: identityId.valueOf(),
       }),
@@ -212,7 +215,7 @@ export class Call extends AggregateRoot {
     if (participant.isRinging()) {
       participant.decline(at);
       this.record(
-        new CallParticipantDeclinedEvent(this.id.valueOf(), {
+        new CallParticipantDeclinedEvent(this.origin.getId().valueOf(), {
           ...this.baseEventAttributes(),
           declinedIdentityId: identityId.valueOf(),
         }),
@@ -233,7 +236,7 @@ export class Call extends AggregateRoot {
     }
 
     this.record(
-      new CallParticipantLeftEvent(this.id.valueOf(), {
+      new CallParticipantLeftEvent(this.origin.getId().valueOf(), {
         ...this.baseEventAttributes(),
         leftIdentityId: identityId.valueOf(),
       }),
@@ -241,7 +244,10 @@ export class Call extends AggregateRoot {
 
     if (!this.isActive()) {
       this.record(
-        new CallEndedEvent(this.id.valueOf(), this.baseEventAttributes()),
+        new CallEndedEvent(
+          this.origin.getId().valueOf(),
+          this.baseEventAttributes(),
+        ),
       );
     }
   }
@@ -252,13 +258,13 @@ export class Call extends AggregateRoot {
 
     assert(
       this.scope.isCommunityChannel()
-        ? this.creatorIdentityId.isEqual(identityId)
+        ? this.origin.getCreatorIdentityId().isEqual(identityId)
         : participant?.isJoined(),
       new CallParticipantNotFoundError(),
     );
     this.lifecycle.end(identityId.valueOf(), at);
     this.record(
-      new CallEndedEvent(this.id.valueOf(), {
+      new CallEndedEvent(this.origin.getId().valueOf(), {
         ...this.baseEventAttributes(),
         endedByIdentityId: identityId.valueOf(),
       }),
@@ -298,7 +304,7 @@ export class Call extends AggregateRoot {
     return CallSignalDelivery.send(
       signalId,
       new CallSignalDeliveryRoute(
-        this.id,
+        this.origin.getId(),
         ownerNodeId,
         this.networkId,
         this.participants.map((participant) => participant.getIdentityId()),
@@ -332,7 +338,7 @@ export class Call extends AggregateRoot {
   }
 
   public getId(): CallId {
-    return this.id;
+    return this.origin.getId();
   }
 
   public getNetworkId(): NetworkId {
@@ -382,11 +388,11 @@ export class Call extends AggregateRoot {
   }
 
   public getCreatorIdentityId(): IdentityId {
-    return this.creatorIdentityId;
+    return this.origin.getCreatorIdentityId();
   }
 
   public getNonce(): CallNonce {
-    return this.nonce;
+    return this.origin.getNonce();
   }
 
   public markTimedOut(timeout: Timestamp): IdentityId[] {
@@ -398,7 +404,7 @@ export class Call extends AggregateRoot {
     for (const participant of missedParticipants) {
       participant.miss(timeout);
       this.record(
-        new CallParticipantMissedEvent(this.id.valueOf(), {
+        new CallParticipantMissedEvent(this.origin.getId().valueOf(), {
           ...this.baseEventAttributes(),
           missedIdentityId: participant.getIdentityId().valueOf(),
         }),
@@ -408,7 +414,7 @@ export class Call extends AggregateRoot {
     if (missedParticipants.length > 0 && !this.hasActiveReceiver()) {
       this.lifecycle.miss(timeout);
       this.record(
-        new CallMissedEvent(this.id.valueOf(), {
+        new CallMissedEvent(this.origin.getId().valueOf(), {
           ...this.baseEventAttributes(),
           missedIdentityIds: missedParticipants.map((participant) =>
             participant.getIdentityId().valueOf(),
@@ -436,12 +442,12 @@ export class Call extends AggregateRoot {
 
     return {
       createdAt: this.lifecycle.getCreatedAt().valueOf(),
-      creatorIdentityId: this.creatorIdentityId.valueOf(),
+      creatorIdentityId: this.origin.getCreatorIdentityId().valueOf(),
       endedAt: this.lifecycle.getEndedAt()?.valueOf(),
       endedByIdentityId: this.lifecycle.getEndedByIdentityId(),
-      id: this.id.valueOf(),
+      id: this.origin.getId().valueOf(),
       networkId: this.networkId.valueOf(),
-      nonce: this.nonce.valueOf(),
+      nonce: this.origin.getNonce().valueOf(),
       participantIds: participants.map((participant) => participant.identityId),
       participants,
       scope: this.scope.toPrimitives(),

@@ -6,6 +6,7 @@ import { Conversation } from './Conversation';
 import { Message } from './entities/messages/Message';
 import { MessageFactory } from './entities/messages/MessageFactory';
 import { ConversationMustHaveTwoDifferentParticipantsError } from './errors/ConversationMustHaveTwoDifferentParticipantsError';
+import { ConversationAdmins } from './value-objects/ConversationAdmins';
 import { ConversationId } from './value-objects/ConversationId';
 import { ConversationType } from './value-objects/ConversationType';
 
@@ -41,7 +42,15 @@ export class OneToOneConversation extends Conversation {
     messages: Message[] = [],
     creatorId: IdentityId | undefined = undefined,
   ) {
-    super(id, networkId, type, participants, name, messages, creatorId);
+    super(
+      id,
+      networkId,
+      type,
+      participants,
+      name,
+      messages,
+      new ConversationAdmins(creatorId),
+    );
 
     assert(
       participants.length === 2 && participants[0].isNotEqual(participants[1]),

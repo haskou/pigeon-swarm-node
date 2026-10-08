@@ -14,7 +14,7 @@ import { Timestamp } from '@haskou/value-objects';
 
 import { CallRecordIds } from '../../domain/CallRecordIds';
 import CallParticipantLeaseRepository from '../../domain/repositories/CallParticipantLeaseRepository';
-import { CallPrimitives } from './OrbitDBCallFold';
+import { CallPrimitives } from './CallPrimitives';
 import OrbitDBCallProjection from './OrbitDBCallProjection';
 
 export default class OrbitDBCallRepository extends CallRepository {

@@ -4,36 +4,27 @@ import { PublicMutationGate } from '@app/contexts/public-mutations/infrastructur
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import CallMutationPolicies from './CallMutationPolicies';
-import CommunityChannelMutationPolicies from './CommunityChannelMutationPolicies';
-import CommunityGovernanceMutationPolicies from './CommunityGovernanceMutationPolicies';
-import ContentReplicationMutationPolicies from './ContentReplicationMutationPolicies';
+import CommunityMutationPolicies from './CommunityMutationPolicies';
+import ContentMutationPolicies from './ContentMutationPolicies';
 import ConversationMutationPolicies from './ConversationMutationPolicies';
 import NotificationMutationPolicies from './NotificationMutationPolicies';
-import PollMutationPolicies from './PollMutationPolicies';
-import StickerMutationPolicies from './StickerMutationPolicies';
 
 export default class PublicMutationGateInitializer {
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly verifier: PublicMutationVerifier,
-    private readonly communityChannels: CommunityChannelMutationPolicies,
-    private readonly communityGovernance: CommunityGovernanceMutationPolicies,
+    private readonly communities: CommunityMutationPolicies,
     private readonly conversations: ConversationMutationPolicies,
-    private readonly stickers: StickerMutationPolicies,
-    private readonly polls: PollMutationPolicies,
-    private readonly contentReplications: ContentReplicationMutationPolicies,
+    private readonly content: ContentMutationPolicies,
     private readonly notifications: NotificationMutationPolicies,
     private readonly calls: CallMutationPolicies,
   ) {}
 
   public ensure(): Promise<void> {
     const gate = new PublicMutationGate(this.verifier, [
-      ...this.communityChannels.all(),
-      ...this.communityGovernance.all(),
+      ...this.communities.all(),
       ...this.conversations.all(),
-      ...this.stickers.all(),
-      ...this.polls.all(),
-      ...this.contentReplications.all(),
+      ...this.content.all(),
       ...this.notifications.all(),
       ...this.calls.all(),
     ]);

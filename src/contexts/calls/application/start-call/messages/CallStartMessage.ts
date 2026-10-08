@@ -3,8 +3,9 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Timestamp } from '@haskou/value-objects';
+import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
+import { CallScope } from '../../../domain/CallScope';
 import { InvalidCallScopeError } from '../../../domain/errors/InvalidCallScopeError';
 import { CallNonce } from '../../../domain/value-objects/CallNonce';
 import { CallScopeType } from '../../../domain/value-objects/CallScopeType';
@@ -23,22 +24,23 @@ export class CallStartMessage {
 
   constructor(
     requesterIdentityId: string,
-    scopeType: string,
+    scope: PrimitiveOf<CallScope>,
     mutation: unknown,
     nonce: string,
     startedAt: number,
-    conversationId?: string,
-    communityId?: string,
-    channelId?: string,
     sessionEpoch?: number,
   ) {
     this.requesterIdentityId = new IdentityId(requesterIdentityId);
-    this.scopeType = new CallScopeType(scopeType);
-    this.conversationId = conversationId
-      ? new ConversationId(conversationId)
+    this.scopeType = new CallScopeType(scope.type);
+    this.conversationId = scope.conversationId
+      ? new ConversationId(scope.conversationId)
       : undefined;
-    this.communityId = communityId ? new CommunityId(communityId) : undefined;
-    this.channelId = channelId ? new CommunityChannelId(channelId) : undefined;
+    this.communityId = scope.communityId
+      ? new CommunityId(scope.communityId)
+      : undefined;
+    this.channelId = scope.channelId
+      ? new CommunityChannelId(scope.channelId)
+      : undefined;
     this.nonce = new CallNonce(nonce);
     this.proof = PublicMutationProof.fromPrimitives(mutation);
     this.sessionEpoch =

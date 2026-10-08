@@ -4,10 +4,8 @@ import { InvalidConversationOperationError } from '../errors/InvalidConversation
 import { ConversationOperation } from './ConversationOperation';
 import { ConversationOperationApplier } from './ConversationOperationApplier';
 import { ConversationOperationLimits } from './ConversationOperationLimits';
-import {
-  ConversationRoster,
-  ConversationRosterPrimitives,
-} from './ConversationRoster';
+import { ConversationRoster } from './ConversationRoster';
+import { ConversationRosterPrimitives } from './ConversationRosterPrimitives';
 import { ConversationStateFold } from './ConversationStateFold';
 
 /**

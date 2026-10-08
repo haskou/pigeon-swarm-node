@@ -21,6 +21,7 @@ import { ConversationMessageWasEditedEvent } from './events/ConversationMessageW
 import { ConversationMessageWasPinnedEvent } from './events/ConversationMessageWasPinnedEvent';
 import { ConversationMessageWasSentEvent } from './events/ConversationMessageWasSentEvent';
 import { ConversationMessageWasUnpinnedEvent } from './events/ConversationMessageWasUnpinnedEvent';
+import { ConversationAdmins } from './value-objects/ConversationAdmins';
 import { ConversationId } from './value-objects/ConversationId';
 import { ConversationType } from './value-objects/ConversationType';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
@@ -46,8 +47,10 @@ export class Conversation extends AggregateRoot {
       primitives.messages.map((message) =>
         MessageFactory.fromPrimitives(message),
       ),
-      primitives.creatorId ? new IdentityId(primitives.creatorId) : undefined,
-      (primitives.adminIds ?? []).map((adminId) => new IdentityId(adminId)),
+      new ConversationAdmins(
+        primitives.creatorId ? new IdentityId(primitives.creatorId) : undefined,
+        (primitives.adminIds ?? []).map((adminId) => new IdentityId(adminId)),
+      ),
     );
   }
 
@@ -58,8 +61,7 @@ export class Conversation extends AggregateRoot {
     private readonly participants: IdentityId[],
     private readonly name: GroupConversationName | undefined = undefined,
     private readonly messages: Message[] = [],
-    private readonly creatorId: IdentityId | undefined = undefined,
-    private readonly adminIds: IdentityId[] = [],
+    private readonly admins: ConversationAdmins = new ConversationAdmins(),
   ) {
     super();
   }
@@ -345,21 +347,20 @@ export class Conversation extends AggregateRoot {
   }
 
   public getAdminIds(): IdentityId[] {
-    return [...this.adminIds];
+    return this.admins.getAdminIds();
   }
 
   public getCreatorId(): IdentityId | undefined {
-    return this.creatorId;
+    return this.admins.getCreatorId();
   }
 
   public isAdmin(identityId: IdentityId): boolean {
-    return this.adminIds.some((admin) => admin.isEqual(identityId));
+    return this.admins.isAdmin(identityId);
   }
 
   public toPrimitives() {
     return {
-      adminIds: this.adminIds.map((admin) => admin.valueOf()),
-      creatorId: this.creatorId?.valueOf(),
+      ...this.admins.toPrimitives(),
       id: this.id.valueOf(),
       messages: this.messages.map((message) => message.toPrimitives()),
       name: this.name?.valueOf(),

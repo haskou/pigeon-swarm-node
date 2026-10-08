@@ -5,6 +5,7 @@ import { PrimitiveOf } from '@haskou/value-objects';
 import { Conversation } from './Conversation';
 import { Message } from './entities/messages/Message';
 import { MessageFactory } from './entities/messages/MessageFactory';
+import { ConversationAdmins } from './value-objects/ConversationAdmins';
 import { ConversationId } from './value-objects/ConversationId';
 import { ConversationType } from './value-objects/ConversationType';
 import { GroupConversationName } from './value-objects/GroupConversationName';
@@ -49,8 +50,7 @@ export class GroupConversation extends Conversation {
       participants,
       name,
       messages,
-      creatorId,
-      adminIds,
+      new ConversationAdmins(creatorId, adminIds),
     );
   }
 }

@@ -2,16 +2,7 @@ import { assert } from '@haskou/value-objects';
 
 import { InvalidConversationOperationError } from '../errors/InvalidConversationOperationError';
 import { ConversationOperationLimits } from './ConversationOperationLimits';
-
-export type ConversationRosterPrimitives = {
-  admins: string[];
-  creator: string;
-  id: string;
-  members: string[];
-  name?: string;
-  networkId: string;
-  type: 'group' | 'one-to-one';
-};
+import { ConversationRosterPrimitives } from './ConversationRosterPrimitives';
 
 /**
  * Who belongs to a conversation and with which role: the state that the signed

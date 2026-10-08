@@ -1,22 +1,11 @@
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
-import PublicMutationVerifier, {
-  PublicMutationExpectation,
-} from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
+import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 import { OrbitDBReplicatedDocumentStoreName } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedDocumentStoreName';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
-/** Which stored records belong to one author, and how many may be admitted. */
-export interface GenuineRecordQuotaRule {
-  /** The payload field that names the author of a record of this kind. */
-  authorField: string;
-  expectationOf: (
-    payload: Record<string, unknown>,
-  ) => Omit<PublicMutationExpectation, 'payload'>;
-  limit: number;
-  scopeType: string;
-}
+import { GenuineRecordQuotaRule } from './GenuineRecordQuotaRule';
 
 /**
  * A retained-record quota per author, shared by the notification policies.
