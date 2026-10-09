@@ -266,6 +266,7 @@ export class OrbitDBPrivateNetworkStores {
     this.contentReplication = stores.contentReplication;
     this.keychains = stores.keychains;
     this.messages = stores.messages;
+    this.mlsRecords = stores.mlsRecords;
     this.moderationLogs = stores.moderationLogs;
     this.notificationSettings = stores.notificationSettings;
     this.notifications = stores.notifications;
