@@ -203,6 +203,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     operationId: string,
     previousRevision: DeviceAuthorizationRevision,
     epoch = DeviceAuthorizationEpoch.genesis(),
+    compromisedSince?: DeviceAuthorizationRevision,
   ): DeviceAuthorizationTransition {
     const unsigned = DeviceAuthorizationTransition.revocation(
       identityId,
@@ -211,6 +212,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       DeviceCredential.fromString(author.toPrimitives().publicKey),
       DeviceCredential.fromString(target.toPrimitives().publicKey),
       epoch,
+      compromisedSince,
     );
 
     return unsigned.authorize(author.sign(unsigned.getSigningPayload()));
@@ -515,6 +517,81 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       expect(timeline?.isAuthorizedAt(credentialOf(owner), revisionOf(0))).toBe(
         true,
       );
+    });
+
+    it('refuses a stolen key from the revision the owner names, and a retirement keeps the interval', async () => {
+      const { genesis, identityId, owner } = await fixture();
+      const phone = await KeyPair.generate();
+      const laptop = await KeyPair.generate();
+      const first = repositoryFixture();
+      await provisionAuthorization(first.repository, genesis);
+      await first.repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000001',
+          '10000000-0000-4000-8000-000000000001',
+        ),
+      );
+      await first.repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          laptop,
+          '00000000-0000-4000-8000-000000000002',
+          '10000000-0000-4000-8000-000000000002',
+          revisionOf(1),
+        ),
+      );
+      await first.repository.compareAndApply(
+        revocation(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000003',
+          revisionOf(2),
+          DeviceAuthorizationEpoch.genesis(),
+          revisionOf(2),
+        ),
+      );
+
+      const timeline = await first.repository.findTimeline(identityId);
+
+      expect(timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(1))).toBe(
+        true,
+      );
+      expect(timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(2))).toBe(
+        false,
+      );
+      expect(timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(3))).toBe(
+        false,
+      );
+      expect(
+        timeline?.isAuthorizedAt(credentialOf(laptop), revisionOf(2)),
+      ).toBe(true);
+    });
+
+    it('rejects a compromise revision beyond the revocation it is signed in', () => {
+      expect(() =>
+        DeviceAuthorizationTransition.revocation(
+          new IdentityId(
+            'MCowBQYDK2VwAyEASrJUZSKSpoUb1mzjaHv/CP8FfO1fcxQ9nYfWajQJN04=',
+          ),
+          new DeviceAuthorizationOperationId(
+            '00000000-0000-4000-8000-000000000003',
+          ),
+          revisionOf(2),
+          DeviceCredential.fromString(
+            'MCowBQYDK2VwAyEASrJUZSKSpoUb1mzjaHv/CP8FfO1fcxQ9nYfWajQJN04=',
+          ),
+          DeviceCredential.fromString(
+            'MCowBQYDK2VwAyEASrJUZSKSpoUb1mzjaHv/CP8FfO1fcxQ9nYfWajQJN04=',
+          ),
+          DeviceAuthorizationEpoch.genesis(),
+          revisionOf(3),
+        ),
+      ).toThrow();
     });
 
     it('never trusts a revision the head has not reached yet', async () => {

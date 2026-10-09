@@ -200,6 +200,29 @@ signing vectors are published in `tests/fixtures/*-vectors.json` and
 
 There is no legacy path: version 1 proofs are rejected by the strict decoder.
 
+## Compromise frontier (#386)
+
+A revocation may carry `compromisedSince`, a revision no greater than its own
+`previousRevision`, covered by the author signature. It means "treat this
+device as stolen from that revision on": the timeline refuses any record the
+target signs while claiming `compromisedSince` or a later revision, even though
+the device was authorized there. Omitting it is a plain retirement and keeps
+the previous behaviour, so no existing signature or document changes.
+
+- Choice over alternatives: a revoker-chosen frontier `inside` the revocation
+  was rejected earlier because it duplicated the revocation revision; the
+  explicit cap differs because it may be *lower* than the revocation revision,
+  which is exactly the stolen-key window. A separate document or a wall-clock
+  window would need new replicated state or a trusted clock.
+- The cap is derived from accepted revocations during replay (minimum across
+  concurrent revocations of the same credential) and held by the timeline, so
+  restart and partition healing recompute it from the same history.
+- Authority: the same as any revocation (an authorized device). A thief that
+  already holds an authorized key could also revoke other devices, so this adds
+  no new power.
+- A credential capped this way stays capped; enrolling the same key again does
+  not lift it. Use a fresh key.
+
 ## Residuals
 
 - **Backdating a scoped record's frontier.** Non-operation community and
@@ -208,16 +231,20 @@ There is no legacy path: version 1 proofs are rejected by the strict decoder.
   removed later can still sign a record that claims an older frontier, which no
   node can tell apart from honest late delivery without a trusted clock. It is
   the same family as the compromised-device window tracked in #386.
-- **Recovery** discards the pre-checkpoint chain, so earlier records of
-  pre-recovery devices become unverifiable. Carrying a compact credential
-  interval summary through checkpoints would keep them valid; it is not done
-  because it changes the replicated authorization document shape.
+- **Recovery is the explicit hard cut.** It discards the pre-checkpoint chain,
+  so records signed by pre-recovery devices become unverifiable and are
+  refused. This fails closed on purpose: recovery is what an owner does after
+  losing every device, and a carried-over interval summary would keep a
+  possibly stolen credential valid for old revisions and change the replicated
+  document shape. Anything that must outlive a recovery has to be re-signed by
+  a post-recovery device.
 - **Backdating inside the authorized interval** (threat 3) cannot be bounded
-  further without a trusted clock.
+  by time. For a device revoked as compromised it is bounded by the owner's
+  compromise frontier (below); a plain retirement keeps the whole interval.
 
 ## Verification
 
-- Unit: `DeviceAuthorizationTimeline`, `OrbitDBDeviceAuthorizationRepository`
+- Unit: `DeviceAuthorizationTimeline` (compromise cap), `DeviceAuthorizationTransition` (shape, signature coverage), `OrbitDBDeviceAuthorizationRepository`
   timeline (replay, restart), `DeviceAuthorizationPublicMutationAuthorization`
   (late delivery, backdating at and after the revocation, not-yet-enrolled,
   unreached revision then healed, shuffled state order),

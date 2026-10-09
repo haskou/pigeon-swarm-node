@@ -209,6 +209,7 @@ function revocation(
   target: KeyPair,
   operationId: string,
   previousRevision: number,
+  compromisedSince?: number,
 ): DeviceAuthorizationTransition {
   const unsigned = DeviceAuthorizationTransition.revocation(
     identityId,
@@ -216,6 +217,10 @@ function revocation(
     new DeviceAuthorizationRevision(previousRevision),
     DeviceCredential.fromString(owner.toPrimitives().publicKey),
     DeviceCredential.fromString(target.toPrimitives().publicKey),
+    undefined,
+    compromisedSince === undefined
+      ? undefined
+      : new DeviceAuthorizationRevision(compromisedSince),
   );
 
   return unsigned.authorize(owner.sign(unsigned.getSigningPayload()));
@@ -356,6 +361,8 @@ async function main(): Promise<void> {
   const recovery = await KeyPair.generate();
   const phone = await KeyPair.generate();
   const laptop = await KeyPair.generate();
+  const tablet = await KeyPair.generate();
+  const watch = await KeyPair.generate();
   const identityId = new IdentityId(identity.toPrimitives().publicKey);
   const genesis = DeviceAuthorization.genesis(
     identityId,
@@ -377,6 +384,7 @@ async function main(): Promise<void> {
   const [first, second] = nodes;
 
   // revision 0: owner. 1: + phone. 2: phone revoked. 3: + laptop.
+  // 4: + tablet. 5: + watch. 6: tablet revoked as compromised since 5.
   await first.repository!.compareAndApply(
     enrollment(
       identityId,
@@ -406,14 +414,48 @@ async function main(): Promise<void> {
     ),
   );
 
+  await first.repository!.compareAndApply(
+    enrollment(
+      identityId,
+      owner,
+      tablet,
+      '00000000-0000-4000-8000-000000000014',
+      '10000000-0000-4000-8000-000000000014',
+      new DeviceAuthorizationRevision(3),
+    ),
+  );
+  await first.repository!.compareAndApply(
+    enrollment(
+      identityId,
+      owner,
+      watch,
+      '00000000-0000-4000-8000-000000000015',
+      '10000000-0000-4000-8000-000000000015',
+      new DeviceAuthorizationRevision(4),
+    ),
+  );
+  await first.repository!.compareAndApply(
+    revocation(
+      identityId,
+      owner,
+      tablet,
+      '00000000-0000-4000-8000-000000000016',
+      5,
+      5,
+    ),
+  );
+
   await expectVerdicts('author node', first, identityId, [
     ['phone before revocation', phone, 1, true],
     ['phone backdating at the revocation revision', phone, 2, false],
     ['phone claiming the current head', phone, 3, false],
-    ['phone claiming an unknown future revision', phone, 4, false],
+    ['phone claiming an unknown future revision', phone, 7, false],
     ['laptop not yet enrolled', laptop, 2, false],
     ['laptop at its enrolment', laptop, 3, true],
     ['owner at every revision', owner, 2, true],
+    ['tablet before the compromise frontier', tablet, 4, true],
+    ['stolen tablet key at the compromise frontier', tablet, 5, false],
+    ['stolen tablet key after the revocation', tablet, 6, false],
   ]);
   await expectVerdicts('partitioned node', second, identityId, [
     ['owner at the only known revision', owner, 0, true],
@@ -428,7 +470,7 @@ async function main(): Promise<void> {
   await until('the partitioned replica reaches the head', async () => {
     const authorization = await second.repository!.find(identityId);
 
-    return authorization?.toPrimitives().revision === 3;
+    return authorization?.toPrimitives().revision === 6;
   });
 
   stage = 'revocation then late delivery';
@@ -441,10 +483,14 @@ async function main(): Promise<void> {
     ],
     ['phone backdating at the revocation revision', phone, 2, false],
     ['phone claiming the current head', phone, 3, false],
-    ['phone claiming an unknown future revision', phone, 4, false],
+    ['phone claiming an unknown future revision', phone, 7, false],
     ['laptop not yet enrolled', laptop, 2, false],
     ['laptop at its enrolment', laptop, 3, true],
-    ['owner at the head', owner, 3, true],
+    ['owner at the head', owner, 6, true],
+    ['tablet before the compromise frontier, delivered late', tablet, 4, true],
+    ['stolen tablet key inside its authorized interval', tablet, 5, false],
+    ['stolen tablet key claiming the head', tablet, 6, false],
+    ['watch enrolled at the frontier', watch, 5, true],
   ];
   await expectVerdicts('healed node', second, identityId, afterHeal);
   await expectVerdicts('author node after heal', first, identityId, afterHeal);
@@ -454,7 +500,7 @@ async function main(): Promise<void> {
   await expectVerdicts('restarted node', second, identityId, afterHeal);
 
   console.log(
-    'PASS causal device authorization: two real private Helia/OrbitDB replicas evaluated signed records at the claimed authorization revision (late delivery honoured, backdating past the revocation refused, unreplicated revisions refused until healed, identical verdicts after a restart). Local loopback transport only; no external NAT claim.',
+    'PASS causal device authorization: two real private Helia/OrbitDB replicas evaluated signed records at the claimed authorization revision (late delivery honoured, backdating past the revocation refused, a key revoked as compromised refused from the compromise frontier the owner signed even inside its authorized interval, unreplicated revisions refused until healed, identical verdicts after a restart). Local loopback transport only; no external NAT claim.',
   );
 }
 

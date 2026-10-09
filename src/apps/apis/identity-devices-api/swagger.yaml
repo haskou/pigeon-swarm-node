@@ -65,7 +65,7 @@ paths:
         {"domain":"pigeon:device-authorization:transition:v3",
         "proofOfPossession":"<target signature>",
         "transition":<unsigned transition>}. The unsigned transition key order
-        is authorCredential, authorizedAt, epoch, identityId, operation,
+        is authorCredential, authorizedAt, compromisedSince, epoch, identityId, operation,
         operationId, pairingExpiration, pairingId, previousRevision, revision,
         targetCredential, targetCredentialCommitment.
       requestBody:
@@ -150,6 +150,10 @@ components:
           type: integer
           format: int64
           description: Time accepted by both device signatures; required for enrollment and no later than pairingExpiration.
+        compromisedSince:
+          type: integer
+          minimum: 0
+          description: Revocation only, and no greater than previousRevision. Revokes the target as compromised, not retired - records the target signs while claiming this revision or any later one are refused, even inside the interval where it was authorized. Omit to retire the device normally. Covered by the author signature.
         epoch:
           type: string
           description: Signed recovery epoch. Use genesis before the first recovery and the recovery operation ID afterwards.

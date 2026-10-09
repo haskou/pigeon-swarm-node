@@ -269,17 +269,17 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
         ]);
       }
 
-      return new DeviceAuthorizationTimeline(
-        this.replayer.statesOf(
-          document.checkpoint
-            ? this.replayer.authorizationFromCheckpoint(
-                DeviceAuthorization.fromPrimitives(document.genesis),
-                document.checkpoint,
-              )
-            : DeviceAuthorization.fromPrimitives(document.genesis),
-          document.history,
-        ),
+      const { compromisedSince, states } = this.replayer.statesOf(
+        document.checkpoint
+          ? this.replayer.authorizationFromCheckpoint(
+              DeviceAuthorization.fromPrimitives(document.genesis),
+              document.checkpoint,
+            )
+          : DeviceAuthorization.fromPrimitives(document.genesis),
+        document.history,
       );
+
+      return new DeviceAuthorizationTimeline(states, compromisedSince);
     });
   }
 

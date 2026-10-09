@@ -5497,7 +5497,11 @@ is:
 ```
 
 Revocation omits `authorizedAt`, `pairingExpiration`, `pairingId` and
-`proofOfPossession`. Recovery also omits `authorCredential`; its target proof
+`proofOfPossession`, and may add `compromisedSince` (a revision no greater than
+`previousRevision`, signed with the transition): the target is then revoked as
+compromised and any record it signs claiming that revision or a later one is
+refused, even inside the interval where it was authorized. Omit it to retire
+the device. Recovery also omits `authorCredential`; its target proof
 uses the proof envelope above, and the recovery authority signs the transition
 envelope. Credentials and signatures use their API string representation
 without decoding or normalization.

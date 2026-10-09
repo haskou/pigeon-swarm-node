@@ -17,6 +17,11 @@ export class PostDeviceAuthorizationTransitionBody {
   @IsInt()
   public readonly authorizedAt?: number;
 
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  public readonly compromisedSince?: number;
+
   @IsString()
   public readonly epoch: string;
 
