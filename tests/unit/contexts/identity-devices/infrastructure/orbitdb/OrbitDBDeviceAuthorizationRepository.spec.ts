@@ -572,88 +572,87 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       ).toBe(true);
     });
 
-    it.each([
-      [
-        'retirement sorts first',
-        '00000000-0000-4000-8000-000000000003',
-        '00000000-0000-4000-8000-000000000004',
-      ],
-      [
-        'compromise sorts first',
-        '00000000-0000-4000-8000-000000000004',
-        '00000000-0000-4000-8000-000000000003',
-      ],
-    ])(
-      'keeps the compromise cap when it races a plain retirement (%s)',
-      async (_name, retireId, compromiseId) => {
-        const { genesis, identityId, owner } = await fixture();
-        const phone = await KeyPair.generate();
-        const laptop = await KeyPair.generate();
-        const base = repositoryFixture();
-        await provisionAuthorization(base.repository, genesis);
-        await base.repository.compareAndApply(
-          await enrollment(
-            identityId,
-            owner,
-            phone,
-            '00000000-0000-4000-8000-000000000001',
-            '10000000-0000-4000-8000-000000000001',
-          ),
-        );
-        await base.repository.compareAndApply(
-          await enrollment(
-            identityId,
-            owner,
-            laptop,
-            '00000000-0000-4000-8000-000000000002',
-            '10000000-0000-4000-8000-000000000002',
-            revisionOf(1),
-          ),
-        );
-        const baseHead = base.getHead() as Record<string, unknown>;
-        const retired = repositoryFixture();
-        const compromised = repositoryFixture();
-        for (const branch of [retired, compromised]) {
-          await provisionAuthorization(branch.repository, genesis);
-          branch.setHead(baseHead);
-        }
-        await retired.repository.compareAndApply(
-          revocation(identityId, owner, phone, retireId, revisionOf(2)),
-        );
-        await compromised.repository.compareAndApply(
-          revocation(
-            identityId,
-            owner,
-            phone,
-            compromiseId,
-            revisionOf(2),
-            DeviceAuthorizationEpoch.genesis(),
-            revisionOf(2),
-          ),
-        );
+    it('keeps the compromise cap when a plain retirement by a lower-sorting author races it', async () => {
+      const { genesis, identityId, owner } = await fixture();
+      const phone = await KeyPair.generate();
+      const laptop = await KeyPair.generate();
+      const keyOf = (key: KeyPair): string => key.toPrimitives().publicKey;
+      // Compaction ties are broken on the serialized record, which starts with
+      // the author credential: the retirement author must sort first so the
+      // capped revocation loses that comparison unless the cap is part of the
+      // effect key.
+      const [retirer, compromiser] =
+        keyOf(owner) < keyOf(laptop) ? [owner, laptop] : [laptop, owner];
+      const base = repositoryFixture();
+      await provisionAuthorization(base.repository, genesis);
+      await base.repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000001',
+          '10000000-0000-4000-8000-000000000001',
+        ),
+      );
+      await base.repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          laptop,
+          '00000000-0000-4000-8000-000000000002',
+          '10000000-0000-4000-8000-000000000002',
+          revisionOf(1),
+        ),
+      );
+      const baseHead = base.getHead() as Record<string, unknown>;
+      const retired = repositoryFixture();
+      const compromised = repositoryFixture();
+      for (const branch of [retired, compromised]) {
+        await provisionAuthorization(branch.repository, genesis);
+        branch.setHead(baseHead);
+      }
+      await retired.repository.compareAndApply(
+        revocation(
+          identityId,
+          retirer,
+          phone,
+          '00000000-0000-4000-8000-000000000003',
+          revisionOf(2),
+        ),
+      );
+      await compromised.repository.compareAndApply(
+        revocation(
+          identityId,
+          compromiser,
+          phone,
+          '00000000-0000-4000-8000-000000000004',
+          revisionOf(2),
+          DeviceAuthorizationEpoch.genesis(),
+          revisionOf(2),
+        ),
+      );
 
-        for (const [left, right] of [
-          [retired, compromised],
-          [compromised, retired],
-        ]) {
-          const merged = left.getMerger()?.(
-            left.getHead(),
-            right.getHead() ?? {},
-          ) as Record<string, unknown>;
-          const reader = repositoryFixture();
-          await provisionAuthorization(reader.repository, genesis);
-          reader.setHead(merged);
-          const timeline = await reader.repository.findTimeline(identityId);
+      for (const [left, right] of [
+        [retired, compromised],
+        [compromised, retired],
+      ]) {
+        const merged = left.getMerger()?.(
+          left.getHead(),
+          right.getHead() ?? {},
+        ) as Record<string, unknown>;
+        const reader = repositoryFixture();
+        await provisionAuthorization(reader.repository, genesis);
+        reader.setHead(merged);
+        const timeline = await reader.repository.findTimeline(identityId);
 
-          expect(
-            timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(1)),
-          ).toBe(true);
-          expect(
-            timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(2)),
-          ).toBe(false);
-        }
-      },
-    );
+        expect(
+          timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(1)),
+        ).toBe(true);
+        expect(
+          timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(2)),
+        ).toBe(false);
+      }
+    });
 
     it('rejects a compromise revision beyond the revocation it is signed in', () => {
       expect(() =>
