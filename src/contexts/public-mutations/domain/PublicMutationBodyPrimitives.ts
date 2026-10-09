@@ -11,4 +11,6 @@ export interface PublicMutationBodyPrimitives {
   sequence: number;
   payloadDigest: string;
   author: PublicMutationAuthorPrimitives;
+  /** Scope operations observed when signing; present only on scoped stores. */
+  frontier?: string[];
 }

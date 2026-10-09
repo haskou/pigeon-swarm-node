@@ -19,6 +19,7 @@ import PollCloseMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/
 import PollMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollMutationPolicy';
 import PollMutationScopeAccess from '@app/contexts/polls/infrastructure/orbitdb/policies/PollMutationScopeAccess';
 import PollVoteMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollVoteMutationPolicy';
+import { PublicMutationBodyPrimitives } from '@app/contexts/public-mutations/domain/PublicMutationBodyPrimitives';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
@@ -31,6 +32,8 @@ import StickerRecentMutationPolicy from '@app/contexts/stickers/infrastructure/o
 import StickerSavedPackMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
+
+const FRONTIER = ['A'.repeat(43)];
 
 describe('PublicMutationGate over pins', () => {
   const author = 'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=';
@@ -61,14 +64,16 @@ describe('PublicMutationGate over pins', () => {
     payload: Record<string, unknown>,
     kind: 'put' | 'delete',
     sequence: number,
+    frontier: string[] | null = FRONTIER,
   ): Promise<Record<string, unknown>> => {
     const device = await KeyPair.generate();
-    const body = {
+    const body: PublicMutationBodyPrimitives = {
       author: {
         authorizationRevision: 0,
         deviceCredential: device.toPrimitives().publicKey,
         identityId: author,
       },
+      ...(frontier ? { frontier } : {}),
       kind,
       operationId: `operation-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -77,7 +82,7 @@ describe('PublicMutationGate over pins', () => {
       sequence,
       store: 'pins',
       version: 2,
-    } as const;
+    };
 
     return PublicMutationRecord.withProof(
       payload,
@@ -90,7 +95,7 @@ describe('PublicMutationGate over pins', () => {
 
   beforeEach(() => {
     authorization.isAuthorized.mockResolvedValue(true);
-    communityRepository.findById.mockResolvedValue(
+    communityRepository.findAtFrontier.mockResolvedValue(
       mock<Community>({ manageChannelMessages: jest.fn() }),
     );
     gate = new PublicMutationGate(new PublicMutationVerifier(authorization), [
@@ -139,7 +144,7 @@ describe('PublicMutationGate over pins', () => {
       false,
     );
 
-    communityRepository.findById.mockResolvedValue(
+    communityRepository.findAtFrontier.mockResolvedValue(
       mock<Community>({
         manageChannelMessages: jest.fn(() => {
           throw new Error('forbidden');
@@ -179,7 +184,7 @@ describe('PublicMutationGate over pins', () => {
     const signed = await sign(pin, 'put', 1);
     let onUpdate: (entry: unknown) => void = () => undefined;
 
-    communityRepository.findById.mockResolvedValue(undefined);
+    communityRepository.findAtFrontier.mockResolvedValue(undefined);
     await registry.register('n', {
       heads: {
         events: {
@@ -195,7 +200,7 @@ describe('PublicMutationGate over pins', () => {
     await jest.advanceTimersByTimeAsync(10);
     expect(registry.findCachedHead('pins-head')?.pins).toEqual([]);
 
-    communityRepository.findById.mockResolvedValue(
+    communityRepository.findAtFrontier.mockResolvedValue(
       mock<Community>({ manageChannelMessages: jest.fn() }),
     );
     await jest.advanceTimersByTimeAsync(2_500);
@@ -203,6 +208,37 @@ describe('PublicMutationGate over pins', () => {
     expect(registry.findCachedHead('pins-head')?.pins).toEqual([signed]);
     registry.clear();
     jest.useRealTimers();
+  });
+  it('requires the causal frontier a scoped record is judged at', async () => {
+    await expect(
+      gate.accepts('pins', await sign(pin, 'put', 1, null)),
+    ).resolves.toBe(false);
+    await expect(sign(pin, 'put', 1, [])).rejects.toThrow();
+    await expect(
+      sign(pin, 'put', 1, ['B'.repeat(43), 'A'.repeat(43)]),
+    ).rejects.toThrow();
+  });
+
+  it('judges the permission at the signed frontier, not at the latest state', async () => {
+    const atFrontier = mock<Community>({ manageChannelMessages: jest.fn() });
+    const removed = mock<Community>({
+      manageChannelMessages: jest.fn(() => {
+        throw new Error('removed');
+      }),
+    });
+    const older = ['A'.repeat(43)];
+    const newer = ['B'.repeat(43)];
+
+    communityRepository.findAtFrontier.mockImplementation((_id, frontier) =>
+      Promise.resolve(frontier[0] === older[0] ? atFrontier : removed),
+    );
+
+    await expect(
+      gate.accepts('pins', await sign(pin, 'put', 1, older)),
+    ).resolves.toBe(true);
+    await expect(
+      gate.accepts('pins', await sign(pin, 'put', 2, newer)),
+    ).resolves.toBe(false);
   });
 });
 
@@ -233,6 +269,7 @@ describe('PublicMutationGate over conversation pins', () => {
         deviceCredential: device.toPrimitives().publicKey,
         identityId: author,
       },
+      frontier: FRONTIER,
       kind: 'put',
       operationId: 'operation-1'.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -254,7 +291,7 @@ describe('PublicMutationGate over conversation pins', () => {
 
   beforeEach(() => {
     authorization.isAuthorized.mockResolvedValue(true);
-    conversationRepository.findMetadataById.mockResolvedValue(
+    conversationRepository.findMetadataAtFrontier.mockResolvedValue(
       mock<Conversation>({ hasParticipant: jest.fn(() => true) }),
     );
     gate = new PublicMutationGate(new PublicMutationVerifier(authorization), [
@@ -268,7 +305,7 @@ describe('PublicMutationGate over conversation pins', () => {
   });
 
   it('rejects a pin from someone who is not a participant', async () => {
-    conversationRepository.findMetadataById.mockResolvedValue(
+    conversationRepository.findMetadataAtFrontier.mockResolvedValue(
       mock<Conversation>({ hasParticipant: jest.fn(() => false) }),
     );
 
@@ -724,6 +761,7 @@ describe('PublicMutationGate over community invites and requests', () => {
         deviceCredential: device.toPrimitives().publicKey,
         identityId: author,
       },
+      frontier: FRONTIER,
       kind: 'put',
       operationId: 'operation-1'.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -745,7 +783,7 @@ describe('PublicMutationGate over community invites and requests', () => {
 
   beforeEach(() => {
     authorization.isAuthorized.mockResolvedValue(true);
-    communityRepository.findById.mockResolvedValue(community);
+    communityRepository.findAtFrontier.mockResolvedValue(community);
     community.assertCanCreateInvite.mockReset();
     community.assertMembershipRequestAuthoredBy.mockReset();
     community.requestMembership.mockReset();
@@ -829,7 +867,7 @@ describe('PublicMutationGate over community invites and requests', () => {
   });
 
   it('rejects records of an unknown community', async () => {
-    communityRepository.findById.mockResolvedValue(undefined);
+    communityRepository.findAtFrontier.mockResolvedValue(undefined);
 
     await expect(
       gate.accepts('requests', await sign(invite, creator)),
@@ -897,6 +935,7 @@ describe('PublicMutationGate over polls', () => {
         deviceCredential: device.toPrimitives().publicKey,
         identityId: author,
       },
+      frontier: FRONTIER,
       kind: payload.removed === true ? 'delete' : 'put',
       operationId: 'operation-1'.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -918,7 +957,7 @@ describe('PublicMutationGate over polls', () => {
 
   beforeEach(() => {
     authorization.isAuthorized.mockResolvedValue(true);
-    communityRepository.findById.mockResolvedValue(community);
+    communityRepository.findAtFrontier.mockResolvedValue(community);
     community.authorizeTextChannelPollCreation.mockReset();
     community.authorizeTextChannelPollVote.mockReset();
     const access = new PollMutationScopeAccess(
@@ -1047,7 +1086,9 @@ describe('PublicMutationGate over polls', () => {
       scopeType: 'poll',
     };
 
-    conversationRepository.findMetadataById.mockResolvedValue(conversation);
+    conversationRepository.findMetadataAtFrontier.mockResolvedValue(
+      conversation,
+    );
     conversation.isGroup.mockReturnValue(true);
     conversation.hasParticipant.mockReturnValue(true);
     await expect(
@@ -1064,7 +1105,7 @@ describe('PublicMutationGate over polls', () => {
   });
 
   it('rejects records of an unknown community', async () => {
-    communityRepository.findById.mockResolvedValue(undefined);
+    communityRepository.findAtFrontier.mockResolvedValue(undefined);
 
     await expect(
       gate.accepts('polls', await sign(poll, creator)),
@@ -1116,6 +1157,7 @@ describe('PublicMutationGate over community channel messages', () => {
         deviceCredential: device.toPrimitives().publicKey,
         identityId,
       },
+      frontier: FRONTIER,
       kind,
       operationId: `operation-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -1138,7 +1180,7 @@ describe('PublicMutationGate over community channel messages', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     authorization.isAuthorized.mockResolvedValue(true);
-    communityRepository.findById.mockResolvedValue(community);
+    communityRepository.findAtFrontier.mockResolvedValue(community);
     gate = new PublicMutationGate(new PublicMutationVerifier(authorization), [
       new CommunityChannelMessageMutationPolicy(communityRepository),
     ]);
@@ -1243,6 +1285,7 @@ describe('PublicMutationGate over community moderation logs', () => {
         deviceCredential: device.toPrimitives().publicKey,
         identityId: author,
       },
+      frontier: FRONTIER,
       kind,
       operationId: 'operation-1'.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -1264,7 +1307,7 @@ describe('PublicMutationGate over community moderation logs', () => {
 
   beforeEach(() => {
     authorization.isAuthorized.mockResolvedValue(true);
-    communityRepository.findById.mockResolvedValue(community);
+    communityRepository.findAtFrontier.mockResolvedValue(community);
     community.assertCanRecordModerationAction.mockReset();
     gate = new PublicMutationGate(new PublicMutationVerifier(authorization), [
       new CommunityModerationLogMutationPolicy(communityRepository as never),
@@ -1381,7 +1424,7 @@ describe('PublicMutationGate over community moderation logs', () => {
   });
 
   it('rejects entries of an unknown community', async () => {
-    communityRepository.findById.mockResolvedValue(undefined);
+    communityRepository.findAtFrontier.mockResolvedValue(undefined);
 
     await expect(
       gate.accepts('moderationLogs', await sign(log, moderator)),

@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import { InvalidPublicMutationError } from './errors/InvalidPublicMutationError';
 import { PublicMutationAuthorPrimitives } from './PublicMutationAuthorPrimitives';
 import { PublicMutationBodyPrimitives } from './PublicMutationBodyPrimitives';
+import { PublicMutationFrontier } from './PublicMutationFrontier';
 import { PublicMutationKind } from './PublicMutationKind';
 import { PublicMutationProofPrimitives } from './PublicMutationProofPrimitives';
 
@@ -95,6 +96,28 @@ export class PublicMutationProof {
     return value;
   }
 
+  /** The optional signed frontier; present means it must be well formed. */
+  private static frontierOf(value: unknown): string[] | undefined {
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      !Object.hasOwn(value, 'frontier')
+    ) {
+      return undefined;
+    }
+    const { frontier } = value as { frontier: unknown };
+
+    if (!PublicMutationFrontier.isValid(frontier)) {
+      throw new InvalidPublicMutationError();
+    }
+
+    return frontier;
+  }
+
+  private static frontierFields(frontier: string[] | undefined): string[] {
+    return frontier ? ['frontier'] : [];
+  }
+
   public static digestOf(payload: Record<string, unknown>): string {
     const canonical = canonicalize(payload);
 
@@ -107,7 +130,9 @@ export class PublicMutationProof {
 
   /** Strict decoder: unknown, missing or malformed fields are rejected. */
   public static fromPrimitives(value: unknown): PublicMutationProof {
+    const frontier = PublicMutationProof.frontierOf(value);
     const proof = PublicMutationProof.exact(value, [
+      ...PublicMutationProof.frontierFields(frontier),
       'version',
       'operationId',
       'kind',
@@ -141,6 +166,7 @@ export class PublicMutationProof {
       return new PublicMutationProof(
         {
           author: PublicMutationProof.author(proof.author),
+          ...(frontier ? { frontier } : {}),
           kind: PublicMutationProof.kind(proof.kind),
           operationId: PublicMutationProof.pattern(
             proof.operationId,

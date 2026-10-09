@@ -218,6 +218,28 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       : undefined;
   }
 
+  /**
+   * The community as it was at `frontier`: the fold of exactly the operations
+   * in the causal past of those heads. A head this node does not hold yet makes
+   * the lookup fail, so the record is retried once the operations replicated.
+   */
+  public async findAtFrontier(
+    id: CommunityId,
+    frontier: string[],
+  ): Promise<Community | undefined> {
+    const records = await this.operationIndex.findRecords(this.headKey(id));
+    const state = CommunityStateFold.fold(
+      CommunityStateFold.closureOf(
+        this.operationsOf(id.valueOf(), records),
+        frontier,
+      ),
+    );
+
+    return state.community && !state.deleted
+      ? this.copyOf(state.community)
+      : undefined;
+  }
+
   /** The operations nobody built on yet: the parents of the next operation. */
   public async findFrontier(id: CommunityId): Promise<string[]> {
     return (await this.findState(id))?.frontier ?? [];

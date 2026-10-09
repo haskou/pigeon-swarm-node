@@ -973,12 +973,20 @@ async function sendConversationMessage(
     scopeType: 'conversation',
     type: MessageType.SENT.valueOf(),
   };
+  const { frontier } = await request<{ frontier: string[] }>(
+    node,
+    'GET',
+    `/conversations/${encodeURIComponent(conversationId)}/frontier`,
+    undefined,
+    author,
+  );
   const mutationBody = {
     author: {
       authorizationRevision: 0,
       deviceCredential: author.deviceCredential,
       identityId: author.id,
     },
+    frontier,
     kind: 'put',
     operationId: randomBytes(16).toString('base64url'),
     payloadDigest: PublicMutationProof.digestOf(record),

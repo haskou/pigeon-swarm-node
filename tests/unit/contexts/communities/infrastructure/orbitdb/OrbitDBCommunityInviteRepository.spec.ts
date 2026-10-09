@@ -145,7 +145,7 @@ describe('OrbitDBCommunityInviteRepository', () => {
         [
           new CommunityInviteUseMutationPolicy(
             {
-              findById: async () => ({ requestMembership }),
+              findAtFrontier: async () => ({ requestMembership }),
             } as never,
             repository,
           ),
@@ -167,6 +167,7 @@ describe('OrbitDBCommunityInviteRepository', () => {
         deviceCredential: device.toPrimitives().publicKey,
         identityId: otherIdentityId.valueOf(),
       },
+      frontier: ['A'.repeat(43)] as string[],
       kind: 'put',
       operationId: 'operation-1'.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),

@@ -1,4 +1,5 @@
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationFrontier } from '@app/contexts/public-mutations/domain/PublicMutationFrontier';
 import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain/PublicMutationRecordShape';
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
 import { PublicMutationExpectation } from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
@@ -27,7 +28,10 @@ export default class MLSRecordMutationPolicy extends PublicMutationPolicy {
     ['authorIdentityId', 'communityId', 'groupId', 'id', 'kind', 'payload'],
     ['createdAt'],
     'community_mls',
-    { optionalIntegers: ['epoch'], optionalStrings: ['recipientIdentityId'] },
+    {
+      optionalIntegers: ['epoch'],
+      optionalStrings: ['recipientIdentityId'],
+    },
   );
 
   private readonly communities = new ShortLivedLookup<Community | undefined>();
@@ -35,6 +39,8 @@ export default class MLSRecordMutationPolicy extends PublicMutationPolicy {
   public readonly collection = 'mlsRecords';
 
   public readonly scopeType = 'community_mls';
+
+  public readonly requiresFrontier = true;
 
   constructor(private readonly communityRepository: CommunityRepository) {
     super();
@@ -73,9 +79,18 @@ export default class MLSRecordMutationPolicy extends PublicMutationPolicy {
     if (!valid) throw new InvalidPublicMutationError();
   }
 
-  private async findCommunity(communityId: string): Promise<Community> {
-    const community = await this.communities.get(communityId, () =>
-      this.communityRepository.findById(new CommunityId(communityId)),
+  private async findCommunity(
+    record: Record<string, unknown>,
+    frontier: string[],
+  ): Promise<Community> {
+    const communityId = record.communityId as string;
+    const community = await this.communities.get(
+      PublicMutationFrontier.keyOf(communityId, frontier),
+      () =>
+        this.communityRepository.findAtFrontier(
+          new CommunityId(communityId),
+          frontier,
+        ),
     );
 
     if (!community) throw new InvalidPublicMutationError();
@@ -121,13 +136,12 @@ export default class MLSRecordMutationPolicy extends PublicMutationPolicy {
     record: Record<string, unknown>,
     authorIdentityId: string,
     isDeletion: boolean,
+    frontier: string[],
   ): Promise<void> {
     if (isDeletion) throw new InvalidPublicMutationError();
 
-    const communityId = record.communityId as string;
-
     MLSGroupAccess.assert(
-      await this.findCommunity(communityId),
+      await this.findCommunity(record, frontier),
       record.groupId as string,
       new IdentityId(authorIdentityId),
       typeof record.recipientIdentityId === 'string'

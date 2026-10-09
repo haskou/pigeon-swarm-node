@@ -83,6 +83,7 @@ signature:
   "operationId": "<random base64url, 22 characters>",
   "recordId": "<record id>",
   "payloadDigest": "<base64url sha256 of the canonical record>",
+  "frontier": ["<scope operation digest>"],
   "predecessor": null,
   "sequence": 0,
   "author": {
@@ -93,6 +94,17 @@ signature:
   "signature": "<Ed25519 signature, standard base64 with padding>"
 }
 ```
+
+`frontier` is present only on records scoped to a community or conversation
+(channel messages, reactions, pins, invites, membership requests, moderation
+log, MLS records, polls, conversation messages, reactions and pins) and absent
+everywhere else; the node rejects a scoped record without it and any other
+record with it. It lists 1–64 digests of the scope's operations, strictly
+ascending, that the author had observed (`GET /communities/:id/frontier`,
+the conversation frontier). The record's permission is judged against the
+scope folded at exactly that frontier, so the verdict does not depend on what
+a node holds when it evaluates the record; an unknown head is refused and
+retried after replication, like an unknown operation parent.
 
 The device signs the UTF-8 bytes `"pigeon:public-mutation:v2\n" +
 canonicalize(body-without-signature)` (RFC 8785). `version` is exactly `2`;

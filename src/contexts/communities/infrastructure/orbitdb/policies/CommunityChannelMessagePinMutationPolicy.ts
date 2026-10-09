@@ -1,4 +1,5 @@
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationFrontier } from '@app/contexts/public-mutations/domain/PublicMutationFrontier';
 import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain/PublicMutationRecordShape';
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
 import { PublicMutationExpectation } from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
@@ -23,6 +24,8 @@ export default class CommunityChannelMessagePinMutationPolicy extends PublicMuta
   public readonly collection = 'pins';
 
   public readonly scopeType = 'community_channel';
+
+  public readonly requiresFrontier = true;
 
   constructor(private readonly communityRepository: CommunityRepository) {
     super();
@@ -50,12 +53,15 @@ export default class CommunityChannelMessagePinMutationPolicy extends PublicMuta
   public async assertPermitted(
     record: Record<string, unknown>,
     authorIdentityId: string,
+    _isDeletion: boolean,
+    frontier: string[],
   ): Promise<void> {
     const community = await this.communities.get(
-      record.communityId as string,
+      PublicMutationFrontier.keyOf(record.communityId as string, frontier),
       () =>
-        this.communityRepository.findById(
+        this.communityRepository.findAtFrontier(
           new CommunityId(record.communityId as string),
+          frontier,
         ),
     );
 

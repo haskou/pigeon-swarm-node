@@ -1,4 +1,5 @@
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationFrontier } from '@app/contexts/public-mutations/domain/PublicMutationFrontier';
 import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain/PublicMutationRecordShape';
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
 import { PublicMutationExpectation } from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
@@ -25,6 +26,8 @@ export default class ConversationMessageReactionMutationPolicy extends PublicMut
   public readonly collection = 'reactions';
 
   public readonly scopeType = 'conversation';
+
+  public readonly requiresFrontier = true;
 
   constructor(private readonly conversationRepository: ConversationRepository) {
     super();
@@ -55,12 +58,15 @@ export default class ConversationMessageReactionMutationPolicy extends PublicMut
   public async assertPermitted(
     record: Record<string, unknown>,
     authorIdentityId: string,
+    _isDeletion: boolean,
+    frontier: string[],
   ): Promise<void> {
     const conversation = await this.conversations.get(
-      record.conversationId as string,
+      PublicMutationFrontier.keyOf(record.conversationId as string, frontier),
       () =>
-        this.conversationRepository.findMetadataById(
+        this.conversationRepository.findMetadataAtFrontier(
           new ConversationId(record.conversationId as string),
+          frontier,
         ),
     );
 

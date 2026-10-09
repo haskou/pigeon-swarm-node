@@ -60,20 +60,24 @@ describe('ConversationMessageMutationPolicy', () => {
   it('accepts a conversation participant author', async () => {
     const conversation = mother.build();
 
-    repository.findMetadataById.mockResolvedValue(conversation);
+    repository.findMetadataAtFrontier.mockResolvedValue(conversation);
 
     await expect(
-      policy.assertPermitted(record(), mother.author.valueOf()),
+      policy.assertPermitted(record(), mother.author.valueOf(), false, [
+        'A'.repeat(43),
+      ]),
     ).resolves.toBeUndefined();
   });
 
   it('rejects an author that is not a participant', async () => {
     const outsider = await ConversationMother.generateIdentityId();
 
-    repository.findMetadataById.mockResolvedValue(mother.build());
+    repository.findMetadataAtFrontier.mockResolvedValue(mother.build());
 
     await expect(
-      policy.assertPermitted(record(), outsider.valueOf()),
+      policy.assertPermitted(record(), outsider.valueOf(), false, [
+        'A'.repeat(43),
+      ]),
     ).rejects.toBeInstanceOf(InvalidPublicMutationError);
   });
 });

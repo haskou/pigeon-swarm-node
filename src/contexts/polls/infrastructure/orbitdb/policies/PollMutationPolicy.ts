@@ -24,6 +24,8 @@ export default class PollMutationPolicy extends PublicMutationPolicy {
 
   public readonly scopeType = PollMutationRecords.POLL;
 
+  public readonly requiresFrontier = true;
+
   constructor(private readonly access: PollMutationScopeAccess) {
     super();
   }
@@ -47,9 +49,12 @@ export default class PollMutationPolicy extends PublicMutationPolicy {
   public assertPermitted(
     record: Record<string, unknown>,
     authorIdentityId: string,
+    _isDeletion: boolean,
+    frontier: string[],
   ): Promise<void> {
     return this.access.assertCanManage(
       PollMutationRecords.scopeOf(record),
+      frontier,
       authorIdentityId,
     );
   }
