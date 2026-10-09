@@ -10,6 +10,7 @@ import { PairingAuthorization } from './value-objects/PairingAuthorization';
 
 export interface DeviceAuthorizationTransitionState {
   authorCredential?: DeviceCredential;
+  compromisedSince?: DeviceAuthorizationRevision;
   epoch: DeviceAuthorizationEpoch;
   identityId: IdentityId;
   operation: DeviceAuthorizationOperation;

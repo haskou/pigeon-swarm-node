@@ -203,17 +203,41 @@ export default class OrbitDBDeviceAuthorizationReplayer {
 
   /**
    * Every state of the replay, from `base` (the genesis or a recovery
-   * checkpoint) to the head, in ascending revision order.
+   * checkpoint) to the head, in ascending revision order, plus the revision
+   * each compromised-revoked credential is capped at.
    */
   public statesOf(
     base: DeviceAuthorization,
     history: OrbitDBDeviceAuthorizationTransitionRecord[],
-  ): DeviceAuthorization[] {
+  ): {
+    compromisedSince: Map<string, number>;
+    states: DeviceAuthorization[];
+  } {
     const states = [base];
+    const replay = this.replayFrom(
+      base,
+      this.transitionRecordsByRevision(history),
+      states,
+    );
+    const compromisedSince = new Map<string, number>();
 
-    this.replayFrom(base, this.transitionRecordsByRevision(history), states);
+    for (const { transition } of replay.history) {
+      if (
+        transition.operation === 'revoke' &&
+        transition.compromisedSince !== undefined
+      ) {
+        compromisedSince.set(
+          transition.targetCredential,
+          Math.min(
+            transition.compromisedSince,
+            compromisedSince.get(transition.targetCredential) ??
+              Number.POSITIVE_INFINITY,
+          ),
+        );
+      }
+    }
 
-    return states;
+    return { compromisedSince, states };
   }
 
   public authorizationFromCheckpoint(

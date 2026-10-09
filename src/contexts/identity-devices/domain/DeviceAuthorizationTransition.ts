@@ -23,6 +23,14 @@ export class DeviceAuthorizationTransition {
   private static readonly PROOF_DOMAIN =
     'pigeon:device-authorization:proof-of-possession:v2';
 
+  private static revisionOrUndefined(
+    value?: number,
+  ): DeviceAuthorizationRevision | undefined {
+    return value === undefined
+      ? undefined
+      : new DeviceAuthorizationRevision(value);
+  }
+
   public static enrollment(
     identityId: IdentityId,
     operationId: DeviceAuthorizationOperationId,
@@ -52,6 +60,9 @@ export class DeviceAuthorizationTransition {
       authorCredential: primitives.authorCredential
         ? DeviceCredential.fromString(primitives.authorCredential)
         : undefined,
+      compromisedSince: DeviceAuthorizationTransition.revisionOrUndefined(
+        primitives.compromisedSince,
+      ),
       epoch: new DeviceAuthorizationEpoch(primitives.epoch),
       identityId: new IdentityId(primitives.identityId),
       operation,
@@ -97,9 +108,11 @@ export class DeviceAuthorizationTransition {
     authorCredential: DeviceCredential,
     targetCredential: DeviceCredential,
     epoch = DeviceAuthorizationEpoch.genesis(),
+    compromisedSince?: DeviceAuthorizationRevision,
   ): DeviceAuthorizationTransition {
     return new DeviceAuthorizationTransition({
       authorCredential,
+      compromisedSince,
       epoch,
       identityId,
       operation: DeviceAuthorizationOperation.revocation(),
@@ -137,17 +150,37 @@ export class DeviceAuthorizationTransition {
 
   private hasValidOperationShape(): boolean {
     if (this.state.operation.isEnrollment()) {
-      return Boolean(this.state.authorCredential && this.state.pairing);
+      return Boolean(
+        this.state.authorCredential &&
+        this.state.pairing &&
+        this.state.compromisedSince === undefined,
+      );
     }
 
     if (this.state.operation.isRevocation()) {
-      return Boolean(this.state.authorCredential && !this.state.pairing);
+      return this.hasValidRevocationShape();
     }
 
     return Boolean(
+      this.state.compromisedSince === undefined &&
       this.state.operation.isRecovery() &&
       !this.state.authorCredential &&
       !this.state.pairing,
+    );
+  }
+
+  private hasValidRevocationShape(): boolean {
+    return Boolean(
+      this.state.authorCredential &&
+      !this.state.pairing &&
+      this.hasValidCompromiseRevision(),
+    );
+  }
+
+  private hasValidCompromiseRevision(): boolean {
+    return (
+      this.state.compromisedSince === undefined ||
+      !this.state.compromisedSince.isGreaterThan(this.state.previousRevision)
     );
   }
 
@@ -161,6 +194,7 @@ export class DeviceAuthorizationTransition {
     return {
       authorCredential: this.state.authorCredential?.valueOf(),
       authorizedAt: this.state.pairing?.getAuthorizedAt().valueOf(),
+      compromisedSince: this.state.compromisedSince?.valueOf(),
       epoch: this.state.epoch.valueOf(),
       identityId: this.state.identityId.valueOf(),
       operation: this.state.operation.valueOf(),
@@ -246,6 +280,14 @@ export class DeviceAuthorizationTransition {
     return this.state.authorCredential;
   }
 
+  /**
+   * The first revision at which the revoked device is no longer trusted, when
+   * the owner revoked it as compromised. Absent for a plain retirement.
+   */
+  public getCompromisedSince(): DeviceAuthorizationRevision | undefined {
+    return this.state.compromisedSince;
+  }
+
   public getTargetCredential(): DeviceCredential {
     return this.state.targetCredential;
   }
@@ -325,6 +367,7 @@ export class DeviceAuthorizationTransition {
     return {
       authorCredential: this.state.authorCredential?.valueOf(),
       authorizedAt: this.state.pairing?.getAuthorizedAt().valueOf(),
+      compromisedSince: this.state.compromisedSince?.valueOf(),
       epoch: this.state.epoch.valueOf(),
       identityId: this.state.identityId.valueOf(),
       operation: this.state.operation.valueOf(),

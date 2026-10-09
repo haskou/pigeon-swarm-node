@@ -10,12 +10,17 @@ import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorization
  * claims, instead of at the current head: a later revocation never reaches
  * back before its own revision, a revision above the head (not replicated yet)
  * is never trusted, and neither is one below the base (a recovery discards the
- * chain it replaced).
+ * chain it replaced). A device revoked as compromised is also capped: records
+ * claiming the revision the owner named, or any later one, are refused even
+ * though the device was authorized there.
  */
 export class DeviceAuthorizationTimeline {
   private readonly states: DeviceAuthorization[];
 
-  public constructor(states: DeviceAuthorization[]) {
+  public constructor(
+    states: DeviceAuthorization[],
+    private readonly compromisedSince: ReadonlyMap<string, number> = new Map(),
+  ) {
     this.states = [...states].sort(
       (left, right) =>
         left.getRevision().valueOf() - right.getRevision().valueOf(),
@@ -34,6 +39,12 @@ export class DeviceAuthorizationTimeline {
     revision: DeviceAuthorizationRevision,
   ): boolean {
     if (!this.hasReached(revision)) {
+      return false;
+    }
+
+    const cap = this.compromisedSince.get(credential.valueOf());
+
+    if (cap !== undefined && revision.valueOf() >= cap) {
       return false;
     }
 
