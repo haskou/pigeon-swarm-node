@@ -3071,10 +3071,12 @@ Implemented:
 - allow any authenticated identity, members or not, because a non-member signs the
   `member_joined` operation of a join, an invite link or an accepted invitation
 - fail with `CommunityNotFoundError` when the community is unknown to the node
-- return `{ "frontier": ["<digest>"] }`, the sorted operation digests no other
-  operation names as parent: the `parents` for the next signed operation. The
-  digests are the ids of immutable records already replicated to every peer of the
-  network, so they disclose nothing else.
+- return `{ "frontier": ["<digest>"], "networkId": "<id>" }`: the sorted operation
+  digests no other operation names as parent (the `parents` for the next signed
+  operation) and the network the operation payload names. A non-member cannot
+  read `networkId` from `GET /communities/{communityId}`. The digests are the ids
+  of immutable records already replicated to every peer of the network, so they
+  disclose nothing else.
 
 ### Update community profile
 
