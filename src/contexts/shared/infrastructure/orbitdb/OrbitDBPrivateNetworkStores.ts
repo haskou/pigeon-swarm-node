@@ -30,6 +30,7 @@ export class OrbitDBPrivateNetworkStores {
   public readonly contentReplication: OrbitDBDatabase;
   public readonly keychains: OrbitDBDatabase;
   public readonly messages: OrbitDBDatabase;
+  public readonly mlsRecords: OrbitDBDatabase;
   public readonly moderationLogs: OrbitDBDatabase;
   public readonly notificationSettings: OrbitDBDatabase;
   public readonly notifications: OrbitDBDatabase;
@@ -192,6 +193,12 @@ export class OrbitDBPrivateNetworkStores {
         'documents/messages',
         AccessController,
       ),
+      mlsRecords: await this.openDocumentsStore(
+        orbitdb,
+        networkId,
+        'documents/mls-records',
+        AccessController,
+      ),
       moderationLogs: await this.openDocumentsStore(
         orbitdb,
         networkId,
@@ -296,6 +303,7 @@ export class OrbitDBPrivateNetworkStores {
       identities: this.identities.address,
       keychains: this.keychains.address,
       messages: this.messages.address,
+      mlsRecords: this.mlsRecords.address,
       moderationLogs: this.moderationLogs.address,
       notifications: this.notifications.address,
       notificationSettings: this.notificationSettings.address,
@@ -325,6 +333,7 @@ export class OrbitDBPrivateNetworkStores {
       { database: this.identities, name: 'identities' },
       { database: this.keychains, name: 'keychains' },
       { database: this.messages, name: 'messages' },
+      { database: this.mlsRecords, name: 'mlsRecords' },
       { database: this.moderationLogs, name: 'moderationLogs' },
       { database: this.notifications, name: 'notifications' },
       {

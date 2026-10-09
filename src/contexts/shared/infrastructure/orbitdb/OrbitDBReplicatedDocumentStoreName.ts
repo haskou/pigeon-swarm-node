@@ -6,6 +6,7 @@ export type OrbitDBReplicatedDocumentStoreName =
   | 'contentReplication'
   | 'keychains'
   | 'messages'
+  | 'mlsRecords'
   | 'moderationLogs'
   | 'notificationSettings'
   | 'notifications'
