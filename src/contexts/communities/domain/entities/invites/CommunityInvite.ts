@@ -8,11 +8,8 @@ import { CommunityInviteMaxUses } from '../../value-objects/CommunityInviteMaxUs
 import { CommunityInviteNonce } from '../../value-objects/CommunityInviteNonce';
 import { CommunityInviteToken } from '../../value-objects/CommunityInviteToken';
 import { CommunityInviteUses } from '../../value-objects/CommunityInviteUses';
-import { EncryptedCommunityInviteKey } from '../../value-objects/EncryptedCommunityInviteKey';
 
 export class CommunityInvite {
-  private encryptedCommunityKey?: EncryptedCommunityInviteKey;
-
   public static create(
     communityId: CommunityId,
     creatorIdentityId: IdentityId,
@@ -20,9 +17,8 @@ export class CommunityInvite {
     createdAt: Timestamp,
     expiresAt?: Timestamp,
     maxUses: CommunityInviteMaxUses = new CommunityInviteMaxUses(1),
-    encryptedCommunityKey?: EncryptedCommunityInviteKey,
   ): CommunityInvite {
-    const invite = new CommunityInvite(
+    return new CommunityInvite(
       CommunityInviteToken.derive(
         communityId.valueOf(),
         creatorIdentityId.valueOf(),
@@ -35,16 +31,12 @@ export class CommunityInvite {
       expiresAt,
       maxUses,
     );
-
-    invite.setEncryptedCommunityKey(encryptedCommunityKey);
-
-    return invite;
   }
 
   public static fromPrimitives(
     primitives: PrimitiveOf<CommunityInvite>,
   ): CommunityInvite {
-    const invite = new CommunityInvite(
+    return new CommunityInvite(
       new CommunityInviteToken(primitives.token),
       new CommunityId(primitives.communityId),
       new IdentityId(primitives.creatorIdentityId),
@@ -53,16 +45,6 @@ export class CommunityInvite {
       primitives.expiresAt ? new Timestamp(primitives.expiresAt) : undefined,
       new CommunityInviteMaxUses(primitives.maxUses),
     );
-
-    invite.setEncryptedCommunityKey(
-      primitives.encryptedCommunityKey
-        ? EncryptedCommunityInviteKey.fromPrimitives(
-            primitives.encryptedCommunityKey,
-          )
-        : undefined,
-    );
-
-    return invite;
   }
 
   constructor(
@@ -74,12 +56,6 @@ export class CommunityInvite {
     private readonly expiresAt: Timestamp | undefined,
     private readonly maxUses: CommunityInviteMaxUses,
   ) {}
-
-  private setEncryptedCommunityKey(
-    encryptedCommunityKey?: EncryptedCommunityInviteKey,
-  ): void {
-    this.encryptedCommunityKey = encryptedCommunityKey;
-  }
 
   public isExpired(now: Timestamp = Timestamp.now()): boolean {
     return this.expiresAt?.isBeforeOrEqual(now) ?? false;
@@ -108,16 +84,11 @@ export class CommunityInvite {
     return this.token;
   }
 
-  public hasEncryptedCommunityKey(): boolean {
-    return this.encryptedCommunityKey !== undefined;
-  }
-
   public toPrimitives() {
     return {
       communityId: this.communityId.valueOf(),
       createdAt: this.createdAt.valueOf(),
       creatorIdentityId: this.creatorIdentityId.valueOf(),
-      encryptedCommunityKey: this.encryptedCommunityKey?.toPrimitives(),
       expiresAt: this.expiresAt?.valueOf(),
       maxUses: this.maxUses.valueOf(),
       nonce: this.nonce.valueOf(),

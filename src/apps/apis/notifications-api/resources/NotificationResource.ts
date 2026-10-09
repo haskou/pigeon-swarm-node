@@ -3,7 +3,6 @@ export type NotificationResource = {
   payload:
     | {
         communityId: string;
-        encryptedCommunityKey: string;
         inviterIdentityId: string;
         nonce: string;
         recipientIdentityId: string;

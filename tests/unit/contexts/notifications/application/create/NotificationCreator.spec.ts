@@ -19,7 +19,7 @@ type Case = [
     | 'group_conversation_invitation'
   ),
   string,
-  string,
+  string | undefined,
   (
     | 'communityInvitation'
     | 'conversationInvitation'
@@ -31,7 +31,7 @@ const cases: Case[] = [
   [
     'community_invitation',
     '550e8400-e29b-41d4-a716-446655440020',
-    'encrypted-community-key',
+    undefined,
     'communityInvitation',
   ],
   [
@@ -79,14 +79,22 @@ describe('NotificationCreator', () => {
       });
 
       const notification = await creator.create(
-        NotificationCreateMessage[factory](
-          subjectId,
-          signer.id,
-          RECIPIENT,
-          key,
-          NONCE,
-          signed.body.mutation,
-        ),
+        factory === 'communityInvitation'
+          ? NotificationCreateMessage.communityInvitation(
+              subjectId,
+              signer.id,
+              RECIPIENT,
+              NONCE,
+              signed.body.mutation,
+            )
+          : NotificationCreateMessage[factory](
+              subjectId,
+              signer.id,
+              RECIPIENT,
+              key as string,
+              NONCE,
+              signed.body.mutation,
+            ),
       );
 
       expect(repository.saveInvitation).toHaveBeenCalledWith(

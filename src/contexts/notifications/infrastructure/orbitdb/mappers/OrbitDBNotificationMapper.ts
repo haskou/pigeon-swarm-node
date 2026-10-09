@@ -29,8 +29,9 @@ export default class OrbitDBNotificationMapper {
     const payload = primitives.payload as InvitationPayload;
 
     return {
-      encryptedKey:
-        payload.encryptedCommunityKey ?? payload.encryptedConversationKey,
+      ...(payload.encryptedConversationKey
+        ? { encryptedKey: payload.encryptedConversationKey }
+        : {}),
       id: primitives.id,
       inviterIdentityId: payload.inviterIdentityId,
       nonce: payload.nonce,
@@ -73,12 +74,11 @@ export default class OrbitDBNotificationMapper {
         ? {
             ...common,
             communityId: invitation.subjectId,
-            encryptedCommunityKey: invitation.encryptedKey,
           }
         : {
             ...common,
             conversationId: invitation.subjectId,
-            encryptedConversationKey: invitation.encryptedKey,
+            encryptedConversationKey: invitation.encryptedKey ?? '',
           },
       recipientIdentityId: invitation.recipientIdentityId,
       state: state?.state ?? 'pending',

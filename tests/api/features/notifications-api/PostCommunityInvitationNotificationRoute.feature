@@ -16,4 +16,4 @@ Feature: Post community invitation notification API
     When I POST to "/notifications/"
     Then response code is equal to 200
     And response body should contain "community_invitation"
-    And response body should contain "encrypted-community-key"
+    And response body should not contain "encrypted"

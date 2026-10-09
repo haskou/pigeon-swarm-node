@@ -12,7 +12,6 @@ export class PostNotificationRequest {
           this.body.communityId || '',
           this.body.inviterIdentityId,
           this.body.recipientIdentityId,
-          this.body.encryptedCommunityKey || '',
           this.body.nonce,
           this.body.mutation,
         ),

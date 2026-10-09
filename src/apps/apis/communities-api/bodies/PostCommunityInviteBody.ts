@@ -10,17 +10,11 @@ import {
 } from 'class-validator';
 
 import { CommunityModerationLogBody } from './CommunityModerationLogBody';
-import { EncryptedCommunityInviteKeyBody } from './EncryptedCommunityInviteKeyBody';
 
 export class PostCommunityInviteBody {
   @IsInt()
   @Min(0)
   public readonly createdAt: number;
-
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => EncryptedCommunityInviteKeyBody)
-  public readonly encryptedCommunityKey?: EncryptedCommunityInviteKeyBody;
 
   @IsOptional()
   @IsNumber()

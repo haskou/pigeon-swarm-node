@@ -129,7 +129,6 @@ components:
         - communityId
         - inviterIdentityId
         - recipientIdentityId
-        - encryptedCommunityKey
         - nonce
       properties:
         communityId:
@@ -137,8 +136,6 @@ components:
         inviterIdentityId:
           type: string
         recipientIdentityId:
-          type: string
-        encryptedCommunityKey:
           type: string
         nonce:
           type: string

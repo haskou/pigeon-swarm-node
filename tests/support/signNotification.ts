@@ -10,7 +10,7 @@ export interface NotificationSigner {
 }
 
 export interface InvitationInput {
-  encryptedKey: string;
+  encryptedKey?: string;
   nonce: string;
   recipientIdentityId: string;
   signer: NotificationSigner;
@@ -54,7 +54,9 @@ export function invitationPayload(
   input: InvitationInput,
 ): Record<string, unknown> & { id: string } {
   return {
-    encryptedKey: input.encryptedKey,
+    ...(input.encryptedKey !== undefined && {
+      encryptedKey: input.encryptedKey,
+    }),
     id: NotificationId.invitation(
       input.signer.id,
       input.recipientIdentityId,
@@ -80,7 +82,9 @@ export function signNotificationInvitation(input: InvitationInput): {
 
   return {
     body: {
-      encryptedKey: input.encryptedKey,
+      ...(input.encryptedKey !== undefined && {
+        encryptedKey: input.encryptedKey,
+      }),
       mutation: proof.toPrimitives() as unknown as Record<string, unknown>,
       nonce: input.nonce,
       recipientIdentityId: input.recipientIdentityId,

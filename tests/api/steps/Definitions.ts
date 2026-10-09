@@ -368,7 +368,11 @@ export default class Definitions {
     const next = sequence ?? this.communityRecordSequences.get(recordId) ?? 0;
     const identityId = keyPair.toPrimitives().publicKey;
     const proofBody = {
-      author: { authorizationRevision: 0, deviceCredential: identityId, identityId },
+      author: {
+        authorizationRevision: 0,
+        deviceCredential: identityId,
+        identityId,
+      },
       kind: 'put',
       operationId: `api-community-${next}-${recordId}`
         .replace(/[^A-Za-z0-9]/g, '')
@@ -599,7 +603,6 @@ export default class Definitions {
         () => ({
           action: 'invite_link_created',
           details: {
-            encryptedCommunityKeyStored: Boolean(body.encryptedCommunityKey),
             expiresAt: body.expiresAt,
             maxUses: body.maxUses,
           },
@@ -2184,19 +2187,6 @@ export default class Definitions {
     });
   }
 
-  @given('I set a community invite body with an encrypted community key')
-  public iSetACommunityInviteBodyWithAnEncryptedCommunityKey(): void {
-    this.body = JSON.stringify({
-      encryptedCommunityKey: {
-        algorithm: 'AES-GCM',
-        ciphertext: 'encryptedcommunitykeyciphertext',
-        nonce: 'encryptedcommunitykeynonce',
-        version: 1,
-      },
-      maxUses: 1,
-    });
-  }
-
   @given('I set an expired community invite body')
   public iSetAnExpiredCommunityInviteBody(): void {
     this.body = JSON.stringify({
@@ -2252,9 +2242,6 @@ export default class Definitions {
       communityId: this.communityId,
       createdAt,
       creatorIdentityId,
-      ...(body.encryptedCommunityKey && {
-        encryptedCommunityKey: body.encryptedCommunityKey,
-      }),
       ...(body.expiresAt !== undefined && { expiresAt: body.expiresAt }),
       id: token,
       maxUses: body.maxUses,
@@ -3086,7 +3073,11 @@ export default class Definitions {
         : { ...document, removed: true };
     const sequence = kind === 'put' ? 0 : 1;
     const proofBody = {
-      author: { authorizationRevision: 0, deviceCredential: identityId, identityId },
+      author: {
+        authorizationRevision: 0,
+        deviceCredential: identityId,
+        identityId,
+      },
       kind,
       operationId: `api-reaction-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -3782,7 +3773,11 @@ export default class Definitions {
     const keyPair = await this.ensureIdentityKeyPair();
     const identityId = keyPair.toPrimitives().publicKey;
     const proofBody = {
-      author: { authorizationRevision: 0, deviceCredential: identityId, identityId },
+      author: {
+        authorizationRevision: 0,
+        deviceCredential: identityId,
+        identityId,
+      },
       kind,
       operationId: `api-community-message-${kind}-${sequence}-${randomUUID()}`
         .replace(/[^A-Za-z0-9_-]/g, '-')
@@ -3815,7 +3810,11 @@ export default class Definitions {
       scopeType: 'conversation',
     };
     const proofBody = {
-      author: { authorizationRevision: 0, deviceCredential: identityId, identityId },
+      author: {
+        authorizationRevision: 0,
+        deviceCredential: identityId,
+        identityId,
+      },
       kind: 'put',
       operationId: `api-conversation-message-${fields.id}`
         .replace(/[^A-Za-z0-9_-]/g, '-')
@@ -3855,7 +3854,11 @@ export default class Definitions {
     const recordId = String(payload.id);
     const sequence = this.stickerMutationSequences.get(recordId) ?? 0;
     const proofBody = {
-      author: { authorizationRevision: 0, deviceCredential: identityId, identityId },
+      author: {
+        authorizationRevision: 0,
+        deviceCredential: identityId,
+        identityId,
+      },
       kind,
       operationId: `api-sticker-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -3982,7 +3985,11 @@ export default class Definitions {
           }
         : { ...base, removed: true };
     const proofBody = {
-      author: { authorizationRevision: 0, deviceCredential: identityId, identityId },
+      author: {
+        authorizationRevision: 0,
+        deviceCredential: identityId,
+        identityId,
+      },
       kind,
       operationId: `api-notification-settings-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -4040,7 +4047,11 @@ export default class Definitions {
         : { ...document, removed: true };
     const sequence = kind === 'put' ? 0 : 1;
     const proofBody = {
-      author: { authorizationRevision: 0, deviceCredential: identityId, identityId },
+      author: {
+        authorizationRevision: 0,
+        deviceCredential: identityId,
+        identityId,
+      },
       kind,
       operationId: `api-conversation-reaction-${sequence}`.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(payload),
@@ -4433,7 +4444,7 @@ export default class Definitions {
   public async iSetACommunityInvitationNotificationBody(): Promise<void> {
     await this.setInvitationNotificationBody(
       this.communityId || 'community-notification-api',
-      'encrypted-community-key',
+      undefined,
       'community_invitation',
     );
   }
@@ -4449,7 +4460,7 @@ export default class Definitions {
 
   private async setInvitationNotificationBody(
     subjectId: string,
-    encryptedKey: string,
+    encryptedKey: string | undefined,
     type:
       | 'community_invitation'
       | 'conversation_invitation'
@@ -4473,8 +4484,11 @@ export default class Definitions {
     });
     const field =
       type === 'community_invitation'
-        ? { communityId: subjectId, encryptedCommunityKey: encryptedKey }
-        : { conversationId: subjectId, encryptedConversationKey: encryptedKey };
+        ? { communityId: subjectId }
+        : {
+            conversationId: subjectId,
+            encryptedConversationKey: encryptedKey,
+          };
 
     this.body = JSON.stringify({
       ...field,

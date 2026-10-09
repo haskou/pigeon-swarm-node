@@ -1,5 +1,5 @@
 export type OrbitDBNotificationInvitationDocument = {
-  encryptedKey: string;
+  encryptedKey?: string;
   id: string;
   inviterIdentityId: string;
   nonce: string;

@@ -15,7 +15,6 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { NotificationReplicationLimits } from '../../../domain/NotificationReplicationLimits';
-import { EncryptedCommunityKey } from '../../../domain/value-objects/EncryptedCommunityKey';
 import { EncryptedConversationKey } from '../../../domain/value-objects/EncryptedConversationKey';
 import { InvitationNonce } from '../../../domain/value-objects/InvitationNonce';
 import { NotificationId } from '../../../domain/value-objects/NotificationId';
@@ -45,7 +44,6 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
 
   private readonly shape = new PublicMutationRecordShape(
     [
-      'encryptedKey',
       'id',
       'inviterIdentityId',
       'nonce',
@@ -55,6 +53,7 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
     ],
     [],
     'notification_invitation',
+    { optionalStrings: ['encryptedKey'] },
   );
 
   private readonly communities = new ShortLivedLookup<Community | undefined>();
@@ -125,10 +124,19 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
   }
 
   private assertKey(record: Record<string, unknown>): void {
-    const key = record.encryptedKey as string;
+    if (this.isCommunity(record)) {
+      if (record.encryptedKey !== undefined) {
+        throw new InvalidPublicMutationError();
+      }
 
-    if (this.isCommunity(record)) new EncryptedCommunityKey(key);
-    else new EncryptedConversationKey(key);
+      return;
+    }
+
+    if (typeof record.encryptedKey !== 'string') {
+      throw new InvalidPublicMutationError();
+    }
+
+    new EncryptedConversationKey(record.encryptedKey);
   }
 
   public expectationOf(

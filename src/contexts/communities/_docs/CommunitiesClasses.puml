@@ -215,7 +215,7 @@ package "communities/domain" {
     - channels: CommunityChannels
     - settings: CommunitySettings
     + create(ownerIdentityId, networkId, profile, settings): Community
-    + createInvite(actor, expiresAt?, maxUses?, encryptedCommunityKey?): CommunityInvite
+    + createInvite(actor, expiresAt?, maxUses?): CommunityInvite
     + acceptInvite(member, acceptedInvite): void
     + inviteMember(actor, invitedIdentityId): CommunityMembershipRequest
     + acceptMembershipRequest(actor, membershipRequest): void
@@ -416,8 +416,7 @@ package "communities/domain" {
     - expiresAt: Timestamp?
     - maxUses: CommunityInviteMaxUses
     - uses: CommunityInviteUses
-    - encryptedCommunityKey: EncryptedCommunityInviteKey?
-    + create(communityId, creatorIdentityId, expiresAt?, maxUses?, encryptedCommunityKey?): CommunityInvite
+    + create(communityId, creatorIdentityId, expiresAt?, maxUses?): CommunityInvite
     + checkAcceptanceAvailability(now?): void
     + accept(now?): void
   }
@@ -458,7 +457,6 @@ package "communities/domain" {
   class CommunityInviteToken
   class CommunityInviteMaxUses
   class CommunityInviteUses
-  class EncryptedCommunityInviteKey
   class CommunityRequestId
   class CommunityRequestStatus {
     + isAccepted(): boolean
@@ -625,7 +623,6 @@ CommunityChannelMessageReaction --> CommunityId
   CommunityInvite --> CommunityInviteToken
   CommunityInvite --> CommunityInviteMaxUses
   CommunityInvite --> CommunityInviteUses
-  CommunityInvite --> EncryptedCommunityInviteKey
   CommunityMembershipRequest --> CommunityId
   CommunityMembershipRequest --> IdentityId
   CommunityMembershipRequest --> CommunityRequestId

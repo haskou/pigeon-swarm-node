@@ -27,7 +27,6 @@ export default class CommunityInviteCreator {
       message.createdAt,
       message.expiresAt,
       message.maxUses,
-      message.encryptedCommunityKey,
     );
 
     await this.moderationLogRecorder.record(
@@ -40,7 +39,6 @@ export default class CommunityInviteCreator {
       ),
       message.moderationLog,
       {
-        encryptedCommunityKeyStored: invite.hasEncryptedCommunityKey(),
         expiresAt: message.expiresAt?.valueOf(),
         maxUses: message.maxUses?.valueOf(),
       },

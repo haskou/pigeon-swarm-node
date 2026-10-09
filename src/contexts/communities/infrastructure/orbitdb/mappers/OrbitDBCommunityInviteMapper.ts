@@ -16,9 +16,6 @@ export default class OrbitDBCommunityInviteMapper {
       communityId: primitives.communityId,
       createdAt: primitives.createdAt,
       creatorIdentityId: primitives.creatorIdentityId,
-      ...(primitives.encryptedCommunityKey && {
-        encryptedCommunityKey: primitives.encryptedCommunityKey,
-      }),
       ...(primitives.expiresAt !== undefined && {
         expiresAt: primitives.expiresAt,
       }),
@@ -37,7 +34,6 @@ export default class OrbitDBCommunityInviteMapper {
       communityId: document.communityId,
       createdAt: document.createdAt,
       creatorIdentityId: document.creatorIdentityId,
-      encryptedCommunityKey: document.encryptedCommunityKey,
       expiresAt: document.expiresAt,
       maxUses: document.maxUses,
       nonce: document.nonce,

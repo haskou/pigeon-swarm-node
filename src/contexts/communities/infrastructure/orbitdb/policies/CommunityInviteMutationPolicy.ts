@@ -16,10 +16,7 @@ export default class CommunityInviteMutationPolicy extends PublicMutationPolicy 
     ['communityId', 'creatorIdentityId', 'id', 'nonce', 'token'],
     ['createdAt', 'maxUses'],
     'community_invite',
-    {
-      optionalIntegers: ['expiresAt'],
-      optionalObjects: ['encryptedCommunityKey'],
-    },
+    { optionalIntegers: ['expiresAt'] },
   );
 
   private readonly communities = new ShortLivedLookup<Community | undefined>();

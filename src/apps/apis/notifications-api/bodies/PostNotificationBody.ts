@@ -20,11 +20,6 @@ export class PostNotificationBody {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  public readonly encryptedCommunityKey?: string;
-
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
   public readonly encryptedConversationKey?: string;
 
   @IsString()
