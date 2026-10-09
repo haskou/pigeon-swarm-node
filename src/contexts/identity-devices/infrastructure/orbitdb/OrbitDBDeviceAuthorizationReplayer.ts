@@ -102,6 +102,7 @@ export default class OrbitDBDeviceAuthorizationReplayer {
 
     for (const candidate of candidates) {
       const effect = this.canonicalizer.serialize({
+        compromisedSince: candidate.transition.getCompromisedSince()?.valueOf(),
         operation: candidate.transition.getOperation().valueOf(),
         previousRevision: candidate.transition.getPreviousRevision().valueOf(),
         targetCredential: candidate.transition.getTargetCredential().valueOf(),
