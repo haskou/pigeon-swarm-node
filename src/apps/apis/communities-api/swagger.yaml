@@ -845,6 +845,66 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityChannelMessagePinsResource'
+  /communities/{communityId}/mls/records:
+    get:
+      tags:
+        - communities
+      summary: List MLS records of one community group
+      description: Members only. `groupId` is the community id or `<communityId>:<channelId>` for a restricted channel the caller can view. Records are ordered by epoch. A `welcome` is only returned to its recipient. The node never parses `payload`.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: query
+          name: groupId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: kind
+          schema:
+            type: string
+            enum: [commit, key_package, welcome]
+        - in: query
+          name: afterEpoch
+          schema:
+            type: integer
+            minimum: 0
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: MLS records of the group.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MLSRecordsResource'
+        '409':
+          description: Authenticated identity is not a member, or cannot view the channel of the group.
+    post:
+      tags:
+        - communities
+      summary: Publish an MLS record
+      description: Members only. Records are immutable and idempotent. `recordId` is base64url(sha256(canonicalize({epoch, groupId, kind, payload, recipientIdentityId}))) and the body carries a client-signed `mutation` for store `mlsRecords` (record id `community:<communityId>:mls:<recordId>`). `commit` and `welcome` require `epoch`; `welcome` requires `recipientIdentityId`, who must be a member.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostMLSRecordBody'
+      responses:
+        '200':
+          description: The stored record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MLSRecordResource'
+        '409':
+          description: Authenticated identity is not a member, the group is not valid for this community, or the public mutation is invalid.
   /communities/{communityId}/channels/{channelId}/messages:
     get:
       tags:
@@ -1837,6 +1897,64 @@ components:
           type: string
         message:
           $ref: '#/components/schemas/CommunityChannelMessageResource'
+    PostMLSRecordBody:
+      type: object
+      required: [createdAt, groupId, kind, payload, mutation]
+      properties:
+        createdAt:
+          type: integer
+          minimum: 0
+        epoch:
+          type: integer
+          minimum: 0
+        groupId:
+          type: string
+        kind:
+          type: string
+          enum: [commit, key_package, welcome]
+        payload:
+          type: string
+          maxLength: 262144
+          description: Base64 of the opaque MLS message.
+        recipientIdentityId:
+          type: string
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    MLSRecordResource:
+      type: object
+      required: [recordId, communityId, groupId, kind, payload, authorIdentityId, createdAt]
+      properties:
+        recordId:
+          type: string
+        communityId:
+          type: string
+        groupId:
+          type: string
+        kind:
+          type: string
+          enum: [commit, key_package, welcome]
+        payload:
+          type: string
+        authorIdentityId:
+          type: string
+        createdAt:
+          type: integer
+        epoch:
+          type: integer
+        recipientIdentityId:
+          type: string
+    MLSRecordsResource:
+      type: object
+      required: [communityId, groupId, records]
+      properties:
+        communityId:
+          type: string
+        groupId:
+          type: string
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/MLSRecordResource'
     CommunityChannelMessagePinsResource:
       type: object
       required:

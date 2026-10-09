@@ -190,6 +190,19 @@ package "communities/application" {
   CommunitiesDiscoverer ..> CommunityRepository
   CommunitiesDiscoverer ..> CommunityMembershipRequestRepository
   CommunityChannelsFinder ..> CommunityRepository
+
+  class MLSRecordPublisher {
+    + publish(message): MLSRecord
+  }
+
+  class MLSRecordsFinder {
+    + find(message): MLSRecord[]
+  }
+
+  MLSRecordPublisher ..> CommunityRepository
+  MLSRecordPublisher ..> MLSRecordRepository
+  MLSRecordsFinder ..> CommunityRepository
+  MLSRecordsFinder ..> MLSRecordRepository
 }
 
 package "communities/domain" {
@@ -635,6 +648,13 @@ CommunityChannelMessageReaction --> CommunityId
   CommunityInviteRepository ..> CommunityInvite
   CommunityMembershipRequestRepository ..> CommunityMembershipRequest
   CommunityModerationLogRepository ..> CommunityModerationLogEntry
+
+  class MLSRecord
+  class MLSGroupAccess
+  abstract class MLSRecordRepository
+
+  MLSRecordRepository ..> MLSRecord
+  MLSGroupAccess ..> Community
 }
 
 package "shared value objects" {
@@ -665,6 +685,9 @@ package "communities/infrastructure" {
   class OrbitDBCommunityMembershipRequestDocument
   class OrbitDBCommunityModerationLogRepository
   class OrbitDBCommunityModerationLogDocument
+  class OrbitDBMLSRecordRepository
+  class OrbitDBMLSRecordDocument
+  class MLSRecordMutationPolicy
 
   CommunityRepositoryRouter ..|> CommunityRepository
   CommunityRepositoryRouter --> OrbitDBCommunityRepository : public
@@ -688,6 +711,9 @@ package "communities/infrastructure" {
   OrbitDBCommunityMembershipRequestRepository --> OrbitDBCommunityMembershipRequestDocument
   OrbitDBCommunityModerationLogRepository ..|> CommunityModerationLogRepository
   OrbitDBCommunityModerationLogRepository --> OrbitDBCommunityModerationLogDocument
+  OrbitDBMLSRecordRepository ..|> MLSRecordRepository
+  OrbitDBMLSRecordRepository --> OrbitDBMLSRecordDocument
+  MLSRecordMutationPolicy --> MLSGroupAccess : authorize
 }
 
 package "private-authorization" {

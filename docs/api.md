@@ -4282,6 +4282,49 @@ Implemented:
 - pins are OrbitDB replicated metadata; message payload documents are not rewritten
 - pinning validates that the target channel message exists
 
+### Community MLS records
+
+```http
+GET /communities/{communityId}/mls/records?groupId=&kind=&afterEpoch=
+POST /communities/{communityId}/mls/records
+```
+
+Transport for the MLS group encryption of private communities (see the UI
+repository's `docs/mls-group-encryption.md`). The node stores opaque, signed,
+immutable records and never parses `payload`; clients run MLS. One group exists
+per community (`groupId` = community id) and one per restricted channel
+(`groupId` = `<communityId>:<channelId>`).
+
+POST body: `{ groupId, kind, payload, createdAt, epoch?, recipientIdentityId?,
+mutation }`. `kind` is `key_package`, `commit` or `welcome`; `payload` is
+base64, at most 262144 characters. `commit` and `welcome` require `epoch`;
+`welcome` requires `recipientIdentityId`; `key_package` carries neither. The
+record id is content-bound: `base64url(sha256(canonicalize({epoch, groupId,
+kind, payload, recipientIdentityId})))`, and the signed `mutation` targets store
+`mlsRecords`.
+Publishing the same record twice is a no-op.
+
+The proof record id is `community:<communityId>:mls:<recordId>`, and the proof is a
+`put` (records cannot be deleted). `payloadDigest` covers the stored document
+`{ authorIdentityId, communityId, createdAt, epoch?, groupId, id, kind, payload,
+recipientIdentityId?, scopeType: "community_mls" }` where `id` is the full
+`community:<communityId>:mls:<recordId>`.
+
+GET returns `{ communityId, groupId, records: [{ recordId, communityId, groupId,
+kind, payload, authorIdentityId, createdAt, epoch?, recipientIdentityId? }] }`
+ordered by epoch. A `welcome` is only returned to its recipient.
+
+Implemented:
+
+- require signed request auth
+- the author must be a current, non-banned member; for a channel group they must
+  also be able to view the channel
+- a `welcome` recipient must be a member (and see the channel for a channel group)
+- receivers re-run the same checks on replicated records, so a peer cannot write
+  around the API
+- no endpoint deletes or rewrites a record; the community-wide rotation on
+  removal is done by clients publishing a new `commit`
+
 ### Search public channel messages
 
 ```http

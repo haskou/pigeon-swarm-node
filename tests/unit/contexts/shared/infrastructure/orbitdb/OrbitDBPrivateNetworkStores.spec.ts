@@ -95,6 +95,7 @@ describe('OrbitDBPrivateNetworkStores', () => {
       'identities',
       'keychains',
       'messages',
+      'mlsRecords',
       'moderationLogs',
       'notifications',
       'notificationSettings',

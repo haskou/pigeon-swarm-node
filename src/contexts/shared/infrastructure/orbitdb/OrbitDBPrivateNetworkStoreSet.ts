@@ -10,6 +10,7 @@ export type OrbitDBPrivateNetworkStoreSet = {
   contentReplication: OrbitDBDatabase;
   keychains: OrbitDBDatabase;
   messages: OrbitDBDatabase;
+  mlsRecords: OrbitDBDatabase;
   moderationLogs: OrbitDBDatabase;
   notificationSettings: OrbitDBDatabase;
   notifications: OrbitDBDatabase;

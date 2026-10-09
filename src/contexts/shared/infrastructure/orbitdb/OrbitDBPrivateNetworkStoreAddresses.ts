@@ -7,6 +7,7 @@ export type OrbitDBPrivateNetworkStoreAddresses = {
   contentReplication: string;
   keychains: string;
   messages: string;
+  mlsRecords: string;
   moderationLogs: string;
   notificationSettings: string;
   notifications: string;
