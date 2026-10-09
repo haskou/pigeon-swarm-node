@@ -839,6 +839,242 @@ components:
           type: string
         payloadDigest:
           type: string
+        frontier:
+          type: array
+          minItems: 1
+          maxItems: 64
+          items:
+            type: string
+            pattern: '^[A-Za-z0-9_-]{43}        predecessor:
+          type: string
+          nullable: true
+          description: Digest of the previous mutation. Null if and only if sequence is 0.
+        sequence:
+          type: integer
+          minimum: 0
+        author:
+          type: object
+          required: [identityId, deviceCredential, authorizationRevision]
+          properties:
+            identityId:
+              type: string
+            deviceCredential:
+              type: string
+            authorizationRevision:
+              type: integer
+              minimum: 0
+              description: Revision of the author's device-authorization chain (GET /identity-devices/authorization) observed when signing. The device is checked against the chain at this revision, not the current head.
+        signature:
+          type: string
+    ConversationMessagePinBody:
+      type: object
+      required: [createdAt, mutation]
+      properties:
+        createdAt:
+          type: integer
+          minimum: 0
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    ConversationMessageUnpinBody:
+      type: object
+      required: [mutation]
+      properties:
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    ConversationMessageReactionBody:
+      type: object
+      required:
+        - emoji
+        - mutation
+      properties:
+        createdAt:
+          type: integer
+          minimum: 0
+          description: Creation time committed by the mutation proof. Ignored on removal.
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+        emoji:
+          type: string
+          description: Emoji reaction to add or remove. Reactions are unique by conversation, message, author and emoji.
+          example: 👍
+    ConversationDraftBody:
+      type: object
+      required:
+        - encryptedPayload
+      properties:
+        encryptedPayload:
+          type: string
+          description: Opaque encrypted draft payload owned by the authenticated identity.
+        updatedAt:
+          type: integer
+    ConversationDraftResource:
+      type: object
+      required:
+        - conversationId
+        - encryptedPayload
+        - updatedAt
+      properties:
+        conversationId:
+          type: string
+        encryptedPayload:
+          type: string
+        updatedAt:
+          type: integer
+    ConversationDraftsResource:
+      type: object
+      required:
+        - drafts
+      properties:
+        drafts:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConversationDraftResource'
+    ConversationMessagePinResource:
+      type: object
+      required:
+        - createdAt
+        - message
+        - messageId
+        - pinnedByIdentityId
+      properties:
+        createdAt:
+          type: integer
+        messageId:
+          type: string
+        pinnedByIdentityId:
+          type: string
+        message:
+          $ref: '#/components/schemas/MessageResource'
+    ConversationMessagePinsResource:
+      type: object
+      required:
+        - conversationId
+        - pins
+      properties:
+        conversationId:
+          type: string
+        pins:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConversationMessagePinResource'
+    MessageReactionResource:
+      type: object
+      required:
+        - authorIdentityId
+        - createdAt
+        - emoji
+      properties:
+        authorIdentityId:
+          type: string
+        createdAt:
+          type: integer
+        emoji:
+          type: string
+    MessageResource:
+      type: object
+      required:
+        - id
+        - conversationId
+        - authorIdentityId
+        - type
+        - createdAt
+        - previousMessageIds
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+        authorIdentityId:
+          type: string
+        type:
+          type: string
+        createdAt:
+          type: integer
+        encryptedPayload:
+          type: string
+        previousMessageIds:
+          type: array
+          items:
+            type: string
+        reactions:
+          type: array
+          description: OrbitDB replicated reactions synchronized by conversation events.
+          items:
+            $ref: '#/components/schemas/MessageReactionResource'
+        replyToMessageId:
+          type: string
+        targetMessageId:
+          type: string
+    MessagesResource:
+      type: object
+      required:
+        - conversationId
+        - messages
+      properties:
+        conversationId:
+          type: string
+        messages:
+          type: array
+          description: >
+            Conversation timeline items. Group conversation poll ids are also
+            valid conversation message ids and can be used in later
+            previousMessageIds.
+          items:
+            oneOf:
+              - $ref: '#/components/schemas/MessageResource'
+              - $ref: '#/components/schemas/ConversationCallEventResource'
+              - $ref: '../polls-api/swagger.yaml#/components/schemas/Poll'
+        nextBeforeMessageId:
+          type: string
+    ConversationCallEventResource:
+      type: object
+      required:
+        - id
+        - conversationId
+        - type
+        - callId
+        - callEventType
+        - actorIdentityId
+        - createdAt
+        - durationMs
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+        type:
+          type: string
+          enum:
+            - call_event
+        callId:
+          type: string
+        callEventType:
+          type: string
+          enum:
+            - declined
+            - ended
+            - missed
+        actorIdentityId:
+          type: string
+        createdAt:
+          type: integer
+        durationMs:
+          type: integer
+    MessagesAroundResource:
+      type: object
+      required:
+        - messages
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageResource'
+        previousCursor:
+          type: string
+        nextCursor:
+          type: string
+
+          description: Digests of the community or conversation operations observed when signing, strictly ascending. Required, and only allowed, on records scoped to a community or conversation (channel messages and their reactions and pins, invites, membership requests, moderation log, MLS records, polls, conversation messages); the record's permission is judged against the scope folded at exactly this frontier. Read it from GET /communities/{id}/frontier or the conversation frontier before signing.
         predecessor:
           type: string
           nullable: true

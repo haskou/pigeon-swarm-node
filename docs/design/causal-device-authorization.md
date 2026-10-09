@@ -202,15 +202,12 @@ There is no legacy path: version 1 proofs are rejected by the strict decoder.
 
 ## Residuals
 
-- **Non-operation community / conversation records** (channel messages,
-  moderation log, invites, membership requests, polls, pins, reactions) check
-  scope permissions (membership, role) against the community or conversation
-  state folded **at admission**, not at a causal frontier. Their device
-  authorization is causal (this change); their permission is not. A later
-  demotion can therefore still make a node refuse such a record that another
-  node admitted earlier. Closing it needs a causal frontier carried inside
-  those records, which is a separate contract change and deliberately not part
-  of #362.
+- **Backdating a scoped record's frontier.** Non-operation community and
+  conversation records carry a signed `frontier` in their proof, and their
+  permission is judged against the scope folded at that frontier. A member
+  removed later can still sign a record that claims an older frontier, which no
+  node can tell apart from honest late delivery without a trusted clock. It is
+  the same family as the compromised-device window tracked in #386.
 - **Recovery** discards the pre-checkpoint chain, so earlier records of
   pre-recovery devices become unverifiable. Carrying a compact credential
   interval summary through checkpoints would keep them valid; it is not done
