@@ -1,4 +1,5 @@
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationFrontier } from '@app/contexts/public-mutations/domain/PublicMutationFrontier';
 import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain/PublicMutationRecordShape';
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
 import { PublicMutationExpectation } from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
@@ -24,6 +25,8 @@ export default class CommunityInviteMutationPolicy extends PublicMutationPolicy 
   public readonly collection = 'requests';
 
   public readonly scopeType = 'community_invite';
+
+  public readonly requiresFrontier = true;
 
   constructor(
     /** Reads the public store directly: the policy runs inside the community storage lock. */
@@ -70,12 +73,15 @@ export default class CommunityInviteMutationPolicy extends PublicMutationPolicy 
   public async assertPermitted(
     record: Record<string, unknown>,
     authorIdentityId: string,
+    _isDeletion: boolean,
+    frontier: string[],
   ): Promise<void> {
     const community = await this.communities.get(
-      record.communityId as string,
+      PublicMutationFrontier.keyOf(record.communityId as string, frontier),
       () =>
-        this.communityRepository.findById(
+        this.communityRepository.findAtFrontier(
           new CommunityId(record.communityId as string),
+          frontier,
         ),
     );
 

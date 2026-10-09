@@ -12,12 +12,16 @@ export default class PollCloseMutationPolicy extends PublicMutationPolicy {
     ['closedByIdentityId', 'id', 'pollId'],
     ['createdAt'],
     PollMutationRecords.CLOSE,
-    { optionalStrings: PollMutationRecords.SCOPE_FIELDS },
+    {
+      optionalStrings: PollMutationRecords.SCOPE_FIELDS,
+    },
   );
 
   public readonly collection = 'polls';
 
   public readonly scopeType = PollMutationRecords.CLOSE;
+
+  public readonly requiresFrontier = true;
 
   constructor(private readonly access: PollMutationScopeAccess) {
     super();
@@ -42,9 +46,12 @@ export default class PollCloseMutationPolicy extends PublicMutationPolicy {
   public assertPermitted(
     record: Record<string, unknown>,
     authorIdentityId: string,
+    _isDeletion: boolean,
+    frontier: string[],
   ): Promise<void> {
     return this.access.assertCanManage(
       PollMutationRecords.scopeOf(record),
+      frontier,
       authorIdentityId,
     );
   }

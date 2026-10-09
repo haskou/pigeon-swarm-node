@@ -12,6 +12,8 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { mock } from 'jest-mock-extended';
 
+const FRONTIER = ['A'.repeat(43)];
+
 describe('MLSRecordMutationPolicy', () => {
   const owner = new IdentityId(
     'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
@@ -37,7 +39,7 @@ describe('MLSRecordMutationPolicy', () => {
     );
     community.addMember(owner, member);
     const communities = mock<CommunityRepository>();
-    communities.findById.mockResolvedValue(community);
+    communities.findAtFrontier.mockResolvedValue(community);
     policy = new MLSRecordMutationPolicy(communities);
   });
 
@@ -95,13 +97,13 @@ describe('MLSRecordMutationPolicy', () => {
   describe('assertPermitted', () => {
     it('lets a member write to the community group', async () => {
       await expect(
-        policy.assertPermitted(record(), member.valueOf(), false),
+        policy.assertPermitted(record(), member.valueOf(), false, FRONTIER),
       ).resolves.toBeUndefined();
     });
 
     it('rejects a non-member', async () => {
       await expect(
-        policy.assertPermitted(record(), outsider.valueOf(), false),
+        policy.assertPermitted(record(), outsider.valueOf(), false, FRONTIER),
       ).rejects.toThrow();
     });
 
@@ -109,7 +111,7 @@ describe('MLSRecordMutationPolicy', () => {
       community.banMember(owner, member);
 
       await expect(
-        policy.assertPermitted(record(), member.valueOf(), false),
+        policy.assertPermitted(record(), member.valueOf(), false, FRONTIER),
       ).rejects.toThrow();
     });
 
@@ -119,6 +121,7 @@ describe('MLSRecordMutationPolicy', () => {
           record({ kind: 'welcome', recipientIdentityId: outsider.valueOf() }),
           owner.valueOf(),
           false,
+          FRONTIER,
         ),
       ).rejects.toThrow();
     });
@@ -129,6 +132,7 @@ describe('MLSRecordMutationPolicy', () => {
           record({ groupId: 'other-community' }),
           owner.valueOf(),
           false,
+          FRONTIER,
         ),
       ).rejects.toThrow();
     });
@@ -139,13 +143,14 @@ describe('MLSRecordMutationPolicy', () => {
           record({ groupId: `${community.getId().valueOf()}:missing` }),
           owner.valueOf(),
           false,
+          FRONTIER,
         ),
       ).rejects.toThrow();
     });
 
     it('rejects deletions: records are immutable', async () => {
       await expect(
-        policy.assertPermitted(record(), owner.valueOf(), true),
+        policy.assertPermitted(record(), owner.valueOf(), true, FRONTIER),
       ).rejects.toThrow(InvalidPublicMutationError);
     });
   });

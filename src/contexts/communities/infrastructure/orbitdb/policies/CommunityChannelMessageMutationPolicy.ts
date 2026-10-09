@@ -1,4 +1,5 @@
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationFrontier } from '@app/contexts/public-mutations/domain/PublicMutationFrontier';
 import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain/PublicMutationRecordShape';
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
 import { PublicMutationExpectation } from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
@@ -37,6 +38,8 @@ export default class CommunityChannelMessageMutationPolicy extends PublicMutatio
   public readonly collection = 'messages';
 
   public readonly scopeType = 'community_channel';
+
+  public readonly requiresFrontier = true;
 
   constructor(private readonly communityRepository: CommunityRepository) {
     super();
@@ -83,9 +86,18 @@ export default class CommunityChannelMessageMutationPolicy extends PublicMutatio
     return hasPoll && !hasPayload && record.editedAt === undefined;
   }
 
-  private async findCommunity(communityId: string): Promise<Community> {
-    const community = await this.communities.get(communityId, () =>
-      this.communityRepository.findById(new CommunityId(communityId)),
+  private async findCommunity(
+    record: Record<string, unknown>,
+    frontier: string[],
+  ): Promise<Community> {
+    const communityId = record.communityId as string;
+    const community = await this.communities.get(
+      PublicMutationFrontier.keyOf(communityId, frontier),
+      () =>
+        this.communityRepository.findAtFrontier(
+          new CommunityId(communityId),
+          frontier,
+        ),
     );
 
     if (!community) throw new InvalidPublicMutationError();
@@ -126,8 +138,9 @@ export default class CommunityChannelMessageMutationPolicy extends PublicMutatio
     record: Record<string, unknown>,
     authorIdentityId: string,
     isDeletion: boolean,
+    frontier: string[],
   ): Promise<void> {
-    const community = await this.findCommunity(record.communityId as string);
+    const community = await this.findCommunity(record, frontier);
     const signer = new IdentityId(authorIdentityId);
     const channelId = new CommunityChannelId(record.channelId as string);
 

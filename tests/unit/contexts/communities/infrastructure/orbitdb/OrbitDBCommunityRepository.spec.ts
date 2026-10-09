@@ -153,6 +153,62 @@ describe('OrbitDBCommunityRepository', () => {
     expect(states[0]?.bannedMemberIds).toEqual([alice.valueOf()]);
   });
 
+  describe('findAtFrontier', () => {
+    it('folds the community as it was at the frontier, not at its latest state', async () => {
+      const created = genesis();
+      const joined = join([created], alice);
+      const banned = ban([joined], alice);
+
+      for (const op of [created, joined, banned]) await save(op);
+      await flushBackgroundTasks();
+
+      const before = await repository.findAtFrontier(communityId, [
+        joined.getHash(),
+      ]);
+      const after = await repository.findAtFrontier(communityId, [
+        banned.getHash(),
+      ]);
+
+      expect(before?.toPrimitives().memberIds).toContain(alice.valueOf());
+      expect(before?.toPrimitives().bannedMemberIds).toEqual([]);
+      expect(after?.toPrimitives().bannedMemberIds).toEqual([alice.valueOf()]);
+    });
+
+    it('keeps judging a record at its frontier when the operations arrive shuffled', async () => {
+      const created = genesis();
+      const joined = join([created], alice);
+      const banned = ban([joined], alice);
+      const operations = [created, joined, banned];
+
+      for (const order of [
+        [2, 1, 0],
+        [1, 0, 2],
+      ]) {
+        documents.splice(0);
+        heads.clear();
+        registry.clear();
+        await registry.register(networkId, storesOf());
+        for (const index of order) await save(operations[index]);
+        await flushBackgroundTasks();
+
+        const community = await repository.findAtFrontier(communityId, [
+          joined.getHash(),
+        ]);
+
+        expect(community?.toPrimitives().bannedMemberIds).toEqual([]);
+      }
+    });
+
+    it('fails on a head this node does not hold, so the record is retried', async () => {
+      await save(genesis());
+      await flushBackgroundTasks();
+
+      await expect(
+        repository.findAtFrontier(communityId, ['B'.repeat(43)]),
+      ).rejects.toThrow();
+    });
+  });
+
   it('lists the communities of a member and the discoverable ones', async () => {
     const created = genesis();
 
