@@ -32,6 +32,7 @@ import { GetCommunityMessageSearchRoute } from '@app/apps/apis/communities-api/r
 import { GetCommunityModerationLogsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityModerationLogsRoute';
 import { GetCommunityRolesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityRolesRoute';
 import { GetCommunityRoute } from '@app/apps/apis/communities-api/routes/GetCommunityRoute';
+import { GetMLSRecordsRoute } from '@app/apps/apis/communities-api/routes/GetMLSRecordsRoute';
 import { PatchCommunityChannelPermissionsRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityChannelPermissionsRoute';
 import { PatchCommunityChannelRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityChannelRoute';
 import { PatchCommunityRequestRoute } from '@app/apps/apis/communities-api/routes/PatchCommunityRequestRoute';
@@ -49,6 +50,7 @@ import { PostCommunityRoleRoute } from '@app/apps/apis/communities-api/routes/Po
 import { PostCommunityRoute } from '@app/apps/apis/communities-api/routes/PostCommunityRoute';
 import { PostCommunityTextChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityTextChannelRoute';
 import { PostCommunityVoiceChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityVoiceChannelRoute';
+import { PostMLSRecordRoute } from '@app/apps/apis/communities-api/routes/PostMLSRecordRoute';
 import { PutCommunityChannelDraftRoute } from '@app/apps/apis/communities-api/routes/PutCommunityChannelDraftRoute';
 import { PutCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/PutCommunityChannelMessageRoute';
 import { PutCommunityMemberRolesRoute } from '@app/apps/apis/communities-api/routes/PutCommunityMemberRolesRoute';
@@ -264,6 +266,8 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   GetCommunityChannelMessagePinsRoute,
   PostCommunityChannelMessagePinRoute,
   DeleteCommunityChannelMessagePinRoute,
+  GetMLSRecordsRoute,
+  PostMLSRecordRoute,
   PostCommunityChannelMessageRoute,
   PutCommunityChannelMessageRoute,
   PostCommunityChannelMessageReactionRoute,
