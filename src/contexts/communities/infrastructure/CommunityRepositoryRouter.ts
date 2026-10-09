@@ -65,6 +65,20 @@ export default class CommunityRepositoryRouter extends CommunityRepository {
     });
   }
 
+  /** A protected community has no replicated operation log: its local state is the only one. */
+  public async findAtFrontier(
+    id: CommunityId,
+    frontier: string[],
+  ): Promise<Community | undefined> {
+    return this.storageCoordinator.exclusively(id.valueOf(), async () => {
+      if (await this.isProtected(id)) {
+        return this.privateRepository.findById(id);
+      }
+
+      return this.publicRepository.findAtFrontier(id, frontier);
+    });
+  }
+
   public async findByMember(identityId: IdentityId): Promise<Community[]> {
     const [unfilteredPublicCommunities, privateCommunities] = await Promise.all(
       [

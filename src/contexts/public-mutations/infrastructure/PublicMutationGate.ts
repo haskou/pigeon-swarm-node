@@ -73,6 +73,12 @@ export class PublicMutationGate extends OrbitDBMutationGate {
       throw new InvalidPublicMutationError();
     }
 
+    const frontier = proof.getBody().frontier;
+
+    if (policy.requiresFrontier !== (frontier !== undefined)) {
+      throw new InvalidPublicMutationError();
+    }
+
     await this.verifier.verify(proof, {
       ...policy.expectationOf(payload),
       payload,
@@ -81,6 +87,7 @@ export class PublicMutationGate extends OrbitDBMutationGate {
       payload,
       proof.getAuthor().identityId,
       proof.isDeletion(),
+      frontier ?? [],
     );
   }
 }

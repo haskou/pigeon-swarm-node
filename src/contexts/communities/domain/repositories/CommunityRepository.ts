@@ -12,6 +12,12 @@ export default abstract class CommunityRepository {
   }): Promise<Community[]>;
 
   public abstract findById(id: CommunityId): Promise<Community | undefined>;
+  /** The community folded from the causal past of `frontier`; throws when a head is unknown. */
+  public abstract findAtFrontier(
+    id: CommunityId,
+    frontier: string[],
+  ): Promise<Community | undefined>;
+
   public abstract findByMember(identityId: IdentityId): Promise<Community[]>;
   /** The operations nobody built on yet: the parents of the next operation. */
   public abstract findFrontier(id: CommunityId): Promise<string[]>;

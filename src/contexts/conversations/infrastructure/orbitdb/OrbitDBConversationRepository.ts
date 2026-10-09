@@ -455,6 +455,23 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     return found ? this.conversationOf(found) : undefined;
   }
 
+  public async findMetadataAtFrontier(
+    conversationId: ConversationId,
+    frontier: string[],
+  ): Promise<Conversation | undefined> {
+    const records = await this.operationIndex.findRecords(
+      this.headKey(conversationId),
+    );
+    const { roster } = ConversationStateFold.fold(
+      ConversationStateFold.closureOf(
+        this.operationsOf(conversationId.valueOf(), records),
+        frontier,
+      ),
+    );
+
+    return roster ? this.conversationOf({ createdAt: 0, roster }) : undefined;
+  }
+
   public async findCandidateMessageById(
     conversationId: ConversationId,
     messageId: MessageId,

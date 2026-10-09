@@ -19,6 +19,12 @@ export default abstract class ConversationRepository {
     conversationId: ConversationId,
   ): Promise<Conversation | undefined>;
 
+  /** The conversation folded from the causal past of `frontier`; throws when a head is unknown. */
+  public abstract findMetadataAtFrontier(
+    conversationId: ConversationId,
+    frontier: string[],
+  ): Promise<Conversation | undefined>;
+
   public abstract findCandidateMessageById(
     conversationId: ConversationId,
     messageId: MessageId,
