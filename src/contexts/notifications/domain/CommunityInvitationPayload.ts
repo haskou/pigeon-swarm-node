@@ -2,7 +2,6 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PrimitiveOf } from '@haskou/value-objects';
 
-import { EncryptedCommunityKey } from './value-objects/EncryptedCommunityKey';
 import { InvitationNonce } from './value-objects/InvitationNonce';
 import { NotificationId } from './value-objects/NotificationId';
 
@@ -14,7 +13,6 @@ export class CommunityInvitationPayload {
       new CommunityId(primitives.communityId),
       new IdentityId(primitives.inviterIdentityId),
       new IdentityId(primitives.recipientIdentityId),
-      new EncryptedCommunityKey(primitives.encryptedCommunityKey),
       new InvitationNonce(primitives.nonce),
     );
   }
@@ -23,7 +21,6 @@ export class CommunityInvitationPayload {
     private readonly communityId: CommunityId,
     private readonly inviterIdentityId: IdentityId,
     private readonly recipientIdentityId: IdentityId,
-    private readonly encryptedCommunityKey: EncryptedCommunityKey,
     private readonly nonce: InvitationNonce,
   ) {}
 
@@ -47,7 +44,6 @@ export class CommunityInvitationPayload {
   public toPrimitives() {
     return {
       communityId: this.communityId.valueOf(),
-      encryptedCommunityKey: this.encryptedCommunityKey.valueOf(),
       inviterIdentityId: this.inviterIdentityId.valueOf(),
       nonce: this.nonce.valueOf(),
       recipientIdentityId: this.recipientIdentityId.valueOf(),

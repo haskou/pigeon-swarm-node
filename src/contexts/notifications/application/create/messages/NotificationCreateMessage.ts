@@ -12,7 +12,6 @@ export class NotificationCreateMessage {
     communityId: string,
     inviterIdentityId: string,
     recipientIdentityId: string,
-    encryptedCommunityKey: string,
     nonce: string,
     mutation: Record<string, unknown>,
   ): NotificationCreateMessage {
@@ -22,7 +21,6 @@ export class NotificationCreateMessage {
       mutation,
       payload: CommunityInvitationPayload.fromPrimitives({
         communityId,
-        encryptedCommunityKey,
         inviterIdentityId,
         nonce,
         recipientIdentityId,

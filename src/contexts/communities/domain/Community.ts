@@ -57,7 +57,6 @@ import { CommunityName } from './value-objects/CommunityName';
 import { CommunityPermission } from './value-objects/CommunityPermission';
 import { CommunityRoleId } from './value-objects/CommunityRoleId';
 import { CommunityRoleName } from './value-objects/CommunityRoleName';
-import { EncryptedCommunityInviteKey } from './value-objects/EncryptedCommunityInviteKey';
 
 export class Community extends AggregateRoot {
   public static create(
@@ -257,7 +256,6 @@ export class Community extends AggregateRoot {
     createdAt: Timestamp,
     expiresAt?: Timestamp,
     maxUses?: CommunityInviteMaxUses,
-    encryptedCommunityKey?: EncryptedCommunityInviteKey,
   ): CommunityInvite {
     this.createAccessValidator().assertCanCreateInvite(actor);
 
@@ -268,7 +266,6 @@ export class Community extends AggregateRoot {
       createdAt,
       expiresAt,
       maxUses,
-      encryptedCommunityKey,
     );
     this.record(
       new CommunityInviteWasCreatedEvent(invite.getToken().valueOf(), {

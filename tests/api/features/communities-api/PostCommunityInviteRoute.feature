@@ -30,7 +30,7 @@ Feature: Post community invite API
     Then response code is equal to 200
     And response body should contain "Private API community"
 
-  Scenario: Owner creates an invite with an encrypted community key
+  Scenario: Owner creates an invite link that carries no key material
     Given I am an anonymous user
     And I register a test IPFS network "communities-api-encrypted-invite-network"
     And I set a private community body
@@ -38,16 +38,15 @@ Feature: Post community invite API
     When I POST to "/communities/"
     Then response code is equal to 200
     And I remember the current community
-    And I set a community invite body with an encrypted community key
+    And I set a community invite body
     And I sign the current community invite request
     When I POST to the current community invites
     Then response code is equal to 200
-    And response body should contain "encryptedCommunityKey"
-    And response body should contain "encryptedcommunitykeyciphertext"
+    And response body should not contain "encryptedCommunityKey"
     And I remember the current community invite
     When I GET the current community invite
     Then response code is equal to 200
-    And response body should contain "encryptedCommunityKey"
+    And response body should not contain "encryptedCommunityKey"
     And response body should contain "API community"
     And response body should contain the current network id
 

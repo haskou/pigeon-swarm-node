@@ -283,7 +283,7 @@ Invitation (`collection: notifications`, `scopeType: notification_invitation`):
   "inviterIdentityId": "<identityId>",
   "recipientIdentityId": "<identityId>",
   "subjectId": "<conversationId | communityId>",
-  "encryptedKey": "<encryptedConversationKey | encryptedCommunityKey>",
+  "encryptedKey": "<encryptedConversationKey>  // absent for community_invitation",
   "nonce": "<base64url>",
   "mutation": { /* PublicMutationProof, author == inviter */ }
 }

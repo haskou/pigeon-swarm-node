@@ -3295,12 +3295,6 @@ Request:
 
 ```json
 {
-  "encryptedCommunityKey": {
-    "version": 1,
-    "algorithm": "AES-GCM",
-    "nonce": "base64url",
-    "ciphertext": "base64url"
-  },
   "expiresAt": 1770000000000,
   "maxUses": 1,
   "nonce": "<16-128 chars>",
@@ -3315,12 +3309,6 @@ Response:
 {
   "inviteToken": "<inviteToken>",
   "communityId": "<communityId>",
-  "encryptedCommunityKey": {
-    "version": 1,
-    "algorithm": "AES-GCM",
-    "nonce": "base64url",
-    "ciphertext": "base64url"
-  },
   "expiresAt": 1770000000000,
   "maxUses": 1,
   "uses": 0
@@ -3333,18 +3321,8 @@ Implemented:
   `create_invites`
 - create a bearer invite token for the community
 - default `maxUses` to `1`
-- optionally store an opaque `encryptedCommunityKey` blob produced by frontend
-- never receive the invite fragment secret or the community key in clear text
-
-Recommended frontend invite link shape:
-
-```text
-https://node.example.com/invite/community/<inviteToken>#k=<inviteSecret>
-```
-
-The `inviteSecret` after `#` must not be sent to the backend. Frontend encrypts
-the current community key entry with that secret and sends only
-`encryptedCommunityKey` in the invite creation body.
+- carry no key material: group encryption keys are negotiated by members over
+  MLS (`/communities/{communityId}/mls/records`), never through the invite
 
 ### Read community invite link token
 
@@ -3365,12 +3343,6 @@ Response:
   "networkId": "<networkId>",
   "communityAvatar": "bagaa...",
   "communityBanner": "bagaa...",
-  "encryptedCommunityKey": {
-    "version": 1,
-    "algorithm": "AES-GCM",
-    "nonce": "base64url",
-    "ciphertext": "base64url"
-  },
   "expiresAt": 1770000000000,
   "maxUses": 1,
   "uses": 0
@@ -3384,8 +3356,6 @@ Implemented:
 - return the community `networkId`, which the invited identity, not yet a member
   and so unable to read `GET /communities/{communityId}`, needs to build the
   signed `member_joined` operation of the accept
-- return `encryptedCommunityKey` exactly as stored
-- never receive the `#k` fragment secret
 
 ### Accept community invite link token
 
@@ -3541,7 +3511,7 @@ match what was signed and the actor holds the permission for the action.
 | `POST .../bans` | `member_banned` | member, banned `identityId` | `{reason}` |
 | `DELETE .../bans/{identityId}` | `member_unbanned` | member, `identityId` | `{}` |
 | `DELETE .../members/{identityId}/kick` | `member_kicked` | member, `identityId` | `{}` |
-| `POST .../invites` | `invite_link_created` | invite, invite `token` | `{encryptedCommunityKeyStored, expiresAt, maxUses}` |
+| `POST .../invites` | `invite_link_created` | invite, invite `token` | `{expiresAt, maxUses}` |
 | `POST .../members` | `invitation_created` | membership_request, request id | `{identityId}` (the invited identity) |
 | `PATCH /communities/membership-requests/{requestId}` | `membership_request_accepted` or `membership_request_declined` | membership_request, `requestId` | `{identityId, type}` of the request |
 | `DELETE .../channels/{channelId}/messages/{messageId}` | `message_deleted` | message, `messageId` | `{channelId, targetMessageAuthorId}` |
@@ -4578,8 +4548,9 @@ longer exist. The body carries the invitation fields, a client-chosen `nonce`
 ```
 
 `group_conversation_invitation` has the same shape with a `group:<id>`
-`conversationId`. A community invitation uses `communityId` and
-`encryptedCommunityKey` instead:
+`conversationId`. A community invitation uses `communityId` and carries no key:
+the invitee obtains the group key by joining the community's MLS group, and a
+node rejects a `community_invitation` that includes `encryptedKey`:
 
 ```json
 {
@@ -4587,7 +4558,6 @@ longer exist. The body carries the invitation fields, a client-chosen `nonce`
   "communityId": "<communityId>",
   "inviterIdentityId": "<aliceIdentityId>",
   "recipientIdentityId": "<bobIdentityId>",
-  "encryptedCommunityKey": "<encryptedForBob>",
   "nonce": "<random 16-128 chars>",
   "mutation": { "...": "SignedPublicMutation" }
 }
@@ -4600,8 +4570,9 @@ checked by `NotificationVectors.spec.ts`):
 - notification id: `"invitation:" + hex(sha256(utf8(canonicalize({inviterIdentityId, nonce, recipientIdentityId, subjectId}))))`,
   where `subjectId` is the conversation id or the community id. The node derives
   it; a client never sends it.
-- signed payload (RFC 8785 canonical JSON): `{encryptedKey, id, inviterIdentityId, nonce, recipientIdentityId, scopeType: "notification_invitation", subjectId, type}`.
-  `encryptedKey` is the value of `encryptedConversationKey` or `encryptedCommunityKey`.
+- signed payload (RFC 8785 canonical JSON): `{encryptedKey?, id, inviterIdentityId, nonce, recipientIdentityId, scopeType: "notification_invitation", subjectId, type}`.
+  `encryptedKey` is the value of `encryptedConversationKey`; it is required for
+  conversation and group invitations and must be absent for community ones.
 - `mutation`: a `put` proof with `store: "notifications"`, `recordId` = the
   notification id, `predecessor: null`, `sequence: 0`, `payloadDigest` =
   `base64url(sha256(utf8(canonicalize(payload))))`, signed with the shared

@@ -40,7 +40,6 @@ package "notifications" {
       -communityId: CommunityId
       -inviterIdentityId: IdentityId
       -recipientIdentityId: IdentityId
-      -encryptedCommunityKey: EncryptedCommunityKey
       -nonce: InvitationNonce
       +toPrimitives(): object
     }

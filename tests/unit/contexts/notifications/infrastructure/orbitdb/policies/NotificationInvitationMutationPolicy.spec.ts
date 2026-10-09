@@ -101,6 +101,30 @@ describe('NotificationInvitationMutationPolicy', () => {
     );
   });
 
+  it('accepts a community invitation that carries no key', () => {
+    const value = record({ type: 'community_invitation' });
+
+    delete value.encryptedKey;
+
+    expect(() => policy.expectationOf(value)).not.toThrow();
+  });
+
+  it('rejects a community invitation that carries a key', () => {
+    expect(() =>
+      policy.expectationOf(record({ type: 'community_invitation' })),
+    ).toThrow(InvalidPublicMutationError);
+  });
+
+  it('rejects a conversation invitation without a key', () => {
+    const value = record();
+
+    delete value.encryptedKey;
+
+    expect(() => policy.expectationOf(value)).toThrow(
+      InvalidPublicMutationError,
+    );
+  });
+
   it('accepts participants of the signed conversation', async () => {
     conversations.findMetadataById.mockResolvedValue(mother.build());
 

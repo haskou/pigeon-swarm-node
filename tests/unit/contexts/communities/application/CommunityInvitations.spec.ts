@@ -176,7 +176,6 @@ describe('Community invitation use cases', () => {
     );
     const invite = mock<CommunityInvite>();
     invite.getToken.mockReturnValue(new CommunityInviteToken(INVITE_TOKEN));
-    invite.hasEncryptedCommunityKey.mockReturnValue(false);
     community.createInvite.mockReturnValue(invite);
 
     const result = await new CommunityInviteCreator(
@@ -192,7 +191,6 @@ describe('Community invitation use cases', () => {
       message.createdAt,
       message.expiresAt,
       message.maxUses,
-      undefined,
     );
     expect(inviteRepository.save).toHaveBeenCalledWith(invite, message.proof);
     expect(eventPublisher.publish).toHaveBeenCalledWith([]);
@@ -203,7 +201,6 @@ describe('Community invitation use cases', () => {
       expect.any(CommunityModerationTarget),
       message.moderationLog,
       {
-        encryptedCommunityKeyStored: false,
         expiresAt,
         maxUses: 5,
       },

@@ -38,7 +38,6 @@ export class PostCommunityInviteRoute extends CommunityRouteSupport {
         body.mutation,
         body.moderationLog,
         {
-          encryptedCommunityKey: body.encryptedCommunityKey,
           expiresAt: body.expiresAt,
           maxUses: body.maxUses,
         },
