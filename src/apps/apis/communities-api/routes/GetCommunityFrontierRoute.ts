@@ -17,10 +17,11 @@ export class GetCommunityFrontierRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     this.authenticate(request);
-    await this.findCommunity(communityId);
+    const community = await this.findCommunity(communityId);
 
     return response.status(HttpRouteStatusEnum.OK).send({
       frontier: await this.finder.findFrontier(new CommunityId(communityId)),
+      networkId: community.getNetworkId().valueOf(),
     });
   }
 }

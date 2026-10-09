@@ -18,6 +18,7 @@ Feature: Post community join request API
     When I GET the current community frontier
     Then response code is equal to 200
     And response body should contain "frontier"
+    And response body should contain the current network id
     And the community member signs the current community join request
     When I POST to request joining the current community
     Then response code is equal to 200
