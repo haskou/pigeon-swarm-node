@@ -465,6 +465,16 @@ Signed public mutations (pins, reactions and the other governed collections):
   from `pending` to `accepted`/`declined` by the authorised party: invitee,
   creator, moderator/owner or the requester). Heads are index wrappers under
   collection `requests`; community deletion writes no unsigned tombstones.
+- `mlsRecords` documents are governed with scope type `community_mls`
+  (record id `community:<community>:mls:<recordId>` where `recordId` is
+  `base64url(sha256(canonicalize({epoch, groupId, kind, payload,
+  recipientIdentityId})))`, so a peer cannot claim an id for content it did not
+  write). Records are immutable: a `removed` marker or a `delete` proof is
+  rejected. The author must be a current member of the community, and for a
+  channel group (`<community>:<channel>`) able to view the channel; a `welcome`
+  recipient must be a member too. `payload` is opaque base64 (at most 262144
+  characters); the node never parses it. Heads are index wrappers under
+  collection `mlsRecords`, keyed `community-mls-index:<community>`.
 - `messages` documents are governed with scope types `community_channel`
   (record id `community:<community>:<channel>:<message>:<author>`; an edit is
   a higher-sequence put, a delete is a `delete` tombstone signed by the author
@@ -530,7 +540,7 @@ protects the collection and what a malicious peer can still do.
 | Store | Writer | Policy | Status |
 | --- | --- | --- | --- |
 | `communityOperations` | `OrbitDBCommunityRepository` | `CommunityOperationGate`, see [Community signed operations](#community-signed-operations) | Signed (#316) |
-| `messages`, `pins`, `reactions`, `requests`, `polls`, `stickerPacks`, `stickerUserLibraries`, `moderationLogs` | the community, conversation, poll, sticker and moderation repositories | `PublicMutationGate`, see [Other signed public mutations](#other-signed-public-mutations) | Signed |
+| `messages`, `mlsRecords`, `pins`, `reactions`, `requests`, `polls`, `stickerPacks`, `stickerUserLibraries`, `moderationLogs` | the community, conversation, poll, sticker and moderation repositories | `PublicMutationGate`, see [Other signed public mutations](#other-signed-public-mutations) | Signed |
 | `notificationSettings` | `OrbitDBNotificationScopeSettingsRepository` | `PublicMutationGate` (`notification_settings`, #349) | Signed |
 | `keychains` | `OrbitDBKeychainMetadataIndex` | `OrbitDBKeychainMutationGate`, see [Keychains](#keychains) | Self-authenticating (this change) |
 | `identities` (identity metadata) | `OrbitDBIdentityMetadataIndex` | identity-key signature plus canonical CID, see [Identities](#identities-and-device-authorization) | Self-authenticating (#361), see [design](design/identity-authentication.md) |
