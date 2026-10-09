@@ -483,6 +483,7 @@ async function assertControlHoldsForged(
 function messageRecord(
   author: ConversationOperationSigner,
   conversationId: ConversationId,
+  frontier: string[],
 ): Record<string, unknown> {
   const id = MessageId.generate().valueOf();
   const message = {
@@ -501,6 +502,7 @@ function messageRecord(
       deviceCredential: author.deviceCredential,
       identityId: author.id,
     },
+    frontier,
     kind: 'put',
     operationId: randomBytes(16).toString('base64url'),
     payloadDigest: PublicMutationProof.digestOf(message),
@@ -951,10 +953,11 @@ async function main(): Promise<void> {
   );
 
   stage = 'removed members cannot post messages';
-  const accepted = messageRecord(erin, group.id);
-  const fromRemoved = messageRecord(dave, group.id);
-  const fromLeft = messageRecord(bob, group.id);
-  const fromOutsider = messageRecord(mallory, group.id);
+  const head = await honest.repository!.findFrontier(group.id);
+  const accepted = messageRecord(erin, group.id, head);
+  const fromRemoved = messageRecord(dave, group.id, head);
+  const fromLeft = messageRecord(bob, group.id, head);
+  const fromOutsider = messageRecord(mallory, group.id, head);
 
   await pause(1200);
   for (const message of [accepted, fromRemoved, fromLeft, fromOutsider])

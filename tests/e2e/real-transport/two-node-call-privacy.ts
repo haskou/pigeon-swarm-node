@@ -489,6 +489,7 @@ async function main(): Promise<void> {
         deviceCredential: identities[0].deviceCredential,
         identityId: identities[0].id,
       },
+      frontier: [genesis.operation.getHash()] as string[],
       kind: 'put',
       operationId: 'call-privacy-channel-log'.padEnd(22, '0'),
       payloadDigest: PublicMutationProof.digestOf(channelLogPayload),
@@ -557,6 +558,7 @@ async function main(): Promise<void> {
     const signJoin = (
       payload: Record<string, unknown>,
       sequence: number,
+      frontier: string[],
     ): Record<string, unknown> => {
       const body = {
         author: {
@@ -564,6 +566,7 @@ async function main(): Promise<void> {
           deviceCredential: identities[1].deviceCredential,
           identityId: requesterId,
         },
+        frontier,
         kind: 'put',
         operationId: `call-privacy-join-${sequence}`.padEnd(22, '0'),
         payloadDigest: PublicMutationProof.digestOf(payload),
@@ -610,9 +613,10 @@ async function main(): Promise<void> {
             acceptedMutation: signJoin(
               { ...joinRecord, status: 'accepted', updatedAt: joinAcceptedAt },
               1,
+              replicated.frontier,
             ),
             createdAt: joinCreatedAt,
-            mutation: signJoin(joinRecord, 0),
+            mutation: signJoin(joinRecord, 0, replicated.frontier),
             operation: joinOperation.body,
           },
           identities[1],
