@@ -64,7 +64,7 @@ describe('HeliaIPFS', () => {
       }),
     );
     await new Promise((resolve) => setImmediate(resolve));
-    expect(log).toHaveBeenCalledWith('IPFS pubsub handler failed');
+    expect(log).toHaveBeenCalledWith('IPFS pubsub handler failed: SyntaxError');
     expect(JSON.stringify(log.mock.calls)).not.toContain('PRIVATE-');
     listener(
       new CustomEvent('message', {
@@ -115,7 +115,9 @@ describe('HeliaIPFS', () => {
       .spyOn(heliaRuntimeAdapter, 'createRawSha256Cid')
       .mockResolvedValue(parsedCid as never);
 
-    await expect(ipfs.provideRecord('private-relay-key')).resolves.toBe(expected);
+    await expect(ipfs.provideRecord('private-relay-key')).resolves.toBe(
+      expected,
+    );
 
     expect(contentRouting.provide).toHaveBeenCalledWith(
       parsedCid,
