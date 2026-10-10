@@ -59,6 +59,7 @@ routes resolve to the bundled frontend.
 | --- | --- | --- | --- |
 | `LOG_LEVEL` | App internal default | No | Log level (`error`, `warn`, `info`, etc.). |
 | `LOG_URL` | unset | No | External logging endpoint, if configured. |
+| `DEBUG_NETWORK` | `false` | No | Opt-in diagnostics for content retrieval (debug level). Identifiers are replaced by digests keyed with a secret generated at process start, so raw CIDs and peer IDs never reach the log and digests change on restart. Enable only while diagnosing and turn it off afterwards. |
 | `SERVICE_NAME` | unset | Recommended | Service name used in logs and message bus metadata. |
 
 ## Message Bus Variables
