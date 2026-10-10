@@ -205,6 +205,35 @@ describe('private blob store', () => {
     ).rejects.toThrow('not found');
   });
 
+  it('keeps sweeping when one blob cannot be deleted and retries it later', async () => {
+    const first = await reserver.reserve('alice', 5);
+    const second = await reserver.reserve('bob', 5);
+
+    await uploader.upload(first.blobId, first.uploadToken, bytes('12345'));
+    await uploader.upload(second.blobId, second.uploadToken, bytes('67890'));
+
+    const realDelete = store.delete.bind(store);
+    let broken = true;
+
+    jest.spyOn(store, 'delete').mockImplementation(async (id: string) => {
+      if (broken && id === first.blobId) {
+        throw new Error('EACCES');
+      }
+
+      return realDelete(id);
+    });
+
+    const expirer = new PrivateBlobExpirer(repository, store);
+    const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
+
+    await expect(expirer.expire(farFuture)).rejects.toThrow('1 of 2');
+    expect([...repository.blobs.keys()]).toEqual([first.blobId]);
+
+    broken = false;
+    expect(await expirer.expire(farFuture)).toBe(1);
+    expect(repository.blobs.size).toBe(0);
+  });
+
   it('only the uploader capability withdraws a blob and bytes go with it', async () => {
     const { blobId, downloadToken, uploadToken } = await reserver.reserve(
       'alice',
