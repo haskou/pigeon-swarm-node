@@ -29,10 +29,6 @@ export default class PushTestNotificationSender {
   private payload(): PushNotificationPayload {
     return {
       body: 'This is a test push notification.',
-      data: {
-        test: true,
-        timestamp: Date.now(),
-      },
       tag: 'push:test',
       title: 'Pigeon test push',
       type: 'notification',

@@ -2732,7 +2732,8 @@ Implemented:
 - consuming nodes apply the same replicated read marker update locally
 - send a Web Push control payload of type `notifications_cleared` to the
   reader identity subscriptions so service workers can close displayed
-  notifications tagged as `conversation:<conversationId>`
+  notifications sharing the conversation's opaque group tag (see
+  "Payload contract" under Push Notification HTTP API)
 
 ### Add message reaction
 
@@ -4937,6 +4938,56 @@ node -e "console.log(require.resolve('web-push'))"
 If VAPID keys are not configured, subscription endpoints still work but backend
 does not send outbound Web Push requests.
 
+### Payload contract
+
+Every Web Push body is a UTF-8 JSON object padded to exactly 1024 bytes, so the
+ciphertext length does not reveal the notification type. Fields:
+
+- `type`: `message`, `call`, `notification` or `notifications_cleared`
+- `title`, `body`: fixed display text (no message, sender or party names)
+- `tag`: group key the service worker uses to replace or close notifications
+- `tags`: present only on `notifications_cleared`, with the same group keys
+- `padding`: filler the client ignores
+
+Payloads never carry conversation, message, community, channel, call,
+notification, identity or scope identifiers. A group key is
+`<kind>:<sha256 digest of the identifiers, first 128 bits>`, so the same
+conversation always yields the same key without exposing its id. A payload that
+cannot be padded to 1024 bytes is not sent; the delivery fails and is logged.
+
+Example decrypted by the browser:
+
+```json
+{
+  "body": "You have a new message.",
+  "padding": "xxxxxxxx",
+  "tag": "conversation:<digest>",
+  "title": "New message",
+  "type": "message"
+}
+```
+
+### What push providers and relays can observe
+
+Bodies are encrypted to each browser subscription (`aes128gcm`); the provider
+cannot read them. The node does not add TTL or urgency, so provider defaults
+apply. For each send, the push provider (FCM, Mozilla autopush or Apple) can
+observe:
+
+- the subscription endpoint URL, which is stable per browser and therefore
+  links every push to one subscription;
+- the time and frequency of pushes to that endpoint, which reveals when a user
+  receives messages, calls or invitations;
+- the node's source address and the VAPID public key and `mailto:` subject,
+  which identify the deployment operator;
+- the encrypted body size, which is the same for every push.
+
+The provider cannot observe the payload fields listed above, sender or
+recipient identities, conversation or call identifiers, or whether a push was
+suppressed by busy presence or notification settings (suppressed pushes are
+never sent). Anyone operating a relay between the node and the provider sees
+the same metadata as the provider.
+
 ### Get VAPID public key
 
 ```http
@@ -5011,13 +5062,9 @@ Response:
 Backend also removes stale subscriptions automatically when the push provider
 returns `404` or `410`.
 
-Push delivery failures are logged with structured JSON including:
-
-- `endpoint`
-- `endpointHost`
-- `statusCode`
-- `error`
-- `shouldDeleteSubscription`
+Push delivery failures are logged as one JSON line with `message`, `endpointHost`,
+`statusCode`, `error` and `shouldDeleteSubscription`. The full endpoint URL,
+payload bodies, identities and subscription keys are never logged.
 
 ### Send test push
 
