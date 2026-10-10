@@ -10,7 +10,7 @@ import { createHash } from 'node:crypto';
  */
 export class IdentityAdmissionProof {
   private static readonly DOMAIN = 'pigeon-identity-admission:v1';
-  public static readonly DEFAULT_DIFFICULTY_BITS = 20;
+  public static readonly DEFAULT_DIFFICULTY_BITS = 16;
   public static readonly MAX_DIFFICULTY_BITS = 32;
   public static readonly MAX_NONCE_LENGTH = 64;
 
@@ -50,6 +50,30 @@ export class IdentityAdmissionProof {
       configured <= IdentityAdmissionProof.MAX_DIFFICULTY_BITS
       ? configured
       : IdentityAdmissionProof.DEFAULT_DIFFICULTY_BITS;
+  }
+
+  /** Reference miner: first nonce that satisfies the configured difficulty. */
+  public static mine(
+    identityId: string,
+    networkIds: string[],
+    accepts: (nonce: string) => boolean = () => true,
+  ): string {
+    const difficultyBits = IdentityAdmissionProof.difficultyBits();
+    const prefix = createHash('sha256').update(
+      IdentityAdmissionProof.preimage(identityId, networkIds, ''),
+    );
+
+    for (let nonce = 0; ; nonce += 1) {
+      const candidate = nonce.toString();
+      const digest = prefix.copy().update(candidate).digest();
+
+      if (
+        IdentityAdmissionProof.leadingZeroBits(digest) >= difficultyBits &&
+        accepts(candidate)
+      ) {
+        return candidate;
+      }
+    }
   }
 
   public static isValid(

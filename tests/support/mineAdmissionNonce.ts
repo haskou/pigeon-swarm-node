@@ -5,13 +5,5 @@ export function mineAdmissionNonce(
   identityId: string,
   networkIds: string[],
 ): string {
-  let nonce = 0;
-
-  while (
-    !IdentityAdmissionProof.isValid(identityId, networkIds, nonce.toString())
-  ) {
-    nonce += 1;
-  }
-
-  return nonce.toString();
+  return IdentityAdmissionProof.mine(identityId, networkIds);
 }

@@ -100,7 +100,7 @@ which merges the persisted history of that key once the genesis is known.
 
 Every identity carries a signed `admissionNonce`. SHA-256 of
 `pigeon-identity-admission:v1:<identityId>:<sorted networkIds>:<nonce>` must
-start with `IDENTITY_ADMISSION_DIFFICULTY_BITS` zero bits (default 20, valid
+start with `IDENTITY_ADMISSION_DIFFICULTY_BITS` zero bits (default 16, valid
 range 1-32, invalid values fall back to the default). The proof is stateless,
 so every node checks it from the record alone: the gate rejects records without
 it and `IdentityCandidateValidationDomainService` rejects whole chains
@@ -108,8 +108,8 @@ containing one. It binds the work to the identity key and to the networks, so
 it cannot be moved to another key or reused to join another network; changing
 the network set requires mining again.
 
-Residual risk: this raises the CPU cost per minted identity (about 2^20
-SHA-256 hashes, around a second on a laptop) but cannot stop a motivated
+Residual risk: this raises the CPU cost per minted identity (about 2^16
+SHA-256 hashes, well under a second on a laptop) but cannot stop a motivated
 attacker with GPUs or many machines, and gives no per-network aggregate cap.
 All nodes of a network must run the same difficulty, otherwise they disagree on
 which identities are valid. Identities published before this change have no

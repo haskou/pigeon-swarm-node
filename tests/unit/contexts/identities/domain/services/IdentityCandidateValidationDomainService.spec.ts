@@ -1,5 +1,6 @@
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import IdentityCandidateValidationDomainService from '@app/contexts/identities/domain/services/IdentityCandidateValidationDomainService';
+import { IdentityAdmissionProof } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionProof';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -38,9 +39,10 @@ describe('IdentityCandidateValidationDomainService', () => {
   it('rejects a genesis whose admission proof does not cover its networks', async () => {
     const signer = await SignedIdentityMother.create();
     const candidate = signer.build({
-      admissionNonce: signer.mineAdmissionNonce([
-        '550e8400-e29b-41d4-a716-446655440077',
-      ]),
+      admissionNonce: signer.mineNonceNotCovering(
+        ['550e8400-e29b-41d4-a716-446655440077'],
+        ['550e8400-e29b-41d4-a716-446655440000'],
+      ),
     });
 
     await expect(
@@ -52,12 +54,19 @@ describe('IdentityCandidateValidationDomainService', () => {
 
   it('rejects a successor that joins a network without fresh work', async () => {
     const previousIdentity = mother.build();
+    const previousNetworks = previousIdentity.toPrimitives().networks;
+    const networks = [
+      ...previousNetworks,
+      '550e8400-e29b-41d4-a716-446655440077',
+    ];
     const candidate = await mother.buildNext({
-      admissionNonce: previousIdentity.toPrimitives().admissionNonce,
-      networks: [
-        ...previousIdentity.toPrimitives().networks,
-        '550e8400-e29b-41d4-a716-446655440077',
-      ],
+      admissionNonce: IdentityAdmissionProof.mine(
+        mother.id.valueOf(),
+        previousNetworks,
+        (nonce) =>
+          !IdentityAdmissionProof.isValid(mother.id.valueOf(), networks, nonce),
+      ),
+      networks,
       previousIdentityExternalIdentifier: 'bafypreviousidentity',
     });
 

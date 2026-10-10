@@ -1865,8 +1865,8 @@ The signature covers this canonical property order:
 
 `admissionNonce` is a hashcash-style proof of work. SHA-256 of
 `pigeon-identity-admission:v1:<identityId>:<sorted networkIds joined by ','>:<admissionNonce>`
-must start with `IDENTITY_ADMISSION_DIFFICULTY_BITS` zero bits (default 20,
-about one million hashes). The nonce is covered by the identity signature, is
+must start with `IDENTITY_ADMISSION_DIFFICULTY_BITS` zero bits (default 16,
+about 65 thousand hashes). The nonce is covered by the identity signature, is
 at most 64 characters, and must be mined again whenever the network set changes.
 Every node verifies it; identities without a valid proof are rejected and never
 admitted to the replicated store. The request `admissionNonce` is required in

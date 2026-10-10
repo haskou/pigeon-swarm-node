@@ -39,15 +39,16 @@ export class SignedIdentityMother {
   }
 
   public mineAdmissionNonce(networks: string[]): string {
-    let nonce = 0;
+    return IdentityAdmissionProof.mine(this.id, networks);
+  }
 
-    while (
-      !IdentityAdmissionProof.isValid(this.id, networks, nonce.toString())
-    ) {
-      nonce += 1;
-    }
-
-    return nonce.toString();
+  /** A nonce valid for `proven` networks that does not prove `actual`. */
+  public mineNonceNotCovering(proven: string[], actual: string[]): string {
+    return IdentityAdmissionProof.mine(
+      this.id,
+      proven,
+      (nonce) => !IdentityAdmissionProof.isValid(this.id, actual, nonce),
+    );
   }
 
   public get id(): string {

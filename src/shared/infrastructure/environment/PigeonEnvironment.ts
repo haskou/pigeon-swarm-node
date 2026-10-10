@@ -36,7 +36,7 @@ export const pigeonEnvironmentSchema = {
     defaultValue: 30,
     type: 'number',
   },
-  IDENTITY_ADMISSION_DIFFICULTY_BITS: { defaultValue: 20, type: 'number' },
+  IDENTITY_ADMISSION_DIFFICULTY_BITS: { defaultValue: 16, type: 'number' },
   IPFS_CONTENT_TIMEOUT_MS: { type: 'number' },
   IPFS_STORAGE_PATH: { defaultValue: './ipfs_storage', type: 'string' },
   LINK_PREVIEW_RATE_LIMIT_PER_MINUTE: {

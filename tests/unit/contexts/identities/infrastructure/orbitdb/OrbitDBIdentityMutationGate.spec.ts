@@ -71,9 +71,10 @@ describe('OrbitDBIdentityMutationGate', () => {
 
   it('should reject a signed identity without a valid admission proof', async () => {
     const signer = await SignedIdentityMother.create();
-    const invalid = signer.mineAdmissionNonce([
-      '550e8400-e29b-41d4-a716-446655440009',
-    ]);
+    const invalid = signer.mineNonceNotCovering(
+      ['550e8400-e29b-41d4-a716-446655440009'],
+      ['550e8400-e29b-41d4-a716-446655440000'],
+    );
 
     await expect(
       gate.accepts(
@@ -85,16 +86,15 @@ describe('OrbitDBIdentityMutationGate', () => {
 
   it('should reject an identity that enters a network its proof does not cover', async () => {
     const signer = await SignedIdentityMother.create();
-    const covered = signer.mineAdmissionNonce([
+    const networks = [
       '550e8400-e29b-41d4-a716-446655440009',
-    ]);
-    const identity = signer.build({
-      admissionNonce: covered,
-      networks: [
-        '550e8400-e29b-41d4-a716-446655440009',
-        '550e8400-e29b-41d4-a716-446655440008',
-      ],
-    });
+      '550e8400-e29b-41d4-a716-446655440008',
+    ];
+    const covered = signer.mineNonceNotCovering(
+      ['550e8400-e29b-41d4-a716-446655440009'],
+      networks,
+    );
+    const identity = signer.build({ admissionNonce: covered, networks });
 
     await expect(
       gate.accepts('identities', await metadata(identity)),
