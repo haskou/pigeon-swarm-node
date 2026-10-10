@@ -49,6 +49,10 @@ import VerifiedPrivateControlTransitionProcessor from '../contexts/private-autho
 import InMemoryPrivateFreshnessGate from '../contexts/private-authorization/infrastructure/freshness/InMemoryPrivateFreshnessGate';
 import LocalPrivateAuthorizationRepository from '../contexts/private-authorization/infrastructure/local-db/LocalPrivateAuthorizationRepository';
 import LocalPrivateOperationUnitOfWork from '../contexts/private-authorization/infrastructure/local-db/LocalPrivateOperationUnitOfWork';
+import PrivateBlobBytesStore from '../contexts/private-blobs/domain/repositories/PrivateBlobBytesStore';
+import PrivateBlobRepository from '../contexts/private-blobs/domain/repositories/PrivateBlobRepository';
+import FilePrivateBlobBytesStore from '../contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore';
+import LocalPrivateBlobRepository from '../contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository';
 import { pigeonEnvironmentSchema } from '../shared/infrastructure/environment/PigeonEnvironment';
 import HttpRequestContext from '../shared/infrastructure/express/HttpRequestContext';
 import {
@@ -206,6 +210,8 @@ export default class PigeonApplication {
           token: DeviceAuthorizationRepository,
           useClass: OrbitDBDeviceAuthorizationRepository,
         },
+        { token: PrivateBlobRepository, useClass: LocalPrivateBlobRepository },
+        { token: PrivateBlobBytesStore, useClass: FilePrivateBlobBytesStore },
         {
           token: PrivateAuthorizationRepository,
           useClass: LocalPrivateAuthorizationRepository,

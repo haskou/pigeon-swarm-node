@@ -1,0 +1,152 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Private Blob API
+  version: 1.0.0
+  description: Node-local, capability-protected storage for client-encrypted bytes. Blobs are never published to IPFS, the DHT, pins or any public index.
+tags:
+  - name: private-blobs
+paths:
+  /private-blobs:
+    post:
+      tags:
+        - private-blobs
+      summary: Reserve a private blob
+      description: Signed call that reserves `size` bytes against the per-owner and total quotas and returns two bearer capabilities. The server stores only their SHA-256 hashes. The reservation expires after `PRIVATE_BLOB_UPLOAD_WINDOW_MS` if no upload completes.
+      security:
+        - signedRequest: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - size
+              properties:
+                size:
+                  type: integer
+                  minimum: 1
+                  description: Exact ciphertext size in bytes. Clients SHOULD pad to a size bucket; padding does not remove all size correlation.
+      responses:
+        '201':
+          description: Reservation created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateBlobReservation'
+        '400':
+          description: Size is not between 1 and `PRIVATE_BLOB_MAX_BYTES`.
+        '401':
+          description: Invalid signed request.
+        '413':
+          description: Per-owner or total quota exceeded.
+  /private-blobs/{blobId}:
+    put:
+      tags:
+        - private-blobs
+      summary: Upload the blob bytes
+      description: Streams the raw request body to storage without buffering. Authorized only by the upload capability in `Authorization`. The blob becomes readable atomically once exactly the reserved size arrived. A second upload is rejected.
+      security:
+        - uploadCapability: []
+      parameters:
+        - $ref: '#/components/parameters/BlobId'
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '204':
+          description: Stored. Retention starts now.
+        '400':
+          description: Body size differs from the reservation; nothing is kept.
+        '404':
+          description: Unknown blob, expired blob, or wrong capability (indistinguishable).
+        '409':
+          description: Upload already complete or in progress.
+    get:
+      tags:
+        - private-blobs
+      summary: Download the blob bytes
+      description: Authorized only by the download capability in `Authorization`. Supports a single byte range via the Range header. Responses are `Cache-Control no-store`.
+      security:
+        - downloadCapability: []
+      parameters:
+        - $ref: '#/components/parameters/BlobId'
+        - name: Range
+          in: header
+          required: false
+          schema:
+            type: string
+          example: bytes=0-1023
+      responses:
+        '200':
+          description: Full ciphertext.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: Requested range.
+        '404':
+          description: Unknown blob, not yet uploaded, expired, or wrong capability.
+        '416':
+          description: Range not satisfiable; `Content-Range` carries the size.
+    delete:
+      tags:
+        - private-blobs
+      summary: Withdraw a blob before retention ends
+      description: Authorized by the upload capability. Removes the bytes and the record from this node only.
+      security:
+        - uploadCapability: []
+      parameters:
+        - $ref: '#/components/parameters/BlobId'
+      responses:
+        '204':
+          description: Removed.
+        '404':
+          description: Unknown blob or wrong capability.
+components:
+  securitySchemes:
+    signedRequest:
+      type: apiKey
+      in: header
+      name: X-Signature
+    uploadCapability:
+      type: http
+      scheme: bearer
+    downloadCapability:
+      type: http
+      scheme: bearer
+  parameters:
+    BlobId:
+      name: blobId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    PrivateBlobReservation:
+      type: object
+      required:
+        - blobId
+        - downloadToken
+        - expiresAt
+        - uploadToken
+      properties:
+        blobId:
+          type: string
+          format: uuid
+        downloadToken:
+          type: string
+          description: Share this (inside an end-to-end encrypted message) with readers. Never put it in a URL.
+        expiresAt:
+          type: integer
+          description: Upload deadline, epoch milliseconds.
+        uploadToken:
+          type: string
+          description: Keep private; authorizes upload and deletion.

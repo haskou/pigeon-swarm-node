@@ -1596,6 +1596,28 @@ Response:
 }
 ```
 
+## Private Blob HTTP API
+
+Node-local storage for client-encrypted bytes. Blobs are never added to IPFS, the DHT, pins or any index, and the server stores no filename, content type, key or thumbnail. The client MUST encrypt (and SHOULD pad to a size bucket) before uploading; padding reduces but does not eliminate size correlation. Unlike IPFS content, a blob is only as available as this node and its retention window. See `docs/design/private-blob-store.md`.
+
+Authorization is split so a streamed body never has to be buffered for signing:
+
+| Step | Auth | Notes |
+| --- | --- | --- |
+| `POST /private-blobs` | Signed request | Body `{ "size": <bytes> }`. Checks size limit and quotas. Returns `{ blobId, uploadToken, downloadToken, expiresAt }`. |
+| `PUT /private-blobs/{blobId}` | `Authorization: Bearer <uploadToken>` | Raw bytes, streamed. Must be exactly the reserved size, else `400` and nothing is kept. Second upload: `409`. |
+| `GET /private-blobs/{blobId}` | `Authorization: Bearer <downloadToken>` | Single `Range: bytes=` supported (`206`/`416`). `Cache-Control: no-store`. |
+| `DELETE /private-blobs/{blobId}` | `Authorization: Bearer <uploadToken>` | Removes bytes and record on this node only. |
+
+- Capabilities are 256-bit random values sent only in the `Authorization` header (never the URL); the node keeps their SHA-256 and compares in constant time.
+- A wrong, swapped, missing or expired capability, an unknown id and a not-yet-uploaded blob all return the same `404`.
+- Quotas: `PRIVATE_BLOB_MAX_BYTES`, `PRIVATE_BLOB_QUOTA_BYTES_PER_OWNER`, `PRIVATE_BLOB_QUOTA_BYTES_TOTAL` (exceeded: `413`). Quota owners are an HMAC of the identity id with a per-node secret salt.
+- Retention: a reservation lives `PRIVATE_BLOB_UPLOAD_WINDOW_MS`; a completed blob lives `PRIVATE_BLOB_RETENTION_MS`. A scheduler removes expired records and bytes every 5 minutes.
+- The `downloadToken` is a secret: send it only inside an end-to-end encrypted message.
+- `PRIVATE_BLOB_STORAGE_PATH` is outside IPFS/OrbitDB; back it up deliberately.
+
+Existing IPFS attachment CIDs are unaffected: this API does not delete anything already distributed.
+
 ## Link Preview HTTP API
 
 Link previews are fetched by the backend so the frontend can render URL cards

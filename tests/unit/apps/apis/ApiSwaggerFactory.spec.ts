@@ -26,6 +26,7 @@ describe('ApiSwaggerFactory', () => {
         'polls-api',
         'presence-api',
         'private-authorization-api',
+        'private-blobs-api',
         'push-api',
         'stickers-api',
       ]);
@@ -128,6 +129,7 @@ describe('ApiSwaggerFactory', () => {
         'presence-api': '/api/swagger/presence-api/swagger.yaml',
         'private-authorization-api':
           '/api/swagger/private-authorization-api/swagger.yaml',
+        'private-blobs-api': '/api/swagger/private-blobs-api/swagger.yaml',
         'push-api': '/api/swagger/push-api/swagger.yaml',
         'stickers-api': '/api/swagger/stickers-api/swagger.yaml',
       });

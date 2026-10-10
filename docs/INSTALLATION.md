@@ -113,6 +113,12 @@ installed `web-push` module path.
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
 | `IPFS_STORAGE_PATH` | `./ipfs_storage` | Recommended | Base folder used by IPFS registry and local node metadata. |
+| `PRIVATE_BLOB_MAX_BYTES` | `52428800` | No | Largest single private blob (50 MiB). |
+| `PRIVATE_BLOB_QUOTA_BYTES_PER_OWNER` | `524288000` | No | Live reserved bytes one identity may hold on this node (500 MiB). |
+| `PRIVATE_BLOB_QUOTA_BYTES_TOTAL` | `10737418240` | No | Live reserved bytes across all owners on this node (10 GiB). |
+| `PRIVATE_BLOB_RETENTION_MS` | `604800000` | No | How long a completed private blob is kept (7 days). |
+| `PRIVATE_BLOB_STORAGE_PATH` | `./private_blobs` | No | Local folder for private blob bytes. Back it up or exclude it deliberately: it is never replicated. |
+| `PRIVATE_BLOB_UPLOAD_WINDOW_MS` | `3600000` | No | How long a reservation waits for its upload before it is cleaned up (1 hour). |
 | `PIGEON_RELAY_RECORD_TTL_MS` | `7200000` | No | Private relay record lifetime. Defaults to 2 hours. |
 | `PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS` | `60000` | No | Fallback interval for requesting a private relay record over gossipsub. The initial request is immediate. |
 | `PIGEON_RELAY_RECORD_PUBLIC_PEER_WAIT_MS` | `8000` | No | Maximum time to wait for public IPFS peers before publishing or requesting private relay records. Values above 10 seconds are capped. |

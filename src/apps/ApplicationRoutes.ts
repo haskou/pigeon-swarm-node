@@ -115,6 +115,10 @@ import { PutPresenceRoute } from '@app/apps/apis/presence-api/routes/PutPresence
 import { PostPrivateAuthorizationChallengeRoute } from '@app/apps/apis/private-authorization-api/routes/PostPrivateAuthorizationChallengeRoute';
 import { PostPrivateAuthorizationOperationRoute } from '@app/apps/apis/private-authorization-api/routes/PostPrivateAuthorizationOperationRoute';
 import { PostPrivateAuthorizationScopeRoute } from '@app/apps/apis/private-authorization-api/routes/PostPrivateAuthorizationScopeRoute';
+import { DeletePrivateBlobRoute } from '@app/apps/apis/private-blobs-api/routes/DeletePrivateBlobRoute';
+import { GetPrivateBlobRoute } from '@app/apps/apis/private-blobs-api/routes/GetPrivateBlobRoute';
+import { PostPrivateBlobRoute } from '@app/apps/apis/private-blobs-api/routes/PostPrivateBlobRoute';
+import { PutPrivateBlobRoute } from '@app/apps/apis/private-blobs-api/routes/PutPrivateBlobRoute';
 import { DeletePushSubscriptionRoute } from '@app/apps/apis/push-api/routes/DeletePushSubscriptionRoute';
 import { GetPushVapidPublicKeyRoute } from '@app/apps/apis/push-api/routes/GetPushVapidPublicKeyRoute';
 import { PostPushTestRoute } from '@app/apps/apis/push-api/routes/PostPushTestRoute';
@@ -182,6 +186,10 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   DeleteConversationAdminRoute,
   GetContentReplicationStatusRoute,
   PutContentReplicationRoute,
+  DeletePrivateBlobRoute,
+  GetPrivateBlobRoute,
+  PostPrivateBlobRoute,
+  PutPrivateBlobRoute,
   DeleteContentReplicationRoute,
   GetIPFSContentRoute,
   PostPublicIPFSContentRoute,

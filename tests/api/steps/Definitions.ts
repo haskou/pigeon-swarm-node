@@ -141,6 +141,8 @@ export default class Definitions {
   private otherIdentityKeyPair: KeyPair | undefined;
 
   private ownerIdentityId: IdentityId | undefined;
+  private privateBlob:
+    { blobId: string; downloadToken: string; uploadToken: string } | undefined;
   private response: RestResponse = null;
   private restClient: RestClient = new RestClient();
   private readonly ipfsDefinition: IPFSDefinition = new IPFSDefinition();
@@ -5312,6 +5314,81 @@ export default class Definitions {
     }
 
     await this.iPOSTTo(`/ipfs/${this.currentNetworkId}`);
+  }
+
+  @when('I reserve a private blob of {int} bytes')
+  public async iReserveAPrivateBlob(size: number): Promise<void> {
+    this.body = JSON.stringify({ size });
+    await this.ensureIdentityKeyPair();
+    await this.signCurrentRequest('POST', '/private-blobs');
+    await this.iPOSTTo('/private-blobs');
+    this.privateBlob =
+      this.response.status === 201
+        ? (this.response.data as unknown as typeof this.privateBlob)
+        : undefined;
+  }
+
+  private privateBlobRequest(capability: string): {
+    path: string;
+    headers: Record<string, string>;
+  } {
+    const blob = this.privateBlob as unknown as Record<string, string>;
+
+    if (!blob) {
+      throw new Error('Private blob must be reserved first.');
+    }
+
+    const token =
+      capability === 'none' ? undefined : blob[`${capability}Token`];
+
+    return {
+      headers: token ? { authorization: `Bearer ${token}` } : {},
+      path: `/private-blobs/${blob.blobId}`,
+    };
+  }
+
+  @when('I upload {string} to the private blob with the {word} capability')
+  public async iUploadToThePrivateBlob(
+    text: string,
+    capability: string,
+  ): Promise<void> {
+    const { headers, path } = this.privateBlobRequest(capability);
+
+    this.response = await this.restClient.put(path, Buffer.from(text), headers);
+  }
+
+  @when('I download the private blob with the {word} capability')
+  public async iDownloadThePrivateBlob(capability: string): Promise<void> {
+    const { headers, path } = this.privateBlobRequest(capability);
+
+    this.response = await this.restClient.getBinary(path, headers);
+  }
+
+  @when(
+    'I download the private blob with the {word} capability and range {string}',
+  )
+  public async iDownloadThePrivateBlobRange(
+    capability: string,
+    range: string,
+  ): Promise<void> {
+    const { headers, path } = this.privateBlobRequest(capability);
+
+    this.response = await this.restClient.getBinary(path, {
+      ...headers,
+      range,
+    });
+  }
+
+  @when('I delete the private blob with the {word} capability')
+  public async iDeleteThePrivateBlob(capability: string): Promise<void> {
+    const { headers, path } = this.privateBlobRequest(capability);
+
+    this.response = await this.restClient.delete(path, undefined, headers);
+  }
+
+  @then('the response header {string} should be {string}')
+  public theResponseHeaderShouldBe(name: string, value: string): void {
+    expect(this.response.headers[name.toLowerCase()]).to.equal(value);
   }
 
   @when('I PUT {string}')

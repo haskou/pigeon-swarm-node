@@ -172,6 +172,11 @@ services:
     class: >-
       /contexts/private-authorization/infrastructure/crypto/PrivateMlsPolicyVerifier
     arguments: []
+  contexts/private-blobs/domain/PrivateBlobPolicy:
+    class: /contexts/private-blobs/domain/PrivateBlobPolicy
+    arguments: []
+  contexts/private-blobs/domain/repositories/PrivateBlobBytesStore: '@contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore'
+  contexts/private-blobs/domain/repositories/PrivateBlobRepository: '@contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository'
   contexts/push-notifications/application/find-vapid-public-key/PushVapidConfigurationReader: '@contexts/push-notifications/infrastructure/web-push/PushVapidConfiguration'
   contexts/push-notifications/application/send/PushNotificationDelivery: >-
     @contexts/push-notifications/infrastructure/web-push/WebPushNotificationDelivery
@@ -606,6 +611,11 @@ services:
     arguments: []
     parent: >-
       contexts/private-authorization/application/accept-operation/PrivateOperationAuthenticator
+  contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore:
+    class: >-
+      /contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore
+    arguments: []
+    parent: contexts/private-blobs/domain/repositories/PrivateBlobBytesStore
   contexts/public-mutations/domain/services/PublicMutationVerifier:
     class: /contexts/public-mutations/domain/services/PublicMutationVerifier
     arguments:
@@ -767,6 +777,10 @@ services:
     class: /apps/schedulers/NodeHeartbeatScheduler
     arguments:
       - '@contexts/nodes/application/send-heartbeat/NodeHeartbeatSender'
+  apps/schedulers/PrivateBlobExpirationScheduler:
+    class: /apps/schedulers/PrivateBlobExpirationScheduler
+    arguments:
+      - '@contexts/private-blobs/application/PrivateBlobExpirer'
   apps/apis/calls-api/CallRelayRecordDiscovery:
     class: /apps/apis/calls-api/CallRelayRecordDiscovery
     arguments:
@@ -1226,6 +1240,36 @@ services:
         @contexts/private-authorization/infrastructure/crypto/PrivateFreshnessVerifier
     parent: >-
       contexts/private-authorization/application/accept-operation/PrivateFreshnessGate
+  contexts/private-blobs/application/PrivateBlobExpirer:
+    class: /contexts/private-blobs/application/PrivateBlobExpirer
+    arguments:
+      - '@contexts/private-blobs/domain/repositories/PrivateBlobRepository'
+      - '@contexts/private-blobs/domain/repositories/PrivateBlobBytesStore'
+  contexts/private-blobs/application/PrivateBlobReader:
+    class: /contexts/private-blobs/application/PrivateBlobReader
+    arguments:
+      - '@contexts/private-blobs/domain/repositories/PrivateBlobRepository'
+      - '@contexts/private-blobs/domain/repositories/PrivateBlobBytesStore'
+  contexts/private-blobs/application/PrivateBlobRemover:
+    class: /contexts/private-blobs/application/PrivateBlobRemover
+    arguments:
+      - '@contexts/private-blobs/domain/repositories/PrivateBlobRepository'
+      - '@contexts/private-blobs/domain/repositories/PrivateBlobBytesStore'
+  contexts/private-blobs/application/PrivateBlobReserver:
+    class: /contexts/private-blobs/application/PrivateBlobReserver
+    arguments:
+      - '@contexts/private-blobs/domain/repositories/PrivateBlobRepository'
+      - '@contexts/private-blobs/domain/PrivateBlobPolicy'
+  contexts/private-blobs/application/PrivateBlobUploader:
+    class: /contexts/private-blobs/application/PrivateBlobUploader
+    arguments:
+      - '@contexts/private-blobs/domain/repositories/PrivateBlobRepository'
+      - '@contexts/private-blobs/domain/repositories/PrivateBlobBytesStore'
+  contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository:
+    class: /contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository
+    arguments:
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+    parent: contexts/private-blobs/domain/repositories/PrivateBlobRepository
   contexts/public-mutations/infrastructure/DeviceAuthorizationPublicMutationAuthorization:
     class: >-
       /contexts/public-mutations/infrastructure/DeviceAuthorizationPublicMutationAuthorization
