@@ -140,6 +140,7 @@ services:
   contexts/mailboxes/application/MailboxCoordinator:
     class: /contexts/mailboxes/application/MailboxCoordinator
     arguments: []
+  contexts/mailboxes/application/MailboxEnvelopeNotifier: '@contexts/mailboxes/infrastructure/realtime/WebSocketMailboxEnvelopeNotifier'
   contexts/mailboxes/domain/MailboxPolicy:
     class: /contexts/mailboxes/domain/MailboxPolicy
     arguments: []
@@ -247,6 +248,9 @@ services:
     arguments: []
   shared/infrastructure/websocket/LocalRealtimeEventPublisher:
     class: /shared/infrastructure/websocket/LocalRealtimeEventPublisher
+    arguments: []
+  shared/infrastructure/websocket/MailboxEnvelopeSubscriptions:
+    class: /shared/infrastructure/websocket/MailboxEnvelopeSubscriptions
     arguments: []
   shared/infrastructure/errors/HandlerNotFoundError:
     class: /shared/infrastructure/errors/HandlerNotFoundError
@@ -524,6 +528,11 @@ services:
     class: /contexts/keychains/domain/services/KeychainSaverService
     arguments:
       - '@contexts/keychains/domain/repositories/KeychainRepository'
+  contexts/mailboxes/infrastructure/realtime/WebSocketMailboxEnvelopeNotifier:
+    class: >-
+      /contexts/mailboxes/infrastructure/realtime/WebSocketMailboxEnvelopeNotifier
+    arguments: []
+    parent: contexts/mailboxes/application/MailboxEnvelopeNotifier
   contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationFinder:
     class: >-
       /contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationFinder
@@ -1734,12 +1743,6 @@ services:
       - >-
         @contexts/keychains/domain/services/KeychainCandidateValidationDomainService
       - '@contexts/keychains/domain/services/KeychainSignatureDomainService'
-  contexts/mailboxes/application/MailboxAppender:
-    class: /contexts/mailboxes/application/MailboxAppender
-    arguments:
-      - '@contexts/mailboxes/domain/repositories/MailboxRepository'
-      - '@contexts/mailboxes/domain/MailboxPolicy'
-      - '@contexts/mailboxes/application/MailboxCoordinator'
   contexts/mailboxes/application/MailboxCreator:
     class: /contexts/mailboxes/application/MailboxCreator
     arguments:
@@ -2252,6 +2255,13 @@ services:
       - '@contexts/keychains/infrastructure/ipfs/mappers/IpfsKeychainMapper'
       - '@contexts/keychains/infrastructure/metadata/KeychainMetadataIndex'
     parent: contexts/keychains/domain/repositories/KeychainRepository
+  contexts/mailboxes/application/MailboxAppender:
+    class: /contexts/mailboxes/application/MailboxAppender
+    arguments:
+      - '@contexts/mailboxes/domain/repositories/MailboxRepository'
+      - '@contexts/mailboxes/domain/MailboxPolicy'
+      - '@contexts/mailboxes/application/MailboxCoordinator'
+      - '@contexts/mailboxes/application/MailboxEnvelopeNotifier'
   contexts/nodes/application/remove-network/NodeNetworkRemover:
     class: /contexts/nodes/application/remove-network/NodeNetworkRemover
     arguments:
@@ -2596,6 +2606,7 @@ services:
       - '@contexts/calls/domain/repositories/CallRepository'
       - '@contexts/calls/domain/repositories/CallParticipantLeaseRepository'
       - '@contexts/calls/application/authorize-call/CallAccessAuthorizer'
+      - '@contexts/mailboxes/domain/repositories/MailboxRepository'
   shared/infrastructure/http/HttpClient: '@shared/infrastructure/http/FetchHttpClient'
   shared/infrastructure/logs/Log: '@shared/infrastructure/logs/WinstonLogger'
   shared/infrastructure/messageBus/MessageBusAdapter: '@shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter'

@@ -13,6 +13,7 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import MailboxRepository from '@app/contexts/mailboxes/domain/repositories/MailboxRepository';
 import IdentityPresenceHeartbeatRecorder from '@app/contexts/presence/application/record-heartbeat/IdentityPresenceHeartbeatRecorder';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -139,6 +140,7 @@ describe('live call privacy', () => {
         calls,
         leases,
         new CallAccessAuthorizer(conversations, communities),
+        mock<MailboxRepository>(),
       ),
     );
     const client = socket();
@@ -212,6 +214,7 @@ describe('live call privacy', () => {
         calls,
         leases,
         new CallAccessAuthorizer(conversations, communities),
+        mock<MailboxRepository>(),
       ),
     );
     const client = socket();

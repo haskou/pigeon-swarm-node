@@ -2,6 +2,7 @@ import MailboxAcknowledger from '@app/contexts/mailboxes/application/MailboxAckn
 import MailboxAppender from '@app/contexts/mailboxes/application/MailboxAppender';
 import MailboxCoordinator from '@app/contexts/mailboxes/application/MailboxCoordinator';
 import MailboxCreator from '@app/contexts/mailboxes/application/MailboxCreator';
+import MailboxEnvelopeNotifier from '@app/contexts/mailboxes/application/MailboxEnvelopeNotifier';
 import MailboxExpirer from '@app/contexts/mailboxes/application/MailboxExpirer';
 import MailboxReader from '@app/contexts/mailboxes/application/MailboxReader';
 import MailboxRemover from '@app/contexts/mailboxes/application/MailboxRemover';
@@ -15,6 +16,7 @@ import LocalMailboxRepository from '@app/contexts/mailboxes/infrastructure/local
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { createHash } from 'crypto';
 import { promises as fs } from 'fs';
+import { mock, MockProxy } from 'jest-mock-extended';
 import os from 'os';
 import path from 'path';
 
@@ -32,6 +34,7 @@ describe('mailboxes', () => {
   let repository: LocalMailboxRepository;
   let creator: MailboxCreator;
   let appender: MailboxAppender;
+  let notifier: MockProxy<MailboxEnvelopeNotifier>;
   let reader: MailboxReader;
   let acknowledger: MailboxAcknowledger;
   let remover: MailboxRemover;
@@ -52,7 +55,8 @@ describe('mailboxes', () => {
     database = new EmbeddedLocalDatabase();
     repository = new LocalMailboxRepository(database);
     creator = new MailboxCreator(repository, policy, coordinator);
-    appender = new MailboxAppender(repository, policy, coordinator);
+    notifier = mock<MailboxEnvelopeNotifier>();
+    appender = new MailboxAppender(repository, policy, coordinator, notifier);
     reader = new MailboxReader(repository, coordinator);
     acknowledger = new MailboxAcknowledger(repository, coordinator);
     remover = new MailboxRemover(repository, coordinator);
@@ -140,6 +144,20 @@ describe('mailboxes', () => {
       appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024)),
     ).resolves.toEqual({ created: false, cursor: 1 });
     expect((await reader.read(MAILBOX, READ, 0, 10)).envelopes).toHaveLength(2);
+  });
+
+  it('notifies realtime listeners only for newly appended envelopes, in cursor order', async () => {
+    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+    await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
+    await expect(
+      appender.append(MAILBOX, POST, 'c'.repeat(22), '!!!!'),
+    ).rejects.toBeInstanceOf(MailboxEnvelopeInvalidError);
+
+    expect(notifier.envelopeAppended.mock.calls).toEqual([
+      [MAILBOX, 1],
+      [MAILBOX, 2],
+    ]);
   });
 
   it('refuses instead of dropping when the envelope or byte limit is reached', async () => {

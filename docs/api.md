@@ -1627,7 +1627,8 @@ Node-local queues of opaque ciphertext envelopes. Mailboxes are never written to
 - A wrong, swapped or missing capability, a malformed id and an unknown mailbox all return the same `404`.
 - Limits: `MAILBOX_MAX_ENVELOPES`, `MAILBOX_MAX_BYTES`, `MAILBOX_MAX_COUNT`, `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE` (in memory, per remote address, `0` disables).
 - Retention: `MAILBOX_RETENTION_MS`. A scheduler deletes older envelopes and mailboxes not read for that long.
-- Not yet implemented: the realtime `mailbox_envelope` hint, client key schedule and retiring the replicated message collections.
+- Realtime: `mailbox_subscribe` over the authenticated WebSocket with `mailboxId` and `readToken`; a wrong or missing capability is ignored, like an unknown mailbox. The node pushes `{ "type": "mailbox_envelope", "mailboxId", "cursor" }` to subscribed sockets for each envelope appended on that node. The hint is content-free: clients must GET the mailbox envelopes, which remain the source of truth. There is no subscription ack and no unsubscribe message; closing the socket ends its subscriptions. A socket holds at most 256 subscriptions.
+- Not yet implemented: client key schedule and retiring the replicated message collections.
 
 ## Private Blob HTTP API
 

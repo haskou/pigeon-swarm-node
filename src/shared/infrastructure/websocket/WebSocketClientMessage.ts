@@ -3,6 +3,8 @@ export type WebSocketClientMessage = {
   channelId?: string;
   communityId?: string;
   conversationId?: string;
+  mailboxId?: string;
+  readToken?: string;
   scope?: string;
   signalId?: string;
   type?: string;

@@ -103,6 +103,17 @@ paths:
         must acknowledge every duplicate while applying its SDP/ICE payload
         only once.
 
+        Clients may subscribe to a mailbox with
+        `{ "type": "mailbox_subscribe", "mailboxId": "<mailboxId>", "readToken": "<readToken>" }`.
+        A wrong or missing capability is ignored, exactly like an unknown
+        mailbox. The server then pushes
+        `{ "type": "mailbox_envelope", "mailboxId": "<mailboxId>", "cursor": 42 }`
+        for each envelope appended on this node. The hint is a content-free
+        nudge: clients must GET the mailbox envelopes to read data, and that
+        GET response is the source of truth. There is no subscription ack and
+        no unsubscribe message; closing the socket ends its subscriptions.
+        A socket holds at most 256 mailbox subscriptions.
+
         Clients may also send ephemeral typing indicators. Conversation typing:
         `{ "type": "typing", "scope": "conversation", "conversationId": "<conversationId>", "active": true }`.
         Community text channel typing:

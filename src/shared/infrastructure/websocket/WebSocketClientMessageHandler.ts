@@ -10,6 +10,7 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import MailboxRepository from '@app/contexts/mailboxes/domain/repositories/MailboxRepository';
 import IdentityPresenceHeartbeatRecorder from '@app/contexts/presence/application/record-heartbeat/IdentityPresenceHeartbeatRecorder';
 import { IdentityPresenceHeartbeatMessage } from '@app/contexts/presence/application/record-heartbeat/messages/IdentityPresenceHeartbeatMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -27,6 +28,7 @@ export default class WebSocketClientMessageHandler {
     private readonly callRepository: CallRepository,
     private readonly callLeases: CallParticipantLeaseRepository,
     private readonly callAccess: CallAccessAuthorizer,
+    private readonly mailboxRepository: MailboxRepository,
   ) {}
 
   private excludeIdentity(
@@ -188,5 +190,14 @@ export default class WebSocketClientMessageHandler {
     await this.signalAcknowledger.acknowledge(
       new CallSignalAcknowledgeMessage(signalId, identityId),
     );
+  }
+
+  public async canReadMailbox(
+    mailboxId: string,
+    readToken: string,
+  ): Promise<boolean> {
+    const mailbox = await this.mailboxRepository.findById(mailboxId);
+
+    return mailbox?.acceptsRead(readToken) ?? false;
   }
 }

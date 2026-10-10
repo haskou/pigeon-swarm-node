@@ -1,14 +1,15 @@
-import { callStartArgs } from '../../../../support/signCall';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import WebSocketClientMessageHandler from '@app/shared/infrastructure/websocket/WebSocketClientMessageHandler';
 import { WebSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { WebSocket } from 'ws';
+
+import { callStartArgs } from '../../../../support/signCall';
 
 class TestDomainEvent extends DomainEvent {
   public static EVENT_NAME = 'test.event';
@@ -170,9 +171,10 @@ describe('WebSocketEventHub', () => {
     );
     await Promise.resolve();
 
-    expect(
-      clientMessageHandler.acknowledgeCallSignal,
-    ).toHaveBeenCalledWith(identityId.valueOf(), signalId);
+    expect(clientMessageHandler.acknowledgeCallSignal).toHaveBeenCalledWith(
+      identityId.valueOf(),
+      signalId,
+    );
   });
 
   it('relays conversation typing indicators to other participants', async () => {
@@ -532,9 +534,7 @@ describe('WebSocketEventHub', () => {
       senderIdentityId: senderIdentityId.valueOf(),
     });
 
-    jest
-      .spyOn(event, 'eventName')
-      .mockReturnValue('calls.v1.signal.sent');
+    jest.spyOn(event, 'eventName').mockReturnValue('calls.v1.signal.sent');
     hub.register(senderIdentityId, senderClient);
     hub.register(recipientIdentityId, recipientClient);
     hub.register(otherParticipantIdentityId, otherParticipantClient);
@@ -544,8 +544,11 @@ describe('WebSocketEventHub', () => {
     hub.publish([event]);
     await flushPromises();
 
-    expect(JSON.parse((recipientClient.send as jest.Mock).mock.calls[0][0])).toMatchObject({
-      event: { type: event.eventName() }, type: 'domain_event',
+    expect(
+      JSON.parse((recipientClient.send as jest.Mock).mock.calls[0][0]),
+    ).toMatchObject({
+      event: { type: event.eventName() },
+      type: 'domain_event',
     });
     expect(senderClient.send).not.toHaveBeenCalled();
     expect(otherParticipantClient.send).not.toHaveBeenCalled();
@@ -572,8 +575,11 @@ describe('WebSocketEventHub', () => {
     hub.publish([event]);
     await flushPromises();
 
-    expect(JSON.parse((participantClient.send as jest.Mock).mock.calls[0][0])).toMatchObject({
-      event: { type: event.eventName() }, type: 'domain_event',
+    expect(
+      JSON.parse((participantClient.send as jest.Mock).mock.calls[0][0]),
+    ).toMatchObject({
+      event: { type: event.eventName() },
+      type: 'domain_event',
     });
   });
 
@@ -649,8 +655,11 @@ describe('WebSocketEventHub', () => {
     hub.publish([event]);
     await flushPromises();
 
-    expect(JSON.parse((participantClient.send as jest.Mock).mock.calls[0][0])).toMatchObject({
-      event: { type: event.eventName() }, type: 'domain_event',
+    expect(
+      JSON.parse((participantClient.send as jest.Mock).mock.calls[0][0]),
+    ).toMatchObject({
+      event: { type: event.eventName() },
+      type: 'domain_event',
     });
   });
 
@@ -706,8 +715,9 @@ describe('WebSocketEventHub', () => {
     hub.publish([event]);
     await flushPromises();
 
-    const realtimeMessages = (participantClient.send as jest.Mock).mock.calls
-      .map(([message]) => JSON.parse(message as string));
+    const realtimeMessages = (
+      participantClient.send as jest.Mock
+    ).mock.calls.map(([message]) => JSON.parse(message as string));
     const callEventMessage = realtimeMessages.find(
       (message) =>
         message.event.type === 'conversations.v1.call.event.was_recorded',
@@ -830,8 +840,9 @@ describe('WebSocketEventHub', () => {
     hub.publish([event]);
     await flushPromises();
 
-    const realtimeMessages = (participantClient.send as jest.Mock).mock.calls
-      .map(([message]) => JSON.parse(message as string));
+    const realtimeMessages = (
+      participantClient.send as jest.Mock
+    ).mock.calls.map(([message]) => JSON.parse(message as string));
 
     expect(
       realtimeMessages.some(
@@ -906,6 +917,132 @@ describe('WebSocketEventHub', () => {
 
     expect(client.send).not.toHaveBeenCalled();
   });
+
+  it('sends mailbox envelope hints only to sockets subscribed with a read capability', async () => {
+    const hub = new WebSocketEventHub();
+    const subscribedIdentityId = await generateIdentityId();
+    const otherIdentityId = await generateIdentityId();
+    const subscribedClient = buildClient();
+    const otherClient = buildClient();
+    const clientMessageHandler = buildClientMessageHandler();
+    const mailboxId = 'm'.repeat(43);
+
+    clientMessageHandler.canReadMailbox.mockResolvedValue(true);
+    hub.setClientMessageHandler(clientMessageHandler);
+    hub.register(subscribedIdentityId, subscribedClient);
+    hub.register(otherIdentityId, otherClient);
+    const messageHandler = getClientMessageHandler(subscribedClient);
+
+    jest.clearAllMocks();
+    messageHandler(
+      Buffer.from(
+        JSON.stringify({
+          mailboxId,
+          readToken: 'r'.repeat(32),
+          type: 'mailbox_subscribe',
+        }),
+      ),
+    );
+    await flushPromises();
+    hub.publishMailboxEnvelope(mailboxId, 7);
+
+    expect(clientMessageHandler.canReadMailbox).toHaveBeenCalledWith(
+      mailboxId,
+      'r'.repeat(32),
+    );
+    expect(subscribedClient.send).toHaveBeenCalledTimes(1);
+    expect(
+      JSON.parse((subscribedClient.send as jest.Mock).mock.calls[0][0]),
+    ).toEqual({ cursor: 7, mailboxId, type: 'mailbox_envelope' });
+    expect(otherClient.send).not.toHaveBeenCalled();
+  });
+
+  it('does not send mailbox envelope hints when the read capability is rejected', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+    const clientMessageHandler = buildClientMessageHandler();
+    const mailboxId = 'm'.repeat(43);
+
+    clientMessageHandler.canReadMailbox.mockResolvedValue(false);
+    hub.setClientMessageHandler(clientMessageHandler);
+    hub.register(identityId, client);
+    const messageHandler = getClientMessageHandler(client);
+
+    messageHandler(
+      Buffer.from(
+        JSON.stringify({
+          mailboxId,
+          readToken: 'x'.repeat(32),
+          type: 'mailbox_subscribe',
+        }),
+      ),
+    );
+    await flushPromises();
+    (client.send as jest.Mock).mockClear();
+    hub.publishMailboxEnvelope(mailboxId, 1);
+
+    expect(clientMessageHandler.canReadMailbox).toHaveBeenCalledWith(
+      mailboxId,
+      'x'.repeat(32),
+    );
+    expect(client.send).not.toHaveBeenCalled();
+  });
+
+  it('does not check mailbox subscriptions without a mailbox id and read token', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+    const clientMessageHandler = buildClientMessageHandler();
+
+    hub.setClientMessageHandler(clientMessageHandler);
+    hub.register(identityId, client);
+    const messageHandler = getClientMessageHandler(client);
+
+    messageHandler(
+      Buffer.from(
+        JSON.stringify({
+          mailboxId: 'm'.repeat(43),
+          type: 'mailbox_subscribe',
+        }),
+      ),
+    );
+    await flushPromises();
+
+    expect(clientMessageHandler.canReadMailbox).not.toHaveBeenCalled();
+  });
+
+  it('stops sending mailbox envelope hints once the subscribed socket closes', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+    const clientMessageHandler = buildClientMessageHandler();
+    const mailboxId = 'm'.repeat(43);
+
+    clientMessageHandler.canReadMailbox.mockResolvedValue(true);
+    hub.setClientMessageHandler(clientMessageHandler);
+    hub.register(identityId, client);
+    const messageHandler = getClientMessageHandler(client);
+    const closeHandler = (client.on as jest.Mock).mock.calls.find(
+      ([eventName]) => eventName === 'close',
+    )?.[1] as () => void;
+
+    messageHandler(
+      Buffer.from(
+        JSON.stringify({
+          mailboxId,
+          readToken: 'r'.repeat(32),
+          type: 'mailbox_subscribe',
+        }),
+      ),
+    );
+    await flushPromises();
+    closeHandler();
+    (client.send as jest.Mock).mockClear();
+    hub.publishMailboxEnvelope(mailboxId, 2);
+
+    expect(client.send).not.toHaveBeenCalled();
+  });
 });
 
 async function generateIdentityId(): Promise<IdentityId> {
@@ -916,11 +1053,11 @@ async function generateIdentityId(): Promise<IdentityId> {
 
 function buildClient(readyState: number = WebSocket.OPEN): WebSocket {
   return {
+    close: jest.fn(),
     on: jest.fn(),
     readyState,
     send: jest.fn(),
     terminate: jest.fn(),
-    close: jest.fn(),
   } as unknown as WebSocket;
 }
 
@@ -939,6 +1076,7 @@ function getClientMessageHandler(client: WebSocket): (message: Buffer) => void {
 function buildClientMessageHandler(): jest.Mocked<WebSocketClientMessageHandler> {
   return {
     acknowledgeCallSignal: jest.fn().mockResolvedValue(undefined),
+    canReadMailbox: jest.fn().mockResolvedValue(false),
     findCommunityChannelEventRecipients: jest.fn().mockResolvedValue([]),
     findCommunityChannelTypingRecipients: jest.fn().mockResolvedValue([]),
     findConversationTypingRecipients: jest.fn().mockResolvedValue([]),
@@ -955,10 +1093,27 @@ async function flushPromises(): Promise<void> {
 
 function authorizeCallAudience(hub: WebSocketEventHub): void {
   const handler = buildClientMessageHandler();
-  handler.findCallAudience = jest.fn().mockImplementation(async (_callId: string, recipientIds: string[]) => {
-    const creator = new IdentityId(recipientIds.at(-1) ?? 'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=');
-    const call = Call.start(creator, new NetworkId('550e8400-e29b-41d4-a716-446655440000'), CallScope.conversation(new ConversationId('conversation-1')), recipientIds.map((identityId) => new IdentityId(identityId)), ...callStartArgs());
-    return { call, leases: [], participants: call.getParticipantIds(), recipientIds };
-  });
+  handler.findCallAudience = jest
+    .fn()
+    .mockImplementation(async (_callId: string, recipientIds: string[]) => {
+      const creator = new IdentityId(
+        recipientIds.at(-1) ??
+          'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=',
+      );
+      const call = Call.start(
+        creator,
+        new NetworkId('550e8400-e29b-41d4-a716-446655440000'),
+        CallScope.conversation(new ConversationId('conversation-1')),
+        recipientIds.map((identityId) => new IdentityId(identityId)),
+        ...callStartArgs(),
+      );
+
+      return {
+        call,
+        leases: [],
+        participants: call.getParticipantIds(),
+        recipientIds,
+      };
+    });
   hub.setClientMessageHandler(handler);
 }

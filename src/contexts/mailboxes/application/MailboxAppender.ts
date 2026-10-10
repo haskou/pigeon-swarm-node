@@ -3,6 +3,7 @@ import { MailboxNotFoundError } from '../domain/errors/MailboxNotFoundError';
 import MailboxPolicy from '../domain/MailboxPolicy';
 import MailboxRepository from '../domain/repositories/MailboxRepository';
 import MailboxCoordinator from './MailboxCoordinator';
+import MailboxEnvelopeNotifier from './MailboxEnvelopeNotifier';
 
 export default class MailboxAppender {
   private static readonly BASE64URL = /^[A-Za-z0-9_-]+$/;
@@ -11,6 +12,7 @@ export default class MailboxAppender {
     private readonly repository: MailboxRepository,
     private readonly policy: MailboxPolicy,
     private readonly coordinator: MailboxCoordinator,
+    private readonly notifier: MailboxEnvelopeNotifier,
   ) {}
 
   private decodedSize(body: string): number {
@@ -63,6 +65,7 @@ export default class MailboxAppender {
         size,
         storedAt: Date.now(),
       });
+      this.notifier.envelopeAppended(mailboxId, cursor);
 
       return { created: true, cursor };
     });

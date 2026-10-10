@@ -1,24 +1,26 @@
-import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
-import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
-import CallParticipantLeaseRepository from '@app/contexts/calls/domain/repositories/CallParticipantLeaseRepository';
-import { mock, MockProxy } from 'jest-mock-extended';
-
 import CallSignalAcknowledger from '@app/contexts/calls/application/acknowledge-signal/CallSignalAcknowledger';
 import { CallSignalAcknowledgeMessage } from '@app/contexts/calls/application/acknowledge-signal/messages/CallSignalAcknowledgeMessage';
+import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
+import CallParticipantLeaseRepository from '@app/contexts/calls/domain/repositories/CallParticipantLeaseRepository';
+import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import { Community } from '@app/contexts/communities/domain/Community';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { Mailbox } from '@app/contexts/mailboxes/domain/Mailbox';
+import MailboxRepository from '@app/contexts/mailboxes/domain/repositories/MailboxRepository';
 import IdentityPresenceHeartbeatRecorder from '@app/contexts/presence/application/record-heartbeat/IdentityPresenceHeartbeatRecorder';
 import { IdentityPresenceHeartbeatMessage } from '@app/contexts/presence/application/record-heartbeat/messages/IdentityPresenceHeartbeatMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import WebSocketClientMessageHandler from '@app/shared/infrastructure/websocket/WebSocketClientMessageHandler';
+import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('WebSocketClientMessageHandler', () => {
   let conversationRepository: MockProxy<ConversationRepository>;
   let communityRepository: MockProxy<CommunityRepository>;
   let heartbeatRecorder: MockProxy<IdentityPresenceHeartbeatRecorder>;
   let signalAcknowledger: MockProxy<CallSignalAcknowledger>;
+  let mailboxRepository: MockProxy<MailboxRepository>;
   let handler: WebSocketClientMessageHandler;
 
   beforeEach(() => {
@@ -26,6 +28,7 @@ describe('WebSocketClientMessageHandler', () => {
     communityRepository = mock<CommunityRepository>();
     heartbeatRecorder = mock<IdentityPresenceHeartbeatRecorder>();
     signalAcknowledger = mock<CallSignalAcknowledger>();
+    mailboxRepository = mock<MailboxRepository>();
     handler = new WebSocketClientMessageHandler(
       conversationRepository,
       communityRepository,
@@ -34,6 +37,7 @@ describe('WebSocketClientMessageHandler', () => {
       mock<CallRepository>(),
       mock<CallParticipantLeaseRepository>(),
       mock<CallAccessAuthorizer>(),
+      mailboxRepository,
     );
   });
 
@@ -107,10 +111,7 @@ describe('WebSocketClientMessageHandler', () => {
     communityRepository.findById.mockResolvedValue(community);
 
     await expect(
-      handler.findCommunityChannelEventRecipients(
-        'community-id',
-        'channel-id',
-      ),
+      handler.findCommunityChannelEventRecipients('community-id', 'channel-id'),
     ).resolves.toEqual([recipient.valueOf()]);
   });
 
@@ -118,10 +119,7 @@ describe('WebSocketClientMessageHandler', () => {
     communityRepository.findById.mockResolvedValue(undefined);
 
     await expect(
-      handler.findCommunityChannelEventRecipients(
-        'community-id',
-        'channel-id',
-      ),
+      handler.findCommunityChannelEventRecipients('community-id', 'channel-id'),
     ).resolves.toEqual([]);
   });
 
@@ -179,5 +177,35 @@ describe('WebSocketClientMessageHandler', () => {
     expect(signalAcknowledger.acknowledge).toHaveBeenCalledWith(
       new CallSignalAcknowledgeMessage(signalId, identityId),
     );
+  });
+
+  it('authorizes mailbox reads only with the mailbox read capability', async () => {
+    const mailbox = mock<Mailbox>({
+      acceptsRead: jest.fn().mockReturnValue(true),
+    });
+    mailboxRepository.findById.mockResolvedValue(mailbox);
+
+    await expect(
+      handler.canReadMailbox('m'.repeat(43), 'r'.repeat(32)),
+    ).resolves.toBe(true);
+    expect(mailbox.acceptsRead).toHaveBeenCalledWith('r'.repeat(32));
+  });
+
+  it('rejects a read capability that does not match the mailbox', async () => {
+    mailboxRepository.findById.mockResolvedValue(
+      mock<Mailbox>({ acceptsRead: jest.fn().mockReturnValue(false) }),
+    );
+
+    await expect(
+      handler.canReadMailbox('m'.repeat(43), 'x'.repeat(32)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects read capabilities for unknown mailboxes', async () => {
+    mailboxRepository.findById.mockResolvedValue(undefined);
+
+    await expect(
+      handler.canReadMailbox('m'.repeat(43), 'r'.repeat(32)),
+    ).resolves.toBe(false);
   });
 });
