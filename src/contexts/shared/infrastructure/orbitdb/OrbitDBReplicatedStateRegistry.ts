@@ -85,6 +85,16 @@ export default class OrbitDBReplicatedStateRegistry {
     Map<string, Record<string, unknown>>
   >();
 
+  /**
+   * The replacement of a network's head cache while it is rebuilt from the log.
+   * Readers keep seeing the previous cache until the rebuilt one takes over, so
+   * a reconciliation never makes a replicated head look absent.
+   */
+  private readonly rebuildingHeadsByNetworkId = new Map<
+    string,
+    Map<string, Record<string, unknown>>
+  >();
+
   private readonly persistedHeadKeysByNetworkId = new Map<
     string,
     Set<string>
@@ -961,6 +971,9 @@ export default class OrbitDBReplicatedStateRegistry {
   private replicatedHeads(
     networkId: string,
   ): Map<string, Record<string, unknown>> {
+    const rebuilding = this.rebuildingHeadsByNetworkId.get(networkId);
+
+    if (rebuilding) return rebuilding;
     const heads =
       this.replicatedHeadsByNetworkId.get(networkId) ??
       new Map<string, Record<string, unknown>>();
@@ -968,6 +981,13 @@ export default class OrbitDBReplicatedStateRegistry {
     this.replicatedHeadsByNetworkId.set(networkId, heads);
 
     return heads;
+  }
+
+  private readableHeadMaps(): Array<Map<string, Record<string, unknown>>> {
+    return [
+      ...this.replicatedHeadsByNetworkId.values(),
+      ...this.rebuildingHeadsByNetworkId.values(),
+    ];
   }
 
   private scopedHeadRecord(
@@ -1055,9 +1075,7 @@ export default class OrbitDBReplicatedStateRegistry {
     }
 
     const candidates = [
-      ...[...this.replicatedHeadsByNetworkId.values()].map((heads) =>
-        heads.get(key),
-      ),
+      ...this.readableHeadMaps().map((heads) => heads.get(key)),
       this.projectedHeads.get(key),
     ].filter(
       (candidate): candidate is Record<string, unknown> =>
@@ -1085,9 +1103,7 @@ export default class OrbitDBReplicatedStateRegistry {
   private cachedHeadKeys(): Set<string> {
     return new Set([
       ...this.projectedHeads.keys(),
-      ...[...this.replicatedHeadsByNetworkId.values()].flatMap((heads) => [
-        ...heads.keys(),
-      ]),
+      ...this.readableHeadMaps().flatMap((heads) => [...heads.keys()]),
     ]);
   }
 
@@ -1286,12 +1302,24 @@ export default class OrbitDBReplicatedStateRegistry {
     reconciledHeadSignature: string | undefined,
   ): Promise<void> {
     const startedAt = process.hrtime.bigint();
-    await this.resetReplicatedHeadCache(networkId);
-    const reconciledHeads = await this.hydrateHeadCache(
-      networkId,
-      stores,
-      reconciledHeadSignature,
-    );
+
+    if (!this.rebuildingHeadsByNetworkId.has(networkId)) {
+      this.rebuildingHeadsByNetworkId.set(networkId, new Map());
+    }
+    let succeeded = false;
+    let reconciledHeads: number;
+
+    try {
+      await this.resetReplicatedHeadCache(networkId);
+      reconciledHeads = await this.hydrateHeadCache(
+        networkId,
+        stores,
+        reconciledHeadSignature,
+      );
+      succeeded = true;
+    } finally {
+      this.finishHeadCacheRebuild(networkId, succeeded);
+    }
     const elapsedMilliseconds =
       Number(process.hrtime.bigint() - startedAt) / 1_000_000;
 
@@ -1307,8 +1335,26 @@ export default class OrbitDBReplicatedStateRegistry {
       await this.headCache.deleteByNetworkId(networkId);
     }
 
-    this.replicatedHeadsByNetworkId.delete(networkId);
     this.persistedHeadKeysByNetworkId.delete(networkId);
+  }
+
+  /** Takes the rebuilt cache over; a failed rebuild keeps what it had and adds what it learned. */
+  private finishHeadCacheRebuild(networkId: string, succeeded: boolean): void {
+    const rebuilt = this.rebuildingHeadsByNetworkId.get(networkId);
+
+    this.rebuildingHeadsByNetworkId.delete(networkId);
+
+    if (!rebuilt || !this.storesByNetworkId.has(networkId)) return;
+
+    if (succeeded) {
+      this.replicatedHeadsByNetworkId.set(networkId, rebuilt);
+
+      return;
+    }
+
+    const current = this.replicatedHeads(networkId);
+
+    for (const [key, head] of rebuilt) current.set(key, head);
   }
 
   private async hydratePersistedHeadCache(
@@ -1886,7 +1932,10 @@ export default class OrbitDBReplicatedStateRegistry {
     prefix: string,
     scope: OrbitDBHeadRecordScope,
   ): void {
-    for (const [networkId, heads] of this.replicatedHeadsByNetworkId) {
+    for (const [networkId, heads] of [
+      ...this.replicatedHeadsByNetworkId,
+      ...this.rebuildingHeadsByNetworkId,
+    ]) {
       this.applyHeadRecordScopeToNetwork(networkId, heads, prefix, scope);
     }
 
@@ -1986,6 +2035,7 @@ export default class OrbitDBReplicatedStateRegistry {
     this.storesByNetworkId.delete(networkId);
     this.persistedHeadKeysByNetworkId.delete(networkId);
     this.replicatedHeadsByNetworkId.delete(networkId);
+    this.rebuildingHeadsByNetworkId.delete(networkId);
     this.projectedHeads.clear();
     this.exactProjectedHeadKeys.clear();
 
@@ -1996,6 +2046,7 @@ export default class OrbitDBReplicatedStateRegistry {
     this.storesByNetworkId.clear();
     this.persistedHeadKeysByNetworkId.clear();
     this.replicatedHeadsByNetworkId.clear();
+    this.rebuildingHeadsByNetworkId.clear();
     this.projectedHeads.clear();
     this.exactProjectedHeadKeys.clear();
   }
