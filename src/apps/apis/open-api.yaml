@@ -23,6 +23,8 @@ tags:
 paths:
   /identity-devices/{identityId}:
     $ref: './identity-devices-api/swagger.yaml#/paths/~1identity-devices~1{identityId}'
+  /identity-devices/{identityId}/devices:
+    $ref: './identity-devices-api/swagger.yaml#/paths/~1identity-devices~1{identityId}~1devices'
   /identity-devices/transitions:
     $ref: './identity-devices-api/swagger.yaml#/paths/~1identity-devices~1transitions'
   /private-authorization/scopes:

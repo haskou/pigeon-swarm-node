@@ -15,8 +15,8 @@ paths:
         authenticates with the recovered stable identity signing key and the
         separate recovery authority.
 
-        The response never exposes an authorized-device catalog, credential
-        commitments, password material, recovery secrets or private keys.
+        The response never exposes the authorized-device list (see
+        /identity-devices/{identityId}/devices), credential commitments, password material, recovery secrets or private keys.
 
         Existing devices send X-Device-Credential and X-Device-Signature
         together. The device signature covers the same canonical request as
@@ -44,6 +44,41 @@ paths:
                 $ref: '#/components/schemas/DeviceAuthorization'
         '401':
           description: The signature is missing or invalid, the signer does not own the requested identity, or the supplied device credential is not currently authorized.
+        '409':
+          description: The authorization checkpoint is unavailable on this node.
+  /identity-devices/{identityId}/devices:
+    get:
+      tags:
+        - identity-devices
+      summary: List the authorized device credentials of the authenticated identity
+      description: |
+        Owner-only. Authentication is identical to the checkpoint read: the path
+        identity must equal the signing identity and exactly one complete device
+        or recovery proof is required. Returns the public credentials authorized
+        at the current head; no labels, commitments, revoked credentials or
+        revocation history.
+      parameters:
+        - in: path
+          name: identityId
+          required: true
+          schema:
+            type: string
+          description: Percent-encoded identity id. It must equal X-Identity-Id.
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XDeviceCredential'
+        - $ref: '#/components/parameters/XDeviceSignature'
+        - $ref: '#/components/parameters/XRecoverySignature'
+      responses:
+        '200':
+          description: Authorized device credentials at the current head.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceCatalog'
+        '401':
+          description: The signature is missing or invalid, the signer does not own the requested identity, or the supplied proof is not valid.
         '409':
           description: The authorization checkpoint is unavailable on this node.
   /identity-devices/transitions:
@@ -189,6 +224,25 @@ components:
         targetCredentialCommitment:
           type: string
           pattern: '^[a-f0-9]{64}$'
+    DeviceCatalog:
+      type: object
+      required:
+        - credentials
+        - epoch
+        - identityId
+        - revision
+      properties:
+        credentials:
+          type: array
+          items:
+            type: string
+        epoch:
+          type: string
+        identityId:
+          type: string
+        revision:
+          type: integer
+          minimum: 0
     DeviceAuthorization:
       type: object
       required:

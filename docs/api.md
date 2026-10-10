@@ -5449,8 +5449,8 @@ signing key must match the requested identity. A client performing total device
 recovery can therefore read the checkpoint after recovering that key, before it
 has an authorized device credential. Missing or invalid authentication and a
 different signer all return the same generic `401`. The response contains only
-`epoch`, `identityId` and `revision`; it does not expose a device catalog or
-credential commitments. Restricting the endpoint to the identity owner avoids
+`epoch`, `identityId` and `revision`. The authorized-device list is a
+separate owner-only endpoint (below). Restricting the endpoint to the identity owner avoids
 creating a public identity-target lookup or cross-identity access relationship.
 
 An existing device additionally sends `X-Device-Credential` and
@@ -5463,6 +5463,21 @@ verifies the device against the current authorization checkpoint or the recovery
 signature against its recovery authority before returning the checkpoint. A
 missing, mixed, malformed, invalid, revoked or unrelated proof returns the same
 generic `401` without revealing which check failed.
+
+List the currently authorized device credentials with:
+
+```http
+GET /identity-devices/{percent-encoded identityId}/devices
+```
+
+It has exactly the authentication of the checkpoint read: the stable identity
+signing key must match the requested identity and exactly one complete device
+or recovery proof is required, so no other participant can read the inventory.
+The response is `{ credentials, epoch, identityId, revision }`, where
+`credentials` holds the normalized public credentials authorized at the
+current head. It carries no labels, commitments, revoked credentials or
+revocation history; a client keeps its own device names. Failures are the same
+generic `401`, and `409` when the checkpoint is not available on this node.
 
 Submit an enrollment, revocation or recovery operation to:
 
@@ -5511,7 +5526,8 @@ rate limits it before any lookup or lock: 20 submissions per identity and 300
 per node per minute. Excess requests return `429`.
 
 The response contains only the identity identifier, current recovery epoch and
-deterministic current revision; it does not return an authorized-device catalog.
+deterministic current revision; the authorized-device list is only served by the
+owner-only `GET /identity-devices/{identityId}/devices`.
 Replayed operation or pairing identifiers, stale predecessors, wrong recovery
 epochs, pairing authorizations signed after their declared expiry, substituted
 identities or credentials, revoked authors and unrelated recovery authorities

@@ -1827,6 +1827,43 @@ export default class Definitions {
       .valueOf();
   }
 
+  @given('I sign the current device list request')
+  public async iSignTheCurrentDeviceListRequest(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.body = undefined;
+    const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}/devices`;
+    await this.signCurrentRequest('GET', path);
+    const timestamp = this.headers['x-timestamp'] as string;
+    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
+      'GET',
+      path,
+      timestamp,
+      this.getCurrentRequestBody(),
+    );
+    const device = await this.ensureIdentityDeviceOwnerKeyPair();
+    this.headers['x-device-credential'] = new IdentityId(
+      device.toPrimitives().publicKey,
+    ).valueOf();
+    this.headers['x-device-signature'] = device
+      .sign(JSON.stringify(payload))
+      .valueOf();
+  }
+
+  @given('another identity signs the current device list request')
+  public async anotherIdentitySignsTheCurrentDeviceListRequest(): Promise<void> {
+    const targetIdentityId = this.ownerIdentityId as IdentityId;
+    const signer = await this.ensureOtherIdentityKeyPair();
+    const signerIdentityId = this.otherIdentityId as IdentityId;
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/identity-devices/${encodeURIComponent(targetIdentityId.valueOf())}/devices`,
+      String(Date.now()),
+      signer,
+      signerIdentityId,
+    );
+  }
+
   @given('I sign the current device authorization checkpoint recovery request')
   public async iSignTheCurrentDeviceAuthorizationCheckpointRecoveryRequest(): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;
@@ -1871,6 +1908,18 @@ export default class Definitions {
       .find(identityId);
 
     expect(authorization?.getRevision().valueOf()).to.equal(0);
+  }
+
+  @then('response is the current device list')
+  public async responseIsTheCurrentDeviceList(): Promise<void> {
+    const device = await this.ensureIdentityDeviceOwnerKeyPair();
+
+    expect(this.response?.data).to.deep.equal({
+      credentials: [new IdentityId(device.toPrimitives().publicKey).valueOf()],
+      epoch: 'genesis',
+      identityId: this.ownerIdentityId?.valueOf(),
+      revision: 0,
+    });
   }
 
   @then('response is the current device authorization checkpoint')
@@ -5945,6 +5994,15 @@ export default class Definitions {
 
     this.response = await this.restClient.get(
       `/keychains/${encodeURIComponent(this.ownerIdentityId.valueOf())}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the current device list')
+  public async iGetTheCurrentDeviceList(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.response = await this.restClient.get(
+      `/identity-devices/${encodeURIComponent(identityId.valueOf())}/devices`,
       this.headers,
     );
   }
