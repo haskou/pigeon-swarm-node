@@ -98,6 +98,27 @@ export const pigeonEnvironmentSchema = {
     defaultValue: './var/cache/calls-turn-runtime.conf',
     type: 'string',
   },
+  PRIVATE_BLOB_MAX_BYTES: { defaultValue: 50 * 1024 * 1024, type: 'number' },
+  PRIVATE_BLOB_QUOTA_BYTES_PER_OWNER: {
+    defaultValue: 500 * 1024 * 1024,
+    type: 'number',
+  },
+  PRIVATE_BLOB_QUOTA_BYTES_TOTAL: {
+    defaultValue: 10 * 1024 * 1024 * 1024,
+    type: 'number',
+  },
+  PRIVATE_BLOB_RETENTION_MS: {
+    defaultValue: 7 * 24 * 60 * 60 * 1000,
+    type: 'number',
+  },
+  PRIVATE_BLOB_STORAGE_PATH: {
+    defaultValue: './private_blobs',
+    type: 'string',
+  },
+  PRIVATE_BLOB_UPLOAD_WINDOW_MS: {
+    defaultValue: 60 * 60 * 1000,
+    type: 'number',
+  },
   PUBSUB_TOPIC_PREFIX: { defaultValue: 'pigeon-swarm', type: 'string' },
   PUSH_VAPID_PRIVATE_KEY: { type: 'string' },
   PUSH_VAPID_PUBLIC_KEY: { type: 'string' },
