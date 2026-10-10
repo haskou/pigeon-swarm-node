@@ -23,6 +23,7 @@ export class PostIdentityRequest {
 
   public getIdentityPublishMessage(): IdentityPublishMessage {
     return new IdentityPublishMessage({
+      admissionNonce: this.body.admissionNonce,
       authorizationRevision: this.body.authorizationRevision,
       deviceCredential: this.body.deviceCredential,
       deviceCredentialCommitment: this.body.deviceCredentialCommitment,

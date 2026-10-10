@@ -1789,6 +1789,7 @@ Response:
 ```json
 {
   "id": "<identityId>",
+  "admissionNonce": "<nonce>",
   "authorizationRevision": 0,
   "deviceCredential": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
   "deviceCredentialCommitment": "<64 lowercase hexadecimal characters>",
@@ -1819,6 +1820,7 @@ Request:
 ```json
 {
   "id": "<identityId>",
+  "admissionNonce": "<nonce>",
   "authorizationRevision": 0,
   "deviceCredential": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
   "deviceCredentialCommitment": "<64 lowercase hexadecimal characters>",
@@ -1845,6 +1847,7 @@ The signature covers this canonical property order:
 
 ```json
 {
+  "admissionNonce": "<nonce>",
   "authorizationRevision": 0,
   "deviceCredential": "<genesisDeviceCredential>",
   "deviceCredentialCommitment": "<commitment>",
@@ -1859,6 +1862,15 @@ The signature covers this canonical property order:
   "version": 1
 }
 ```
+
+`admissionNonce` is a hashcash-style proof of work. SHA-256 of
+`pigeon-identity-admission:v1:<identityId>:<sorted networkIds joined by ','>:<admissionNonce>`
+must start with `IDENTITY_ADMISSION_DIFFICULTY_BITS` zero bits (default 16,
+about 65 thousand hashes). The nonce is covered by the identity signature, is
+at most 64 characters, and must be mined again whenever the network set changes.
+Every node verifies it; identities without a valid proof are rejected and never
+admitted to the replicated store. The request `admissionNonce` is required in
+practice: without it the identity is refused.
 
 Undefined optional properties are omitted before signing. Handles must already
 be normalized. Current requests reject `encryptedKeyPair`,

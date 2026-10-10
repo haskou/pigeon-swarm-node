@@ -6,6 +6,7 @@ import { IdentitySignaturePayload } from '@app/contexts/identities/domain/Identi
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { DeviceCredentialCommitment } from '@app/contexts/identities/domain/value-objects/DeviceCredentialCommitment';
+import { IdentityAdmissionProof } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionProof';
 import { IdentityAuthorizationRevision } from '@app/contexts/identities/domain/value-objects/IdentityAuthorizationRevision';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/IdentityVersion';
@@ -61,8 +62,10 @@ export class IdentityMother {
   public timestamp: Timestamp = new Timestamp(1773848829055);
 
   public signature: Signature = new Signature(
-    'm7XqWFHeZqRuuQplLYI7AdwTs79+stkLF6HZxl6rU+/oGIdXcQnNnUxziVLhAUJymE2sAuR5M1cT16ZrNuhvAg==',
+    'wCPbroLcA588ZrZgDcGixu5HCeeqlkSbgsi9YCtKsnsrlS5qCNkamXbrk8ktXD1FK29GAci803HFeTYySbCbAQ==',
   );
+
+  public admissionNonce: string | undefined = '241347';
 
   public version: IdentityVersion = new IdentityVersion(1);
 
@@ -99,6 +102,12 @@ export class IdentityMother {
     return this;
   }
 
+  public withAdmissionNonce(admissionNonce: string | undefined): this {
+    this.admissionNonce = admissionNonce;
+
+    return this;
+  }
+
   public withVersion(version: IdentityVersion): this {
     this.version = version;
 
@@ -128,8 +137,13 @@ export class IdentityMother {
         this.signature,
         this.version,
         this.previousIdentityExternalIdentifier,
+        this.admissionNonce,
       ),
     );
+  }
+
+  public mineAdmissionNonce(networks: string[]): string {
+    return IdentityAdmissionProof.mine(this.id.valueOf(), networks);
   }
 
   public async buildNext(
@@ -137,6 +151,7 @@ export class IdentityMother {
   ): Promise<Identity> {
     const current = this.build().toPrimitives();
     const unsigned: Omit<IdentityPrimitives, 'signature'> = {
+      admissionNonce: current.admissionNonce,
       authorizationRevision: current.authorizationRevision,
       deviceCredential: current.deviceCredential,
       deviceCredentialCommitment: current.deviceCredentialCommitment,
@@ -149,6 +164,11 @@ export class IdentityMother {
       version: current.version + 1,
       ...overrides,
     };
+
+    if (overrides.networks && overrides.admissionNonce === undefined) {
+      unsigned.admissionNonce = this.mineAdmissionNonce(overrides.networks);
+    }
+
     const signature = await this.encryptedKeyPair.sign(
       new IdentitySignatureDomainService().getCanonicalSigningContent(
         IdentitySignaturePayload.fromPrimitives(unsigned),

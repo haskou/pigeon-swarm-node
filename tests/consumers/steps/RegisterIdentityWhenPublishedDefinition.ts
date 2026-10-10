@@ -18,6 +18,7 @@ import { expect } from 'chai';
 import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import * as fsSync from 'fs';
 import path from 'path';
+import { mineAdmissionNonce } from '../../support/mineAdmissionNonce';
 
 setDefaultTimeout(20_000);
 
@@ -159,6 +160,7 @@ export default class RegisterIdentityWhenPublishedDefinition {
       picture: undefined,
     };
     const signaturePayload = {
+      admissionNonce: mineAdmissionNonce(identityId.valueOf(), [networkId]),
       authorizationRevision: 0,
       deviceCredential: deviceCredential.valueOf(),
       deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),

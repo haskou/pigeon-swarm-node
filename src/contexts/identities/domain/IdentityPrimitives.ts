@@ -3,6 +3,7 @@ import { PrimitiveOf } from '@haskou/value-objects';
 import { Profile } from './Profile';
 
 export interface IdentityPrimitives {
+  admissionNonce?: string;
   authorizationRevision: number;
   deviceCredential: string;
   deviceCredentialCommitment: string;

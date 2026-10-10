@@ -69,6 +69,38 @@ describe('OrbitDBIdentityMutationGate', () => {
     ).resolves.toBe(true);
   });
 
+  it('should reject a signed identity without a valid admission proof', async () => {
+    const signer = await SignedIdentityMother.create();
+    const invalid = signer.mineNonceNotCovering(
+      ['550e8400-e29b-41d4-a716-446655440009'],
+      ['550e8400-e29b-41d4-a716-446655440000'],
+    );
+
+    await expect(
+      gate.accepts(
+        'identities',
+        await metadata(signer.build({ admissionNonce: invalid })),
+      ),
+    ).resolves.toBe(false);
+  });
+
+  it('should reject an identity that enters a network its proof does not cover', async () => {
+    const signer = await SignedIdentityMother.create();
+    const networks = [
+      '550e8400-e29b-41d4-a716-446655440009',
+      '550e8400-e29b-41d4-a716-446655440008',
+    ];
+    const covered = signer.mineNonceNotCovering(
+      ['550e8400-e29b-41d4-a716-446655440009'],
+      networks,
+    );
+    const identity = signer.build({ admissionNonce: covered, networks });
+
+    await expect(
+      gate.accepts('identities', await metadata(identity)),
+    ).resolves.toBe(false);
+  });
+
   it('should accept a self-signed successor with a handle and previous cid', async () => {
     const signer = await SignedIdentityMother.create();
     const identity = signer.build({

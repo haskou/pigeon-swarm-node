@@ -2,6 +2,7 @@ import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityNotFoundError } from '../../../../../../src/contexts/identities/domain/errors/IdentityNotFoundError';
+import { IdentityAdmissionProof } from '../../../../../../src/contexts/identities/domain/value-objects/IdentityAdmissionProof';
 import { Identity } from '../../../../../../src/contexts/identities/domain/Identity';
 import { Profile } from '../../../../../../src/contexts/identities/domain/Profile';
 import { DeviceCredential } from '../../../../../../src/contexts/identities/domain/value-objects/DeviceCredential';
@@ -53,7 +54,20 @@ describe('IpfsIdentityRepository', () => {
     );
     const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
     const previousIdentityExternalIdentifier: string | undefined = undefined;
+    let nonce = 0;
+
+    while (
+      !IdentityAdmissionProof.isValid(
+        identityId.valueOf(),
+        [networkId],
+        nonce.toString(),
+      )
+    ) {
+      nonce += 1;
+    }
+
     const signaturePayload = {
+      admissionNonce: nonce.toString(),
       authorizationRevision: 0,
       deviceCredential: deviceCredential.valueOf(),
       deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),

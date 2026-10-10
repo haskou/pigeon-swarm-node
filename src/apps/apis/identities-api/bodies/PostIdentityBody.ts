@@ -27,6 +27,10 @@ export class PostIdentityBody {
   @IsEmpty()
   public readonly masterKeyDerivation?: never;
 
+  @IsOptional()
+  @IsString()
+  public readonly admissionNonce?: string;
+
   @IsString()
   public readonly id: string;
 

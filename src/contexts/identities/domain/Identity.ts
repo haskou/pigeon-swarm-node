@@ -13,6 +13,7 @@ import { IdentityPublication } from './IdentityPublication';
 import { IdentitySignaturePayload } from './IdentitySignaturePayload';
 import { DeviceCredential } from './value-objects/DeviceCredential';
 import { DeviceCredentialCommitment } from './value-objects/DeviceCredentialCommitment';
+import { IdentityAdmissionProof } from './value-objects/IdentityAdmissionProof';
 import { IdentityAuthorizationRevision } from './value-objects/IdentityAuthorizationRevision';
 import { IdentityExternalIdentifier } from './value-objects/IdentityExternalIdentifier';
 import { IdentityVersion } from './value-objects/IdentityVersion';
@@ -87,6 +88,14 @@ export class Identity extends AggregateRoot {
     assert(
       this.networks.length > 0,
       new IdentityMustHaveAtLeastOneNetworkError(),
+    );
+  }
+
+  public hasValidAdmissionProof(): boolean {
+    return IdentityAdmissionProof.isValid(
+      this.id.valueOf(),
+      this.networks.toArray().map((networkId) => networkId.valueOf()),
+      this.publication.getAdmissionNonce(),
     );
   }
 

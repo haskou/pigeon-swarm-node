@@ -1,10 +1,13 @@
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import IdentityCandidateValidationDomainService from '@app/contexts/identities/domain/services/IdentityCandidateValidationDomainService';
+import { IdentityAdmissionProof } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionProof';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { faker } from '@faker-js/faker';
 
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { SignedIdentityMother } from '../../../../mothers/SignedIdentityMother';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe('IdentityCandidateValidationDomainService', () => {
@@ -31,6 +34,47 @@ describe('IdentityCandidateValidationDomainService', () => {
     );
 
     expect(result).toBe(true);
+  });
+
+  it('rejects a genesis whose admission proof does not cover its networks', async () => {
+    const signer = await SignedIdentityMother.create();
+    const candidate = signer.build({
+      admissionNonce: signer.mineNonceNotCovering(
+        ['550e8400-e29b-41d4-a716-446655440077'],
+        ['550e8400-e29b-41d4-a716-446655440000'],
+      ),
+    });
+
+    await expect(
+      service.isValidChainFor(new IdentityId(signer.id), candidate, () =>
+        Promise.resolve(undefined),
+      ),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a successor that joins a network without fresh work', async () => {
+    const previousIdentity = mother.build();
+    const previousNetworks = previousIdentity.toPrimitives().networks;
+    const networks = [
+      ...previousNetworks,
+      '550e8400-e29b-41d4-a716-446655440077',
+    ];
+    const candidate = await mother.buildNext({
+      admissionNonce: IdentityAdmissionProof.mine(
+        mother.id.valueOf(),
+        previousNetworks,
+        (nonce) =>
+          !IdentityAdmissionProof.isValid(mother.id.valueOf(), networks, nonce),
+      ),
+      networks,
+      previousIdentityExternalIdentifier: 'bafypreviousidentity',
+    });
+
+    await expect(
+      service.isValidChainFor(mother.id, candidate, () =>
+        Promise.resolve(previousIdentity),
+      ),
+    ).resolves.toBe(false);
   });
 
   it('rejects a previous chain deeper than the allowed depth', async () => {

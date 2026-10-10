@@ -22,6 +22,7 @@ import {
   signCallStart,
 } from '../../support/signCall';
 import { signConversationOperation } from '../../support/signConversationOperation';
+import { mineAdmissionNonce } from '../../support/mineAdmissionNonce';
 import {
   signNotificationInvitation,
   signNotificationState,
@@ -530,6 +531,7 @@ async function publishIdentity(
   const timestamp = Date.now();
   const version = 1;
   const signaturePayload = {
+    admissionNonce: mineAdmissionNonce(id, [NETWORK_ID]),
     authorizationRevision: 0,
     deviceCredential: deviceCredential.valueOf(),
     deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),
@@ -578,6 +580,7 @@ async function updateIdentity(
   handle: string,
 ): Promise<IdentityFixture> {
   const signaturePayload = {
+    admissionNonce: mineAdmissionNonce(identity.id, [NETWORK_ID]),
     authorizationRevision: identity.authorizationRevision,
     deviceCredential: identity.deviceCredential,
     deviceCredentialCommitment: identity.deviceCredentialCommitment,

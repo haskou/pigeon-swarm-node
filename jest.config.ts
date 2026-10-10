@@ -11,13 +11,14 @@ const config: Config.InitialOptions = {
   moduleNameMapper: {
     '^@app/(.*)$': '<rootDir>/src/$1',
   },
-  testPathIgnorePatterns: [
-    '<rootDir>/node_modules/',
-  ],
+  testPathIgnorePatterns: ['<rootDir>/node_modules/'],
   verbose: true,
   roots: ['<rootDir>/src/', '<rootDir>/tests/'],
   moduleDirectories: ['node_modules', '<rootDir>/src'],
-  setupFiles: ['reflect-metadata'],
+  setupFiles: [
+    'reflect-metadata',
+    '<rootDir>/tests/support/jest-environment.ts',
+  ],
   coverageReporters: ['json'],
   coverageDirectory: '<rootDir>/coverage/unit',
   collectCoverageFrom: ['<rootDir>/src/**/*.ts'],

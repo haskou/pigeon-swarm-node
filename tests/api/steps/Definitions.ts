@@ -79,6 +79,7 @@ import { signConversationOperation } from '../../support/signConversationOperati
 import IPFSDefinition from './IPFSDefinition';
 import RestClient from './RestClient';
 import { RestResponse } from './RestResponse';
+import { mineAdmissionNonce } from '../../support/mineAdmissionNonce';
 
 chai.use(chaiSubset);
 
@@ -238,6 +239,7 @@ export default class Definitions {
       picture: undefined,
     };
     const signaturePayload = {
+      admissionNonce: mineAdmissionNonce(ownerIdentityId.valueOf(), networks),
       authorizationRevision: 0,
       deviceCredential: deviceCredential.valueOf(),
       deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),

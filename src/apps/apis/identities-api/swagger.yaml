@@ -96,6 +96,7 @@ components:
       additionalProperties: false
       required:
         - id
+        - admissionNonce
         - authorizationRevision
         - deviceCredential
         - deviceCredentialCommitment
@@ -108,6 +109,11 @@ components:
       properties:
         id:
           type: string
+        admissionNonce:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Proof-of-work nonce bound to the identity id and its sorted network ids. SHA-256 of `pigeon-identity-admission:v1:<id>:<networks>:<nonce>` must have IDENTITY_ADMISSION_DIFFICULTY_BITS leading zero bits. Covered by the identity signature.
         authorizationRevision:
           type: integer
           minimum: 0
@@ -179,6 +185,9 @@ components:
         id:
           type: string
           example: MCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=
+        admissionNonce:
+          type: string
+          description: Proof-of-work nonce covered by the identity signature.
         authorizationRevision:
           type: integer
           minimum: 0

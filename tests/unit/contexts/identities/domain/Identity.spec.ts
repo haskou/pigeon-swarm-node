@@ -25,6 +25,7 @@ describe(Identity.name, () => {
     const primitives = mother.build().toPrimitives();
 
     expect(primitives).toEqual({
+      admissionNonce: mother.admissionNonce,
       authorizationRevision: mother.authorizationRevision.valueOf(),
       deviceCredential: mother.deviceCredential.valueOf(),
       deviceCredentialCommitment: mother.deviceCredentialCommitment.valueOf(),
@@ -152,9 +153,7 @@ describe(Identity.name, () => {
       const unsigned: Omit<IdentityPrimitives, 'signature'> = {
         ...mother.build().toPrimitives(),
         deviceCredential: deviceCredential.valueOf(),
-        deviceCredentialCommitment: deviceCredential
-          .getCommitment()
-          .valueOf(),
+        deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),
         id: id.valueOf(),
         recoveryAuthority: recoveryAuthority.valueOf(),
       };

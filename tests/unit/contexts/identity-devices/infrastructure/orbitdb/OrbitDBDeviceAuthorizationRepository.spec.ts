@@ -151,6 +151,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     );
     identity.getVersion.mockReturnValue(new IdentityVersion(version));
     identity.isIdentifiedBy.mockReturnValue(true);
+    identity.hasValidAdmissionProof.mockReturnValue(true);
     identity.isFirstVersion.mockReturnValue(version === 1);
     identity.hasNoPreviousReference.mockReturnValue(version === 1);
     identity.hasInitialAuthorizationRevision.mockReturnValue(true);

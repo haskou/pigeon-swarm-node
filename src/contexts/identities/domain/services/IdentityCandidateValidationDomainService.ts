@@ -42,7 +42,9 @@ export default class IdentityCandidateValidationDomainService {
   }
 
   public isValidFor(identityId: IdentityId, candidate: Identity): boolean {
-    return candidate.isIdentifiedBy(identityId);
+    return (
+      candidate.isIdentifiedBy(identityId) && candidate.hasValidAdmissionProof()
+    );
   }
 
   public async isValidChainFor(
