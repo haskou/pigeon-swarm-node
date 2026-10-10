@@ -9,6 +9,11 @@ export type WebSocketRealtimeMessage =
       type: 'heartbeat_ack';
     }
   | {
+      cursor: number;
+      mailboxId: string;
+      type: 'mailbox_envelope';
+    }
+  | {
       event: unknown;
       type: 'domain_event';
     }

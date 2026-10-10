@@ -9,6 +9,7 @@ import { RawData, WebSocket } from 'ws';
 
 import { CallRealtimeAudience } from './CallRealtimeAudience';
 import { ConversationCallEventRealtimeMapper } from './ConversationCallEventRealtimeMapper';
+import MailboxEnvelopeSubscriptions from './MailboxEnvelopeSubscriptions';
 import { WebSocketClientMessage } from './WebSocketClientMessage';
 import WebSocketClientMessageHandler from './WebSocketClientMessageHandler';
 import { WebSocketRealtimeMessage } from './WebSocketRealtimeMessage';
@@ -59,6 +60,7 @@ export class WebSocketEventHub {
   private readonly pendingCalls = new Map<string, Promise<void>>();
 
   private readonly clients = new Map<string, Set<WebSocket>>();
+  private readonly mailboxSubscriptions = new MailboxEnvelopeSubscriptions();
   private readonly messageWindows = new WeakMap<
     WebSocket,
     { count: number; resetAt: number }
@@ -224,6 +226,14 @@ export class WebSocketEventHub {
     if (message.type === 'call_signal_ack') {
       this.acknowledgeCallSignal(identityId, message).catch(() => {
         Kernel.logger?.error('WebSocket call signal acknowledgement failed');
+      });
+
+      return;
+    }
+
+    if (message.type === 'mailbox_subscribe') {
+      this.subscribeToMailbox(client, message).catch(() => {
+        Kernel.logger?.error('WebSocket mailbox subscription failed');
       });
 
       return;
@@ -464,6 +474,27 @@ export class WebSocketEventHub {
     );
   }
 
+  private async subscribeToMailbox(
+    client: WebSocket,
+    message: WebSocketClientMessage,
+  ): Promise<void> {
+    if (
+      typeof message.mailboxId !== 'string' ||
+      typeof message.readToken !== 'string'
+    ) {
+      return;
+    }
+
+    const authorized = await this.clientMessageHandler?.canReadMailbox(
+      message.mailboxId,
+      message.readToken,
+    );
+
+    if (authorized && client.readyState === WebSocket.OPEN) {
+      this.mailboxSubscriptions.add(client, message.mailboxId);
+    }
+  }
+
   private parseClientMessage(
     rawMessage: RawData,
   ): WebSocketClientMessage | undefined {
@@ -491,6 +522,12 @@ export class WebSocketEventHub {
       case 'call_signal_ack':
         return {
           signalId: this.optionalString(message.signalId),
+          type: message.type,
+        };
+      case 'mailbox_subscribe':
+        return {
+          mailboxId: this.optionalString(message.mailboxId),
+          readToken: this.optionalString(message.readToken),
           type: message.type,
         };
       case 'identity_heartbeat':
@@ -521,6 +558,7 @@ export class WebSocketEventHub {
   }
 
   private unregister(identityId: string, client: WebSocket): void {
+    this.mailboxSubscriptions.remove(client);
     const identityClients = this.clients.get(identityId);
 
     if (!identityClients) {
@@ -685,6 +723,7 @@ export class WebSocketEventHub {
 
   public clear(): void {
     this.clients.clear();
+    this.mailboxSubscriptions.clear();
   }
 
   public setCallEventAttestor(attestor: CallEventAttestor): void {
@@ -693,6 +732,18 @@ export class WebSocketEventHub {
 
   public setClientMessageHandler(handler: WebSocketClientMessageHandler): void {
     this.clientMessageHandler = handler;
+  }
+
+  public publishMailboxEnvelope(mailboxId: string, cursor: number): void {
+    const message: WebSocketRealtimeMessage = {
+      cursor,
+      mailboxId,
+      type: 'mailbox_envelope',
+    };
+
+    this.mailboxSubscriptions.subscribersOf(mailboxId).forEach((client) => {
+      this.send(client, message);
+    });
   }
 
   public setNetworkSynchronizationStatusProvider(

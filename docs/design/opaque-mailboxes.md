@@ -162,7 +162,7 @@ Network-level protection (Tor, mixnets, relays) is out of scope.
 1. Domain and storage: `Mailbox` aggregate, capability hashing, quotas, expiry
    scheduler, local database repository, with unit tests for every limit and for
    crash atomicity.
-2. HTTP API and OpenAPI/Swagger/`docs/api.md`; WebSocket `mailbox_envelope` hint.
+2. HTTP API and OpenAPI/Swagger/`docs/api.md`; WebSocket `mailbox_envelope` hint (done).
 3. Real-transport test proving mailbox records and envelopes never reach DHT,
    public IPFS or pubsub, and that an offline recipient receives pending
    envelopes after reconnect.
