@@ -1864,14 +1864,14 @@
     "@multiformats/multiaddr" "^13.0.3"
     progress-events "^1.0.1"
 
-"@libp2p/interface@3.2.5", "@libp2p/interface@^3.0.0", "@libp2p/interface@^3.0.2", "@libp2p/interface@^3.1.0", "@libp2p/interface@^3.2.0", "@libp2p/interface@^3.2.2", "@libp2p/interface@^3.2.3", "@libp2p/interface@^3.2.4", "@libp2p/interface@^3.2.5", "@libp2p/interface@^3.3.0":
-  version "3.2.5"
-  resolved "https://registry.yarnpkg.com/@libp2p/interface/-/interface-3.2.5.tgz#fe951a4f864f9012e5b9ae9495ebebdf20c0e4b7"
-  integrity sha512-RdTchTdakBBc4ShKKsvoME/bJYsrCoVDpdYQVdd4TQ30TCb8QwWKGClqAtw7gfLNuaUKm41xz06kASW6AZpbDA==
+"@libp2p/interface@3.3.1", "@libp2p/interface@^3.0.0", "@libp2p/interface@^3.0.2", "@libp2p/interface@^3.1.0", "@libp2p/interface@^3.2.0", "@libp2p/interface@^3.2.2", "@libp2p/interface@^3.2.3", "@libp2p/interface@^3.2.4", "@libp2p/interface@^3.2.5", "@libp2p/interface@^3.3.0":
+  version "3.3.1"
+  resolved "https://registry.yarnpkg.com/@libp2p/interface/-/interface-3.3.1.tgz#985813fca1f54bb69fd095da8ce1facc20e9a800"
+  integrity sha512-o+C4OAW+7HWUDylczSxkX/67HRYtSyKj5wAwNXu3CZnfPBw7x2/mvKT7GoHgEvIpW/5VddsSFt+e8CpmldFkHA==
   dependencies:
     "@multiformats/dns" "^1.0.6"
     "@multiformats/multiaddr" "^13.0.3"
-    main-event "^1.0.1"
+    main-event "^1.0.5"
     multiformats "^14.0.0"
     progress-events "^1.1.0"
     uint8arraylist "^3.0.2"
@@ -7104,6 +7104,11 @@ main-event@^1.0.4:
   version "1.0.4"
   resolved "https://registry.yarnpkg.com/main-event/-/main-event-1.0.4.tgz#371eb627575ba4379fa35c854b8952208f1fcdc3"
   integrity sha512-sKazUjIy2Jalv5lkQ446iOcrx8Q7TkaCuk6xfnzg5uUqMusMLDMPmRDmSNE2kjSVpSTJo4j1bQZusS+Ib7Bvrg==
+
+main-event@^1.0.5:
+  version "1.0.5"
+  resolved "https://registry.yarnpkg.com/main-event/-/main-event-1.0.5.tgz#956db3cd0d730cc96df9440e4da78a2519702ce9"
+  integrity sha512-4l9z8r7Q446mhhVTwdHmfPksOYBwN2xa7ewEW2yxPVNQapIaAf57ORFLMB91SpMEMa4wXowect7fq3uMLjDnGA==
 
 make-dir@^3.0.0, make-dir@^3.0.2:
   version "3.1.0"
