@@ -126,6 +126,7 @@ export const pigeonEnvironmentSchema = {
     defaultValue: 'mailto:admin@localhost',
     type: 'string',
   },
+  REALTIME_ALLOWED_ORIGINS: { defaultValue: '', type: 'string' },
   ROUTE_PREFIX: { type: 'string' },
   SERVICE_NAME: { type: 'string' },
   TRANSPORT_DSN: { defaultValue: 'in-memory', type: 'string' },

@@ -5,12 +5,14 @@ import { WebSocketServer } from 'ws';
 import { WebSocketAdmissionLimiter } from './WebSocketAdmissionLimiter';
 import { WebSocketConnectionAuthenticator } from './WebSocketConnectionAuthenticator';
 import { webSocketEventHub } from './WebSocketEventHub';
+import { WebSocketOriginPolicy } from './WebSocketOriginPolicy';
 
 const MAX_CLIENT_FRAME_BYTES = 16 * 1024;
 
 export class WebSocketRealtimeServer {
   private readonly admissionLimiter = new WebSocketAdmissionLimiter();
   private readonly authenticator = new WebSocketConnectionAuthenticator();
+  private readonly originPolicy = new WebSocketOriginPolicy();
   private readonly server = new WebSocketServer({
     maxPayload: MAX_CLIENT_FRAME_BYTES,
     noServer: true,
@@ -25,6 +27,13 @@ export class WebSocketRealtimeServer {
     const url = new URL(request.url || '/', 'http://localhost');
 
     if (url.pathname !== websocketPath) {
+      return;
+    }
+
+    if (!this.originPolicy.allows(request)) {
+      socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+      socket.destroy();
+
       return;
     }
 
