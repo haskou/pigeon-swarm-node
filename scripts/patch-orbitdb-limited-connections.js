@@ -151,6 +151,57 @@ const files = [
         runOnLimitedConnection: true
       })`,
       },
+      {
+        search: `  const headsSyncAddress = pathJoin('/orbitdb/heads/', address)`,
+        replacement: `  const headsSyncAddress = pathJoin('/orbitdb/heads-framed/', address)
+  const MaxHeadFrameBytes = 16 * 1024 * 1024
+
+  const frameHead = (bytes) => {
+    const frame = new Uint8Array(4 + bytes.length)
+    new DataView(frame.buffer).setUint32(0, bytes.length)
+    frame.set(bytes, 4)
+    return frame
+  }`,
+      },
+      {
+        search: `        stream.send(bytes)`,
+        replacement: `        stream.send(frameHead(bytes))`,
+      },
+      {
+        search: `    for await (const value of stream) {
+      const headBytes = value.subarray()
+      if (headBytes && onSynced) {
+        const entry = await Entry.decode(headBytes, log.encryption.replication?.decrypt, log.encryption.data?.decrypt)
+        await onSynced(entry)
+      }
+    }`,
+        replacement: `    let pending = new Uint8Array(0)
+    for await (const value of stream) {
+      const chunk = value.subarray()
+      const joined = new Uint8Array(pending.length + chunk.length)
+      joined.set(pending)
+      joined.set(chunk, pending.length)
+      pending = joined
+      while (pending.length >= 4) {
+        const length = new DataView(pending.buffer, pending.byteOffset).getUint32(0)
+        if (length > MaxHeadFrameBytes) {
+          throw new Error('Heads frame exceeds the size limit')
+        }
+        if (pending.length < 4 + length) {
+          break
+        }
+        const headBytes = pending.slice(4, 4 + length)
+        pending = pending.subarray(4 + length)
+        if (onSynced) {
+          const entry = await Entry.decode(headBytes, log.encryption.replication?.decrypt, log.encryption.data?.decrypt)
+          await onSynced(entry)
+        }
+      }
+    }
+    if (pending.length > 0) {
+      throw new Error('Heads stream ended inside a frame')
+    }`,
+      },
     ],
   },
 ];

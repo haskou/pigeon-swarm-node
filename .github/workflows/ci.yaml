@@ -161,3 +161,7 @@ jobs:
       - name: Network reconfiguration
         run: yarn test:integration:network-reconfiguration
         timeout-minutes: 4
+
+      - name: OrbitDB heads framing
+        run: yarn test:integration:orbitdb-heads-framing
+        timeout-minutes: 4
