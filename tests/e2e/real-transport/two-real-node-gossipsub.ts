@@ -580,6 +580,7 @@ async function updateIdentity(
   handle: string,
 ): Promise<IdentityFixture> {
   const signaturePayload = {
+    admissionNonce: mineAdmissionNonce(identity.id, [NETWORK_ID]),
     authorizationRevision: identity.authorizationRevision,
     deviceCredential: identity.deviceCredential,
     deviceCredentialCommitment: identity.deviceCredentialCommitment,
