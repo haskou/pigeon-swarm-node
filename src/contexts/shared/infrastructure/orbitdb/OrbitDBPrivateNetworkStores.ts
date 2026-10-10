@@ -98,19 +98,6 @@ export class OrbitDBPrivateNetworkStores {
     );
   }
 
-  private static describeOrigin(error: unknown): string {
-    if (!(error instanceof Error) || !error.stack) {
-      return '';
-    }
-
-    const frames = error.stack
-      .split('\n')
-      .slice(1, 7)
-      .map((frame) => frame.trim().replace(/^at /, ''));
-
-    return ` origin=[${frames.join(' <- ')}]`;
-  }
-
   private static registerSyncErrorLogger(
     networkId: string,
     store: string,
@@ -130,8 +117,7 @@ export class OrbitDBPrivateNetworkStores {
         `OrbitDB private network store sync error handled: networkId=${networkId}` +
           ` store=${store}` +
           ` transient=${this.isTransientSyncError(error)}` +
-          ` error=${String(error)}` +
-          this.describeOrigin(error),
+          ` error=${String(error)}`,
       );
     });
   }
