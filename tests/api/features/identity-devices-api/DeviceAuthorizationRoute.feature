@@ -70,3 +70,33 @@ Feature: Device authorization route
     Given another identity signs the current device authorization checkpoint request
     When I GET the current device authorization checkpoint
     Then response code is equal to 401
+
+  Scenario: List the authorized devices only to the owner
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "device list owner" and handle "device-list-owner"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I sign the current device list request
+    When I GET the current device list
+    Then response code is equal to 200
+    And response is the current device list
+
+  Scenario: Reject an unauthenticated device list read
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "device list private" and handle "device-list-private"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    When I GET the current device list
+    Then response code is equal to 401
+
+  Scenario: Reject another identity reading the device list
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "device list isolated" and handle "device-list-isolated"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given another identity signs the current device list request
+    When I GET the current device list
+    Then response code is equal to 401
