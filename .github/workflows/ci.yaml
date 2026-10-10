@@ -17,7 +17,7 @@ permissions:
 jobs:
   static:
     name: Static checks
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - name: Checkout code
@@ -40,7 +40,7 @@ jobs:
 
   unit:
     name: Unit tests
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -57,7 +57,7 @@ jobs:
 
   unit-device-authorization:
     name: Device authorization repository spec
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -74,7 +74,7 @@ jobs:
 
   cucumber:
     name: Cucumber suites
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -103,7 +103,7 @@ jobs:
 
   integration:
     name: In-process integration scripts
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=4096
