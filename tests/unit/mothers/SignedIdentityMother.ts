@@ -1,3 +1,4 @@
+import { IdentityAdmissionProof } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionProof';
 import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
 import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { Identity } from '@app/contexts/identities/domain/Identity';
@@ -9,6 +10,7 @@ import { ProfileName } from '@app/contexts/identities/domain/value-objects/Profi
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 
 export interface SignedIdentityOptions {
+  admissionNonce?: string;
   handle?: string;
   networks?: string[];
   previousIdentityExternalIdentifier?: string;
@@ -36,19 +38,36 @@ export class SignedIdentityMother {
     );
   }
 
+  public mineAdmissionNonce(networks: string[]): string {
+    let nonce = 0;
+
+    while (
+      !IdentityAdmissionProof.isValid(this.id, networks, nonce.toString())
+    ) {
+      nonce += 1;
+    }
+
+    return nonce.toString();
+  }
+
   public get id(): string {
     return new IdentityId(this.keyPair.toPrimitives().publicKey).valueOf();
   }
 
   public build(options: SignedIdentityOptions = {}): Identity {
+    const networks = options.networks ?? [
+      '550e8400-e29b-41d4-a716-446655440000',
+    ];
     const payload = {
+      admissionNonce:
+        options.admissionNonce ?? this.mineAdmissionNonce(networks),
       authorizationRevision: 0,
       deviceCredential: this.deviceCredential.valueOf(),
       deviceCredentialCommitment: this.deviceCredential
         .getCommitment()
         .valueOf(),
       id: this.id,
-      networks: options.networks ?? ['550e8400-e29b-41d4-a716-446655440000'],
+      networks,
       previousIdentityExternalIdentifier:
         options.previousIdentityExternalIdentifier,
       profile: new Profile(

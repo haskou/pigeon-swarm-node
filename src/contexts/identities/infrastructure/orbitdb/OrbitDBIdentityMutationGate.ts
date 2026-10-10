@@ -117,6 +117,7 @@ export class OrbitDBIdentityMutationGate extends OrbitDBMutationGate {
 
       return signed.networks.length <=
         OrbitDBIdentityMutationGate.MAX_NETWORKS &&
+        identity.hasValidAdmissionProof() &&
         this.repeatsSignedFields(record, signed) &&
         (await this.isCanonical(identity, record.cid))
         ? identity

@@ -5,6 +5,7 @@ import { IpfsIdentityDocument } from '../documents/IpfsIdentityDocument';
 export default class IpfsIdentityMapper {
   public toDomain(document: IpfsIdentityDocument): Identity {
     return Identity.fromPrimitives({
+      admissionNonce: document.admissionNonce,
       authorizationRevision: document.authorizationRevision,
       deviceCredential: document.deviceCredential,
       deviceCredentialCommitment: document.deviceCredentialCommitment,
@@ -24,6 +25,7 @@ export default class IpfsIdentityMapper {
 
     return {
       _id: primitives.id,
+      admissionNonce: primitives.admissionNonce,
       authorizationRevision: primitives.authorizationRevision,
       deviceCredential: primitives.deviceCredential,
       deviceCredentialCommitment: primitives.deviceCredentialCommitment,

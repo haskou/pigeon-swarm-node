@@ -8,6 +8,7 @@ import { ProfileHandle } from './value-objects/ProfileHandle';
 
 export class IdentityPublication {
   public static fromPrimitives(primitives: {
+    admissionNonce?: string;
     previousIdentityExternalIdentifier?: string;
     profile: PrimitiveOf<Profile>;
     signature: string;
@@ -24,6 +25,7 @@ export class IdentityPublication {
             primitives.previousIdentityExternalIdentifier,
           )
         : undefined,
+      primitives.admissionNonce,
     );
   }
 
@@ -33,7 +35,12 @@ export class IdentityPublication {
     private readonly signature: Signature,
     private readonly version: IdentityVersion,
     private readonly previousIdentityExternalIdentifier?: IdentityExternalIdentifier,
+    private readonly admissionNonce?: string,
   ) {}
+
+  public getAdmissionNonce(): string | undefined {
+    return this.admissionNonce;
+  }
 
   public hasHandle(handle: ProfileHandle): boolean {
     return this.profile.hasHandle(handle);
@@ -73,6 +80,7 @@ export class IdentityPublication {
 
   public toPrimitives() {
     return {
+      admissionNonce: this.admissionNonce,
       previousIdentityExternalIdentifier:
         this.previousIdentityExternalIdentifier?.valueOf(),
       profile: this.profile.toPrimitives(),

@@ -47,6 +47,7 @@ describe('IpfsIdentityMapper', () => {
       const primitives = identity.toPrimitives();
       const document: IpfsIdentityDocument = {
         _id: primitives.id,
+        admissionNonce: primitives.admissionNonce,
         authorizationRevision: primitives.authorizationRevision,
         deviceCredential: primitives.deviceCredential,
         deviceCredentialCommitment: primitives.deviceCredentialCommitment,

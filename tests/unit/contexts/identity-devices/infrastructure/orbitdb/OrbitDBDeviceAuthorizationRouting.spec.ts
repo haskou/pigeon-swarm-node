@@ -72,6 +72,7 @@ describe(OrbitDBDeviceAuthorizationRouting.name, () => {
     identity.isFirstVersion.mockReturnValue(options.version === 1);
     identity.hasNoPreviousReference.mockReturnValue(options.version === 1);
     identity.hasInitialAuthorizationRevision.mockReturnValue(true);
+    identity.hasValidAdmissionProof.mockReturnValue(true);
     identity.getPreviousReference.mockReturnValue(options.previous);
     identity.isNextVersionAfter.mockReturnValue(true);
     identity.usesSameGenesisAuthorizationAs.mockReturnValue(true);

@@ -5,6 +5,8 @@ import { ProfileName } from '@app/contexts/identities/domain/value-objects/Profi
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { faker } from '@faker-js/faker';
 
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { SignedIdentityMother } from '../../../../mothers/SignedIdentityMother';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 describe('IdentityCandidateValidationDomainService', () => {
@@ -31,6 +33,39 @@ describe('IdentityCandidateValidationDomainService', () => {
     );
 
     expect(result).toBe(true);
+  });
+
+  it('rejects a genesis whose admission proof does not cover its networks', async () => {
+    const signer = await SignedIdentityMother.create();
+    const candidate = signer.build({
+      admissionNonce: signer.mineAdmissionNonce([
+        '550e8400-e29b-41d4-a716-446655440077',
+      ]),
+    });
+
+    await expect(
+      service.isValidChainFor(new IdentityId(signer.id), candidate, () =>
+        Promise.resolve(undefined),
+      ),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a successor that joins a network without fresh work', async () => {
+    const previousIdentity = mother.build();
+    const candidate = await mother.buildNext({
+      admissionNonce: previousIdentity.toPrimitives().admissionNonce,
+      networks: [
+        ...previousIdentity.toPrimitives().networks,
+        '550e8400-e29b-41d4-a716-446655440077',
+      ],
+      previousIdentityExternalIdentifier: 'bafypreviousidentity',
+    });
+
+    await expect(
+      service.isValidChainFor(mother.id, candidate, () =>
+        Promise.resolve(previousIdentity),
+      ),
+    ).resolves.toBe(false);
   });
 
   it('rejects a previous chain deeper than the allowed depth', async () => {

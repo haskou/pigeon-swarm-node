@@ -1,4 +1,5 @@
 export interface IdentityResource {
+  admissionNonce?: string;
   id: string;
   authorizationRevision: number;
   deviceCredential: string;

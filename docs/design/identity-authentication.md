@@ -40,7 +40,8 @@ admitted only when:
 - `id === cid` and `cid` is the canonical CID of
   `IpfsIdentityMapper.toDocument(identity)`;
 - `identityId`, `handle`, `networkIds`, `version` and `previousCid` equal the
-  signed values, and the identity names at most 32 networks.
+  signed values, and the identity names at most 32 networks;
+- the identity carries a valid admission proof (see below).
 
 `acceptsHead` requires the key to equal the key derived from the signed
 identity, so a valid record cannot be planted under another identity's or
@@ -95,6 +96,25 @@ refusal is not a loss: the heads store keeps the entries, and the repository
 reads a missing head through `OrbitDBReplicatedStateRegistry.rehydrateHead`,
 which merges the persisted history of that key once the genesis is known.
 
+### (f) Admission proof (cost of minting identities)
+
+Every identity carries a signed `admissionNonce`. SHA-256 of
+`pigeon-identity-admission:v1:<identityId>:<sorted networkIds>:<nonce>` must
+start with `IDENTITY_ADMISSION_DIFFICULTY_BITS` zero bits (default 20, valid
+range 1-32, invalid values fall back to the default). The proof is stateless,
+so every node checks it from the record alone: the gate rejects records without
+it and `IdentityCandidateValidationDomainService` rejects whole chains
+containing one. It binds the work to the identity key and to the networks, so
+it cannot be moved to another key or reused to join another network; changing
+the network set requires mining again.
+
+Residual risk: this raises the CPU cost per minted identity (about 2^20
+SHA-256 hashes, around a second on a laptop) but cannot stop a motivated
+attacker with GPUs or many machines, and gives no per-network aggregate cap.
+All nodes of a network must run the same difficulty, otherwise they disagree on
+which identities are valid. Identities published before this change have no
+nonce and are no longer valid.
+
 ## Order and convergence
 
 Every decision depends only on the set of admitted records: gate admission is a
@@ -125,6 +145,8 @@ claiming that handle, which is the sybil non-goal below.
 - `IdentityHandleOwnershipDomainService.spec.ts` and
   `OrbitDBIdentityMetadataIndex.spec.ts`: earliest wins, tie-break, every
   projection order converges, caps.
+- `IdentityAdmissionProof.spec.ts`, plus gate and chain validation specs that
+  reject a missing proof or one that does not cover the networks.
 - `IdentityPublishRateLimiter.spec.ts`.
 - `yarn test:integration:forged-identities` (real-transport e2e).
 
@@ -132,8 +154,9 @@ claiming that handle, which is the sybil non-goal below.
 
 - The signer chooses the timestamp, so the holder of an identity key can
   backdate a claim.
-- Minting many valid identities (sybil) cannot be prevented without an
-  admission authority. The caps only bound the cost to honest nodes.
+- Minting many valid identities (sybil) is made costly by the admission proof
+  but not prevented; only an admission authority could do that. The caps bound
+  the cost to honest nodes.
 - A handle is a claim, not an authority: the identity id (public key) remains
   the authoritative reference.
 - The identity-key holder can equivocate on its own genesis; a peer without the

@@ -33,6 +33,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 import { teardownAndExit } from './RealTransportTeardown';
+import { mineAdmissionNonce } from '../../support/mineAdmissionNonce';
 
 type Replica = {
   name: string;
@@ -186,11 +187,15 @@ async function signedIdentity(
   const deviceCredential = DeviceCredential.fromString(
     signer.device.toPrimitives().publicKey,
   );
+  const identityId = new IdentityId(
+    signer.id.toPrimitives().publicKey,
+  ).valueOf();
   const unsigned: Omit<IdentityPrimitives, 'signature'> = {
+    admissionNonce: mineAdmissionNonce(identityId, [networkId]),
     authorizationRevision: 0,
     deviceCredential: deviceCredential.valueOf(),
     deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),
-    id: new IdentityId(signer.id.toPrimitives().publicKey).valueOf(),
+    id: identityId,
     networks: [networkId],
     previousIdentityExternalIdentifier: options.previousCid,
     profile: new Profile(
