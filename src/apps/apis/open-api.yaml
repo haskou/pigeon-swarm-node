@@ -17,6 +17,7 @@ tags:
   - name: notification-settings
   - name: presence
   - name: private-authorization
+  - name: private-blobs
   - name: polls
   - name: push
   - name: realtime
@@ -33,6 +34,10 @@ paths:
     $ref: './private-authorization-api/swagger.yaml#/paths/~1private-authorization~1challenges'
   /private-authorization/operations:
     $ref: './private-authorization-api/swagger.yaml#/paths/~1private-authorization~1operations'
+  /private-blobs:
+    $ref: './private-blobs-api/swagger.yaml#/paths/~1private-blobs'
+  /private-blobs/{blobId}:
+    $ref: './private-blobs-api/swagger.yaml#/paths/~1private-blobs~1{blobId}'
   /client-contract:
     $ref: './nodes-api/swagger.yaml#/paths/~1client-contract'
   /ws:
