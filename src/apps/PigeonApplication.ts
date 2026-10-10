@@ -23,6 +23,8 @@ import CommunityRepository from '../contexts/communities/domain/repositories/Com
 import CommunityRepositoryRouter from '../contexts/communities/infrastructure/CommunityRepositoryRouter';
 import { DeviceAuthorizationRepository } from '../contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
 import OrbitDBDeviceAuthorizationRepository from '../contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationRepository';
+import MailboxRepository from '../contexts/mailboxes/domain/repositories/MailboxRepository';
+import LocalMailboxRepository from '../contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository';
 import NodeNetworkSynchronizationMonitor from '../contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
 import NotificationScopeSettingsRepository from '../contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
@@ -210,6 +212,7 @@ export default class PigeonApplication {
           token: DeviceAuthorizationRepository,
           useClass: OrbitDBDeviceAuthorizationRepository,
         },
+        { token: MailboxRepository, useClass: LocalMailboxRepository },
         { token: PrivateBlobRepository, useClass: LocalPrivateBlobRepository },
         { token: PrivateBlobBytesStore, useClass: FilePrivateBlobBytesStore },
         {

@@ -12,6 +12,7 @@ tags:
   - name: ipfs
   - name: keychains
   - name: link-previews
+  - name: mailboxes
   - name: nodes
   - name: notifications
   - name: notification-settings
@@ -34,6 +35,12 @@ paths:
     $ref: './private-authorization-api/swagger.yaml#/paths/~1private-authorization~1challenges'
   /private-authorization/operations:
     $ref: './private-authorization-api/swagger.yaml#/paths/~1private-authorization~1operations'
+  /mailboxes/{mailboxId}:
+    $ref: './mailboxes-api/swagger.yaml#/paths/~1mailboxes~1{mailboxId}'
+  /mailboxes/{mailboxId}/envelopes:
+    $ref: './mailboxes-api/swagger.yaml#/paths/~1mailboxes~1{mailboxId}~1envelopes'
+  /mailboxes/{mailboxId}/ack:
+    $ref: './mailboxes-api/swagger.yaml#/paths/~1mailboxes~1{mailboxId}~1ack'
   /private-blobs:
     $ref: './private-blobs-api/swagger.yaml#/paths/~1private-blobs'
   /private-blobs/{blobId}:

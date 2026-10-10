@@ -1,0 +1,206 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Mailbox API
+  version: 1.0.0
+  description: Node-local queues of opaque ciphertext envelopes addressed by an unlinkable mailbox identifier. Requests carry no identity; authorization is a bearer capability only. Mailboxes are never published to OrbitDB, IPFS, the DHT or pubsub.
+tags:
+  - name: mailboxes
+paths:
+  /mailboxes/{mailboxId}:
+    put:
+      tags:
+        - mailboxes
+      summary: Create a mailbox
+      description: Unauthenticated, rate limited per remote address by `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE`. The recipient supplies the SHA-256 (hex) of the post and read tokens; the node never sees the tokens at creation. Idempotent for identical hashes.
+      parameters:
+        - $ref: '#/components/parameters/MailboxId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - postTokenHash
+                - readTokenHash
+              properties:
+                postTokenHash:
+                  type: string
+                  pattern: '^[0-9a-f]{64}$'
+                readTokenHash:
+                  type: string
+                  pattern: '^[0-9a-f]{64}$'
+      responses:
+        '200':
+          description: Already exists with the same hashes.
+        '201':
+          description: Created.
+        '400':
+          description: Invalid hashes.
+        '409':
+          description: Exists with different hashes.
+        '429':
+          description: Creation rate limit or `MAILBOX_MAX_COUNT` reached.
+    delete:
+      tags:
+        - mailboxes
+      summary: Delete a mailbox and its envelopes
+      security:
+        - readCapability: []
+      parameters:
+        - $ref: '#/components/parameters/MailboxId'
+      responses:
+        '204':
+          description: Deleted.
+        '404':
+          description: Unknown mailbox or wrong capability.
+  /mailboxes/{mailboxId}/envelopes:
+    post:
+      tags:
+        - mailboxes
+      summary: Append an envelope
+      description: Authorized by the post capability. `body` must decode to exactly 1024, 4096, 16384 or 65536 bytes (clients pad to a bucket). Appending an already stored `envelopeId` returns the first cursor and stores nothing. A full mailbox fails with 409; older envelopes are never dropped.
+      security:
+        - postCapability: []
+      parameters:
+        - $ref: '#/components/parameters/MailboxId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - envelopeId
+                - body
+              properties:
+                envelopeId:
+                  type: string
+                  pattern: '^[A-Za-z0-9_-]{22}$'
+                  description: 16 random bytes, base64url. Deduplication key.
+                body:
+                  type: string
+                  description: Base64url ciphertext.
+      responses:
+        '200':
+          description: Duplicate envelopeId; the earlier cursor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cursor'
+        '201':
+          description: Stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cursor'
+        '400':
+          description: Body is not base64url or not an allowed size.
+        '404':
+          description: Unknown mailbox or wrong capability.
+        '409':
+          description: Mailbox reached its envelope or byte limit.
+    get:
+      tags:
+        - mailboxes
+      summary: Page pending envelopes
+      description: Authorized by the read capability. Returns envelopes with cursor greater than `after`, oldest first. Reading marks the mailbox live for retention.
+      security:
+        - readCapability: []
+      parameters:
+        - $ref: '#/components/parameters/MailboxId'
+        - name: after
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 100
+      responses:
+        '200':
+          description: A page of envelopes.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - envelopes
+                  - hasMore
+                properties:
+                  hasMore:
+                    type: boolean
+                  envelopes:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - body
+                        - cursor
+                        - envelopeId
+                      properties:
+                        body:
+                          type: string
+                        cursor:
+                          type: integer
+                        envelopeId:
+                          type: string
+        '404':
+          description: Unknown mailbox or wrong capability.
+  /mailboxes/{mailboxId}/ack:
+    post:
+      tags:
+        - mailboxes
+      summary: Acknowledge envelopes
+      description: Authorized by the read capability. Deletes every envelope with cursor up to and including `upTo`.
+      security:
+        - readCapability: []
+      parameters:
+        - $ref: '#/components/parameters/MailboxId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - upTo
+              properties:
+                upTo:
+                  type: integer
+                  minimum: 0
+      responses:
+        '204':
+          description: Acknowledged.
+        '404':
+          description: Unknown mailbox or wrong capability.
+components:
+  securitySchemes:
+    postCapability:
+      type: http
+      scheme: bearer
+    readCapability:
+      type: http
+      scheme: bearer
+  parameters:
+    MailboxId:
+      name: mailboxId
+      in: path
+      required: true
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9_-]{43}$'
+      description: 32 bytes, base64url, derived by the endpoints from a shared secret.
+  schemas:
+    Cursor:
+      type: object
+      required:
+        - cursor
+      properties:
+        cursor:
+          type: integer

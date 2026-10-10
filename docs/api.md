@@ -1611,6 +1611,24 @@ Response:
 }
 ```
 
+## Mailbox HTTP API
+
+Node-local queues of opaque ciphertext envelopes. Mailboxes are never written to OrbitDB, IPFS, the DHT or pubsub. No request carries an identity; authorization is a bearer capability only, and the node keeps the SHA-256 of each capability. Design: `docs/design/opaque-mailboxes.md`.
+
+| Step | Auth | Notes |
+| --- | --- | --- |
+| `PUT /mailboxes/{mailboxId}` | None, rate limited per remote address | Body `{ postTokenHash, readTokenHash }` (hex SHA-256). `201` created, `200` identical replay, `409` different hashes, `429` rate or `MAILBOX_MAX_COUNT` limit. |
+| `POST /mailboxes/{mailboxId}/envelopes` | `Bearer <postToken>` | Body `{ envelopeId, body }`. `body` is base64url and must decode to exactly 1024, 4096, 16384 or 65536 bytes (else `400`). `201` with `{ cursor }`; a repeated `envelopeId` returns `200` with the first cursor and stores nothing. A full mailbox returns `409`; nothing older is ever dropped. |
+| `GET /mailboxes/{mailboxId}/envelopes?after=&limit=` | `Bearer <readToken>` | Envelopes with cursor greater than `after`, oldest first, at most 100, with `hasMore`. `Cache-Control: no-store`. A read keeps the mailbox live. |
+| `POST /mailboxes/{mailboxId}/ack` | `Bearer <readToken>` | Body `{ upTo }`. Deletes envelopes up to and including that cursor. `204`. |
+| `DELETE /mailboxes/{mailboxId}` | `Bearer <readToken>` | Deletes the mailbox and its envelopes. `204`. |
+
+- `mailboxId` is 32 bytes base64url; capabilities are sent only in `Authorization`, never the URL.
+- A wrong, swapped or missing capability, a malformed id and an unknown mailbox all return the same `404`.
+- Limits: `MAILBOX_MAX_ENVELOPES`, `MAILBOX_MAX_BYTES`, `MAILBOX_MAX_COUNT`, `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE` (in memory, per remote address, `0` disables).
+- Retention: `MAILBOX_RETENTION_MS`. A scheduler deletes older envelopes and mailboxes not read for that long.
+- Not yet implemented: the realtime `mailbox_envelope` hint, client key schedule and retiring the replicated message collections.
+
 ## Private Blob HTTP API
 
 Node-local storage for client-encrypted bytes. Blobs are never added to IPFS, the DHT, pins or any index, and the server stores no filename, content type, key or thumbnail. The client MUST encrypt (and SHOULD pad to a size bucket) before uploading; padding reduces but does not eliminate size correlation. Unlike IPFS content, a blob is only as available as this node and its retention window. See `docs/design/private-blob-store.md`.
