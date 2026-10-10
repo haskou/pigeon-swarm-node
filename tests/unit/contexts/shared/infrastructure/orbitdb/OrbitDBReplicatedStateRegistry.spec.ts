@@ -1795,6 +1795,40 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     ).resolves.toBe(JSON.stringify(['head-2']));
   });
 
+  it('keeps serving cached heads while a peer join rebuilds the head cache', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const network = createStores();
+    const record = (updatedAt: number): Entry => ({
+      key: 'community:community-1',
+      value: { id: 'community-1', networkId: 'network-1', updatedAt },
+    });
+
+    network.heads.all.mockResolvedValue([record(1)]);
+    await registry.register('network-1', network.stores);
+
+    let release: (entries: Entry[]) => void = () => undefined;
+
+    network.heads.all.mockReturnValue(
+      new Promise<Entry[]>((resolve) => {
+        release = resolve;
+      }),
+    );
+    network.heads.emitJoin('peer-1', [{ hash: 'head-2' }] as OrbitDBEntry[]);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    await expect(registry.findHead('community:community-1')).resolves.toEqual(
+      record(1).value,
+    );
+
+    release([record(2)]);
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+
+    await expect(registry.findHead('community:community-1')).resolves.toEqual(
+      record(2).value,
+    );
+  });
+
   it('removes stale derived aliases when rebuilding a changed OrbitDB head cache', async () => {
     const headCache = new InMemoryOrbitDBReplicatedHeadCache();
     const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
