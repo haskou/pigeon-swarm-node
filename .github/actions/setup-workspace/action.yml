@@ -5,11 +5,13 @@ runs:
   using: composite
   steps:
     - name: Setup Node.js
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v7
       with:
         node-version: 24.21.0
         cache: 'yarn'
         registry-url: 'https://npm.pkg.github.com'
+      env:
+        NODE_AUTH_TOKEN: ${{ github.token }}
 
     - name: Install dependencies
       shell: bash
