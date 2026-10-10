@@ -12,6 +12,7 @@ const swaggerFileByApi: Record<string, string> = {
   'ipfs-api': 'ipfs-api/swagger.yaml',
   'keychains-api': 'keychains-api/swagger.yaml',
   'link-previews-api': 'link-previews-api/swagger.yaml',
+  'mailboxes-api': 'mailboxes-api/swagger.yaml',
   'nodes-api': 'nodes-api/swagger.yaml',
   'notification-settings-api': 'notification-settings-api/swagger.yaml',
   'notifications-api': 'notifications-api/swagger.yaml',

@@ -5386,6 +5386,169 @@ export default class Definitions {
     this.response = await this.restClient.delete(path, undefined, headers);
   }
 
+  private mailbox?: {
+    id: string;
+    postToken: string;
+    readToken: string;
+  };
+
+  private mailboxHeaders(capability: string): Record<string, string> {
+    const mailbox = this.mailbox;
+
+    if (!mailbox) {
+      throw new Error('Mailbox must be created first.');
+    }
+
+    if (capability === 'none') {
+      return {};
+    }
+
+    return {
+      authorization: `Bearer ${capability === 'post' ? mailbox.postToken : mailbox.readToken}`,
+    };
+  }
+
+  private mailboxHash(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  @when('I create a mailbox')
+  public async iCreateAMailbox(): Promise<void> {
+    this.mailbox = {
+      id: randomBytes(32).toString('base64url'),
+      postToken: randomBytes(32).toString('base64url'),
+      readToken: randomBytes(32).toString('base64url'),
+    };
+    await this.putMailbox(this.mailbox);
+  }
+
+  private async putMailbox(mailbox: {
+    id: string;
+    postToken: string;
+    readToken: string;
+  }): Promise<void> {
+    this.response = await this.restClient.put(`/mailboxes/${mailbox.id}`, {
+      postTokenHash: this.mailboxHash(mailbox.postToken),
+      readTokenHash: this.mailboxHash(mailbox.readToken),
+    });
+  }
+
+  @when('I create the same mailbox again')
+  public async iCreateTheSameMailboxAgain(): Promise<void> {
+    if (!this.mailbox) {
+      throw new Error('Mailbox must be created first.');
+    }
+
+    await this.putMailbox(this.mailbox);
+  }
+
+  @when('I create the mailbox again with other capabilities')
+  public async iCreateTheMailboxAgainWithOtherCapabilities(): Promise<void> {
+    if (!this.mailbox) {
+      throw new Error('Mailbox must be created first.');
+    }
+
+    await this.putMailbox({
+      ...this.mailbox,
+      postToken: randomBytes(32).toString('base64url'),
+    });
+  }
+
+  @when(
+    'I append an envelope {string} of {int} bytes to the mailbox with the {word} capability',
+  )
+  public async iAppendAMailboxEnvelope(
+    label: string,
+    size: number,
+    capability: string,
+  ): Promise<void> {
+    if (!this.mailbox) {
+      throw new Error('Mailbox must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/mailboxes/${this.mailbox.id}/envelopes`,
+      {
+        body: Buffer.alloc(size, label).toString('base64url'),
+        envelopeId: createHash('sha256')
+          .update(label)
+          .digest('base64url')
+          .slice(0, 22),
+      },
+      this.mailboxHeaders(capability),
+    );
+  }
+
+  @when(
+    'I read the mailbox envelopes after {int} limit {int} with the {word} capability',
+  )
+  public async iReadMailboxEnvelopes(
+    after: number,
+    limit: number,
+    capability: string,
+  ): Promise<void> {
+    if (!this.mailbox) {
+      throw new Error('Mailbox must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/mailboxes/${this.mailbox.id}/envelopes?after=${after}&limit=${limit}`,
+      this.mailboxHeaders(capability),
+    );
+  }
+
+  @when('I acknowledge the mailbox up to {int} with the {word} capability')
+  public async iAcknowledgeTheMailbox(
+    upTo: number,
+    capability: string,
+  ): Promise<void> {
+    if (!this.mailbox) {
+      throw new Error('Mailbox must be created first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/mailboxes/${this.mailbox.id}/ack`,
+      { upTo },
+      this.mailboxHeaders(capability),
+    );
+  }
+
+  @when('I delete the mailbox with the {word} capability')
+  public async iDeleteTheMailbox(capability: string): Promise<void> {
+    if (!this.mailbox) {
+      throw new Error('Mailbox must be created first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/mailboxes/${this.mailbox.id}`,
+      undefined,
+      this.mailboxHeaders(capability),
+    );
+  }
+
+  @then('the mailbox response cursor should be {int}')
+  public theMailboxResponseCursorShouldBe(cursor: number): void {
+    expect((this.response.data as { cursor: number }).cursor).to.equal(cursor);
+  }
+
+  @then('the mailbox page should hold cursors {string}')
+  public theMailboxPageShouldHoldCursors(expected: string): void {
+    const data = this.response.data as unknown as {
+      envelopes: Array<{ cursor: number }>;
+    };
+
+    expect(
+      data.envelopes.map((envelope) => envelope.cursor).join(','),
+    ).to.equal(expected);
+  }
+
+  @then('the mailbox page should report more {word}')
+  public theMailboxPageShouldReportMore(expected: string): void {
+    expect(
+      (this.response.data as unknown as { hasMore: boolean }).hasMore,
+    ).to.equal(expected === 'true');
+  }
+
   @then('the response header {string} should be {string}')
   public theResponseHeaderShouldBe(name: string, value: string): void {
     expect(this.response.headers[name.toLowerCase()]).to.equal(value);

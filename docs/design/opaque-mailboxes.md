@@ -1,7 +1,9 @@
 # Opaque mailboxes for private message delivery
 
 Status: proposed design for [#289](https://github.com/haskou/pigeon-swarm-node/issues/289).
-Nothing in this document is implemented yet. It is the contract that the
+Implemented so far: the domain, local storage and HTTP API (steps 1 and 2 of the
+plan below). Still open: the realtime hint, client key schedule and retiring the
+replicated collections. It is the contract that the
 implementation PRs, and [#290](https://github.com/haskou/pigeon-swarm-node/issues/290)
 (private blobs), build on.
 

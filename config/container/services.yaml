@@ -14,6 +14,9 @@ services:
   apps/apis/identity-devices-api/DeviceAuthorizationTransitionRateLimiter:
     class: /apps/apis/identity-devices-api/DeviceAuthorizationTransitionRateLimiter
     arguments: []
+  apps/apis/mailboxes-api/MailboxCreationRateLimiter:
+    class: /apps/apis/mailboxes-api/MailboxCreationRateLimiter
+    arguments: []
   apps/apis/shared/SignedHttpRequestAuthenticator:
     class: /apps/apis/shared/SignedHttpRequestAuthenticator
     arguments: []
@@ -134,6 +137,13 @@ services:
     class: /contexts/keychains/infrastructure/ipfs/mappers/IpfsKeychainMapper
     arguments: []
   contexts/keychains/infrastructure/metadata/KeychainMetadataIndex: '@contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataIndex'
+  contexts/mailboxes/application/MailboxCoordinator:
+    class: /contexts/mailboxes/application/MailboxCoordinator
+    arguments: []
+  contexts/mailboxes/domain/MailboxPolicy:
+    class: /contexts/mailboxes/domain/MailboxPolicy
+    arguments: []
+  contexts/mailboxes/domain/repositories/MailboxRepository: '@contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository'
   contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor: >-
     @contexts/nodes/infrastructure/network-synchronization/InMemoryNodeNetworkSynchronizationMonitor
   contexts/nodes/domain/repositories/NodePeerRepository: '@contexts/nodes/infrastructure/local-db/LocalNodePeerRepository'
@@ -773,6 +783,10 @@ services:
     arguments:
       - >-
         @contexts/presence/application/expire/IdentityPresenceExpirationRegistrar
+  apps/schedulers/MailboxExpirationScheduler:
+    class: /apps/schedulers/MailboxExpirationScheduler
+    arguments:
+      - '@contexts/mailboxes/application/MailboxExpirer'
   apps/schedulers/NodeHeartbeatScheduler:
     class: /apps/schedulers/NodeHeartbeatScheduler
     arguments:
@@ -1137,6 +1151,26 @@ services:
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - '@contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataIndex'
+  contexts/mailboxes/application/MailboxAcknowledger:
+    class: /contexts/mailboxes/application/MailboxAcknowledger
+    arguments:
+      - '@contexts/mailboxes/domain/repositories/MailboxRepository'
+      - '@contexts/mailboxes/application/MailboxCoordinator'
+  contexts/mailboxes/application/MailboxReader:
+    class: /contexts/mailboxes/application/MailboxReader
+    arguments:
+      - '@contexts/mailboxes/domain/repositories/MailboxRepository'
+      - '@contexts/mailboxes/application/MailboxCoordinator'
+  contexts/mailboxes/application/MailboxRemover:
+    class: /contexts/mailboxes/application/MailboxRemover
+    arguments:
+      - '@contexts/mailboxes/domain/repositories/MailboxRepository'
+      - '@contexts/mailboxes/application/MailboxCoordinator'
+  contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository:
+    class: /contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository
+    arguments:
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+    parent: contexts/mailboxes/domain/repositories/MailboxRepository
   contexts/nodes/application/assign-owner/NodeOwnerAssigner:
     class: /contexts/nodes/application/assign-owner/NodeOwnerAssigner
     arguments:
@@ -1700,6 +1734,24 @@ services:
       - >-
         @contexts/keychains/domain/services/KeychainCandidateValidationDomainService
       - '@contexts/keychains/domain/services/KeychainSignatureDomainService'
+  contexts/mailboxes/application/MailboxAppender:
+    class: /contexts/mailboxes/application/MailboxAppender
+    arguments:
+      - '@contexts/mailboxes/domain/repositories/MailboxRepository'
+      - '@contexts/mailboxes/domain/MailboxPolicy'
+      - '@contexts/mailboxes/application/MailboxCoordinator'
+  contexts/mailboxes/application/MailboxCreator:
+    class: /contexts/mailboxes/application/MailboxCreator
+    arguments:
+      - '@contexts/mailboxes/domain/repositories/MailboxRepository'
+      - '@contexts/mailboxes/domain/MailboxPolicy'
+      - '@contexts/mailboxes/application/MailboxCoordinator'
+  contexts/mailboxes/application/MailboxExpirer:
+    class: /contexts/mailboxes/application/MailboxExpirer
+    arguments:
+      - '@contexts/mailboxes/domain/repositories/MailboxRepository'
+      - '@contexts/mailboxes/domain/MailboxPolicy'
+      - '@contexts/mailboxes/application/MailboxCoordinator'
   contexts/nodes/application/add-network/NodeNetworkAdder:
     class: /contexts/nodes/application/add-network/NodeNetworkAdder
     arguments:

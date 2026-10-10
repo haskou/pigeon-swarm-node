@@ -113,6 +113,11 @@ installed `web-push` module path.
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
 | `IPFS_STORAGE_PATH` | `./ipfs_storage` | Recommended | Base folder used by IPFS registry and local node metadata. |
+| `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE` | `30` | No | Mailbox creations one remote address may make per minute (in memory; `0` disables). |
+| `MAILBOX_MAX_BYTES` | `8388608` | No | Pending ciphertext bytes per mailbox (8 MiB). A full mailbox refuses new envelopes. |
+| `MAILBOX_MAX_COUNT` | `10000` | No | Mailboxes this node will hold. |
+| `MAILBOX_MAX_ENVELOPES` | `1000` | No | Pending envelopes per mailbox. |
+| `MAILBOX_RETENTION_MS` | `1209600000` | No | Age at which envelopes expire and an unread mailbox is deleted (14 days). |
 | `PRIVATE_BLOB_MAX_BYTES` | `52428800` | No | Largest single private blob (50 MiB). |
 | `PRIVATE_BLOB_QUOTA_BYTES_PER_OWNER` | `524288000` | No | Live reserved bytes one identity may hold on this node (500 MiB). |
 | `PRIVATE_BLOB_QUOTA_BYTES_TOTAL` | `10737418240` | No | Live reserved bytes across all owners on this node (10 GiB). |

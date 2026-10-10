@@ -20,6 +20,7 @@ describe('ApiSwaggerFactory', () => {
         'ipfs-api',
         'keychains-api',
         'link-previews-api',
+        'mailboxes-api',
         'nodes-api',
         'notification-settings-api',
         'notifications-api',
@@ -121,6 +122,7 @@ describe('ApiSwaggerFactory', () => {
         'ipfs-api': '/api/swagger/ipfs-api/swagger.yaml',
         'keychains-api': '/api/swagger/keychains-api/swagger.yaml',
         'link-previews-api': '/api/swagger/link-previews-api/swagger.yaml',
+        'mailboxes-api': '/api/swagger/mailboxes-api/swagger.yaml',
         'nodes-api': '/api/swagger/nodes-api/swagger.yaml',
         'notification-settings-api':
           '/api/swagger/notification-settings-api/swagger.yaml',

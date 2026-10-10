@@ -2,6 +2,7 @@ import CallParticipantLeaseExpirationScheduler from '@app/apps/schedulers/CallPa
 import CallTimeoutScheduler from '@app/apps/schedulers/CallTimeoutScheduler';
 import ContentReplicationMaintenanceScheduler from '@app/apps/schedulers/ContentReplicationMaintenanceScheduler';
 import IdentityPresenceExpirationScheduler from '@app/apps/schedulers/IdentityPresenceExpirationScheduler';
+import MailboxExpirationScheduler from '@app/apps/schedulers/MailboxExpirationScheduler';
 import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler';
 import PrivateBlobExpirationScheduler from '@app/apps/schedulers/PrivateBlobExpirationScheduler';
 import Scheduler from '@haskou/ddd-kernel/scheduler';
@@ -15,6 +16,7 @@ export const recurringSchedulers: ApplicationServiceClass<Scheduler>[] = [
   CallTimeoutScheduler,
   ContentReplicationMaintenanceScheduler,
   PrivateBlobExpirationScheduler,
+  MailboxExpirationScheduler,
 ];
 
 export const startupSchedulers: ApplicationServiceClass<Scheduler>[] = [];
