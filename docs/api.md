@@ -207,6 +207,21 @@ are capped; excess upgrades receive `429 Too Many Requests` before signature
 verification. A socket sending more than 200 client messages in 10 seconds is
 closed with code `1008`.
 
+Cookies are never an input to realtime authentication: a request carrying only
+a `Cookie` header is refused with `401`, and a signed upgrade ignores any
+cookie sent with it. The node never answers an upgrade with a redirect.
+These properties are covered by a real HTTP server and `ws` client test. They
+do not prove what a browser sends: browsers attach eligible cookies to native
+WebSocket handshakes regardless of this server, so a browser-level test and a
+credentialless transport remain open (#291).
+
+Optional Origin allowlist: set `REALTIME_ALLOWED_ORIGINS` to a comma-separated
+list of origins and browser upgrades whose `Origin` header is not in the list
+(including `null`) get `403`. Empty (default) applies no restriction.
+Requests without `Origin` (non-browser clients) are not refused by this
+setting. Origin is not authentication; it only lets an operator refuse pages
+from other sites.
+
 Connection acknowledgement:
 
 ```json
