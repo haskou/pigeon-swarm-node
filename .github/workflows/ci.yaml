@@ -38,6 +38,10 @@ jobs:
         run: yarn build
         timeout-minutes: 5
 
+      - name: Compiled boot with CONTAINER_BUILD=true
+        run: yarn test:e2e:container:compiled-boot
+        timeout-minutes: 3
+
   unit:
     name: Unit tests
     runs-on: ubuntu-24.04

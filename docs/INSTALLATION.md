@@ -51,7 +51,7 @@ routes resolve to the bundled frontend.
 | `NODE_ENV` | `development` behavior in several modules | No | Runtime mode. Affects error/log verbosity. |
 | `API_PORT` | App internal default | No | HTTP port for API server. |
 | `ROUTE_PREFIX` | App internal default | No | Route prefix for API endpoints. |
-| `CONTAINER_BUILD` | unset | No | Used during DI/container build logic. |
+| `CONTAINER_BUILD` | unset | No | Source runs only: autowires DI from TypeScript sources. Compiled builds (`dist/`) cannot read sources, so they ignore it and load the committed `config/container/services.yaml`. |
 
 ## Logging Variables
 
