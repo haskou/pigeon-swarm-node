@@ -1,4 +1,10 @@
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import {
+  REALTIME_PROTOCOL_VERSION,
+  RealtimeTicketStore,
+  realtimeTicketStore,
+} from '@app/shared/infrastructure/websocket/RealtimeTicketStore';
 import { WebSocketRealtimeServer } from '@app/shared/infrastructure/websocket/WebSocketRealtimeServer';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { createServer, Server } from 'http';
@@ -6,9 +12,11 @@ import { AddressInfo } from 'net';
 import WebSocket from 'ws';
 
 type Outcome = { status: number } | { opened: true };
+type ProtocolOutcome = { status: number } | { opened: true; protocol: string };
 
 describe('realtime upgrade (real HTTP server and ws client)', () => {
   const path = '/ws';
+  const ticketPath = '/realtime/v1';
   let server: Server;
   let port: number;
 
@@ -18,7 +26,10 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
       response.setHeader('Location', 'http://127.0.0.1:1/elsewhere');
       response.end();
     });
-    new WebSocketRealtimeServer().attach(server, path);
+    new WebSocketRealtimeServer().attach(server, {
+      signedQueryPath: path,
+      ticketPath,
+    });
     await new Promise<void>((resolve) =>
       server.listen(0, '127.0.0.1', resolve),
     );
@@ -123,5 +134,136 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
         Origin: 'https://anything.example',
       }),
     ).toEqual({ opened: true });
+  });
+
+  describe('credentialless ticket upgrade', () => {
+    async function issueTicket(): Promise<string> {
+      const keyPair = await KeyPair.generate();
+      const identityId = new IdentityId(
+        keyPair.toPrimitives().publicKey,
+      ).valueOf();
+      const issued = realtimeTicketStore.issue(identityId);
+
+      if (!issued) {
+        throw new Error('ticket capacity exhausted in test');
+      }
+
+      return issued.ticket;
+    }
+
+    function connectWithProtocols(
+      target: string,
+      protocols: string[],
+    ): Promise<ProtocolOutcome> {
+      const { promise, resolve } = Promise.withResolvers<ProtocolOutcome>();
+      const socket = new WebSocket(
+        `ws://127.0.0.1:${port}${target}`,
+        protocols,
+      );
+
+      socket.on('open', () => {
+        resolve({ opened: true, protocol: socket.protocol });
+        socket.terminate();
+      });
+      socket.on('unexpected-response', (_request, response) => {
+        resolve({ status: response.statusCode ?? 0 });
+        response.destroy();
+      });
+      socket.on('error', () => undefined);
+
+      return promise;
+    }
+
+    it('opens with the version subprotocol and never echoes the ticket', async () => {
+      const ticket = await issueTicket();
+
+      expect(
+        await connectWithProtocols(ticketPath, [
+          REALTIME_PROTOCOL_VERSION,
+          `ticket.${ticket}`,
+        ]),
+      ).toEqual({ opened: true, protocol: REALTIME_PROTOCOL_VERSION });
+    });
+
+    it('consumes the ticket on first use', async () => {
+      const ticket = await issueTicket();
+      const protocols = [REALTIME_PROTOCOL_VERSION, `ticket.${ticket}`];
+
+      expect(await connectWithProtocols(ticketPath, protocols)).toMatchObject({
+        opened: true,
+      });
+      expect(await connectWithProtocols(ticketPath, protocols)).toEqual({
+        status: 401,
+      });
+    });
+
+    it('refuses a ticket that was never issued', async () => {
+      expect(
+        await connectWithProtocols(ticketPath, [
+          REALTIME_PROTOCOL_VERSION,
+          `ticket.${'A'.repeat(43)}`,
+        ]),
+      ).toEqual({ status: 401 });
+    });
+
+    it('refuses a request without the version subprotocol', async () => {
+      const ticket = await issueTicket();
+
+      expect(
+        await connectWithProtocols(ticketPath, [`ticket.${ticket}`]),
+      ).toEqual({ status: 401 });
+    });
+
+    it('refuses more than one ticket offered at once', async () => {
+      const first = await issueTicket();
+      const second = await issueTicket();
+
+      expect(
+        await connectWithProtocols(ticketPath, [
+          REALTIME_PROTOCOL_VERSION,
+          `ticket.${first}`,
+          `ticket.${second}`,
+        ]),
+      ).toEqual({ status: 401 });
+    });
+
+    it('refuses a ticket passed in the query string', async () => {
+      const ticket = await issueTicket();
+
+      expect(
+        await connectWithProtocols(`${ticketPath}?ticket=${ticket}`, [
+          REALTIME_PROTOCOL_VERSION,
+        ]),
+      ).toEqual({ status: 401 });
+    });
+
+    it('does not authenticate the signed path with a ticket', async () => {
+      const ticket = await issueTicket();
+
+      expect(
+        await connectWithProtocols(path, [
+          REALTIME_PROTOCOL_VERSION,
+          `ticket.${ticket}`,
+        ]),
+      ).toEqual({ status: 401 });
+    });
+
+    it('refuses an expired ticket', async () => {
+      const ticket = await issueTicket();
+      const spy = jest
+        .spyOn(Date, 'now')
+        .mockReturnValue(Date.now() + RealtimeTicketStore.TTL_MS + 1);
+
+      try {
+        expect(
+          await connectWithProtocols(ticketPath, [
+            REALTIME_PROTOCOL_VERSION,
+            `ticket.${ticket}`,
+          ]),
+        ).toEqual({ status: 401 });
+      } finally {
+        spy.mockRestore();
+      }
+    });
   });
 });

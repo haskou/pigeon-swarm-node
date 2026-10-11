@@ -222,6 +222,36 @@ Requests without `Origin` (non-browser clients) are not refused by this
 setting. Origin is not authentication; it only lets an operator refuse pages
 from other sites.
 
+Credentialless clients (#291) fetch a single-use ticket with a signed request
+and present it in a WebSocket subprotocol instead of a query string:
+
+```http
+POST /realtime/v1/tickets
+X-Identity-Id: <identityId>
+X-Timestamp: <timestamp>
+X-Signature: <signature>
+```
+
+The signed canonical request is `POST /realtime/v1/tickets` with body `{}`,
+prefixed by `ROUTE_PREFIX` when configured. The response is
+`201 {"ticket": "<base64url>", "expiresAt": <epochMs>}` with
+`Cache-Control: no-store`. Connect to `/realtime/v1` (prefixed by
+`ROUTE_PREFIX` when configured) with both subprotocols:
+
+```ts
+const socket = new WebSocket('ws://localhost:8080/realtime/v1', [
+  'pigeon-realtime.v1',
+  `ticket.${ticket}`,
+]);
+```
+
+The server selects `pigeon-realtime.v1` and never echoes the ticket. A ticket
+is valid for 30 seconds and one upgrade, and is consumed as soon as it is
+presented, even if that upgrade later fails. Each identity may hold 8
+outstanding tickets and each node 10,000; at capacity issuance returns `429`
+with code `429050`. Tickets in the query string, or presented to `/ws`, are
+refused with `401`.
+
 Connection acknowledgement:
 
 ```json

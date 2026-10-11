@@ -1,0 +1,71 @@
+openapi: 3.0.3
+info:
+  title: Pigeon-swarm Realtime API
+  version: 1.0.0
+  description: Single-use tickets for the credentialless realtime WebSocket.
+tags:
+  - name: realtime
+paths:
+  /realtime/v1/tickets:
+    post:
+      tags:
+        - realtime
+      summary: Issue a single-use realtime WebSocket ticket
+      description: |
+        Signed request that returns a random ticket for one credentialless
+        WebSocket upgrade at `GET /realtime/v1`. The signed canonical request is
+        `POST /realtime/v1/tickets` with an empty body `{}`. When `ROUTE_PREFIX`
+        is configured, sign the prefixed path.
+
+        The ticket is valid for 30 seconds and for exactly one upgrade. It is
+        consumed when presented, even if that upgrade later fails. At most 8
+        tickets are outstanding per identity. When the node is at capacity the
+        request is refused with `429`. The response is never cached.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '201':
+          description: Ticket issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RealtimeTicket'
+        '401':
+          description: Missing or invalid signed request headers.
+        '429':
+          description: Too many outstanding tickets on this node.
+components:
+  parameters:
+    XIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      in: header
+      name: X-Timestamp
+      required: true
+      schema:
+        type: string
+    XSignature:
+      in: header
+      name: X-Signature
+      required: true
+      schema:
+        type: string
+  schemas:
+    RealtimeTicket:
+      type: object
+      required:
+        - ticket
+        - expiresAt
+      properties:
+        ticket:
+          type: string
+          description: Base64url secret. Present it once in Sec-WebSocket-Protocol.
+        expiresAt:
+          type: integer
+          description: Epoch milliseconds after which the ticket is refused.

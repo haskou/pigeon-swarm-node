@@ -29,6 +29,7 @@ describe('ApiSwaggerFactory', () => {
         'private-authorization-api',
         'private-blobs-api',
         'push-api',
+        'realtime-api',
         'stickers-api',
       ]);
       expect(specs['calls-api']).toContain('/calls/:');
@@ -133,6 +134,7 @@ describe('ApiSwaggerFactory', () => {
           '/api/swagger/private-authorization-api/swagger.yaml',
         'private-blobs-api': '/api/swagger/private-blobs-api/swagger.yaml',
         'push-api': '/api/swagger/push-api/swagger.yaml',
+        'realtime-api': '/api/swagger/realtime-api/swagger.yaml',
         'stickers-api': '/api/swagger/stickers-api/swagger.yaml',
       });
     });
