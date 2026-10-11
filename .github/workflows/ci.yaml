@@ -101,6 +101,21 @@ jobs:
         run: yarn test:scheduler
         timeout-minutes: 5
 
+  container:
+    name: Container image (non-root smoke)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup workspace
+        uses: ./.github/actions/setup-workspace
+
+      - name: Private blob container smoke
+        run: yarn test:e2e:container:private-blob
+        timeout-minutes: 12
+
   integration:
     name: In-process integration scripts
     runs-on: ubuntu-24.04
