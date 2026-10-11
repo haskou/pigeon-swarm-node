@@ -10,6 +10,7 @@ import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 import PushSubscriptionRepository from '../../domain/repositories/PushSubscriptionRepository';
 import PushNotificationDelivery from './PushNotificationDelivery';
+import { PushNotificationGroupTag } from './PushNotificationGroupTag';
 import { PushNotificationIntent } from './PushNotificationIntent';
 import { PushNotificationScope } from './PushNotificationScope';
 
@@ -131,11 +132,7 @@ export default class PushNotificationDispatcher {
       ),
       payload: {
         body: 'You have a new message.',
-        data: {
-          conversationId: event.aggregateId,
-          messageId: event.attributes.messageId,
-        },
-        tag: `conversation:${event.aggregateId}`,
+        tag: PushNotificationGroupTag.of('conversation', event.aggregateId),
         title: 'New message',
         type: 'message',
       },
@@ -169,12 +166,11 @@ export default class PushNotificationDispatcher {
       ),
       payload: {
         body: 'You have a new community message.',
-        data: {
-          channelId: event.attributes.channelId,
-          communityId: event.aggregateId,
-          messageId: event.attributes.messageId,
-        },
-        tag: `community:${event.aggregateId}:${String(event.attributes.channelId)}`,
+        tag: PushNotificationGroupTag.of(
+          'community',
+          event.aggregateId,
+          String(event.attributes.channelId),
+        ),
         title: 'New community message',
         type: 'message',
       },
@@ -202,11 +198,7 @@ export default class PushNotificationDispatcher {
       mentionsRoleIdentityIds: [],
       payload: {
         body: this.notificationBody(notificationType),
-        data: {
-          notificationId: event.aggregateId,
-          notificationType,
-        },
-        tag: `notification:${event.aggregateId}`,
+        tag: PushNotificationGroupTag.of('notification', event.aggregateId),
         title: this.notificationTitle(notificationType),
         type: isCallNotification ? 'call' : 'notification',
       },
@@ -237,11 +229,7 @@ export default class PushNotificationDispatcher {
       mentionsRoleIdentityIds: [],
       payload: {
         body: 'Someone is calling you.',
-        data: {
-          callId: event.aggregateId,
-          scope: event.attributes.scope,
-        },
-        tag: `call:${event.aggregateId}`,
+        tag: PushNotificationGroupTag.of('call', event.aggregateId),
         title: 'Incoming call',
         type: 'call',
       },
@@ -260,7 +248,7 @@ export default class PushNotificationDispatcher {
     const readerIdentityId = PushNotificationDispatcher.optionalIdentityId(
       event.attributes.readerIdentityId,
     );
-    const tag = `conversation:${event.aggregateId}`;
+    const tag = PushNotificationGroupTag.of('conversation', event.aggregateId);
 
     return {
       mentionsEveryoneOrHere: false,
@@ -268,15 +256,6 @@ export default class PushNotificationDispatcher {
       mentionsRoleIdentityIds: [],
       payload: {
         body: '',
-        data: {
-          conversationId: event.aggregateId,
-          messageId: event.attributes.messageId,
-          scope: {
-            conversationId: event.aggregateId,
-            type: NotificationSettingScopeType.CONVERSATION,
-          },
-          tags: [tag],
-        },
         tag,
         tags: [tag],
         title: 'Notifications updated',

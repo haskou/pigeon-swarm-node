@@ -9,6 +9,7 @@ import PushVapidConfiguration from './PushVapidConfiguration';
 import { WebPushError } from './types/WebPushError';
 import { WebPushModule } from './types/WebPushModule';
 import { WebPushSendResult } from './types/WebPushSendResult';
+import WebPushPayloadEnvelope from './WebPushPayloadEnvelope';
 
 export default class WebPushNotificationDelivery extends PushNotificationDelivery {
   private readonly webPush = this.loadWebPush();
@@ -60,6 +61,18 @@ export default class WebPushNotificationDelivery extends PushNotificationDeliver
       endpoint,
       endpointHost: this.endpointHost(endpoint),
       error: 'Web Push delivery is disabled.',
+      shouldDeleteSubscription: false,
+    };
+  }
+
+  private oversizedPayloadResult(
+    endpoint: string,
+  ): PushNotificationDeliveryResult {
+    return {
+      delivered: false,
+      endpoint,
+      endpointHost: this.endpointHost(endpoint),
+      error: 'Web Push payload does not fit the fixed envelope size.',
       shouldDeleteSubscription: false,
     };
   }
@@ -130,6 +143,16 @@ export default class WebPushNotificationDelivery extends PushNotificationDeliver
       return this.disabledDeliveryResult(primitives.endpoint);
     }
 
+    const body = WebPushPayloadEnvelope.encode(payload);
+
+    if (body === undefined) {
+      const result = this.oversizedPayloadResult(primitives.endpoint);
+
+      this.logFailedDelivery(result);
+
+      return result;
+    }
+
     try {
       const sendResult = await this.webPush.sendNotification(
         {
@@ -140,7 +163,7 @@ export default class WebPushNotificationDelivery extends PushNotificationDeliver
             p256dh: primitives.p256dh,
           },
         },
-        JSON.stringify(payload),
+        body,
       );
 
       return this.successDeliveryResult(primitives.endpoint, sendResult);

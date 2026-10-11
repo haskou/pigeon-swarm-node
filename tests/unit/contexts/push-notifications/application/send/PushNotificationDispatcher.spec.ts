@@ -7,6 +7,7 @@ import NotificationScopeSettingsRepository from '@app/contexts/notification-sett
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import PushNotificationDelivery from '@app/contexts/push-notifications/application/send/PushNotificationDelivery';
 import { PushNotificationDeliveryResult } from '@app/contexts/push-notifications/application/send/PushNotificationDeliveryResult';
+import { PushNotificationPayload } from '@app/contexts/push-notifications/application/send/PushNotificationPayload';
 import PushNotificationDispatcher from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
 import { PushSubscription } from '@app/contexts/push-notifications/domain/PushSubscription';
 import PushSubscriptionRepository from '@app/contexts/push-notifications/domain/repositories/PushSubscriptionRepository';
@@ -48,13 +49,122 @@ describe('PushNotificationDispatcher', () => {
     expect(delivery.send).toHaveBeenCalledWith(
       subscription,
       expect.objectContaining({
-        data: {
-          conversationId: 'conversation-id',
-          messageId: 'message-id',
-        },
         type: 'message',
       }),
     );
+  });
+
+  it('keeps social and message identifiers out of message push payloads', async () => {
+    const authorIdentityId = await generateIdentityId();
+    const recipientIdentityId = await generateIdentityId();
+    const delivery = mockDelivery(true);
+    const dispatcher = createDispatcher({
+      delivery,
+      subscriptions: [createSubscription(recipientIdentityId)],
+    });
+    const event = new TestDomainEvent('conversation-id', {
+      authorId: authorIdentityId.valueOf(),
+      eventName: 'conversations.v1.message.was_sent',
+      messageId: 'message-id',
+      participantIds: [
+        authorIdentityId.valueOf(),
+        recipientIdentityId.valueOf(),
+      ],
+    });
+
+    await dispatcher.dispatch(event);
+
+    const payload = sentPayload(delivery);
+
+    expect(payload).not.toHaveProperty('data');
+    expectNoIdentifiers(payload, [
+      'conversation-id',
+      'message-id',
+      authorIdentityId.valueOf(),
+      recipientIdentityId.valueOf(),
+    ]);
+  });
+
+  it('keeps community channel identifiers out of channel message push payloads', async () => {
+    const authorIdentityId = await generateIdentityId();
+    const recipientIdentityId = await generateIdentityId();
+    const delivery = mockDelivery(true);
+    const dispatcher = createDispatcher({
+      delivery,
+      subscriptions: [createSubscription(recipientIdentityId)],
+    });
+    const event = new TestDomainEvent('community-id', {
+      authorIdentityId: authorIdentityId.valueOf(),
+      channelId: 'channel-id',
+      eventName: 'communities.v1.channel.message.was_sent',
+      memberIds: [authorIdentityId.valueOf(), recipientIdentityId.valueOf()],
+      messageId: 'message-id',
+    });
+
+    await dispatcher.dispatch(event);
+
+    expect(delivery.send).toHaveBeenCalledTimes(1);
+    expect(sentPayload(delivery)).not.toHaveProperty('data');
+    expectNoIdentifiers(sentPayload(delivery), [
+      'community-id',
+      'channel-id',
+      'message-id',
+    ]);
+  });
+
+  it('keeps call and scope identifiers out of call push payloads', async () => {
+    const creatorIdentityId = await generateIdentityId();
+    const recipientIdentityId = await generateIdentityId();
+    const delivery = mockDelivery(true);
+    const dispatcher = createDispatcher({
+      delivery,
+      subscriptions: [createSubscription(recipientIdentityId)],
+    });
+    const event = new TestDomainEvent('call-id', {
+      creatorIdentityId: creatorIdentityId.valueOf(),
+      eventName: 'calls.v1.call.started',
+      participantIds: [
+        creatorIdentityId.valueOf(),
+        recipientIdentityId.valueOf(),
+      ],
+      scope: {
+        conversationId: 'conversation-id',
+        type: 'conversation',
+      },
+    });
+
+    await dispatcher.dispatch(event);
+
+    expect(delivery.send).toHaveBeenCalledTimes(1);
+    expect(sentPayload(delivery)).not.toHaveProperty('data');
+    expectNoIdentifiers(sentPayload(delivery), [
+      'call-id',
+      'conversation-id',
+      creatorIdentityId.valueOf(),
+    ]);
+  });
+
+  it('keeps notification identifiers out of invitation push payloads', async () => {
+    const recipientIdentityId = await generateIdentityId();
+    const delivery = mockDelivery(true);
+    const dispatcher = createDispatcher({
+      delivery,
+      subscriptions: [createSubscription(recipientIdentityId)],
+    });
+    const event = new TestDomainEvent('notification-id', {
+      eventName: 'notifications.v1.notification.was_created',
+      recipientIdentityId: recipientIdentityId.valueOf(),
+      type: 'conversation_invitation',
+    });
+
+    await dispatcher.dispatch(event);
+
+    expect(delivery.send).toHaveBeenCalledTimes(1);
+    expect(sentPayload(delivery)).not.toHaveProperty('data');
+    expectNoIdentifiers(sentPayload(delivery), [
+      'notification-id',
+      recipientIdentityId.valueOf(),
+    ]);
   });
 
   it('does not send message push notifications when recipient is busy', async () => {
@@ -204,21 +314,80 @@ describe('PushNotificationDispatcher', () => {
     await dispatcher.dispatch(event);
 
     expect(delivery.send).toHaveBeenCalledTimes(1);
-    expect(delivery.send).toHaveBeenCalledWith(
-      readerSubscription,
+    const payload = sentPayload(delivery);
+
+    expect(payload).toEqual(
       expect.objectContaining({
-        data: expect.objectContaining({
-          conversationId: 'conversation-id',
-          messageId: 'message-id',
-          tags: ['conversation:conversation-id'],
-        }),
-        tag: 'conversation:conversation-id',
-        tags: ['conversation:conversation-id'],
+        tag: expect.any(String),
+        tags: [payload.tag],
         type: 'notifications_cleared',
       }),
     );
+    expect(payload).not.toHaveProperty('data');
+    expectNoIdentifiers(payload, ['conversation-id', 'message-id']);
+  });
+
+  it('groups a conversation message and its clear push under the same opaque tag', async () => {
+    const authorIdentityId = await generateIdentityId();
+    const readerIdentityId = await generateIdentityId();
+    const delivery = mockDelivery(true);
+    const dispatcher = createDispatcher({
+      delivery,
+      subscriptions: [createSubscription(readerIdentityId)],
+    });
+
+    await dispatcher.dispatch(
+      new TestDomainEvent('conversation-id', {
+        authorId: authorIdentityId.valueOf(),
+        eventName: 'conversations.v1.message.was_sent',
+        messageId: 'message-id',
+        participantIds: [
+          authorIdentityId.valueOf(),
+          readerIdentityId.valueOf(),
+        ],
+      }),
+    );
+    await dispatcher.dispatch(
+      new TestDomainEvent('conversation-id', {
+        eventName: 'conversations.v1.messages.were_read',
+        messageId: 'message-id',
+        participantIds: [
+          authorIdentityId.valueOf(),
+          readerIdentityId.valueOf(),
+        ],
+        readerIdentityId: readerIdentityId.valueOf(),
+      }),
+    );
+
+    const [messagePayload, clearPayload] = (
+      delivery.send as jest.Mock
+    ).mock.calls.map(([, payload]) => payload);
+
+    expect(messagePayload.tag).toEqual(expect.any(String));
+    expect(messagePayload.tag).not.toContain('conversation-id');
+    expect(clearPayload.tags).toEqual([messagePayload.tag]);
+    expect(clearPayload.tag).toBe(messagePayload.tag);
   });
 });
+
+function sentPayload(
+  delivery: PushNotificationDelivery,
+): PushNotificationPayload {
+  const [call] = (delivery.send as jest.Mock).mock.calls;
+
+  return call[1] as PushNotificationPayload;
+}
+
+function expectNoIdentifiers(
+  payload: PushNotificationPayload,
+  identifiers: string[],
+): void {
+  const serialized = JSON.stringify(payload);
+
+  for (const identifier of identifiers) {
+    expect(serialized).not.toContain(identifier);
+  }
+}
 
 async function generateIdentityId(): Promise<IdentityId> {
   const keyPair = await KeyPair.generate();

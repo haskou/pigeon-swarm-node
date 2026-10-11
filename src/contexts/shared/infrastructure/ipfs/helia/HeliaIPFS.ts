@@ -1,4 +1,5 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { DiagnosticIdentifierRedactor } from '@app/shared/infrastructure/logs/DiagnosticIdentifierRedactor';
 import { PublicRelayRecordPrimitives } from '@app/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
 import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
 import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
@@ -19,6 +20,7 @@ import {
   ParsedCidLike,
 } from './adapters/HeliaRuntimeAdapter';
 import { HeliaUnixfsCatOptions } from './adapters/types/HeliaUnixfsCatOptions';
+import { ContentRetrievalProgressLogLine } from './ContentRetrievalProgressLogLine';
 import { HeliaIPFSParser } from './HeliaIPFSParser';
 import HeliaPinningStrategy from './HeliaPinningStrategy';
 import IPFSCidCodec from './IPFSCidCodec';
@@ -26,7 +28,6 @@ import { IPFSConnection } from './IPFSConnection';
 import { IPFSId } from './IPFSId';
 import { IPFSOptions } from './IPFSOptions';
 import { ContentRetrievalOptions } from './types/ContentRetrievalOptions';
-import { ContentRetrievalProgressDetail } from './types/ContentRetrievalProgressDetail';
 import { ContentRetrievalProgressEvent } from './types/ContentRetrievalProgressEvent';
 import { ParsedHeliaIPFSOptions } from './types/ParsedHeliaIPFSOptions';
 
@@ -50,10 +51,8 @@ export abstract class HeliaIPFS implements IPFSConnection {
   private static readonly maxAutomaticProviderPublicationAttempts = 10_000;
   private static readonly routingPublicationRetryDelayMs = 30_000;
 
-  private static readonly CONTENT_RETRIEVAL_DEBUG_EVENTS = new Set([
-    'bitswap:block',
-    'bitswap:found-provider',
-  ]);
+  private static readonly contentRetrievalProgressLines =
+    new ContentRetrievalProgressLogLine(new DiagnosticIdentifierRedactor());
 
   private static readonly publicRelayRecordRegistry =
     new PublicRelayRecordRegistry();
@@ -454,47 +453,18 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return (event) => this.logContentRetrievalProgress(cid, event);
   }
 
-  private contentRetrievalProgressDetail(
-    event: ContentRetrievalProgressEvent,
-  ): ContentRetrievalProgressDetail {
-    return event.detail as ContentRetrievalProgressDetail;
-  }
-
-  private contentRetrievalProgressProviderId(
-    detail: ContentRetrievalProgressDetail,
-  ): string | undefined {
-    return detail.provider?.id?.toString();
-  }
-
-  private contentRetrievalProgressProviderRouting(
-    detail: ContentRetrievalProgressDetail,
-  ): string | undefined {
-    return detail.provider?.routing;
-  }
-
-  private contentRetrievalProgressSenderId(
-    detail: ContentRetrievalProgressDetail,
-  ): string | undefined {
-    return detail.sender?.toString();
-  }
-
   private logContentRetrievalProgress(
     cid: IPFSId,
     event: ContentRetrievalProgressEvent,
   ): void {
-    if (!HeliaIPFS.CONTENT_RETRIEVAL_DEBUG_EVENTS.has(event.type)) {
-      return;
-    }
-
-    const detail = this.contentRetrievalProgressDetail(event);
-    const providerId = this.contentRetrievalProgressProviderId(detail);
-    const providerRouting =
-      this.contentRetrievalProgressProviderRouting(detail);
-    const senderId = this.contentRetrievalProgressSenderId(detail);
-
-    Kernel.logger.debug(
-      `IPFS content retrieval progress: cid="${cid.valueOf()}" event="${event.type}" provider="${providerId ?? ''}" routing="${providerRouting ?? ''}" sender="${senderId ?? ''}"`,
+    const line = HeliaIPFS.contentRetrievalProgressLines.format(
+      cid.valueOf(),
+      event,
     );
+
+    if (line !== undefined) {
+      Kernel.logger.debug(line);
+    }
   }
 
   private async collectRawBlockBytes(
