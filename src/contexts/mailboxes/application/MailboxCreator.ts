@@ -53,11 +53,11 @@ export default class MailboxCreator {
 
       await this.repository.create(
         Mailbox.create({
+          appendTokens: this.policy.maxAppendsPerMinute(),
           id: mailboxId,
           now: Date.now(),
           postTokenHash,
           readTokenHash,
-          appendTokens: this.policy.maxAppendsPerMinute(),
         }),
       );
 

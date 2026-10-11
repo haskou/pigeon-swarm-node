@@ -1,9 +1,10 @@
 # Opaque mailboxes for private message delivery
 
 Status: proposed design for [#289](https://github.com/haskou/pigeon-swarm-node/issues/289).
-Implemented so far: the domain, local storage and HTTP API (steps 1 and 2 of the
-plan below). Still open: the realtime hint, client key schedule and retiring the
-replicated collections. It is the contract that the
+Implemented so far: the domain, local storage, HTTP API, the content-free realtime
+hint, the creation proof of work, the per-mailbox append rate limit, and a two-node
+real-transport proof. Still open: the client key schedule, UI and wrapper
+integration, and retiring the replicated collections. It is the contract that the
 implementation PRs, and [#290](https://github.com/haskou/pigeon-swarm-node/issues/290)
 (private blobs), build on.
 
@@ -72,7 +73,7 @@ of access logs.
 
 | Operation | Capability | Effect |
 | --- | --- | --- |
-| `PUT /mailboxes/{mailboxId}` | recipient supplies `postTokenHash`, `readTokenHash` | creates the queue; idempotent for identical hashes |
+| `PUT /mailboxes/{mailboxId}` | recipient supplies `postTokenHash`, `readTokenHash`, `creationNonce` | creates the queue; `creationNonce` is a proof of work bound to the id and both hashes; idempotent for identical hashes and nonce |
 | `POST /mailboxes/{mailboxId}/envelopes` | `postToken` | appends an envelope, returns its server cursor |
 | `GET /mailboxes/{mailboxId}/envelopes?after=<cursor>&limit=N` | `readToken` | pages pending envelopes in cursor order |
 | `POST /mailboxes/{mailboxId}/ack` | `readToken` | body `{ upTo: cursor }`; deletes envelopes up to the cursor |

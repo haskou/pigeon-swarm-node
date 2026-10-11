@@ -41,10 +41,7 @@ export class IdentityAdmissionProof {
       const candidate = nonce.toString();
       const digest = prefix.copy().update(candidate).digest();
 
-      if (
-        leadingZeroBits(digest) >= difficultyBits &&
-        accepts(candidate)
-      ) {
+      if (leadingZeroBits(digest) >= difficultyBits && accepts(candidate)) {
         return candidate;
       }
     }
