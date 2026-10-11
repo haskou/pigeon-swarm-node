@@ -146,8 +146,14 @@ export class IdentityPresence extends AggregateRoot {
     this.status = this.derivedStatus(this.updatedAt);
   }
 
-  public isVisibleTo(identityId: IdentityId): boolean {
-    return this.identityId.isEqual(identityId) || !this.status.isInvisible();
+  public isVisibleTo(
+    viewerIdentityId: IdentityId,
+    sharesRelationship: boolean,
+  ): boolean {
+    return (
+      this.identityId.isEqual(viewerIdentityId) ||
+      (sharesRelationship && !this.status.isInvisible())
+    );
   }
 
   public isBusy(): boolean {
