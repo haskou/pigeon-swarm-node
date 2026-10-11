@@ -38,6 +38,18 @@ describe('MessageReadProof', () => {
     expect(MessageReadProof.isAuthentic(proof, claimFor(reader))).toBe(true);
   });
 
+  it('accepts a receipt signed under a configured ROUTE_PREFIX', async () => {
+    const reader = await KeyPair.generate();
+    const proof = await signedReadReceipt({
+      conversationId,
+      keyPair: reader,
+      messageId,
+      pathPrefix: '/api',
+    });
+
+    expect(MessageReadProof.isAuthentic(proof, claimFor(reader))).toBe(true);
+  });
+
   it('accepts exactly the signed request the HTTP verifier accepts', async () => {
     const reader = await KeyPair.generate();
     const timestamp = Date.now();

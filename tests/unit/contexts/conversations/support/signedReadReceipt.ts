@@ -14,9 +14,10 @@ export async function signedReadReceipt(options: {
   conversationId: string;
   keyPair: KeyPair;
   messageId: string;
+  pathPrefix?: string;
   timestamp?: number;
 }): Promise<SignedReadReceipt> {
-  const path = `/conversations/${encodeURIComponent(options.conversationId)}/messages/read-until`;
+  const path = `${options.pathPrefix ?? ''}/conversations/${encodeURIComponent(options.conversationId)}/messages/read-until`;
   const body = { messageId: options.messageId };
   const timestamp = options.timestamp ?? Date.now();
   const payload = new SignedHttpRequestVerifier().getCanonicalPayload(

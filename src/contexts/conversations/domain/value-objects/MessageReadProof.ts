@@ -21,13 +21,16 @@ export type MessageReadClaim = {
  * conversation and message. Receipts without a valid proof are not authentic
  * and must neither change read state nor reach clients.
  *
+ * The signed path is `request.path`, so it carries any configured
+ * `ROUTE_PREFIX` before `/conversations`.
+ *
  * The signed bytes come from the same canonicalizer SignedHttpRequestVerifier
  * uses for `PUT .../messages/read-until`, so the proof and the HTTP request it
  * was taken from always agree.
  */
 export class MessageReadProof {
   private static readonly READ_UNTIL_PATH =
-    /^\/conversations\/([^/]+)\/messages\/read-until$/;
+    /^(?:\/[^/]+)*\/conversations\/([^/]+)\/messages\/read-until$/;
 
   private static hasShape(value: unknown): value is MessageReadProofData {
     if (typeof value !== 'object' || value === null) {
