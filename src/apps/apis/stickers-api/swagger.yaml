@@ -30,6 +30,9 @@ paths:
       summary: Create a sticker pack
       security:
         - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
       requestBody:
         required: true
         content:
@@ -53,6 +56,9 @@ paths:
       description: Returns saved packs, favorite stickers and the last 10 recently used stickers for the authenticated identity.
       security:
         - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
       responses:
         '200':
           description: Authenticated sticker library.
@@ -85,6 +91,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/PackId'
       requestBody:
         required: true
@@ -112,6 +120,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/PackId'
       requestBody:
         required: true
@@ -138,6 +148,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/PackId'
         - $ref: '#/components/parameters/StickerId'
       requestBody:
@@ -164,6 +176,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/PackId'
         - $ref: '#/components/parameters/StickerId'
       requestBody:
@@ -191,6 +205,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/PackId'
       requestBody:
         required: true
@@ -212,6 +228,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/PackId'
       requestBody:
         required: true
@@ -234,6 +252,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/PackId'
         - $ref: '#/components/parameters/StickerId'
       requestBody:
@@ -256,6 +276,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/PackId'
         - $ref: '#/components/parameters/StickerId'
       requestBody:
@@ -280,6 +302,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/PackId'
         - $ref: '#/components/parameters/StickerId'
       requestBody:
@@ -311,6 +335,18 @@ components:
     StickerId:
       name: stickerId
       in: path
+      required: true
+      schema:
+        type: string
+    XIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      in: header
+      name: X-Timestamp
       required: true
       schema:
         type: string

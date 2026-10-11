@@ -93,7 +93,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ConversationResource'
         '409':
-          description: InvalidConversationOperationError or ConversationOperationLimitExceededError.
+          description: ConversationNotFoundError, InvalidConversationOperationError, or ConversationOperationLimitExceededError.
   /conversations/{conversationId}/members/me:
     delete:
       tags:
@@ -118,7 +118,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ConversationResource'
         '409':
-          description: InvalidConversationOperationError or ConversationOperationLimitExceededError.
+          description: ConversationNotFoundError, InvalidConversationOperationError, or ConversationOperationLimitExceededError.
   /conversations/{conversationId}/members/{identityId}:
     delete:
       tags:
@@ -144,7 +144,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ConversationResource'
         '409':
-          description: InvalidConversationOperationError or ConversationOperationLimitExceededError.
+          description: ConversationNotFoundError, InvalidConversationOperationError, or ConversationOperationLimitExceededError.
   /conversations/{conversationId}/admins/{identityId}:
     put:
       tags:
@@ -170,7 +170,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ConversationResource'
         '409':
-          description: InvalidConversationOperationError or ConversationOperationLimitExceededError.
+          description: ConversationNotFoundError, InvalidConversationOperationError, or ConversationOperationLimitExceededError.
     delete:
       tags:
         - conversations
@@ -195,7 +195,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ConversationResource'
         '409':
-          description: InvalidConversationOperationError or ConversationOperationLimitExceededError.
+          description: ConversationNotFoundError, InvalidConversationOperationError, or ConversationOperationLimitExceededError.
   /conversations/{conversationId}/messages:
     post:
       tags:

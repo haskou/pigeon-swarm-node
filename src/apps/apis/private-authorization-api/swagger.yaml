@@ -7,7 +7,7 @@ paths:
     post:
       tags: [private-authorization]
       summary: Provision a private authorization scope
-      description: Verifies that the declared owner device credential is authorized for the signed HTTP identity at the exact supplied revision, verifies the device-signed genesis and protected MLS state, validates the owner-only private community projection, and commits all initial local state atomically.
+      description: Verifies that the declared owner device credential is authorized for the signed HTTP identity at the exact supplied revision, verifies the device-signed genesis and protected MLS state, validates the owner-only private community projection, and commits all initial local state atomically. The signed request must come from the current node owner.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -31,6 +31,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PrivateAuthorizationProvisionResource'
+        '403':
+          description: Signed request identity is not the current node owner (code 403010).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrivateAuthorizationError'
         '409':
           description: Invalid or conflicting private authorization genesis
           content:

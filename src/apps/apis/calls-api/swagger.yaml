@@ -205,7 +205,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CallSignalDeliveryResource'
         '429':
-          description: Signal rate limit exceeded.
+          description: Signal rate limit exceeded (code 429010, CALLS_SIGNAL_RATE_LIMIT_PER_MINUTE signals per call and sender per minute).
         '413':
           description: Signal payload exceeds 64 KiB.
 components:

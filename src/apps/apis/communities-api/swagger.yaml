@@ -546,7 +546,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommunityInviteDetailsResource'
         '409':
-          description: Invite token was not found.
+          description: Invite token was not found, expired, or has no uses left.
   /communities/{communityId}/join-requests:
     post:
       tags:
@@ -571,6 +571,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityMembershipRequestResource'
+        '409':
+          description: Community not found, identity is banned, or an auto-join request lacks the requester-signed acceptedAt and acceptedMutation (CommunityNotFoundError, CommunityMemberBannedError, CommunityRequestAutoAcceptanceRequiredError).
   /communities/invites/{inviteToken}/accept:
     post:
       tags:
@@ -619,6 +621,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityChannelsResource'
+        '409':
+          description: Community not found, or the authenticated identity is not a member (CommunityNotFoundError, CommunityMemberNotFoundError).
   /communities/{communityId}/channels/text:
     post:
       tags:
@@ -986,6 +990,7 @@ paths:
           name: limit
           schema:
             type: integer
+            default: 20
             minimum: 1
             maximum: 50
         - $ref: '#/components/parameters/XIdentityId'
@@ -1021,6 +1026,7 @@ paths:
           name: limit
           schema:
             type: integer
+            default: 20
             minimum: 1
             maximum: 50
         - $ref: '#/components/parameters/XIdentityId'

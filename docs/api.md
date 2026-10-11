@@ -170,7 +170,8 @@ than a regular request/response flow.
 Clients authenticate the upgrade with a single-use ticket obtained from a signed
 HTTP request. The ticket travels in the `Sec-WebSocket-Protocol` header, so
 browser and non-browser clients use the same flow. Signed query parameters and
-signed headers are not accepted on this endpoint.
+signed headers are ignored on this endpoint; only the ticket in
+`Sec-WebSocket-Protocol` authenticates the upgrade.
 
 The former signed-query endpoint `GET /ws` has been removed. Any upgrade to
 `/ws` gets `404`, like any other path the node does not serve, whatever
@@ -431,6 +432,7 @@ Event contracts used by frontend:
 | `communities.v1.member.was_added`                     | community id      | `communityId`, `networkId`, `memberIds`, `identityId`, `community`                                                         |
 | `communities.v1.member.was_left`                      | community id      | `communityId`, `networkId`, `memberIds`, `identityId`, `community`                                                         |
 | `communities.v1.channel.message.was_sent`             | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds`                                      |
+| `communities.v1.channel.message.was_edited`           | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `networkId`, `memberIds`                                      |
 | `communities.v1.channel.message.was_deleted`          | community id      | `communityId`, `channelId`, `messageId`, `targetMessageId`, `deletedByIdentityId`, `networkId`, `memberIds`                |
 | `communities.v1.channel.message.was_pinned`           | community id      | `communityId`, `channelId`, `messageId`, `pinnedByIdentityId`, `networkId`, `memberIds`                                    |
 | `communities.v1.channel.message.was_unpinned`         | community id      | `communityId`, `channelId`, `messageId`, `unpinnedByIdentityId`, `networkId`, `memberIds`                                  |
@@ -515,7 +517,7 @@ next start; clock differences do not determine that epoch.
 
 ### Presence retention
 
-Runtime leases are memory-only. A lease expires after twenty seconds without a
+Runtime leases are memory-only. A lease expires after five seconds without a
 heartbeat, checked by the scheduled expiration pass; disconnected entries are
 purged after sixty seconds. Local expiry updates local clients but is never
 republished as a claim by the remote owner. Only the owner publishes its own

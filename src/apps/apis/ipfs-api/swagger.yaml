@@ -15,6 +15,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - name: resourceId
           in: path
           required: true
@@ -95,6 +97,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - name: Content-Type
           in: header
           required: false
@@ -134,6 +138,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - name: cid
           in: path
           required: true
@@ -170,6 +176,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - name: cid
           in: path
           required: true
@@ -200,6 +208,9 @@ paths:
       description: Returns the precomputed local content replication summary. The endpoint does not list known CIDs or calculate replica responsibility on demand; registrations and the maintenance scheduler refresh the summary document.
       security:
         - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
       responses:
         '200':
           description: Local replication status.
@@ -210,6 +221,19 @@ paths:
         '401':
           description: Invalid signed request.
 components:
+  parameters:
+    XIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      in: header
+      name: X-Timestamp
+      required: true
+      schema:
+        type: string
   securitySchemes:
     signedRequest:
       type: apiKey

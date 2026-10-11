@@ -11,6 +11,9 @@ paths:
       summary: Create a poll in a community text channel or group conversation
       security:
         - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
       requestBody:
         required: true
         content:
@@ -31,6 +34,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/PollId'
       responses:
         '200':
@@ -46,6 +51,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/PollId'
       requestBody:
         required: true
@@ -67,6 +74,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/PollId'
       requestBody:
         required: true
@@ -88,6 +97,8 @@ paths:
       security:
         - signedRequest: []
       parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/PollId'
       requestBody:
         required: true
@@ -112,6 +123,18 @@ components:
     PollId:
       in: path
       name: pollId
+      required: true
+      schema:
+        type: string
+    XIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      in: header
+      name: X-Timestamp
       required: true
       schema:
         type: string

@@ -14,6 +14,9 @@ paths:
       description: Signed call that reserves `size` bytes against the per-owner and total quotas and returns two bearer capabilities. The server stores only their SHA-256 hashes. The reservation expires after `PRIVATE_BLOB_UPLOAD_WINDOW_MS` if no upload completes.
       security:
         - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
       requestBody:
         required: true
         content:
@@ -129,6 +132,18 @@ components:
       schema:
         type: string
         format: uuid
+    XIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      in: header
+      name: X-Timestamp
+      required: true
+      schema:
+        type: string
   schemas:
     PrivateBlobReservation:
       type: object
