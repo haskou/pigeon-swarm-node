@@ -30,3 +30,43 @@ Feature: GET /presence
     When I GET the current presence list
     Then response code is equal to 200
     And response body is an array with length of 1
+
+  Scenario: Hide presence status and message from a viewer without a shared relationship
+    Given I set json body
+      """
+      {
+        "status": "available",
+        "customMessage": "Ready"
+      }
+      """
+    And I sign the current presence update request
+    When I PUT "/presence/me"
+    Then response code is equal to 200
+    Given another identity signs the current identity presence request
+    When I GET the current identity presence
+    Then response code is equal to 200
+    And response data should match partially
+      """
+      {
+        "status": "disconnected"
+      }
+      """
+    And response body should not contain "Ready"
+
+  Scenario: Hide presence list status and message from a viewer without a shared relationship
+    Given I set json body
+      """
+      {
+        "status": "available",
+        "customMessage": "Ready"
+      }
+      """
+    And I sign the current presence update request
+    When I PUT "/presence/me"
+    Then response code is equal to 200
+    Given another identity signs the current presence list request
+    When I GET the current presence list
+    Then response code is equal to 200
+    And response body is an array with length of 1
+    And response body should contain "\"status\":\"disconnected\""
+    And response body should not contain "Ready"

@@ -2055,6 +2055,35 @@ export default class Definitions {
     );
   }
 
+  @given('another identity signs the current identity presence request')
+  public async anotherIdentitySignsTheCurrentIdentityPresenceRequest(): Promise<void> {
+    const targetIdentityId = this.ownerIdentityId as IdentityId;
+    const signer = await this.ensureOtherIdentityKeyPair();
+    const signerIdentityId = this.otherIdentityId as IdentityId;
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/presence/${encodeURIComponent(targetIdentityId.valueOf())}`,
+      String(Date.now()),
+      signer,
+      signerIdentityId,
+    );
+  }
+
+  @given('another identity signs the current presence list request')
+  public async anotherIdentitySignsTheCurrentPresenceListRequest(): Promise<void> {
+    const signer = await this.ensureOtherIdentityKeyPair();
+    const signerIdentityId = this.otherIdentityId as IdentityId;
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      '/presence/',
+      String(Date.now()),
+      signer,
+      signerIdentityId,
+    );
+  }
+
   @given('I have published a keychain for the authenticated identity')
   public async iHavePublishedAKeychainForTheAuthenticatedIdentity(): Promise<void> {
     this.body = JSON.stringify({
