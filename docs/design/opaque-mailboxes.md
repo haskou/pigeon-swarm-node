@@ -1,10 +1,13 @@
 # Opaque mailboxes for private message delivery
 
-Status: proposed design for [#289](https://github.com/haskou/pigeon-swarm-node/issues/289).
-Implemented so far: the domain, local storage, HTTP API, the content-free realtime
-hint, the adaptive creation proof of work with idle eviction at capacity, the per-mailbox append rate limit, the creation client key with `API_TRUST_PROXY`, and a two-node
-real-transport proof. Still open: the client key schedule, UI and wrapper
-integration, and retiring the replicated collections. It is the contract that the
+Status: design for [#289](https://github.com/haskou/pigeon-swarm-node/issues/289), partly implemented.
+Implemented: the domain, local storage, HTTP API, the content-free realtime hint,
+the adaptive creation proof of work with idle eviction at capacity, the per-mailbox
+append rate limit, the creation client key with `API_TRUST_PROXY`, and a two-node
+real-transport proof. The UI client (key schedule, send/receive, cursor recovery)
+is merged in pigeon-swarm-ui #252 and #257. Open: mailbox key rotation,
+direct-message wiring (#258), wrapper integration, and retiring the replicated
+collections. It is the contract that the
 implementation PRs, and [#290](https://github.com/haskou/pigeon-swarm-node/issues/290)
 (private blobs), build on.
 
@@ -105,7 +108,7 @@ any user identifier:
 - maximum envelope size and maximum envelopes per mailbox (queue depth); append
   past the limit fails with `429`/`409`, never drops older envelopes silently;
 - maximum bytes per mailbox and maximum mailbox count per node;
-- creation difficulty by fill: 16 leading zero bits while the node holds at most half of `MAILBOX_MAX_COUNT`, rising linearly to 20 bits at the limit (`MailboxCreationDifficulty`). A short proof, or a replay checked against the current difficulty, is refused with `400` and the bits it needs. The check is stateless and runs before any lookup, so an unproven request learns nothing about which ids exist;
+- creation difficulty by fill: 16 leading zero bits while the node holds at most half of `MAILBOX_MAX_COUNT`, rising in four steps above half capacity to 20 bits at the limit (`MailboxCreationDifficulty`). A short proof, or a replay checked against the current difficulty, is refused with `400` and the bits it needs. The check is stateless and runs before any lookup, so an unproven request learns nothing about which ids exist;
 - at the count limit, creation evicts the least recently read mailboxes that are empty and unread for 7 days (`MailboxPolicy.EVICTION_IDLE_MS`), all or nothing; with too few such mailboxes it is refused with `429`;
 - per-client fixed-window cap on creation, keyed by the socket address (or the forwarded address behind a proxy named by `API_TRUST_PROXY`; IPv6 per /64), plus a per-mailbox append rate;
 - retention window (default 14 days). A background scheduler deletes expired
@@ -128,7 +131,7 @@ Backups: managed copies live only in the local database directory. Deleting a
 mailbox removes the rows; copies held in filesystem snapshots or operator backups
 are outside the node's control and are documented as such.
 
-## Availability replication
+## Availability replication (not yet implemented)
 
 By default a mailbox lives on the recipient's home node only. A recipient may
 name additional *availability servers* explicitly; the `PUT` is then repeated on
@@ -136,7 +139,7 @@ each, with the same hashes. Senders append to every listed server and the
 recipient reads from all, deduplicating by `envelopeId`. Nothing is replicated to
 servers the recipient did not choose, and there is no gossip of mailbox state.
 
-## Group fan-out
+## Group fan-out (not yet implemented)
 
 The sender holds one `(mailboxId, postToken)` per member, delivered inside the
 group's encrypted channel. Sending is N appends. This costs O(N) requests but
@@ -175,8 +178,7 @@ Network-level protection (Tor, mixnets, relays) is out of scope.
 3. Real-transport test proving mailbox records and envelopes never reach DHT,
    public IPFS or pubsub, and that an offline recipient receives pending
    envelopes after reconnect.
-4. UI: key schedule, send/receive, rotation, cursor recovery; removal of the
-   OrbitDB conversation path for protected scopes.
+4. UI: key schedule, send/receive and cursor recovery (done in pigeon-swarm-ui #252 and #257). Open: rotation; direct-message wiring (#258); removal of the OrbitDB conversation path for protected scopes.
 5. Wrapper: end-to-end two-node proof, then retire the replicated conversation
    collections.
 

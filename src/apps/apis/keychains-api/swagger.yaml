@@ -43,7 +43,7 @@ paths:
         '401':
           description: Missing or invalid signed request headers.
         '409':
-          description: Invalid keychain candidate.
+          description: Invalid keychain candidate (code InvalidKeychainCandidateError), or the owner identity has no networks (code KeychainOwnerNetworksNotFoundError).
   /keychains/{identityId}:
     get:
       tags:
@@ -79,6 +79,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/KeychainResource'
+        '401':
+          description: Missing or invalid signed request (401021 or 401020), or X-Identity-Id differs from identityId.
+        '409':
+          description: No valid keychain candidate for this identity (code KeychainNotFoundError).
 components:
   schemas:
     PostKeychainBody:
@@ -100,7 +104,7 @@ components:
           type: string
           example: lWbIzBOHn7vYKk3WOB9JMvOq9XeXRRy8qvqh8DRPrvUL839Y6DEFGDgPTTMngt+pBugsWSK6LoTKKULTy8joBw==
         timestamp:
-          type: number
+          type: integer
           example: 1773848829055
         version:
           type: integer

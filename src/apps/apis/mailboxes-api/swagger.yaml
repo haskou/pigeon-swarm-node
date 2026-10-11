@@ -11,7 +11,7 @@ paths:
       tags:
         - mailboxes
       summary: Create a mailbox
-      description: Unauthenticated, rate limited per client address by `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE`. The address is the socket address unless `API_TRUST_PROXY` names a reverse proxy; IPv6 clients share a /64. The recipient supplies the SHA-256 (hex) of the post and read tokens and a `creationNonce` proof of work, which is SHA-256 over the mailbox id, both token hashes and the nonce, and must start with the current difficulty (16 zero bits while the node holds at most half of `MAILBOX_MAX_COUNT`, rising to 20 at the limit). The node never sees the tokens at creation. Idempotent for identical hashes and nonce.
+      description: Unauthenticated, rate limited per client address by `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE`. The address is the socket address unless `API_TRUST_PROXY` names a reverse proxy; IPv6 clients share a /64. The recipient supplies the SHA-256 (hex) of the post and read tokens and a `creationNonce` proof of work, which is SHA-256 over the mailbox id, both token hashes and the nonce, and must start with the current difficulty (16 zero bits while the node holds at most half of `MAILBOX_MAX_COUNT`, rising in four steps above half capacity to 20 at the limit). The node never sees the tokens at creation. Idempotent for identical hashes and nonce.
       parameters:
         - $ref: '#/components/parameters/MailboxId'
       requestBody:
@@ -44,7 +44,7 @@ paths:
         '409':
           description: Exists with different hashes.
         '429':
-          description: Creation rate limit, or `MAILBOX_MAX_COUNT` reached with no idle empty mailbox to evict.
+          description: Creation rate limit (code 429041, `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE` per client address), or `MAILBOX_MAX_COUNT` reached with no idle empty mailbox to evict.
     delete:
       tags:
         - mailboxes

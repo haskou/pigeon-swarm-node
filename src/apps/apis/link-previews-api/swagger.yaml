@@ -20,6 +20,9 @@ paths:
         authenticated identity and requester IP.
       security:
         - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
       requestBody:
         required: true
         content:
@@ -47,6 +50,19 @@ components:
       type: apiKey
       in: header
       name: X-Signature
+  parameters:
+    XIdentityId:
+      in: header
+      name: X-Identity-Id
+      required: true
+      schema:
+        type: string
+    XTimestamp:
+      in: header
+      name: X-Timestamp
+      required: true
+      schema:
+        type: string
   schemas:
     PostLinkPreviewBody:
       type: object

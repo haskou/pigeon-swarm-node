@@ -52,18 +52,19 @@ routes resolve to the bundled frontend.
 
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
-| `NODE_ENV` | `development` behavior in several modules | No | Runtime mode. Affects error/log verbosity. |
-| `API_PORT` | App internal default | No | HTTP port for API server. |
+| `NODE_ENV` | `local` | No | Runtime mode. `test` shortens the default IPFS content timeout to 500 ms and turns off the public relay record registry unless `PIGEON_PUBLIC_RELAY_RECORDS_PATH` is set. |
+| `API_PORT` | `8080` | No | HTTP port for API server. |
 | `API_TRUST_PROXY` | `false` | No | How the node reads a client's address for `request.ip`, which the mailbox creation limit uses. `false` uses the socket address and ignores `X-Forwarded-For`. `loopback`, or a hop count such as `1` behind one reverse proxy, trusts the forwarded address. `true` is refused at boot, so clients cannot pick their own key. |
-| `ROUTE_PREFIX` | App internal default | No | Route prefix for API endpoints. |
-| `CONTAINER_BUILD` | unset | No | Source runs only: autowires DI from TypeScript sources. Compiled builds (`dist/`) cannot read sources, so they ignore it and load the committed `config/container/services.yaml`. |
+| `ROUTE_PREFIX` | unset (no prefix) | No | Route prefix for API endpoints, for example `/api`. |
+| `CONTAINER_BUILD` | `false` | No | Source runs only: autowires DI from TypeScript sources. Compiled builds (`dist/`) cannot read sources, so they ignore it and load the committed `config/container/services.yaml`. |
+| `PIGEON_LOCAL_DB_PATH` | `<project root>/local_storage` | No | Local embedded storage folder. |
 
 ## Logging Variables
 
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
 | `LOG_LEVEL` | App internal default | No | Log level (`error`, `warn`, `info`, etc.). |
-| `LOG_URL` | unset | No | External logging endpoint, if configured. |
+| `LOG_URL` | `logs` | No | Log folder under the project root; file is `<SERVICE_NAME or service>.log`. |
 | `DIAGNOSTICS_WINDOW_MINUTES` | `0` | No | Opens a diagnostics window for content retrieval for the given number of minutes (max 60) after the node starts. `0` keeps diagnostics off, which is the default. The window closes on its own and only a restart opens a new one. Lines are written at debug level, so `LOG_LEVEL=debug` is also required. CIDs, provider and sender IDs are replaced by digests keyed with a secret generated at process start, so the log never holds raw identifiers and the digests change on restart; the log can be shared in that form. |
 | `SERVICE_NAME` | unset | Recommended | Service name used in logs and message bus metadata. |
 
@@ -71,12 +72,12 @@ routes resolve to the bundled frontend.
 
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
-| `TRANSPORT_DSN` | `in-memory://` fallback in code paths | Recommended | Transport DSN (`in-memory://` or `libp2p-gossipsub://`). |
+| `TRANSPORT_DSN` | `in-memory` | Recommended | Message bus transport. Must start with `in-memory` or `libp2p-gossipsub`. |
 
 ## PWA Web Push Variables
 
 Web Push requires VAPID keys. Without them, `GET /push/vapid-public-key`
-returns `{ "enabled": false, "publicKey": null }`, browsers must not call
+returns `"enabled": false`, browsers must not call
 `pushManager.subscribe`, and backend will not send outbound push notifications.
 
 Generate one key pair per deployment:
@@ -107,12 +108,35 @@ docker compose up -d backend
 Verify the runtime:
 
 ```bash
-curl http://localhost:8080/api/push/vapid-public-key
+curl http://localhost:8080/push/vapid-public-key
 docker compose exec backend node -e "console.log(require.resolve('web-push'))"
 ```
 
 The API should return `enabled: true` and the Node command should print the
 installed `web-push` module path.
+
+## Calls, Rate Limit and Quota Variables
+
+| Variable | Default | Required | Description |
+| --- | --- | --- | --- |
+| `CALLS_ICE_TRANSPORT_POLICY` | `all` | No | ICE transport policy returned to clients. |
+| `CALLS_MAX_DURATION_MS` | `43200000` | No | Maximum call duration (12 hours). |
+| `CALLS_RECORD_RATE_LIMIT_PER_MINUTE` | `30` | No | Call record rate limit per minute; excess returns `429` with code `429021`. |
+| `CALLS_SIGNAL_RATE_LIMIT_PER_MINUTE` | `120` | No | Signal rate limit per call and sender per minute; excess returns `429` with code `429010`. |
+| `CALLS_TURN_CREDENTIAL_TTL_SECONDS` | `3600` | No | Lifetime of issued TURN credentials, in seconds. |
+| `CALLS_TURN_DISCOVERY_ENABLED` | `true` | No | Enables node-to-node TURN relay discovery. |
+| `CALLS_TURN_RECORD_TTL_MS` | `600000` | No | Lifetime of published TURN relay records (ten minutes). Invalid values use the default. |
+| `CALLS_TURN_PUBLICATION_INTERVAL_MS` | half of `CALLS_TURN_RECORD_TTL_MS` | No | Interval between TURN relay record publications (five minutes at the default TTL). |
+| `CALLS_TURN_TRANSPORTS` | `udp,tcp` | No | Comma-separated TURN transports. |
+| `CALLS_TURN_SHARED_SECRET` | unset | For TURN credential issuance | Shared secret matching the TURN servers; see the TURN/coturn setup section below. |
+| `IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE` | `30` | No | Identity publications per minute; excess returns `429` with code `429040`. |
+| `IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE` | `0` | No | Identity admissions per network per minute; excess returns `429` with code `429041`. |
+| `NOTIFICATIONS_RECORD_RATE_LIMIT_PER_MINUTE` | `30` | No | Notification record writes per minute. |
+| `NOTIFICATIONS_MAX_INVITATIONS_PER_IDENTITY` | `10000` | No | Maximum stored invitations per identity. |
+| `NOTIFICATIONS_MAX_STATES_PER_IDENTITY` | `30000` | No | Maximum stored notification states per identity. |
+| `CONTENT_REPLICATION_MAX_RECORDS_PER_IDENTITY` | `10000` | No | Maximum replicated content records per identity. |
+| `CONTENT_REPLICATION_QUOTA_BYTES` | `1073741824` | No | Replicated content byte quota (1 GiB). |
+| `LINK_PREVIEW_RATE_LIMIT_PER_MINUTE` | `30` | No | Link preview requests per minute. |
 
 ## IPFS Variables
 
@@ -138,27 +162,41 @@ installed `web-push` module path.
 | `PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS` | `3600000` | No | How often private relay nodes refresh their public relay record publication after the initial publish. |
 | `PIGEON_PRIVATE_RELAY_DIAL_TIMEOUT_MS` | `15000` | No | Maximum time to wait when dialing a discovered private relay multiaddr before logging the failure and retrying later. |
 | `PIGEON_RELAY_DATA_LIMIT_BYTES` | `67108864` | No | Per-reservation circuit relay data limit. The default is `64 MiB`, raised above libp2p's small default so media CIDs can move through relay. |
+| `IPFS_CONTENT_TIMEOUT_MS` | `2500` (`500` when `NODE_ENV=test`) | No | Time budget for locating and fetching remote IPFS content. Values are capped at `5000`. |
+| `PIGEON_IPFS_ROUTING_RECORD_TIMEOUT_MS` | `15000` | No | Timeout for IPFS routing record lookups. |
+| `PIGEON_RELAY_DIRECTORY_ROUTING_TIMEOUT_MS` | `15000` | No | Timeout for relay directory routing lookups. |
+| `PIGEON_RELAY_RECORD_CONNECTED_DISCOVERY_INTERVAL_MS` | `300000` | No | Relay record discovery interval while connected. |
+| `PIGEON_PRIVATE_RELAY_CONNECTED_DISCOVERY_INTERVAL_MS` | `300000` | No | Private relay discovery interval while connected. |
+| `PIGEON_PRIVATE_RELAY_CONNECTION_GRACE_MS` | `60000` | No | Grace period for private relay connections. |
+| `PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS` | `3600` | No | Private relay record refresh interval, in seconds. |
+| `PIGEON_PUBLIC_BOOTSTRAP_ENABLED` | `true` | No | Enables public libp2p bootstrap peers. |
+| `PIGEON_PUBLIC_BOOTSTRAP_MULTIADDRS` | libp2p default `dnsaddr` bootstrap list | No | Public bootstrap multiaddrs. |
+| `PIGEON_PUBLIC_RELAY_RECORDS_PATH` | `${IPFS_STORAGE_PATH}/publicRelayRecords.json` | No | Public relay record registry file. Setting it enables the registry even when `NODE_ENV=test`. |
+| `PIGEON_STORED_RELAY_FALLBACK_MS` | `604800000` | No | Stored relay fallback window in milliseconds (7 days). |
+| `PIGEON_TURN_RUNTIME_CONFIG_PATH` | `./var/cache/calls-turn-runtime.conf` | No | Generated TURN runtime configuration file. |
+| `PUBSUB_TOPIC_PREFIX` | `pigeon-swarm` | No | Prefix for pubsub topic names. |
 
 ### Private blob storage in Docker
 
-The image runs as the unprivileged `node` user (uid 1000), not root. The
-folders it writes must be writable by uid 1000.
+The `final` image runs as the unprivileged `node` user (uid 1000). Its build
+creates `private_blobs`, `local_storage`, `ipfs_storage`, `logs`, `var/log` and
+`var/cache` and changes ownership of the data folders to `node`. The `local`
+image has no `USER` instruction, and `docker-compose.yml` builds that stage, so
+the compose backend runs as root.
 
-- `docker-compose.yml` bind-mounts the checkout at `/var/www`, so the host
-  folders `private_blobs`, `local_storage`, `ipfs_storage`, `logs` and `var`
-  are the ones the container writes. Create them once and give them to uid
-  1000 before the first start:
+- `docker-compose.yml` bind-mounts the checkout at `/var/www` and masks
+  `/var/www/var` with an anonymous volume, so the host `var` folder is not used
+  by the container. If you run the `final` image with host bind mounts for the
+  data folders, create them and give them to uid 1000 before the first start:
 
   ```bash
-  mkdir -p private_blobs local_storage ipfs_storage logs var
-  sudo chown -R 1000:1000 private_blobs local_storage ipfs_storage logs var
+  mkdir -p private_blobs local_storage ipfs_storage logs
+  sudo chown -R 1000:1000 private_blobs local_storage ipfs_storage logs
   ```
 
-- Data written by an earlier image that ran as root is root-owned. Run the
-  same `chown -R 1000:1000` once before starting the new image. Until then the
-  node cannot write its data and private blob uploads fail.
-- A named volume mounted at `/var/www/private_blobs` takes the `node`
-  ownership of the image on first use.
+- Data written by an image built before PR #420 (commit `93371dd4`) is
+  root-owned. Run the same `chown -R 1000:1000` once before starting the new
+  image.
 
 To back up private blobs, stop the node and copy `private_blobs` and
 `local_storage` together. Restore semantics are in the
@@ -219,7 +257,7 @@ Operational rules:
 - nodes without `privateRelay.enabled` do not start relay servers; they can
   discover private relay records when `privateRelay.discoveryEnabled` is true,
   and can always use `manualRelayMultiaddrs` as an explicit fallback;
-- CID fetch over IPFS is capped at `10s` while locating/fetching remote content;
+- CID fetch over IPFS is bounded by `IPFS_CONTENT_TIMEOUT_MS` (default `2500` ms, capped at `5000` ms) while locating and fetching remote content;
 - the public relay-record connection runs DHT, gossipsub and circuit-relay
   transport without HTTP/Bitswap block brokers or persistent block stores, so
   public wantlists cannot turn it into a content cache;
@@ -244,14 +282,13 @@ Example:
 CALLS_TURN_SHARED_SECRET=<private-random-secret-from-your-secret-manager>
 ```
 
-Replace the placeholder with a private random secret. The official deployment
-requires 32–256 characters using letters, digits, `+`, `/` or `=`. Provision it
+Replace the placeholder with a private random secret. Provision it
 through your secret manager or a protected environment file; do not commit it,
 print it in logs or pass it in command-line arguments.
 
-Missing, blank and known public shared secrets disable temporary TURN
-credential issuance and local relay-record publication. The deployment also
-rejects the known public secret. Configure each backend issuer and its
+Missing, blank and known public shared secrets leave TURN unconfigured: the node
+issues no temporary TURN credentials and publishes no local relay records, and it
+still starts. Configure each backend issuer and its
 advertised coturn server with the same private value and restart both. Rotate
 the secret on coturn itself: changing only the backend cannot revoke
 credentials accepted by a server using the old key.
@@ -278,8 +315,7 @@ PUT /node/relay-configuration
 
 The backend publishes this persisted configuration to the local TURN sidecar.
 Coturn listens on `callsRelay.port` and reuses the private relay range over UDP.
-It reloads automatically when the persisted configuration changes. Publish the
-configured host range over TCP for IPFS and UDP for TURN; no TURN port, media
+Publish the configured host range over TCP for IPFS and UDP for TURN; no TURN port, media
 range, URL, or ICE policy environment variables are required.
 
 The node-to-node discovery protocol is documented in

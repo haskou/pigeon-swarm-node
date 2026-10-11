@@ -68,8 +68,8 @@ paths:
         example `GET /api/realtime/v1`.
 
         The former signed-query endpoint `GET /ws` has been removed and answers
-        `404`. Signed query parameters and signed headers are refused on this
-        path with `401`.
+        `404`. Signed query parameters and signed headers are ignored on this
+        path; without a valid ticket in `Sec-WebSocket-Protocol` the upgrade answers `401`.
 
         On success the server sends:
 
@@ -142,7 +142,7 @@ paths:
         '101':
           description: WebSocket upgrade accepted. The server selects `pigeon-realtime.v1`.
         '401':
-          description: Ticket missing, unknown, expired, or already used, or signed credentials sent in the query string or headers.
+          description: Ticket missing, malformed, unknown, expired, or already used, or `pigeon-realtime.v1` not offered. Signed headers and query parameters do not authenticate the upgrade.
         '403':
           description: Browser Origin is not listed in `REALTIME_ALLOWED_ORIGINS`.
         '429':

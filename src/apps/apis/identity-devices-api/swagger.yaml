@@ -121,7 +121,7 @@ paths:
         '409':
           description: Expired, replayed, causally stale or unauthorized transition.
         '429':
-          description: Per-identity or per-node transition rate limit exceeded.
+          description: Per-identity (20 per minute) or per-node (300 per minute) transition rate limit exceeded (code 429030).
 components:
   parameters:
     XIdentityId:
