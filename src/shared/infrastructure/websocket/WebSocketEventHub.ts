@@ -1,6 +1,8 @@
 import { CallViewModel } from '@app/apps/apis/calls-api/view-model/CallViewModel';
 import CallEventAttestor from '@app/contexts/calls/application/attest-event/CallEventAttestor';
 import { CallEventAttestation } from '@app/contexts/calls/domain/CallEventAttestation';
+import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
+import { MessageReadProof } from '@app/contexts/conversations/domain/value-objects/MessageReadProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Kernel from '@haskou/ddd-kernel';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
@@ -826,6 +828,17 @@ export class WebSocketEventHub {
    */
   public publishFromNetwork(events: DomainEvent[]): void {
     for (const event of events) {
+      // Read receipts change read state, so unproven ones never reach clients.
+      if (
+        event.eventName() === ConversationMessagesWereReadEvent.EVENT_NAME &&
+        !MessageReadProof.isAuthentic(event.attributes.readProof, {
+          conversationId: event.aggregateId,
+          messageId: String(event.attributes.messageId),
+          readerIdentityId: String(event.attributes.readerIdentityId),
+        })
+      ) {
+        continue;
+      }
       if (!CallEventAttestation.isLifecycleEvent(event)) {
         this.publish([event]);
         continue;

@@ -37,6 +37,7 @@ export default class MessagesReadMarker {
           .getParticipantIds()
           .map((participantId) => participantId.valueOf()),
         readerIdentityId: message.readerIdentityId.valueOf(),
+        readProof: message.readProof,
       }),
     ]);
   }
