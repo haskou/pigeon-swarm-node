@@ -21,7 +21,10 @@ import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { expect } from 'chai';
 import { before, binding, then, when } from 'cucumber-tsflow';
 
-import { signedReadReceipt, SignedReadReceipt } from '../../unit/contexts/conversations/support/signedReadReceipt';
+import {
+  signedReadReceipt,
+  SignedReadReceipt,
+} from '../../unit/contexts/conversations/support/signedReadReceipt';
 import { signedMutation } from '../../unit/contexts/public-mutations/support/signedMutation';
 import { PubSubConsumerTestContext } from './PubSubConsumerTestHelpers';
 
@@ -183,7 +186,6 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
     );
   }
 
-
   private async signedReadProof(): Promise<SignedReadReceipt> {
     const readerKeyPair = await KeyPair.generate();
 
@@ -288,9 +290,7 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
     expect(event.attributes.readerIdentityId).to.equal(this.readerIdentityId);
   }
 
-  @then(
-    'the push notification dispatcher should receive no read announcement',
-  )
+  @then('the push notification dispatcher should receive no read announcement')
   public pushNotificationDispatcherShouldReceiveNoReadAnnouncement(): void {
     expect(this.calls).to.be.empty;
   }

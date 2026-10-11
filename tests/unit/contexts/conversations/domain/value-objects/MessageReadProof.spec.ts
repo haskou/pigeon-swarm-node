@@ -47,7 +47,9 @@ describe('MessageReadProof', () => {
       messageId,
       timestamp,
     });
-    const identityId = new IdentityId(reader.toPrimitives().publicKey).valueOf();
+    const identityId = new IdentityId(
+      reader.toPrimitives().publicKey,
+    ).valueOf();
     const headers: Record<string, string> = {
       'x-identity-id': identityId,
       'x-signature': proof.signature,
@@ -127,8 +129,8 @@ describe('MessageReadProof', () => {
     expect(MessageReadProof.isAuthentic(undefined, claimFor(reader))).toBe(
       false,
     );
-    expect(
-      MessageReadProof.isAuthentic({ body: {} }, claimFor(reader)),
-    ).toBe(false);
+    expect(MessageReadProof.isAuthentic({ body: {} }, claimFor(reader))).toBe(
+      false,
+    );
   });
 });
