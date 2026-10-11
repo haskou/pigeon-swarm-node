@@ -24,6 +24,13 @@ COPY --from=build /var/www/config ./config
 # swagger specs are read from src/apps/apis at runtime
 COPY --from=build /var/www/src/apps/apis ./src/apps/apis
 RUN yarn --ignore-engines --frozen-lockfile --production
+# The process writes only under these folders (docs/INSTALLATION.md). They are
+# owned by the unprivileged `node` user so the container never needs root, and a
+# new named volume mounted on one of them inherits writable ownership.
+RUN mkdir -p private_blobs local_storage ipfs_storage logs var/log var/cache \
+  && chown -R node:node private_blobs local_storage ipfs_storage logs var \
+  && chmod 0700 private_blobs
+USER node
 ENV NODE_ENV=
 CMD yarn start
 

@@ -8,5 +8,9 @@ node_modules
 README.md
 db
 ipfs_storage
+local_storage
+logs
+private_blobs
+var
 dist
 coverage

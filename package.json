@@ -32,6 +32,7 @@
     "test:e2e:real-transport:mailbox-two-node": "tsx -r tsconfig-paths/register tests/e2e/real-transport/two-node-mailboxes.ts",
     "test:e2e:real-transport:realtime-ticket": "tsx -r tsconfig-paths/register tests/e2e/real-transport/realtime-ticket.ts",
     "test:e2e:turn-credentials": "tsx -r tsconfig-paths/register tests/e2e/turn/credential-acceptance.ts",
+    "test:e2e:container:private-blob": "tsx -r tsconfig-paths/register tests/e2e/container/private-blob-container.ts",
     "test:scheduler": "NODE_ENV=test cucumber-js -p scheduler",
     "test:scheduler:only": "NODE_ENV=test cucumber-js -p scheduler --tags @Only",
     "test:integration:network-reconfiguration": "tsx -r tsconfig-paths/register tests/e2e/real-transport/orbitdb-network-reconfiguration.ts",
