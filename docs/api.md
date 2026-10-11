@@ -422,8 +422,9 @@ Implemented:
 - deliver conversation events only to the conversation participants when the
   event carries `participantIds`
 - deliver `conversations.v1.messages.were_read` receipts only to the conversation
-  participants this node already knows; the `participantIds` on a receipt are not
-  used for routing because they arrive from the network unverified
+  participants this node already knows, and only after `readProof` verifies for
+  the event's conversation, message and reader; the `participantIds` on a receipt
+  are not used for routing because they arrive from the network unverified
 - deliver presence events only to the connections of the identity they describe
 - deliver conversation call snapshots only to currently authorized participants;
   community call snapshots go to clients with current voice-channel access
@@ -1749,9 +1750,10 @@ reads, are not written to OrbitDB/IPFS, and reset when the node restarts.
 
 Who can see presence:
 
-- Over HTTP, any signed viewer connected to this node can read another
-  identity's presence. Invisible identities read as `disconnected` to everyone
-  except themselves.
+- Over HTTP, a signed viewer reads another identity's presence only when they
+  share a conversation or community with it that this node knows about.
+  Otherwise the identity reads as `disconnected` with no custom message.
+  Invisible identities read as `disconnected` to everyone except themselves.
 - Over WebSocket, presence events are delivered only to the connections of the
   identity they describe.
 - Presence updates, including the custom message, are gossiped on each network
@@ -2787,8 +2789,12 @@ Implemented:
 - update the OrbitDB replicated read marker for the authenticated identity up to
   and including `messageId`
 - publish `ConversationMessagesWereReadEvent` with `messageId`,
-  `readerIdentityId`, `networkId` and `participantIds`
-- consuming nodes apply the same replicated read marker update locally
+  `readerIdentityId`, `networkId`, `participantIds` and `readProof` (the reader's
+  signed request)
+- consuming nodes verify `readProof` against the reader's identity key before
+  they apply the same replicated read marker update locally; unproven receipts
+  are dropped (residual risks: "Conversation read receipts" in
+  `docs/pubsub-sync-protocol.md`)
 - send a Web Push control payload of type `notifications_cleared` to the
   reader identity subscriptions so service workers can close displayed
   notifications sharing the conversation's opaque group tag (see

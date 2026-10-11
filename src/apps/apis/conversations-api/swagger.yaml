@@ -249,7 +249,7 @@ paths:
       tags:
         - conversations
       summary: Mark conversation messages as read up to a message
-      description: Deletes local unread flags for the authenticated identity up to and including the given message id, then publishes a read event so other nodes can apply the same projection update.
+      description: Deletes local unread flags for the authenticated identity up to and including the given message id, then publishes a read event so other nodes can apply the same projection update. The signed request is kept as the event's `readProof`; receivers act on the event only after the proof verifies.
       parameters:
         - $ref: '#/components/parameters/ConversationId'
         - $ref: '#/components/parameters/XIdentityId'
