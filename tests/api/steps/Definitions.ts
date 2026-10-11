@@ -5494,6 +5494,34 @@ export default class Definitions {
     });
   }
 
+  @when('I create a mailbox with a proof of work below the required difficulty')
+  public async iCreateAMailboxWithAShortProofOfWork(): Promise<void> {
+    const id = randomBytes(32).toString('base64url');
+    const postToken = randomBytes(32).toString('base64url');
+    const readToken = randomBytes(32).toString('base64url');
+    const postTokenHash = this.mailboxHash(postToken);
+    const readTokenHash = this.mailboxHash(readToken);
+    let nonce = 0;
+
+    while (
+      MailboxCreationProof.isValid(
+        id,
+        postTokenHash,
+        readTokenHash,
+        String(nonce),
+        MailboxCreationDifficulty.MIN_BITS,
+      )
+    ) {
+      nonce += 1;
+    }
+
+    this.response = await this.restClient.put(`/mailboxes/${id}`, {
+      creationNonce: String(nonce),
+      postTokenHash,
+      readTokenHash,
+    });
+  }
+
   @when('I create the same mailbox again')
   public async iCreateTheSameMailboxAgain(): Promise<void> {
     if (!this.mailbox) {
