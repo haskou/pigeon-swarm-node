@@ -12,8 +12,6 @@ const MINUTE_MS = 60_000;
 export class DiagnosticsWindow {
   private static processWindow?: DiagnosticsWindow;
 
-  private constructor(private readonly closesAtMs?: number) {}
-
   public static fromMinutes(
     minutes: number,
     openedAtMs: number,
@@ -38,6 +36,8 @@ export class DiagnosticsWindow {
 
     return DiagnosticsWindow.processWindow;
   }
+
+  private constructor(private readonly closesAtMs?: number) {}
 
   public isOpen(nowMs: number = Date.now()): boolean {
     return this.closesAtMs !== undefined && nowMs < this.closesAtMs;
