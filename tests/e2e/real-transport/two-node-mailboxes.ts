@@ -1,3 +1,4 @@
+import { MailboxCreationDifficulty } from '@app/contexts/mailboxes/domain/MailboxCreationDifficulty';
 import { MailboxCreationProof } from '@app/contexts/mailboxes/domain/MailboxCreationProof';
 import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
@@ -73,6 +74,7 @@ async function putMailbox(
             mailbox.id,
             mailbox.postTokenHash,
             mailbox.readTokenHash,
+            MailboxCreationDifficulty.MIN_BITS,
           )
         : undefined,
       postTokenHash: mailbox.postTokenHash,

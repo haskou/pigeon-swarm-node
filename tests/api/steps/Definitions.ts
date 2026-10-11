@@ -28,6 +28,7 @@ import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/doma
 import { PairingAuthorization } from '@app/contexts/identity-devices/domain/value-objects/PairingAuthorization';
 import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
 import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/PairingId';
+import { MailboxCreationDifficulty } from '@app/contexts/mailboxes/domain/MailboxCreationDifficulty';
 import { MailboxCreationProof } from '@app/contexts/mailboxes/domain/MailboxCreationProof';
 import { NodeNetworkAdderMessage } from '@app/contexts/nodes/application/add-network/messages/NodeNetworkAdderMessage';
 import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNetworkAdder';
@@ -5474,6 +5475,7 @@ export default class Definitions {
         mailbox.id,
         postTokenHash,
         readTokenHash,
+        MailboxCreationDifficulty.MIN_BITS,
       ),
       postTokenHash,
       readTokenHash,

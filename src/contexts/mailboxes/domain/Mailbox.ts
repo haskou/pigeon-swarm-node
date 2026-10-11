@@ -59,6 +59,14 @@ export class Mailbox {
     );
   }
 
+  /** Empty and unread for `idleMs`: the only mailboxes eviction may remove. */
+  public isIdleAndEmpty(now: number, idleMs: number): boolean {
+    return (
+      this.primitives.envelopeCount === 0 &&
+      this.primitives.lastReadAt + idleMs <= now
+    );
+  }
+
   public markRead(now: number): void {
     this.primitives.lastReadAt = now;
   }

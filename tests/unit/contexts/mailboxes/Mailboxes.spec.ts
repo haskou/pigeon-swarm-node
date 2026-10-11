@@ -348,7 +348,12 @@ describe('mailboxes', () => {
 
   it('refuses creation without a proof of work bound to that mailbox', async () => {
     const other = 'n'.repeat(43);
-    const forMailbox = MailboxCreationProof.mine(MAILBOX, sha(POST), sha(READ));
+    const forMailbox = MailboxCreationProof.mine(
+      MAILBOX,
+      sha(POST),
+      sha(READ),
+      MailboxCreationDifficulty.MIN_BITS,
+    );
 
     await expect(
       creator.create(other, sha(POST), sha(READ), ''),
@@ -376,9 +381,9 @@ describe('mailboxes', () => {
   it('admits a 16-bit proof while the node is at most half full', async () => {
     process.env.MAILBOX_MAX_COUNT = '2';
 
-    await expect(
-      createMailbox(FRESH, POST_HASH, READ_HASH),
-    ).resolves.toBe(true);
+    await expect(createMailbox(FRESH, POST_HASH, READ_HASH)).resolves.toBe(
+      true,
+    );
   });
 
   it('raises the required difficulty as the node fills past half', async () => {
@@ -396,9 +401,9 @@ describe('mailboxes', () => {
     expect(
       (refusal as MailboxCreationProofInvalidError).requiredDifficultyBits,
     ).toBe(18);
-    await expect(
-      createMailbox(FRESH, POST_HASH, READ_HASH, 18),
-    ).resolves.toBe(true);
+    await expect(createMailbox(FRESH, POST_HASH, READ_HASH, 18)).resolves.toBe(
+      true,
+    );
   });
 
   it('reports the required difficulty when a proof falls short at capacity', async () => {

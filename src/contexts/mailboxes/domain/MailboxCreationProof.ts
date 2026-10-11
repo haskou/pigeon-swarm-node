@@ -3,14 +3,14 @@ import { createHash } from 'node:crypto';
 
 /**
  * Hashcash-style proof that creating a mailbox cost work. SHA-256 over the
- * mailbox id, both capability hashes and the nonce must start with
- * DIFFICULTY_BITS leading zero bits. Binding the id and both hashes means a
- * proof solved for one mailbox cannot be replayed for another. Any node
- * verifies it statelessly, before any storage lookup.
+ * mailbox id, both capability hashes and the nonce must start with the
+ * difficulty bits the caller requires (see MailboxCreationDifficulty).
+ * Binding the id and both hashes means a proof solved for one mailbox cannot
+ * be replayed for another. Any node verifies it statelessly, before any
+ * storage lookup.
  */
 export class MailboxCreationProof {
   private static readonly DOMAIN = 'pigeon-mailbox-creation:v1';
-  public static readonly DIFFICULTY_BITS = 16;
   public static readonly MAX_NONCE_LENGTH = 64;
 
   public static preimage(
@@ -28,11 +28,12 @@ export class MailboxCreationProof {
     ].join(':');
   }
 
-  /** Reference miner: first nonce that satisfies the protocol difficulty. */
+  /** Reference miner: first nonce with difficultyBits leading zero bits. */
   public static mine(
     mailboxId: string,
     postTokenHash: string,
     readTokenHash: string,
+    difficultyBits: number,
   ): string {
     const prefix = createHash('sha256').update(
       MailboxCreationProof.preimage(
@@ -47,7 +48,7 @@ export class MailboxCreationProof {
       const candidate = nonce.toString();
       const digest = prefix.copy().update(candidate).digest();
 
-      if (leadingZeroBits(digest) >= MailboxCreationProof.DIFFICULTY_BITS) {
+      if (leadingZeroBits(digest) >= difficultyBits) {
         return candidate;
       }
     }
@@ -58,6 +59,7 @@ export class MailboxCreationProof {
     postTokenHash: string,
     readTokenHash: string,
     nonce: string,
+    difficultyBits: number,
   ): boolean {
     if (
       nonce.length === 0 ||
@@ -77,6 +79,6 @@ export class MailboxCreationProof {
       )
       .digest();
 
-    return leadingZeroBits(digest) >= MailboxCreationProof.DIFFICULTY_BITS;
+    return leadingZeroBits(digest) >= difficultyBits;
   }
 }

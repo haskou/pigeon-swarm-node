@@ -1,4 +1,5 @@
 import MailboxCreator from '@app/contexts/mailboxes/application/MailboxCreator';
+import { MailboxCreationProofInvalidError } from '@app/contexts/mailboxes/domain/errors/MailboxCreationProofInvalidError';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
@@ -46,6 +47,16 @@ export class PutMailboxRoute extends MailboxRouteSupport {
         .status(created ? HttpRouteStatusEnum.CREATED : HttpRouteStatusEnum.OK)
         .send();
     } catch (error: unknown) {
+      if (error instanceof MailboxCreationProofInvalidError) {
+        return response.status(HttpRouteStatusEnum.BAD_REQUEST).json({
+          code: 'BadRequestError',
+          errors: [],
+          httpStatus: HttpRouteStatusEnum.BAD_REQUEST,
+          message: error.message,
+          requiredDifficultyBits: error.requiredDifficultyBits,
+        });
+      }
+
       return this.translate(error);
     }
   }

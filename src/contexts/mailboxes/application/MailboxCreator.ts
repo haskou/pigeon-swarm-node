@@ -2,6 +2,7 @@ import { MailboxConflictError } from '../domain/errors/MailboxConflictError';
 import { MailboxCreationProofInvalidError } from '../domain/errors/MailboxCreationProofInvalidError';
 import { MailboxLimitReachedError } from '../domain/errors/MailboxLimitReachedError';
 import { Mailbox } from '../domain/Mailbox';
+import { MailboxCreationDifficulty } from '../domain/MailboxCreationDifficulty';
 import { MailboxCreationProof } from '../domain/MailboxCreationProof';
 import MailboxPolicy from '../domain/MailboxPolicy';
 import MailboxRepository from '../domain/repositories/MailboxRepository';
@@ -15,9 +16,31 @@ export default class MailboxCreator {
   ) {}
 
   /**
+   * Frees `needed` slots by removing the least recently read mailboxes that
+   * are empty and idle. All or nothing: with too few such mailboxes nothing
+   * is removed and the creation is refused.
+   */
+  private async evictIdleEmpty(needed: number, now: number): Promise<void> {
+    const candidates = (await this.repository.listAll())
+      .filter((mailbox) =>
+        mailbox.isIdleAndEmpty(now, MailboxPolicy.EVICTION_IDLE_MS),
+      )
+      .sort((a, b) => a.getLastReadAt() - b.getLastReadAt());
+
+    if (candidates.length < needed) {
+      throw new MailboxLimitReachedError();
+    }
+
+    for (const mailbox of candidates.slice(0, needed)) {
+      await this.repository.remove(mailbox.getId());
+    }
+  }
+
+  /**
    * Idempotent for identical hashes; returns whether a queue was created.
    * The proof of work is checked before any lookup, so an unproven request
-   * learns nothing about which mailbox ids exist.
+   * learns nothing about which mailbox ids exist. The required difficulty
+   * follows how full the node is, and a short proof is told what it needs.
    */
   public async create(
     mailboxId: string,
@@ -25,15 +48,21 @@ export default class MailboxCreator {
     readTokenHash: string,
     creationNonce: string,
   ): Promise<boolean> {
+    const requiredBits = MailboxCreationDifficulty.bitsFor(
+      await this.repository.count(),
+      this.policy.maxMailboxes(),
+    );
+
     if (
       !MailboxCreationProof.isValid(
         mailboxId,
         postTokenHash,
         readTokenHash,
         creationNonce,
+        requiredBits,
       )
     ) {
-      throw new MailboxCreationProofInvalidError();
+      throw new MailboxCreationProofInvalidError(requiredBits);
     }
 
     return this.coordinator.run(async (): Promise<boolean> => {
@@ -47,15 +76,19 @@ export default class MailboxCreator {
         return false;
       }
 
-      if ((await this.repository.count()) >= this.policy.maxMailboxes()) {
-        throw new MailboxLimitReachedError();
+      const now = Date.now();
+      const count = await this.repository.count();
+      const max = this.policy.maxMailboxes();
+
+      if (count >= max) {
+        await this.evictIdleEmpty(count - max + 1, now);
       }
 
       await this.repository.create(
         Mailbox.create({
           appendTokens: this.policy.maxAppendsPerMinute(),
           id: mailboxId,
-          now: Date.now(),
+          now,
           postTokenHash,
           readTokenHash,
         }),

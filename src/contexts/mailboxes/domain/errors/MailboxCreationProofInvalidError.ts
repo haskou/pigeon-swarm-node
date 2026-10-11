@@ -1,7 +1,9 @@
 import { BaseError } from '@haskou/ddd-kernel/domain';
 
 export class MailboxCreationProofInvalidError extends BaseError {
-  constructor() {
-    super('Mailbox creation needs a valid creationNonce.');
+  constructor(public readonly requiredDifficultyBits: number) {
+    super(
+      `Mailbox creation needs a creationNonce with ${requiredDifficultyBits} leading zero bits.`,
+    );
   }
 }
