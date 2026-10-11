@@ -54,6 +54,7 @@ routes resolve to the bundled frontend.
 | --- | --- | --- | --- |
 | `NODE_ENV` | `development` behavior in several modules | No | Runtime mode. Affects error/log verbosity. |
 | `API_PORT` | App internal default | No | HTTP port for API server. |
+| `API_TRUST_PROXY` | `false` | No | How the node reads a client's address for `request.ip`, which the mailbox creation limit uses. `false` uses the socket address and ignores `X-Forwarded-For`. `loopback`, or a hop count such as `1` behind one reverse proxy, trusts the forwarded address. `true` is refused at boot, so clients cannot pick their own key. |
 | `ROUTE_PREFIX` | App internal default | No | Route prefix for API endpoints. |
 | `CONTAINER_BUILD` | unset | No | Source runs only: autowires DI from TypeScript sources. Compiled builds (`dist/`) cannot read sources, so they ignore it and load the committed `config/container/services.yaml`. |
 
@@ -119,7 +120,7 @@ installed `web-push` module path.
 | --- | --- | --- | --- |
 | `IPFS_STORAGE_PATH` | `./ipfs_storage` | Recommended | Base folder used by IPFS registry and local node metadata. |
 | `MAILBOX_APPEND_RATE_PER_MINUTE` | `120` | No | Envelopes one mailbox may receive per minute, kept across restarts (`0` disables). Duplicate envelopes are not charged. |
-| `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE` | `30` | No | Mailbox creations one remote address may make per minute (in memory; `0` disables). |
+| `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE` | `30` | No | Mailbox creations one client address may make per minute, keyed by the address `API_TRUST_PROXY` resolves (IPv6 per /64). In memory, reset on restart; `0` disables. |
 | `MAILBOX_MAX_BYTES` | `8388608` | No | Pending ciphertext bytes per mailbox (8 MiB). A full mailbox refuses new envelopes. |
 | `MAILBOX_MAX_COUNT` | `10000` | No | Mailboxes this node will hold. |
 | `MAILBOX_MAX_ENVELOPES` | `1000` | No | Pending envelopes per mailbox. |
