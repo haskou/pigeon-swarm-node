@@ -59,7 +59,7 @@ routes resolve to the bundled frontend.
 | --- | --- | --- | --- |
 | `LOG_LEVEL` | App internal default | No | Log level (`error`, `warn`, `info`, etc.). |
 | `LOG_URL` | unset | No | External logging endpoint, if configured. |
-| `DEBUG_NETWORK` | `false` | No | Opt-in diagnostics for content retrieval (debug level). Identifiers are replaced by digests keyed with a secret generated at process start, so raw CIDs and peer IDs never reach the log and digests change on restart. Enable only while diagnosing and turn it off afterwards. |
+| `DIAGNOSTICS_WINDOW_MINUTES` | `0` | No | Opens a diagnostics window for content retrieval for the given number of minutes (max 60) after the node starts. `0` keeps diagnostics off, which is the default. The window closes on its own and only a restart opens a new one. Lines are written at debug level, so `LOG_LEVEL=debug` is also required. CIDs, provider and sender IDs are replaced by digests keyed with a secret generated at process start, so the log never holds raw identifiers and the digests change on restart; the log can be shared in that form. |
 | `SERVICE_NAME` | unset | Recommended | Service name used in logs and message bus metadata. |
 
 ## Message Bus Variables
@@ -126,6 +126,7 @@ installed `web-push` module path.
 | `PRIVATE_BLOB_STORAGE_PATH` | `./private_blobs` | No | Local folder for private blob bytes. Back it up or exclude it deliberately: it is never replicated. |
 | `PRIVATE_BLOB_UPLOAD_WINDOW_MS` | `3600000` | No | How long a reservation waits for its upload before it is cleaned up (1 hour). |
 | `REALTIME_ALLOWED_ORIGINS` | empty | No | Comma-separated browser origins (for example `https://chat.example.com`) allowed to open the realtime WebSocket. Empty means no Origin restriction. Requests without an `Origin` header (non-browser clients) are never refused by this setting; they still need a valid signature. Refused upgrades get `403`. |
+| `REALTIME_SIGNED_QUERY_WS_ENABLED` | `true` | No | Set to `false` once every client uses the ticket endpoint `/realtime/v1`, to refuse the legacy signed-query WebSocket at `/ws` with `404`. |
 | `PIGEON_RELAY_RECORD_TTL_MS` | `7200000` | No | Private relay record lifetime. Defaults to 2 hours. |
 | `PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS` | `60000` | No | Fallback interval for requesting a private relay record over gossipsub. The initial request is immediate. |
 | `PIGEON_RELAY_RECORD_PUBLIC_PEER_WAIT_MS` | `8000` | No | Maximum time to wait for public IPFS peers before publishing or requesting private relay records. Values above 10 seconds are capped. |

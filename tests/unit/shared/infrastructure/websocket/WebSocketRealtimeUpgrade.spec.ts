@@ -63,11 +63,15 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
   function connect(
     query: string,
     headers: Record<string, string> = {},
+    serverPort = port,
   ): Promise<Outcome> {
     return new Promise((resolve) => {
-      const socket = new WebSocket(`ws://127.0.0.1:${port}${path}${query}`, {
-        headers,
-      });
+      const socket = new WebSocket(
+        `ws://127.0.0.1:${serverPort}${path}${query}`,
+        {
+          headers,
+        },
+      );
 
       socket.on('open', () => {
         socket.terminate();
@@ -264,6 +268,31 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
       } finally {
         spy.mockRestore();
       }
+    });
+  });
+
+  describe('legacy signed-query endpoint disabled', () => {
+    let disabledServer: Server;
+    let disabledPort: number;
+
+    beforeEach(async () => {
+      disabledServer = createServer();
+      new WebSocketRealtimeServer().attach(disabledServer, { ticketPath });
+      const { promise, resolve } = Promise.withResolvers<void>();
+      disabledServer.listen(0, '127.0.0.1', resolve);
+      await promise;
+      disabledPort = (disabledServer.address() as AddressInfo).port;
+    });
+
+    afterEach(async () => {
+      disabledServer.closeAllConnections();
+      await new Promise((resolve) => disabledServer.close(resolve));
+    });
+
+    it('refuses a validly signed upgrade on the legacy path with 404', async () => {
+      expect(await connect(await signedQuery(), {}, disabledPort)).toEqual({
+        status: 404,
+      });
     });
   });
 });

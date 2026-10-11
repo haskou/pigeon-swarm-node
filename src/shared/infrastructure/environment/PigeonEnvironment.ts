@@ -31,7 +31,7 @@ export const pigeonEnvironmentSchema = {
     defaultValue: 1024 ** 3,
     type: 'number',
   },
-  DEBUG_NETWORK: { defaultValue: false, type: 'boolean' },
+  DIAGNOSTICS_WINDOW_MINUTES: { defaultValue: 0, type: 'number' },
   IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE: {
     defaultValue: 0,
     type: 'number',
@@ -138,6 +138,7 @@ export const pigeonEnvironmentSchema = {
     type: 'string',
   },
   REALTIME_ALLOWED_ORIGINS: { defaultValue: '', type: 'string' },
+  REALTIME_SIGNED_QUERY_WS_ENABLED: { defaultValue: true, type: 'boolean' },
   ROUTE_PREFIX: { type: 'string' },
   SERVICE_NAME: { type: 'string' },
   TRANSPORT_DSN: { defaultValue: 'in-memory', type: 'string' },

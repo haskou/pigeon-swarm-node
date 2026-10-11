@@ -202,6 +202,10 @@ X-Signature: <signature>
 The signed path is the WebSocket path without query string. If `ROUTE_PREFIX`
 is configured, sign `<ROUTE_PREFIX>/ws`. Each signed upgrade URL is single-use.
 
+Set `REALTIME_SIGNED_QUERY_WS_ENABLED=false` to refuse this legacy endpoint
+(default `true`). A signed upgrade then gets `404`, like any other path the node
+does not serve, and clients must use the credentialless ticket endpoint below.
+
 Per node, upgrades are rate limited per remote address and total open sockets
 are capped; excess upgrades receive `429 Too Many Requests` before signature
 verification. A socket sending more than 200 client messages in 10 seconds is
@@ -417,6 +421,10 @@ Implemented:
 - deliver notification events only to the notification recipient
 - deliver conversation events only to the conversation participants when the
   event carries `participantIds`
+- deliver `conversations.v1.messages.were_read` receipts only to the conversation
+  participants this node already knows; the `participantIds` on a receipt are not
+  used for routing because they arrive from the network unverified
+- deliver presence events only to the connections of the identity they describe
 - deliver conversation call snapshots only to currently authorized participants;
   community call snapshots go to clients with current voice-channel access
 - deliver call signals only to `recipientIdentityId`
@@ -1738,6 +1746,18 @@ lease for every identity connected through it. Heartbeats renew that node's
 lease through domain events; another node may expire its local copy but never
 broadcast an expiration on behalf of the lease owner. Leases are aggregated for
 reads, are not written to OrbitDB/IPFS, and reset when the node restarts.
+
+Who can see presence:
+
+- Over HTTP, any signed viewer connected to this node can read another
+  identity's presence. Invisible identities read as `disconnected` to everyone
+  except themselves.
+- Over WebSocket, presence events are delivered only to the connections of the
+  identity they describe.
+- Presence updates, including the custom message, are gossiped on each network
+  the identity belongs to. Nodes subscribed to that network keep them and serve
+  them to their own clients, so a custom message is visible beyond this node.
+  Do not put private text in it.
 
 Statuses:
 
