@@ -1,6 +1,6 @@
 # Independent TURN deployments
 
-The deployment generates a random 256-bit private TURN secret on first startup and persists it outside replicated data. The backend issuer and its coturn sidecar read the same value. An explicit administrator override remains supported. There is no shared default and a corrupt stored secret is an error, not permission to rotate silently.
+The `haskou/pigeon-swarm` image generates a random 256-bit private TURN secret on first startup and stores it in `/data/local_storage/turn-shared-secret`. The backend issuer and its coturn read the same value. An explicit administrator override (`CALLS_TURN_SHARED_SECRET`) remains supported. There is no shared default: the known public bootstrap value is rejected, and a corrupt stored secret is an error, not permission to rotate silently.
 
 Version 2 relay announcements authenticate the relay peer identity without a pool HMAC. Credentials are requested on an authenticated, encrypted libp2p stream to an already connected relay in a shared private network. Public-network strangers cannot obtain credentials through this protocol. Possession of the private network access key authorizes relay use; it is not per-conversation authorization. The issuer applies per-peer and global request limits, coturn allocation quotas remain in force, and clients only select relays already trusted through their private-network connection.
 
@@ -8,13 +8,13 @@ The issuer returns its own TURN URLs and short-lived credentials. Other nodes ne
 
 Version 1 announcements keep pool verification and are published only on public networks. Version 2 announcements are published only on private networks and use the separate stream protocol described here.
 
-Validation covers separate installation secrets, persistence, concurrent first startup, file permissions, invalid secrets, signed advertisement tampering, private-network admission, request limits, bounded responses and real two-node credential exchange. A real coturn allocation must accept credentials obtained from the owner and reject credentials minted with the requester's different secret. Local tests do not establish Internet NAT reachability.
+Repository validation covers separate installation secrets, cross-secret rejection, signed advertisement tampering, private-network admission, request limits, bounded responses and real two-node credential exchange. A real coturn allocation must accept credentials obtained from the owner and reject credentials minted with the requester's different secret. Secret-file persistence, concurrent first startup and file permissions are implemented by the `haskou/pigeon-swarm` image and are not tested in this repository. Local tests do not establish Internet NAT reachability.
 
 ## Deployment
 
-Automatic secret generation is provided by the Pigeon Swarm image entrypoint and companion Compose deployment. Standalone backend processes must still configure a private secret matching their own coturn service. The private-network v2 path does not require requesters to configure any local TURN service or to know the owner's secret. Public-network v1 pools retain their shared-secret requirement.
+The `haskou/pigeon-swarm` image entrypoint generates the secret. Standalone backend processes must still configure a private secret matching their own coturn service. The private-network v2 path does not require requesters to configure any local TURN service or to know the owner's secret. Public-network v1 pools retain their shared-secret requirement.
 
-The updated Compose configuration is required to run the coturn sidecar. Updating the application image alone does not add a missing service. Externally hosted coturn must be provisioned separately. No public connectivity is inferred from the presence of TURN URLs.
+The `external-turn` profile of `haskou/pigeon-swarm`'s `docker-compose.yml` runs coturn as a separate sidecar; the default embedded mode needs no extra service. Updating the application image alone does not add the sidecar. Externally hosted coturn must be provisioned separately. No public connectivity is inferred from the presence of TURN URLs.
 
 Master-secret rotation requires restarting the issuer and coturn together. Clients invalidate cached credentials when the owner publishes its new signed advertisement; credentials already handed to a browser may still be rejected until that browser requests a fresh ICE configuration; seamless active-call rotation is not guaranteed. Revoking a private network connection stops new credentials but does not revoke previously issued credentials before expiry.
 

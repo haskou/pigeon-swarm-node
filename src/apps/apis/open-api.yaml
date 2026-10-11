@@ -86,7 +86,8 @@ paths:
         peers cannot be known in an eventually consistent network.
 
         Clients may send `{ "type": "identity_heartbeat" }` over the open
-        socket every 10 seconds. Include `"active": true` when the user has
+        socket. The reference client (`pigeon-swarm-ui`) sends one every 10 seconds.
+        Include `"active": true` when the user has
         produced activity since the previous heartbeat. The server answers
         `{ "type": "heartbeat_ack", "identityId": "<normalizedIdentityId>", "timestamp": 1770000000000 }`.
         Presence is kept in memory, replicated through domain events, and is

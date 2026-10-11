@@ -267,8 +267,9 @@ Operational rules:
 ### Calls TURN/coturn setup
 
 Calls use WebRTC ICE, not the libp2p/IPFS circuit relay. The backend does not
-embed a TURN server. The official deployment runs coturn as a sidecar sharing
-the backend network namespace.
+embed a TURN server. The `haskou/pigeon-swarm` image runs coturn inside the app
+container by default (`PIGEON_TURN_MODE=embedded`). Its opt-in `external-turn`
+Compose profile runs coturn as a sidecar sharing the backend network namespace.
 
 The same host-level port range can be reused operationally when the protocols do
 not collide. The existing private IPFS relay range is TCP. TURN media relay
@@ -313,8 +314,8 @@ PUT /node/relay-configuration
 }
 ```
 
-The backend publishes this persisted configuration to the local TURN sidecar.
-Coturn listens on `callsRelay.port` and reuses the private relay range over UDP.
+The backend writes this persisted configuration atomically to
+`PIGEON_TURN_RUNTIME_CONFIG_PATH` (default `./var/cache/calls-turn-runtime.conf`). The `haskou/pigeon-swarm` launcher reads `/run/pigeon/calls-turn-runtime.conf` and runs coturn on `callsRelay.port`, reusing the private relay range over UDP.
 Publish the configured host range over TCP for IPFS and UDP for TURN; no TURN port, media
 range, URL, or ICE policy environment variables are required.
 
@@ -329,8 +330,8 @@ relay to which it is currently connected. Every issuer needs a private
 The current distributed issuance pool uses one shared private value. Independent
 TURN servers do not need matching secrets merely to relay media to each other.
 
-The official coturn sidecar consumes `relayConfiguration.callsRelay.port` and
-the persisted private relay range directly. The router and firewall must still
+The `haskou/pigeon-swarm` coturn launcher reads `callsRelay.port` and the
+persisted private relay range from the runtime configuration file. The router and firewall must still
 expose the listener over UDP/TCP and the media range over UDP without
 translation. Clients inside the relay's LAN also need NAT loopback or split DNS.
 The endpoint uses `iceTransportPolicy=all` by default.

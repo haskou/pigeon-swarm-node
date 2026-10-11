@@ -270,7 +270,7 @@ Identity presence heartbeat:
 }
 ```
 
-Send it every 10 seconds. `active: true` means the user interacted with the
+The reference client (`pigeon-swarm-ui`) sends it every 10 seconds. `active: true` means the user interacted with the
 client since the previous heartbeat. Heartbeats are not individually signed
 because the WebSocket upgrade already authenticated the identity. Backend marks
 the identity `disconnected` after roughly 20 seconds without heartbeat and
@@ -292,8 +292,8 @@ Heartbeat acknowledgement:
 Heartbeat messages do not need a new signature; the WebSocket upgrade already
 authenticated the connection. The backend ignores any client-sent `identityId`
 and answers with the identity bound to the socket. Unknown or malformed client
-messages are ignored. Recommended client interval: 10 seconds, reconnecting
-with a new ticket if no `heartbeat_ack` arrives within 2 intervals.
+messages are ignored. Reference client interval: 10 seconds. It closes the socket with
+code 4000 when no `heartbeat_ack` arrives within 30 seconds.
 
 Call signal acknowledgement:
 
@@ -506,9 +506,8 @@ server, not an OrbitDB revision or cross-node clock. Reset revision tracking on
 each connection acknowledgement; reject older/duplicate revisions per call.
 Load the call list on initial connection/reconnect, preserving any newer
 WebSocket snapshots received while the recovery request was outstanding.
-Recovery makes at most three attempts with one- and two-second delays, deduplicates
-pending requests and discards responses from an earlier connection generation.
-Malformed snapshots trigger bounded per-call recovery; stale revisions do not.
+Client recovery behavior (retry count and delays, request deduplication, handling of
+malformed snapshots) is implemented by the client and is not enforced by the backend.
 Stable heartbeats do not trigger full-call GETs. ICE negotiation and actual audio remain separate from presence.
 
 Community starts for the same known session use a shared, scoped identifier
@@ -657,10 +656,11 @@ secrets, a shared pool, wrong-secret rejection, expiry, renewal and coordinated
 restart. The harness removes its containers and network and reports cleanup
 failures as failures. It does not simulate a public NAT.
 
-The wrapper's `tests/turn-media.integration.mjs` covers signed HTTP credential
+The `haskou/pigeon-swarm` wrapper's `tests/turn-media.integration.mjs` covers signed HTTP credential
 requests from the real backend and Chromium audio over UDP, TCP and TLS before
-and after coturn restart. `tests/two-node-call.integration.mjs` covers application
-signalling and browser audio between two nodes with independent TURN secrets.
+and after coturn restart. Its `tests/two-node-call.integration.mjs` delegates to
+`tests/two-node-call-runner.mjs`, which starts two nodes with separate TURN services and
+secrets (`turn-a`, `turn-b`, `TEST_SECRET_A`, `TEST_SECRET_B`). The runner source has no audio check.
 External NAT/CGNAT and user-observed audio acceptance remain tracked separately
 in [deployment #29](https://github.com/haskou/pigeon-swarm/issues/29).
 
@@ -670,9 +670,10 @@ peer connection per participant pair. For large groups, add an SFU/media relay
 later so every client uploads one media stream and receives only the streams it
 needs.
 
-The backend does not embed a TURN server. The official coturn sidecar consumes
-the persisted listener and private relay range through a local runtime contract,
-then shares the backend network namespace. The configured host range must be
+The backend does not embed a TURN server. The `haskou/pigeon-swarm` image runs
+coturn embedded by default and reads the persisted listener and private relay range
+from a local runtime contract. Its `external-turn` Compose profile runs coturn as a
+sidecar sharing the backend network namespace. The configured host range must be
 published over TCP for IPFS and UDP for TURN. The node-to-node relay discovery
 protocol is documented in
 [Calls TURN Relay Discovery](calls-turn-relay-discovery.md).
