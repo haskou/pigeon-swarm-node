@@ -376,9 +376,10 @@ flowchart LR
     TurnListen --> TurnMedia
 ```
 
-The official Compose stack shares the backend network namespace with coturn, so
-the same published host range carries private IPFS over TCP and TURN media over
-UDP.
+In the `haskou/pigeon-swarm` image, coturn runs embedded in the app container by default
+or, with the `external-turn` profile, as a service sharing the backend network namespace
+(`network_mode: service:app`). Either way the same published host range carries private IPFS
+over TCP and TURN media over UDP.
 
 ## Configuration
 
@@ -397,9 +398,10 @@ When explicit `CALLS_TURN_URLS` are not enough, local TURN URLs are derived from
 `relayConfiguration.publicHost` and `relayConfiguration.callsRelay.port` in
 `PUT /node/relay-configuration`.
 
-The official deployment does not duplicate TURN ports in environment
-variables. The backend atomically publishes
-`/run/pigeon/calls-turn-runtime.conf` from the persisted node configuration:
+The listener and media range are not set in environment variables; they come from the
+persisted node configuration. The backend atomically writes that configuration to
+`PIGEON_TURN_RUNTIME_CONFIG_PATH` (`/run/pigeon/calls-turn-runtime.conf` in the
+`haskou/pigeon-swarm` image, `./var/cache/calls-turn-runtime.conf` by default):
 
 ```text
 version=1
@@ -409,9 +411,10 @@ relay_port_start=4102
 relay_port_end=4199
 ```
 
-Coturn observes this local-only contract and reloads when it changes. The
-listener must be outside the media relay range. Incomplete or conflicting
-persisted configuration publishes `enabled=false` and stops the sidecar.
+The `haskou/pigeon-swarm` launcher polls this local-only file every 2 seconds and restarts
+coturn when it changes. The listener must be outside the media relay range. Incomplete or
+conflicting persisted configuration publishes `enabled=false`; the launcher then stops coturn
+and does not start it.
 
 ## Operational States
 
