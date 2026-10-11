@@ -11,6 +11,9 @@ services:
   apps/apis/calls-api/CallRelayRecordSigner:
     class: /apps/apis/calls-api/CallRelayRecordSigner
     arguments: []
+  apps/apis/identities-api/FixedWindowCounter:
+    class: /apps/apis/identities-api/FixedWindowCounter
+    arguments: []
   apps/apis/identity-devices-api/DeviceAuthorizationTransitionRateLimiter:
     class: /apps/apis/identity-devices-api/DeviceAuthorizationTransitionRateLimiter
     arguments: []
@@ -193,6 +196,10 @@ services:
     @contexts/push-notifications/infrastructure/web-push/WebPushNotificationDelivery
   contexts/push-notifications/domain/repositories/PushSubscriptionRepository: >-
     @contexts/push-notifications/infrastructure/local-db/LocalPushSubscriptionRepository
+  contexts/push-notifications/infrastructure/web-push/WebPushPayloadEnvelope:
+    class: >-
+      /contexts/push-notifications/infrastructure/web-push/WebPushPayloadEnvelope
+    arguments: []
   contexts/shared/infrastructure/ipfs/helia/HeliaPinningStrategy:
     class: /contexts/shared/infrastructure/ipfs/helia/HeliaPinningStrategy
     arguments: []
@@ -271,6 +278,10 @@ services:
       - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
   apps/apis/calls-api/CallSignalRateLimiter:
     class: /apps/apis/calls-api/CallSignalRateLimiter
+    arguments:
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+  apps/apis/identities-api/IdentityNetworkAdmissionRateLimiter:
+    class: /apps/apis/identities-api/IdentityNetworkAdmissionRateLimiter
     arguments:
       - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
   apps/apis/identities-api/IdentityPublishRateLimiter:
