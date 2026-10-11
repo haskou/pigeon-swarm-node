@@ -839,6 +839,7 @@ export class WebSocketEventHub {
       ) {
         continue;
       }
+
       if (!CallEventAttestation.isLifecycleEvent(event)) {
         this.publish([event]);
         continue;

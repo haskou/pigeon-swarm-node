@@ -29,6 +29,24 @@ export class MessageReadProof {
   private static readonly READ_UNTIL_PATH =
     /^\/conversations\/([^/]+)\/messages\/read-until$/;
 
+  private static hasShape(value: unknown): value is MessageReadProofData {
+    if (typeof value !== 'object' || value === null) {
+      return false;
+    }
+
+    const candidate = value as Record<string, unknown>;
+    const body = candidate.body;
+
+    return (
+      typeof body === 'object' &&
+      body !== null &&
+      typeof candidate.method === 'string' &&
+      typeof candidate.path === 'string' &&
+      typeof candidate.signature === 'string' &&
+      Number.isInteger(candidate.timestamp)
+    );
+  }
+
   public static isAuthentic(
     value: unknown,
     claim: MessageReadClaim,
@@ -66,23 +84,5 @@ export class MessageReadProof {
     } catch {
       return false;
     }
-  }
-
-  private static hasShape(value: unknown): value is MessageReadProofData {
-    if (typeof value !== 'object' || value === null) {
-      return false;
-    }
-
-    const candidate = value as Record<string, unknown>;
-    const body = candidate.body;
-
-    return (
-      typeof body === 'object' &&
-      body !== null &&
-      typeof candidate.method === 'string' &&
-      typeof candidate.path === 'string' &&
-      typeof candidate.signature === 'string' &&
-      Number.isInteger(candidate.timestamp)
-    );
   }
 }

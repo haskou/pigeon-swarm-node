@@ -21,9 +21,8 @@ export class GetPresenceRoute extends Route {
     IdentityPresenceFinder,
   );
 
-  private readonly clientMessageHandler = this.get<WebSocketClientMessageHandler>(
-    WebSocketClientMessageHandler,
-  );
+  private readonly clientMessageHandler =
+    this.get<WebSocketClientMessageHandler>(WebSocketClientMessageHandler);
 
   private identityIdsFrom(request: Request): string | string[] | undefined {
     const { identityIds } = request.query;
@@ -86,7 +85,10 @@ export class GetPresenceRoute extends Route {
     const viewerIdentityId =
       await this.signedRequestAuthenticator.authenticate(request);
     const [presence] = await this.finder.find(
-      new GetPresenceRequest(viewerIdentityId.valueOf(), identityId).getMessage(),
+      new GetPresenceRequest(
+        viewerIdentityId.valueOf(),
+        identityId,
+      ).getMessage(),
     );
     const sharesRelationship = (
       await this.sharedIdentityIdsOf(viewerIdentityId)
