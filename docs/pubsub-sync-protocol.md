@@ -117,8 +117,10 @@ for the event's conversation, message and reader. Push clearing sends
 `notifications_cleared` only to that verified reader.
 
 A receipt that marks an earlier message than the reader's stored marker is
-refused by the store, so the marker never moves back. Such a receipt is still
-forwarded to WebSocket clients (see residual risks).
+refused by the store, so the marker never moves back. Such a receipt is not
+forwarded to WebSocket clients either. Receipts for the stored marker's own
+message, and for a message this node has not replicated yet, are still accepted
+and forwarded (see residual risks).
 
 Residual risks accepted for this change:
 
@@ -132,9 +134,10 @@ Residual risks accepted for this change:
   private network.
 - Upgraded nodes drop proofless receipts from older nodes, so those receipts do
   not update read state or clear push until the sender upgrades.
-- Authentic receipts for an earlier message are still forwarded to WebSocket
-  clients. The stored marker does not move back, but a client can briefly show
-  the earlier read state.
+- Authentic receipts for the stored marker's own message, or for a message this
+  node has not replicated yet, are still forwarded to WebSocket clients. The
+  store accepts them without an order check, so a client can briefly show a read
+  state the replicated head has not confirmed.
 
 ## Durable call state convergence
 

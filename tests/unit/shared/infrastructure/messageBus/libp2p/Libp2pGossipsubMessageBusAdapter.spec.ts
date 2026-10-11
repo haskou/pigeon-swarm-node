@@ -3,6 +3,7 @@ import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networ
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import Libp2pGossipsubAdapter from '@app/shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter';
+import { networkFanoutSuppression } from '@app/shared/infrastructure/messageBus/NetworkFanoutSuppression';
 import PubSubNetworkMessageCodec from '@app/shared/infrastructure/messageBus/libp2p/PubSubNetworkMessageCodec';
 import PubSubTopicResolver from '@app/shared/infrastructure/messageBus/libp2p/PubSubTopicResolver';
 import PubSubTransport from '@app/shared/infrastructure/pubsub/PubSubTransport';
@@ -215,6 +216,72 @@ describe('Libp2pGossipsubAdapter', () => {
     publishSpy.mockRestore();
   });
 
+  it('should not fan out transport payloads a consumer refused as stale', async () => {
+    const staleHandler = jest.fn(async (event: DomainEvent) => {
+      networkFanoutSuppression.add(event);
+    });
+    const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
+    const publishSpy = jest
+      .spyOn(webSocketEventHub, 'publish')
+      .mockImplementation(() => undefined);
+    let subscribedHandler: ((payload: string) => Promise<void>) | undefined;
+
+    transport.subscribe.mockImplementation(async (_topic, callback) => {
+      subscribedHandler = callback;
+    });
+
+    await adapter.consume(
+      'queue',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      staleHandler,
+    );
+    await subscribedHandler?.(event.decode());
+
+    expect(staleHandler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
+    expect(publishSpy).not.toHaveBeenCalled();
+
+    publishSpy.mockRestore();
+  });
+
+  it('should not fan out transport payloads when any consumer refused them as stale', async () => {
+    const staleHandler = jest.fn(async (event: DomainEvent) => {
+      networkFanoutSuppression.add(event);
+    });
+    const acceptingHandler = jest.fn();
+    const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
+    const publishSpy = jest
+      .spyOn(webSocketEventHub, 'publish')
+      .mockImplementation(() => undefined);
+    let subscribedHandler: ((payload: string) => Promise<void>) | undefined;
+
+    transport.subscribe.mockImplementation(async (_topic, callback) => {
+      subscribedHandler = callback;
+    });
+
+    await adapter.consume(
+      'queue-a',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      staleHandler,
+    );
+    await adapter.consume(
+      'queue-b',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      acceptingHandler,
+    );
+    await subscribedHandler?.(event.decode());
+
+    expect(acceptingHandler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
+    expect(publishSpy).not.toHaveBeenCalled();
+
+    publishSpy.mockRestore();
+  });
+
   it('should fan out transport payloads once to websockets after every consumer accepts them', async () => {
     const firstHandler = jest.fn();
     const secondHandler = jest.fn();
@@ -374,6 +441,39 @@ describe('Libp2pGossipsubAdapter', () => {
       subscribedHandler?.(network.publishPubSub.mock.calls[0][1]),
     ).rejects.toBe(expectedError);
 
+    expect(publishSpy).not.toHaveBeenCalled();
+
+    publishSpy.mockRestore();
+  });
+
+  it('should not fan out network payloads a consumer refused as stale', async () => {
+    const staleHandler = jest.fn(async (event: DomainEvent) => {
+      networkFanoutSuppression.add(event);
+    });
+    const network = createNetwork({ id: 'network-id' });
+    const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
+    const publishSpy = jest
+      .spyOn(webSocketEventHub, 'publish')
+      .mockImplementation(() => undefined);
+    let subscribedHandler: ((payload: string) => Promise<void>) | undefined;
+
+    networkRegistry.getAll.mockReturnValue([network]);
+    network.subscribePubSub.mockImplementation(async (_topic, callback) => {
+      subscribedHandler = callback;
+    });
+    adapter = createAdapter();
+
+    await adapter.consume(
+      'queue',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      staleHandler,
+    );
+    await adapter.publish([event]);
+    await subscribedHandler?.(network.publishPubSub.mock.calls[0][1]);
+
+    expect(staleHandler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
     expect(publishSpy).not.toHaveBeenCalled();
 
     publishSpy.mockRestore();
