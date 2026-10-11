@@ -14,6 +14,8 @@ import MailboxRepository from '../../domain/repositories/MailboxRepository';
  */
 export default class LocalMailboxRepository extends MailboxRepository {
   private static readonly MAILBOXES = 'mailboxes';
+  private static readonly COUNTERS = 'mailbox_counters';
+  private static readonly MAILBOX_COUNT_ID = 'mailboxes';
 
   constructor(private readonly database: EmbeddedLocalDatabase) {
     super();
@@ -105,11 +107,51 @@ export default class LocalMailboxRepository extends MailboxRepository {
   }
 
   public async count(): Promise<number> {
-    return (await this.database.find(LocalMailboxRepository.MAILBOXES)).length;
+    return this.readCount();
+  }
+
+  /**
+   * The mailbox count lives in its own document, so creation checks are O(1).
+   * create and remove update it in the same batch as the mailbox. Every
+   * mailbox mutation runs under MailboxCoordinator, so this read-modify-write
+   * cannot interleave. A database written before the counter existed is
+   * counted once and the result saved.
+   */
+  private async readCount(): Promise<number> {
+    const counter = await this.database.findOne(
+      LocalMailboxRepository.COUNTERS,
+      LocalMailboxRepository.MAILBOX_COUNT_ID,
+    );
+
+    if (typeof counter?.count === 'number') {
+      return counter.count;
+    }
+
+    const documents = await this.database.find(
+      LocalMailboxRepository.MAILBOXES,
+    );
+
+    await this.database.save(
+      LocalMailboxRepository.COUNTERS,
+      LocalMailboxRepository.MAILBOX_COUNT_ID,
+      { count: documents.length },
+    );
+
+    return documents.length;
   }
 
   public async create(mailbox: Mailbox): Promise<void> {
-    await this.database.commit([this.mailboxPut(mailbox)]);
+    const count = await this.readCount();
+
+    await this.database.commit([
+      this.mailboxPut(mailbox),
+      {
+        document: { count: count + 1 },
+        id: LocalMailboxRepository.MAILBOX_COUNT_ID,
+        namespace: LocalMailboxRepository.COUNTERS,
+        type: 'put',
+      },
+    ]);
   }
 
   public async findById(id: string): Promise<Mailbox | undefined> {
@@ -157,6 +199,11 @@ export default class LocalMailboxRepository extends MailboxRepository {
   }
 
   public async remove(mailboxId: string): Promise<void> {
+    const existing = await this.database.findOne(
+      LocalMailboxRepository.MAILBOXES,
+      mailboxId,
+    );
+    const count = await this.readCount();
     const envelopes = await this.database.find(
       this.envelopeNamespace(mailboxId),
     );
@@ -166,6 +213,12 @@ export default class LocalMailboxRepository extends MailboxRepository {
         id: mailboxId,
         namespace: LocalMailboxRepository.MAILBOXES,
         type: 'del',
+      },
+      {
+        document: { count: existing ? count - 1 : count },
+        id: LocalMailboxRepository.MAILBOX_COUNT_ID,
+        namespace: LocalMailboxRepository.COUNTERS,
+        type: 'put',
       },
       ...envelopes.flatMap((document): EmbeddedLocalDatabaseOperation[] => [
         {
