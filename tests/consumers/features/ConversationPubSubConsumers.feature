@@ -26,3 +26,11 @@ Feature: Conversation PubSub consumers
   Scenario: Ignore a read announcement without the reader's signature through the consumer
     When the messages read consumer handles an unsigned read announcement
     Then the messages read registrar should receive no read marker
+
+  Scenario: Clear push notifications for a signed read announcement through the consumer
+    When the push clear consumer handles a read announcement
+    Then the push notification dispatcher should receive that read announcement
+
+  Scenario: Ignore a read announcement without the reader's signature for push clearing
+    When the push clear consumer handles an unsigned read announcement
+    Then the push notification dispatcher should receive no read announcement
