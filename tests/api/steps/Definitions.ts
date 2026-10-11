@@ -28,6 +28,7 @@ import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/doma
 import { PairingAuthorization } from '@app/contexts/identity-devices/domain/value-objects/PairingAuthorization';
 import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
 import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/PairingId';
+import { MailboxCreationDifficulty } from '@app/contexts/mailboxes/domain/MailboxCreationDifficulty';
 import { MailboxCreationProof } from '@app/contexts/mailboxes/domain/MailboxCreationProof';
 import { NodeNetworkAdderMessage } from '@app/contexts/nodes/application/add-network/messages/NodeNetworkAdderMessage';
 import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNetworkAdder';
@@ -5474,6 +5475,7 @@ export default class Definitions {
         mailbox.id,
         postTokenHash,
         readTokenHash,
+        MailboxCreationDifficulty.MIN_BITS,
       ),
       postTokenHash,
       readTokenHash,
@@ -5489,6 +5491,34 @@ export default class Definitions {
     this.response = await this.restClient.put(`/mailboxes/${id}`, {
       postTokenHash: this.mailboxHash(postToken),
       readTokenHash: this.mailboxHash(readToken),
+    });
+  }
+
+  @when('I create a mailbox with a proof of work below the required difficulty')
+  public async iCreateAMailboxWithAShortProofOfWork(): Promise<void> {
+    const id = randomBytes(32).toString('base64url');
+    const postToken = randomBytes(32).toString('base64url');
+    const readToken = randomBytes(32).toString('base64url');
+    const postTokenHash = this.mailboxHash(postToken);
+    const readTokenHash = this.mailboxHash(readToken);
+    let nonce = 0;
+
+    while (
+      MailboxCreationProof.isValid(
+        id,
+        postTokenHash,
+        readTokenHash,
+        String(nonce),
+        MailboxCreationDifficulty.MIN_BITS,
+      )
+    ) {
+      nonce += 1;
+    }
+
+    this.response = await this.restClient.put(`/mailboxes/${id}`, {
+      creationNonce: String(nonce),
+      postTokenHash,
+      readTokenHash,
     });
   }
 

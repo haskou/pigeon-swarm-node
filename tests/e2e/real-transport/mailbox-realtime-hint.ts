@@ -1,3 +1,4 @@
+import { MailboxCreationDifficulty } from '@app/contexts/mailboxes/domain/MailboxCreationDifficulty';
 import { MailboxCreationProof } from '@app/contexts/mailboxes/domain/MailboxCreationProof';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import assert from 'node:assert/strict';
@@ -92,6 +93,7 @@ async function verify(node: NodeRuntime): Promise<void> {
         mailboxId,
         postTokenHash,
         readTokenHash,
+        MailboxCreationDifficulty.MIN_BITS,
       ),
       postTokenHash,
       readTokenHash,

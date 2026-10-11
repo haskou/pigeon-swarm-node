@@ -122,7 +122,7 @@ installed `web-push` module path.
 | `MAILBOX_APPEND_RATE_PER_MINUTE` | `120` | No | Envelopes one mailbox may receive per minute, kept across restarts (`0` disables). Duplicate envelopes are not charged. |
 | `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE` | `30` | No | Mailbox creations one client address may make per minute, keyed by the address `API_TRUST_PROXY` resolves (IPv6 per /64). In memory, reset on restart; `0` disables. |
 | `MAILBOX_MAX_BYTES` | `8388608` | No | Pending ciphertext bytes per mailbox (8 MiB). A full mailbox refuses new envelopes. |
-| `MAILBOX_MAX_COUNT` | `10000` | No | Mailboxes this node will hold. |
+| `MAILBOX_MAX_COUNT` | `10000` | No | Mailboxes this node will hold. Past half full, creation needs more proof of work (16 to 20 bits); at the limit, an empty mailbox unread for 7 days may be evicted to make room. |
 | `MAILBOX_MAX_ENVELOPES` | `1000` | No | Pending envelopes per mailbox. |
 | `MAILBOX_RETENTION_MS` | `1209600000` | No | Age at which envelopes expire and an unread mailbox is deleted (14 days). |
 | `PRIVATE_BLOB_MAX_BYTES` | `52428800` | No | Largest single private blob (50 MiB). |

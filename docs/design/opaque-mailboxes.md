@@ -2,7 +2,7 @@
 
 Status: proposed design for [#289](https://github.com/haskou/pigeon-swarm-node/issues/289).
 Implemented so far: the domain, local storage, HTTP API, the content-free realtime
-hint, the creation proof of work, the per-mailbox append rate limit, the creation client key with `API_TRUST_PROXY`, and a two-node
+hint, the adaptive creation proof of work with idle eviction at capacity, the per-mailbox append rate limit, the creation client key with `API_TRUST_PROXY`, and a two-node
 real-transport proof. Still open: the client key schedule, UI and wrapper
 integration, and retiring the replicated collections. It is the contract that the
 implementation PRs, and [#290](https://github.com/haskou/pigeon-swarm-node/issues/290)
@@ -73,7 +73,7 @@ of access logs.
 
 | Operation | Capability | Effect |
 | --- | --- | --- |
-| `PUT /mailboxes/{mailboxId}` | recipient supplies `postTokenHash`, `readTokenHash`, `creationNonce` | creates the queue; `creationNonce` is a proof of work bound to the id and both hashes; idempotent for identical hashes and nonce |
+| `PUT /mailboxes/{mailboxId}` | recipient supplies `postTokenHash`, `readTokenHash`, `creationNonce` | creates the queue; `creationNonce` is a proof of work bound to the id and both hashes, 16 leading zero bits rising to 20 as the node fills (see Limits); idempotent for identical hashes and nonce |
 | `POST /mailboxes/{mailboxId}/envelopes` | `postToken` | appends an envelope, returns its server cursor |
 | `GET /mailboxes/{mailboxId}/envelopes?after=<cursor>&limit=N` | `readToken` | pages pending envelopes in cursor order |
 | `POST /mailboxes/{mailboxId}/ack` | `readToken` | body `{ upTo: cursor }`; deletes envelopes up to the cursor |
@@ -105,6 +105,8 @@ any user identifier:
 - maximum envelope size and maximum envelopes per mailbox (queue depth); append
   past the limit fails with `429`/`409`, never drops older envelopes silently;
 - maximum bytes per mailbox and maximum mailbox count per node;
+- creation difficulty by fill: 16 leading zero bits while the node holds at most half of `MAILBOX_MAX_COUNT`, rising linearly to 20 bits at the limit (`MailboxCreationDifficulty`). A short proof, or a replay checked against the current difficulty, is refused with `400` and the bits it needs. The check is stateless and runs before any lookup, so an unproven request learns nothing about which ids exist;
+- at the count limit, creation evicts the least recently read mailboxes that are empty and unread for 7 days (`MailboxPolicy.EVICTION_IDLE_MS`), all or nothing; with too few such mailboxes it is refused with `429`;
 - per-client fixed-window cap on creation, keyed by the socket address (or the forwarded address behind a proxy named by `API_TRUST_PROXY`; IPv6 per /64), plus a per-mailbox append rate;
 - retention window (default 14 days). A background scheduler deletes expired
   envelopes and idle mailboxes; a mailbox with no read for the window is deleted;

@@ -10,6 +10,9 @@ export default class MailboxPolicy {
 
   public static readonly MAX_PAGE = 100;
 
+  /** Empty and unread for this long: only such mailboxes may be evicted at capacity. */
+  public static readonly EVICTION_IDLE_MS = 7 * 24 * 60 * 60 * 1000;
+
   public isAllowedBodySize(size: number): boolean {
     return MailboxPolicy.SIZE_BUCKETS.includes(size);
   }

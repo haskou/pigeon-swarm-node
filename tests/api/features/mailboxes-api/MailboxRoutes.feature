@@ -59,3 +59,13 @@ Feature: Opaque mailbox routes
   Scenario: Creating a mailbox requires proof of work bound to that mailbox
     When I create a mailbox without proof of work
     Then response code is equal to 400
+
+  Scenario: A short proof of work is refused with the difficulty it needs
+    When I create a mailbox with a proof of work below the required difficulty
+    Then response code is equal to 400
+    And response data should match partially
+    """
+    {
+      "requiredDifficultyBits": 16
+    }
+    """

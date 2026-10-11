@@ -13,6 +13,7 @@ import { MailboxEnvelopeInvalidError } from '@app/contexts/mailboxes/domain/erro
 import { MailboxFullError } from '@app/contexts/mailboxes/domain/errors/MailboxFullError';
 import { MailboxLimitReachedError } from '@app/contexts/mailboxes/domain/errors/MailboxLimitReachedError';
 import { MailboxNotFoundError } from '@app/contexts/mailboxes/domain/errors/MailboxNotFoundError';
+import { MailboxCreationDifficulty } from '@app/contexts/mailboxes/domain/MailboxCreationDifficulty';
 import { MailboxCreationProof } from '@app/contexts/mailboxes/domain/MailboxCreationProof';
 import MailboxPolicy from '@app/contexts/mailboxes/domain/MailboxPolicy';
 import LocalMailboxRepository from '@app/contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository';
@@ -31,6 +32,38 @@ const MAILBOX = 'm'.repeat(43);
 const POST = 'p'.repeat(32);
 const READ = 'r'.repeat(32);
 const RATED = 'q'.repeat(43);
+const FRESH = 'n'.repeat(43);
+const SECOND = 'o'.repeat(43);
+const THIRD = 'p'.repeat(43);
+const POST_HASH = sha(POST);
+const READ_HASH = sha(READ);
+const DAY = 24 * 60 * 60 * 1000;
+const IDLE_MS = MailboxPolicy.EVICTION_IDLE_MS;
+/**
+ * MailboxCreationProof.mine(FRESH, POST_HASH, READ_HASH, 20), computed once:
+ * mining 20 bits takes about seven seconds under jest.
+ */
+const FULL_NONCE = '1761816';
+
+/** First nonce that meets `meets` difficulty bits but not `misses`. */
+const proofMeeting = (
+  id: string,
+  postHash: string,
+  readHash: string,
+  meets: number,
+  misses: number,
+): string => {
+  for (let nonce = 0; ; nonce += 1) {
+    const candidate = nonce.toString();
+
+    if (
+      MailboxCreationProof.isValid(id, postHash, readHash, candidate, meets) &&
+      !MailboxCreationProof.isValid(id, postHash, readHash, candidate, misses)
+    ) {
+      return candidate;
+    }
+  }
+};
 
 describe('mailboxes', () => {
   let databasePath: string;
@@ -72,12 +105,13 @@ describe('mailboxes', () => {
     id: string,
     postHash: string,
     readHash: string,
+    difficultyBits = MailboxCreationDifficulty.MIN_BITS,
   ): Promise<boolean> =>
     creator.create(
       id,
       postHash,
       readHash,
-      MailboxCreationProof.mine(id, postHash, readHash),
+      MailboxCreationProof.mine(id, postHash, readHash, difficultyBits),
     );
 
   beforeEach(async () => {
@@ -116,7 +150,7 @@ describe('mailboxes', () => {
     process.env.MAILBOX_MAX_COUNT = '1';
 
     await expect(
-      createMailbox('n'.repeat(43), sha(POST), sha(READ)),
+      creator.create(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
     ).rejects.toBeInstanceOf(MailboxLimitReachedError);
   });
 
@@ -314,7 +348,12 @@ describe('mailboxes', () => {
 
   it('refuses creation without a proof of work bound to that mailbox', async () => {
     const other = 'n'.repeat(43);
-    const forMailbox = MailboxCreationProof.mine(MAILBOX, sha(POST), sha(READ));
+    const forMailbox = MailboxCreationProof.mine(
+      MAILBOX,
+      sha(POST),
+      sha(READ),
+      MailboxCreationDifficulty.MIN_BITS,
+    );
 
     await expect(
       creator.create(other, sha(POST), sha(READ), ''),
@@ -325,6 +364,135 @@ describe('mailboxes', () => {
     await expect(reader.read(other, READ, 0, 10)).rejects.toBeInstanceOf(
       MailboxNotFoundError,
     );
+  });
+
+  it('keeps the full-capacity fixture valid at the full difficulty', () => {
+    expect(
+      MailboxCreationProof.isValid(
+        FRESH,
+        POST_HASH,
+        READ_HASH,
+        FULL_NONCE,
+        MailboxCreationDifficulty.MAX_BITS,
+      ),
+    ).toBe(true);
+  });
+
+  it('admits a 16-bit proof while the node is at most half full', async () => {
+    process.env.MAILBOX_MAX_COUNT = '2';
+
+    await expect(createMailbox(FRESH, POST_HASH, READ_HASH)).resolves.toBe(
+      true,
+    );
+  });
+
+  it('raises the required difficulty as the node fills past half', async () => {
+    process.env.MAILBOX_MAX_COUNT = '4';
+    await createMailbox(SECOND, POST_HASH, READ_HASH);
+    await createMailbox(THIRD, POST_HASH, READ_HASH);
+
+    // Three of four slots are taken, so the next mailbox needs 18 bits.
+    const weak = proofMeeting(FRESH, POST_HASH, READ_HASH, 16, 18);
+    const refusal = await creator
+      .create(FRESH, POST_HASH, READ_HASH, weak)
+      .catch((e: unknown) => e);
+
+    expect(refusal).toBeInstanceOf(MailboxCreationProofInvalidError);
+    expect(
+      (refusal as MailboxCreationProofInvalidError).requiredDifficultyBits,
+    ).toBe(18);
+    await expect(createMailbox(FRESH, POST_HASH, READ_HASH, 18)).resolves.toBe(
+      true,
+    );
+  });
+
+  it('reports the required difficulty when a proof falls short at capacity', async () => {
+    process.env.MAILBOX_MAX_COUNT = '1';
+    const weak = proofMeeting(FRESH, POST_HASH, READ_HASH, 16, 20);
+    const refusal = await creator
+      .create(FRESH, POST_HASH, READ_HASH, weak)
+      .catch((e: unknown) => e);
+
+    expect(refusal).toBeInstanceOf(MailboxCreationProofInvalidError);
+    expect(
+      (refusal as MailboxCreationProofInvalidError).requiredDifficultyBits,
+    ).toBe(20);
+    await expect(repository.count()).resolves.toBe(1);
+  });
+
+  it('evicts an idle, empty mailbox at capacity so an honest creation succeeds', async () => {
+    process.env.MAILBOX_MAX_COUNT = '1';
+    const clock = jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(Date.now() + IDLE_MS + 1000);
+
+    await expect(
+      creator.create(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+    ).resolves.toBe(true);
+    await expect(repository.findById(MAILBOX)).resolves.toBeUndefined();
+    await expect(repository.count()).resolves.toBe(1);
+    clock.mockRestore();
+  });
+
+  it('never evicts a mailbox that still holds envelopes', async () => {
+    process.env.MAILBOX_MAX_COUNT = '1';
+    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+    const clock = jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(Date.now() + IDLE_MS + 1000);
+
+    await expect(
+      creator.create(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+    ).rejects.toBeInstanceOf(MailboxLimitReachedError);
+    await expect(repository.findById(MAILBOX)).resolves.toBeDefined();
+    clock.mockRestore();
+  });
+
+  it('keeps an empty mailbox that was read within the idle window', async () => {
+    process.env.MAILBOX_MAX_COUNT = '1';
+    const t0 = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(t0 + DAY);
+    await reader.read(MAILBOX, READ, 0, 10);
+    clock.mockReturnValue(t0 + DAY + IDLE_MS - 1000);
+
+    await expect(
+      creator.create(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+    ).rejects.toBeInstanceOf(MailboxLimitReachedError);
+    clock.mockRestore();
+  });
+
+  it('evicts the least recently read idle mailbox first', async () => {
+    process.env.MAILBOX_MAX_COUNT = '2';
+    const t0 = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(t0 + 1000);
+    await createMailbox(SECOND, POST_HASH, READ_HASH);
+    clock.mockReturnValue(t0 + IDLE_MS + 2000);
+
+    await expect(
+      creator.create(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+    ).resolves.toBe(true);
+    await expect(repository.findById(MAILBOX)).resolves.toBeUndefined();
+    await expect(repository.findById(SECOND)).resolves.toBeDefined();
+    clock.mockRestore();
+  });
+
+  it('evicts nothing unless it can free enough room for the new mailbox', async () => {
+    const t0 = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(t0);
+    await createMailbox(SECOND, POST_HASH, READ_HASH);
+    await createMailbox(THIRD, POST_HASH, READ_HASH);
+    clock.mockReturnValue(t0 + DAY);
+    await reader.read(THIRD, READ, 0, 10);
+    process.env.MAILBOX_MAX_COUNT = '1';
+    clock.mockReturnValue(t0 + IDLE_MS + 2000);
+
+    await expect(
+      creator.create(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+    ).rejects.toBeInstanceOf(MailboxLimitReachedError);
+    await expect(repository.count()).resolves.toBe(3);
+    await expect(repository.findById(MAILBOX)).resolves.toBeDefined();
+    await expect(repository.findById(SECOND)).resolves.toBeDefined();
+    clock.mockRestore();
   });
 
   it('rate limits appends per mailbox and refills one per interval', async () => {
