@@ -7,7 +7,14 @@ import { PrivateBlob } from '@app/contexts/private-blobs/domain/PrivateBlob';
 import PrivateBlobPolicy from '@app/contexts/private-blobs/domain/PrivateBlobPolicy';
 import PrivateBlobRepository from '@app/contexts/private-blobs/domain/repositories/PrivateBlobRepository';
 import FilePrivateBlobBytesStore from '@app/contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore';
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'fs';
+import { randomUUID } from 'crypto';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { Readable } from 'stream';
@@ -232,6 +239,29 @@ describe('private blob store', () => {
     broken = false;
     expect(await expirer.expire(farFuture)).toBe(1);
     expect(repository.blobs.size).toBe(0);
+  });
+
+  it('sweeps bytes that no record owns and never touches unrelated files', async () => {
+    const kept = await reserver.reserve('alice', 3);
+    const orphanBlob = randomUUID();
+    const orphanPart = randomUUID();
+
+    await uploader.upload(kept.blobId, kept.uploadToken, bytes('abc'));
+    writeFileSync(path.join(directory, `${orphanBlob}.blob`), 'stale');
+    writeFileSync(path.join(directory, `${orphanPart}.part`), 'stale');
+    writeFileSync(path.join(directory, 'notes.txt'), 'not ours');
+
+    const expirer = new PrivateBlobExpirer(repository, store);
+
+    expect(await expirer.expire(Date.now())).toBe(0);
+    expect(readdirSync(directory).sort()).toEqual(
+      ['notes.txt', `${kept.blobId}.blob`].sort(),
+    );
+    expect(
+      await collect(
+        (await reader.open(kept.blobId, kept.downloadToken)).stream,
+      ),
+    ).toBe('abc');
   });
 
   it('only the uploader capability withdraws a blob and bytes go with it', async () => {

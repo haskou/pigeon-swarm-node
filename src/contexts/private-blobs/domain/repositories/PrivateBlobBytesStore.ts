@@ -5,6 +5,9 @@ import { PrivateBlobByteRange } from '../PrivateBlobByteRange';
 export default abstract class PrivateBlobBytesStore {
   public abstract delete(id: string): Promise<void>;
 
+  /** Ids that have a stored blob or a partial upload on disk. */
+  public abstract listIds(): Promise<string[]>;
+
   public abstract read(id: string, range?: PrivateBlobByteRange): Readable;
 
   /**
