@@ -27,6 +27,10 @@ import {
   signNotificationInvitation,
   signNotificationState,
 } from '../../support/signNotification';
+import {
+  connectRealtimeSocket,
+  issueRealtimeTicket,
+} from './RealtimeTicketClient';
 
 type IdentityFixture = {
   authorizationRevision: number;
@@ -1174,16 +1178,8 @@ async function listenForDomainEvents(
   eventType: string,
   aggregateId: string,
 ): Promise<void> {
-  const timestamp = String(Date.now());
-  const signature = signRequest(identity.keyPair, 'GET', '/ws', timestamp, {});
-  const query = new URLSearchParams({
-    identityId: identity.id,
-    signature,
-    timestamp,
-  });
-  const ws = new WebSocket(
-    `ws://127.0.0.1:${node.port}/ws?${query.toString()}`,
-  );
+  const ticket = await issueRealtimeTicket(node, identity.keyPair);
+  const ws = connectRealtimeSocket(node, ticket);
 
   await new Promise<void>((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -1221,16 +1217,8 @@ async function receiveAndAcknowledgeCallSignal(
   callId: string,
   sendSignal: () => Promise<{ expiresAt: number; signalId: string }>,
 ): Promise<CallSignalDeliveryResult> {
-  const timestamp = String(Date.now());
-  const signature = signRequest(identity.keyPair, 'GET', '/ws', timestamp, {});
-  const query = new URLSearchParams({
-    identityId: identity.id,
-    signature,
-    timestamp,
-  });
-  const ws = new WebSocket(
-    `ws://127.0.0.1:${node.port}/ws?${query.toString()}`,
-  );
+  const ticket = await issueRealtimeTicket(node, identity.keyPair);
+  const ws = connectRealtimeSocket(node, ticket);
 
   return new Promise<CallSignalDeliveryResult>((resolve, reject) => {
     const receiver: CallSignalReceiver = {
