@@ -4,6 +4,7 @@ import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conv
 import RegisterMessageReactionWhenAdded from '@app/apps/consumers/pubsub/conversations/RegisterMessageReactionWhenAdded';
 import RegisterMessageReactionWhenRemoved from '@app/apps/consumers/pubsub/conversations/RegisterMessageReactionWhenRemoved';
 import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced';
+import ClearPushNotificationWhenConversationMessagesRead from '@app/apps/consumers/pubsub/push/ClearPushNotificationWhenConversationMessagesRead';
 import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import MessageReactionRegistrar from '@app/contexts/conversations/application/register-reaction/MessageReactionRegistrar';
@@ -13,9 +14,17 @@ import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/d
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
+import PushNotificationDispatcher from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { expect } from 'chai';
 import { before, binding, then, when } from 'cucumber-tsflow';
 
+import {
+  signedReadReceipt,
+  SignedReadReceipt,
+} from '../../unit/contexts/conversations/support/signedReadReceipt';
 import { signedMutation } from '../../unit/contexts/public-mutations/support/signedMutation';
 import { PubSubConsumerTestContext } from './PubSubConsumerTestHelpers';
 
@@ -26,8 +35,7 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
 
   private readonly messageId = '507f1f77bcf86cd799439011';
 
-  private readonly readerIdentityId =
-    'MCowBQYDK2VwAyEAeLMrMAfBRHdSU4eI1qpIUsqyfkXtR4FGjLhFzaWlfsI=';
+  private readerIdentityId = '';
 
   private readonly reactionAuthorId =
     'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=';
@@ -136,14 +144,78 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
 
   @when('the messages read consumer handles a read announcement')
   public async messagesReadConsumerHandlesAReadAnnouncement(): Promise<void> {
-    const consumer = new MarkMessagesReadWhenAnnounced(
-      this.eventConsumer(),
-      this.fakeUseCase<MessagesReadRegistrar>('register'),
+    await this.handleReadAnnouncement(
+      await this.signedReadProof(),
+      new MarkMessagesReadWhenAnnounced(
+        this.eventConsumer(),
+        this.fakeUseCase<MessagesReadRegistrar>('register'),
+      ),
     );
+  }
 
+  @when('the messages read consumer handles an unsigned read announcement')
+  public async messagesReadConsumerHandlesAnUnsignedReadAnnouncement(): Promise<void> {
+    await this.handleReadAnnouncement(
+      await this.unsignedReadProof(),
+      new MarkMessagesReadWhenAnnounced(
+        this.eventConsumer(),
+        this.fakeUseCase<MessagesReadRegistrar>('register'),
+      ),
+    );
+  }
+
+  @when('the push clear consumer handles a read announcement')
+  public async pushClearConsumerHandlesAReadAnnouncement(): Promise<void> {
+    await this.handleReadAnnouncement(
+      await this.signedReadProof(),
+      new ClearPushNotificationWhenConversationMessagesRead(
+        this.eventConsumer(),
+        this.fakeUseCase<PushNotificationDispatcher>('dispatch'),
+      ),
+    );
+  }
+
+  @when('the push clear consumer handles an unsigned read announcement')
+  public async pushClearConsumerHandlesAnUnsignedReadAnnouncement(): Promise<void> {
+    await this.handleReadAnnouncement(
+      await this.unsignedReadProof(),
+      new ClearPushNotificationWhenConversationMessagesRead(
+        this.eventConsumer(),
+        this.fakeUseCase<PushNotificationDispatcher>('dispatch'),
+      ),
+    );
+  }
+
+  private async signedReadProof(): Promise<SignedReadReceipt> {
+    const readerKeyPair = await KeyPair.generate();
+
+    this.readerIdentityId = new IdentityId(
+      readerKeyPair.toPrimitives().publicKey,
+    ).valueOf();
+
+    return signedReadReceipt({
+      conversationId: this.conversationId,
+      keyPair: readerKeyPair,
+      messageId: this.messageId,
+    });
+  }
+
+  private async unsignedReadProof(): Promise<undefined> {
+    this.readerIdentityId = new IdentityId(
+      (await KeyPair.generate()).toPrimitives().publicKey,
+    ).valueOf();
+
+    return undefined;
+  }
+
+  private async handleReadAnnouncement(
+    readProof: SignedReadReceipt | undefined,
+    consumer: Consumer,
+  ): Promise<void> {
     await consumer.handler(
       new ConversationMessagesWereReadEvent(this.conversationId, {
         messageId: this.messageId,
+        readProof,
         readerIdentityId: this.readerIdentityId,
       }),
     );
@@ -197,5 +269,29 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
     expect(message.conversationId.valueOf()).to.equal(this.conversationId);
     expect(message.messageId.valueOf()).to.equal(this.messageId);
     expect(message.readerIdentityId.valueOf()).to.equal(this.readerIdentityId);
+  }
+
+  @then('the messages read registrar should receive no read marker')
+  public messagesReadRegistrarShouldReceiveNoReadMarker(): void {
+    expect(this.calls).to.be.empty;
+  }
+
+  @then(
+    'the push notification dispatcher should receive that read announcement',
+  )
+  public pushNotificationDispatcherShouldReceiveThatReadAnnouncement(): void {
+    const event = this.lastMessage<{
+      aggregateId: string;
+      attributes: { readerIdentityId: string };
+    }>();
+
+    expect(this.calls.at(-1)?.method).to.equal('dispatch');
+    expect(event.aggregateId).to.equal(this.conversationId);
+    expect(event.attributes.readerIdentityId).to.equal(this.readerIdentityId);
+  }
+
+  @then('the push notification dispatcher should receive no read announcement')
+  public pushNotificationDispatcherShouldReceiveNoReadAnnouncement(): void {
+    expect(this.calls).to.be.empty;
   }
 }

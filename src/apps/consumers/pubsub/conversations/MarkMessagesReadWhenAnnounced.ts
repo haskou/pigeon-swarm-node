@@ -1,6 +1,7 @@
 import { MessagesReadMarkMessage } from '@app/contexts/conversations/application/mark-messages-read/messages/MessagesReadMarkMessage';
 import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
+import { MessageReadProof } from '@app/contexts/conversations/domain/value-objects/MessageReadProof';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
@@ -29,11 +30,27 @@ export default class MarkMessagesReadWhenAnnounced extends Consumer {
   }
 
   public async handler(event: DomainEvent): Promise<void> {
+    const conversationId = event.aggregateId;
+    const readerIdentityId = String(event.attributes.readerIdentityId);
+    const messageId = String(event.attributes.messageId);
+    const readProof = event.attributes.readProof;
+
+    if (
+      !MessageReadProof.isAuthentic(readProof, {
+        conversationId,
+        messageId,
+        readerIdentityId,
+      })
+    ) {
+      return;
+    }
+
     await this.registrar.register(
       new MessagesReadMarkMessage(
-        event.aggregateId,
-        String(event.attributes.readerIdentityId),
-        String(event.attributes.messageId),
+        conversationId,
+        readerIdentityId,
+        messageId,
+        readProof,
       ),
     );
   }

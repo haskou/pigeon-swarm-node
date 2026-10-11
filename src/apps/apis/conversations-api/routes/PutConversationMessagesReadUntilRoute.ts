@@ -37,6 +37,13 @@ export class PutConversationMessagesReadUntilRoute extends Route {
         conversationId,
         body,
         readerIdentityId,
+        {
+          body: request.body,
+          method: request.method,
+          path: request.path,
+          signature: String(request.header('x-signature')),
+          timestamp: Number(request.header('x-timestamp')),
+        },
       ).getMessage(),
     );
 

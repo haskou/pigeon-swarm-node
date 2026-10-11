@@ -7,6 +7,7 @@ export class IdentityPresencesViewModel {
   constructor(
     private readonly presences: IdentityPresence[],
     private readonly viewerIdentityId: IdentityId,
+    private readonly sharedIdentityIds: ReadonlySet<string>,
   ) {}
 
   public toResource(): object[] {
@@ -14,6 +15,7 @@ export class IdentityPresencesViewModel {
       new IdentityPresenceViewModel(
         presence,
         this.viewerIdentityId,
+        this.sharedIdentityIds.has(presence.toPrimitives().identityId),
       ).toResource(),
     );
   }

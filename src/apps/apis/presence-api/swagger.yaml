@@ -12,7 +12,9 @@ paths:
         - presence
       summary: List identity presence states
       description: |
-        Returns presence for the requested identity ids. Invisible identities are
+        Returns presence for the requested identity ids. Identities the
+        authenticated viewer does not share a conversation or community with read
+        as `disconnected` without a custom message. Invisible identities are
         exposed as `disconnected` unless the authenticated viewer is asking for
         their own identity. Presence state is kept in memory and replicated
         through domain events; it is not persisted in OrbitDB/IPFS.
@@ -46,6 +48,10 @@ paths:
       tags:
         - presence
       summary: Read one identity presence state
+      description: |
+        Returns the identity presence. Viewers who do not share a conversation or
+        community with the identity receive `disconnected` without a custom
+        message.
       parameters:
         - in: path
           name: identityId

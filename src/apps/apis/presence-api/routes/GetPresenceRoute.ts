@@ -1,5 +1,7 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import IdentityPresenceFinder from '@app/contexts/presence/application/find/IdentityPresenceFinder';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import WebSocketClientMessageHandler from '@app/shared/infrastructure/websocket/WebSocketClientMessageHandler';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
@@ -19,6 +21,9 @@ export class GetPresenceRoute extends Route {
     IdentityPresenceFinder,
   );
 
+  private readonly clientMessageHandler =
+    this.get<WebSocketClientMessageHandler>(WebSocketClientMessageHandler);
+
   private identityIdsFrom(request: Request): string | string[] | undefined {
     const { identityIds } = request.query;
 
@@ -27,6 +32,23 @@ export class GetPresenceRoute extends Route {
     }
 
     return typeof identityIds === 'string' ? identityIds : undefined;
+  }
+
+  /**
+   * Identities that share a conversation or community with the viewer. Only
+   * they may read presence over HTTP, matching realtime identity updates.
+   */
+  private async sharedIdentityIdsOf(
+    viewerIdentityId: IdentityId,
+  ): Promise<Set<string>> {
+    const recipients =
+      await this.clientMessageHandler.findIdentityUpdateRecipients(
+        viewerIdentityId.valueOf(),
+      );
+
+    return new Set(
+      recipients.map((recipient) => new IdentityId(recipient).valueOf()),
+    );
   }
 
   @Get('/')
@@ -49,6 +71,7 @@ export class GetPresenceRoute extends Route {
         new IdentityPresencesViewModel(
           presences,
           viewerIdentityId,
+          await this.sharedIdentityIdsOf(viewerIdentityId),
         ).toResource(),
       );
   }
@@ -67,11 +90,18 @@ export class GetPresenceRoute extends Route {
         identityId,
       ).getMessage(),
     );
+    const sharesRelationship = (
+      await this.sharedIdentityIdsOf(viewerIdentityId)
+    ).has(new IdentityId(identityId).valueOf());
 
     return response
       .status(HttpRouteStatusEnum.OK)
       .send(
-        new IdentityPresenceViewModel(presence, viewerIdentityId).toResource(),
+        new IdentityPresenceViewModel(
+          presence,
+          viewerIdentityId,
+          sharesRelationship,
+        ).toResource(),
       );
   }
 }

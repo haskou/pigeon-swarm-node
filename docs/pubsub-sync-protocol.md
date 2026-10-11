@@ -105,6 +105,30 @@ The event attributes are:
 absent. `identityId`, `ownerNodeId`, `preferenceUpdatedAt`, `selectedStatus`,
 `status`, and `updatedAt` are required.
 
+## Conversation read receipts
+
+`conversations.v1.messages.were_read` carries the reader's signed
+`PUT /conversations/{conversationId}/messages/read-until` request as
+`readProof`: method, path, timestamp, body and signature. Receivers verify it
+with the reader's identity key over the canonical payload that
+`SignedHttpRequestVerifier` uses. A receipt updates read state, reaches
+WebSocket clients and clears push notifications only when the proof verifies
+for the event's conversation, message and reader. Push clearing sends
+`notifications_cleared` only to that verified reader.
+
+Residual risks accepted for this change:
+
+- Receipt replay has no freshness window. HTTP requests are limited to a 30
+  second clock skew and a replay guard; a receipt proof verifies for as long as
+  the reader's key does.
+- The replicated read-marker head is unsigned. Nodes apply the stored head, so
+  a writer to that store can change it without a receipt.
+- Other conversation gossip is not signed per event; only receipts carry proofs.
+- `network_synchronization_status` is reported for the whole node, not per
+  private network.
+- Upgraded nodes drop proofless receipts from older nodes, so those receipts do
+  not update read state or clear push until the sender upgrades.
+
 ## Durable call state convergence
 
 Calls are a signed event log (#373), not replicated documents. The `calls` store
