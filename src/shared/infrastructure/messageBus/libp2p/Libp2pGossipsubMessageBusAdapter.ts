@@ -7,6 +7,7 @@ import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 import { Message } from '../Message';
 import { MessageBusAdapter } from '../MessageBusAdapter';
+import { networkFanoutSuppression } from '../NetworkFanoutSuppression';
 import PubSubNetworkMessageCodec from './PubSubNetworkMessageCodec';
 import PubSubTopicResolver from './PubSubTopicResolver';
 
@@ -121,7 +122,9 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
         ),
       );
 
-      webSocketEventHub.publishFromNetwork([event]);
+      if (!networkFanoutSuppression.has(event)) {
+        webSocketEventHub.publishFromNetwork([event]);
+      }
     });
   }
 
@@ -157,7 +160,9 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
         ),
       );
 
-      webSocketEventHub.publishFromNetwork([event]);
+      if (!networkFanoutSuppression.has(event)) {
+        webSocketEventHub.publishFromNetwork([event]);
+      }
     });
   }
 

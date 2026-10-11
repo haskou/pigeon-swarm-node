@@ -4,6 +4,7 @@ import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/d
 import { MessageReadProof } from '@app/contexts/conversations/domain/value-objects/MessageReadProof';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
+import { networkFanoutSuppression } from '@app/shared/infrastructure/messageBus/NetworkFanoutSuppression';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
@@ -45,7 +46,7 @@ export default class MarkMessagesReadWhenAnnounced extends Consumer {
       return;
     }
 
-    await this.registrar.register(
+    const accepted = await this.registrar.register(
       new MessagesReadMarkMessage(
         conversationId,
         readerIdentityId,
@@ -53,6 +54,12 @@ export default class MarkMessagesReadWhenAnnounced extends Consumer {
         readProof,
       ),
     );
+
+    // The store refused this marker as stale. Keep the receipt off the WebSocket
+    // fanout that runs after the handlers. Duplicates and unknown messages still fan out.
+    if (!accepted) {
+      networkFanoutSuppression.add(event);
+    }
   }
 
   public get queueName(): string {
