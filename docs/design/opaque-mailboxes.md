@@ -2,7 +2,7 @@
 
 Status: proposed design for [#289](https://github.com/haskou/pigeon-swarm-node/issues/289).
 Implemented so far: the domain, local storage, HTTP API, the content-free realtime
-hint, the creation proof of work, the per-mailbox append rate limit, and a two-node
+hint, the creation proof of work, the per-mailbox append rate limit, the creation client key with `API_TRUST_PROXY`, and a two-node
 real-transport proof. Still open: the client key schedule, UI and wrapper
 integration, and retiring the replicated collections. It is the contract that the
 implementation PRs, and [#290](https://github.com/haskou/pigeon-swarm-node/issues/290)
@@ -105,10 +105,16 @@ any user identifier:
 - maximum envelope size and maximum envelopes per mailbox (queue depth); append
   past the limit fails with `429`/`409`, never drops older envelopes silently;
 - maximum bytes per mailbox and maximum mailbox count per node;
-- per-address token bucket for creation, plus a per-mailbox append rate;
+- per-client fixed-window cap on creation, keyed by the socket address (or the forwarded address behind a proxy named by `API_TRUST_PROXY`; IPv6 per /64), plus a per-mailbox append rate;
 - retention window (default 14 days). A background scheduler deletes expired
   envelopes and idle mailboxes; a mailbox with no read for the window is deleted;
 - acknowledgement deletes immediately.
+
+The creation window lives in memory and resets on restart; remote addresses are
+never written to disk. The restart residual is bounded by `MAILBOX_MAX_COUNT`,
+which is persisted. Without `API_TRUST_PROXY`, every client behind a reverse
+proxy shares the proxy's address and one window. `true` is refused, so no client
+can choose its own key.
 
 Storage is a local embedded database (the same `EmbeddedLocalDatabase` used for
 private authorization), never OrbitDB, never IPFS. Writes are batched so a crash

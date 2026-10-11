@@ -120,6 +120,33 @@ describe('mailboxes', () => {
     ).rejects.toBeInstanceOf(MailboxLimitReachedError);
   });
 
+  it('counts in constant time and keeps the count across a restart', async () => {
+    await createMailbox('n'.repeat(43), sha(POST), sha(READ));
+    await createMailbox('o'.repeat(43), sha(POST), sha(READ));
+    await remover.remove(MAILBOX, READ);
+    await database.close();
+    wire();
+
+    const find = jest.spyOn(database, 'find');
+
+    await expect(repository.count()).resolves.toBe(2);
+    expect(find).not.toHaveBeenCalled();
+    find.mockRestore();
+  });
+
+  it('backfills the counter for a database written before it existed', async () => {
+    await createMailbox('n'.repeat(43), sha(POST), sha(READ));
+    await database.delete('mailbox_counters', 'mailboxes');
+
+    await expect(repository.count()).resolves.toBe(2);
+
+    const find = jest.spyOn(database, 'find');
+
+    await expect(repository.count()).resolves.toBe(2);
+    expect(find).not.toHaveBeenCalled();
+    find.mockRestore();
+  });
+
   it('answers wrong capability, swapped capability and unknown mailbox identically', async () => {
     const outcomes = await Promise.all([
       appender
