@@ -5,10 +5,10 @@ import { pigeonEnvironment } from '../environment/PigeonEnvironment';
 /**
  * Optional browser Origin allowlist for the realtime upgrade.
  *
- * Authentication is a signed query, so the Origin is not a credential: this
- * only lets an operator refuse upgrades started by pages from other sites.
- * Requests without an Origin header (non-browser clients) are not browsers
- * and are always left to signature authentication.
+ * Authentication is the single-use realtime ticket, so the Origin is not a
+ * credential: this only lets an operator refuse upgrades started by pages
+ * from other sites. Requests without an Origin header (non-browser clients)
+ * are not browsers and are always left to ticket authentication.
  */
 export class WebSocketOriginPolicy {
   private allowedOrigins(): string[] {

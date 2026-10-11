@@ -55,10 +55,7 @@ import PrivateBlobBytesStore from '../contexts/private-blobs/domain/repositories
 import PrivateBlobRepository from '../contexts/private-blobs/domain/repositories/PrivateBlobRepository';
 import FilePrivateBlobBytesStore from '../contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore';
 import LocalPrivateBlobRepository from '../contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository';
-import {
-  pigeonEnvironment,
-  pigeonEnvironmentSchema,
-} from '../shared/infrastructure/environment/PigeonEnvironment';
+import { pigeonEnvironmentSchema } from '../shared/infrastructure/environment/PigeonEnvironment';
 import HttpRequestContext from '../shared/infrastructure/express/HttpRequestContext';
 import {
   handleCustomHttpError,
@@ -331,12 +328,10 @@ export default class PigeonApplication {
     const routePrefix = this.getRoutePrefix().toString();
 
     await server.run();
-    this.webSocketRealtimeServer.attach(server.server, {
-      signedQueryPath: pigeonEnvironment().REALTIME_SIGNED_QUERY_WS_ENABLED
-        ? `${routePrefix}/ws`
-        : undefined,
-      ticketPath: `${routePrefix}/realtime/v1`,
-    });
+    this.webSocketRealtimeServer.attach(
+      server.server,
+      `${routePrefix}/realtime/v1`,
+    );
   }
 
   public addConsumers(

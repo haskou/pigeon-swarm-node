@@ -31,11 +31,14 @@ import {
   publishIdentity,
   request,
   signHeaders,
-  signRequest,
   startNode,
   stopNode,
   waitFor,
 } from './two-real-node-gossipsub';
+import {
+  connectRealtimeSocket,
+  issueRealtimeTicket,
+} from './RealtimeTicketClient';
 
 type LiveCall = {
   id: string;
@@ -156,15 +159,8 @@ async function socket(
   node: NodeRuntime,
   identity: IdentityFixture,
 ): Promise<{ ws: WebSocket; frames: Frame[] }> {
-  const timestamp = String(Date.now());
-  const query = new URLSearchParams({
-    identityId: identity.id,
-    signature: signRequest(identity.keyPair, 'GET', '/ws', timestamp, {}),
-    timestamp,
-  });
-  const ws = new WebSocket(
-    `${node.baseUrl.replace('http:', 'ws:')}/ws?${query}`,
-  );
+  const ticket = await issueRealtimeTicket(node, identity.keyPair);
+  const ws = connectRealtimeSocket(node, ticket);
   const frames: Frame[] = [];
   ws.on('message', (data) => frames.push(JSON.parse(data.toString()) as Frame));
   await waitFor(

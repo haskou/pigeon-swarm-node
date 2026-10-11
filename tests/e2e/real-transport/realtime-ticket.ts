@@ -8,6 +8,12 @@ import type { NodeRuntime } from './two-real-node-gossipsub';
 
 import { teardownAndExit } from './RealTransportTeardown';
 import {
+  issueRealtimeTicket,
+  REALTIME_PROTOCOL_VERSION,
+  REALTIME_WS_PATH,
+  ticketProtocols,
+} from './RealtimeTicketClient';
+import {
   buildNodeRuntime,
   signRequest,
   startNode,
@@ -16,10 +22,7 @@ import {
 } from './two-real-node-gossipsub';
 
 const NODE_PORT = 19200;
-const PROTOCOL_VERSION = 'pigeon-realtime.v1';
-const TICKETS_PATH = '/realtime/v1/tickets';
-const TICKET_WS_PATH = '/realtime/v1';
-const SIGNED_WS_PATH = '/ws';
+const LEGACY_WS_PATH = '/ws';
 
 type ServerMessage = { type: string; [key: string]: unknown };
 
@@ -27,31 +30,14 @@ type Attempt =
   | { status: number }
   | { messages: ServerMessage[]; protocol: string; ws: WebSocket };
 
-async function issueTicket(node: NodeRuntime): Promise<string> {
-  const keyPair = await KeyPair.generate();
-  const identityId = new IdentityId(keyPair.toPrimitives().publicKey).valueOf();
+function signedQuery(keyPair: KeyPair, requestPath: string): string {
   const timestamp = String(Date.now());
-  const response = await fetch(`${node.baseUrl}${TICKETS_PATH}`, {
-    headers: {
-      'x-identity-id': identityId,
-      'x-signature': signRequest(keyPair, 'POST', TICKETS_PATH, timestamp, {}),
-      'x-timestamp': timestamp,
-    },
-    method: 'POST',
-  });
 
-  assert.equal(response.status, 201, `ticket POST returned ${response.status}`);
-  assert.equal(response.headers.get('cache-control'), 'no-store');
-
-  const { expiresAt, ticket } = (await response.json()) as {
-    expiresAt: number;
-    ticket: string;
-  };
-
-  assert.match(ticket, /^[A-Za-z0-9_-]{43}$/, 'ticket is not base64url');
-  assert.ok(expiresAt > Date.now(), 'ticket expiry is not in the future');
-
-  return ticket;
+  return new URLSearchParams({
+    identityId: new IdentityId(keyPair.toPrimitives().publicKey).valueOf(),
+    signature: signRequest(keyPair, 'GET', requestPath, timestamp, {}),
+    timestamp,
+  }).toString();
 }
 
 function connect(
@@ -79,12 +65,15 @@ function connect(
 }
 
 async function verify(node: NodeRuntime): Promise<void> {
-  const ticket = await issueTicket(node);
-  const protocols = [PROTOCOL_VERSION, `ticket.${ticket}`];
-  const attempt = await connect(node, TICKET_WS_PATH, protocols);
+  const ticket = await issueRealtimeTicket(node, await KeyPair.generate());
+  const attempt = await connect(
+    node,
+    REALTIME_WS_PATH,
+    ticketProtocols(ticket),
+  );
 
   assert.ok(!('status' in attempt), 'ticket upgrade was refused');
-  assert.equal(attempt.protocol, PROTOCOL_VERSION);
+  assert.equal(attempt.protocol, REALTIME_PROTOCOL_VERSION);
 
   await waitFor(
     () => attempt.messages.some((message) => message.type === 'connection_ack'),
@@ -92,21 +81,53 @@ async function verify(node: NodeRuntime): Promise<void> {
   );
   attempt.ws.close();
 
-  const replay = await connect(node, TICKET_WS_PATH, protocols);
+  const replay = await connect(
+    node,
+    REALTIME_WS_PATH,
+    ticketProtocols(ticket),
+  );
 
   assert.ok('status' in replay, 'replayed ticket was accepted');
   assert.equal(replay.status, 401, 'replayed ticket was not refused with 401');
 
-  const signedPathAttempt = await connect(node, SIGNED_WS_PATH, [
-    PROTOCOL_VERSION,
-    `ticket.${await issueTicket(node)}`,
-  ]);
+  const retired = await connect(
+    node,
+    LEGACY_WS_PATH,
+    ticketProtocols(await issueRealtimeTicket(node, await KeyPair.generate())),
+  );
+
+  assert.ok('status' in retired, 'ticket authenticated the retired /ws path');
+  assert.equal(retired.status, 404, 'retired /ws path was not refused with 404');
+
+  const keyPair = await KeyPair.generate();
+  const legacyQuery = await connect(
+    node,
+    `${LEGACY_WS_PATH}?${signedQuery(keyPair, LEGACY_WS_PATH)}`,
+    [],
+  );
+
+  assert.ok('status' in legacyQuery, 'signed query authenticated /ws');
+  assert.equal(
+    legacyQuery.status,
+    404,
+    'signed query on /ws was not refused with 404',
+  );
+
+  const realtimeQuery = await connect(
+    node,
+    `${REALTIME_WS_PATH}?${signedQuery(keyPair, REALTIME_WS_PATH)}`,
+    [REALTIME_PROTOCOL_VERSION],
+  );
 
   assert.ok(
-    'status' in signedPathAttempt,
-    'ticket authenticated the signed /ws path',
+    'status' in realtimeQuery,
+    'signed query authenticated /realtime/v1 without a ticket',
   );
-  assert.equal(signedPathAttempt.status, 401);
+  assert.equal(
+    realtimeQuery.status,
+    401,
+    'signed query on /realtime/v1 was not refused with 401',
+  );
 }
 
 async function main(): Promise<void> {

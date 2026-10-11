@@ -1,5 +1,4 @@
 import { MailboxCreationProof } from '@app/contexts/mailboxes/domain/MailboxCreationProof';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
@@ -11,11 +10,14 @@ import type { NodeRuntime } from './two-real-node-gossipsub';
 import { teardownAndExit } from './RealTransportTeardown';
 import {
   buildNodeRuntime,
-  signRequest,
   startNode,
   stopNode,
   waitFor,
 } from './two-real-node-gossipsub';
+import {
+  connectRealtimeSocket,
+  issueRealtimeTicket,
+} from './RealtimeTicketClient';
 
 const NODE_PORT = 19190;
 const HINT_GRACE_MS = 1500;
@@ -26,16 +28,8 @@ type Socket = { messages: ServerMessage[]; ws: WebSocket };
 
 async function openSocket(node: NodeRuntime, label: string): Promise<Socket> {
   const keyPair = await KeyPair.generate();
-  const identityId = new IdentityId(keyPair.toPrimitives().publicKey).valueOf();
-  const timestamp = String(Date.now());
-  const query = new URLSearchParams({
-    identityId,
-    signature: signRequest(keyPair, 'GET', '/ws', timestamp, {}),
-    timestamp,
-  });
-  const ws = new WebSocket(
-    `ws://127.0.0.1:${node.port}/ws?${query.toString()}`,
-  );
+  const ticket = await issueRealtimeTicket(node, keyPair);
+  const ws = connectRealtimeSocket(node, ticket);
   const socket: Socket = { messages: [], ws };
 
   ws.on('message', (data) => {

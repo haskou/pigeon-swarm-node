@@ -21,6 +21,10 @@ import {
   waitForKeychain,
   waitForMessage,
 } from './two-real-node-gossipsub';
+import {
+  connectRealtimeSocket,
+  issueRealtimeTicket,
+} from './RealtimeTicketClient';
 
 const ROOT = path.resolve(
   process.env.PIGEON_TEST_SOURCE_ROOT || path.resolve(__dirname, '../../..'),
@@ -136,15 +140,8 @@ async function openRealtimeSocket(
   identity: IdentityFixture,
   label: string,
 ): Promise<RealtimeSocket> {
-  const timestamp = String(Date.now());
-  const query = new URLSearchParams({
-    identityId: identity.id,
-    signature: signRequest(identity.keyPair, 'GET', '/ws', timestamp, {}),
-    timestamp,
-  });
-  const ws = new WebSocket(
-    `ws://127.0.0.1:${node.port}/ws?${query.toString()}`,
-  );
+  const ticket = await issueRealtimeTicket(node, identity.keyPair);
+  const ws = connectRealtimeSocket(node, ticket);
   const socket: RealtimeSocket = { messages: [], ws };
 
   ws.on('message', (data) => {
