@@ -1,4 +1,5 @@
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
+import { StaleReadMarkerError } from '@app/contexts/conversations/domain/errors/StaleReadMarkerError';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
@@ -23,12 +24,17 @@ export default class MessagesReadMarker {
       throw new ConversationNotFoundError(message.conversationId);
     }
 
-    await this.conversationRepository.markReadUntil(
+    const accepted = await this.conversationRepository.markReadUntil(
       message.conversationId,
       message.readerIdentityId,
       message.messageId,
       conversation.getNetworkId(),
     );
+
+    if (!accepted) {
+      throw new StaleReadMarkerError();
+    }
+
     await this.eventPublisher.publish([
       new ConversationMessagesWereReadEvent(message.conversationId.valueOf(), {
         messageId: message.messageId.valueOf(),
