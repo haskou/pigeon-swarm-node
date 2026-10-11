@@ -185,13 +185,32 @@ export default class PigeonApplication {
     return this.server;
   }
 
+  // Autowire derives constructor arguments from TypeScript sources, which the
+  // compiled build does not ship. Compiled runs load the committed
+  // config/container/services.yaml, the graph autowire generates from src.
+  private resolveContainerBuild(): boolean {
+    if (!this.kernel.environment.CONTAINER_BUILD) {
+      return false;
+    }
+
+    if (path.extname(__filename) === '.ts') {
+      return true;
+    }
+
+    this.logger.warn(
+      'CONTAINER_BUILD is ignored in compiled builds; loading config/container/services.yaml',
+    );
+
+    return false;
+  }
+
   public loadEnvironmentVariables(environment?: string): void {
     this.kernel.loadEnvironmentVariables(environment);
   }
 
   public async dependencyInjection(): Promise<void> {
     await this.kernel.dependencyInjection({
-      containerBuild: this.kernel.environment.CONTAINER_BUILD,
+      containerBuild: this.resolveContainerBuild(),
       overrides: [
         {
           token: CallSignalDeliveryRepository,
