@@ -155,7 +155,7 @@ The node expects:
 * OrbitDB for replicated state and local embedded storage for node-local state.
 * IPFS network configuration for content publication and retrieval.
 * Libp2p GossipSub transport for node-to-node event propagation.
-* Signed HTTP/WebSocket requests from clients.
+* Signed HTTP requests and ticket-authenticated WebSocket connections from clients.
 
 For local development, the repository includes Docker Compose configuration and
 test-friendly in-memory network helpers.

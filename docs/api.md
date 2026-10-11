@@ -61,13 +61,11 @@ X-Signature: <signature>
 Implemented:
 
 - canonical request payload: method, path, timestamp and body hash
-- canonical payload `timestamp` is a JSON number; HTTP headers and WebSocket
-  query parameters still carry it as text
+- canonical payload `timestamp` is a JSON number; HTTP headers carry it as text
 - timestamp freshness validation with a 30 second maximum clock skew
-- replay rejection: a mutating (non-GET/HEAD/OPTIONS) signed request or
-  WebSocket upgrade whose identity and signature were already accepted inside
-  the freshness window is rejected with `401`; the guard is in-memory and per
-  node
+- replay rejection: a mutating (non-GET/HEAD/OPTIONS) signed request whose
+  identity and signature were already accepted inside the freshness window is
+  rejected with `401`; the guard is in-memory and per node
 - Cucumber scenarios for invalid and stale signed requests
 
 ## Public mutation proof (authorization revision)
@@ -162,62 +160,34 @@ Header values such as `X-Identity-Id` are not URL encoded.
 Realtime events are exposed through a WebSocket upgrade endpoint:
 
 ```http
-GET /ws
+GET /realtime/v1
 ```
 
 This endpoint is also listed in OpenAPI so Swagger consumers can discover the
 realtime entrypoint, although the actual interaction is an HTTP upgrade rather
 than a regular request/response flow.
 
-Browser clients cannot set custom headers in the native `WebSocket` constructor,
-so they must authenticate with signed query parameters:
+Clients authenticate the upgrade with a single-use ticket obtained from a signed
+HTTP request. The ticket travels in the `Sec-WebSocket-Protocol` header, so
+browser and non-browser clients use the same flow. Signed query parameters and
+signed headers are not accepted on this endpoint.
 
-```ts
-const path = '/ws';
-const timestamp = Date.now();
-const body = {};
-const canonicalPayload = {
-  bodyHash: sha256(JSON.stringify(body)),
-  method: 'GET',
-  path,
-  timestamp,
-};
-const signature = sign(JSON.stringify(canonicalPayload));
-const url =
-  `ws://localhost:8080${path}` +
-  `?identityId=${encodeURIComponent(identityId)}` +
-  `&timestamp=${encodeURIComponent(String(timestamp))}` +
-  `&signature=${encodeURIComponent(signature)}`;
-const socket = new WebSocket(url);
-```
-
-Non-browser clients may send the same signature through headers:
-
-```http
-X-Identity-Id: <identityId>
-X-Timestamp: <timestamp>
-X-Signature: <signature>
-```
-
-The signed path is the WebSocket path without query string. If `ROUTE_PREFIX`
-is configured, sign `<ROUTE_PREFIX>/ws`. Each signed upgrade URL is single-use.
-
-Set `REALTIME_SIGNED_QUERY_WS_ENABLED=false` to refuse this legacy endpoint
-(default `true`). A signed upgrade then gets `404`, like any other path the node
-does not serve, and clients must use the credentialless ticket endpoint below.
+The former signed-query endpoint `GET /ws` has been removed. Any upgrade to
+`/ws` gets `404`, like any other path the node does not serve, whatever
+credentials it carries. The ticket flow is described below.
 
 Per node, upgrades are rate limited per remote address and total open sockets
-are capped; excess upgrades receive `429 Too Many Requests` before signature
+are capped; excess upgrades receive `429 Too Many Requests` before ticket
 verification. A socket sending more than 200 client messages in 10 seconds is
 closed with code `1008`.
 
 Cookies are never an input to realtime authentication: a request carrying only
-a `Cookie` header is refused with `401`, and a signed upgrade ignores any
+a `Cookie` header is refused with `401`, and a ticket upgrade ignores any
 cookie sent with it. The node never answers an upgrade with a redirect.
 These properties are covered by a real HTTP server and `ws` client test. They
 do not prove what a browser sends: browsers attach eligible cookies to native
-WebSocket handshakes regardless of this server, so a browser-level test and a
-credentialless transport remain open (#291).
+WebSocket handshakes regardless of this server, so a browser-level cookie test
+remains open (#291).
 
 Optional Origin allowlist: set `REALTIME_ALLOWED_ORIGINS` to a comma-separated
 list of origins and browser upgrades whose `Origin` header is not in the list
@@ -226,7 +196,7 @@ Requests without `Origin` (non-browser clients) are not refused by this
 setting. Origin is not authentication; it only lets an operator refuse pages
 from other sites.
 
-Credentialless clients (#291) fetch a single-use ticket with a signed request
+Clients fetch a single-use ticket with a signed request
 and present it in a WebSocket subprotocol instead of a query string:
 
 ```http
@@ -253,8 +223,8 @@ The server selects `pigeon-realtime.v1` and never echoes the ticket. A ticket
 is valid for 30 seconds and one upgrade, and is consumed as soon as it is
 presented, even if that upgrade later fails. Each identity may hold 8
 outstanding tickets and each node 10,000; at capacity issuance returns `429`
-with code `429050`. Tickets in the query string, or presented to `/ws`, are
-refused with `401`.
+with code `429050`. Tickets sent in the query string are not read and get
+`401`; the retired `/ws` path answers `404`.
 
 Connection acknowledgement:
 
@@ -322,8 +292,7 @@ Heartbeat messages do not need a new signature; the WebSocket upgrade already
 authenticated the connection. The backend ignores any client-sent `identityId`
 and answers with the identity bound to the socket. Unknown or malformed client
 messages are ignored. Recommended client interval: 10 seconds, reconnecting
-with a fresh signed WebSocket URL if no `heartbeat_ack` arrives within 2
-intervals.
+with a new ticket if no `heartbeat_ack` arrives within 2 intervals.
 
 Call signal acknowledgement:
 
@@ -411,9 +380,8 @@ Domain event payload:
 
 Implemented:
 
-- require a valid signed WebSocket handshake
-- accept browser-compatible query parameter authentication
-- accept header authentication for non-browser clients
+- require a single-use ticket on the `/realtime/v1` WebSocket upgrade
+- accept the ticket in the `Sec-WebSocket-Protocol` header for browser and non-browser clients
 - reject stale timestamps outside the 30 second freshness window
 - push domain events after they have been published by the local node
 - deliver identity events only to the matching identity connection

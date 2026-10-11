@@ -49,27 +49,27 @@ paths:
     $ref: './nodes-api/swagger.yaml#/paths/~1client-contract'
   /realtime/v1/tickets:
     $ref: './realtime-api/swagger.yaml#/paths/~1realtime~1v1~1tickets'
-  /ws:
+  /realtime/v1:
     get:
       tags:
         - realtime
-      summary: Open a signed WebSocket realtime connection
+      summary: Open a ticket-authenticated realtime connection
       description: |
         WebSocket upgrade endpoint for realtime domain events and live network synchronization status.
 
-        Browser clients authenticate with query parameters because custom
-        WebSocket headers are not available in browsers. Non-browser clients may
-        send the same credentials as headers.
+        Authenticate with a single-use ticket from `POST /realtime/v1/tickets`,
+        offered in the `Sec-WebSocket-Protocol` header next to the protocol
+        version: `pigeon-realtime.v1, ticket.<ticket>`. Browser clients set
+        subprotocols in the native `WebSocket` constructor, so no custom headers
+        or query parameters are needed. The server selects `pigeon-realtime.v1`
+        and never echoes the ticket.
 
-        The signed canonical request is `GET /ws` with an empty body `{}`. When
-        `ROUTE_PREFIX` is configured, sign the prefixed path, for example
-        `GET /api/ws`.
-        The canonical payload timestamp is a JSON number, even though the
-        browser query parameter and HTTP header carry it as text.
+        When `ROUTE_PREFIX` is configured, connect to the prefixed path, for
+        example `GET /api/realtime/v1`.
 
-        The operator can turn off this legacy endpoint with
-        `REALTIME_SIGNED_QUERY_WS_ENABLED=false`; the upgrade then gets `404`.
-        Credentialless clients use `/realtime/v1` instead.
+        The former signed-query endpoint `GET /ws` has been removed and answers
+        `404`. Signed query parameters and signed headers are refused on this
+        path with `401`.
 
         On success the server sends:
 
@@ -132,44 +132,21 @@ paths:
 
         `{ "type": "domain_event", "event": { "type": "<eventType>", "aggregate_id": "<aggregateId>", "attributes": {} } }`
       parameters:
-        - in: query
-          name: identityId
-          required: false
-          schema:
-            type: string
-          description: Identity id/public key without PEM wrapping. Browser auth parameter equivalent to `X-Identity-Id`.
-        - in: query
-          name: timestamp
-          required: false
-          schema:
-            type: string
-          description: Millisecond timestamp. Browser auth parameter equivalent to `X-Timestamp`.
-        - in: query
-          name: signature
-          required: false
-          schema:
-            type: string
-          description: Signature over the canonical signed request. Browser auth parameter equivalent to `X-Signature`.
         - in: header
-          name: X-Identity-Id
-          required: false
+          name: Sec-WebSocket-Protocol
+          required: true
           schema:
             type: string
-        - in: header
-          name: X-Timestamp
-          required: false
-          schema:
-            type: string
-        - in: header
-          name: X-Signature
-          required: false
-          schema:
-            type: string
+          description: Offers `pigeon-realtime.v1` and `ticket.<ticket>`. The ticket is single-use and is consumed as soon as it is presented.
       responses:
         '101':
-          description: WebSocket upgrade accepted.
+          description: WebSocket upgrade accepted. The server selects `pigeon-realtime.v1`.
         '401':
-          description: Signed WebSocket handshake is missing, stale, or invalid.
+          description: Ticket missing, unknown, expired, or already used, or signed credentials sent in the query string or headers.
+        '403':
+          description: Browser Origin is not listed in `REALTIME_ALLOWED_ORIGINS`.
+        '429':
+          description: Too many upgrades or open sockets on this node.
   /calls/:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1'
   /calls/{callId}:
