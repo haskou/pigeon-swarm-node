@@ -40,11 +40,7 @@ function logError(message: string, error: unknown): void {
   Kernel.logger.error(details ? `${message}: ${details}` : message);
 }
 
-async function init() {
-  startTimer('Kernel');
-  const application = new PigeonApplication();
-  endTimer('Kernel');
-
+async function init(application: PigeonApplication) {
   startTimer('Environment variables');
   application.loadEnvironmentVariables();
   endTimer('Environment variables');
@@ -90,12 +86,48 @@ async function init() {
   logInfo('Ready!');
 }
 
+const FAILED_INIT_SHUTDOWN_TIMEOUT_MS = 10_000;
+
+async function shutdownAfterInitFailure(
+  application: PigeonApplication,
+): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`timed out after ${FAILED_INIT_SHUTDOWN_TIMEOUT_MS}ms`));
+    }, FAILED_INIT_SHUTDOWN_TIMEOUT_MS);
+  });
+
+  try {
+    await Promise.race([application.shutdown(), timeout]);
+  } catch (error) {
+    logError('Shutdown after init failure', error);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function run(): Promise<void> {
+  let application: PigeonApplication | undefined;
+
+  try {
+    startTimer('Kernel');
+    application = new PigeonApplication();
+    endTimer('Kernel');
+
+    await init(application);
+    logInfo('Application started');
+  } catch (error) {
+    logError('Application error', error);
+
+    if (application) {
+      await shutdownAfterInitFailure(application);
+    }
+
+    process.exit(1);
+  }
+}
+
 if (require.main === module) {
-  init()
-    .then(() => {
-      logInfo('Application started');
-    })
-    .catch((error) => {
-      logError('Application error', error);
-    });
+  void run();
 }

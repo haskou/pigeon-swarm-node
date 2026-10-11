@@ -65,7 +65,9 @@ async function freePort(): Promise<number> {
   return address.port;
 }
 
-function runUntilExit(environment: Record<string, string>): Promise<ExitResult> {
+function runUntilExit(
+  environment: Record<string, string>,
+): Promise<ExitResult> {
   const { promise, reject, resolve } = Promise.withResolvers<ExitResult>();
   const child = spawn(process.execPath, [ENTRY_POINT], {
     cwd: REPOSITORY_ROOT,

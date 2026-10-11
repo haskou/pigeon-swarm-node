@@ -386,4 +386,8 @@ export default class PigeonApplication {
 
     await nodeLoader.loadNode();
   }
+
+  public async shutdown(): Promise<void> {
+    await this.kernel.shutdown();
+  }
 }
