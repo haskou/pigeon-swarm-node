@@ -3,9 +3,7 @@ import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networ
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import Libp2pGossipsubAdapter from '@app/shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter';
-import {
-  networkFanoutSuppression,
-} from '@app/shared/infrastructure/messageBus/NetworkFanoutSuppression';
+import { networkFanoutSuppression } from '@app/shared/infrastructure/messageBus/NetworkFanoutSuppression';
 import PubSubNetworkMessageCodec from '@app/shared/infrastructure/messageBus/libp2p/PubSubNetworkMessageCodec';
 import PubSubTopicResolver from '@app/shared/infrastructure/messageBus/libp2p/PubSubTopicResolver';
 import PubSubTransport from '@app/shared/infrastructure/pubsub/PubSubTransport';
