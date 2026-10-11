@@ -67,6 +67,10 @@ paths:
         The canonical payload timestamp is a JSON number, even though the
         browser query parameter and HTTP header carry it as text.
 
+        The operator can turn off this legacy endpoint with
+        `REALTIME_SIGNED_QUERY_WS_ENABLED=false`; the upgrade then gets `404`.
+        Credentialless clients use `/realtime/v1` instead.
+
         On success the server sends:
 
         `{ "type": "connection_ack", "identityId": "<normalizedIdentityId>" }`

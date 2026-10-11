@@ -12,8 +12,11 @@ import { WebSocketTicketAuthenticator } from './WebSocketTicketAuthenticator';
 const MAX_CLIENT_FRAME_BYTES = 16 * 1024;
 
 export type WebSocketPaths = {
-  /** Legacy endpoint: credentials as signed query parameters or headers. */
-  signedQueryPath: string;
+  /**
+   * Legacy endpoint: credentials as signed query parameters or headers.
+   * Omit it to refuse the endpoint.
+   */
+  signedQueryPath?: string;
   /** Credentialless endpoint: single-use ticket in Sec-WebSocket-Protocol. */
   ticketPath: string;
 };
@@ -50,14 +53,22 @@ export class WebSocketRealtimeServer {
     const url = new URL(request.url || '/', 'http://localhost');
     const authenticators = new Map([
       [paths.ticketPath, () => this.ticketAuthenticator.authenticate(request)],
-      [
-        paths.signedQueryPath,
-        () => this.authenticator.authenticate(request, paths.signedQueryPath),
-      ],
     ]);
+
+    if (paths.signedQueryPath !== undefined) {
+      const signedQueryPath = paths.signedQueryPath;
+
+      authenticators.set(signedQueryPath, () =>
+        this.authenticator.authenticate(request, signedQueryPath),
+      );
+    }
+
     const authenticate = authenticators.get(url.pathname);
 
     if (!authenticate) {
+      socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+      socket.destroy();
+
       return;
     }
 
