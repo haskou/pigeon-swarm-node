@@ -29,6 +29,10 @@ SERVICE_NAME=pigeon-swarm
 
 3. Start the app with `yarn local` or `docker compose up`
 
+## Startup Failures
+
+If initialization fails (for example an invalid environment value or an unwritable `IPFS_STORAGE_PATH`), the node logs `Application error`, stops the services it already started on a best-effort basis (at most 10 seconds), and exits with status `1`. Container restart policies such as Docker `on-failure` act on that status. Fix the reported error before starting the node again.
+
 ## Frontend Static Assets
 
 The backend can serve static files from the root `public/` directory. This is

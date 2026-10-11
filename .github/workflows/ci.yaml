@@ -42,6 +42,10 @@ jobs:
         run: yarn test:e2e:container:compiled-boot
         timeout-minutes: 3
 
+      - name: Init failure exits with status 1
+        run: yarn test:e2e:container:init-failure
+        timeout-minutes: 3
+
   unit:
     name: Unit tests
     runs-on: ubuntu-24.04
