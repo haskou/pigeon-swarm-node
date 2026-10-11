@@ -1,7 +1,9 @@
-FROM node:24.21.0-bullseye AS base
+FROM node:24.18.0-bullseye AS base
 ENV NODE_OPTIONS=--max_old_space_size=4096
 WORKDIR /var/www/
 COPY package.json yarn.lock ./
+# postinstall patches dependencies with these scripts
+COPY scripts ./scripts
 # COPY .npmrc .
 
 FROM base AS build
@@ -19,6 +21,8 @@ FROM base AS final
 COPY --from=build /var/www/.env .env
 COPY --from=build /var/www/dist ./dist
 COPY --from=build /var/www/config ./config
+# swagger specs are read from src/apps/apis at runtime
+COPY --from=build /var/www/src/apps/apis ./src/apps/apis
 RUN yarn --ignore-engines --frozen-lockfile --production
 ENV NODE_ENV=
 CMD yarn start
