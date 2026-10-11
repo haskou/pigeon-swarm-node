@@ -1458,6 +1458,7 @@ export default class Definitions {
   @after()
   public restoreIdentityPublicationLimit(): void {
     delete process.env.IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE;
+    delete process.env.IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE;
   }
 
   @after()
@@ -1769,6 +1770,14 @@ export default class Definitions {
   @given('identity publications are limited to {int} per minute')
   public identityPublicationsAreLimitedToPerMinute(limit: number): void {
     process.env.IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE = String(limit);
+  }
+
+  @given('identity admissions are limited to {int} per network per minute')
+  public identityAdmissionsAreLimitedToPerNetworkPerMinute(
+    limit: number,
+  ): void {
+    process.env.IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE =
+      String(limit);
   }
 
   @given(

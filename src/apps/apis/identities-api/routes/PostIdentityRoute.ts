@@ -6,6 +6,7 @@ import { Response } from 'express';
 import { Body, JsonController, Post, Res } from 'routing-controllers';
 
 import { PostIdentityBody } from '../bodies/PostIdentityBody';
+import IdentityNetworkAdmissionRateLimiter from '../IdentityNetworkAdmissionRateLimiter';
 import IdentityPublishRateLimiter from '../IdentityPublishRateLimiter';
 import { PostIdentityRequest } from '../requests/PostIdentityRequest';
 import { IdentityViewModel } from '../view-model/IdentityViewModel';
@@ -19,6 +20,11 @@ export class PostIdentityRoute extends Route {
     IdentityPublishRateLimiter,
   );
 
+  private readonly networkAdmissionRateLimiter =
+    this.get<IdentityNetworkAdmissionRateLimiter>(
+      IdentityNetworkAdmissionRateLimiter,
+    );
+
   @Post('/')
   public async createIdentity(
     @Body({
@@ -29,6 +35,7 @@ export class PostIdentityRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     await this.rateLimiter.consume(new IdentityId(body.id));
+    await this.networkAdmissionRateLimiter.consume(body.networks);
 
     const request = new PostIdentityRequest(body);
     const candidate = await this.identityPublisher.publish(

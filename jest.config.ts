@@ -15,10 +15,7 @@ const config: Config.InitialOptions = {
   verbose: true,
   roots: ['<rootDir>/src/', '<rootDir>/tests/'],
   moduleDirectories: ['node_modules', '<rootDir>/src'],
-  setupFiles: [
-    'reflect-metadata',
-    '<rootDir>/tests/support/jest-environment.ts',
-  ],
+  setupFiles: ['reflect-metadata'],
   coverageReporters: ['json'],
   coverageDirectory: '<rootDir>/coverage/unit',
   collectCoverageFrom: ['<rootDir>/src/**/*.ts'],

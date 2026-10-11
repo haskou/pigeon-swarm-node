@@ -25,7 +25,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/IdentityResource'
         '429':
-          description: Identity publication rate limit exceeded (code 429040, IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE publications per identity per minute).
+          description: Identity publication rate limit exceeded (code 429040, IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE publications per identity per minute). Identity admission network quota exceeded (code 429041, IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE, off by default).
   /identities/{reference}:
     get:
       tags:
@@ -86,7 +86,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/IdentityResource'
         '429':
-          description: Identity publication rate limit exceeded (code 429040).
+          description: Identity publication rate limit exceeded (code 429040). Identity admission network quota exceeded (code 429041, off by default).
 components:
   schemas:
     PostIdentityBody:
@@ -113,7 +113,7 @@ components:
           type: string
           minLength: 1
           maxLength: 64
-          description: Proof-of-work nonce bound to the identity id and its sorted network ids. SHA-256 of `pigeon-identity-admission:v1:<id>:<networks>:<nonce>` must have IDENTITY_ADMISSION_DIFFICULTY_BITS leading zero bits. Covered by the identity signature.
+          description: Proof-of-work nonce bound to the identity id and its sorted network ids. SHA-256 of `pigeon-identity-admission:v1:<id>:<networks>:<nonce>` must have 16 leading zero bits (a fixed protocol constant). Covered by the identity signature.
         authorizationRevision:
           type: integer
           minimum: 0

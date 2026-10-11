@@ -15,6 +15,7 @@ import {
 } from 'routing-controllers';
 
 import { PutIdentityBody } from '../bodies/PutIdentityBody';
+import IdentityNetworkAdmissionRateLimiter from '../IdentityNetworkAdmissionRateLimiter';
 import IdentityPublishRateLimiter from '../IdentityPublishRateLimiter';
 import { PutIdentityRequest } from '../requests/PutIdentityRequest';
 import { IdentityViewModel } from '../view-model/IdentityViewModel';
@@ -30,6 +31,11 @@ export class PutIdentityRoute extends Route {
   private readonly rateLimiter = this.get<IdentityPublishRateLimiter>(
     IdentityPublishRateLimiter,
   );
+
+  private readonly networkAdmissionRateLimiter =
+    this.get<IdentityNetworkAdmissionRateLimiter>(
+      IdentityNetworkAdmissionRateLimiter,
+    );
 
   @Put('/:identityId')
   public async updateIdentity(
@@ -55,6 +61,7 @@ export class PutIdentityRoute extends Route {
     }
 
     await this.rateLimiter.consume(authenticatedIdentityId);
+    await this.networkAdmissionRateLimiter.consume(body.networks);
 
     const candidate = await this.identityPublisher.publish(
       new PutIdentityRequest(body).getIdentityPublishMessage(),

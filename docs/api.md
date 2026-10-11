@@ -1951,8 +1951,8 @@ The signature covers this canonical property order:
 
 `admissionNonce` is a hashcash-style proof of work. SHA-256 of
 `pigeon-identity-admission:v1:<identityId>:<sorted networkIds joined by ','>:<admissionNonce>`
-must start with `IDENTITY_ADMISSION_DIFFICULTY_BITS` zero bits (default 16,
-about 65 thousand hashes). The nonce is covered by the identity signature, is
+must start with 16 zero bits (a protocol constant, not configurable; about
+65 thousand hashes on average). The nonce is covered by the identity signature, is
 at most 64 characters, and must be mined again whenever the network set changes.
 Every node verifies it; identities without a valid proof are rejected and never
 admitted to the replicated store. The request `admissionNonce` is required in
@@ -1966,6 +1966,15 @@ At most `IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE` (default 30, `0` disables)
 identity publications are accepted per identity per minute, on `POST /identities`
 and `PUT /identities/{identityId}` together; the next one is refused with `429`,
 code `429040`.
+
+At most `IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE` (default 0, off)
+identity admissions per network per minute are accepted by this node. Every
+network an identity enters is charged on `POST /identities` and
+`PUT /identities/{identityId}`, including a `PUT` that leaves the networks
+unchanged; the next admission is refused with `429`, code `429041`, when any of
+those networks is over the cap. The count is local to the node and is not shared
+with peers. Enabling it lets a flood through this node block registrations here
+for the window, which is why it is off by default.
 
 ### Update identity
 

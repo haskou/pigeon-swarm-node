@@ -72,17 +72,21 @@ describe('IdentityAdmissionProof', () => {
     },
   );
 
-  it('falls back to the default for invalid configuration', () => {
-    const configured = (value: number) =>
-      IdentityAdmissionProof.difficultyBits({
-        IDENTITY_ADMISSION_DIFFICULTY_BITS: value,
-      } as never);
+  it('uses one protocol difficulty and ignores any environment override', () => {
+    const previous = process.env.IDENTITY_ADMISSION_DIFFICULTY_BITS;
+    process.env.IDENTITY_ADMISSION_DIFFICULTY_BITS = '4';
 
-    expect(configured(0)).toBe(IdentityAdmissionProof.DEFAULT_DIFFICULTY_BITS);
-    expect(configured(33)).toBe(IdentityAdmissionProof.DEFAULT_DIFFICULTY_BITS);
-    expect(configured(Number.NaN)).toBe(
-      IdentityAdmissionProof.DEFAULT_DIFFICULTY_BITS,
-    );
-    expect(configured(20)).toBe(20);
+    try {
+      const nonce = IdentityAdmissionProof.mine('identity-a', networks);
+
+      expect(IdentityAdmissionProof.DIFFICULTY_BITS).toBe(16);
+      expect(
+        IdentityAdmissionProof.isValid('identity-a', networks, nonce, 16),
+      ).toBe(true);
+    } finally {
+      if (previous === undefined)
+        delete process.env.IDENTITY_ADMISSION_DIFFICULTY_BITS;
+      else process.env.IDENTITY_ADMISSION_DIFFICULTY_BITS = previous;
+    }
   });
 });

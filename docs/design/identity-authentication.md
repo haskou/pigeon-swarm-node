@@ -100,8 +100,8 @@ which merges the persisted history of that key once the genesis is known.
 
 Every identity carries a signed `admissionNonce`. SHA-256 of
 `pigeon-identity-admission:v1:<identityId>:<sorted networkIds>:<nonce>` must
-start with `IDENTITY_ADMISSION_DIFFICULTY_BITS` zero bits (default 16, valid
-range 1-32, invalid values fall back to the default). The proof is stateless,
+start with 16 zero bits (`IdentityAdmissionProof.DIFFICULTY_BITS`, a protocol
+constant so every node verifies the same proof; not configurable). The proof is stateless,
 so every node checks it from the record alone: the gate rejects records without
 it and `IdentityCandidateValidationDomainService` rejects whole chains
 containing one. It binds the work to the identity key and to the networks, so
@@ -131,6 +131,19 @@ heal yields the same owner and the same latest identity.
 | Retained versions per identity | 64 (`MAX_CANDIDATES_PER_IDENTITY`) |
 | Remote handle candidates | 32 |
 | Publications per identity per minute | `IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE`, default 30, `429` code `429040` |
+| Admissions per network per minute on this node | `IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE`, default 0 (off), `429` code `429041` |
+
+Admission cost is a fixed protocol constant, not adaptive. Difficulty derived
+from observed load or record counts would not converge, because nodes see
+different record subsets. A network-wide admission cap is not enforced either:
+16-bit proofs are cheap to produce, so a convergent cap turns a sybil flood into
+a registration outage for everyone (DoS amplification). The per-node network
+quota is off by default for the same reason: it lets a flood at one node block
+registrations there for the window. Measured proof cost (Node `sha256`, mean
+nonce about 66k): 16 bits median 41 ms (p90 157 ms, max 438 ms); 18 bits median
+187 ms; 20 bits median 836 ms. Headless Chromium at 16 bits: median 0.8 s at 1x
+CPU, 3.5 s at 4x. Raising the constant makes honest clients, including mobile,
+pay the cost on every identity, and it does not address GPU-scale attackers.
 
 Claimants of a handle are deliberately not capped: evicting a lower ranked
 claimant would make the owner depend on the order of past events (a node that

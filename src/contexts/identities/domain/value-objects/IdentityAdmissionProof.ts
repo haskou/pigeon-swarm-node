@@ -1,17 +1,15 @@
-import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { createHash } from 'node:crypto';
 
 /**
  * Hashcash-style proof that minting an identity into a set of networks cost
  * work. SHA-256 over the id, the sorted network ids and the nonce must start
- * with the configured number of zero bits. The proof is bound to the identity key and
+ * with DIFFICULTY_BITS leading zero bits. The proof is bound to the identity key and
  * to the networks it enters, so it cannot be reused for another key or to join
  * a different network. Any node verifies it statelessly.
  */
 export class IdentityAdmissionProof {
   private static readonly DOMAIN = 'pigeon-identity-admission:v1';
-  public static readonly DEFAULT_DIFFICULTY_BITS = 16;
-  public static readonly MAX_DIFFICULTY_BITS = 32;
+  public static readonly DIFFICULTY_BITS = 16;
   public static readonly MAX_NONCE_LENGTH = 64;
 
   private static leadingZeroBits(digest: Buffer): number {
@@ -42,23 +40,13 @@ export class IdentityAdmissionProof {
     ].join(':');
   }
 
-  public static difficultyBits(environment = pigeonEnvironment()): number {
-    const configured = environment.IDENTITY_ADMISSION_DIFFICULTY_BITS;
-
-    return Number.isInteger(configured) &&
-      configured > 0 &&
-      configured <= IdentityAdmissionProof.MAX_DIFFICULTY_BITS
-      ? configured
-      : IdentityAdmissionProof.DEFAULT_DIFFICULTY_BITS;
-  }
-
-  /** Reference miner: first nonce that satisfies the configured difficulty. */
+  /** Reference miner: first nonce that satisfies the protocol difficulty. */
   public static mine(
     identityId: string,
     networkIds: string[],
     accepts: (nonce: string) => boolean = () => true,
   ): string {
-    const difficultyBits = IdentityAdmissionProof.difficultyBits();
+    const difficultyBits = IdentityAdmissionProof.DIFFICULTY_BITS;
     const prefix = createHash('sha256').update(
       IdentityAdmissionProof.preimage(identityId, networkIds, ''),
     );
@@ -80,7 +68,7 @@ export class IdentityAdmissionProof {
     identityId: string,
     networkIds: string[],
     nonce: string | undefined,
-    difficultyBits: number = IdentityAdmissionProof.difficultyBits(),
+    difficultyBits: number = IdentityAdmissionProof.DIFFICULTY_BITS,
   ): boolean {
     if (
       typeof nonce !== 'string' ||

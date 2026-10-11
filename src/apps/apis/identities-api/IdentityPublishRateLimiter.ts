@@ -3,6 +3,7 @@ import { pigeonEnvironment } from '@app/shared/infrastructure/environment/Pigeon
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 
 import { IdentityPublishRateLimitExceededError } from './errors/IdentityPublishRateLimitExceededError';
+import FixedWindowCounter from './FixedWindowCounter';
 
 /** Caps the identity versions one identity may publish through this node per minute. */
 export default class IdentityPublishRateLimiter {
@@ -27,25 +28,12 @@ export default class IdentityPublishRateLimiter {
 
     if (limit === 0) return;
 
-    const id = identityId.valueOf();
-    const now = Date.now();
-    const current = await this.database.findOne(
+    const count = await FixedWindowCounter.increment(
+      this.database,
       IdentityPublishRateLimiter.NAMESPACE,
-      id,
+      identityId.valueOf(),
+      IdentityPublishRateLimiter.WINDOW_MS,
     );
-    const live =
-      typeof current?.resetAt === 'number' &&
-      current.resetAt > now &&
-      typeof current.count === 'number';
-    const count = live ? (current.count as number) + 1 : 1;
-    const resetAt = live
-      ? (current.resetAt as number)
-      : now + IdentityPublishRateLimiter.WINDOW_MS;
-
-    await this.database.save(IdentityPublishRateLimiter.NAMESPACE, id, {
-      count,
-      resetAt,
-    });
 
     if (count > limit) throw new IdentityPublishRateLimitExceededError(limit);
   }

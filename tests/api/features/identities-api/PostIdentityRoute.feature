@@ -126,3 +126,15 @@ Feature: Post identity route
     When I POST to "/identities/"
     Then response code is equal to 429
     And response body should contain "429040"
+
+  Scenario: Reject identity admissions above the per-network rate limit
+    Given I am an anonymous user
+    And identity admissions are limited to 1 per network per minute
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174999" and name "admission-network"
+    And I set a client-signed identity body with name "first admission" and handle "first-admission"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I set a client-signed identity body with name "second admission" and handle "second-admission"
+    When I POST to "/identities/"
+    Then response code is equal to 429
+    And response body should contain "429041"
