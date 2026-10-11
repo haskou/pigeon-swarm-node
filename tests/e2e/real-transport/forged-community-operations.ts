@@ -462,6 +462,7 @@ async function main(): Promise<void> {
       method: 'automatic',
     }),
     forgedOperation(mallory, 'MEMBER_BANNED', { identityId: owner.id }),
+    forgedOperation(carol, 'MEMBER_KICKED', { identityId: alice.id }),
   ];
   const wrongSignature = forgedOperation(
     { ...owner, deviceKeyPair: mallory.deviceKeyPair },
@@ -518,7 +519,7 @@ async function main(): Promise<void> {
     `community-operation-index:${communityId.valueOf()}`,
     {
       communityId: communityId.valueOf(),
-      communityOperations: [tombstone, ...forgedRecords.slice(1, 4)],
+      communityOperations: [tombstone, ...forgedRecords.slice(1, 5)],
       id: `community-operation-index:${communityId.valueOf()}`,
       networkId,
       updatedAt: Date.now() + 10 ** 12,
@@ -553,7 +554,7 @@ async function main(): Promise<void> {
     );
   }
   console.log(
-    'PASS forged tombstone, roles, bans, joins, copied scope, swapped proof, replay and oversized arguments rejected on every replica',
+    'PASS forged tombstone, roles, bans, joins, kicks, copied scope, swapped proof, replay and oversized arguments rejected on every replica',
   );
 
   stage = 'concurrent partitions converge by the total order';
@@ -724,6 +725,20 @@ async function main(): Promise<void> {
     );
   }
   console.log('PASS operations of a revoked device rejected on every replica');
+  stage = 'signed kick';
+  await submit(second, communityId, owner, 'MEMBER_KICKED', {
+    identityId: alice.id,
+  });
+  await converged('kick reached every replica', communityId);
+  for (const replica of nodes) {
+    const community = await replica.repository!.findById(communityId);
+
+    assert.ok(
+      community && !community.isMember(new IdentityId(alice.id)),
+      `${replica.name} must drop the kicked member`,
+    );
+  }
+  console.log('PASS signed kick removed the member on every replica');
 }
 
 const watchdog = setTimeout(() => {

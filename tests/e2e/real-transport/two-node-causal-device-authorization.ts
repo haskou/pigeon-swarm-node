@@ -120,15 +120,39 @@ async function open(replica: Replica): Promise<void> {
   );
 }
 
-async function connect(): Promise<void> {
-  const address = nodes[1].helia.libp2p
+async function createReplica(
+  name: string,
+  swarmKey: PrivateKey,
+): Promise<Replica> {
+  const helia = await HeliaIPFS.createPrivateHeliaCore(
+    {
+      contentRoutingEnabled: false,
+      distributedHashTableEnabled: false,
+      listenAddresses: ['/ip4/127.0.0.1/tcp/0'],
+      localPeerDiscoveryEnabled: false,
+      manualRelayMultiaddrs: [],
+      publicRelayDiscoveryEnabled: false,
+      storageLocation: path.join(root, name, 'ipfs'),
+    },
+    swarmKey,
+    networkId,
+  );
+  const replica = { helia, name };
+  nodes.push(replica);
+  await open(replica);
+
+  return replica;
+}
+
+async function connect(from: Replica, to: Replica): Promise<void> {
+  const address = to.helia.libp2p
     .getMultiaddrs()
     .find((value) => value.toString().startsWith('/ip4/127.0.0.1/tcp/'));
-  assert.ok(address, 'The second fixture peer must listen on loopback');
+  assert.ok(address, `${to.name} must listen on loopback`);
   const target = await heliaRuntimeAdapter.createMultiaddr(address.toString());
   await until('private peers connect', async () => {
     try {
-      await nodes[0].helia.libp2p.dial(target);
+      await from.helia.libp2p.dial(target);
 
       return true;
     } catch {
@@ -137,8 +161,10 @@ async function connect(): Promise<void> {
   });
 }
 
-async function startSynchronization(): Promise<void> {
-  for (const node of nodes)
+async function startSynchronization(
+  replicas: Replica[] = nodes,
+): Promise<void> {
+  for (const node of replicas)
     for (const store of Object.values(node.stores!)) {
       assert.ok(store.sync, 'Real OrbitDB synchronization is required');
       await store.sync.start();
@@ -337,24 +363,7 @@ async function main(): Promise<void> {
       .toString(),
   );
 
-  for (const name of ['first', 'second']) {
-    const helia = await HeliaIPFS.createPrivateHeliaCore(
-      {
-        contentRoutingEnabled: false,
-        distributedHashTableEnabled: false,
-        listenAddresses: ['/ip4/127.0.0.1/tcp/0'],
-        localPeerDiscoveryEnabled: false,
-        manualRelayMultiaddrs: [],
-        publicRelayDiscoveryEnabled: false,
-        storageLocation: path.join(root, name, 'ipfs'),
-      },
-      swarmKey,
-      networkId,
-    );
-    const replica = { helia, name };
-    nodes.push(replica);
-    await open(replica);
-  }
+  for (const name of ['first', 'second']) await createReplica(name, swarmKey);
 
   const identity = await KeyPair.generate();
   const owner = await KeyPair.generate();
@@ -464,7 +473,7 @@ async function main(): Promise<void> {
   ]);
 
   stage = 'real OrbitDB convergence';
-  await connect();
+  await connect(first, second);
   await startSynchronization();
   await verifyExchange();
   await until('the partitioned replica reaches the head', async () => {
@@ -499,8 +508,83 @@ async function main(): Promise<void> {
   await restart(second, genesis);
   await expectVerdicts('restarted node', second, identityId, afterHeal);
 
+  stage = 'recovery checkpoint';
+  await startSynchronization([second]);
+  const recovered = await KeyPair.generate();
+  const unsignedRecovery = DeviceAuthorizationTransition.recovery(
+    identityId,
+    new DeviceAuthorizationOperationId(
+      '00000000-0000-4000-8000-000000000017',
+    ),
+    new DeviceAuthorizationRevision(6),
+    DeviceCredential.fromString(recovered.toPrimitives().publicKey),
+  );
+  const provenRecovery = unsignedRecovery.provePossession(
+    recovered.sign(unsignedRecovery.getProofOfPossessionPayload()),
+  );
+  await first.repository!.compareAndApply(
+    provenRecovery.authorizeRecovery(
+      recovery.sign(provenRecovery.getSigningPayload()),
+    ),
+  );
+  await until('second reaches the recovery checkpoint', async () => {
+    const authorization = await second.repository!.find(identityId);
+
+    return authorization?.toPrimitives().revision === 7;
+  });
+  const afterRecovery: Array<[string, KeyPair, number, boolean]> = [
+    ['recovered device at its checkpoint', recovered, 7, true],
+    ['recovered device below the checkpoint', recovered, 6, false],
+    ['recovered device past the head', recovered, 8, false],
+    ['pre-recovery owner at the replaced head', owner, 6, false],
+    ['pre-recovery owner at the checkpoint', owner, 7, false],
+    ['pre-recovery phone before its revocation', phone, 1, false],
+    ['stolen tablet inside its old interval', tablet, 5, false],
+    ['watch enrolled before the checkpoint', watch, 5, false],
+  ];
+  await expectVerdicts(
+    'recovered author node',
+    first,
+    identityId,
+    afterRecovery,
+  );
+  await expectVerdicts(
+    'recovered healed node',
+    second,
+    identityId,
+    afterRecovery,
+  );
+
+  stage = 'fresh replica after recovery';
+  const third = await createReplica('third', swarmKey);
+  await third.repository!.provision(
+    genesis,
+    new IdentityVersion(1),
+    new IdentityExternalIdentifier('bafy-genesis'),
+  );
+  await connect(third, second);
+  await startSynchronization([third]);
+  await until('third joins the replication', () =>
+    Object.values(third.stores!).every((store) => (store.peers?.size ?? 0) > 0),
+  );
+  await until('third reaches the recovery checkpoint', async () => {
+    const authorization = await third.repository!.find(identityId);
+
+    return authorization?.toPrimitives().revision === 7;
+  });
+  await expectVerdicts('fresh replica', third, identityId, afterRecovery);
+
+  stage = 'restart after recovery';
+  await restart(second, genesis);
+  await expectVerdicts(
+    'restarted recovered node',
+    second,
+    identityId,
+    afterRecovery,
+  );
+
   console.log(
-    'PASS causal device authorization: two real private Helia/OrbitDB replicas evaluated signed records at the claimed authorization revision (late delivery honoured, backdating past the revocation refused, a key revoked as compromised refused from the compromise frontier the owner signed even inside its authorized interval, unreplicated revisions refused until healed, identical verdicts after a restart). Local loopback transport only; no external NAT claim.',
+    'PASS causal device authorization: two real private Helia/OrbitDB replicas evaluated signed records at the claimed authorization revision (late delivery honoured, backdating past the revocation refused, a key revoked as compromised refused from the compromise frontier the owner signed even inside its authorized interval, unreplicated revisions refused until healed, identical verdicts after a restart, and a recovery checkpoint that replaced every pre-recovery credential and revision on the author, healed, fresh and restarted replicas). Local loopback transport only; no external NAT claim.',
   );
 }
 

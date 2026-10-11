@@ -220,8 +220,10 @@ the previous behaviour, so no existing signature or document changes.
 - Authority: the same as any revocation (an authorized device). A thief that
   already holds an authorized key could also revoke other devices, so this adds
   no new power.
-- A credential capped this way stays capped; enrolling the same key again does
-  not lift it. Use a fresh key.
+- A credential capped this way stays capped while the replayed history holds the
+  revocation: enrolling the same key again within that history does not lift
+  it. Use a fresh key. A recovery checkpoint discards the cap with the rest of
+  the pre-checkpoint chain (see Residuals).
 
 ## Residuals
 
@@ -241,6 +243,14 @@ the previous behaviour, so no existing signature or document changes.
 - **Backdating inside the authorized interval** (threat 3) cannot be bounded
   by time. For a device revoked as compromised it is bounded by the owner's
   compromise frontier (below); a plain retirement keeps the whole interval.
+- **Compromise caps do not outlive a recovery.** The checkpoint carries only
+  recovery transitions, so a `compromisedSince` cap set before a recovery is not
+  replayed after it. A pre-recovery credential is still absent from the
+  recovered credential set, so its records are refused; but an owner who enrols
+  the same key again on a post-recovery device re-admits it from that enrolment
+  revision. Carrying the caps across the checkpoint would change the replicated
+  checkpoint shape, so it is an open design decision (#386): use a fresh key for
+  every device.
 
 ## Verification
 
@@ -255,6 +265,10 @@ the previous behaviour, so no existing signature or document changes.
   `tests/fixtures/*-vectors.json`.
 - Real transport: `yarn test:integration:causal-device-authorization` (two real
   private Helia/OrbitDB replicas: partitioned authorization history, healing,
-  late delivery, backdating, unreplicated revision and a restart; in `test:ci`).
+  late delivery, backdating, unreplicated revision and a restart; then a recovery
+  checkpoint at revision 7 verified on the author, a healed, a restarted and a
+  fresh replica: the pre-recovery owner, phone, stolen tablet and watch are
+  refused, and the recovered device is accepted only at its checkpoint revision;
+  in `test:ci`).
   The existing `forged-*`, `two-real-node-gossipsub` and call scripts keep
   covering the admission gates end to end.
