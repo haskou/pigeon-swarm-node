@@ -1,5 +1,6 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DiagnosticIdentifierRedactor } from '@app/shared/infrastructure/logs/DiagnosticIdentifierRedactor';
+import { DiagnosticsWindow } from '@app/shared/infrastructure/logs/DiagnosticsWindow';
 import { PublicRelayRecordPrimitives } from '@app/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
 import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
 import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
@@ -446,7 +447,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
   private contentRetrievalProgressLogger(
     cid: IPFSId,
   ): ContentRetrievalOptions['onProgress'] | undefined {
-    if (!pigeonEnvironment().DEBUG_NETWORK) {
+    if (!DiagnosticsWindow.forProcess().isOpen()) {
       return undefined;
     }
 
@@ -457,6 +458,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
     cid: IPFSId,
     event: ContentRetrievalProgressEvent,
   ): void {
+    if (!DiagnosticsWindow.forProcess().isOpen()) {
+      return;
+    }
+
     const line = HeliaIPFS.contentRetrievalProgressLines.format(
       cid.valueOf(),
       event,
