@@ -1,25 +1,17 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import {
+  canonicalSignedRequestPayload,
+  SignedRequestPayload,
+} from '@app/contexts/shared/domain/value-objects/SignedRequestPayload';
 import { PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
-import { createHash } from 'crypto';
 
 import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';
 import { MissingSignedRequestHeaderError } from './errors/MissingSignedRequestHeaderError';
 import { SignedHttpRequest } from './SignedHttpRequest';
-import { SignedRequestPayload } from './SignedRequestPayload';
 
 export type { SignedHttpRequest } from './SignedHttpRequest';
 
 export class SignedHttpRequestVerifier {
-  private hashBody(body: unknown): string {
-    if (Buffer.isBuffer(body)) {
-      return createHash('sha256').update(body).digest('hex');
-    }
-
-    return createHash('sha256')
-      .update(JSON.stringify(body || {}))
-      .digest('hex');
-  }
-
   private getCanonicalTimestamp(timestamp: number | string): number {
     const canonicalTimestamp = Number(timestamp);
 
@@ -47,12 +39,12 @@ export class SignedHttpRequestVerifier {
     timestamp: number | string,
     body: unknown,
   ): SignedRequestPayload {
-    return {
-      bodyHash: this.hashBody(body),
-      method: method.toUpperCase(),
+    return canonicalSignedRequestPayload(
+      method,
       path,
-      timestamp: this.getCanonicalTimestamp(timestamp),
-    };
+      this.getCanonicalTimestamp(timestamp),
+      body,
+    );
   }
 
   public verifySignature(request: SignedHttpRequest): {

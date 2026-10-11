@@ -2,6 +2,11 @@ import {
   MessageReadClaim,
   MessageReadProof,
 } from '@app/contexts/conversations/domain/value-objects/MessageReadProof';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import {
+  SignedHttpRequest,
+  SignedHttpRequestVerifier,
+} from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 
 import { signedReadReceipt } from '../../support/signedReadReceipt';
@@ -30,6 +35,34 @@ describe('MessageReadProof', () => {
       messageId,
     });
 
+    expect(MessageReadProof.isAuthentic(proof, claimFor(reader))).toBe(true);
+  });
+
+  it('accepts exactly the signed request the HTTP verifier accepts', async () => {
+    const reader = await KeyPair.generate();
+    const timestamp = Date.now();
+    const proof = await signedReadReceipt({
+      conversationId,
+      keyPair: reader,
+      messageId,
+      timestamp,
+    });
+    const identityId = new IdentityId(reader.toPrimitives().publicKey).valueOf();
+    const headers: Record<string, string> = {
+      'x-identity-id': identityId,
+      'x-signature': proof.signature,
+      'x-timestamp': String(timestamp),
+    };
+    const request: SignedHttpRequest = {
+      body: proof.body,
+      header: (name) => headers[name],
+      method: proof.method,
+      path: proof.path,
+    };
+
+    expect(new SignedHttpRequestVerifier().verify(request).valueOf()).toBe(
+      identityId,
+    );
     expect(MessageReadProof.isAuthentic(proof, claimFor(reader))).toBe(true);
   });
 

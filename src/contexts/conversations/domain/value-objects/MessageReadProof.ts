@@ -1,6 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { canonicalSignedRequestPayload } from '@app/contexts/shared/domain/value-objects/SignedRequestPayload';
 import { PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
-import { createHash } from 'crypto';
 
 export type MessageReadProofData = {
   body: Record<string, unknown>;
@@ -20,6 +20,10 @@ export type MessageReadClaim = {
  * Proves a read receipt was signed by the reader's identity key for this exact
  * conversation and message. Receipts without a valid proof are not authentic
  * and must neither change read state nor reach clients.
+ *
+ * The signed bytes come from the same canonicalizer SignedHttpRequestVerifier
+ * uses for `PUT .../messages/read-until`, so the proof and the HTTP request it
+ * was taken from always agree.
  */
 export class MessageReadProof {
   private static readonly READ_UNTIL_PATH =
@@ -45,14 +49,12 @@ export class MessageReadProof {
         return false;
       }
 
-      const payload = {
-        bodyHash: createHash('sha256')
-          .update(JSON.stringify(value.body))
-          .digest('hex'),
-        method: value.method,
-        path: value.path,
-        timestamp: value.timestamp,
-      };
+      const payload = canonicalSignedRequestPayload(
+        value.method,
+        value.path,
+        value.timestamp,
+        value.body,
+      );
       const readerKey = PublicKey.fromPEM(
         new IdentityId(claim.readerIdentityId).toString(),
       );
