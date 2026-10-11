@@ -382,7 +382,6 @@ Implemented:
 
 - require a single-use ticket on the `/realtime/v1` WebSocket upgrade
 - accept the ticket in the `Sec-WebSocket-Protocol` header for browser and non-browser clients
-- reject stale timestamps outside the 30 second freshness window
 - push domain events after they have been published by the local node
 - deliver identity events only to the matching identity connection
 - deliver keychain events only to the matching keychain owner
@@ -516,7 +515,7 @@ next start; clock differences do not determine that epoch.
 
 ### Presence retention
 
-Runtime leases are memory-only. A lease expires after five seconds without a
+Runtime leases are memory-only. A lease expires after twenty seconds without a
 heartbeat, checked by the scheduled expiration pass; disconnected entries are
 purged after sixty seconds. Local expiry updates local clients but is never
 republished as a claim by the remote owner. Only the owner publishes its own
@@ -1074,8 +1073,7 @@ Implemented:
 - backend does not inspect SDP/ICE payloads
 - signal request bodies are limited to 64 KiB
 - signalling is rate-limited per `(callId, senderIdentityId)` with
-  `CALLS_SIGNAL_RATE_LIMIT_PER_MINUTE` defaulting to `120`; `0` disables the
-  limit for local/debug runs
+  `CALLS_SIGNAL_RATE_LIMIT_PER_MINUTE` defaulting to `120`; exceeding it returns `429` with code `429010`
 - the response contains `signalId` and `expiresAt`; it no longer serializes the
   entire call for every SDP or ICE message
 - sending subscribes all network nodes to `calls.v1.signal.sent`, while
@@ -1488,6 +1486,8 @@ document, because identities, keychains and private upload documents are stored
 as JSON. Reading a CID may populate Helia's local block cache, but it does not
 pin the content or advertise this node as a provider.
 
+Unknown CIDs return `404` with body `{ "error": "CID not found in any network" }`.
+
 ### Publish private content
 
 ```http
@@ -1525,17 +1525,6 @@ Implemented:
   `uploadedAt` and `uploadedByIdentityId`
 - limit encrypted content size to 50 MiB
 - return the CID to place inside encrypted message payloads
-
-### Get IPFS JSON content
-
-```http
-GET /ipfs/{cid}
-```
-
-Implemented:
-
-- read JSON content by CID from any configured IPFS network
-- return `404` when the CID is not found
 
 ### Register content replication
 
@@ -1624,7 +1613,7 @@ Node-local queues of opaque ciphertext envelopes. Mailboxes are never written to
 
 | Step | Auth | Notes |
 | --- | --- | --- |
-| `PUT /mailboxes/{mailboxId}` | None, rate limited per client address (see `API_TRUST_PROXY`) | Body `{ postTokenHash, readTokenHash, creationNonce }` (hex SHA-256 and a proof of work). The SHA-256 over the mailbox id, both hashes and the nonce must start with the current difficulty: 16 zero bits while the node holds at most half of `MAILBOX_MAX_COUNT`, rising linearly to 20 bits at the limit (about 65k hashes at 16, about 1M at 20). A replay of an existing mailbox is checked against the current difficulty too. `201` created, `200` identical replay, `400` invalid body or nonce (a proof short of the current difficulty adds `requiredDifficultyBits`), `409` different hashes, `429` rate or `MAILBOX_MAX_COUNT` limit. |
+| `PUT /mailboxes/{mailboxId}` | None, rate limited per client address (see `API_TRUST_PROXY`) | Body `{ postTokenHash, readTokenHash, creationNonce }` (hex SHA-256 and a proof of work). The SHA-256 over the mailbox id, both hashes and the nonce must start with the current difficulty: 16 zero bits while the node holds at most half of `MAILBOX_MAX_COUNT`, rising in four steps above half capacity to 20 bits at the limit (about 65k hashes at 16, about 1M at 20). A replay of an existing mailbox is checked against the current difficulty too. `201` created, `200` identical replay, `400` invalid body or nonce (a proof short of the current difficulty adds `requiredDifficultyBits`), `409` different hashes, `429` rate or `MAILBOX_MAX_COUNT` limit. |
 | `POST /mailboxes/{mailboxId}/envelopes` | `Bearer <postToken>` | Body `{ envelopeId, body }`. `body` is base64url and must decode to exactly 1024, 4096, 16384 or 65536 bytes (else `400`). `201` with `{ cursor }`; a repeated `envelopeId` returns `200` with the first cursor and stores nothing. A full mailbox returns `409`; nothing older is ever dropped. Appends are rate limited per mailbox (`429`, `MAILBOX_APPEND_RATE_PER_MINUTE`); a repeated `envelopeId` is not charged. |
 | `GET /mailboxes/{mailboxId}/envelopes?after=&limit=` | `Bearer <readToken>` | Envelopes with cursor greater than `after`, oldest first, at most 100, with `hasMore`. `Cache-Control: no-store`. A read keeps the mailbox live. |
 | `POST /mailboxes/{mailboxId}/ack` | `Bearer <readToken>` | Body `{ upTo }`. Deletes envelopes up to and including that cursor. `204`. |
@@ -1632,11 +1621,11 @@ Node-local queues of opaque ciphertext envelopes. Mailboxes are never written to
 
 - `mailboxId` is 32 bytes base64url; capabilities are sent only in `Authorization`, never the URL.
 - A wrong, swapped or missing capability, a malformed id and an unknown mailbox all return the same `404`.
-- Limits: `MAILBOX_MAX_ENVELOPES`, `MAILBOX_MAX_BYTES`, `MAILBOX_MAX_COUNT`, `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE` (in memory, per client address, `0` disables; IPv6 counts per /64, IPv4-mapped addresses as IPv4; the address is the socket address unless `API_TRUST_PROXY` is set; the window resets on restart and `MAILBOX_MAX_COUNT` still bounds creation), `MAILBOX_APPEND_RATE_PER_MINUTE` (persisted per mailbox, default `120`, `0` disables).
+- Limits: `MAILBOX_MAX_ENVELOPES`, `MAILBOX_MAX_BYTES`, `MAILBOX_MAX_COUNT`, `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE` (in memory, per client address, `0` disables; IPv6 counts per /64, IPv4-mapped addresses as IPv4; the address is the socket address unless `API_TRUST_PROXY` is set; the window resets on restart and `MAILBOX_MAX_COUNT` still bounds creation; exceeding the rate returns `429` with code `429041`), `MAILBOX_APPEND_RATE_PER_MINUTE` (persisted per mailbox, default `120`, `0` disables).
 - At `MAILBOX_MAX_COUNT`, creation evicts the least recently read mailboxes that are empty and unread for 7 days (`MailboxPolicy.EVICTION_IDLE_MS`), all or nothing; with too few such mailboxes it returns `429`. An evicted mailbox is unknown afterwards (`404`), so the recipient re-creates it with the same id and hashes, paying the current difficulty.
 - Retention: `MAILBOX_RETENTION_MS`. A scheduler deletes older envelopes and mailboxes not read for that long.
 - Realtime: `mailbox_subscribe` over the authenticated WebSocket with `mailboxId` and `readToken`; a wrong or missing capability is ignored, like an unknown mailbox. The node pushes `{ "type": "mailbox_envelope", "mailboxId", "cursor" }` to subscribed sockets for each envelope appended on that node. The hint is content-free: clients must GET the mailbox envelopes, which remain the source of truth. There is no subscription ack and no unsubscribe message; closing the socket ends its subscriptions. A socket holds at most 256 subscriptions.
-- Not yet implemented: client key schedule, UI and wrapper integration, and retiring the replicated message collections.
+- Status: client key schedule, send/receive and cursor recovery are merged in `pigeon-swarm-ui` (#252, #257). Not yet done: mailbox key rotation, direct-message wiring (#258), wrapper integration, and retiring the replicated message collections.
 
 ## Private Blob HTTP API
 
@@ -1646,10 +1635,10 @@ Authorization is split so a streamed body never has to be buffered for signing:
 
 | Step | Auth | Notes |
 | --- | --- | --- |
-| `POST /private-blobs` | Signed request | Body `{ "size": <bytes> }`. Checks size limit and quotas. Returns `{ blobId, uploadToken, downloadToken, expiresAt }`. |
-| `PUT /private-blobs/{blobId}` | `Authorization: Bearer <uploadToken>` | Raw bytes, streamed. Must be exactly the reserved size, else `400` and nothing is kept. Second upload: `409`. |
+| `POST /private-blobs` | Signed request | Body `{ "size": <bytes> }`. Checks size limit and quotas. Returns `201` with `{ blobId, uploadToken, downloadToken, expiresAt }`. Invalid size: `400`. Quota exceeded: `413`. |
+| `PUT /private-blobs/{blobId}` | `Authorization: Bearer <uploadToken>` | Raw bytes, streamed. Must be exactly the reserved size, else `400` and nothing is kept. Returns `204`. Second upload: `409`. |
 | `GET /private-blobs/{blobId}` | `Authorization: Bearer <downloadToken>` | Single `Range: bytes=` supported (`206`/`416`). `Cache-Control: no-store`. |
-| `DELETE /private-blobs/{blobId}` | `Authorization: Bearer <uploadToken>` | Removes bytes and record on this node only. |
+| `DELETE /private-blobs/{blobId}` | `Authorization: Bearer <uploadToken>` | Removes bytes and record on this node only. Returns `204`. |
 
 - Capabilities are 256-bit random values sent only in the `Authorization` header (never the URL); the node keeps their SHA-256 and compares in constant time.
 - A wrong, swapped, missing or expired capability, an unknown id and a not-yet-uploaded blob all return the same `404`.
@@ -1998,7 +1987,8 @@ Request:
   "version": 1,
   "previousKeychainExternalIdentifier": null,
   "encryptedPayload": "<encryptedKeychainPayload>",
-  "signature": "<keychainSignature>"
+  "signature": "<keychainSignature>",
+  "timestamp": 1770000000000
 }
 ```
 
@@ -2038,8 +2028,10 @@ Response:
   "ownerIdentityId": "<identityId>",
   "version": 1,
   "keychainExternalIdentifier": "<externalIdentifier>",
+  "previousKeychainExternalIdentifier": null,
   "encryptedPayload": "<encryptedKeychainPayload>",
-  "signature": "<keychainSignature>"
+  "signature": "<keychainSignature>",
+  "timestamp": 1770000000000
 }
 ```
 
@@ -2453,7 +2445,7 @@ is rejected before any signature check with `400` (validation error); it never
 reaches the use case. A malformed record, wrong args, a wrong id, a mismatching signature
 author, an unknown parent or any violated roster rule answers `409` with code
 `InvalidConversationOperationError` (`Invalid conversation operation`). An unknown
-conversation answers `ConversationNotFoundError`.
+conversation answers `409` with code `ConversationNotFoundError`.
 
 **Worked examples** (all use `X-Identity-Id`, `X-Timestamp` and `X-Signature` like
 every route; `operation` is built as above, with `action` and `args` of the row):
@@ -2505,7 +2497,7 @@ Implemented:
 
 - add a member (`member_added`), remove one (`member_removed`), leave
   (`member_left`), promote (`admin_promoted`) and demote (`admin_demoted`)
-- refuse with `404` an unknown conversation and with `409` any change the roster
+- refuse with `409` an unknown conversation (`ConversationNotFoundError`) and with `409` any change the roster
   rules or limits do not allow (`Invalid conversation operation`,
   `Conversation operation limit exceeded`); nothing is stored on refusal
 - `GET .../frontier` is member-only and returns `{ "frontier": ["<digest>"] }`, the
@@ -2897,7 +2889,7 @@ Signed HTTP request validation:
 
 ## Community HTTP API
 
-Communities are private in the current MVP. A community belongs to one network,
+Communities have a `visibility` of `private` or `public`. A community belongs to one network,
 has one owner, and contains member ids, text channel metadata and encrypted
 text channel messages. Community channels are not backed by `Conversation`;
 they live inside the `communities` context.
@@ -3931,8 +3923,8 @@ Implemented:
 
 ### Community realtime metadata events
 
-Community metadata changes are published as WebSocket domain events and routed
-to every connected identity in `memberIds`.
+Community metadata changes are published as WebSocket domain events. Each event is
+routed to connected identities by its identity attributes, such as `memberIds`.
 
 Community creation:
 
@@ -3998,6 +3990,10 @@ Other metadata events:
   state changes to `accepted`
 - `communities.v1.membership_request.was_declined`: same request payload after
   state changes to `declined`
+- `communities.v1.invite.was_created`
+- `communities.v1.invite.was_accepted`
+- `communities.v1.channel.message.was_pinned`
+- `communities.v1.channel.message.was_unpinned`
 
 Membership request events include identity attributes for WebSocket routing:
 `identityId`, `creatorIdentityId`, `requesterIdentityId` and
@@ -4432,6 +4428,7 @@ Implemented:
   the backend
 - return the same `CommunityChannelMessagesResource` shape as the normal list
   endpoint
+- `limit` accepts 1 to 50 (default 20)
 
 ### Search public community messages
 
@@ -4452,6 +4449,7 @@ Implemented:
 - return message resources with their real `channelId`, so frontend can jump
   to the right channel/message
 - private encrypted messages are not searchable by the backend
+- `limit` accepts 1 to 50 (default 20)
 
 Response:
 
@@ -5547,8 +5545,8 @@ with `createdAt` after the earliest close are ignored.
 
 ## Private operation authorization
 
-Create a protected scope with `POST /private-authorization/scopes`. The signed
-request identity must own the submitted private community projection. The body
+Create a protected scope with `POST /private-authorization/scopes`. The signed request must come from the current node owner; that identity is recorded as the scope owner and
+must own the submitted private community projection. The body
 contains an independently authorized owner device key, the exact identity
 authorization revision, the device-signed genesis, its protected MLS state and
 an owner-only, non-discoverable private community projection. The node verifies
@@ -5570,7 +5568,7 @@ monotonic time and is consumed only after a valid proof is successfully verified
 Submit the signed operation, signed freshness proof and, for commits or device
 revocation, the participant-encrypted control frame to
 `POST /private-authorization/operations`. The response status is `accepted`,
-`duplicate` or `pending`. Pending means the signature and freshness proof were
+`duplicate` or `pending`; `accepted` and `duplicate` return `200`, `pending` returns `202`. Pending means the signature and freshness proof were
 valid but a causal dependency or newer authorization checkpoint is missing.
 Clients retain the encrypted frame and retry it with a new challenge; the node
 does not acknowledge remote delivery until the result is accepted or duplicate.
@@ -5673,7 +5671,7 @@ without decoding or normalization.
 
 The endpoint is unauthenticated until signatures are verified, so each node
 rate limits it before any lookup or lock: 20 submissions per identity and 300
-per node per minute. Excess requests return `429`.
+per node per minute. Excess requests return `429` with code `429030`.
 
 The response contains only the identity identifier, current recovery epoch and
 deterministic current revision; the authorized-device list is only served by the

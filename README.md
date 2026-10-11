@@ -77,13 +77,19 @@ The backend is organized around bounded contexts:
 * `notification-settings`: per-scope mute and notification preferences.
 * `stickers`: sticker packs, sticker assets and user sticker state.
 * `polls`: polls, votes and poll lifecycle for conversations and communities.
-* `ipfs-replication`: local replica policy, claims and replication summaries.
+* `content-replication`: local replica policy, claims and replication summaries.
+* `mailboxes`: node-local opaque ciphertext envelope queues.
+* `identity-devices`: device authorization.
+* `public-mutations`: signed public mutation records.
+* `private-blobs`: node-local client-encrypted blobs.
+* `private-authorization`: protected scope and operation authorization.
 * `shared`: common value objects plus IPFS, OrbitDB, local embedded storage,
   message bus, HTTP, WebSocket and dependency-injection infrastructure.
 
-The backend does not receive private keys, passwords, or decrypted
-conversation/community keys. Clients generate identity material, encrypt local
-secrets, sign domain payloads, and publish encrypted keychain updates.
+The backend does not receive user identity private keys, passwords, or decrypted
+conversation/community keys. It holds node-level keys: its libp2p peer key and
+private-network keys. Clients generate identity material, encrypt local secrets,
+sign domain payloads, and publish encrypted keychain updates.
 
 ## API Surface
 
@@ -92,8 +98,9 @@ Primary API documentation:
 * [HTTP API](./docs/api.md)
 * [Relay recovery acceptance](./docs/relay-recovery-acceptance.md)
 * [Aggregated OpenAPI spec](./src/apps/apis/open-api.yaml)
+* Served at `GET /swagger/open-api.yaml` (prefixed by `ROUTE_PREFIX` when set)
 
-When the server is running, Swagger UI is available at:
+When the server is running, Swagger UI is available at `GET /swagger`, or at `GET <ROUTE_PREFIX>/swagger` when `ROUTE_PREFIX` is set:
 
 ```http
 GET /swagger
@@ -107,7 +114,7 @@ Install dependencies:
 yarn
 ```
 
-Create a local `.env` from the documented configuration and choose how nodes
+Create a local `.env` from the documented configuration (`docker compose` reads `.env.local` instead) and choose how nodes
 exchange events:
 
 * `TRANSPORT_DSN=in-memory` for local tests and single-node development.
@@ -125,6 +132,8 @@ yarn test
 yarn test:unit
 yarn test:api
 yarn test:consumer
+yarn typecheck
+yarn test:scheduler
 ```
 
 Docker helpers are available through the `Makefile`:
@@ -135,6 +144,11 @@ make start
 make stop
 make test
 make logs
+make build-no-cache
+make shell
+make lint
+make logs-backend
+make init
 ```
 
 This repository contains the backend node source. The full self-hosted
