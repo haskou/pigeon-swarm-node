@@ -11,7 +11,9 @@ function ipv6Groups(address: string): number[] {
   const hexTail = address.replace(
     /(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/,
     (_match: string, a: string, b: string, c: string, d: string) =>
-      `${((Number(a) << 8) | Number(b)).toString(16)}:${((Number(c) << 8) | Number(d)).toString(16)}`,
+      [Number(a) * 256 + Number(b), Number(c) * 256 + Number(d)]
+        .map((hextet) => hextet.toString(16))
+        .join(':'),
   );
   const sides = hexTail.split('::');
   const head = sides[0] ? sides[0].split(':') : [];
@@ -42,10 +44,10 @@ function creationRateKey(address: string): string {
 
   if (mapped) {
     return [
-      groups[6] >> 8,
-      groups[6] & 0xff,
-      groups[7] >> 8,
-      groups[7] & 0xff,
+      Math.floor(groups[6] / 256),
+      groups[6] % 256,
+      Math.floor(groups[7] / 256),
+      groups[7] % 256,
     ].join('.');
   }
 

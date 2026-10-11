@@ -60,6 +60,36 @@ export default class LocalMailboxRepository extends MailboxRepository {
     return Mailbox.fromPrimitives(primitives as unknown as MailboxPrimitives);
   }
 
+  /**
+   * The mailbox count lives in its own document, so creation checks are O(1).
+   * create and remove update it in the same batch as the mailbox. Every
+   * mailbox mutation runs under MailboxCoordinator, so this read-modify-write
+   * cannot interleave. A database written before the counter existed is
+   * counted once and the result saved.
+   */
+  private async readCount(): Promise<number> {
+    const counter = await this.database.findOne(
+      LocalMailboxRepository.COUNTERS,
+      LocalMailboxRepository.MAILBOX_COUNT_ID,
+    );
+
+    if (typeof counter?.count === 'number') {
+      return counter.count;
+    }
+
+    const documents = await this.database.find(
+      LocalMailboxRepository.MAILBOXES,
+    );
+
+    await this.database.save(
+      LocalMailboxRepository.COUNTERS,
+      LocalMailboxRepository.MAILBOX_COUNT_ID,
+      { count: documents.length },
+    );
+
+    return documents.length;
+  }
+
   public async commitAppend(
     mailbox: Mailbox,
     envelope: MailboxEnvelope,
@@ -108,36 +138,6 @@ export default class LocalMailboxRepository extends MailboxRepository {
 
   public async count(): Promise<number> {
     return this.readCount();
-  }
-
-  /**
-   * The mailbox count lives in its own document, so creation checks are O(1).
-   * create and remove update it in the same batch as the mailbox. Every
-   * mailbox mutation runs under MailboxCoordinator, so this read-modify-write
-   * cannot interleave. A database written before the counter existed is
-   * counted once and the result saved.
-   */
-  private async readCount(): Promise<number> {
-    const counter = await this.database.findOne(
-      LocalMailboxRepository.COUNTERS,
-      LocalMailboxRepository.MAILBOX_COUNT_ID,
-    );
-
-    if (typeof counter?.count === 'number') {
-      return counter.count;
-    }
-
-    const documents = await this.database.find(
-      LocalMailboxRepository.MAILBOXES,
-    );
-
-    await this.database.save(
-      LocalMailboxRepository.COUNTERS,
-      LocalMailboxRepository.MAILBOX_COUNT_ID,
-      { count: documents.length },
-    );
-
-    return documents.length;
   }
 
   public async create(mailbox: Mailbox): Promise<void> {
