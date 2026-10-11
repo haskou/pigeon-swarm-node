@@ -1,10 +1,11 @@
 import CurrentKeychainFinder from '@app/contexts/keychains/application/find-current/CurrentKeychainFinder';
-import { CurrentKeychainFindMessage } from '@app/contexts/keychains/application/find-current/messages/CurrentKeychainFindMessage';
 import { KeychainWasPublishedEvent } from '@app/contexts/keychains/domain/events/KeychainWasPublishedEvent';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
+
+import findPublishedKeychain from './FindPublishedKeychain';
 
 export default class RegisterKeychainWhenPublished extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.register-keychain-when-published';
@@ -33,6 +34,6 @@ export default class RegisterKeychainWhenPublished extends Consumer {
   }
 
   public async handler(event: DomainEvent): Promise<void> {
-    await this.finder.find(new CurrentKeychainFindMessage(event.aggregateId));
+    await findPublishedKeychain(this.finder, event);
   }
 }

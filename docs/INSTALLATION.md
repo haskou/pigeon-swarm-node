@@ -382,7 +382,7 @@ storage.
 
 HTTP access logs record the request method and response status alongside the logger timestamp and severity. They exclude URLs, query parameters, headers, cookies, request bodies and response bodies. Private identifiers and bearer capabilities must not be added to access-log messages.
 
-A failed pubsub subscriber emits only `IPFS pubsub handler failed` or `PubSub handler failed`, depending on the transport. Publish failures in the shared pubsub transport emit only `PubSub publish failed`. The topic and exception text are omitted because parser errors can contain decrypted message fragments. Subsequent messages continue to be processed.
+A failed pubsub subscriber emits only `IPFS pubsub handler failed` or `PubSub handler failed`, depending on the transport. Publish failures in the shared pubsub transport emit only `PubSub publish failed`. The topic and exception text are omitted because parser errors can contain decrypted message fragments. Subsequent messages continue to be processed. A keychain publication whose keychain is not resolvable yet is not a subscriber failure: its consumers log one debug line without identifiers and complete.
 
 The WebSocket event hub does not log successful registrations, domain-event delivery or recipient fanout, even at debug level. Handler failures retain a fixed operation label and severity, without identity, conversation, channel, event payload, exception text or stack trace. Normal delivery, heartbeats and signal acknowledgements continue after a handler rejection.
 

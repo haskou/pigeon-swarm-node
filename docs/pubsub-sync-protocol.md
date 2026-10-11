@@ -608,6 +608,17 @@ No request contract changes: the keychain endpoints already carry the signature.
 A malicious peer can still flood the store with validly signed junk of its own
 identity, and keychains it signs itself for its own identity remain valid.
 
+Keychain publication events (`keychains.v1.keychain.was_published`) carry only
+the owner identity. The register and synchronize consumers resolve the keychain
+through `CurrentKeychainFinder`, the lookup that also serves `GetKeychainRoute`:
+local replicated metadata first, then the routing records. When the lookup
+reports `KeychainNotFoundError` because the replicated document or routing
+record has not arrived yet, the consumer completes without an error and logs one
+debug line without identifiers. The event is not retried. The keychain is
+recorded when the replicated document is projected into the metadata index or by
+a later lookup, and the WebSocket fanout of the event still runs. Other lookup
+errors still fail the handler.
+
 `yarn test:integration:forged-keychains` runs four real private Helia/OrbitDB
 nodes (two with the gate, one malicious without it, one ungated control). It
 checks that a valid keychain and its successor replicate, that the ungated
