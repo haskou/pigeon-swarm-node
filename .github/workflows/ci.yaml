@@ -169,3 +169,7 @@ jobs:
       - name: Mailbox realtime hint
         run: yarn test:e2e:real-transport:mailbox-realtime
         timeout-minutes: 4
+
+      - name: Realtime ticket upgrade
+        run: yarn test:e2e:real-transport:realtime-ticket
+        timeout-minutes: 4

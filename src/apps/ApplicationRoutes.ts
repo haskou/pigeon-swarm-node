@@ -128,6 +128,7 @@ import { DeletePushSubscriptionRoute } from '@app/apps/apis/push-api/routes/Dele
 import { GetPushVapidPublicKeyRoute } from '@app/apps/apis/push-api/routes/GetPushVapidPublicKeyRoute';
 import { PostPushTestRoute } from '@app/apps/apis/push-api/routes/PostPushTestRoute';
 import { PutPushSubscriptionRoute } from '@app/apps/apis/push-api/routes/PutPushSubscriptionRoute';
+import { PostRealtimeTicketRoute } from '@app/apps/apis/realtime-api/routes/PostRealtimeTicketRoute';
 import { DeleteFavoriteStickerRoute } from '@app/apps/apis/stickers-api/routes/DeleteFavoriteStickerRoute';
 import { DeleteSavedStickerPackRoute } from '@app/apps/apis/stickers-api/routes/DeleteSavedStickerPackRoute';
 import { DeleteStickerRoute } from '@app/apps/apis/stickers-api/routes/DeleteStickerRoute';
@@ -291,4 +292,5 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PostCommunityChannelMessageReactionRoute,
   DeleteCommunityChannelMessageReactionRoute,
   DeleteCommunityChannelMessageRoute,
+  PostRealtimeTicketRoute,
 ];

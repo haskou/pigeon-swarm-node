@@ -306,10 +306,13 @@ export default class PigeonApplication {
 
   public async runServer(): Promise<void> {
     const server = this.getServer();
-    const websocketPath = `${this.getRoutePrefix().toString()}/ws`;
+    const routePrefix = this.getRoutePrefix().toString();
 
     await server.run();
-    this.webSocketRealtimeServer.attach(server.server, websocketPath);
+    this.webSocketRealtimeServer.attach(server.server, {
+      signedQueryPath: `${routePrefix}/ws`,
+      ticketPath: `${routePrefix}/realtime/v1`,
+    });
   }
 
   public addConsumers(

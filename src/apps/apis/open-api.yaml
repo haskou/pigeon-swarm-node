@@ -47,6 +47,8 @@ paths:
     $ref: './private-blobs-api/swagger.yaml#/paths/~1private-blobs~1{blobId}'
   /client-contract:
     $ref: './nodes-api/swagger.yaml#/paths/~1client-contract'
+  /realtime/v1/tickets:
+    $ref: './realtime-api/swagger.yaml#/paths/~1realtime~1v1~1tickets'
   /ws:
     get:
       tags:
