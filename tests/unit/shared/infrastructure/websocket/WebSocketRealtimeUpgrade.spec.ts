@@ -11,12 +11,16 @@ import { createServer, Server } from 'http';
 import { AddressInfo } from 'net';
 import WebSocket from 'ws';
 
-type Outcome = { status: number } | { opened: true };
-type ProtocolOutcome = { status: number } | { opened: true; protocol: string };
+type Outcome = { status: number } | { opened: true; protocol: string };
+
+type ConnectOptions = {
+  headers?: Record<string, string>;
+  protocols?: string[];
+};
 
 describe('realtime upgrade (real HTTP server and ws client)', () => {
-  const path = '/ws';
   const ticketPath = '/realtime/v1';
+  const legacyPath = '/ws';
   let server: Server;
   let port: number;
 
@@ -26,10 +30,7 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
       response.setHeader('Location', 'http://127.0.0.1:1/elsewhere');
       response.end();
     });
-    new WebSocketRealtimeServer().attach(server, {
-      signedQueryPath: path,
-      ticketPath,
-    });
+    new WebSocketRealtimeServer().attach(server, ticketPath);
     await new Promise<void>((resolve) =>
       server.listen(0, '127.0.0.1', resolve),
     );
@@ -42,171 +43,115 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
     await new Promise((resolve) => server.close(resolve));
   });
 
-  async function signedQuery(): Promise<string> {
+  async function issueTicket(): Promise<string> {
+    const keyPair = await KeyPair.generate();
+    const identityId = new IdentityId(
+      keyPair.toPrimitives().publicKey,
+    ).valueOf();
+    const issued = realtimeTicketStore.issue(identityId);
+
+    if (!issued) {
+      throw new Error('ticket capacity exhausted in test');
+    }
+
+    return issued.ticket;
+  }
+
+  function ticketProtocols(ticket: string): string[] {
+    return [REALTIME_PROTOCOL_VERSION, `ticket.${ticket}`];
+  }
+
+  async function signedCredentials(
+    requestPath: string,
+  ): Promise<Record<string, string>> {
     const keyPair = await KeyPair.generate();
     const timestamp = String(Date.now());
     const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
       'GET',
-      path,
+      requestPath,
       timestamp,
       {},
     );
-    const query = new URLSearchParams({
+
+    return {
       identityId: keyPair.toPrimitives().publicKey,
       signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
       timestamp,
-    });
+    };
+  }
+
+  async function signedQuery(requestPath: string): Promise<string> {
+    const query = new URLSearchParams(await signedCredentials(requestPath));
 
     return `?${query.toString()}`;
   }
 
-  function connect(
-    query: string,
-    headers: Record<string, string> = {},
-    serverPort = port,
-  ): Promise<Outcome> {
-    return new Promise((resolve) => {
-      const socket = new WebSocket(
-        `ws://127.0.0.1:${serverPort}${path}${query}`,
-        {
-          headers,
-        },
-      );
+  async function signedHeaders(
+    requestPath: string,
+  ): Promise<Record<string, string>> {
+    const credentials = await signedCredentials(requestPath);
 
-      socket.on('open', () => {
-        socket.terminate();
-        resolve({ opened: true });
-      });
-      socket.on('unexpected-response', (_request, response) => {
-        resolve({ status: response.statusCode ?? 0 });
-        response.destroy();
-      });
-      socket.on('error', () => undefined);
-    });
+    return {
+      'X-Identity-Id': credentials.identityId,
+      'X-Signature': credentials.signature,
+      'X-Timestamp': credentials.timestamp,
+    };
   }
 
-  it('does not treat ambient cookies as credentials', async () => {
-    expect(
-      await connect('', { Cookie: 'session=abc; identityId=victim' }),
-    ).toEqual({ status: 401 });
-  });
+  function connect(
+    target: string,
+    { headers = {}, protocols }: ConnectOptions = {},
+  ): Promise<Outcome> {
+    const { promise, resolve } = Promise.withResolvers<Outcome>();
+    const socket = new WebSocket(
+      `ws://127.0.0.1:${port}${target}`,
+      protocols ?? [],
+      { headers },
+    );
 
-  it('accepts a signed upgrade even when a cookie rides along, ignoring it', async () => {
-    expect(
-      await connect(await signedQuery(), { Cookie: 'session=abc' }),
-    ).toEqual({ opened: true });
-  });
+    socket.on('open', () => {
+      resolve({ opened: true, protocol: socket.protocol });
+      socket.terminate();
+    });
+    socket.on('unexpected-response', (_request, response) => {
+      resolve({ status: response.statusCode ?? 0 });
+      response.destroy();
+    });
+    socket.on('error', () => undefined);
+
+    return promise;
+  }
 
   it('never answers an upgrade with a redirect', async () => {
-    const outcomes = await Promise.all([
-      connect(''),
-      connect('?identityId=x&timestamp=1&signature=y'),
-    ]);
-
-    for (const outcome of outcomes) {
-      expect(outcome).toEqual({ status: 401 });
-    }
-  });
-
-  it('refuses browser origins outside the allowlist with 403', async () => {
-    process.env.REALTIME_ALLOWED_ORIGINS =
-      'https://chat.example.com, https://alt.example.com';
-
-    expect(
-      await connect(await signedQuery(), { Origin: 'https://evil.example' }),
-    ).toEqual({ status: 403 });
-    expect(await connect(await signedQuery(), { Origin: 'null' })).toEqual({
-      status: 403,
-    });
-    expect(
-      await connect(await signedQuery(), {
-        Origin: 'https://CHAT.example.com',
-      }),
-    ).toEqual({ opened: true });
-  });
-
-  it('leaves clients without an Origin to signature authentication', async () => {
-    process.env.REALTIME_ALLOWED_ORIGINS = 'https://chat.example.com';
-
-    expect(await connect(await signedQuery())).toEqual({ opened: true });
-    expect(await connect('')).toEqual({ status: 401 });
-  });
-
-  it('does not restrict origins when the allowlist is unset', async () => {
-    expect(
-      await connect(await signedQuery(), {
-        Origin: 'https://anything.example',
-      }),
-    ).toEqual({ opened: true });
+    expect(await connect(ticketPath)).toEqual({ status: 401 });
+    expect(await connect(legacyPath)).toEqual({ status: 404 });
   });
 
   describe('credentialless ticket upgrade', () => {
-    async function issueTicket(): Promise<string> {
-      const keyPair = await KeyPair.generate();
-      const identityId = new IdentityId(
-        keyPair.toPrimitives().publicKey,
-      ).valueOf();
-      const issued = realtimeTicketStore.issue(identityId);
-
-      if (!issued) {
-        throw new Error('ticket capacity exhausted in test');
-      }
-
-      return issued.ticket;
-    }
-
-    function connectWithProtocols(
-      target: string,
-      protocols: string[],
-    ): Promise<ProtocolOutcome> {
-      const { promise, resolve } = Promise.withResolvers<ProtocolOutcome>();
-      const socket = new WebSocket(
-        `ws://127.0.0.1:${port}${target}`,
-        protocols,
-      );
-
-      socket.on('open', () => {
-        resolve({ opened: true, protocol: socket.protocol });
-        socket.terminate();
-      });
-      socket.on('unexpected-response', (_request, response) => {
-        resolve({ status: response.statusCode ?? 0 });
-        response.destroy();
-      });
-      socket.on('error', () => undefined);
-
-      return promise;
-    }
-
     it('opens with the version subprotocol and never echoes the ticket', async () => {
       const ticket = await issueTicket();
 
       expect(
-        await connectWithProtocols(ticketPath, [
-          REALTIME_PROTOCOL_VERSION,
-          `ticket.${ticket}`,
-        ]),
+        await connect(ticketPath, { protocols: ticketProtocols(ticket) }),
       ).toEqual({ opened: true, protocol: REALTIME_PROTOCOL_VERSION });
     });
 
     it('consumes the ticket on first use', async () => {
-      const ticket = await issueTicket();
-      const protocols = [REALTIME_PROTOCOL_VERSION, `ticket.${ticket}`];
+      const protocols = ticketProtocols(await issueTicket());
 
-      expect(await connectWithProtocols(ticketPath, protocols)).toMatchObject({
+      expect(await connect(ticketPath, { protocols })).toMatchObject({
         opened: true,
       });
-      expect(await connectWithProtocols(ticketPath, protocols)).toEqual({
+      expect(await connect(ticketPath, { protocols })).toEqual({
         status: 401,
       });
     });
 
     it('refuses a ticket that was never issued', async () => {
       expect(
-        await connectWithProtocols(ticketPath, [
-          REALTIME_PROTOCOL_VERSION,
-          `ticket.${'A'.repeat(43)}`,
-        ]),
+        await connect(ticketPath, {
+          protocols: [REALTIME_PROTOCOL_VERSION, `ticket.${'A'.repeat(43)}`],
+        }),
       ).toEqual({ status: 401 });
     });
 
@@ -214,7 +159,7 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
       const ticket = await issueTicket();
 
       expect(
-        await connectWithProtocols(ticketPath, [`ticket.${ticket}`]),
+        await connect(ticketPath, { protocols: [`ticket.${ticket}`] }),
       ).toEqual({ status: 401 });
     });
 
@@ -223,11 +168,13 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
       const second = await issueTicket();
 
       expect(
-        await connectWithProtocols(ticketPath, [
-          REALTIME_PROTOCOL_VERSION,
-          `ticket.${first}`,
-          `ticket.${second}`,
-        ]),
+        await connect(ticketPath, {
+          protocols: [
+            REALTIME_PROTOCOL_VERSION,
+            `ticket.${first}`,
+            `ticket.${second}`,
+          ],
+        }),
       ).toEqual({ status: 401 });
     });
 
@@ -235,21 +182,18 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
       const ticket = await issueTicket();
 
       expect(
-        await connectWithProtocols(`${ticketPath}?ticket=${ticket}`, [
-          REALTIME_PROTOCOL_VERSION,
-        ]),
+        await connect(`${ticketPath}?ticket=${ticket}`, {
+          protocols: [REALTIME_PROTOCOL_VERSION],
+        }),
       ).toEqual({ status: 401 });
     });
 
-    it('does not authenticate the signed path with a ticket', async () => {
+    it('refuses a ticket on the legacy path with 404', async () => {
       const ticket = await issueTicket();
 
       expect(
-        await connectWithProtocols(path, [
-          REALTIME_PROTOCOL_VERSION,
-          `ticket.${ticket}`,
-        ]),
-      ).toEqual({ status: 401 });
+        await connect(legacyPath, { protocols: ticketProtocols(ticket) }),
+      ).toEqual({ status: 404 });
     });
 
     it('refuses an expired ticket', async () => {
@@ -260,39 +204,111 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
 
       try {
         expect(
-          await connectWithProtocols(ticketPath, [
-            REALTIME_PROTOCOL_VERSION,
-            `ticket.${ticket}`,
-          ]),
+          await connect(ticketPath, {
+            protocols: ticketProtocols(ticket),
+          }),
         ).toEqual({ status: 401 });
       } finally {
         spy.mockRestore();
       }
     });
+
+    it('ignores a cookie that rides along with a ticket', async () => {
+      const ticket = await issueTicket();
+
+      expect(
+        await connect(ticketPath, {
+          headers: { Cookie: 'session=abc' },
+          protocols: ticketProtocols(ticket),
+        }),
+      ).toMatchObject({ opened: true });
+    });
   });
 
-  describe('legacy signed-query endpoint disabled', () => {
-    let disabledServer: Server;
-    let disabledPort: number;
-
-    beforeEach(async () => {
-      disabledServer = createServer();
-      new WebSocketRealtimeServer().attach(disabledServer, { ticketPath });
-      const { promise, resolve } = Promise.withResolvers<void>();
-      disabledServer.listen(0, '127.0.0.1', resolve);
-      await promise;
-      disabledPort = (disabledServer.address() as AddressInfo).port;
+  describe('query, header and cookie credentials are refused', () => {
+    it('refuses a validly signed query on the legacy path with 404', async () => {
+      expect(
+        await connect(`${legacyPath}${await signedQuery(legacyPath)}`),
+      ).toEqual({ status: 404 });
     });
 
-    afterEach(async () => {
-      disabledServer.closeAllConnections();
-      await new Promise((resolve) => disabledServer.close(resolve));
+    it('refuses a validly signed query on the ticket path with 401', async () => {
+      expect(
+        await connect(`${ticketPath}${await signedQuery(ticketPath)}`, {
+          protocols: [REALTIME_PROTOCOL_VERSION],
+        }),
+      ).toEqual({ status: 401 });
     });
 
-    it('refuses a validly signed upgrade on the legacy path with 404', async () => {
-      expect(await connect(await signedQuery(), {}, disabledPort)).toEqual({
-        status: 404,
-      });
+    it('refuses validly signed headers on the legacy path with 404', async () => {
+      expect(
+        await connect(legacyPath, {
+          headers: await signedHeaders(legacyPath),
+        }),
+      ).toEqual({ status: 404 });
+    });
+
+    it('refuses validly signed headers on the ticket path with 401', async () => {
+      expect(
+        await connect(ticketPath, {
+          headers: await signedHeaders(ticketPath),
+          protocols: [REALTIME_PROTOCOL_VERSION],
+        }),
+      ).toEqual({ status: 401 });
+    });
+
+    it('does not treat a cookie as a credential', async () => {
+      expect(
+        await connect(ticketPath, {
+          headers: { Cookie: 'session=abc; identityId=victim' },
+        }),
+      ).toEqual({ status: 401 });
+    });
+  });
+
+  describe('browser Origin allowlist', () => {
+    it('refuses browser origins outside the allowlist with 403', async () => {
+      process.env.REALTIME_ALLOWED_ORIGINS =
+        'https://chat.example.com, https://alt.example.com';
+
+      expect(
+        await connect(ticketPath, {
+          headers: { Origin: 'https://evil.example' },
+          protocols: ticketProtocols(await issueTicket()),
+        }),
+      ).toEqual({ status: 403 });
+      expect(
+        await connect(ticketPath, {
+          headers: { Origin: 'null' },
+          protocols: ticketProtocols(await issueTicket()),
+        }),
+      ).toEqual({ status: 403 });
+      expect(
+        await connect(ticketPath, {
+          headers: { Origin: 'https://CHAT.example.com' },
+          protocols: ticketProtocols(await issueTicket()),
+        }),
+      ).toMatchObject({ opened: true });
+    });
+
+    it('leaves clients without an Origin to ticket authentication', async () => {
+      process.env.REALTIME_ALLOWED_ORIGINS = 'https://chat.example.com';
+
+      expect(
+        await connect(ticketPath, {
+          protocols: ticketProtocols(await issueTicket()),
+        }),
+      ).toMatchObject({ opened: true });
+      expect(await connect(ticketPath)).toEqual({ status: 401 });
+    });
+
+    it('does not restrict origins when the allowlist is unset', async () => {
+      expect(
+        await connect(ticketPath, {
+          headers: { Origin: 'https://anything.example' },
+          protocols: ticketProtocols(await issueTicket()),
+        }),
+      ).toMatchObject({ opened: true });
     });
   });
 });

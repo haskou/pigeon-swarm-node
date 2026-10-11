@@ -139,7 +139,6 @@ export const pigeonEnvironmentSchema = {
     type: 'string',
   },
   REALTIME_ALLOWED_ORIGINS: { defaultValue: '', type: 'string' },
-  REALTIME_SIGNED_QUERY_WS_ENABLED: { defaultValue: true, type: 'boolean' },
   ROUTE_PREFIX: { type: 'string' },
   SERVICE_NAME: { type: 'string' },
   TRANSPORT_DSN: { defaultValue: 'in-memory', type: 'string' },
