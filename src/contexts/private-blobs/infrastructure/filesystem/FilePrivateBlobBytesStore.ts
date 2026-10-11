@@ -1,6 +1,6 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { createReadStream, createWriteStream } from 'fs';
-import { mkdir, rename, rm } from 'fs/promises';
+import { mkdir, readdir, rename, rm } from 'fs/promises';
 import path from 'path';
 import { Readable, Transform } from 'stream';
 import { pipeline } from 'stream/promises';
@@ -54,6 +54,33 @@ export default class FilePrivateBlobBytesStore extends PrivateBlobBytesStore {
   public async delete(id: string): Promise<void> {
     await rm(this.pathFor(id, 'blob'), { force: true });
     await rm(this.pathFor(id, 'part'), { force: true });
+  }
+
+  /** Only names this store writes are listed; other files are never touched. */
+  public async listIds(): Promise<string[]> {
+    let names: string[];
+
+    try {
+      names = await readdir(this.directory());
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return [];
+      }
+
+      throw error;
+    }
+
+    const ids = new Set<string>();
+
+    for (const name of names) {
+      const match = /^([0-9a-f-]{36})\.(?:blob|part)$/.exec(name);
+
+      if (match) {
+        ids.add(match[1]);
+      }
+    }
+
+    return [...ids];
   }
 
   public read(id: string, range?: PrivateBlobByteRange): Readable {

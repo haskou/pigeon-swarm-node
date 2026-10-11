@@ -124,7 +124,7 @@ installed `web-push` module path.
 | `PRIVATE_BLOB_QUOTA_BYTES_PER_OWNER` | `524288000` | No | Live reserved bytes one identity may hold on this node (500 MiB). |
 | `PRIVATE_BLOB_QUOTA_BYTES_TOTAL` | `10737418240` | No | Live reserved bytes across all owners on this node (10 GiB). |
 | `PRIVATE_BLOB_RETENTION_MS` | `604800000` | No | How long a completed private blob is kept (7 days). |
-| `PRIVATE_BLOB_STORAGE_PATH` | `./private_blobs` | No | Local folder for private blob bytes. Back it up or exclude it deliberately: it is never replicated. |
+| `PRIVATE_BLOB_STORAGE_PATH` | `./private_blobs` | No | Local folder for private blob bytes. Never replicated: back it up together with `PIGEON_LOCAL_DB_PATH` (see [private blob store design](design/private-blob-store.md)). |
 | `PRIVATE_BLOB_UPLOAD_WINDOW_MS` | `3600000` | No | How long a reservation waits for its upload before it is cleaned up (1 hour). |
 | `REALTIME_ALLOWED_ORIGINS` | empty | No | Comma-separated browser origins (for example `https://chat.example.com`) allowed to open the realtime WebSocket. Empty means no Origin restriction. Requests without an `Origin` header (non-browser clients) are never refused by this setting; they still need a valid signature. Refused upgrades get `403`. |
 | `REALTIME_SIGNED_QUERY_WS_ENABLED` | `true` | No | Set to `false` once every client uses the ticket endpoint `/realtime/v1`, to refuse the legacy signed-query WebSocket at `/ws` with `404`. |
@@ -134,6 +134,31 @@ installed `web-push` module path.
 | `PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS` | `3600000` | No | How often private relay nodes refresh their public relay record publication after the initial publish. |
 | `PIGEON_PRIVATE_RELAY_DIAL_TIMEOUT_MS` | `15000` | No | Maximum time to wait when dialing a discovered private relay multiaddr before logging the failure and retrying later. |
 | `PIGEON_RELAY_DATA_LIMIT_BYTES` | `67108864` | No | Per-reservation circuit relay data limit. The default is `64 MiB`, raised above libp2p's small default so media CIDs can move through relay. |
+
+### Private blob storage in Docker
+
+The image runs as the unprivileged `node` user (uid 1000), not root. The
+folders it writes must be writable by uid 1000.
+
+- `docker-compose.yml` bind-mounts the checkout at `/var/www`, so the host
+  folders `private_blobs`, `local_storage`, `ipfs_storage`, `logs` and `var`
+  are the ones the container writes. Create them once and give them to uid
+  1000 before the first start:
+
+  ```bash
+  mkdir -p private_blobs local_storage ipfs_storage logs var
+  sudo chown -R 1000:1000 private_blobs local_storage ipfs_storage logs var
+  ```
+
+- Data written by an earlier image that ran as root is root-owned. Run the
+  same `chown -R 1000:1000` once before starting the new image. Until then the
+  node cannot write its data and private blob uploads fail.
+- A named volume mounted at `/var/www/private_blobs` takes the `node`
+  ownership of the image on first use.
+
+To back up private blobs, stop the node and copy `private_blobs` and
+`local_storage` together. Restore semantics are in the
+[private blob store design](design/private-blob-store.md).
 
 Private networks and relay ownership settings are no longer configured through
 environment variables.
