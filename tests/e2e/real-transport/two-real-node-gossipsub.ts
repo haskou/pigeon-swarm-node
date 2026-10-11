@@ -402,11 +402,15 @@ async function main(): Promise<void> {
   }
 }
 
-function buildNodeRuntime(name: string, port: number): NodeRuntime {
+function buildNodeRuntime(
+  name: string,
+  port: number,
+  root: string = TMP_ROOT,
+): NodeRuntime {
   return {
     baseUrl: `http://127.0.0.1:${port}`,
-    ipfsPath: path.join(TMP_ROOT, name, 'ipfs'),
-    localDbPath: path.join(TMP_ROOT, name, 'local-db'),
+    ipfsPath: path.join(root, name, 'ipfs'),
+    localDbPath: path.join(root, name, 'local-db'),
     name,
     port,
     stderr: [],
@@ -1599,6 +1603,13 @@ export {
   signRequest,
   request,
   waitFor,
+  publishKeychain,
+  createOneToOneConversation,
+  sendConversationMessage,
+  waitForIdentity,
+  waitForKeychain,
+  waitForConversation,
+  waitForMessage,
   NETWORK_ID,
 };
 export type { NodeRuntime, IdentityFixture };

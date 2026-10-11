@@ -96,12 +96,16 @@ export default abstract class ConversationRepository {
     networkId: NetworkId,
   ): Promise<OneToOneConversation | undefined>;
 
+  /**
+   * Advances the reader's marker to the message. Resolves to `false` when the
+   * stored marker already points at a later message; the stored marker is kept.
+   */
   public abstract markReadUntil(
     conversationId: ConversationId,
     recipientIdentityId: IdentityId,
     messageId: MessageId,
     networkId?: NetworkId,
-  ): Promise<void>;
+  ): Promise<boolean>;
 
   /**
    * Persists the new messages of the conversation. Every message that is new

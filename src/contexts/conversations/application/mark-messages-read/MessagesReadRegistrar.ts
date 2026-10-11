@@ -5,6 +5,7 @@ export default class MessagesReadRegistrar {
   constructor(private readonly repository: ConversationRepository) {}
 
   public async register(message: MessagesReadMarkMessage): Promise<void> {
+    // A marker behind the stored one is dropped, see markReadUntil.
     await this.repository.markReadUntil(
       message.conversationId,
       message.readerIdentityId,

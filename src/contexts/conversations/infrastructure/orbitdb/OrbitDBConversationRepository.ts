@@ -36,6 +36,7 @@ type FoldedConversation = { createdAt: number; roster: ConversationRoster };
  */
 export default class OrbitDBConversationRepository implements ConversationRepository {
   private static readonly HEAD_PREFIX = 'conversation-operation-index:';
+  private static readonly READ_MARKER_HEAD_PREFIX = 'read-marker:';
   private static readonly MAX_FOLDED_CONVERSATIONS = 2_048;
 
   private readonly folded = new Map<
@@ -63,6 +64,10 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     this.registry.registerHeadRecordMerger(
       OrbitDBConversationRepository.HEAD_PREFIX,
       (current, candidate) => this.mergeHeads(current, candidate),
+    );
+    this.registry.registerHeadRecordMerger(
+      OrbitDBConversationRepository.READ_MARKER_HEAD_PREFIX,
+      (current, candidate) => this.mergeReadMarkers(current, candidate),
     );
   }
 
@@ -398,11 +403,39 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     return message?.createdAt;
   }
 
+  /**
+   * A read marker only moves forward. The candidate replaces the current
+   * marker when it marks the same or a later message, so a replayed, delayed
+   * or replicated older marker never rolls the reader back. Every replica
+   * applies this rule to the replicated head.
+   */
+  private mergeReadMarkers(
+    current: Record<string, unknown> | undefined,
+    candidate: Record<string, unknown>,
+  ): Record<string, unknown> {
+    if (!current) return candidate;
+
+    const candidatePosition = this.readMarkerPosition(candidate);
+
+    return candidatePosition >= this.readMarkerPosition(current)
+      ? candidate
+      : current;
+  }
+
+  private readMarkerPosition(
+    marker: Record<string, unknown> | undefined,
+  ): number {
+    return (
+      (marker ? this.numberValue(marker, 'messageCreatedAt') : undefined) ??
+      Number.NEGATIVE_INFINITY
+    );
+  }
+
   private readMarkerHeadKey(
     conversationId: ConversationId,
     recipientIdentityId: IdentityId,
   ): string {
-    return `read-marker:${conversationId.valueOf()}:${recipientIdentityId.valueOf()}`;
+    return `${OrbitDBConversationRepository.READ_MARKER_HEAD_PREFIX}${conversationId.valueOf()}:${recipientIdentityId.valueOf()}`;
   }
 
   private async findMessageDocumentById(
@@ -661,12 +694,17 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       : undefined;
   }
 
+  /**
+   * Resolves to `false` when the stored marker already points at a later
+   * message: the stored marker is kept and the caller must not publish.
+   * Every other outcome resolves to `true`.
+   */
   public async markReadUntil(
     conversationId: ConversationId,
     recipientIdentityId: IdentityId,
     messageId: MessageId,
     networkId?: NetworkId,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const externalMessageCreatedAt = this.messageCreatedAtFromExternalId(
       conversationId,
       messageId,
@@ -678,13 +716,22 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     const messageCreatedAt = externalMessageCreatedAt ?? message?.createdAt;
 
     if (messageCreatedAt === undefined) {
-      return;
+      return true;
     }
 
     const markerNetworkId = await this.readMarkerNetworkId(
       conversationId,
       networkId,
     );
+
+    const key = this.readMarkerHeadKey(conversationId, recipientIdentityId);
+    const storedPosition = this.readMarkerPosition(
+      this.registry.findCachedHead(key),
+    );
+
+    if (storedPosition > messageCreatedAt) {
+      return false;
+    }
 
     const marker = {
       conversationId: conversationId.valueOf(),
@@ -695,9 +742,10 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       recipientIdentityId: recipientIdentityId.valueOf(),
     };
     const markerNetworkIds = markerNetworkId ? [markerNetworkId] : [];
-    const key = this.readMarkerHeadKey(conversationId, recipientIdentityId);
 
     this.registry.replicateHeadInBackground(key, marker, markerNetworkIds);
+
+    return true;
   }
 
   /**

@@ -249,7 +249,7 @@ paths:
       tags:
         - conversations
       summary: Mark conversation messages as read up to a message
-      description: Deletes local unread flags for the authenticated identity up to and including the given message id, then publishes a read event so other nodes can apply the same projection update. The signed request is kept as the event's `readProof`; receivers act on the event only after the proof verifies.
+      description: Moves the reader's read marker forward to the given message id and deletes local unread flags up to and including it, then publishes a read event so other nodes can apply the same projection update. A marker never moves backwards: an id older than the stored marker is rejected with 409 and nothing is published. The signed request is kept as the event's `readProof`; receivers act on the event only after the proof verifies.
       parameters:
         - $ref: '#/components/parameters/ConversationId'
         - $ref: '#/components/parameters/XIdentityId'
@@ -264,6 +264,8 @@ paths:
       responses:
         '200':
           description: Messages marked as read.
+        '409':
+          description: The reader's marker already points at a later message. Nothing is stored or published.
   /conversations/me/drafts:
     get:
       tags:

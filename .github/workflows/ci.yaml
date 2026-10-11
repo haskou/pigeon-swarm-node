@@ -200,3 +200,7 @@ jobs:
       - name: Mailbox two-node proof
         run: yarn test:e2e:real-transport:mailbox-two-node
         timeout-minutes: 4
+
+      - name: Read-until receipt proof
+        run: yarn test:e2e:real-transport:read-until
+        timeout-minutes: 4

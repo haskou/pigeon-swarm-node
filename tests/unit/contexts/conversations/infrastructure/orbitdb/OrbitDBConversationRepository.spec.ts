@@ -249,7 +249,7 @@ describe('OrbitDBConversationRepository', () => {
         messageId,
         mother.networkId,
       ),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(true);
     await flushPromises();
 
     const marker = readMarkerFromCache(
@@ -265,6 +265,120 @@ describe('OrbitDBConversationRepository', () => {
         messageId: messageId.valueOf(),
         recipientIdentityId: mother.recipient.valueOf(),
       }),
+    );
+  });
+
+  it('should keep the newer read marker when an older message is marked read', async () => {
+    const conversation = await seeded(mother.build());
+    const newerMessageId = new MessageId(
+      `${conversation.getId().valueOf()}:1781121453305:client`,
+    );
+    const olderMessageId = new MessageId(
+      `${conversation.getId().valueOf()}:1781121453000:client`,
+    );
+
+    await repository.save(conversation, proofsOf(conversation));
+    await repository.markReadUntil(
+      conversation.getId(),
+      mother.recipient,
+      newerMessageId,
+      mother.networkId,
+    );
+    await flushPromises();
+    headsPut.mockClear();
+
+    await expect(
+      repository.markReadUntil(
+        conversation.getId(),
+        mother.recipient,
+        olderMessageId,
+        mother.networkId,
+      ),
+    ).resolves.toBe(false);
+    await flushPromises();
+
+    expect(headsPut).not.toHaveBeenCalled();
+    expect(
+      readMarkerFromCache(
+        registry,
+        conversation.getId().valueOf(),
+        mother.recipient.valueOf(),
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        messageCreatedAt: 1781121453305,
+        messageId: newerMessageId.valueOf(),
+      }),
+    );
+  });
+
+  it('should accept a read marker for another message at the same time', async () => {
+    const conversation = await seeded(mother.build());
+    const firstMessageId = new MessageId(
+      `${conversation.getId().valueOf()}:1781121453305:client`,
+    );
+    const secondMessageId = new MessageId(
+      `${conversation.getId().valueOf()}:1781121453305:other`,
+    );
+
+    await repository.save(conversation, proofsOf(conversation));
+    await repository.markReadUntil(
+      conversation.getId(),
+      mother.recipient,
+      firstMessageId,
+      mother.networkId,
+    );
+    await expect(
+      repository.markReadUntil(
+        conversation.getId(),
+        mother.recipient,
+        secondMessageId,
+        mother.networkId,
+      ),
+    ).resolves.toBe(true);
+    await flushPromises();
+
+    expect(
+      readMarkerFromCache(
+        registry,
+        conversation.getId().valueOf(),
+        mother.recipient.valueOf(),
+      ),
+    ).toEqual(expect.objectContaining({ messageId: secondMessageId.valueOf() }));
+  });
+
+  it('should not replace a newer read marker with an older replicated head', async () => {
+    const conversation = await seeded(mother.build());
+    const conversationId = conversation.getId().valueOf();
+    const recipientId = mother.recipient.valueOf();
+    const replicatedAt = Timestamp.now().valueOf() + 60_000;
+
+    await repository.save(conversation, proofsOf(conversation));
+    await repository.markReadUntil(
+      conversation.getId(),
+      mother.recipient,
+      new MessageId(`${conversationId}:1781121453305:client`),
+      mother.networkId,
+    );
+    await flushPromises();
+
+    await registry.putHead(
+      `read-marker:${conversationId}:${recipientId}`,
+      {
+        conversationId,
+        messageCreatedAt: 1781121453000,
+        messageId: `${conversationId}:1781121453000:client`,
+        networkId: mother.networkId.valueOf(),
+        readAt: replicatedAt,
+        recipientIdentityId: recipientId,
+        updatedAt: replicatedAt,
+      },
+      [mother.networkId.valueOf()],
+    );
+    await flushPromises();
+
+    expect(readMarkerFromCache(registry, conversationId, recipientId)).toEqual(
+      expect.objectContaining({ messageCreatedAt: 1781121453305 }),
     );
   });
 

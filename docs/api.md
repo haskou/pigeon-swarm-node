@@ -2788,6 +2788,7 @@ Implemented:
 - require the authenticated identity to be a conversation participant
 - update the OrbitDB replicated read marker for the authenticated identity up to
   and including `messageId`
+- reject a `messageId` older than the stored marker with `409` (`StaleReadMarkerError`); the stored marker stays and no event is published
 - publish `ConversationMessagesWereReadEvent` with `messageId`,
   `readerIdentityId`, `networkId`, `participantIds` and `readProof` (the reader's
   signed request)
