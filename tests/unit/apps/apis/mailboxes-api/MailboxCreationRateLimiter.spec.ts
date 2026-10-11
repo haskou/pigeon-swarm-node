@@ -1,5 +1,6 @@
 import MailboxCreationRateLimiter from '@app/apps/apis/mailboxes-api/MailboxCreationRateLimiter';
-import { MailboxCreationRateLimitExceededError } from '@app/apps/apis/mailboxes-api/errors/MailboxCreationRateLimitExceededError';
+
+const LIMIT_REACHED = 'Mailbox creation rate limit exceeded';
 
 describe('MailboxCreationRateLimiter', () => {
   const key = 'MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE';
@@ -23,9 +24,7 @@ describe('MailboxCreationRateLimiter', () => {
 
     limiter.consume('::ffff:203.0.113.7', 0);
 
-    expect(() => limiter.consume('203.0.113.7', 0)).toThrow(
-      MailboxCreationRateLimitExceededError,
-    );
+    expect(() => limiter.consume('203.0.113.7', 0)).toThrow(LIMIT_REACHED);
   });
 
   it('buckets IPv6 addresses by /64 and keeps different /64s apart', () => {
@@ -33,9 +32,9 @@ describe('MailboxCreationRateLimiter', () => {
 
     limiter.consume('2001:db8:0:1::1', 0);
 
-    expect(() =>
-      limiter.consume('2001:db8:0:1:ffff:ffff:ffff:2', 0),
-    ).toThrow(MailboxCreationRateLimitExceededError);
+    expect(() => limiter.consume('2001:db8:0:1:ffff:ffff:ffff:2', 0)).toThrow(
+      LIMIT_REACHED,
+    );
     expect(() => limiter.consume('2001:db8:0:2::1', 0)).not.toThrow();
   });
 });
