@@ -74,7 +74,7 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
     );
 
     return {
-      identityId: keyPair.toPrimitives().publicKey,
+      identityId: new IdentityId(keyPair.toPrimitives().publicKey).valueOf(),
       signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
       timestamp,
     };
