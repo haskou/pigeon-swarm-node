@@ -62,6 +62,7 @@ import {
   handleDomainError,
 } from '../shared/infrastructure/express/PigeonHttpErrorResponseHandlers';
 import { PublicStaticContent } from '../shared/infrastructure/express/PublicStaticContent';
+import { parseTrustProxySetting } from '../shared/infrastructure/express/TrustProxySetting';
 import { Initializer } from '../shared/infrastructure/lifecycle/Initializer';
 import { Runtime } from '../shared/infrastructure/lifecycle/Runtime';
 import WinstonLogger from '../shared/infrastructure/logs/WinstonLogger';
@@ -158,6 +159,15 @@ export default class PigeonApplication {
               new PublicStaticContent(routePrefix).register(app);
             },
             phase: 'beforeErrors',
+          },
+          {
+            handle: (app) => {
+              app.set(
+                'trust proxy',
+                parseTrustProxySetting(this.kernel.environment.API_TRUST_PROXY),
+              );
+            },
+            phase: 'beforeControllers',
           },
         ],
         kernel: this.kernel,
