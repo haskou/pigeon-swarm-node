@@ -260,7 +260,9 @@ async function main(): Promise<void> {
     console.error(`Container logs:\n${await containerLogs()}`);
     process.exitCode = 1;
   } finally {
-    await docker(['rm', '--force', CONTAINER]).catch(() => undefined);
+    await docker(['rm', '--force', CONTAINER]).catch(
+      (): undefined => undefined,
+    );
   }
 }
 

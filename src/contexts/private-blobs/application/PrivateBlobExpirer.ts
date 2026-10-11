@@ -8,6 +8,18 @@ export default class PrivateBlobExpirer {
     private readonly bytes: PrivateBlobBytesStore,
   ) {}
 
+  private async findOrphanIds(): Promise<string[]> {
+    const orphans: string[] = [];
+
+    for (const id of await this.bytes.listIds()) {
+      if (!(await this.repository.findById(id))) {
+        orphans.push(id);
+      }
+    }
+
+    return orphans;
+  }
+
   /**
    * Returns the number of records removed. One failing blob never stops the
    * sweep: its record stays so the next sweep retries it, and the failure
@@ -49,17 +61,5 @@ export default class PrivateBlobExpirer {
     }
 
     return removed;
-  }
-
-  private async findOrphanIds(): Promise<string[]> {
-    const orphans: string[] = [];
-
-    for (const id of await this.bytes.listIds()) {
-      if (!(await this.repository.findById(id))) {
-        orphans.push(id);
-      }
-    }
-
-    return orphans;
   }
 }
