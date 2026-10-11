@@ -1,3 +1,4 @@
+import { leadingZeroBits } from '@app/contexts/shared/domain/value-objects/LeadingZeroBits';
 import { createHash } from 'node:crypto';
 
 /**
@@ -11,21 +12,6 @@ export class IdentityAdmissionProof {
   private static readonly DOMAIN = 'pigeon-identity-admission:v1';
   public static readonly DIFFICULTY_BITS = 16;
   public static readonly MAX_NONCE_LENGTH = 64;
-
-  private static leadingZeroBits(digest: Buffer): number {
-    let bits = 0;
-
-    for (const byte of digest) {
-      if (byte === 0) {
-        bits += 8;
-        continue;
-      }
-
-      return bits + Math.clz32(byte) - 24;
-    }
-
-    return bits;
-  }
 
   public static preimage(
     identityId: string,
@@ -55,10 +41,7 @@ export class IdentityAdmissionProof {
       const candidate = nonce.toString();
       const digest = prefix.copy().update(candidate).digest();
 
-      if (
-        IdentityAdmissionProof.leadingZeroBits(digest) >= difficultyBits &&
-        accepts(candidate)
-      ) {
+      if (leadingZeroBits(digest) >= difficultyBits && accepts(candidate)) {
         return candidate;
       }
     }
@@ -82,6 +65,6 @@ export class IdentityAdmissionProof {
       .update(IdentityAdmissionProof.preimage(identityId, networkIds, nonce))
       .digest();
 
-    return IdentityAdmissionProof.leadingZeroBits(digest) >= difficultyBits;
+    return leadingZeroBits(digest) >= difficultyBits;
   }
 }

@@ -6,11 +6,14 @@ import MailboxEnvelopeNotifier from '@app/contexts/mailboxes/application/Mailbox
 import MailboxExpirer from '@app/contexts/mailboxes/application/MailboxExpirer';
 import MailboxReader from '@app/contexts/mailboxes/application/MailboxReader';
 import MailboxRemover from '@app/contexts/mailboxes/application/MailboxRemover';
+import { MailboxAppendRateLimitedError } from '@app/contexts/mailboxes/domain/errors/MailboxAppendRateLimitedError';
 import { MailboxConflictError } from '@app/contexts/mailboxes/domain/errors/MailboxConflictError';
+import { MailboxCreationProofInvalidError } from '@app/contexts/mailboxes/domain/errors/MailboxCreationProofInvalidError';
 import { MailboxEnvelopeInvalidError } from '@app/contexts/mailboxes/domain/errors/MailboxEnvelopeInvalidError';
 import { MailboxFullError } from '@app/contexts/mailboxes/domain/errors/MailboxFullError';
 import { MailboxLimitReachedError } from '@app/contexts/mailboxes/domain/errors/MailboxLimitReachedError';
 import { MailboxNotFoundError } from '@app/contexts/mailboxes/domain/errors/MailboxNotFoundError';
+import { MailboxCreationProof } from '@app/contexts/mailboxes/domain/MailboxCreationProof';
 import MailboxPolicy from '@app/contexts/mailboxes/domain/MailboxPolicy';
 import LocalMailboxRepository from '@app/contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
@@ -27,6 +30,7 @@ const body = (size: number): string =>
 const MAILBOX = 'm'.repeat(43);
 const POST = 'p'.repeat(32);
 const READ = 'r'.repeat(32);
+const RATED = 'q'.repeat(43);
 
 describe('mailboxes', () => {
   let databasePath: string;
@@ -46,6 +50,7 @@ describe('mailboxes', () => {
     'MAILBOX_MAX_BYTES',
     'MAILBOX_MAX_COUNT',
     'MAILBOX_RETENTION_MS',
+    'MAILBOX_APPEND_RATE_PER_MINUTE',
   ];
 
   const wire = (): void => {
@@ -63,6 +68,18 @@ describe('mailboxes', () => {
     expirer = new MailboxExpirer(repository, policy, coordinator);
   };
 
+  const createMailbox = (
+    id: string,
+    postHash: string,
+    readHash: string,
+  ): Promise<boolean> =>
+    creator.create(
+      id,
+      postHash,
+      readHash,
+      MailboxCreationProof.mine(id, postHash, readHash),
+    );
+
   beforeEach(async () => {
     for (const key of envKeys) {
       saved[key] = process.env[key];
@@ -70,7 +87,7 @@ describe('mailboxes', () => {
     databasePath = await fs.mkdtemp(path.join(os.tmpdir(), 'pigeon-mailbox-'));
     process.env.PIGEON_LOCAL_DB_PATH = databasePath;
     wire();
-    await creator.create(MAILBOX, sha(POST), sha(READ));
+    await createMailbox(MAILBOX, sha(POST), sha(READ));
   });
 
   afterEach(async () => {
@@ -87,11 +104,11 @@ describe('mailboxes', () => {
   });
 
   it('creates idempotently and rejects different hashes', async () => {
-    await expect(creator.create(MAILBOX, sha(POST), sha(READ))).resolves.toBe(
+    await expect(createMailbox(MAILBOX, sha(POST), sha(READ))).resolves.toBe(
       false,
     );
     await expect(
-      creator.create(MAILBOX, sha('other'), sha(READ)),
+      createMailbox(MAILBOX, sha('other'), sha(READ)),
     ).rejects.toBeInstanceOf(MailboxConflictError);
   });
 
@@ -99,7 +116,7 @@ describe('mailboxes', () => {
     process.env.MAILBOX_MAX_COUNT = '1';
 
     await expect(
-      creator.create('n'.repeat(43), sha(POST), sha(READ)),
+      createMailbox('n'.repeat(43), sha(POST), sha(READ)),
     ).rejects.toBeInstanceOf(MailboxLimitReachedError);
   });
 
@@ -226,7 +243,7 @@ describe('mailboxes', () => {
     await expect(reader.read(MAILBOX, READ, 0, 10)).rejects.toBeInstanceOf(
       MailboxNotFoundError,
     );
-    await creator.create(MAILBOX, sha(POST), sha(READ));
+    await createMailbox(MAILBOX, sha(POST), sha(READ));
     expect((await reader.read(MAILBOX, READ, 0, 10)).envelopes).toEqual([]);
   });
 
@@ -238,7 +255,7 @@ describe('mailboxes', () => {
 
     clock.mockReturnValue(t0);
     await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
-    await creator.create(idle, sha(POST), sha(READ));
+    await createMailbox(idle, sha(POST), sha(READ));
 
     clock.mockReturnValue(t0 + 800);
     await reader.read(MAILBOX, READ, 0, 10);
@@ -266,5 +283,75 @@ describe('mailboxes', () => {
     await expect(
       appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024)),
     ).resolves.toEqual({ created: true, cursor: 2 });
+  });
+
+  it('refuses creation without a proof of work bound to that mailbox', async () => {
+    const other = 'n'.repeat(43);
+    const forMailbox = MailboxCreationProof.mine(MAILBOX, sha(POST), sha(READ));
+
+    await expect(
+      creator.create(other, sha(POST), sha(READ), ''),
+    ).rejects.toBeInstanceOf(MailboxCreationProofInvalidError);
+    await expect(
+      creator.create(other, sha(POST), sha(READ), forMailbox),
+    ).rejects.toBeInstanceOf(MailboxCreationProofInvalidError);
+    await expect(reader.read(other, READ, 0, 10)).rejects.toBeInstanceOf(
+      MailboxNotFoundError,
+    );
+  });
+
+  it('rate limits appends per mailbox and refills one per interval', async () => {
+    process.env.MAILBOX_APPEND_RATE_PER_MINUTE = '3';
+    const t0 = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(t0);
+    await createMailbox(RATED, sha(POST), sha(READ));
+
+    await appender.append(RATED, POST, 'a'.repeat(22), body(1024));
+    await appender.append(RATED, POST, 'b'.repeat(22), body(1024));
+    await appender.append(RATED, POST, 'c'.repeat(22), body(1024));
+    await expect(
+      appender.append(RATED, POST, 'd'.repeat(22), body(1024)),
+    ).rejects.toBeInstanceOf(MailboxAppendRateLimitedError);
+
+    // Three per minute: one token returns after twenty seconds.
+    clock.mockReturnValue(t0 + 20_000);
+    await expect(
+      appender.append(RATED, POST, 'd'.repeat(22), body(1024)),
+    ).resolves.toEqual({ created: true, cursor: 4 });
+    clock.mockRestore();
+  });
+
+  it('keeps the append rate across a restart', async () => {
+    process.env.MAILBOX_APPEND_RATE_PER_MINUTE = '1';
+    await createMailbox(RATED, sha(POST), sha(READ));
+    await appender.append(RATED, POST, 'a'.repeat(22), body(1024));
+
+    await database.close();
+    wire();
+
+    await expect(
+      appender.append(RATED, POST, 'b'.repeat(22), body(1024)),
+    ).rejects.toBeInstanceOf(MailboxAppendRateLimitedError);
+  });
+
+  it('does not charge the append rate for a replayed envelope', async () => {
+    process.env.MAILBOX_APPEND_RATE_PER_MINUTE = '1';
+    await createMailbox(RATED, sha(POST), sha(READ));
+    await appender.append(RATED, POST, 'a'.repeat(22), body(1024));
+
+    await expect(
+      appender.append(RATED, POST, 'a'.repeat(22), body(1024)),
+    ).resolves.toEqual({ created: false, cursor: 1 });
+  });
+
+  it('turns the append rate off with MAILBOX_APPEND_RATE_PER_MINUTE=0', async () => {
+    process.env.MAILBOX_APPEND_RATE_PER_MINUTE = '0';
+    await createMailbox(RATED, sha(POST), sha(READ));
+
+    for (const letter of ['a', 'b', 'c', 'd', 'e']) {
+      await appender.append(RATED, POST, letter.repeat(22), body(1024));
+    }
+
+    expect((await reader.read(RATED, READ, 0, 10)).envelopes).toHaveLength(5);
   });
 });

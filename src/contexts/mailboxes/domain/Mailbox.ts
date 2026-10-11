@@ -1,3 +1,4 @@
+import { MailboxAppendRateLimitedError } from './errors/MailboxAppendRateLimitedError';
 import { MailboxFullError } from './errors/MailboxFullError';
 import { MailboxCapability } from './MailboxCapability';
 import MailboxPolicy from './MailboxPolicy';
@@ -13,8 +14,11 @@ export class Mailbox {
     now: number;
     postTokenHash: string;
     readTokenHash: string;
+    appendTokens: number;
   }): Mailbox {
     return new Mailbox({
+      appendRefilledAt: params.now,
+      appendTokens: params.appendTokens,
       bytes: 0,
       createdAt: params.now,
       envelopeCount: 0,
@@ -75,6 +79,37 @@ export class Mailbox {
     this.primitives.bytes += size;
 
     return cursor;
+  }
+
+  /**
+   * Token bucket for accepted envelopes: refills at the per-minute policy
+   * rate, capped at one minute of appends. The state lives on the mailbox, so
+   * a restart does not reset it. A refused append leaves the state untouched.
+   */
+  public consumeAppend(now: number, policy: MailboxPolicy): void {
+    const perMinute = policy.maxAppendsPerMinute();
+
+    if (perMinute === 0) {
+      return;
+    }
+
+    // Documents written before the bucket existed start with a full bucket.
+    const stored = Number.isFinite(this.primitives.appendTokens)
+      ? this.primitives.appendTokens
+      : perMinute;
+    const refilledAt = Number.isFinite(this.primitives.appendRefilledAt)
+      ? this.primitives.appendRefilledAt
+      : now;
+    const refilled =
+      stored + (Math.max(0, now - refilledAt) * perMinute) / 60_000;
+    const available = Math.min(perMinute, refilled);
+
+    if (available < 1) {
+      throw new MailboxAppendRateLimitedError();
+    }
+
+    this.primitives.appendTokens = available - 1;
+    this.primitives.appendRefilledAt = now;
   }
 
   public releaseEnvelopes(count: number, bytes: number): void {

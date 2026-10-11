@@ -14,6 +14,10 @@ export default class MailboxPolicy {
     return MailboxPolicy.SIZE_BUCKETS.includes(size);
   }
 
+  public maxAppendsPerMinute(): number {
+    return pigeonEnvironment().MAILBOX_APPEND_RATE_PER_MINUTE;
+  }
+
   public maxBytesPerMailbox(): number {
     return pigeonEnvironment().MAILBOX_MAX_BYTES;
   }

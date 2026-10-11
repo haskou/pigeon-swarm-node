@@ -55,3 +55,7 @@ Feature: Opaque mailbox routes
     When I create a mailbox
     And I append an envelope "a" of 1000 bytes to the mailbox with the post capability
     Then response code is equal to 400
+
+  Scenario: Creating a mailbox requires proof of work bound to that mailbox
+    When I create a mailbox without proof of work
+    Then response code is equal to 400

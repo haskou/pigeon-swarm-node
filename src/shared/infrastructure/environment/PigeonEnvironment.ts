@@ -48,6 +48,7 @@ export const pigeonEnvironmentSchema = {
   },
   LOG_LEVEL: { type: 'string' },
   LOG_URL: { defaultValue: 'logs', type: 'string' },
+  MAILBOX_APPEND_RATE_PER_MINUTE: { defaultValue: 120, type: 'number' },
   MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE: { defaultValue: 30, type: 'number' },
   MAILBOX_MAX_BYTES: { defaultValue: 8 * 1024 * 1024, type: 'number' },
   MAILBOX_MAX_COUNT: { defaultValue: 10_000, type: 'number' },

@@ -39,6 +39,7 @@ export class PutMailboxRoute extends MailboxRouteSupport {
         id,
         body.postTokenHash,
         body.readTokenHash,
+        body.creationNonce,
       );
 
       return response

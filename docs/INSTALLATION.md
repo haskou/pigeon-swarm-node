@@ -114,6 +114,7 @@ installed `web-push` module path.
 | Variable | Default | Required | Description |
 | --- | --- | --- | --- |
 | `IPFS_STORAGE_PATH` | `./ipfs_storage` | Recommended | Base folder used by IPFS registry and local node metadata. |
+| `MAILBOX_APPEND_RATE_PER_MINUTE` | `120` | No | Envelopes one mailbox may receive per minute, kept across restarts (`0` disables). Duplicate envelopes are not charged. |
 | `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE` | `30` | No | Mailbox creations one remote address may make per minute (in memory; `0` disables). |
 | `MAILBOX_MAX_BYTES` | `8388608` | No | Pending ciphertext bytes per mailbox (8 MiB). A full mailbox refuses new envelopes. |
 | `MAILBOX_MAX_COUNT` | `10000` | No | Mailboxes this node will hold. |

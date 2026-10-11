@@ -28,6 +28,7 @@ import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/doma
 import { PairingAuthorization } from '@app/contexts/identity-devices/domain/value-objects/PairingAuthorization';
 import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
 import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/PairingId';
+import { MailboxCreationProof } from '@app/contexts/mailboxes/domain/MailboxCreationProof';
 import { NodeNetworkAdderMessage } from '@app/contexts/nodes/application/add-network/messages/NodeNetworkAdderMessage';
 import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNetworkAdder';
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
@@ -5436,9 +5437,29 @@ export default class Definitions {
     postToken: string;
     readToken: string;
   }): Promise<void> {
+    const postTokenHash = this.mailboxHash(mailbox.postToken);
+    const readTokenHash = this.mailboxHash(mailbox.readToken);
+
     this.response = await this.restClient.put(`/mailboxes/${mailbox.id}`, {
-      postTokenHash: this.mailboxHash(mailbox.postToken),
-      readTokenHash: this.mailboxHash(mailbox.readToken),
+      creationNonce: MailboxCreationProof.mine(
+        mailbox.id,
+        postTokenHash,
+        readTokenHash,
+      ),
+      postTokenHash,
+      readTokenHash,
+    });
+  }
+
+  @when('I create a mailbox without proof of work')
+  public async iCreateAMailboxWithoutProofOfWork(): Promise<void> {
+    const id = randomBytes(32).toString('base64url');
+    const postToken = randomBytes(32).toString('base64url');
+    const readToken = randomBytes(32).toString('base64url');
+
+    this.response = await this.restClient.put(`/mailboxes/${id}`, {
+      postTokenHash: this.mailboxHash(postToken),
+      readTokenHash: this.mailboxHash(readToken),
     });
   }
 

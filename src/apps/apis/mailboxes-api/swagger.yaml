@@ -11,7 +11,7 @@ paths:
       tags:
         - mailboxes
       summary: Create a mailbox
-      description: Unauthenticated, rate limited per remote address by `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE`. The recipient supplies the SHA-256 (hex) of the post and read tokens; the node never sees the tokens at creation. Idempotent for identical hashes.
+      description: Unauthenticated, rate limited per remote address by `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE`. The recipient supplies the SHA-256 (hex) of the post and read tokens and a `creationNonce` proof of work, which is SHA-256 over the mailbox id, both token hashes and the nonce, and must start with 16 zero bits. The node never sees the tokens at creation. Idempotent for identical hashes and nonce.
       parameters:
         - $ref: '#/components/parameters/MailboxId'
       requestBody:
@@ -23,6 +23,7 @@ paths:
               required:
                 - postTokenHash
                 - readTokenHash
+                - creationNonce
               properties:
                 postTokenHash:
                   type: string
@@ -30,13 +31,16 @@ paths:
                 readTokenHash:
                   type: string
                   pattern: '^[0-9a-f]{64}$'
+                creationNonce:
+                  type: string
+                  pattern: '^[A-Za-z0-9_-]{1,64}$'
       responses:
         '200':
           description: Already exists with the same hashes.
         '201':
           description: Created.
         '400':
-          description: Invalid hashes.
+          description: Invalid hashes, or a creationNonce that fails the proof of work.
         '409':
           description: Exists with different hashes.
         '429':
@@ -59,7 +63,7 @@ paths:
       tags:
         - mailboxes
       summary: Append an envelope
-      description: Authorized by the post capability. `body` must decode to exactly 1024, 4096, 16384 or 65536 bytes (clients pad to a bucket). Appending an already stored `envelopeId` returns the first cursor and stores nothing. A full mailbox fails with 409; older envelopes are never dropped.
+      description: Authorized by the post capability. `body` must decode to exactly 1024, 4096, 16384 or 65536 bytes (clients pad to a bucket). Appending an already stored `envelopeId` returns the first cursor and stores nothing. A full mailbox fails with 409; older envelopes are never dropped. Appends are rate limited per mailbox (`MAILBOX_APPEND_RATE_PER_MINUTE`, 429); a repeated `envelopeId` is not charged.
       security:
         - postCapability: []
       parameters:
@@ -100,6 +104,8 @@ paths:
           description: Unknown mailbox or wrong capability.
         '409':
           description: Mailbox reached its envelope or byte limit.
+        '429':
+          description: Mailbox is receiving envelopes too quickly.
     get:
       tags:
         - mailboxes

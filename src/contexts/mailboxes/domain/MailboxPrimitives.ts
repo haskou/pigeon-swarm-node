@@ -1,4 +1,6 @@
 export interface MailboxPrimitives {
+  appendRefilledAt: number;
+  appendTokens: number;
   bytes: number;
   createdAt: number;
   envelopeCount: number;
