@@ -1593,6 +1593,7 @@ export {
   startNode,
   stopNode,
   addPrivateNetwork,
+  generateNetworkKey,
   publishIdentity,
   signHeaders,
   signRequest,

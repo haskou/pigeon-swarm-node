@@ -56,6 +56,9 @@ export default class MailboxAppender {
         return { created: false, cursor: known };
       }
 
+      const now = Date.now();
+      mailbox.consumeAppend(now, this.policy);
+
       const cursor = mailbox.reserveEnvelope(size, this.policy);
 
       await this.repository.commitAppend(mailbox, {
@@ -63,7 +66,7 @@ export default class MailboxAppender {
         cursor,
         envelopeId,
         size,
-        storedAt: Date.now(),
+        storedAt: now,
       });
       this.notifier.envelopeAppended(mailboxId, cursor);
 

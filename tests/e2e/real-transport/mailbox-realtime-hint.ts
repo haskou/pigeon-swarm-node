@@ -1,3 +1,4 @@
+import { MailboxCreationProof } from '@app/contexts/mailboxes/domain/MailboxCreationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import assert from 'node:assert/strict';
@@ -89,10 +90,17 @@ async function verify(node: NodeRuntime): Promise<void> {
   const mailboxId = randomBytes(32).toString('base64url');
   const postToken = randomBytes(32).toString('base64url');
   const readToken = randomBytes(32).toString('base64url');
+  const postTokenHash = createHash('sha256').update(postToken).digest('hex');
+  const readTokenHash = createHash('sha256').update(readToken).digest('hex');
   const put = await fetch(`${node.baseUrl}/mailboxes/${mailboxId}`, {
     body: JSON.stringify({
-      postTokenHash: createHash('sha256').update(postToken).digest('hex'),
-      readTokenHash: createHash('sha256').update(readToken).digest('hex'),
+      creationNonce: MailboxCreationProof.mine(
+        mailboxId,
+        postTokenHash,
+        readTokenHash,
+      ),
+      postTokenHash,
+      readTokenHash,
     }),
     headers: { 'content-type': 'application/json' },
     method: 'PUT',
