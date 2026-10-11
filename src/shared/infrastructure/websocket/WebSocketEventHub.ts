@@ -47,6 +47,8 @@ const MAX_CLIENTS_PER_IDENTITY = 16;
 const MAX_CLIENT_MESSAGES_PER_WINDOW = 200;
 const CLIENT_MESSAGE_WINDOW_MS = 10_000;
 
+const CONVERSATION_READ_RECEIPT_EVENT = 'conversations.v1.messages.were_read';
+
 export class WebSocketEventHub {
   private readonly conversationCallEventMapper =
     new ConversationCallEventRealtimeMapper();
@@ -93,6 +95,12 @@ export class WebSocketEventHub {
     const recipients = new Set<string>();
 
     if (this.shouldSuppressCallParticipantLeaseEvent(event)) {
+      return recipients;
+    }
+
+    // Receipts carry a claimed participantIds list from the network, so they
+    // are delivered only through the locally known conversation roster.
+    if (event.eventName() === CONVERSATION_READ_RECEIPT_EVENT) {
       return recipients;
     }
 
@@ -400,6 +408,22 @@ export class WebSocketEventHub {
         scope.channelId,
       )) || []
     ).filter((recipient) => !baseRecipients.has(recipient));
+
+    this.sendToRecipients(recipients, message);
+  }
+
+  private async relayConversationReadReceipt(
+    event: DomainEvent,
+    message: WebSocketRealtimeMessage,
+  ): Promise<void> {
+    if (event.eventName() !== CONVERSATION_READ_RECEIPT_EVENT) {
+      return;
+    }
+
+    const recipients =
+      (await this.clientMessageHandler?.findConversationParticipantIds(
+        event.aggregateId,
+      )) || [];
 
     this.sendToRecipients(recipients, message);
   }
@@ -847,6 +871,9 @@ export class WebSocketEventHub {
           Kernel.logger?.error('WebSocket community poll fanout failed');
         },
       );
+      this.relayConversationReadReceipt(event, domainEventMessage).catch(() => {
+        Kernel.logger?.error('WebSocket read receipt fanout failed');
+      });
       const conversationCallEvents =
         this.conversationCallEventMapper.toEvents(event);
 

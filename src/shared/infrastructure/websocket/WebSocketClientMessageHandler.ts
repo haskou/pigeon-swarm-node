@@ -93,6 +93,22 @@ export default class WebSocketClientMessageHandler {
     return this.excludeIdentity(conversation.getParticipantIds(), actorId);
   }
 
+  public async findConversationParticipantIds(
+    conversationId: string,
+  ): Promise<string[]> {
+    const conversation = await this.conversationRepository.findMetadataById(
+      new ConversationId(conversationId),
+    );
+
+    if (!conversation) {
+      return [];
+    }
+
+    const participantIds = conversation.getParticipantIds();
+
+    return participantIds.map((identityId) => identityId.valueOf());
+  }
+
   public async findCommunityChannelTypingRecipients(
     identityId: string,
     communityId: string,

@@ -31,6 +31,18 @@ class TestNodeDomainEvent extends DomainEvent {
   }
 }
 
+class TestConversationReadReceiptEvent extends DomainEvent {
+  public eventName(): string {
+    return 'conversations.v1.messages.were_read';
+  }
+}
+
+class TestPresenceEvent extends DomainEvent {
+  public eventName(): string {
+    return 'presence.v1.identity_presence.was_updated';
+  }
+}
+
 describe('WebSocketEventHub', () => {
   it('closes a socket that floods client messages and counts open sockets', async () => {
     const hub = new WebSocketEventHub();
@@ -431,6 +443,75 @@ describe('WebSocketEventHub', () => {
     hub.publish([event]);
 
     expect(participantClient.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: JSON.parse(event.decode()),
+        type: 'domain_event',
+      }),
+    );
+    expect(otherClient.send).not.toHaveBeenCalled();
+  });
+
+  it('delivers read receipts only to the conversation participants known locally', async () => {
+    const hub = new WebSocketEventHub();
+    const participantIdentityId = await generateIdentityId();
+    const forgedIdentityId = await generateIdentityId();
+    const participantClient = buildClient();
+    const forgedClient = buildClient();
+    const clientMessageHandler = buildClientMessageHandler();
+
+    clientMessageHandler.findConversationParticipantIds.mockResolvedValue([
+      participantIdentityId.valueOf(),
+    ]);
+    hub.setClientMessageHandler(clientMessageHandler);
+    hub.register(participantIdentityId, participantClient);
+    hub.register(forgedIdentityId, forgedClient);
+    jest.clearAllMocks();
+
+    const event = new TestConversationReadReceiptEvent('conversation-id', {
+      messageId: 'message-id',
+      networkId: 'network-id',
+      participantIds: [
+        participantIdentityId.valueOf(),
+        forgedIdentityId.valueOf(),
+      ],
+      readerIdentityId: participantIdentityId.valueOf(),
+    });
+
+    hub.publish([event]);
+    await flushPromises();
+
+    expect(participantClient.send).toHaveBeenCalledWith(
+      JSON.stringify({
+        event: JSON.parse(event.decode()),
+        type: 'domain_event',
+      }),
+    );
+    expect(forgedClient.send).not.toHaveBeenCalled();
+    expect(
+      clientMessageHandler.findConversationParticipantIds,
+    ).toHaveBeenCalledWith('conversation-id');
+  });
+
+  it('delivers presence updates only to the owning identity connections', async () => {
+    const hub = new WebSocketEventHub();
+    const ownerIdentityId = await generateIdentityId();
+    const otherIdentityId = await generateIdentityId();
+    const ownerClient = buildClient();
+    const otherClient = buildClient();
+    const event = new TestPresenceEvent(ownerIdentityId.valueOf(), {
+      identityId: ownerIdentityId.valueOf(),
+      networkIds: ['network-id'],
+      status: 'available',
+    });
+
+    hub.register(ownerIdentityId, ownerClient);
+    hub.register(otherIdentityId, otherClient);
+    jest.clearAllMocks();
+
+    hub.publish([event]);
+    await flushPromises();
+
+    expect(ownerClient.send).toHaveBeenCalledWith(
       JSON.stringify({
         event: JSON.parse(event.decode()),
         type: 'domain_event',
@@ -1079,6 +1160,7 @@ function buildClientMessageHandler(): jest.Mocked<WebSocketClientMessageHandler>
     canReadMailbox: jest.fn().mockResolvedValue(false),
     findCommunityChannelEventRecipients: jest.fn().mockResolvedValue([]),
     findCommunityChannelTypingRecipients: jest.fn().mockResolvedValue([]),
+    findConversationParticipantIds: jest.fn().mockResolvedValue([]),
     findConversationTypingRecipients: jest.fn().mockResolvedValue([]),
     findIdentityUpdateRecipients: jest.fn().mockResolvedValue([]),
     recordIdentityHeartbeat: jest.fn().mockResolvedValue(undefined),
