@@ -143,7 +143,10 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
   public async messagesReadConsumerHandlesAReadAnnouncement(): Promise<void> {
     await this.handleReadAnnouncement(
       await this.signedReadProof(),
-      this.markReadConsumer(),
+      new MarkMessagesReadWhenAnnounced(
+        this.eventConsumer(),
+        this.fakeUseCase<MessagesReadRegistrar>('register'),
+      ),
     );
   }
 
@@ -151,7 +154,10 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
   public async messagesReadConsumerHandlesAnUnsignedReadAnnouncement(): Promise<void> {
     await this.handleReadAnnouncement(
       await this.unsignedReadProof(),
-      this.markReadConsumer(),
+      new MarkMessagesReadWhenAnnounced(
+        this.eventConsumer(),
+        this.fakeUseCase<MessagesReadRegistrar>('register'),
+      ),
     );
   }
 
@@ -159,7 +165,10 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
   public async pushClearConsumerHandlesAReadAnnouncement(): Promise<void> {
     await this.handleReadAnnouncement(
       await this.signedReadProof(),
-      this.pushClearConsumer(),
+      new ClearPushNotificationWhenConversationMessagesRead(
+        this.eventConsumer(),
+        this.fakeUseCase<PushNotificationDispatcher>('dispatch'),
+      ),
     );
   }
 
@@ -167,23 +176,13 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
   public async pushClearConsumerHandlesAnUnsignedReadAnnouncement(): Promise<void> {
     await this.handleReadAnnouncement(
       await this.unsignedReadProof(),
-      this.pushClearConsumer(),
+      new ClearPushNotificationWhenConversationMessagesRead(
+        this.eventConsumer(),
+        this.fakeUseCase<PushNotificationDispatcher>('dispatch'),
+      ),
     );
   }
 
-  private markReadConsumer(): MarkMessagesReadWhenAnnounced {
-    return new MarkMessagesReadWhenAnnounced(
-      this.eventConsumer(),
-      this.fakeUseCase<MessagesReadRegistrar>('register'),
-    );
-  }
-
-  private pushClearConsumer(): ClearPushNotificationWhenConversationMessagesRead {
-    return new ClearPushNotificationWhenConversationMessagesRead(
-      this.eventConsumer(),
-      this.fakeUseCase<PushNotificationDispatcher>('dispatch'),
-    );
-  }
 
   private async signedReadProof(): Promise<SignedReadReceipt> {
     const readerKeyPair = await KeyPair.generate();
