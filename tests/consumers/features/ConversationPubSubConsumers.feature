@@ -22,3 +22,7 @@ Feature: Conversation PubSub consumers
   Scenario: Mark conversation messages as read through the consumer
     When the messages read consumer handles a read announcement
     Then the messages read registrar should receive that read marker
+
+  Scenario: Ignore a read announcement without the reader's signature through the consumer
+    When the messages read consumer handles an unsigned read announcement
+    Then the messages read registrar should receive no read marker

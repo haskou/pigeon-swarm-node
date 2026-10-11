@@ -13,9 +13,12 @@ import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/d
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { expect } from 'chai';
 import { before, binding, then, when } from 'cucumber-tsflow';
 
+import { signedReadReceipt, SignedReadReceipt } from '../../unit/contexts/conversations/support/signedReadReceipt';
 import { signedMutation } from '../../unit/contexts/public-mutations/support/signedMutation';
 import { PubSubConsumerTestContext } from './PubSubConsumerTestHelpers';
 
@@ -26,8 +29,7 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
 
   private readonly messageId = '507f1f77bcf86cd799439011';
 
-  private readonly readerIdentityId =
-    'MCowBQYDK2VwAyEAeLMrMAfBRHdSU4eI1qpIUsqyfkXtR4FGjLhFzaWlfsI=';
+  private readerIdentityId = '';
 
   private readonly reactionAuthorId =
     'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=';
@@ -136,6 +138,31 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
 
   @when('the messages read consumer handles a read announcement')
   public async messagesReadConsumerHandlesAReadAnnouncement(): Promise<void> {
+    const readerKeyPair = await KeyPair.generate();
+
+    this.readerIdentityId = new IdentityId(
+      readerKeyPair.toPrimitives().publicKey,
+    ).valueOf();
+    await this.handleReadAnnouncement(
+      await signedReadReceipt({
+        conversationId: this.conversationId,
+        keyPair: readerKeyPair,
+        messageId: this.messageId,
+      }),
+    );
+  }
+
+  @when('the messages read consumer handles an unsigned read announcement')
+  public async messagesReadConsumerHandlesAnUnsignedReadAnnouncement(): Promise<void> {
+    this.readerIdentityId = new IdentityId(
+      (await KeyPair.generate()).toPrimitives().publicKey,
+    ).valueOf();
+    await this.handleReadAnnouncement(undefined);
+  }
+
+  private async handleReadAnnouncement(
+    readProof: SignedReadReceipt | undefined,
+  ): Promise<void> {
     const consumer = new MarkMessagesReadWhenAnnounced(
       this.eventConsumer(),
       this.fakeUseCase<MessagesReadRegistrar>('register'),
@@ -144,6 +171,7 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
     await consumer.handler(
       new ConversationMessagesWereReadEvent(this.conversationId, {
         messageId: this.messageId,
+        readProof,
         readerIdentityId: this.readerIdentityId,
       }),
     );
@@ -197,5 +225,10 @@ export default class ConversationPubSubConsumersDefinition extends PubSubConsume
     expect(message.conversationId.valueOf()).to.equal(this.conversationId);
     expect(message.messageId.valueOf()).to.equal(this.messageId);
     expect(message.readerIdentityId.valueOf()).to.equal(this.readerIdentityId);
+  }
+
+  @then('the messages read registrar should receive no read marker')
+  public messagesReadRegistrarShouldReceiveNoReadMarker(): void {
+    expect(this.calls).to.be.empty;
   }
 }
