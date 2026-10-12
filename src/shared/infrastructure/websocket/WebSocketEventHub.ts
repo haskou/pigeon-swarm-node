@@ -831,7 +831,7 @@ export class WebSocketEventHub {
       // Read receipts change read state, so unproven ones never reach clients.
       if (
         event.eventName() === ConversationMessagesWereReadEvent.EVENT_NAME &&
-        !MessageReadProof.isAuthentic(event.attributes.readProof, {
+        !MessageReadProof.isReceivable(event.attributes.readProof, {
           conversationId: event.aggregateId,
           messageId: String(event.attributes.messageId),
           readerIdentityId: String(event.attributes.readerIdentityId),

@@ -23,7 +23,7 @@ export default class ClearPushNotificationWhenConversationMessagesRead extends S
    */
   public async handler(event: DomainEvent): Promise<void> {
     if (
-      !MessageReadProof.isAuthentic(event.attributes.readProof, {
+      !MessageReadProof.isReceivable(event.attributes.readProof, {
         conversationId: event.aggregateId,
         messageId: String(event.attributes.messageId),
         readerIdentityId: String(event.attributes.readerIdentityId),
