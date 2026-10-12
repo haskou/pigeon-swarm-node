@@ -1581,6 +1581,10 @@ Same body with `kind: "delete"` and a tombstone payload `{ cid, id, networkId,
 ownerIdentityId, removed: true, scopeType: "content_replication" }`, signed by
 the owner. Response: `204`.
 
+When the owner held a live registration on that network, the node also removes
+its local copy of the bytes from that network. Copies registered by other
+identities are never removed.
+
 ### Get content replication status
 
 ```http
