@@ -257,6 +257,15 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
+  private async assertAdmitted(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    cleanDocument: Record<string, unknown>,
+  ): Promise<void> {
+    if (!(await this.admitRecord(storeName, cleanDocument))) {
+      throw new InvalidPublicMutationError();
+    }
+  }
+
   /**
    * A record can depend on another record of the same batch (an operation
    * lists its parents), so rejected records are offered again while the
@@ -2100,6 +2109,18 @@ export default class OrbitDBReplicatedStateRegistry {
       : gate;
   }
 
+  /**
+   * Admits a document exactly as `putDocument` does, without writing it. Used
+   * for records that must be verified but must not be replicated.
+   */
+  public async admitDocument(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    document: Record<string, unknown>,
+  ): Promise<void> {
+    this.assertReady();
+    await this.assertAdmitted(storeName, this.cleanDocument(document));
+  }
+
   public async putDocument(
     storeName: OrbitDBReplicatedDocumentStoreName,
     document: Record<string, unknown>,
@@ -2108,9 +2129,7 @@ export default class OrbitDBReplicatedStateRegistry {
     this.assertReady();
     const cleanDocument = this.cleanDocument(document);
 
-    if (!(await this.admitRecord(storeName, cleanDocument))) {
-      throw new InvalidPublicMutationError();
-    }
+    await this.assertAdmitted(storeName, cleanDocument);
 
     const targetNetworkIds = await this.targetNetworkIdsForDocument(
       cleanDocument,

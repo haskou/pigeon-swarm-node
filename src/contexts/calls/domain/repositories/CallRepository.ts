@@ -47,6 +47,8 @@ export default abstract class CallRepository {
   /**
    * Persists the signed state of one participant (joined, left or declined)
    * at the signed time `at`, which may differ from the time the call state holds.
+   * Conversation participants are stored. Community participants are only
+   * verified: their roster is the lease set, so nothing is persisted.
    */
   public abstract saveParticipant(
     call: Call,

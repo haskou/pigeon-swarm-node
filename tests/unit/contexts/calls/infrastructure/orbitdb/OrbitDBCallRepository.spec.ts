@@ -11,8 +11,10 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
+import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { OrbitDBMutationGate } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -52,6 +54,28 @@ function createStore() {
 }
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+/** Rejects every participant record, as a gate that cannot admit a join would. */
+class RejectingParticipantGate extends OrbitDBMutationGate {
+  public governs(collection: string): boolean {
+    return collection === 'calls';
+  }
+
+  public async accepts(
+    _collection: string,
+    record: Record<string, unknown>,
+  ): Promise<boolean> {
+    return record.scopeType !== 'call_participant';
+  }
+
+  public governsHead(): boolean {
+    return false;
+  }
+
+  public async acceptsHead(): Promise<boolean> {
+    return true;
+  }
+}
 
 describe('OrbitDBCallRepository', () => {
   const networkId = '550e8400-e29b-41d4-a716-446655440002';
@@ -279,5 +303,89 @@ describe('OrbitDBCallRepository', () => {
     expect(loser?.isActive()).toBe(false);
     const winner = await repository.findById(new CallId(winnerId));
     expect(winner?.toPrimitives().status).toBe('active');
+  });
+
+  it('verifies but does not store a community participant record', async () => {
+    const start = communityStart();
+    await replicate(start.payload, start.proof);
+    const call = (await repository.findById(new CallId(start.callId))) as Call;
+    const at = now() + 1;
+    const joined = signCallParticipant({
+      at,
+      callId: start.callId,
+      signer: peer,
+      state: 'joined',
+    });
+    call.joinOrAdd(new IdentityId(peer.id), new Timestamp(at));
+    const writes = calls.put.mock.calls.length;
+
+    await repository.saveParticipant(
+      call,
+      new IdentityId(peer.id),
+      new Timestamp(at),
+      joined.proof,
+    );
+
+    expect(calls.put.mock.calls.length).toBe(writes);
+    expect(calls.put).not.toHaveBeenCalledWith(
+      expect.objectContaining({ scopeType: 'call_participant' }),
+    );
+  });
+
+  it('rejects a community join whose proof the gate does not admit', async () => {
+    const start = communityStart();
+    await replicate(start.payload, start.proof);
+    const call = (await repository.findById(new CallId(start.callId))) as Call;
+    const at = now() + 1;
+    const joined = signCallParticipant({
+      at,
+      callId: start.callId,
+      signer: peer,
+      state: 'joined',
+    });
+    call.joinOrAdd(new IdentityId(peer.id), new Timestamp(at));
+    registry.addMutationGate(new RejectingParticipantGate());
+
+    await expect(
+      repository.saveParticipant(
+        call,
+        new IdentityId(peer.id),
+        new Timestamp(at),
+        joined.proof,
+      ),
+    ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+    expect(calls.put).not.toHaveBeenCalledWith(
+      expect.objectContaining({ scopeType: 'call_participant' }),
+    );
+  });
+
+  it('still stores a conversation participant record', async () => {
+    const start = conversationStart();
+    await replicate(start.payload, start.proof);
+    const call = (await repository.findById(new CallId(start.callId))) as Call;
+    const at = now() + 1;
+    const joined = signCallParticipant({
+      at,
+      callId: start.callId,
+      signer: peer,
+      state: 'joined',
+    });
+    call.join(new IdentityId(peer.id), new Timestamp(at));
+
+    await repository.saveParticipant(
+      call,
+      new IdentityId(peer.id),
+      new Timestamp(at),
+      joined.proof,
+    );
+
+    expect(calls.put).toHaveBeenCalledWith(
+      expect.objectContaining({
+        callId: start.callId,
+        identityId: peer.id,
+        scopeType: 'call_participant',
+        state: 'joined',
+      }),
+    );
   });
 });

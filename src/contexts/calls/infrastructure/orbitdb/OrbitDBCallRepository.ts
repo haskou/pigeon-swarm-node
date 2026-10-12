@@ -191,6 +191,23 @@ export default class OrbitDBCallRepository extends CallRepository {
     });
   }
 
+  /**
+   * Community participants are never stored: the roster is the lease set and
+   * the signed join or leave is only admitted here, so nothing is replicated.
+   */
+  private async admit(
+    call: Call,
+    payload: Record<string, unknown>,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    await this.runWhilePublicCommunityScope(call, () =>
+      this.registry.admitDocument(
+        'calls',
+        PublicMutationRecord.withProof(payload, proof),
+      ),
+    );
+  }
+
   public async findById(id: CallId): Promise<Call | undefined> {
     const document = await this.callProjection.findById(id);
 
@@ -304,7 +321,13 @@ export default class OrbitDBCallRepository extends CallRepository {
     at: Timestamp,
     proof: PublicMutationProof,
   ): Promise<void> {
-    return this.put(call, this.participantRecord(call, identityId, at), proof);
+    const payload = this.participantRecord(call, identityId, at);
+
+    if (call.getScope().isCommunityChannel()) {
+      return this.admit(call, payload, proof);
+    }
+
+    return this.put(call, payload, proof);
   }
 
   public saveEnd(call: Call, proof: PublicMutationProof): Promise<void> {

@@ -539,7 +539,8 @@ events (no replicated mutable state).
 - Call start: `scopeType: call_start`, one record per call, author == caller.
 - Participant events: `scopeType: call_participant`, one record per
   `(callId, identityId)` with a `sequence` chain whose payload `state` is
-  `joined | left | declined`.
+  `joined | left | declined`. Conversation calls only: community joins and
+  leaves are verified and not stored.
 - Call end: `scopeType: call_end`, one record per call, signed by the creator
   (or, for conversation calls, derivable: all participants left or declined).
 - **Derived (never replicated):** `status`, `endedAt` for the derived end,
