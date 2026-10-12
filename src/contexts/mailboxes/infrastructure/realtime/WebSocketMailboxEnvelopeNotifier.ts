@@ -5,4 +5,12 @@ export default class WebSocketMailboxEnvelopeNotifier extends MailboxEnvelopeNot
   public envelopeAppended(mailboxId: string, cursor: number): void {
     webSocketEventHub.publishMailboxEnvelope(mailboxId, cursor);
   }
+
+  public readerRevoked(mailboxId: string, readTokenHash: string): void {
+    webSocketEventHub.dropMailboxReaderSubscriptions(mailboxId, readTokenHash);
+  }
+
+  public mailboxRemoved(mailboxId: string): void {
+    webSocketEventHub.dropMailboxSubscriptions(mailboxId);
+  }
 }

@@ -112,11 +112,16 @@ describe('mailboxes', () => {
     reader = new MailboxReader(repository, coordinator);
     const settler = new MailboxSettler(repository);
     acknowledger = new MailboxAcknowledger(repository, coordinator, settler);
-    remover = new MailboxRemover(repository, coordinator);
-    expirer = new MailboxExpirer(repository, policy, coordinator);
+    remover = new MailboxRemover(repository, coordinator, notifier);
+    expirer = new MailboxExpirer(repository, policy, coordinator, notifier);
     adder = new MailboxReaderAdder(repository, policy, coordinator);
     lister = new MailboxReaderLister(repository, policy);
-    revoker = new MailboxReaderRevoker(repository, coordinator, settler);
+    revoker = new MailboxReaderRevoker(
+      repository,
+      coordinator,
+      settler,
+      notifier,
+    );
   };
 
   const createMailbox = (
@@ -334,6 +339,12 @@ describe('mailboxes', () => {
     expect((await reader.read(MAILBOX, READ, 0, 10)).envelopes).toEqual([]);
   });
 
+  it('tells realtime listeners when a mailbox is deleted', async () => {
+    await remover.remove(MAILBOX, READ);
+
+    expect(notifier.mailboxRemoved).toHaveBeenCalledWith(MAILBOX);
+  });
+
   it('never reuses a cursor when a deleted mailbox is recreated under the same id', async () => {
     await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
     await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
@@ -392,6 +403,21 @@ describe('mailboxes', () => {
       MailboxNotFoundError,
     );
     clock.mockRestore();
+  });
+
+  it('tells realtime listeners when expiry deletes an idle mailbox', async () => {
+    process.env.MAILBOX_RETENTION_MS = '1000';
+    const t0 = Date.now();
+    const clock = jest.spyOn(Date, 'now');
+    const idle = 'i'.repeat(43);
+
+    clock.mockReturnValue(t0);
+    await createMailbox(idle, sha(POST), sha(READ));
+
+    await expirer.expire(t0 + 1200);
+    clock.mockRestore();
+
+    expect(notifier.mailboxRemoved).toHaveBeenCalledWith(idle);
   });
 
   it('leaves the old state when a batch fails midway', async () => {
@@ -729,6 +755,25 @@ describe('mailboxes', () => {
     await expect(
       revoker.revoke(MAILBOX, READ, sha(THIRD)),
     ).rejects.toBeInstanceOf(MailboxReaderNotFoundError);
+  });
+
+  it('tells realtime listeners which reader was revoked', async () => {
+    await adder.add(MAILBOX, READ, OTHER_READ_HASH);
+
+    await revoker.revoke(MAILBOX, READ, OTHER_READ_HASH);
+
+    expect(notifier.readerRevoked).toHaveBeenCalledWith(
+      MAILBOX,
+      OTHER_READ_HASH,
+    );
+  });
+
+  it('tells realtime listeners nothing about a refused revocation', async () => {
+    await expect(
+      revoker.revoke(MAILBOX, READ, READ_HASH),
+    ).rejects.toBeInstanceOf(MailboxLastReaderError);
+
+    expect(notifier.readerRevoked).not.toHaveBeenCalled();
   });
 
   it('keeps envelopes a silent reader has not acknowledged until retention expires them', async () => {
