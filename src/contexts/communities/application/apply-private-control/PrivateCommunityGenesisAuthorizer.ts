@@ -1,4 +1,5 @@
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityPrimitivesShape } from '@app/contexts/communities/domain/CommunityPrimitivesShape';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { PrivateGenesisProjectionAuthorizer } from '@app/contexts/private-authorization/application/provision-scope/PrivateGenesisProjectionAuthorizer';
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
@@ -12,10 +13,12 @@ export default class PrivateCommunityGenesisAuthorizer extends PrivateGenesisPro
     ownerIdentityId: IdentityId,
     projection: Record<string, unknown>,
   ): Record<string, unknown> {
+    if (!CommunityPrimitivesShape.isCommunityPrimitives(projection)) {
+      throw new InvalidPrivateAuthorizationError();
+    }
+
     try {
-      const community = Community.fromPrimitives(
-        projection as ReturnType<Community['toPrimitives']>,
-      );
+      const community = Community.fromPrimitives(projection);
 
       assert(
         community.isPrivateGenesisFor(

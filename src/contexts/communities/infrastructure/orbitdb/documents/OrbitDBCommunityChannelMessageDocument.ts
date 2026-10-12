@@ -10,7 +10,7 @@ export interface OrbitDBCommunityChannelMessageDocument extends Record<
   encryptedPayload?: string;
   id: string;
   mentions?: {
-    targetId: string | undefined;
+    targetId?: string;
     type: string;
   }[];
   messageId: string;

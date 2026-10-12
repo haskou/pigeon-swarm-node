@@ -3,6 +3,7 @@ import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 
 import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError';
+import { InvalidIdentityCandidateError } from '../../domain/errors/InvalidIdentityCandidateError';
 import { Identity } from '../../domain/Identity';
 import { IdentityCandidate } from '../../domain/IdentityCandidate';
 import IdentityRepository from '../../domain/repositories/IdentityRepository';
@@ -13,6 +14,7 @@ import { ProfileHandle } from '../../domain/value-objects/ProfileHandle';
 import IdentityMetadataIndex from '../metadata/IdentityMetadataIndex';
 import { IdentityMetadataRecord } from '../metadata/IdentityMetadataRecord';
 import { IpfsIdentityDocument } from './documents/IpfsIdentityDocument';
+import { IpfsIdentityDocumentShape } from './documents/IpfsIdentityDocumentShape';
 import IpfsIdentityMapper from './mappers/IpfsIdentityMapper';
 
 export default class IpfsIdentityRepository extends IdentityRepository {
@@ -111,14 +113,27 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     cid: IPFSId,
     networkIds?: string[],
   ): Promise<IpfsIdentityDocument> {
+    const document = await this.readDocumentFromCid(cid, networkIds);
+
+    if (!IpfsIdentityDocumentShape.isIpfsIdentityDocument(document)) {
+      throw new InvalidIdentityCandidateError();
+    }
+
+    return document;
+  }
+
+  private async readDocumentFromCid(
+    cid: IPFSId,
+    networkIds?: string[],
+  ): Promise<unknown> {
     try {
       return networkIds && networkIds.length > 0
-        ? await this.ipfsManager.getJSONFromNetworks<IpfsIdentityDocument>(
+        ? await this.ipfsManager.getJSONFromNetworks<unknown>(
             cid,
             networkIds,
             IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
           )
-        : await this.ipfsManager.getJSON<IpfsIdentityDocument>(
+        : await this.ipfsManager.getJSON<unknown>(
             cid,
             IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
           );
@@ -135,9 +150,9 @@ export default class IpfsIdentityRepository extends IdentityRepository {
               IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
             );
 
-      return JSON.parse(
-        Buffer.from(bytes).toString('utf8'),
-      ) as IpfsIdentityDocument;
+      const document: unknown = JSON.parse(Buffer.from(bytes).toString('utf8'));
+
+      return document;
     }
   }
 

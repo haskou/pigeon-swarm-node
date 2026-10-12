@@ -1,6 +1,6 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import { IdentityCandidate } from '@app/contexts/identities/domain/IdentityCandidate';
-import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
+import { IdentityPrimitivesShape } from '@app/contexts/identities/domain/IdentityPrimitivesShape';
 import IdentityHandleOwnershipDomainService from '@app/contexts/identities/domain/services/IdentityHandleOwnershipDomainService';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
@@ -37,14 +37,14 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
   private identityFrom(
     document: Record<string, unknown>,
   ): Identity | undefined {
-    if (typeof document.identity !== 'object' || document.identity === null) {
+    const { identity } = document;
+
+    if (!IdentityPrimitivesShape.isIdentityPrimitives(identity)) {
       return undefined;
     }
 
     try {
-      return Identity.fromPrimitives(
-        document.identity as unknown as IdentityPrimitives,
-      );
+      return Identity.fromPrimitives(identity);
     } catch {
       return undefined;
     }

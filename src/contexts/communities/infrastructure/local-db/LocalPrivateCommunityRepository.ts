@@ -3,6 +3,7 @@ import { PrivateAuthorizationRepository } from '@app/contexts/private-authorizat
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Community } from '../../domain/Community';
+import { CommunityPrimitivesShape } from '../../domain/CommunityPrimitivesShape';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 
 export default class LocalPrivateCommunityRepository {
@@ -18,9 +19,11 @@ export default class LocalPrivateCommunityRepository {
     if (!projection) return undefined;
 
     try {
-      const community = Community.fromPrimitives(
-        projection as ReturnType<Community['toPrimitives']>,
-      );
+      if (!CommunityPrimitivesShape.isCommunityPrimitives(projection)) {
+        throw new InvalidPrivateAuthorizationError();
+      }
+
+      const community = Community.fromPrimitives(projection);
 
       if (!community.isIdentifiedBy(id)) {
         throw new InvalidPrivateAuthorizationError();

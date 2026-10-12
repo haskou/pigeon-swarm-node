@@ -16,6 +16,19 @@ import OrbitDBContentReplicationMapper from './mappers/OrbitDBContentReplication
  * that the policy refuses is never listed, whoever wrote it.
  */
 export default class OrbitDBContentReplicationRepository extends ContentReplicationRepository {
+  private static isDocument(
+    record: Record<string, unknown>,
+  ): record is OrbitDBContentReplicationDocument {
+    return (
+      typeof record.cid === 'string' &&
+      typeof record.context === 'string' &&
+      typeof record.networkId === 'string' &&
+      typeof record.ownerIdentityId === 'string' &&
+      record.scopeType === 'content_replication' &&
+      typeof record.sizeBytes === 'number'
+    );
+  }
+
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly mapper: OrbitDBContentReplicationMapper,
@@ -34,9 +47,7 @@ export default class OrbitDBContentReplicationRepository extends ContentReplicat
         (cid === undefined || record.cid === cid),
     );
 
-    return records.map(
-      (record) => record as unknown as OrbitDBContentReplicationDocument,
-    );
+    return records.filter(OrbitDBContentReplicationRepository.isDocument);
   }
 
   private toDomain(
