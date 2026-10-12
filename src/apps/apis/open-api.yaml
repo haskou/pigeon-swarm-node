@@ -41,6 +41,10 @@ paths:
     $ref: './mailboxes-api/swagger.yaml#/paths/~1mailboxes~1{mailboxId}~1envelopes'
   /mailboxes/{mailboxId}/ack:
     $ref: './mailboxes-api/swagger.yaml#/paths/~1mailboxes~1{mailboxId}~1ack'
+  /mailboxes/{mailboxId}/readers:
+    $ref: './mailboxes-api/swagger.yaml#/paths/~1mailboxes~1{mailboxId}~1readers'
+  /mailboxes/{mailboxId}/readers/{readTokenHash}:
+    $ref: './mailboxes-api/swagger.yaml#/paths/~1mailboxes~1{mailboxId}~1readers~1{readTokenHash}'
   /private-blobs:
     $ref: './private-blobs-api/swagger.yaml#/paths/~1private-blobs'
   /private-blobs/{blobId}:

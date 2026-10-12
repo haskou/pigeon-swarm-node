@@ -1,3 +1,5 @@
+import { MailboxReaderPrimitives } from './MailboxReaderPrimitives';
+
 export interface MailboxPrimitives {
   appendRefilledAt: number;
   appendTokens: number;
@@ -8,5 +10,5 @@ export interface MailboxPrimitives {
   lastReadAt: number;
   nextCursor: number;
   postTokenHash: string;
-  readTokenHash: string;
+  readers: MailboxReaderPrimitives[];
 }

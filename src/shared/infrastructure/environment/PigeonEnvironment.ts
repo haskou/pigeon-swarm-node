@@ -54,6 +54,7 @@ export const pigeonEnvironmentSchema = {
   MAILBOX_MAX_BYTES: { defaultValue: 8 * 1024 * 1024, type: 'number' },
   MAILBOX_MAX_COUNT: { defaultValue: 10_000, type: 'number' },
   MAILBOX_MAX_ENVELOPES: { defaultValue: 1000, type: 'number' },
+  MAILBOX_MAX_READERS: { defaultValue: 8, type: 'number' },
   MAILBOX_RETENTION_MS: {
     defaultValue: 14 * 24 * 60 * 60 * 1000,
     type: 'number',

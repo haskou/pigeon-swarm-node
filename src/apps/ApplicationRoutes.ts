@@ -88,10 +88,13 @@ import { PutContentReplicationRoute } from '@app/apps/apis/ipfs-api/routes/PutCo
 import { GetKeychainRoute } from '@app/apps/apis/keychains-api/routes/GetKeychainRoute';
 import { PostKeychainRoute } from '@app/apps/apis/keychains-api/routes/PostKeychainRoute';
 import { PostLinkPreviewRoute } from '@app/apps/apis/link-previews-api/routes/PostLinkPreviewRoute';
+import { DeleteMailboxReaderRoute } from '@app/apps/apis/mailboxes-api/routes/DeleteMailboxReaderRoute';
 import { DeleteMailboxRoute } from '@app/apps/apis/mailboxes-api/routes/DeleteMailboxRoute';
 import { GetMailboxEnvelopesRoute } from '@app/apps/apis/mailboxes-api/routes/GetMailboxEnvelopesRoute';
+import { GetMailboxReadersRoute } from '@app/apps/apis/mailboxes-api/routes/GetMailboxReadersRoute';
 import { PostMailboxAckRoute } from '@app/apps/apis/mailboxes-api/routes/PostMailboxAckRoute';
 import { PostMailboxEnvelopeRoute } from '@app/apps/apis/mailboxes-api/routes/PostMailboxEnvelopeRoute';
+import { PostMailboxReaderRoute } from '@app/apps/apis/mailboxes-api/routes/PostMailboxReaderRoute';
 import { PutMailboxRoute } from '@app/apps/apis/mailboxes-api/routes/PutMailboxRoute';
 import { DeleteNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/DeleteNodeNetworkRoute';
 import { GetClientContractRoute } from '@app/apps/apis/nodes-api/routes/GetClientContractRoute';
@@ -192,10 +195,13 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   DeleteConversationAdminRoute,
   GetContentReplicationStatusRoute,
   PutContentReplicationRoute,
+  DeleteMailboxReaderRoute,
   DeleteMailboxRoute,
   GetMailboxEnvelopesRoute,
+  GetMailboxReadersRoute,
   PostMailboxAckRoute,
   PostMailboxEnvelopeRoute,
+  PostMailboxReaderRoute,
   PutMailboxRoute,
   DeletePrivateBlobRoute,
   GetPrivateBlobRoute,
