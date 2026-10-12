@@ -1,3 +1,4 @@
+import { Timestamp } from '@haskou/value-objects';
 import { Readable } from 'stream';
 
 import { PrivateBlobNotFoundError } from '../domain/errors/PrivateBlobNotFoundError';
@@ -23,7 +24,7 @@ export default class PrivateBlobUploader {
 
     if (
       !blob ||
-      blob.isExpired(Date.now()) ||
+      blob.isExpired(Timestamp.now()) ||
       !blob.acceptsUpload(uploadToken)
     ) {
       throw new PrivateBlobNotFoundError();
@@ -41,7 +42,7 @@ export default class PrivateBlobUploader {
 
     try {
       await this.bytes.write(blobId, source, blob.getSize());
-      blob.markStored(Date.now());
+      blob.markStored(Timestamp.now());
       await this.repository.save(blob);
     } finally {
       this.inProgress.delete(blobId);

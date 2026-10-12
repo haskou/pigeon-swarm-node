@@ -1,3 +1,5 @@
+import { Timestamp } from '@haskou/value-objects';
+
 import { Mailbox } from '../domain/Mailbox';
 import MailboxPolicy from '../domain/MailboxPolicy';
 import MailboxRepository from '../domain/repositories/MailboxRepository';
@@ -13,10 +15,8 @@ export default class MailboxExpirer {
     private readonly notifier: MailboxEnvelopeNotifier,
   ) {}
 
-  private async expireOne(mailbox: Mailbox, now: number): Promise<void> {
-    const retention = this.policy.retentionMs();
-
-    if (mailbox.getLastReadAt() + retention <= now) {
+  private async expireOne(mailbox: Mailbox, now: Timestamp): Promise<void> {
+    if (mailbox.isExpired(now, this.policy)) {
       await this.repository.remove(mailbox.getId());
       this.notifier.mailboxRemoved(mailbox.getId());
 
@@ -28,23 +28,18 @@ export default class MailboxExpirer {
       0,
       Number.MAX_SAFE_INTEGER,
     );
-    const expired = all.filter(
-      (envelope) => envelope.storedAt + retention <= now,
-    );
+    const expired = this.policy.expiredEnvelopes(all, now);
 
     if (expired.length === 0) {
       return;
     }
 
-    mailbox.releaseEnvelopes(
-      expired.length,
-      expired.reduce((sum, envelope) => sum + envelope.size, 0),
-    );
+    mailbox.releaseEnvelopes(expired);
     await this.repository.commitRemoval(mailbox, expired);
   }
 
   /** One failing mailbox never stops the sweep; failures are reported as a count. */
-  public async expire(now: number): Promise<void> {
+  public async expire(now: Timestamp): Promise<void> {
     const mailboxes = await this.repository.listAll();
     let failed = 0;
 

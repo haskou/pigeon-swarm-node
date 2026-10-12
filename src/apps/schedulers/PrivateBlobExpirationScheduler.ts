@@ -2,6 +2,7 @@ import PrivateBlobExpirer from '@app/contexts/private-blobs/application/PrivateB
 import ReplicatedStateSchedulerErrorPolicy from '@app/shared/infrastructure/scheduler/ReplicatedStateSchedulerErrorPolicy';
 import Scheduler from '@haskou/ddd-kernel/scheduler';
 import { CronExpression } from '@haskou/ddd-kernel/scheduler';
+import { Timestamp } from '@haskou/value-objects';
 
 export default class PrivateBlobExpirationScheduler extends Scheduler {
   constructor(private readonly expirer: PrivateBlobExpirer) {
@@ -9,7 +10,7 @@ export default class PrivateBlobExpirationScheduler extends Scheduler {
   }
 
   public async execute(): Promise<void> {
-    await this.expirer.expire(Date.now());
+    await this.expirer.expire(Timestamp.now());
   }
 
   public getCronExpression(): CronExpression {

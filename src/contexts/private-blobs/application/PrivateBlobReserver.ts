@@ -1,5 +1,5 @@
-import { PrivateBlobQuotaExceededError } from '../domain/errors/PrivateBlobQuotaExceededError';
-import { PrivateBlobSizeInvalidError } from '../domain/errors/PrivateBlobSizeInvalidError';
+import { Timestamp } from '@haskou/value-objects';
+
 import { PrivateBlob } from '../domain/PrivateBlob';
 import PrivateBlobPolicy from '../domain/PrivateBlobPolicy';
 import PrivateBlobRepository from '../domain/repositories/PrivateBlobRepository';
@@ -23,27 +23,16 @@ export default class PrivateBlobReserver {
     ownerIdentityId: string,
     size: number,
   ): Promise<PrivateBlobReservation> {
-    if (
-      !Number.isSafeInteger(size) ||
-      size < 1 ||
-      size > this.policy.maxBytes()
-    ) {
-      throw new PrivateBlobSizeInvalidError(this.policy.maxBytes());
-    }
+    this.policy.assertSizeAllowed(size);
 
-    const now = Date.now();
+    const now = Timestamp.now();
     const ownerKey = await this.repository.ownerKeyFor(ownerIdentityId);
     const [total, owned] = await Promise.all([
       this.repository.reservedBytes(now),
       this.repository.reservedBytes(now, ownerKey),
     ]);
 
-    if (
-      total + size > this.policy.totalQuotaBytes() ||
-      owned + size > this.policy.ownerQuotaBytes()
-    ) {
-      throw new PrivateBlobQuotaExceededError();
-    }
+    this.policy.assertQuotaAllowed(size, total, owned);
 
     const { blob, downloadToken, uploadToken } = PrivateBlob.reserve({
       now,

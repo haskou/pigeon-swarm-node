@@ -1,3 +1,5 @@
+import { Timestamp } from '@haskou/value-objects';
+
 import { MailboxNotFoundError } from '../domain/errors/MailboxNotFoundError';
 import MailboxPolicy from '../domain/MailboxPolicy';
 import MailboxRepository from '../domain/repositories/MailboxRepository';
@@ -29,7 +31,7 @@ export default class MailboxReaderAdder {
 
       const added = mailbox.addReader(readTokenHash, this.policy);
 
-      mailbox.markRead(Date.now());
+      mailbox.markRead(Timestamp.now());
       await this.repository.save(mailbox);
 
       return added;

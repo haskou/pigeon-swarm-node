@@ -1,6 +1,6 @@
-import { MailboxConflictError } from '../domain/errors/MailboxConflictError';
+import { Timestamp } from '@haskou/value-objects';
+
 import { MailboxCreationProofInvalidError } from '../domain/errors/MailboxCreationProofInvalidError';
-import { MailboxLimitReachedError } from '../domain/errors/MailboxLimitReachedError';
 import { Mailbox } from '../domain/Mailbox';
 import { MailboxCreationDifficulty } from '../domain/MailboxCreationDifficulty';
 import { MailboxCreationProof } from '../domain/MailboxCreationProof';
@@ -20,18 +20,14 @@ export default class MailboxCreator {
    * are empty and idle. All or nothing: with too few such mailboxes nothing
    * is removed and the creation is refused.
    */
-  private async evictIdleEmpty(needed: number, now: number): Promise<void> {
-    const candidates = (await this.repository.listAll())
-      .filter((mailbox) =>
-        mailbox.isIdleAndEmpty(now, MailboxPolicy.EVICTION_IDLE_MS),
-      )
-      .sort((a, b) => a.getLastReadAt() - b.getLastReadAt());
+  private async evictIdleEmpty(needed: number, now: Timestamp): Promise<void> {
+    const victims = Mailbox.selectEvictions(
+      await this.repository.listAll(),
+      now,
+      needed,
+    );
 
-    if (candidates.length < needed) {
-      throw new MailboxLimitReachedError();
-    }
-
-    for (const mailbox of candidates.slice(0, needed)) {
+    for (const mailbox of victims) {
       await this.repository.remove(mailbox.getId());
     }
   }
@@ -69,14 +65,12 @@ export default class MailboxCreator {
       const existing = await this.repository.findById(mailboxId);
 
       if (existing) {
-        if (!existing.hasHashes(postTokenHash, readTokenHash)) {
-          throw new MailboxConflictError();
-        }
+        existing.requireHashes(postTokenHash, readTokenHash);
 
         return false;
       }
 
-      const now = Date.now();
+      const now = Timestamp.now();
       const count = await this.repository.count();
       const max = this.policy.maxMailboxes();
 

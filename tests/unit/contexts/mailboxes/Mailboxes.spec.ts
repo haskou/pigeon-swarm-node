@@ -27,6 +27,7 @@ import MailboxPolicy from '@app/contexts/mailboxes/domain/MailboxPolicy';
 import { MailboxLimitsFromEnvironment } from '@app/contexts/mailboxes/infrastructure/environment/MailboxLimitsFromEnvironment';
 import LocalMailboxRepository from '@app/contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import { Timestamp } from '@haskou/value-objects';
 import { createHash } from 'crypto';
 import { promises as fs } from 'fs';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -408,7 +409,7 @@ describe('mailboxes', () => {
 
     clock.mockReturnValue(t0 + 800);
     await reader.read(MAILBOX, READ, 0, 10);
-    await expirer.expire(t0 + 1200);
+    await expirer.expire(new Timestamp(t0 + 1200));
     clock.mockReturnValue(t0 + 1200);
 
     expect((await reader.read(MAILBOX, READ, 0, 10)).envelopes).toEqual([]);
@@ -428,7 +429,7 @@ describe('mailboxes', () => {
     clock.mockReturnValue(t0);
     await createMailbox(idle, sha(POST), sha(READ));
 
-    await expirer.expire(t0 + 1200);
+    await expirer.expire(new Timestamp(t0 + 1200));
     clock.mockRestore();
 
     expect(notifier.mailboxRemoved).toHaveBeenCalledWith(idle);
@@ -817,7 +818,7 @@ describe('mailboxes', () => {
     expect(await readCursors(MAILBOX, READ)).toEqual([1]);
 
     clock.mockReturnValue(start + 1200);
-    await expirer.expire(start + 1200);
+    await expirer.expire(new Timestamp(start + 1200));
     expect(await readCursors(MAILBOX, READ)).toEqual([]);
     clock.mockRestore();
   });

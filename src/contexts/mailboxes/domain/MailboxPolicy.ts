@@ -1,7 +1,13 @@
+import { Timestamp } from '@haskou/value-objects';
+
+import { MailboxEnvelopeInvalidError } from './errors/MailboxEnvelopeInvalidError';
+import { MailboxEnvelope } from './MailboxEnvelope';
 import { MailboxLimits } from './MailboxLimits';
 
 /** Operator-configurable bounds, bound by composition. None of them uses a user identifier. */
 export default class MailboxPolicy {
+  private static readonly BASE64URL = /^[A-Za-z0-9_-]+$/;
+
   /**
    * Envelope bodies must be exactly one of these decoded sizes. Clients pad up
    * to the next bucket, so the node only ever sees a few distinct sizes.
@@ -15,8 +21,36 @@ export default class MailboxPolicy {
 
   constructor(private readonly limits: MailboxLimits) {}
 
-  public isAllowedBodySize(size: number): boolean {
-    return MailboxPolicy.SIZE_BUCKETS.includes(size);
+  /**
+   * Decoded size of a base64url body. Throws unless the body is base64url
+   * and its decoded size is one of the buckets.
+   */
+  public decodedBodySize(body: string): number {
+    if (!MailboxPolicy.BASE64URL.test(body)) {
+      throw new MailboxEnvelopeInvalidError(MailboxPolicy.SIZE_BUCKETS);
+    }
+
+    const size = Buffer.from(body, 'base64url').length;
+
+    if (!MailboxPolicy.SIZE_BUCKETS.includes(size)) {
+      throw new MailboxEnvelopeInvalidError(MailboxPolicy.SIZE_BUCKETS);
+    }
+
+    return size;
+  }
+
+  /** Envelopes whose retention has ended by `now`. */
+  public expiredEnvelopes(
+    envelopes: MailboxEnvelope[],
+    now: Timestamp,
+  ): MailboxEnvelope[] {
+    const retentionMs = this.retentionMs();
+
+    return envelopes.filter((envelope) =>
+      new Timestamp(envelope.storedAt)
+        .addMilliseconds(retentionMs)
+        .isBeforeOrEqual(now),
+    );
   }
 
   public maxAppendsPerMinute(): number {

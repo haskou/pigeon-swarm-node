@@ -1,3 +1,4 @@
+import { Timestamp } from '@haskou/value-objects';
 import { Readable } from 'stream';
 
 import { PrivateBlobNotFoundError } from '../domain/errors/PrivateBlobNotFoundError';
@@ -27,7 +28,7 @@ export default class PrivateBlobReader {
 
     if (
       !blob ||
-      blob.isExpired(Date.now()) ||
+      blob.isExpired(Timestamp.now()) ||
       !blob.acceptsDownload(downloadToken)
     ) {
       throw new PrivateBlobNotFoundError();
