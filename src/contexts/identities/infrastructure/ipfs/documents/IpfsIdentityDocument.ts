@@ -4,6 +4,7 @@ export interface IpfsIdentityDocument {
   authorizationRevision: number;
   deviceCredential: string;
   deviceCredentialCommitment: string;
+  mailboxHome?: string;
   networks: string[];
   previousCid: string | undefined;
   profile: {

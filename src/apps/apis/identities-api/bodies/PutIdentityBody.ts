@@ -47,6 +47,10 @@ export class PutIdentityBody {
   @IsString()
   public readonly recoveryAuthority: string;
 
+  @IsOptional()
+  @IsString()
+  public readonly mailboxHome?: string;
+
   @IsArray()
   @IsString({ each: true })
   @ArrayMinSize(1)

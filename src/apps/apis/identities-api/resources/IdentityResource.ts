@@ -4,6 +4,7 @@ export interface IdentityResource {
   authorizationRevision: number;
   deviceCredential: string;
   deviceCredentialCommitment: string;
+  mailboxHome?: string;
   networks: string[];
   profile: {
     banner: string | undefined;

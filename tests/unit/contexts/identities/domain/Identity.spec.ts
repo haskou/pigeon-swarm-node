@@ -13,6 +13,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 
 import { IdentityMother } from '../../../mothers/IdentityMother';
+import { SignedIdentityMother } from '../../../mothers/SignedIdentityMother';
 
 describe(Identity.name, () => {
   let mother: IdentityMother;
@@ -194,5 +195,44 @@ describe(Identity.name, () => {
         picture: undefined,
       }),
     ).toThrow(InvalidProfileBannerError);
+  });
+
+  describe('mailbox home hint', () => {
+    it('signs the mailbox home so it is restored unchanged', async () => {
+      const primitives = (await SignedIdentityMother.create())
+        .build({ mailboxHome: 'https://node.example' })
+        .toPrimitives();
+
+      expect(primitives.mailboxHome).toBe('https://node.example');
+      expect(Identity.fromPrimitives(primitives).toPrimitives()).toEqual(
+        primitives,
+      );
+    });
+
+    it('rejects a mailbox home rewritten after signing', async () => {
+      const primitives = (await SignedIdentityMother.create())
+        .build({ mailboxHome: 'https://node.example' })
+        .toPrimitives();
+
+      expect(() =>
+        Identity.fromPrimitives({
+          ...primitives,
+          mailboxHome: 'https://attacker.example',
+        }),
+      ).toThrow(InvalidIdentitySignatureError);
+    });
+
+    it('keeps the signing content of publications without a mailbox home', async () => {
+      const primitives = (await SignedIdentityMother.create())
+        .build()
+        .toPrimitives();
+      const content =
+        new IdentitySignatureDomainService().getCanonicalSigningContent(
+          IdentitySignaturePayload.fromPrimitives(primitives),
+        );
+
+      expect(primitives.mailboxHome).toBeUndefined();
+      expect(content).not.toContain('mailboxHome');
+    });
   });
 });

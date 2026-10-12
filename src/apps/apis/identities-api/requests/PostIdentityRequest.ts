@@ -28,6 +28,7 @@ export class PostIdentityRequest {
       deviceCredential: this.body.deviceCredential,
       deviceCredentialCommitment: this.body.deviceCredentialCommitment,
       id: this.body.id || '',
+      mailboxHome: this.body.mailboxHome,
       networks: this.body.networks,
       previousIdentityExternalIdentifier:
         this.body.previousIdentityExternalIdentifier,

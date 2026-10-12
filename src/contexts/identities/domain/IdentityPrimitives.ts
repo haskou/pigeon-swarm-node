@@ -8,6 +8,7 @@ export interface IdentityPrimitives {
   deviceCredential: string;
   deviceCredentialCommitment: string;
   id: string;
+  mailboxHome?: string;
   networks: string[];
   previousIdentityExternalIdentifier?: string;
   profile: PrimitiveOf<Profile>;
