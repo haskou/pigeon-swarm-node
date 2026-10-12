@@ -1846,7 +1846,8 @@ services:
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
   contexts/mailboxes/domain/MailboxPolicy:
     class: /contexts/mailboxes/domain/MailboxPolicy
-    arguments: []
+    arguments:
+      - '@contexts/mailboxes/domain/MailboxLimits'
   contexts/mailboxes/domain/repositories/MailboxRepository: '@contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository'
   contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository:
     class: /contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository
@@ -2310,7 +2311,8 @@ services:
       - '@contexts/private-blobs/domain/repositories/PrivateBlobBytesStore'
   contexts/private-blobs/domain/PrivateBlobPolicy:
     class: /contexts/private-blobs/domain/PrivateBlobPolicy
-    arguments: []
+    arguments:
+      - '@contexts/private-blobs/domain/PrivateBlobLimits'
   contexts/private-blobs/domain/repositories/PrivateBlobBytesStore: '@contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore'
   contexts/private-blobs/domain/repositories/PrivateBlobRepository: '@contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository'
   contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore:
@@ -2670,6 +2672,10 @@ services:
       - '@contexts/calls/domain/repositories/CallParticipantLeaseRepository'
       - '@contexts/calls/application/authorize-call/CallAccessAuthorizer'
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
+  ddd-kernel.override.factory.MailboxLimits:
+    synthetic: true
+  ddd-kernel.override.factory.PrivateBlobLimits:
+    synthetic: true
   shared/infrastructure/lifecycle/Runtime: '@apps/apis/calls-api/CallRelayRuntime'
   shared/infrastructure/http/HttpClient: '@shared/infrastructure/http/FetchHttpClient'
   shared/infrastructure/logs/Log: '@shared/infrastructure/logs/WinstonLogger'
@@ -2703,3 +2709,5 @@ services:
     @contexts/private-authorization/infrastructure/local-db/LocalPrivateOperationUnitOfWork
   contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization: >-
     @contexts/public-mutations/infrastructure/DeviceAuthorizationPublicMutationAuthorization
+  contexts/mailboxes/domain/MailboxLimits: '@ddd-kernel.override.factory.MailboxLimits'
+  contexts/private-blobs/domain/PrivateBlobLimits: '@ddd-kernel.override.factory.PrivateBlobLimits'
