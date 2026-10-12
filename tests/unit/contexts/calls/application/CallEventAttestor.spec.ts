@@ -5,6 +5,7 @@ import { CallStartedEvent } from '@app/contexts/calls/domain/events/CallStartedE
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { Timestamp } from '@haskou/value-objects';
 
 import { callStartArgs } from '../../../../support/signCall';
 
@@ -26,6 +27,10 @@ function newCall(): Call {
 }
 
 describe('CallEventAttestor', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('drops an event of a call this node never admitted', async () => {
     const call = newCall();
     const [started] = call.pullDomainEvents();
@@ -45,10 +50,7 @@ describe('CallEventAttestor', () => {
     const [started] = call.pullDomainEvents();
     const repository = {
       awaitUpdate: jest.fn().mockResolvedValue(true),
-      hasById: jest
-        .fn()
-        .mockResolvedValueOnce(false)
-        .mockResolvedValue(true),
+      hasById: jest.fn().mockResolvedValueOnce(false).mockResolvedValue(true),
       requireById: jest.fn().mockResolvedValue(call),
     };
     const attested = await new CallEventAttestor(repository as never).attest(
@@ -56,6 +58,34 @@ describe('CallEventAttestor', () => {
     );
 
     expect(attested).toBeInstanceOf(CallStartedEvent);
+  });
+
+  it('waits for admissions within a deadline read from the timestamp clock', async () => {
+    const call = newCall();
+    const [started] = call.pullDomainEvents();
+    let now = 1_000_000;
+
+    jest.spyOn(Timestamp, 'now').mockImplementation(() => new Timestamp(now));
+    const repository = {
+      awaitUpdate: jest
+        .fn()
+        .mockImplementationOnce(() => {
+          now += 5_000;
+
+          return Promise.resolve(true);
+        })
+        .mockResolvedValue(false),
+      hasById: jest.fn().mockResolvedValue(false),
+    };
+
+    await expect(
+      new CallEventAttestor(repository as never).attest(started),
+    ).resolves.toBeUndefined();
+    expect(repository.awaitUpdate).toHaveBeenCalledTimes(1);
+    expect(repository.awaitUpdate).toHaveBeenCalledWith(
+      expect.anything(),
+      5_000,
+    );
   });
 
   it('drops an event whose aggregate is not a call id', async () => {

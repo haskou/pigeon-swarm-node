@@ -3,16 +3,21 @@ import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodePeer } from '@app/contexts/nodes/domain/NodePeer';
 import NodePeerRepository from '@app/contexts/nodes/domain/repositories/NodePeerRepository';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import { Timestamp } from '@haskou/value-objects';
 import { mock } from 'jest-mock-extended';
 
 describe('NodePeersFinder', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it('finds active node peers', async () => {
     const peerRepository = mock<NodePeerRepository>();
     const nodeRepository = mock<NodeRepository>();
     const localNode = mock<Node>();
     const peer = mock<NodePeer>();
 
-    jest.spyOn(Date, 'now').mockReturnValue(1780000000000);
+    jest.spyOn(Timestamp, 'now').mockReturnValue(new Timestamp(1780000000000));
     nodeRepository.loadLocalNode.mockResolvedValue(localNode);
     peerRepository.findActive.mockResolvedValue([peer]);
     const activePeers = await new NodePeersFinder(
