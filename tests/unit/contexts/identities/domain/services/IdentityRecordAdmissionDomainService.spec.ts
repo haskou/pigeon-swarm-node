@@ -54,7 +54,10 @@ describe('IdentityRecordAdmissionDomainService', () => {
       const signer = await SignedIdentityMother.create();
 
       expect(
-        admission.admitsShape(recordFor(signer.build(), 'bafy-record', overrides), 100),
+        admission.admitsShape(
+          recordFor(signer.build(), 'bafy-record', overrides),
+          100,
+        ),
       ).toBe(false);
     });
 
@@ -75,9 +78,9 @@ describe('IdentityRecordAdmissionDomainService', () => {
       const signer = await SignedIdentityMother.create();
       const identity = signer.build({ handle: 'hasko' });
 
-      expect(
-        admission.admitsIdentity(identity, recordFor(identity)),
-      ).toBe(true);
+      expect(admission.admitsIdentity(identity, recordFor(identity))).toBe(
+        true,
+      );
     });
 
     it('should reject a record whose redundant identityId differs from the signed id', async () => {
@@ -100,26 +103,28 @@ describe('IdentityRecordAdmissionDomainService', () => {
           (_, index) =>
             `550e8400-e29b-41d4-a716-${String(index).padStart(12, '0')}`,
         );
-      const atCap = networksAt(IdentityRecordAdmissionDomainService.MAX_NETWORKS);
+      const atCap = networksAt(
+        IdentityRecordAdmissionDomainService.MAX_NETWORKS,
+      );
       const overCap = networksAt(
         IdentityRecordAdmissionDomainService.MAX_NETWORKS + 1,
       );
 
       const admitted = signer.build({
-        networks: atCap,
         admissionNonce: signer.mineAdmissionNonce(atCap),
+        networks: atCap,
       });
       const rejected = signer.build({
-        networks: overCap,
         admissionNonce: signer.mineAdmissionNonce(overCap),
+        networks: overCap,
       });
 
-      expect(
-        admission.admitsIdentity(admitted, recordFor(admitted)),
-      ).toBe(true);
-      expect(
-        admission.admitsIdentity(rejected, recordFor(rejected)),
-      ).toBe(false);
+      expect(admission.admitsIdentity(admitted, recordFor(admitted))).toBe(
+        true,
+      );
+      expect(admission.admitsIdentity(rejected, recordFor(rejected))).toBe(
+        false,
+      );
     });
   });
 

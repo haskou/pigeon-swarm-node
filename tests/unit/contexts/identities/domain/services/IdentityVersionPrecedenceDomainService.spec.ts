@@ -33,8 +33,9 @@ describe('IdentityVersionPrecedenceDomainService', () => {
       { cid: 'bafy-bob', identityId: 'bob', version: 1 },
     ];
 
-    expect(
-      service.latestPerIdentity(documents).map((d) => d.cid),
-    ).toEqual(['bafy-new', 'bafy-bob']);
+    expect(service.latestPerIdentity(documents).map((d) => d.cid)).toEqual([
+      'bafy-new',
+      'bafy-bob',
+    ]);
   });
 });
