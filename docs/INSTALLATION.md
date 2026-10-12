@@ -56,7 +56,7 @@ routes resolve to the bundled frontend.
 | `API_PORT` | `8080` | No | HTTP port for API server. |
 | `API_TRUST_PROXY` | `false` | No | How the node reads a client's address for `request.ip`, which the mailbox creation limit uses. `false` uses the socket address and ignores `X-Forwarded-For`. `loopback`, or a hop count such as `1` behind one reverse proxy, trusts the forwarded address. `true` is refused at boot, so clients cannot pick their own key. |
 | `ROUTE_PREFIX` | unset (no prefix) | No | Route prefix for API endpoints, for example `/api`. |
-| `CONTAINER_BUILD` | `false` | No | Source runs only: autowires DI from TypeScript sources. Compiled builds (`dist/`) cannot read sources, so they ignore it and load the committed `config/container/services.yaml`. |
+| `CONTAINER_BUILD` | `false` | No | Source runs only: autowires DI from TypeScript sources. Compiled builds (`dist/`) cannot read sources, so they ignore it and load the committed `config/container/services.yaml`. Regenerate that file with `CONTAINER_BUILD=true`; `tests/unit/config/ServicesYamlGeneration.spec.ts` fails when the committed file no longer matches a fresh generation. |
 | `PIGEON_LOCAL_DB_PATH` | `<project root>/local_storage` | No | Local embedded storage folder. |
 
 ## Logging Variables

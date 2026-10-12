@@ -5,7 +5,7 @@ import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/Domai
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
-import findPublishedKeychain from './FindPublishedKeychain';
+import { findPublishedKeychain } from './FindPublishedKeychain';
 
 export default class RegisterKeychainWhenPublished extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.register-keychain-when-published';
