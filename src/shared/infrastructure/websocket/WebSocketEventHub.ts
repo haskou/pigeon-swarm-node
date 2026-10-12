@@ -1,6 +1,8 @@
 import { CallViewModel } from '@app/apps/apis/calls-api/view-model/CallViewModel';
 import CallEventAttestor from '@app/contexts/calls/application/attest-event/CallEventAttestor';
 import { CallEventAttestation } from '@app/contexts/calls/domain/CallEventAttestation';
+import { MessageReadProofVerifier } from '@app/contexts/conversations/application/verify-message-read-proof/MessageReadProofVerifier';
+import { MessageReadProofVerifyMessage } from '@app/contexts/conversations/application/verify-message-read-proof/messages/MessageReadProofVerifyMessage';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { MessageReadProof } from '@app/contexts/conversations/domain/value-objects/MessageReadProof';
 import { MailboxCapability } from '@app/contexts/mailboxes/domain/MailboxCapability';
@@ -55,6 +57,8 @@ const CONVERSATION_READ_RECEIPT_EVENT = 'conversations.v1.messages.were_read';
 export class WebSocketEventHub {
   private readonly conversationCallEventMapper =
     new ConversationCallEventRealtimeMapper();
+
+  private readonly readProofVerifier = new MessageReadProofVerifier();
 
   private clientMessageHandler?: WebSocketClientMessageHandler;
 
@@ -861,15 +865,20 @@ export class WebSocketEventHub {
   public publishFromNetwork(events: DomainEvent[]): void {
     for (const event of events) {
       // Read receipts change read state, so unproven ones never reach clients.
-      if (
-        event.eventName() === ConversationMessagesWereReadEvent.EVENT_NAME &&
-        !MessageReadProof.isReceivable(event.attributes.readProof, {
-          conversationId: event.aggregateId,
-          messageId: String(event.attributes.messageId),
-          readerIdentityId: String(event.attributes.readerIdentityId),
-        })
-      ) {
-        continue;
+      if (event.eventName() === ConversationMessagesWereReadEvent.EVENT_NAME) {
+        const now = Date.now();
+        const verified = this.readProofVerifier.verify(
+          new MessageReadProofVerifyMessage(
+            event.aggregateId,
+            String(event.attributes.readerIdentityId),
+            String(event.attributes.messageId),
+            event.attributes.readProof,
+          ),
+        );
+
+        if (!verified || !MessageReadProof.isFresh(verified.claim, now)) {
+          continue;
+        }
       }
 
       if (!CallEventAttestation.isLifecycleEvent(event)) {

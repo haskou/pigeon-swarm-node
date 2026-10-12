@@ -1,5 +1,7 @@
 import { MessagesReadMarkMessage } from '@app/contexts/conversations/application/mark-messages-read/messages/MessagesReadMarkMessage';
 import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
+import { MessageReadProofVerifier } from '@app/contexts/conversations/application/verify-message-read-proof/MessageReadProofVerifier';
+import { MessageReadProofVerifyMessage } from '@app/contexts/conversations/application/verify-message-read-proof/messages/MessageReadProofVerifyMessage';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { MessageReadProof } from '@app/contexts/conversations/domain/value-objects/MessageReadProof';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
@@ -10,6 +12,8 @@ import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
 export default class MarkMessagesReadWhenAnnounced extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.mark-messages-read-when-announced';
+
+  private readonly readProofVerifier = new MessageReadProofVerifier();
 
   constructor(
     eventConsumer: DomainEventConsumer,
@@ -36,13 +40,17 @@ export default class MarkMessagesReadWhenAnnounced extends Consumer {
     const messageId = String(event.attributes.messageId);
     const readProof = event.attributes.readProof;
 
-    if (
-      !MessageReadProof.isReceivable(readProof, {
+    const now = Date.now();
+    const verified = this.readProofVerifier.verify(
+      new MessageReadProofVerifyMessage(
         conversationId,
-        messageId,
         readerIdentityId,
-      })
-    ) {
+        messageId,
+        readProof,
+      ),
+    );
+
+    if (!verified || !MessageReadProof.isFresh(verified.claim, now)) {
       return;
     }
 
@@ -51,7 +59,7 @@ export default class MarkMessagesReadWhenAnnounced extends Consumer {
         conversationId,
         readerIdentityId,
         messageId,
-        readProof,
+        verified.proof,
       ),
     );
 
