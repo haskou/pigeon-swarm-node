@@ -7,6 +7,7 @@ import { Request } from 'express';
 
 import { InvalidSignedRequestError } from '../shared/errors/InvalidSignedRequestError';
 import { SignedHttpRequestVerifier } from '../shared/SignedHttpRequestVerifier';
+import { assertSignedRequestTimestampIsFresh } from '../shared/SignedRequestFreshness';
 
 export class DeviceAuthorizationRequestAuthenticator {
   private readonly verifier = new SignedHttpRequestVerifier();
@@ -78,6 +79,37 @@ export class DeviceAuthorizationRequestAuthenticator {
       this.authenticateDevice(
         credentialValue,
         deviceSignatureValue,
+        payload,
+        authorization,
+      );
+    } catch {
+      throw new InvalidSignedRequestError();
+    }
+  }
+
+  public authenticateCurrentDevice(
+    request: Request,
+    authorization: DeviceAuthorization,
+  ): void {
+    try {
+      assert(
+        request.header('x-recovery-signature') === undefined,
+        new InvalidSignedRequestError(),
+      );
+      const timestamp = this.verifier.getRequiredHeader(request, 'x-timestamp');
+      assertSignedRequestTimestampIsFresh(timestamp);
+      const payload = JSON.stringify(
+        this.verifier.getCanonicalPayload(
+          request.method,
+          request.path,
+          timestamp,
+          request.body,
+        ),
+      );
+
+      this.authenticateDevice(
+        request.header('x-device-credential'),
+        request.header('x-device-signature'),
         payload,
         authorization,
       );
