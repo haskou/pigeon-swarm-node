@@ -11,6 +11,17 @@ import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorization
  * lowest revision a credential is ever capped at is the one that holds.
  */
 export class DeviceCompromiseCaps {
+  public static none(): DeviceCompromiseCaps {
+    return new DeviceCompromiseCaps([]);
+  }
+
+  /** The caps a recovery carries forward across its checkpoint. */
+  public static carriedBy(
+    recovery: DeviceAuthorizationTransition,
+  ): DeviceCompromiseCaps {
+    return new DeviceCompromiseCaps(recovery.getCompromisedCredentials());
+  }
+
   private constructor(
     private readonly caps: readonly DeviceCompromisedCredential[],
   ) {}
@@ -33,17 +44,6 @@ export class DeviceCompromiseCaps {
     );
   }
 
-  public static none(): DeviceCompromiseCaps {
-    return new DeviceCompromiseCaps([]);
-  }
-
-  /** The caps a recovery carries forward across its checkpoint. */
-  public static carriedBy(
-    recovery: DeviceAuthorizationTransition,
-  ): DeviceCompromiseCaps {
-    return new DeviceCompromiseCaps(recovery.getCompromisedCredentials());
-  }
-
   /**
    * The caps after an accepted transition: the caps it carries and, for a
    * compromised revocation, the cap on its target.
@@ -53,10 +53,7 @@ export class DeviceCompromiseCaps {
   ): DeviceCompromiseCaps {
     const carried = transition
       .getCompromisedCredentials()
-      .reduce<DeviceCompromiseCaps>(
-        (caps, entry) => caps.tighten(entry),
-        this,
-      );
+      .reduce<DeviceCompromiseCaps>((caps, entry) => caps.tighten(entry), this);
     const compromisedSince = transition.getCompromisedSince();
 
     return compromisedSince !== undefined && transition.isRevocation()
