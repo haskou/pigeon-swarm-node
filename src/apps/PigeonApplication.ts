@@ -22,6 +22,8 @@ import PrivateCommunityGenesisAuthorizer from '../contexts/communities/applicati
 import CommunityRepository from '../contexts/communities/domain/repositories/CommunityRepository';
 import CommunityRepositoryRouter from '../contexts/communities/infrastructure/CommunityRepositoryRouter';
 import { DeviceAuthorizationRepository } from '../contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
+import { DeviceSealedSecretRepository } from '../contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository';
+import LocalDeviceSealedSecretRepository from '../contexts/identity-devices/infrastructure/local-db/LocalDeviceSealedSecretRepository';
 import OrbitDBDeviceAuthorizationRepository from '../contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationRepository';
 import MailboxRepository from '../contexts/mailboxes/domain/repositories/MailboxRepository';
 import LocalMailboxRepository from '../contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository';
@@ -242,6 +244,10 @@ export default class PigeonApplication {
           useClass: OrbitDBDeviceAuthorizationRepository,
         },
         { token: MailboxRepository, useClass: LocalMailboxRepository },
+        {
+          token: DeviceSealedSecretRepository,
+          useClass: LocalDeviceSealedSecretRepository,
+        },
         { token: PrivateBlobRepository, useClass: LocalPrivateBlobRepository },
         { token: PrivateBlobBytesStore, useClass: FilePrivateBlobBytesStore },
         {

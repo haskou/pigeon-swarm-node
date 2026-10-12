@@ -17,7 +17,7 @@ export class DeviceAuthorizationRequestAuthenticator {
     signatureValue: string | undefined,
     payload: string,
     authorization: DeviceAuthorization,
-  ): void {
+  ): IdentityId {
     assert(
       credentialValue !== undefined &&
         credentialValue.length > 0 &&
@@ -36,6 +36,8 @@ export class DeviceAuthorizationRequestAuthenticator {
       hasValidSignature && authorization.isAuthorized(credential),
       new InvalidSignedRequestError(),
     );
+
+    return new IdentityId(credentialValue);
   }
 
   public authenticate(
@@ -90,7 +92,7 @@ export class DeviceAuthorizationRequestAuthenticator {
   public authenticateCurrentDevice(
     request: Request,
     authorization: DeviceAuthorization,
-  ): void {
+  ): IdentityId {
     try {
       assert(
         request.header('x-recovery-signature') === undefined,
@@ -107,7 +109,7 @@ export class DeviceAuthorizationRequestAuthenticator {
         ),
       );
 
-      this.authenticateDevice(
+      return this.authenticateDevice(
         request.header('x-device-credential'),
         request.header('x-device-signature'),
         payload,

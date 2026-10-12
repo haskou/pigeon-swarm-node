@@ -113,9 +113,27 @@ services:
     class: /contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper
     arguments: []
   contexts/identities/infrastructure/metadata/IdentityMetadataIndex: '@contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex'
+  contexts/identity-devices/application/find/DeviceSealedSecretFinder:
+    class: /contexts/identity-devices/application/find/DeviceSealedSecretFinder
+    arguments:
+      - >-
+        @contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository
+  contexts/identity-devices/application/publish/DeviceSealedSecretPublisher:
+    class: /contexts/identity-devices/application/publish/DeviceSealedSecretPublisher
+    arguments:
+      - >-
+        @contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository
+      - >-
+        @contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository
   contexts/identity-devices/domain/services/DeviceAuthorizationPolicy:
     class: /contexts/identity-devices/domain/services/DeviceAuthorizationPolicy
     arguments: []
+  contexts/identity-devices/infrastructure/local-db/LocalDeviceSealedSecretRepository:
+    class: >-
+      /contexts/identity-devices/infrastructure/local-db/LocalDeviceSealedSecretRepository
+    arguments:
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+    parent: contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository
   contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationCanonicalizer:
     class: >-
       /contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationCanonicalizer
