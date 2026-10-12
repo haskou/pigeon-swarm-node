@@ -153,7 +153,7 @@ installed `web-push` module path.
 | `PRIVATE_BLOB_MAX_BYTES` | `52428800` | No | Largest single private blob (50 MiB). |
 | `PRIVATE_BLOB_QUOTA_BYTES_PER_OWNER` | `524288000` | No | Live reserved bytes one identity may hold on this node (500 MiB). |
 | `PRIVATE_BLOB_QUOTA_BYTES_TOTAL` | `10737418240` | No | Live reserved bytes across all owners on this node (10 GiB). |
-| `PRIVATE_BLOB_RETENTION_MS` | `604800000` | No | How long a completed private blob is kept (7 days). |
+| `PRIVATE_BLOB_RETENTION_MS` | `1209600000` | No | How long a completed private blob is kept (14 days). Never less than `MAILBOX_RETENTION_MS`; a lower value is raised to it. |
 | `PRIVATE_BLOB_STORAGE_PATH` | `./private_blobs` | No | Local folder for private blob bytes. Never replicated: back it up together with `PIGEON_LOCAL_DB_PATH` (see [private blob store design](design/private-blob-store.md)). |
 | `PRIVATE_BLOB_UPLOAD_WINDOW_MS` | `3600000` | No | How long a reservation waits for its upload before it is cleaned up (1 hour). |
 | `REALTIME_ALLOWED_ORIGINS` | empty | No | Comma-separated browser origins (for example `https://chat.example.com`) allowed to open the realtime WebSocket. Empty means no Origin restriction. Requests without an `Origin` header (non-browser clients) are never refused by this setting; they still need a valid ticket. Refused upgrades get `403`. |

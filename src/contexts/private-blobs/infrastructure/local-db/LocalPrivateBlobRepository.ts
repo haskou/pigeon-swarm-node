@@ -80,6 +80,12 @@ export default class LocalPrivateBlobRepository extends PrivateBlobRepository {
     return this.all((blob) => blob.isExpired(now));
   }
 
+  public findStoredRetainedBelow(retentionMs: number): Promise<PrivateBlob[]> {
+    return this.all(
+      (blob) => blob.isStored() && blob.getRetentionMs() < retentionMs,
+    );
+  }
+
   public async ownerKeyFor(identityId: string): Promise<string> {
     return createHmac('sha256', await this.salt())
       .update(identityId)

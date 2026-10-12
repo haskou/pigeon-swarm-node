@@ -21,16 +21,18 @@ IPFS publishing is explicitly **not** done for private blobs. IPFS content ids a
 | Single blob         | `PRIVATE_BLOB_MAX_BYTES`             | 50 MiB  |
 | Per owner           | `PRIVATE_BLOB_QUOTA_BYTES_PER_OWNER` | 500 MiB |
 | Whole node          | `PRIVATE_BLOB_QUOTA_BYTES_TOTAL`     | 10 GiB  |
-| Completed retention | `PRIVATE_BLOB_RETENTION_MS`          | 7 days  |
+| Completed retention | `PRIVATE_BLOB_RETENTION_MS`          | 14 days |
 | Upload window       | `PRIVATE_BLOB_UPLOAD_WINDOW_MS`      | 1 hour  |
 
 Reservations are serialized so concurrent calls cannot overshoot a quota. Bytes are written to `<id>.part` and renamed to `<id>.blob` only when the exact reserved size arrived; a mismatch deletes the part file. A scheduler (every 5 minutes) deletes expired bytes and records, so abandoned reservations and aged blobs are reclaimed. Each sweep also deletes stored or partial files that no record owns (after a partial restore, or when an upload finished after its record was expired). Only files named `<id>.blob` or `<id>.part` are considered; other files in the folder are never touched. Files are mode 0600 in a 0700 directory.
+
+Completed blobs live `max(PRIVATE_BLOB_RETENTION_MS, MAILBOX_RETENTION_MS)`, so a blob never expires before the mailbox envelopes that may reference it. The node cannot see those references. A sender that appends its envelope long after the blob completed can still lose the blob; raise `PRIVATE_BLOB_RETENTION_MS` above `MAILBOX_RETENTION_MS` by the largest sender delay you accept. Each sweep also raises stored blobs recorded under a shorter retention (older records, or a lowered setting) to the current floor. Until the first sweep after an upgrade, a legacy blob can answer `404` at read time because the reader checks the old deadline.
 
 ## What this does not do
 
 - **Size correlation is not removed.** The node keeps exact sizes: it serves `Content-Length` and checks the uploaded size. Clients should pad plaintext to size buckets before encryption. That reduces correlation but does not eliminate it. The bucket format is not specified, and the node does not enforce it yet.
 - **Availability is one node.** A blob exists only on the node that received it and only until retention ends. Multi-node fetch or replication is out of scope.
-- **Backups.** A complete backup needs both halves captured at the same moment: the bytes under `PRIVATE_BLOB_STORAGE_PATH` and the local database at `PIGEON_LOCAL_DB_PATH` (default `./local_storage`), which holds the `private_blobs` records and the `owner-key-salt` in `private_blob_meta`. Stop the node, or copy both from one filesystem snapshot. A bytes-only backup restores no records, so the next sweep deletes its files. A restored record keeps its original `expiresAt`, so a restore never extends retention. Capabilities are stored only as SHA-256 hashes, so a backup cannot download a blob on its own. Treat backups as sensitive: they contain the owner-key salt.
+- **Backups.** A complete backup needs both halves captured at the same moment: the bytes under `PRIVATE_BLOB_STORAGE_PATH` and the local database at `PIGEON_LOCAL_DB_PATH` (default `./local_storage`), which holds the `private_blobs` records and the `owner-key-salt` in `private_blob_meta`. Stop the node, or copy both from one filesystem snapshot. A bytes-only backup restores no records, so the next sweep deletes its files. A restored record keeps its original `expiresAt`; the sweep only raises it to the current retention floor. Capabilities are stored only as SHA-256 hashes, so a backup cannot download a blob on its own. Treat backups as sensitive: they contain the owner-key salt.
 - **Migration.** Attachments already published as IPFS CIDs stay distributed; this store cannot delete them. No automatic migration exists.
 - **Client.** The UI does not use this API yet.
 - Metadata visible to the node operator: blob size, upload time, and request timing/IP at the HTTP layer.

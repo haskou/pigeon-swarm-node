@@ -7,6 +7,7 @@ import { PrivateBlob } from '@app/contexts/private-blobs/domain/PrivateBlob';
 import PrivateBlobPolicy from '@app/contexts/private-blobs/domain/PrivateBlobPolicy';
 import PrivateBlobRepository from '@app/contexts/private-blobs/domain/repositories/PrivateBlobRepository';
 import FilePrivateBlobBytesStore from '@app/contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore';
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { randomUUID } from 'crypto';
 import {
   existsSync,
@@ -32,6 +33,14 @@ class MemoryRepository extends PrivateBlobRepository {
 
   public async findExpired(now: number): Promise<PrivateBlob[]> {
     return [...this.blobs.values()].filter((blob) => blob.isExpired(now));
+  }
+
+  public async findStoredRetainedBelow(
+    retentionMs: number,
+  ): Promise<PrivateBlob[]> {
+    return [...this.blobs.values()].filter(
+      (blob) => blob.isStored() && blob.getRetentionMs() < retentionMs,
+    );
   }
 
   public async ownerKeyFor(identityId: string): Promise<string> {
@@ -94,6 +103,8 @@ describe('private blob store', () => {
     delete process.env.PRIVATE_BLOB_QUOTA_BYTES_PER_OWNER;
     delete process.env.PRIVATE_BLOB_QUOTA_BYTES_TOTAL;
     delete process.env.PRIVATE_BLOB_MAX_BYTES;
+    delete process.env.PRIVATE_BLOB_RETENTION_MS;
+    delete process.env.MAILBOX_RETENTION_MS;
   });
 
   it('round-trips bytes and serves ranges with the right slice', async () => {
@@ -200,7 +211,11 @@ describe('private blob store', () => {
 
     await uploader.upload(stored.blobId, stored.uploadToken, bytes('12345'));
 
-    const expirer = new PrivateBlobExpirer(repository, store);
+    const expirer = new PrivateBlobExpirer(
+      repository,
+      store,
+      new PrivateBlobPolicy(),
+    );
     const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
 
     expect(await expirer.expire(Date.now())).toBe(0);
@@ -230,7 +245,11 @@ describe('private blob store', () => {
       return realDelete(id);
     });
 
-    const expirer = new PrivateBlobExpirer(repository, store);
+    const expirer = new PrivateBlobExpirer(
+      repository,
+      store,
+      new PrivateBlobPolicy(),
+    );
     const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
 
     await expect(expirer.expire(farFuture)).rejects.toThrow('1 of 2');
@@ -251,7 +270,11 @@ describe('private blob store', () => {
     writeFileSync(path.join(directory, `${orphanPart}.part`), 'stale');
     writeFileSync(path.join(directory, 'notes.txt'), 'not ours');
 
-    const expirer = new PrivateBlobExpirer(repository, store);
+    const expirer = new PrivateBlobExpirer(
+      repository,
+      store,
+      new PrivateBlobPolicy(),
+    );
 
     expect(await expirer.expire(Date.now())).toBe(0);
     expect(readdirSync(directory).sort()).toEqual(
@@ -295,5 +318,90 @@ describe('private blob store', () => {
     expect(serialized).not.toContain(downloadToken);
     expect(serialized).not.toContain(uploadToken);
     expect(serialized).not.toContain('alice');
+  });
+
+  it('keeps a stored blob for at least the mailbox retention, whatever the blob setting', async () => {
+    const dayMs = 24 * 60 * 60 * 1000;
+    process.env.PRIVATE_BLOB_RETENTION_MS = String(dayMs);
+    const mailboxRetentionMs = pigeonEnvironment().MAILBOX_RETENTION_MS;
+    const now = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
+
+    try {
+      const { blobId, downloadToken, uploadToken } = await reserver.reserve(
+        'alice',
+        3,
+      );
+
+      await uploader.upload(blobId, uploadToken, bytes('abc'));
+      expect(
+        repository.blobs.get(blobId)?.getExpiresAt(),
+      ).toBeGreaterThanOrEqual(now + mailboxRetentionMs);
+
+      const expirer = new PrivateBlobExpirer(
+        repository,
+        store,
+        new PrivateBlobPolicy(),
+      );
+
+      // Envelopes appended at storage time expire at now + mailbox retention.
+      expect(await expirer.expire(now + mailboxRetentionMs - 1)).toBe(0);
+      expect(
+        await collect((await reader.open(blobId, downloadToken)).stream),
+      ).toBe('abc');
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('extends stored blobs recorded under a shorter retention on the next sweep', async () => {
+    const dayMs = 24 * 60 * 60 * 1000;
+    process.env.PRIVATE_BLOB_RETENTION_MS = String(dayMs);
+    const now = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(now);
+
+    try {
+      const { blobId, downloadToken, uploadToken } = await reserver.reserve(
+        'alice',
+        3,
+      );
+
+      await uploader.upload(blobId, uploadToken, bytes('abc'));
+
+      // The setting is gone after the upgrade; the blob keeps its old record.
+      delete process.env.PRIVATE_BLOB_RETENTION_MS;
+      const expirer = new PrivateBlobExpirer(
+        repository,
+        store,
+        new PrivateBlobPolicy(),
+      );
+
+      expect(await expirer.expire(now + 2 * dayMs)).toBe(0);
+      expect(repository.blobs.get(blobId)?.getExpiresAt()).toBe(
+        now + pigeonEnvironment().MAILBOX_RETENTION_MS,
+      );
+      expect(
+        await collect((await reader.open(blobId, downloadToken)).stream),
+      ).toBe('abc');
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it('defaults blob retention to the mailbox retention and never lets it fall below', () => {
+    delete process.env.PRIVATE_BLOB_RETENTION_MS;
+    delete process.env.MAILBOX_RETENTION_MS;
+    const defaults = pigeonEnvironment();
+
+    expect(defaults.PRIVATE_BLOB_RETENTION_MS).toBe(
+      defaults.MAILBOX_RETENTION_MS,
+    );
+
+    process.env.PRIVATE_BLOB_RETENTION_MS = '1000';
+    process.env.MAILBOX_RETENTION_MS = '5000';
+    expect(new PrivateBlobPolicy().retentionMs()).toBe(5000);
+
+    process.env.PRIVATE_BLOB_RETENTION_MS = '9000';
+    expect(new PrivateBlobPolicy().retentionMs()).toBe(9000);
   });
 });

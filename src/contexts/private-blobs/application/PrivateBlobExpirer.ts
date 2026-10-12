@@ -1,3 +1,4 @@
+import PrivateBlobPolicy from '../domain/PrivateBlobPolicy';
 import PrivateBlobBytesStore from '../domain/repositories/PrivateBlobBytesStore';
 import PrivateBlobRepository from '../domain/repositories/PrivateBlobRepository';
 
@@ -6,6 +7,7 @@ export default class PrivateBlobExpirer {
   constructor(
     private readonly repository: PrivateBlobRepository,
     private readonly bytes: PrivateBlobBytesStore,
+    private readonly policy: PrivateBlobPolicy,
   ) {}
 
   private async findOrphanIds(): Promise<string[]> {
@@ -21,6 +23,28 @@ export default class PrivateBlobExpirer {
   }
 
   /**
+   * Extends stored blobs recorded under a shorter retention than the current
+   * floor (older records, or a lowered setting). Returns how many could not be
+   * extended; the next sweep retries them.
+   */
+  private async alignRetention(): Promise<number> {
+    const floorMs = this.policy.retentionMs();
+    const stale = await this.repository.findStoredRetainedBelow(floorMs);
+    let failed = 0;
+
+    for (const blob of stale) {
+      try {
+        blob.extendRetentionTo(floorMs);
+        await this.repository.save(blob);
+      } catch {
+        failed += 1;
+      }
+    }
+
+    return failed;
+  }
+
+  /**
    * Returns the number of records removed. One failing blob never stops the
    * sweep: its record stays so the next sweep retries it, and the failure
    * count is reported after the rest ran.
@@ -30,6 +54,7 @@ export default class PrivateBlobExpirer {
    * expirer removed its record leaves a file behind. Those are removed here.
    */
   public async expire(now: number): Promise<number> {
+    const alignmentFailed = await this.alignRetention();
     const expired = await this.repository.findExpired(now);
     let removed = 0;
     let failed = 0;
@@ -54,9 +79,9 @@ export default class PrivateBlobExpirer {
       }
     }
 
-    if (failed > 0 || orphansFailed > 0) {
+    if (failed > 0 || orphansFailed > 0 || alignmentFailed > 0) {
       throw new Error(
-        `Private blob expiration failed for ${failed} of ${expired.length} blobs and ${orphansFailed} orphaned files; ${removed} removed.`,
+        `Private blob expiration failed for ${failed} of ${expired.length} blobs, ${orphansFailed} orphaned files and ${alignmentFailed} retention extensions; ${removed} removed.`,
       );
     }
 
