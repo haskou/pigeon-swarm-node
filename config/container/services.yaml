@@ -1537,13 +1537,23 @@ services:
   contexts/identities/domain/services/IdentityHandleOwnershipDomainService:
     class: /contexts/identities/domain/services/IdentityHandleOwnershipDomainService
     arguments: []
+  contexts/identities/domain/services/IdentityRecordAdmissionDomainService:
+    class: /contexts/identities/domain/services/IdentityRecordAdmissionDomainService
+    arguments: []
   contexts/identities/domain/services/IdentityResolutionDomainService:
     class: /contexts/identities/domain/services/IdentityResolutionDomainService
+    arguments: []
+  contexts/identities/domain/services/IdentityRoutingDomainService:
+    class: /contexts/identities/domain/services/IdentityRoutingDomainService
     arguments: []
   contexts/identities/domain/services/IdentitySaverService:
     class: /contexts/identities/domain/services/IdentitySaverService
     arguments:
       - '@contexts/identities/domain/repositories/IdentityRepository'
+  contexts/identities/domain/services/IdentityVersionPrecedenceDomainService:
+    class: >-
+      /contexts/identities/domain/services/IdentityVersionPrecedenceDomainService
+    arguments: []
   contexts/identities/infrastructure/ipfs/IpfsIdentityRepository:
     class: /contexts/identities/infrastructure/ipfs/IpfsIdentityRepository
     arguments:

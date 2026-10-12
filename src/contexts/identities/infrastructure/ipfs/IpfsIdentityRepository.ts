@@ -9,6 +9,8 @@ import { IdentityCandidate } from '../../domain/IdentityCandidate';
 import IdentityRepository from '../../domain/repositories/IdentityRepository';
 import IdentityCandidateValidationDomainService from '../../domain/services/IdentityCandidateValidationDomainService';
 import IdentityHandleOwnershipDomainService from '../../domain/services/IdentityHandleOwnershipDomainService';
+import IdentityRoutingDomainService from '../../domain/services/IdentityRoutingDomainService';
+import IdentityVersionPrecedenceDomainService from '../../domain/services/IdentityVersionPrecedenceDomainService';
 import { IdentityExternalIdentifier } from '../../domain/value-objects/IdentityExternalIdentifier';
 import { ProfileHandle } from '../../domain/value-objects/ProfileHandle';
 import IdentityMetadataIndex from '../metadata/IdentityMetadataIndex';
@@ -25,6 +27,8 @@ export default class IpfsIdentityRepository extends IdentityRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_identity-';
   private readonly validator = new IdentityCandidateValidationDomainService();
   private readonly ownership = new IdentityHandleOwnershipDomainService();
+  private readonly versions = new IdentityVersionPrecedenceDomainService();
+  private readonly routing = new IdentityRoutingDomainService();
   private readonly identityByCid = new Map<string, Identity>();
   private readonly activeRemoteCandidateRefreshes = new Set<string>();
 
@@ -40,50 +44,12 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     id: IdentityId,
   ): Promise<IdentityMetadataRecord[]> {
     try {
-      return this.deduplicateMetadata(
+      return this.versions.newestFirst(
         await this.metadataIndex.findByIdentityId(id),
       );
     } catch {
       return [];
     }
-  }
-
-  private deduplicateMetadata(
-    documents: IdentityMetadataRecord[],
-  ): IdentityMetadataRecord[] {
-    const deduplicated = new Map<string, IdentityMetadataRecord>();
-
-    for (const document of documents) {
-      deduplicated.set(`${document.identityId}:${document.cid}`, document);
-    }
-
-    return [...deduplicated.values()].sort((left, right) => {
-      if (left.version !== right.version) {
-        return right.version - left.version;
-      }
-
-      if (left.cid === right.cid) return 0;
-
-      return left.cid < right.cid ? -1 : 1;
-    });
-  }
-
-  private latestMetadataByIdentity(
-    documents: IdentityMetadataRecord[],
-  ): IdentityMetadataRecord[] {
-    const latest = new Map<string, IdentityMetadataRecord>();
-
-    for (const document of this.deduplicateMetadata(documents)) {
-      if (!latest.has(document.identityId)) {
-        latest.set(document.identityId, document);
-      }
-    }
-
-    return [...latest.values()];
-  }
-
-  private routingNetworkIdsFrom(document: IdentityMetadataRecord): string[] {
-    return [...new Set(document.networkIds ?? [])];
   }
 
   private async saveMetadata(identity: Identity, cid: IPFSId): Promise<void> {
@@ -698,14 +664,13 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     networkId?: string,
   ): Promise<number> {
     let republished = 0;
-    const documents = this.latestMetadataByIdentity(
+    const documents = this.versions.latestPerIdentity(
       await this.metadataIndex.findAllCanonical(),
     );
-    const routableNetworkIds = documents
-      .flatMap((document) => this.routingNetworkIdsFrom(document))
-      .filter(
-        (routableNetworkId) => !networkId || routableNetworkId === networkId,
-      );
+    const routableNetworkIds = this.routing.networksToCheck(
+      documents,
+      networkId,
+    );
 
     if (routableNetworkIds.length === 0) {
       return 0;
@@ -716,10 +681,10 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     );
 
     for (const document of documents) {
-      const networkIds = this.routingNetworkIdsFrom(document).filter(
-        (documentNetworkId) =>
-          connectedNetworkIds.has(documentNetworkId) &&
-          (!networkId || documentNetworkId === networkId),
+      const networkIds = this.routing.republishNetworkIds(
+        document,
+        connectedNetworkIds,
+        networkId,
       );
       const handle = document.handle;
 

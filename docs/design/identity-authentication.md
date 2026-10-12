@@ -43,6 +43,10 @@ admitted only when:
   signed values, and the identity names at most 32 networks;
 - the identity carries a valid admission proof (see below).
 
+The rules are decided by `IdentityRecordAdmissionDomainService`; the gate
+parses the record, computes its canonical CID, and binds each head key to the
+identity it names.
+
 `acceptsHead` requires the key to equal the key derived from the signed
 identity, so a valid record cannot be planted under another identity's or
 handle's head. Metadata projections derive everything from the embedded
@@ -170,6 +174,11 @@ claiming that handle, which is the sybil non-goal below.
 - `IdentityHandleOwnershipDomainService.spec.ts` and
   `OrbitDBIdentityMetadataIndex.spec.ts`: earliest wins, tie-break, every
   projection order converges, caps.
+- `IdentityRecordAdmissionDomainService.spec.ts`,
+  `IdentityRoutingDomainService.spec.ts` and
+  `IdentityVersionPrecedenceDomainService.spec.ts`: the admission, routing
+  eligibility and newest-version rules the gate, republish and metadata lookup
+  delegate to.
 - `IdentityAdmissionProof.spec.ts`, plus gate and chain validation specs that
   reject a missing proof or one that does not cover the networks.
 - `IdentityPublishRateLimiter.spec.ts`.
