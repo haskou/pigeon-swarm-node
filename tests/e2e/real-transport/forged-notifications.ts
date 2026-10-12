@@ -8,6 +8,7 @@ import ConversationOperationMutationPolicy from '@app/contexts/conversations/inf
 import { Notification } from '@app/contexts/notifications/domain/Notification';
 import { NotificationReplicationLimits } from '@app/contexts/notifications/domain/NotificationReplicationLimits';
 import { NotificationId } from '@app/contexts/notifications/domain/value-objects/NotificationId';
+import { NotificationReplicationLimitsFromEnvironment } from '@app/contexts/notifications/infrastructure/environment/NotificationReplicationLimitsFromEnvironment';
 import OrbitDBNotificationMapper from '@app/contexts/notifications/infrastructure/orbitdb/mappers/OrbitDBNotificationMapper';
 import OrbitDBNotificationRepository from '@app/contexts/notifications/infrastructure/orbitdb/OrbitDBNotificationRepository';
 import NotificationInvitationMutationPolicy from '@app/contexts/notifications/infrastructure/orbitdb/policies/NotificationInvitationMutationPolicy';
@@ -153,17 +154,20 @@ async function open(replica: Replica): Promise<void> {
   const verifier = new PublicMutationVerifier(authorization);
 
   if (replica.gated) {
-    const states = new NotificationStateMutationPolicy(registry, verifier);
+    const states = new NotificationStateMutationPolicy(
+      registry,
+      verifier,
+      NotificationReplicationLimitsFromEnvironment.load(),
+    );
     const invitations = new NotificationInvitationMutationPolicy(
       conversations,
       undefined as never,
       registry,
       verifier,
-    );
-
-    invitations.limits = new NotificationReplicationLimits(
-      INVITATION_QUOTA,
-      NotificationReplicationLimits.DEFAULT_MAX_STATES,
+      new NotificationReplicationLimits(
+        INVITATION_QUOTA,
+        NotificationReplicationLimits.DEFAULT_MAX_STATES,
+      ),
     );
     replica.policies = { invitations, states };
     registry.addMutationGate(

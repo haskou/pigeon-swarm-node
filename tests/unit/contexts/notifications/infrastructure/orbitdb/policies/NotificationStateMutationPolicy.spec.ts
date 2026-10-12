@@ -49,8 +49,11 @@ describe('NotificationStateMutationPolicy', () => {
         throw new InvalidPublicMutationError();
       }
     });
-    policy = new NotificationStateMutationPolicy(registry, verifier);
-    policy.limits = new NotificationReplicationLimits(100, 3);
+    policy = new NotificationStateMutationPolicy(
+      registry,
+      verifier,
+      new NotificationReplicationLimits(100, 3),
+    );
   });
 
   const record = (

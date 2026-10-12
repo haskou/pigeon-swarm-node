@@ -45,8 +45,8 @@ describe('NotificationInvitationMutationPolicy', () => {
       mock<OrbitDBCommunityRepository>(),
       registry,
       verifier,
+      new NotificationReplicationLimits(3, 100),
     );
-    policy.limits = new NotificationReplicationLimits(3, 100);
   });
 
   function nonceOf(index: number): string {

@@ -76,8 +76,8 @@ describe('ContentReplicationMutationPolicy', () => {
       registry,
       identityRepository,
       verifier,
+      new ContentReplicationLimits(10_000, 3),
     );
-    policy.limits = new ContentReplicationLimits(10_000, 3);
     registry.queryUnadmittedDocuments.mockResolvedValue([]);
     identityRepository.findById.mockResolvedValue({
       getNetworkIds: () => [{ valueOf: () => NETWORK }],

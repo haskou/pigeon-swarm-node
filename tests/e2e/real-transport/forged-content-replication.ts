@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { ContentReplication } from '@app/contexts/content-replication/domain/ContentReplication';
+import { ContentReplicationLimitsFromEnvironment } from '@app/contexts/content-replication/infrastructure/environment/ContentReplicationLimitsFromEnvironment';
 import OrbitDBContentReplicationMapper from '@app/contexts/content-replication/infrastructure/orbitdb/mappers/OrbitDBContentReplicationMapper';
 import OrbitDBContentReplicationRepository from '@app/contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicationRepository';
 import ContentReplicationMutationPolicy from '@app/contexts/content-replication/infrastructure/orbitdb/policies/ContentReplicationMutationPolicy';
@@ -102,7 +103,11 @@ function sign(
   recordId = payload.id,
 ): PublicMutationProof {
   const body = {
-    author: { authorizationRevision: 0, deviceCredential: signer.credential, identityId: signer.id },
+    author: {
+      authorizationRevision: 0,
+      deviceCredential: signer.credential,
+      identityId: signer.id,
+    },
     kind,
     operationId: randomBytes(16).toString('base64url'),
     payloadDigest: PublicMutationProof.digestOf(payload),
@@ -162,6 +167,7 @@ async function open(replica: Replica): Promise<void> {
           registry,
           identities,
           new PublicMutationVerifier(authorization),
+          ContentReplicationLimitsFromEnvironment.load(),
         ),
       ]),
     );

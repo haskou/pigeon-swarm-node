@@ -21,6 +21,8 @@ import PrivateCommunityControlApplier from '../contexts/communities/application/
 import PrivateCommunityGenesisAuthorizer from '../contexts/communities/application/apply-private-control/PrivateCommunityGenesisAuthorizer';
 import CommunityRepository from '../contexts/communities/domain/repositories/CommunityRepository';
 import CommunityRepositoryRouter from '../contexts/communities/infrastructure/CommunityRepositoryRouter';
+import { ContentReplicationLimits } from '../contexts/content-replication/domain/ContentReplicationLimits';
+import { ContentReplicationLimitsFromEnvironment } from '../contexts/content-replication/infrastructure/environment/ContentReplicationLimitsFromEnvironment';
 import { DeviceAuthorizationRepository } from '../contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
 import { DeviceSealedSecretRepository } from '../contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository';
 import LocalDeviceSealedSecretRepository from '../contexts/identity-devices/infrastructure/local-db/LocalDeviceSealedSecretRepository';
@@ -33,7 +35,9 @@ import NodeNetworkSynchronizationMonitor from '../contexts/nodes/application/fin
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
 import NotificationScopeSettingsRepository from '../contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
 import NotificationScopeSettingsRepositoryRouter from '../contexts/notification-settings/infrastructure/NotificationScopeSettingsRepositoryRouter';
+import { NotificationReplicationLimits } from '../contexts/notifications/domain/NotificationReplicationLimits';
 import NotificationRepository from '../contexts/notifications/domain/repositories/NotificationRepository';
+import { NotificationReplicationLimitsFromEnvironment } from '../contexts/notifications/infrastructure/environment/NotificationReplicationLimitsFromEnvironment';
 import NotificationRepositoryRouter from '../contexts/notifications/infrastructure/NotificationRepositoryRouter';
 import IdentityPresenceRepository from '../contexts/presence/domain/repositories/IdentityPresenceRepository';
 import InMemoryIdentityPresenceRepository from '../contexts/presence/infrastructure/memory/InMemoryIdentityPresenceRepository';
@@ -318,6 +322,14 @@ export default class PigeonApplication {
         {
           token: PrivateBlobLimits,
           useFactory: () => PrivateBlobLimitsFromEnvironment.load(),
+        },
+        {
+          token: ContentReplicationLimits,
+          useFactory: () => ContentReplicationLimitsFromEnvironment.load(),
+        },
+        {
+          token: NotificationReplicationLimits,
+          useFactory: () => NotificationReplicationLimitsFromEnvironment.load(),
         },
       ],
     });
