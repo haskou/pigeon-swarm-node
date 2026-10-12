@@ -1134,6 +1134,188 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
       expect(getMerger()?.(trusted, candidate)).toEqual(trusted);
     });
+
+    it('derives the caps of an overflowed timeline from its witness and carries them into the recovery over it', async () => {
+      const { genesis, identityId, owner, recovery } = await fixture();
+      const phone = await KeyPair.generate();
+      const transient = await KeyPair.generate();
+      const recovered = await KeyPair.generate();
+      const aggregate = repositoryFixture();
+      const policy = new DeviceAuthorizationPolicy();
+      await provisionAuthorization(aggregate.repository, genesis);
+      await aggregate.repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000001',
+          '10000000-0000-4000-8000-000000000001',
+        ),
+      );
+      const base = aggregate.getHead() as {
+        authorization: ReturnType<DeviceAuthorization['toPrimitives']>;
+        history: Array<{
+          transition: ReturnType<DeviceAuthorizationTransition['toPrimitives']>;
+        }>;
+      };
+      const capping = revocation(
+        identityId,
+        owner,
+        phone,
+        '00000000-0000-4000-8000-000000000002',
+        revisionOf(1),
+        DeviceAuthorizationEpoch.genesis(),
+        revisionOf(1),
+      );
+      let authorization = policy.apply(
+        DeviceAuthorization.fromPrimitives(base.authorization),
+        capping,
+      );
+      const history = [...base.history, { transition: capping.toPrimitives() }];
+
+      for (let index = 0; index < 126; index += 1) {
+        const suffix = String(index + 3).padStart(12, '0');
+        const enroll = await enrollment(
+          identityId,
+          owner,
+          transient,
+          `00000000-0000-4000-8000-${suffix}`,
+          `10000000-0000-4000-8000-${suffix}`,
+          authorization.getRevision(),
+        );
+        authorization = policy.apply(authorization, enroll);
+        history.push({ transition: enroll.toPrimitives() });
+        const revoke = revocation(
+          identityId,
+          owner,
+          transient,
+          `20000000-0000-4000-8000-${suffix}`,
+          authorization.getRevision(),
+        );
+        authorization = policy.apply(authorization, revoke);
+        history.push({ transition: revoke.toPrimitives() });
+      }
+
+      const boundaryEnroll = await enrollment(
+        identityId,
+        owner,
+        transient,
+        '00000000-0000-4000-8000-999999999999',
+        '10000000-0000-4000-8000-999999999999',
+        authorization.getRevision(),
+      );
+      authorization = policy.apply(authorization, boundaryEnroll);
+      history.push({ transition: boundaryEnroll.toPrimitives() });
+      const boundaryAuthorization = authorization;
+      const boundaryHistory = [...history];
+      const finalRevoke = revocation(
+        identityId,
+        owner,
+        transient,
+        '20000000-0000-4000-8000-999999999999',
+        boundaryAuthorization.getRevision(),
+      );
+      authorization = policy.apply(authorization, finalRevoke);
+      history.push({ transition: finalRevoke.toPrimitives() });
+      const fork = revocation(
+        identityId,
+        owner,
+        transient,
+        '30000000-0000-4000-8000-999999999999',
+        boundaryAuthorization.getRevision(),
+      );
+      const competingHistory = [
+        ...boundaryHistory,
+        { transition: fork.toPrimitives() },
+      ];
+      const malicious = {
+        ...base,
+        authorization: authorization.toPrimitives(),
+        history,
+        sources: [{ history }],
+      };
+      const competing = {
+        ...base,
+        authorization: policy.apply(boundaryAuthorization, fork).toPrimitives(),
+        history: competingHistory,
+        sources: [{ history: competingHistory }],
+      };
+      const overflow = aggregate.getMerger()?.(competing, malicious) as {
+        authorization: { revision: number };
+        overflow?: unknown;
+      };
+
+      expect(overflow.overflow).toBeDefined();
+      aggregate.setHead(overflow as Record<string, unknown>);
+      const overflowRevision = new DeviceAuthorizationRevision(
+        overflow.authorization.revision,
+      );
+      const phoneCredential = credentialOf(phone).valueOf();
+
+      expect(
+        await aggregate.repository.findCompromisedSince(identityId),
+      ).toEqual(new Map([[phoneCredential, 1]]));
+      await expect(
+        aggregate.repository.compareAndApply(
+          recoveryOf(
+            identityId,
+            recovery,
+            recovered,
+            '50000000-0000-4000-8000-999999999901',
+            overflowRevision,
+          ),
+        ),
+      ).rejects.toThrow();
+      await expect(
+        aggregate.repository.compareAndApply(
+          recoveryOf(
+            identityId,
+            recovery,
+            recovered,
+            '50000000-0000-4000-8000-999999999902',
+            overflowRevision,
+            [
+              {
+                compromisedSince: revisionOf(1),
+                credential: credentialOf(phone),
+              },
+            ],
+          ),
+        ),
+      ).resolves.toBeDefined();
+
+      expect(aggregate.getHead()).not.toHaveProperty('overflow');
+      expect(
+        await aggregate.repository.findCompromisedSince(identityId),
+      ).toEqual(new Map([[phoneCredential, 1]]));
+      await aggregate.repository.compareAndApply(
+        await enrollment(
+          identityId,
+          recovered,
+          phone,
+          '50000000-0000-4000-8000-999999999903',
+          '70000000-0000-4000-8000-999999999903',
+          new DeviceAuthorizationRevision(overflowRevision.valueOf() + 1),
+          DeviceAuthorizationEpoch.fromRecovery(
+            new DeviceAuthorizationOperationId(
+              '50000000-0000-4000-8000-999999999902',
+            ),
+          ),
+        ),
+      );
+
+      const timeline = await aggregate.repository.findTimeline(identityId);
+      const checkedRevision = new DeviceAuthorizationRevision(
+        overflowRevision.valueOf() + 2,
+      );
+
+      expect(
+        timeline?.isAuthorizedAt(credentialOf(phone), checkedRevision),
+      ).toBe(false);
+      expect(
+        timeline?.isAuthorizedAt(credentialOf(recovered), checkedRevision),
+      ).toBe(true);
+    });
   });
 
   it('converges at the sibling limit and drops stale branches after recovery', async () => {
