@@ -3,7 +3,7 @@ import { Readable } from 'stream';
 
 import { PrivateBlobNotFoundError } from '../domain/errors/PrivateBlobNotFoundError';
 import { PrivateBlobByteRange } from '../domain/PrivateBlobByteRange';
-import { PrivateBlobRange } from '../domain/PrivateBlobRange';
+import { PrivateBlobRangeRequest } from '../domain/PrivateBlobRangeRequest';
 import PrivateBlobBytesStore from '../domain/repositories/PrivateBlobBytesStore';
 import PrivateBlobRepository from '../domain/repositories/PrivateBlobRepository';
 
@@ -22,7 +22,7 @@ export default class PrivateBlobReader {
   public async open(
     blobId: string,
     downloadToken: string,
-    rangeHeader?: string,
+    rangeRequest?: PrivateBlobRangeRequest,
   ): Promise<PrivateBlobDownload> {
     const blob = await this.repository.findById(blobId);
 
@@ -35,7 +35,9 @@ export default class PrivateBlobReader {
     }
 
     const size = blob.getSize();
-    const range = PrivateBlobRange.resolve(rangeHeader, size);
+    const range = rangeRequest
+      ? PrivateBlobByteRange.resolve(rangeRequest, size)
+      : undefined;
 
     return { range, size, stream: this.bytes.read(blobId, range) };
   }
