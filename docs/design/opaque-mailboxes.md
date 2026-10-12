@@ -56,13 +56,14 @@ introduction). Then:
 ```text
 mailboxId   = HKDF(S, "pigeon/mailbox/id/v1",   epoch)    // 32 bytes, base64url
 postToken   = HKDF(S, "pigeon/mailbox/post/v1", epoch)    // capability to append
-readToken   = random 32 bytes chosen by the recipient     // capability to read/ack
+readToken   = HKDF(rootKey, "pigeon/mailbox/read/v1" || mailboxId)  // capability to read/ack/delete
 ```
 
 - `mailboxId` and `postToken` are derived from `S`, which the server never sees,
   so they cannot be linked to identities, conversation IDs or CIDs.
 - The server stores `SHA-256(postToken)` and `SHA-256(readToken)` only; it
   verifies presented tokens against the hashes.
+- `readToken` is derived from the identity's user root key, not from `S`: HKDF-SHA256 with no salt over the 32-byte root key, info `"pigeon/mailbox/read/v1" || mailboxId`. The mailbox id changes with `epoch`, so the read token does too. The derivation lets a device that lost its local storage recover an inbox it created, because the root key is restored on every authorized device. The peer never holds the root key, so it cannot read, ack or delete the inbox. Trade-off: whoever holds the root key and the mailbox id of an inbox can derive its read token, so compromise of the root key exposes every inbox whose id is known. A random read token exposed only its own inbox.
 - `epoch` rotates mailboxes. The recipient announces the next epoch inside an
   encrypted envelope; the sender switches after the announcement and the old
   mailbox is drained and deleted. Rotation limits how long a leaked capability
@@ -147,6 +148,17 @@ group's encrypted channel. Sending is N appends. This costs O(N) requests but
 means no server holds a conversation-to-recipient table. Large groups may batch
 appends to one availability server in a single request; the server still sees
 independent mailboxes.
+
+## Open limitation: devices of one identity share one inbox
+
+Every device of an identity derives the same read token for a mailbox id, so
+they share one inbox: one cursor and one acknowledgement. `POST /mailboxes/{mailboxId}/ack`
+deletes every envelope up to `upTo` for all devices, so a device that acknowledges
+before another device has read those envelopes hides them from that device. The
+node keeps one `readTokenHash` per mailbox and cannot tell devices apart, so this
+is not solved on the server. Creation is idempotent across devices because they
+present identical hashes. Fixing it needs either per-device read capabilities or
+per-device mailboxes; neither is designed yet.
 
 ## Observable metadata (documented residual leakage)
 
