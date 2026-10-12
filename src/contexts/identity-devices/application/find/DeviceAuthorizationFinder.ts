@@ -19,4 +19,10 @@ export default class DeviceAuthorizationFinder {
 
     return authorization;
   }
+
+  public findCompromisedSince(
+    message: DeviceAuthorizationFindMessage,
+  ): Promise<ReadonlyMap<string, number>> {
+    return this.repository.findCompromisedSince(message.identityId);
+  }
 }

@@ -1,12 +1,18 @@
 import { DeviceAuthorizationOperationValue } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperation';
+import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsEnum,
   IsInt,
   IsOptional,
   IsString,
   IsUUID,
   Min,
+  ValidateNested,
 } from 'class-validator';
+
+import { DeviceCompromisedCredentialBody } from './DeviceCompromisedCredentialBody';
 
 export class PostDeviceAuthorizationTransitionBody {
   @IsOptional()
@@ -16,6 +22,13 @@ export class PostDeviceAuthorizationTransitionBody {
   @IsOptional()
   @IsInt()
   public readonly authorizedAt?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(32)
+  @ValidateNested({ each: true })
+  @Type(() => DeviceCompromisedCredentialBody)
+  public readonly compromisedCredentials?: DeviceCompromisedCredentialBody[];
 
   @IsOptional()
   @IsInt()

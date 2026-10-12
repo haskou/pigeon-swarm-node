@@ -1,4 +1,6 @@
 import DeviceAuthorizationTransitionApplier from '@app/contexts/identity-devices/application/apply-transition/DeviceAuthorizationTransitionApplier';
+import DeviceAuthorizationFinder from '@app/contexts/identity-devices/application/find/DeviceAuthorizationFinder';
+import { DeviceAuthorizationFindMessage } from '@app/contexts/identity-devices/application/find/messages/DeviceAuthorizationFindMessage';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Response } from 'express';
@@ -20,6 +22,10 @@ export class PostDeviceAuthorizationTransitionRoute extends Route {
       DeviceAuthorizationTransitionRateLimiter,
     );
 
+  private readonly finder = this.get<DeviceAuthorizationFinder>(
+    DeviceAuthorizationFinder,
+  );
+
   @Post('/transitions')
   public async apply(
     @Body({
@@ -35,9 +41,17 @@ export class PostDeviceAuthorizationTransitionRoute extends Route {
 
     this.rateLimiter.consume(message.transition.getIdentityId());
     const authorization = await this.applier.apply(message);
+    const compromisedSince = await this.finder.findCompromisedSince(
+      new DeviceAuthorizationFindMessage(authorization.getIdentityId()),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new DeviceAuthorizationViewModel(authorization).toResource());
+      .send(
+        new DeviceAuthorizationViewModel(
+          authorization,
+          compromisedSince,
+        ).toResource(),
+      );
   }
 }

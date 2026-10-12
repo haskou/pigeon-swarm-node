@@ -35,6 +35,28 @@ export default class OrbitDBDeviceAuthorizationTransitionProjector {
     return this.policy.applyRecoveryCheckpoint(suspended, transition);
   }
 
+  /**
+   * A recovery must carry exactly the caps in effect: dropping one would
+   * re-admit a compromised key, and capping one never revoked is refused.
+   */
+  private carriesCompromisedCredentials(
+    stored: OrbitDBDeviceAuthorizationDocument,
+    genesis: DeviceAuthorization,
+    transition: DeviceAuthorizationTransition,
+  ): boolean {
+    const inEffect = this.replayer.compromisedSinceOf(genesis, stored);
+    const carried = transition.getCompromisedCredentials();
+
+    return (
+      carried.length === inEffect.size &&
+      carried.every(
+        (entry) =>
+          inEffect.get(entry.credential.valueOf()) ===
+          entry.compromisedSince.valueOf(),
+      )
+    );
+  }
+
   public hasReplay(
     document: OrbitDBDeviceAuthorizationDocument,
     transition: DeviceAuthorizationTransition,
@@ -62,6 +84,12 @@ export default class OrbitDBDeviceAuthorizationTransitionProjector {
     genesis: DeviceAuthorization,
     transition: DeviceAuthorizationTransition,
   ): DeviceAuthorization {
+    assert(
+      !transition.isRecovery() ||
+        this.carriesCompromisedCredentials(stored, genesis, transition),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
     return stored.overflow
       ? this.applyOverflowRecovery(
           DeviceAuthorization.fromPrimitives(stored.authorization),
