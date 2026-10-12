@@ -3,6 +3,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { Signature } from '@haskou/pigeon-swarm-crypto';
 
 import { DeviceAuthorization } from './DeviceAuthorization';
+import { DeviceSealedSecretGenerationStaleError } from './errors/DeviceSealedSecretGenerationStaleError';
 import { DeviceSealedSecretNotFoundError } from './errors/DeviceSealedSecretNotFoundError';
 import { DeviceSealedSecretPublisherNotAuthorizedError } from './errors/DeviceSealedSecretPublisherNotAuthorizedError';
 import { DeviceSealedSecretRecipientsMismatchError } from './errors/DeviceSealedSecretRecipientsMismatchError';
@@ -211,6 +212,12 @@ export class DeviceSealedSecretBundle {
       if (!this.hasValidSignature(publisher, entry)) {
         throw new InvalidDeviceSealedSecretSignatureError();
       }
+    }
+  }
+
+  public assertSupersedes(stored: DeviceSealedSecretBundle | undefined): void {
+    if (stored && stored.generation >= this.generation) {
+      throw new DeviceSealedSecretGenerationStaleError();
     }
   }
 
