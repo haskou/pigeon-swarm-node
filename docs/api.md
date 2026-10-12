@@ -1665,6 +1665,7 @@ Authorization is split so a streamed body never has to be buffered for signing:
 - Quotas: `PRIVATE_BLOB_MAX_BYTES`, `PRIVATE_BLOB_QUOTA_BYTES_PER_OWNER`, `PRIVATE_BLOB_QUOTA_BYTES_TOTAL` (exceeded: `413`). Quota owners are an HMAC of the identity id with a per-node secret salt.
 - Retention: a reservation lives `PRIVATE_BLOB_UPLOAD_WINDOW_MS`; a completed blob lives `max(PRIVATE_BLOB_RETENTION_MS, MAILBOX_RETENTION_MS)`, so it outlives the mailbox envelopes that reference it. The reservation response's `expiresAt` is the upload deadline, not the post-completion expiry. A scheduler removes expired records and bytes every 5 minutes and raises stored blobs recorded under a shorter retention to the current floor.
 - The `downloadToken` is a secret: send it only inside an end-to-end encrypted message.
+- Disclosure: the signed `POST /private-blobs` carries the signer's identity id (its PEM public key) and `size` in clear, so each node that receives a reservation learns both and the request time. A client that reserves on several nodes discloses the same to each of them (see `docs/design/private-blob-store.md`, "Availability across nodes").
 - `PRIVATE_BLOB_STORAGE_PATH` is outside IPFS/OrbitDB; back it up deliberately.
 
 Existing IPFS attachment CIDs are unaffected: this API does not delete anything already distributed.
