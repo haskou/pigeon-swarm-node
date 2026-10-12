@@ -1993,6 +1993,16 @@ those networks is over the cap. The count is local to the node and is not shared
 with peers. Enabling it lets a flood through this node block registrations here
 for the window, which is why it is off by default.
 
+At most `IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE` (default 30, `0` disables)
+identity admissions per client address are accepted by this node per minute, on
+`POST /identities` and `PUT /identities/{identityId}` together. The address is the
+socket address unless `API_TRUST_PROXY` names a reverse proxy; IPv6 clients share a
+/64 and IPv4-mapped addresses count as IPv4. The check runs before authentication
+and before the per-identity and per-network counters, so a flood from one address
+is refused without spending them; the next admission from that address is refused
+with `429`, code `429042`. The count is in memory and local to the node, and it
+resets on restart. Clients behind one NAT share the count.
+
 ### Update identity
 
 ```http

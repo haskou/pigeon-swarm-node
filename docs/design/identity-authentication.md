@@ -115,6 +115,12 @@ All nodes of a network must run the same difficulty, otherwise they disagree on
 which identities are valid. Identities published before this change have no
 nonce and are no longer valid.
 
+Per-source limit (API only): `POST /identities` and `PUT /identities/{identityId}`
+charge each client address against `IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE`
+(default 30, `429` code `429042`) before authentication, so one source's flood
+cannot spend the identity or network counters. The count is in memory and local
+to the node, and it is keyed by address, not by network.
+
 ## Order and convergence
 
 Every decision depends only on the set of admitted records: gate admission is a
@@ -132,6 +138,7 @@ heal yields the same owner and the same latest identity.
 | Remote handle candidates | 32 |
 | Publications per identity per minute | `IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE`, default 30, `429` code `429040` |
 | Admissions per network per minute on this node | `IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE`, default 0 (off), `429` code `429041` |
+| Admissions per client address per minute on this node | `IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE`, default 30, `429` code `429042` |
 
 Admission cost is a fixed protocol constant, not adaptive. Difficulty derived
 from observed load or record counts would not converge, because nodes see
@@ -144,6 +151,11 @@ nonce about 66k): 16 bits median 41 ms (p90 157 ms, max 438 ms); 18 bits median
 187 ms; 20 bits median 836 ms. Headless Chromium at 16 bits: median 0.8 s at 1x
 CPU, 3.5 s at 4x. Raising the constant makes honest clients, including mobile,
 pay the cost on every identity, and it does not address GPU-scale attackers.
+
+Memory-hard proofs (scrypt, argon2) are rejected as well. Verification costs about
+as much as minting. The gate verifies every replicated record on every node, so a
+cheap signer could make each node spend that cost per bogus record, where one
+SHA-256 costs far less today. This is not benchmarked here.
 
 Claimants of a handle are deliberately not capped: evicting a lower ranked
 claimant would make the owner depend on the order of past events (a node that
@@ -161,6 +173,8 @@ claiming that handle, which is the sybil non-goal below.
 - `IdentityAdmissionProof.spec.ts`, plus gate and chain validation specs that
   reject a missing proof or one that does not cover the networks.
 - `IdentityPublishRateLimiter.spec.ts`.
+- `IdentityAdmissionSourceRateLimiter.spec.ts` and `ClientRateWindows.spec.ts`;
+  the per-source POST and PUT scenarios in `PostIdentityRoute.feature`.
 - `yarn test:integration:forged-identities` (real-transport e2e).
 
 ## Remaining non-goals
@@ -170,6 +184,10 @@ claiming that handle, which is the sybil non-goal below.
 - Minting many valid identities (sybil) is made costly by the admission proof
   but not prevented; only an admission authority could do that. The caps bound
   the cost to honest nodes.
+- GPU-scale minting is slowed by a constant factor, not stopped. The per-source
+  limit binds only the HTTP routes on each node, per client address: replicated
+  records are not rate limited, and an attacker with many addresses or their own
+  node is not bounded by it.
 - A handle is a claim, not an authority: the identity id (public key) remains
   the authoritative reference.
 - The identity-key holder can equivocate on its own genesis; a peer without the
