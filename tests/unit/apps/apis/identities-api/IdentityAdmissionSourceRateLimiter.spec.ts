@@ -1,8 +1,8 @@
 import IdentityAdmissionSourceRateLimiter from '@app/apps/apis/identities-api/IdentityAdmissionSourceRateLimiter';
-import { IdentityAdmissionSourceRateLimitExceededError } from '@app/apps/apis/identities-api/errors/IdentityAdmissionSourceRateLimitExceededError';
 
 const KEY = 'IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE';
 const MINUTE = 60_000;
+const REFUSED = 'Identity admission rate limit exceeded.';
 
 function refusalOf(attempt: () => void): unknown {
   try {
@@ -36,9 +36,7 @@ describe('IdentityAdmissionSourceRateLimiter', () => {
     limiter.consume('203.0.113.7', 0);
     limiter.consume('203.0.113.7', 0);
 
-    expect(() => limiter.consume('203.0.113.7', 0)).toThrow(
-      IdentityAdmissionSourceRateLimitExceededError,
-    );
+    expect(() => limiter.consume('203.0.113.7', 0)).toThrow(REFUSED);
   });
 
   it('keeps one source from using up the admissions of another', () => {
@@ -56,14 +54,9 @@ describe('IdentityAdmissionSourceRateLimiter', () => {
 
     limiter.consume('203.0.113.7', 0);
 
-    const refusal = refusalOf(() => limiter.consume('203.0.113.7', 0));
-
-    expect(refusal).toBeInstanceOf(
-      IdentityAdmissionSourceRateLimitExceededError,
-    );
     expect(
-      (refusal as IdentityAdmissionSourceRateLimitExceededError).code,
-    ).toBe(429042);
+      refusalOf(() => limiter.consume('203.0.113.7', 0)),
+    ).toMatchObject({ code: 429042 });
   });
 
   it('admits again once the one minute window has passed', () => {
@@ -72,9 +65,7 @@ describe('IdentityAdmissionSourceRateLimiter', () => {
 
     limiter.consume('203.0.113.7', 0);
 
-    expect(() => limiter.consume('203.0.113.7', MINUTE - 1)).toThrow(
-      IdentityAdmissionSourceRateLimitExceededError,
-    );
+    expect(() => limiter.consume('203.0.113.7', MINUTE - 1)).toThrow(REFUSED);
     expect(() => limiter.consume('203.0.113.7', MINUTE)).not.toThrow();
   });
 
@@ -97,8 +88,6 @@ describe('IdentityAdmissionSourceRateLimiter', () => {
       limiter.consume('203.0.113.7', 0);
     }
 
-    expect(() => limiter.consume('203.0.113.7', 0)).toThrow(
-      IdentityAdmissionSourceRateLimitExceededError,
-    );
+    expect(() => limiter.consume('203.0.113.7', 0)).toThrow(REFUSED);
   });
 });

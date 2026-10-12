@@ -1,4 +1,5 @@
 import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
+import IdentityAdmissionSourceRateLimiter from '@app/apps/apis/identities-api/IdentityAdmissionSourceRateLimiter';
 import {
   signNotificationInvitation,
   signNotificationState,
@@ -1457,10 +1458,20 @@ export default class Definitions {
     }
   }
 
+  @before()
+  public resetIdentitySourceAdmissionLimit(): void {
+    process.env.IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE = '0';
+    const limiter = Kernel.di.getService<IdentityAdmissionSourceRateLimiter>(
+      IdentityAdmissionSourceRateLimiter,
+    );
+    limiter.reset();
+  }
+
   @after()
   public restoreIdentityPublicationLimit(): void {
     delete process.env.IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE;
     delete process.env.IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE;
+    delete process.env.IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE;
   }
 
   @after()
@@ -1779,6 +1790,14 @@ export default class Definitions {
     limit: number,
   ): void {
     process.env.IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE =
+      String(limit);
+  }
+
+  @given('identity admissions are limited to {int} per source per minute')
+  public identityAdmissionsAreLimitedToPerSourcePerMinute(
+    limit: number,
+  ): void {
+    process.env.IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE =
       String(limit);
   }
 

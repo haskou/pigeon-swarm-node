@@ -15,6 +15,7 @@ import {
 } from 'routing-controllers';
 
 import { PutIdentityBody } from '../bodies/PutIdentityBody';
+import IdentityAdmissionSourceRateLimiter from '../IdentityAdmissionSourceRateLimiter';
 import IdentityNetworkAdmissionRateLimiter from '../IdentityNetworkAdmissionRateLimiter';
 import IdentityPublishRateLimiter from '../IdentityPublishRateLimiter';
 import { PutIdentityRequest } from '../requests/PutIdentityRequest';
@@ -27,6 +28,11 @@ export class PutIdentityRoute extends Route {
 
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
+
+  private readonly sourceRateLimiter =
+    this.get<IdentityAdmissionSourceRateLimiter>(
+      IdentityAdmissionSourceRateLimiter,
+    );
 
   private readonly rateLimiter = this.get<IdentityPublishRateLimiter>(
     IdentityPublishRateLimiter,
@@ -48,6 +54,8 @@ export class PutIdentityRoute extends Route {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
+    this.sourceRateLimiter.consume(request.ip ?? 'unknown');
+
     const authenticatedIdentityId =
       await this.signedRequestAuthenticator.authenticate(request);
     const requestedIdentityId = new IdentityId(decodeURIComponent(identityId));

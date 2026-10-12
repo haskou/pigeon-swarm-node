@@ -280,6 +280,9 @@ services:
     class: /apps/apis/calls-api/CallSignalRateLimiter
     arguments:
       - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+  apps/apis/identities-api/IdentityAdmissionSourceRateLimiter:
+    class: /apps/apis/identities-api/IdentityAdmissionSourceRateLimiter
+    arguments: []
   apps/apis/identities-api/IdentityNetworkAdmissionRateLimiter:
     class: /apps/apis/identities-api/IdentityNetworkAdmissionRateLimiter
     arguments:

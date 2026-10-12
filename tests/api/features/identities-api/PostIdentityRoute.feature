@@ -138,3 +138,28 @@ Feature: Post identity route
     When I POST to "/identities/"
     Then response code is equal to 429
     And response body should contain "429041"
+
+  Scenario: Reject identity admissions above the per-source rate limit
+    Given I am an anonymous user
+    And identity admissions are limited to 1 per source per minute
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174998" and name "source-admission-network"
+    And I set a client-signed identity body with name "first source" and handle "source-first"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I set a client-signed identity body with name "second source" and handle "source-second"
+    When I POST to "/identities/"
+    Then response code is equal to 429
+    And response body should contain "429042"
+
+  Scenario: Reject identity updates above the per-source rate limit
+    Given I am an anonymous user
+    And identity admissions are limited to 1 per source per minute
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174997" and name "source-update-network"
+    And I set a client-signed identity body with name "source update" and handle "source-update"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I set a client-signed identity update body with name "source renamed", handle "source_renamed" and password "New-client-password1!"
+    And I sign the current identity update request
+    When I PUT the created identity
+    Then response code is equal to 429
+    And response body should contain "429042"
