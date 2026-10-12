@@ -1,6 +1,7 @@
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 
 import { DeviceAuthorization } from './DeviceAuthorization';
+import { DeviceCompromiseCaps } from './DeviceCompromiseCaps';
 import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
 
 /**
@@ -19,7 +20,7 @@ export class DeviceAuthorizationTimeline {
 
   public constructor(
     states: DeviceAuthorization[],
-    private readonly compromisedSince: ReadonlyMap<string, number> = new Map(),
+    private readonly compromiseCaps: DeviceCompromiseCaps = DeviceCompromiseCaps.none(),
   ) {
     this.states = [...states].sort(
       (left, right) =>
@@ -42,9 +43,7 @@ export class DeviceAuthorizationTimeline {
       return false;
     }
 
-    const cap = this.compromisedSince.get(credential.valueOf());
-
-    if (cap !== undefined && revision.valueOf() >= cap) {
+    if (this.compromiseCaps.isCompromisedAt(credential, revision)) {
       return false;
     }
 

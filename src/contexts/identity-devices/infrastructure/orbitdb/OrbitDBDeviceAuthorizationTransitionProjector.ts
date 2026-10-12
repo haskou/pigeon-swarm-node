@@ -44,17 +44,9 @@ export default class OrbitDBDeviceAuthorizationTransitionProjector {
     genesis: DeviceAuthorization,
     transition: DeviceAuthorizationTransition,
   ): boolean {
-    const inEffect = this.replayer.compromisedSinceOf(genesis, stored);
-    const carried = transition.getCompromisedCredentials();
-
-    return (
-      carried.length === inEffect.size &&
-      carried.every(
-        (entry) =>
-          inEffect.get(entry.credential.valueOf()) ===
-          entry.compromisedSince.valueOf(),
-      )
-    );
+    return this.replayer
+      .compromiseCapsOf(genesis, stored)
+      .isCarriedBy(transition);
   }
 
   public hasReplay(

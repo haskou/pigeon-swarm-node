@@ -280,9 +280,17 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       const document = await this.resolveDocument(identityId);
 
       return document
-        ? this.replayer.compromisedSinceOf(
-            DeviceAuthorization.fromPrimitives(document.genesis),
-            document,
+        ? new Map(
+            this.replayer
+              .compromiseCapsOf(
+                DeviceAuthorization.fromPrimitives(document.genesis),
+                document,
+              )
+              .toPrimitives()
+              .map((entry): [string, number] => [
+                entry.credential,
+                entry.compromisedSince,
+              ]),
           )
         : new Map<string, number>();
     });

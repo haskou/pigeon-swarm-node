@@ -5,6 +5,7 @@ import { DeviceAuthorizationApplication } from '../DeviceAuthorizationApplicatio
 import { DeviceAuthorizationCandidate } from '../DeviceAuthorizationCandidate';
 import { DeviceAuthorizationReplayResult } from '../DeviceAuthorizationReplayResult';
 import { DeviceAuthorizationTransition } from '../DeviceAuthorizationTransition';
+import { DeviceCompromiseCaps } from '../DeviceCompromiseCaps';
 import { InvalidDeviceAuthorizationTransitionError } from '../errors/InvalidDeviceAuthorizationTransitionError';
 import { DeviceAuthorizationEpoch } from '../value-objects/DeviceAuthorizationEpoch';
 
@@ -245,6 +246,37 @@ export default class DeviceAuthorizationPolicy {
       transition.getTargetCredential(),
       DeviceAuthorizationEpoch.fromRecovery(transition.getOperationId()),
     );
+  }
+
+  /**
+   * The replay base of a recovery lineage: the authorization the lineage ends
+   * at and the compromise caps it carries. Every recovery must apply, and a
+   * later recovery may tighten or add caps but never drop or loosen one an
+   * earlier recovery carried, so no checkpoint re-admits a capped credential.
+   */
+  public replayRecoveryLineage(
+    genesis: DeviceAuthorization,
+    recoveries: DeviceAuthorizationTransition[],
+  ): {
+    authorization: DeviceAuthorization;
+    compromiseCaps: DeviceCompromiseCaps;
+  } {
+    let authorization = genesis;
+    let compromiseCaps = DeviceCompromiseCaps.none();
+
+    for (const recovery of recoveries) {
+      authorization = this.applyRecoveryCheckpoint(authorization, recovery);
+
+      const carried = DeviceCompromiseCaps.carriedBy(recovery);
+
+      assert(
+        compromiseCaps.isNotLoosenedBy(carried),
+        new InvalidDeviceAuthorizationTransitionError(),
+      );
+      compromiseCaps = carried;
+    }
+
+    return { authorization, compromiseCaps };
   }
 
   public apply(
