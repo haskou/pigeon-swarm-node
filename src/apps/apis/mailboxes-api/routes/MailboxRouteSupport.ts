@@ -66,6 +66,10 @@ export abstract class MailboxRouteSupport extends Route {
       throw new HttpError(429, error.message);
     }
 
+    return this.translateConflict(error);
+  }
+
+  protected translateConflict(error: unknown): never {
     if (
       error instanceof MailboxFullError ||
       error instanceof MailboxConflictError ||

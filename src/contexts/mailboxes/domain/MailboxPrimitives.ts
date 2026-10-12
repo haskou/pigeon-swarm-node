@@ -1,7 +1,4 @@
-export interface MailboxReaderPrimitives {
-  ackedCursor: number;
-  readTokenHash: string;
-}
+import { MailboxReaderPrimitives } from './MailboxReaderPrimitives';
 
 export interface MailboxPrimitives {
   appendRefilledAt: number;

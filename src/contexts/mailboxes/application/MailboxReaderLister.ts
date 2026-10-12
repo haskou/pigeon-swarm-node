@@ -1,6 +1,6 @@
 import { MailboxNotFoundError } from '../domain/errors/MailboxNotFoundError';
 import MailboxPolicy from '../domain/MailboxPolicy';
-import { MailboxReaderPrimitives } from '../domain/MailboxPrimitives';
+import { MailboxReaderPrimitives } from '../domain/MailboxReaderPrimitives';
 import MailboxRepository from '../domain/repositories/MailboxRepository';
 
 /**

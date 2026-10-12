@@ -5,10 +5,8 @@ import { MailboxReaderLimitReachedError } from './errors/MailboxReaderLimitReach
 import { MailboxReaderNotFoundError } from './errors/MailboxReaderNotFoundError';
 import { MailboxCapability } from './MailboxCapability';
 import MailboxPolicy from './MailboxPolicy';
-import {
-  MailboxPrimitives,
-  MailboxReaderPrimitives,
-} from './MailboxPrimitives';
+import { MailboxPrimitives } from './MailboxPrimitives';
+import { MailboxReaderPrimitives } from './MailboxReaderPrimitives';
 
 /**
  * Queue owned by one receiving relationship direction. It stores no identity,
@@ -45,6 +43,21 @@ export class Mailbox {
   }
 
   private constructor(private primitives: MailboxPrimitives) {}
+
+  /**
+   * Scans every reader so the timing does not reveal which one matched.
+   */
+  private readerFor(token: string): MailboxReaderPrimitives | undefined {
+    let match: MailboxReaderPrimitives | undefined;
+
+    for (const reader of this.primitives.readers) {
+      if (MailboxCapability.matches(token, reader.readTokenHash)) {
+        match = reader;
+      }
+    }
+
+    return match;
+  }
 
   public acceptsPost(token: string): boolean {
     return MailboxCapability.matches(token, this.primitives.postTokenHash);
@@ -220,20 +233,5 @@ export class Mailbox {
 
   public toPrimitives(): MailboxPrimitives {
     return { ...this.primitives, readers: this.readers() };
-  }
-
-  /**
-   * Scans every reader so the timing does not reveal which one matched.
-   */
-  private readerFor(token: string): MailboxReaderPrimitives | undefined {
-    let match: MailboxReaderPrimitives | undefined;
-
-    for (const reader of this.primitives.readers) {
-      if (MailboxCapability.matches(token, reader.readTokenHash)) {
-        match = reader;
-      }
-    }
-
-    return match;
   }
 }
