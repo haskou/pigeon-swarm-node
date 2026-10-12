@@ -479,4 +479,84 @@ describe(DeviceAuthorization.name, () => {
 
     expect(() => policy.apply(revoked, attemptedEnrollment)).toThrow();
   });
+
+  const eventNames = (aggregate: DeviceAuthorization): string[] =>
+    aggregate.pullDomainEvents().map((event) => event.eventName());
+
+  it('records no domain events on genesis or hydration', () => {
+    expect(authorization.pullDomainEvents()).toEqual([]);
+    expect(
+      DeviceAuthorization.fromPrimitives(
+        authorization.toPrimitives(),
+      ).pullDomainEvents(),
+    ).toEqual([]);
+  });
+
+  it('records an enrollment event for enroll and enrollConcurrently', () => {
+    const candidateCredential = DeviceCredential.fromString(
+      candidate.toPrimitives().publicKey,
+    );
+
+    expect(eventNames(authorization.enroll(candidateCredential))).toEqual([
+      'identity-devices.v1.device_authorization.credential_enrolled',
+    ]);
+    expect(
+      eventNames(authorization.enrollConcurrently([candidateCredential])),
+    ).toEqual(['identity-devices.v1.device_authorization.credential_enrolled']);
+  });
+
+  it('records a revocation event for revoke and revokeConcurrently', () => {
+    const candidateCredential = DeviceCredential.fromString(
+      candidate.toPrimitives().publicKey,
+    );
+    const enrolled = authorization.enroll(candidateCredential);
+    enrolled.pullDomainEvents();
+
+    expect(eventNames(enrolled.revoke(candidateCredential))).toEqual([
+      'identity-devices.v1.device_authorization.credential_revoked',
+    ]);
+    expect(
+      eventNames(enrolled.revokeConcurrently([candidateCredential])),
+    ).toEqual(['identity-devices.v1.device_authorization.credential_revoked']);
+  });
+
+  it('records a recovery event for recover and recoverAt', () => {
+    const candidateCredential = DeviceCredential.fromString(
+      candidate.toPrimitives().publicKey,
+    );
+    const epoch = DeviceAuthorizationEpoch.fromRecovery(
+      DeviceAuthorizationOperationId.generate(),
+    );
+
+    expect(
+      eventNames(authorization.recover(candidateCredential, epoch)),
+    ).toEqual(['identity-devices.v1.device_authorization.recovered']);
+    expect(
+      eventNames(
+        authorization.recoverAt(
+          authorization.getRevision().next(),
+          candidateCredential,
+          epoch,
+        ),
+      ),
+    ).toEqual(['identity-devices.v1.device_authorization.recovered']);
+  });
+
+  it('keeps domain event attributes to identifiers and revision', () => {
+    const enrolled = authorization.enroll(
+      DeviceCredential.fromString(candidate.toPrimitives().publicKey),
+    );
+    const events = enrolled.pullDomainEvents();
+
+    expect(events.map((event) => event.attributes)).toEqual([
+      {
+        epoch: enrolled.getEpoch().valueOf(),
+        identityId: identityId.valueOf(),
+        revision: enrolled.getRevision().valueOf(),
+      },
+    ]);
+    expect(JSON.stringify(events)).not.toContain(
+      candidate.toPrimitives().publicKey,
+    );
+  });
 });
