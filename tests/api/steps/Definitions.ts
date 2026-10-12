@@ -1881,6 +1881,62 @@ export default class Definitions {
       .valueOf();
   }
 
+  @given('I set an unsigned sealed secret bundle body')
+  public iSetAnUnsignedSealedSecretBundleBody(): void {
+    this.body = JSON.stringify({
+      authorizationRevision: 1,
+      entries: [
+        {
+          recipientCredential: 'unsigned-recipient',
+          sealedSecret: 'c2VhbGVk',
+          signature: 'unsigned-signature',
+        },
+      ],
+      generation: 1,
+    });
+  }
+
+  @given('I sign the current sealed secret delivery request')
+  public async iSignTheCurrentSealedSecretDeliveryRequest(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.body = undefined;
+    const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}/sealed-secrets`;
+    await this.signCurrentRequest('GET', path);
+    const timestamp = this.headers['x-timestamp'] as string;
+    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
+      'GET',
+      path,
+      timestamp,
+      this.getCurrentRequestBody(),
+    );
+    const device = await this.ensureIdentityDeviceOwnerKeyPair();
+    this.headers['x-device-credential'] = new IdentityId(
+      device.toPrimitives().publicKey,
+    ).valueOf();
+    this.headers['x-device-signature'] = device
+      .sign(JSON.stringify(payload))
+      .valueOf();
+  }
+
+  @when('I PUT the current sealed secret bundle')
+  public async iPUTTheCurrentSealedSecretBundle(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.response = await this.restClient.put(
+      `/identity-devices/${encodeURIComponent(identityId.valueOf())}/sealed-secrets`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I GET the current sealed secret delivery')
+  public async iGETTheCurrentSealedSecretDelivery(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.response = await this.restClient.get(
+      `/identity-devices/${encodeURIComponent(identityId.valueOf())}/sealed-secrets`,
+      this.headers,
+    );
+  }
+
   @given('another identity signs the current device list request')
   public async anotherIdentitySignsTheCurrentDeviceListRequest(): Promise<void> {
     const targetIdentityId = this.ownerIdentityId as IdentityId;

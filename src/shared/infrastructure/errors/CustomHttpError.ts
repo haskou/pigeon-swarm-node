@@ -5,7 +5,7 @@ export default abstract class CustomHttpError extends HttpError {
   constructor(httpCode: number, code: number, message: string) {
     super(httpCode, message);
     this._code = code;
-    Object.setPrototypeOf(this, CustomHttpError.prototype);
+    Object.setPrototypeOf(this, new.target.prototype);
   }
 
   public get code(): number {

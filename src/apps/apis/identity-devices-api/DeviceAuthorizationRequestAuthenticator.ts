@@ -7,6 +7,7 @@ import { Request } from 'express';
 
 import { InvalidSignedRequestError } from '../shared/errors/InvalidSignedRequestError';
 import { SignedHttpRequestVerifier } from '../shared/SignedHttpRequestVerifier';
+import { assertSignedRequestTimestampIsFresh } from '../shared/SignedRequestFreshness';
 
 export class DeviceAuthorizationRequestAuthenticator {
   private readonly verifier = new SignedHttpRequestVerifier();
@@ -16,7 +17,7 @@ export class DeviceAuthorizationRequestAuthenticator {
     signatureValue: string | undefined,
     payload: string,
     authorization: DeviceAuthorization,
-  ): void {
+  ): IdentityId {
     assert(
       credentialValue !== undefined &&
         credentialValue.length > 0 &&
@@ -35,6 +36,8 @@ export class DeviceAuthorizationRequestAuthenticator {
       hasValidSignature && authorization.isAuthorized(credential),
       new InvalidSignedRequestError(),
     );
+
+    return new IdentityId(credentialValue);
   }
 
   public authenticate(
@@ -78,6 +81,37 @@ export class DeviceAuthorizationRequestAuthenticator {
       this.authenticateDevice(
         credentialValue,
         deviceSignatureValue,
+        payload,
+        authorization,
+      );
+    } catch {
+      throw new InvalidSignedRequestError();
+    }
+  }
+
+  public authenticateCurrentDevice(
+    request: Request,
+    authorization: DeviceAuthorization,
+  ): IdentityId {
+    try {
+      assert(
+        request.header('x-recovery-signature') === undefined,
+        new InvalidSignedRequestError(),
+      );
+      const timestamp = this.verifier.getRequiredHeader(request, 'x-timestamp');
+      assertSignedRequestTimestampIsFresh(timestamp);
+      const payload = JSON.stringify(
+        this.verifier.getCanonicalPayload(
+          request.method,
+          request.path,
+          timestamp,
+          request.body,
+        ),
+      );
+
+      return this.authenticateDevice(
+        request.header('x-device-credential'),
+        request.header('x-device-signature'),
         payload,
         authorization,
       );

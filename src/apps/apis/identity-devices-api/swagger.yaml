@@ -82,6 +82,109 @@ paths:
           description: The signature is missing or invalid, the signer does not own the requested identity, or the supplied proof is not valid.
         '409':
           description: The authorization checkpoint is unavailable on this node.
+  /identity-devices/{identityId}/sealed-secrets:
+    put:
+      tags:
+        - identity-devices
+      summary: Publish a device sealed secrets generation
+      description: |
+        Publishes one generation of per-device sealed secrets for the identity.
+        The publisher is the device named by X-Device-Credential. Authentication
+        is device proof only, checked against the current head. The identity
+        signature and X-Recovery-Signature are not accepted. X-Timestamp must be
+        within 30 seconds of the node clock. The request signature is consumed by
+        the replay guard.
+
+        Each entry signature covers this preimage, serialized with JSON.stringify
+        in exactly this key order:
+        {"purpose":"pigeon:device-sealed-secret:v1","identityId":"<identity id>","generation":<generation>,"authorizationRevision":<authorizationRevision>,"publisherCredential":"<device credential>","recipientCredential":"<device credential>","sealedSecret":"<sealedSecret>"}
+
+        Entries must cover exactly the authorized device credentials at the head.
+        The node stores sealed payloads without decrypting or inspecting them.
+      parameters:
+        - in: path
+          name: identityId
+          required: true
+          schema:
+            type: string
+          description: Percent-encoded identity id.
+        - $ref: '#/components/parameters/XTimestamp'
+        - in: header
+          name: X-Device-Credential
+          required: true
+          schema:
+            type: string
+          description: Publishing device credential in normalized public-key form. It must be authorized at the current head.
+        - in: header
+          name: X-Device-Signature
+          required: true
+          schema:
+            type: string
+          description: Device signature over the canonical request payload (method, path, timestamp and body hash).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceSealedSecretPublication'
+      responses:
+        '200':
+          description: Generation stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceSealedSecretReceipt'
+        '400':
+          description: Malformed body or a field outside its limits.
+        '401':
+          description: Timestamp outside the 30 second window, missing or invalid device proof, revoked or unknown credential, replayed request, or X-Recovery-Signature supplied.
+        '409':
+          description: Authorization revision mismatch, recipients mismatch (missing, revoked, unknown or duplicate credential), invalid entry signature, or generation not greater than the stored generation.
+    get:
+      tags:
+        - identity-devices
+      summary: Read the caller's device sealed secret
+      description: |
+        Returns the caller's own entry of the stored generation. Authentication is
+        device proof only, checked against the current head, with the same
+        X-Timestamp window as PUT. A revoked or unknown credential is refused.
+        The request is not replay-guarded.
+
+        The response never includes other devices' entries, the authorized-device
+        list, head commitments or decrypted material. A device added after the last
+        publish has no entry until the owner republishes. Recipients verify the
+        signature against publisherCredential and the PUT preimage themselves.
+      parameters:
+        - in: path
+          name: identityId
+          required: true
+          schema:
+            type: string
+          description: Percent-encoded identity id.
+        - $ref: '#/components/parameters/XTimestamp'
+        - in: header
+          name: X-Device-Credential
+          required: true
+          schema:
+            type: string
+          description: Caller device credential in normalized public-key form. It must be authorized at the current head.
+        - in: header
+          name: X-Device-Signature
+          required: true
+          schema:
+            type: string
+          description: Device signature over the canonical request payload (method, path, timestamp and body hash).
+      responses:
+        '200':
+          description: The caller's entry of the stored generation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceSealedSecretRecord'
+        '401':
+          description: Timestamp outside the 30 second window, missing or invalid device proof, revoked or unknown credential, or X-Recovery-Signature supplied.
+        '404':
+          description: No stored bundle for the identity, or no entry for the caller.
   /identity-devices/transitions:
     post:
       tags:
@@ -285,3 +388,88 @@ components:
         revision:
           type: integer
           minimum: 0
+    DeviceSealedSecretPublication:
+      type: object
+      required:
+        - generation
+        - authorizationRevision
+        - entries
+      properties:
+        generation:
+          type: integer
+          minimum: 1
+        authorizationRevision:
+          type: integer
+          minimum: 0
+          description: Head revision the publisher observed. Must equal the current head.
+        entries:
+          type: array
+          minItems: 1
+          maxItems: 128
+          description: Exactly one entry per authorized device credential at the head.
+          items:
+            $ref: '#/components/schemas/DeviceSealedSecretEntry'
+    DeviceSealedSecretEntry:
+      type: object
+      required:
+        - recipientCredential
+        - sealedSecret
+        - signature
+      properties:
+        recipientCredential:
+          type: string
+          description: Authorized device credential the entry is sealed to.
+        sealedSecret:
+          type: string
+          minLength: 1
+          maxLength: 4096
+          pattern: '^[A-Za-z0-9+/=.-]+$'
+          description: Opaque sealed payload in the form v2.x25519-hkdf-sha256-aes-256-gcm.<eph>.<iv>.<ct>.<tag>.
+        signature:
+          type: string
+          minLength: 1
+          description: Base64 publisher signature over the entry preimage.
+    DeviceSealedSecretReceipt:
+      type: object
+      required:
+        - identityId
+        - generation
+        - authorizationRevision
+      properties:
+        identityId:
+          type: string
+        generation:
+          type: integer
+          minimum: 1
+        authorizationRevision:
+          type: integer
+          minimum: 0
+    DeviceSealedSecretRecord:
+      type: object
+      required:
+        - identityId
+        - generation
+        - authorizationRevision
+        - publisherCredential
+        - recipientCredential
+        - sealedSecret
+        - signature
+      properties:
+        identityId:
+          type: string
+        generation:
+          type: integer
+          minimum: 1
+        authorizationRevision:
+          type: integer
+          minimum: 0
+        publisherCredential:
+          type: string
+          description: Device that published the generation. Verify the entry signature against it.
+        recipientCredential:
+          type: string
+          description: The caller's own device credential.
+        sealedSecret:
+          type: string
+        signature:
+          type: string

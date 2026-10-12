@@ -5756,6 +5756,98 @@ invalidate it. The author must refuse to create that final signature after the
 pairing deadline. The endpoint never returns local vault envelopes or secret
 recovery material.
 
+### Device sealed secrets
+
+Each new generation carries one sealed payload per authorized device (for
+example a fresh mailbox root and keychain key). The node requires entries for
+exactly the authorized devices, so a revoked device gets nothing from a
+generation published after its revocation. Both routes use device proof only,
+checked against the current authorization head: `X-Timestamp`,
+`X-Device-Credential` and `X-Device-Signature`. The identity signature
+(`X-Identity-Id`, `X-Signature`) and `X-Recovery-Signature` are not accepted.
+`X-Timestamp` must be within 30 seconds of the node clock.
+
+Publish a generation with:
+
+```http
+PUT /identity-devices/{percent-encoded identityId}/sealed-secrets
+X-Timestamp: <millisecondsSinceEpoch>
+X-Device-Credential: <device credential>
+X-Device-Signature: <signature>
+```
+
+The publisher is the device named by `X-Device-Credential`. The body is:
+
+```json
+{
+  "generation": 3,
+  "authorizationRevision": 2,
+  "entries": [
+    {
+      "recipientCredential": "<device credential>",
+      "sealedSecret": "v2.x25519-hkdf-sha256-aes-256-gcm.…",
+      "signature": "<base64 publisher signature over the preimage>"
+    }
+  ]
+}
+```
+
+`generation` is an integer of at least 1. `entries` holds 1 to 128 items.
+`sealedSecret` is 1 to 4096 characters from `A-Za-z0-9+/=.-`. The node stores
+it without decrypting or inspecting it.
+
+The node checks, in order:
+
+1. Freshness and device proof against the head: `401`.
+2. Replay guard on the request signature: `401`.
+3. Body shape and limits: `400`.
+4. `authorizationRevision` equals the head revision: `409`.
+5. `recipientCredential` values are exactly the authorized device credentials at
+   the head: none missing, revoked, unknown or duplicated: `409`.
+6. Every entry signature verifies under the publisher credential: `409`.
+7. `generation` is strictly greater than the stored generation: `409`.
+
+Success returns `200` with `{ identityId, generation, authorizationRevision }`.
+
+Each entry signature covers this preimage, serialized with `JSON.stringify` in
+exactly this key order:
+
+```json
+{"purpose":"pigeon:device-sealed-secret:v1","identityId":"<identity id>","generation":3,"authorizationRevision":2,"publisherCredential":"<device credential>","recipientCredential":"<device credential>","sealedSecret":"v2.x25519-hkdf-sha256-aes-256-gcm.…"}
+```
+
+Read the caller's own entry of the stored generation with:
+
+```http
+GET /identity-devices/{percent-encoded identityId}/sealed-secrets
+X-Timestamp: <millisecondsSinceEpoch>
+X-Device-Credential: <device credential>
+X-Device-Signature: <signature>
+```
+
+Freshness and device proof are checked as for `PUT`, and a revoked or unknown
+credential returns `401`. The route is not replay-guarded. No stored bundle, or
+no entry for the caller, returns `404`. A device added after the last publish
+has no entry until the owner republishes.
+
+Success returns `200`:
+
+```json
+{
+  "identityId": "<identity id>",
+  "generation": 3,
+  "authorizationRevision": 2,
+  "publisherCredential": "<device credential>",
+  "recipientCredential": "<device credential>",
+  "sealedSecret": "v2.x25519-hkdf-sha256-aes-256-gcm.…",
+  "signature": "<base64 publisher signature over the preimage>"
+}
+```
+
+The response never includes other devices' entries, the authorized-device list,
+head commitments or decrypted material. Recipients verify `signature` against
+`publisherCredential` and the preimage above; the node is not trusted for that.
+
 ## Planned API
 
 The following API shapes are not implemented yet. They are kept here as design
