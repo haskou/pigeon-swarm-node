@@ -457,6 +457,35 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const revisionOf = (value: number): DeviceAuthorizationRevision =>
       new DeviceAuthorizationRevision(value);
 
+    const recoveryOf = (
+      identityId: IdentityId,
+      authority: KeyPair,
+      target: KeyPair,
+      operationId: string,
+      previousRevision: DeviceAuthorizationRevision,
+      compromisedCredentials?: Array<{
+        compromisedSince: DeviceAuthorizationRevision;
+        credential: DeviceCredential;
+      }>,
+      epoch: DeviceAuthorizationEpoch = DeviceAuthorizationEpoch.genesis(),
+    ): DeviceAuthorizationTransition => {
+      const unsigned = DeviceAuthorizationTransition.recovery(
+        identityId,
+        new DeviceAuthorizationOperationId(operationId),
+        previousRevision,
+        credentialOf(target),
+        epoch,
+        compromisedCredentials,
+      );
+      const proven = unsigned.provePossession(
+        target.sign(unsigned.getProofOfPossessionPayload()),
+      );
+
+      return proven.authorizeRecovery(
+        authority.sign(proven.getSigningPayload()),
+      );
+    };
+
     it('answers for the revision a record claims, not for the head', async () => {
       const { genesis, identityId, owner } = await fixture();
       const phone = await KeyPair.generate();
@@ -803,6 +832,307 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       expect(timeline?.isAuthorizedAt(credentialOf(owner), revisionOf(2))).toBe(
         false,
       );
+    });
+
+    it('carries a compromise cap across a recovery checkpoint so a re-enrolled stolen key stays refused', async () => {
+      const { genesis, identityId, owner, recovery } = await fixture();
+      const phone = await KeyPair.generate();
+      const recovered = await KeyPair.generate();
+      const { repository } = repositoryFixture();
+      await provisionAuthorization(repository, genesis);
+      await repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000001',
+          '10000000-0000-4000-8000-000000000001',
+        ),
+      );
+      await repository.compareAndApply(
+        await revocation(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000002',
+          revisionOf(1),
+          DeviceAuthorizationEpoch.genesis(),
+          revisionOf(1),
+        ),
+      );
+      await repository.compareAndApply(
+        recoveryOf(
+          identityId,
+          recovery,
+          recovered,
+          '00000000-0000-4000-8000-000000000003',
+          revisionOf(2),
+          [{ compromisedSince: revisionOf(1), credential: credentialOf(phone) }],
+        ),
+      );
+      await repository.compareAndApply(
+        await enrollment(
+          identityId,
+          recovered,
+          phone,
+          '00000000-0000-4000-8000-000000000004',
+          '10000000-0000-4000-8000-000000000004',
+          revisionOf(3),
+          DeviceAuthorizationEpoch.fromRecovery(
+            new DeviceAuthorizationOperationId(
+              '00000000-0000-4000-8000-000000000003',
+            ),
+          ),
+        ),
+      );
+
+      const timeline = await repository.findTimeline(identityId);
+
+      expect(timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(4))).toBe(
+        false,
+      );
+      expect(
+        timeline?.isAuthorizedAt(credentialOf(recovered), revisionOf(4)),
+      ).toBe(true);
+    });
+
+    it('keeps a carried compromise cap after a restart and on a fresh replica', async () => {
+      const { genesis, identityId, owner, recovery } = await fixture();
+      const phone = await KeyPair.generate();
+      const recovered = await KeyPair.generate();
+      const first = repositoryFixture();
+      await provisionAuthorization(first.repository, genesis);
+      await first.repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000001',
+          '10000000-0000-4000-8000-000000000001',
+        ),
+      );
+      await first.repository.compareAndApply(
+        await revocation(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000002',
+          revisionOf(1),
+          DeviceAuthorizationEpoch.genesis(),
+          revisionOf(1),
+        ),
+      );
+      await first.repository.compareAndApply(
+        recoveryOf(
+          identityId,
+          recovery,
+          recovered,
+          '00000000-0000-4000-8000-000000000003',
+          revisionOf(2),
+          [{ compromisedSince: revisionOf(1), credential: credentialOf(phone) }],
+        ),
+      );
+      await first.repository.compareAndApply(
+        await enrollment(
+          identityId,
+          recovered,
+          phone,
+          '00000000-0000-4000-8000-000000000004',
+          '10000000-0000-4000-8000-000000000004',
+          revisionOf(3),
+          DeviceAuthorizationEpoch.fromRecovery(
+            new DeviceAuthorizationOperationId(
+              '00000000-0000-4000-8000-000000000003',
+            ),
+          ),
+        ),
+      );
+      const identity = identityOf(genesis);
+      first.identityRepository.findFreshCandidateReferencesById.mockResolvedValue(
+        [new IdentityCandidate(genesisExternalIdentifier, identity)],
+      );
+      const replica = repositoryFixture();
+      replica.identityRepository.findFreshCandidateReferencesById.mockResolvedValue(
+        [new IdentityCandidate(genesisExternalIdentifier, identity)],
+      );
+      replica.setHead(first.getHead() as Record<string, unknown>);
+      const restarted = new OrbitDBDeviceAuthorizationRepository(
+        first.registry,
+        new DeviceAuthorizationPolicy(),
+        first.identityRepository,
+        first.networkRegistry,
+        first.database,
+      );
+
+      const timelines = [
+        await restarted.findTimeline(identityId),
+        await replica.repository.findTimeline(identityId),
+      ];
+
+      for (const timeline of timelines) {
+        expect(timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(4))).toBe(
+          false,
+        );
+        expect(
+          timeline?.isAuthorizedAt(credentialOf(recovered), revisionOf(4)),
+        ).toBe(true);
+      }
+    });
+
+    it('refuses a recovery that drops a compromise cap still in effect', async () => {
+      const { genesis, identityId, owner, recovery } = await fixture();
+      const phone = await KeyPair.generate();
+      const recovered = await KeyPair.generate();
+      const { repository } = repositoryFixture();
+      await provisionAuthorization(repository, genesis);
+      await repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000001',
+          '10000000-0000-4000-8000-000000000001',
+        ),
+      );
+      await repository.compareAndApply(
+        await revocation(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000002',
+          revisionOf(1),
+          DeviceAuthorizationEpoch.genesis(),
+          revisionOf(1),
+        ),
+      );
+
+      await expect(
+        repository.compareAndApply(
+          recoveryOf(
+            identityId,
+            recovery,
+            recovered,
+            '00000000-0000-4000-8000-000000000003',
+            revisionOf(2),
+          ),
+        ),
+      ).rejects.toThrow();
+    });
+
+    it('refuses a recovery that caps a credential that was never revoked', async () => {
+      const { genesis, identityId, owner, recovery } = await fixture();
+      const phone = await KeyPair.generate();
+      const recovered = await KeyPair.generate();
+      const { repository } = repositoryFixture();
+      await provisionAuthorization(repository, genesis);
+      await repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000001',
+          '10000000-0000-4000-8000-000000000001',
+        ),
+      );
+
+      await expect(
+        repository.compareAndApply(
+          recoveryOf(
+            identityId,
+            recovery,
+            recovered,
+            '00000000-0000-4000-8000-000000000002',
+            revisionOf(1),
+            [{ compromisedSince: revisionOf(1), credential: credentialOf(phone) }],
+          ),
+        ),
+      ).rejects.toThrow();
+    });
+
+    it('rejects a replicated recovery checkpoint that drops a carried compromise cap', async () => {
+      const { genesis, identityId, owner, recovery } = await fixture();
+      const phone = await KeyPair.generate();
+      const recovered = await KeyPair.generate();
+      const successor = await KeyPair.generate();
+      const { getHead, getMerger, repository } = repositoryFixture();
+      await provisionAuthorization(repository, genesis);
+      await repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000001',
+          '10000000-0000-4000-8000-000000000001',
+        ),
+      );
+      await repository.compareAndApply(
+        await revocation(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000002',
+          revisionOf(1),
+          DeviceAuthorizationEpoch.genesis(),
+          revisionOf(1),
+        ),
+      );
+      await repository.compareAndApply(
+        recoveryOf(
+          identityId,
+          recovery,
+          recovered,
+          '00000000-0000-4000-8000-000000000003',
+          revisionOf(2),
+          [{ compromisedSince: revisionOf(1), credential: credentialOf(phone) }],
+        ),
+      );
+      const trusted = getHead() as {
+        checkpoint: {
+          transition: {
+            transition: Record<string, unknown>;
+          };
+        };
+      } & Record<string, unknown>;
+      const recoveredAuthorization = genesis.recoverAt(
+        revisionOf(3),
+        credentialOf(recovered),
+        DeviceAuthorizationEpoch.fromRecovery(
+          new DeviceAuthorizationOperationId('00000000-0000-4000-8000-000000000003'),
+        ),
+      );
+      const successorRecovery = recoveryOf(
+        identityId,
+        recovery,
+        successor,
+        '00000000-0000-4000-8000-000000000004',
+        revisionOf(3),
+        undefined,
+        DeviceAuthorizationEpoch.fromRecovery(
+          new DeviceAuthorizationOperationId('00000000-0000-4000-8000-000000000003'),
+        ),
+      );
+      const candidateAuthorization = recoveredAuthorization.recoverAt(
+        successorRecovery.getRevision(),
+        successorRecovery.getTargetCredential(),
+        DeviceAuthorizationEpoch.fromRecovery(successorRecovery.getOperationId()),
+      );
+      const checkpoint = {
+        authorization: candidateAuthorization.toPrimitives(),
+        lineage: [trusted.checkpoint.transition],
+        transition: { transition: successorRecovery.toPrimitives() },
+      };
+      const emptyHistory: Array<{
+        transition: Record<string, unknown>;
+      }> = [];
+      const candidate = {
+        ...trusted,
+        authorization: candidateAuthorization.toPrimitives(),
+        checkpoint,
+        history: emptyHistory,
+        sources: [{ checkpoint, history: emptyHistory }],
+      };
+
+      expect(getMerger()?.(trusted, candidate)).toEqual(trusted);
     });
   });
 
