@@ -1042,6 +1042,8 @@ services:
       - >-
         @contexts/content-replication/domain/repositories/ContentReplicationRepository
       - >-
+        @contexts/content-replication/application/content-storage/ReplicatedContentStorage
+      - >-
         @contexts/content-replication/application/refresh-status-summary/ContentReplicationSummaryRefresher
   contexts/content-replication/infrastructure/ipfs/IpfsContentStorage:
     class: /contexts/content-replication/infrastructure/ipfs/IpfsContentStorage
