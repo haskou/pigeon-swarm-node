@@ -7,6 +7,7 @@ import {
   DeviceSealedSecretBundlePrimitives,
   DeviceSealedSecretEntryPrimitives,
 } from '@app/contexts/identity-devices/domain/DeviceSealedSecretBundle';
+import { DeviceSealedSecretGenerationStaleError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretGenerationStaleError';
 import { DeviceSealedSecretPublisherNotAuthorizedError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretPublisherNotAuthorizedError';
 import { DeviceSealedSecretRecipientsMismatchError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretRecipientsMismatchError';
 import { DeviceSealedSecretRevisionMismatchError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretRevisionMismatchError';
@@ -129,6 +130,27 @@ function bundleOf(
     identityId: input.identityId,
     publisherCredential: credentialOf(input.publisher),
     ...input,
+  });
+}
+
+function bundleAtGeneration(
+  identityId: string,
+  owner: KeyPair,
+  generation: number,
+): DeviceSealedSecretBundle {
+  return bundleOf({
+    entries: [
+      sealedEntry({
+        authorizationRevision: 0,
+        generation,
+        identityId,
+        publisher: owner,
+        recipient: owner,
+      }),
+    ],
+    generation,
+    identityId,
+    publisher: owner,
   });
 }
 
@@ -359,5 +381,40 @@ describe(DeviceSealedSecretBundle.name, () => {
         }),
       ).toThrow(InvalidDeviceSealedSecretBundleError);
     }
+  });
+
+  it('supersedes when no bundle is stored', async () => {
+    const { identityId, owner } = await singleDeviceFixture();
+    const candidate = bundleAtGeneration(identityId, owner, 1);
+
+    expect(() => candidate.assertSupersedes(undefined)).not.toThrow();
+  });
+
+  it('supersedes a stored bundle of a lower generation', async () => {
+    const { identityId, owner } = await singleDeviceFixture();
+    const stored = bundleAtGeneration(identityId, owner, 1);
+    const candidate = bundleAtGeneration(identityId, owner, 2);
+
+    expect(() => candidate.assertSupersedes(stored)).not.toThrow();
+  });
+
+  it('rejects a generation equal to the stored one', async () => {
+    const { identityId, owner } = await singleDeviceFixture();
+    const stored = bundleAtGeneration(identityId, owner, 2);
+    const candidate = bundleAtGeneration(identityId, owner, 2);
+
+    expect(() => candidate.assertSupersedes(stored)).toThrow(
+      DeviceSealedSecretGenerationStaleError,
+    );
+  });
+
+  it('rejects a generation below the stored one', async () => {
+    const { identityId, owner } = await singleDeviceFixture();
+    const stored = bundleAtGeneration(identityId, owner, 3);
+    const candidate = bundleAtGeneration(identityId, owner, 2);
+
+    expect(() => candidate.assertSupersedes(stored)).toThrow(
+      DeviceSealedSecretGenerationStaleError,
+    );
   });
 });
