@@ -148,7 +148,7 @@ installed `web-push` module path.
 | `MAILBOX_MAX_BYTES` | `8388608` | No | Pending ciphertext bytes per mailbox (8 MiB). A full mailbox refuses new envelopes. |
 | `MAILBOX_MAX_COUNT` | `10000` | No | Mailboxes this node will hold. Past half full, creation needs more proof of work (16 to 20 bits); at the limit, an empty mailbox unread for 7 days may be evicted to make room. |
 | `MAILBOX_MAX_ENVELOPES` | `1000` | No | Pending envelopes per mailbox. |
-| `MAILBOX_MAX_READERS` | `8` | No | Read capabilities (one per device) a mailbox may hold, at least 1. A silent reader holds envelopes until retention expires them; revoke it to free them. |
+| `MAILBOX_MAX_READERS` | `129` | No | Read capabilities a mailbox may hold, at least 1: the root reader plus one per device. The default admits every device an identity may hold (128). A silent reader holds envelopes until retention expires them; revoke it to free them. |
 | `MAILBOX_RETENTION_MS` | `1209600000` | No | Age at which envelopes expire and an unread mailbox is deleted (14 days). |
 | `PRIVATE_BLOB_MAX_BYTES` | `52428800` | No | Largest single private blob (50 MiB). |
 | `PRIVATE_BLOB_QUOTA_BYTES_PER_OWNER` | `524288000` | No | Live reserved bytes one identity may hold on this node (500 MiB). |

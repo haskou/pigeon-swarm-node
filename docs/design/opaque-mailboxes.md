@@ -158,7 +158,8 @@ Every device of one identity derives the same root read token for a mailbox id
 (`readToken` above). With one shared cursor, an acknowledgement from one device
 hid envelopes from the others. A mailbox now holds a bounded set of readers,
 each `{ readTokenHash, ackedCursor }`, capped by `MAILBOX_MAX_READERS` (default
-`8`). The root reader from `PUT` stays registered. A device that holds the root
+`129`: the root reader plus one per device, enough for all 128 devices an identity
+may hold). The root reader from `PUT` stays registered. A device that holds the root
 key adds its own random per-device read token with
 `POST /mailboxes/{mailboxId}/readers`; the node stores only its hash. Each device
 then reads, acks and revokes with its own token.

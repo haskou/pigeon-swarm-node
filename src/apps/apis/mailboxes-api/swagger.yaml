@@ -182,6 +182,7 @@ paths:
                 properties:
                   maxReaders:
                     type: integer
+                    description: Most readers the mailbox holds, `MAILBOX_MAX_READERS` (default 129, the root plus 128 devices).
                   readers:
                     type: array
                     items:
