@@ -1649,7 +1649,7 @@ Node-local queues of opaque ciphertext envelopes. Mailboxes are never written to
 
 ## Private Blob HTTP API
 
-Node-local storage for client-encrypted bytes. Blobs are never added to IPFS, the DHT, pins or any index, and the server stores no filename, content type, key or thumbnail. The client MUST encrypt (and SHOULD pad to a size bucket) before uploading; padding reduces but does not eliminate size correlation. Unlike IPFS content, a blob is only as available as this node and its retention window. See `docs/design/private-blob-store.md`.
+Node-local storage for client-encrypted bytes. Blobs are never added to IPFS, the DHT, pins or any index, and the server stores no filename, content type, key or thumbnail. The client MUST encrypt (and SHOULD pad to a size bucket; the buckets are in `docs/design/private-blob-store.md`) before uploading; padding reduces but does not eliminate size correlation. Unlike IPFS content, a blob is only as available as this node and its retention window. See `docs/design/private-blob-store.md`.
 
 Authorization is split so a streamed body never has to be buffered for signing:
 
