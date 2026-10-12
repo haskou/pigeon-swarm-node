@@ -627,7 +627,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
       return true;
     } catch {
-      Kernel.logger.debug?.(`DHT record publication skipped for key: ${key}`);
+      Kernel.logger.debug?.('DHT record publication skipped');
 
       return false;
     } finally {
