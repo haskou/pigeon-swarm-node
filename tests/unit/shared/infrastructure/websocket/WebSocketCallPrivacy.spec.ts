@@ -119,8 +119,10 @@ describe('live call privacy', () => {
     const conversations = mock<ConversationRepository>();
     const communities = mock<CommunityRepository>();
     const community = mock<Community>();
-    calls.findById.mockResolvedValue(call);
-    communities.findById.mockResolvedValue(community);
+    calls.hasById.mockResolvedValue(true);
+    calls.requireById.mockResolvedValue(call);
+    communities.hasById.mockResolvedValue(true);
+    communities.requireById.mockResolvedValue(community);
     const leases = new InMemoryCallParticipantLeaseRepository();
     const lease = CallParticipantLease.connect(
       call.getId(),
@@ -189,10 +191,12 @@ describe('live call privacy', () => {
     lease.pullDomainEvents();
     call.joinOrAdd(other);
     const calls = mock<CallRepository>();
-    calls.findById.mockResolvedValue(call);
+    calls.hasById.mockResolvedValue(true);
+    calls.requireById.mockResolvedValue(call);
     const conversations = mock<ConversationRepository>();
     const communities = mock<CommunityRepository>();
-    communities.findById.mockResolvedValue(mock<Community>());
+    communities.hasById.mockResolvedValue(true);
+    communities.requireById.mockResolvedValue(mock<Community>());
     const leases = new InMemoryCallParticipantLeaseRepository();
     await leases.save(lease);
     await leases.save(
@@ -225,7 +229,9 @@ describe('live call privacy', () => {
         .toString('base64'),
     );
     const outsiderClient = socket();
-    const community = (await communities.findById(new CommunityId('community-1')))!;
+    const community = await communities.requireById(
+      new CommunityId('community-1'),
+    );
     jest.mocked(community.authorizeVoiceChannelCall).mockImplementation((identityId) => {
       if (identityId.isEqual(outsider)) throw new Error('Not a member');
     });

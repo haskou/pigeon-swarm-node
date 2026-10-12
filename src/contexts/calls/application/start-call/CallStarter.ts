@@ -23,12 +23,19 @@ export default class CallStarter {
   ): Promise<Call> {
     if (message.scopeType.isCommunityChannel()) {
       // One live call per channel: the caller signs a join instead of a start.
-      const activeCall = await this.repository.findActiveByCommunityChannel(
-        message.getCommunityId(),
-        message.getCommunityChannelId(),
+      const communityId = message.getCommunityId();
+      const channelId = message.getCommunityChannelId();
+      const hasActiveCall = await this.repository.hasActiveByCommunityChannel(
+        communityId,
+        channelId,
       );
 
-      if (activeCall) return activeCall;
+      if (hasActiveCall) {
+        return this.repository.requireActiveByCommunityChannel(
+          communityId,
+          channelId,
+        );
+      }
     }
 
     const call = Call.start(

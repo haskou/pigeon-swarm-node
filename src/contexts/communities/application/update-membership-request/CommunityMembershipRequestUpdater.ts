@@ -2,7 +2,6 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 
 import { CommunityMembershipRequest } from '../../domain/entities/membership/CommunityMembershipRequest';
 import { CommunityModerationTarget } from '../../domain/entities/moderation/CommunityModerationTarget';
-import { CommunityRequestNotFoundError } from '../../domain/errors/CommunityRequestNotFoundError';
 import CommunityMembershipRequestRepository from '../../domain/repositories/CommunityMembershipRequestRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityJoinMethod } from '../../domain/value-objects/CommunityJoinMethod';
@@ -102,13 +101,9 @@ export default class CommunityMembershipRequestUpdater {
   public async update(
     message: CommunityMembershipRequestUpdateMessage,
   ): Promise<CommunityMembershipRequest> {
-    const membershipRequest = await this.requestRepository.findById(
+    const membershipRequest = await this.requestRepository.requireById(
       message.requestId,
     );
-
-    if (!membershipRequest) {
-      throw new CommunityRequestNotFoundError();
-    }
 
     if (message.isAccepted()) {
       await this.acceptRequest(membershipRequest, message);

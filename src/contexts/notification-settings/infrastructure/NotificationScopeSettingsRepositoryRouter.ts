@@ -100,16 +100,16 @@ export default class NotificationScopeSettingsRepositoryRouter extends Notificat
     return [...settings.values()];
   }
 
-  public async findByScope(
+  public async hasByScope(
     identityId: IdentityId,
     scope: NotificationSettingScope,
-  ): Promise<NotificationScopeSettings | undefined> {
+  ): Promise<boolean> {
     if (await this.isPrivateScope(scope)) {
-      return this.privateRepository.findByScope(identityId, scope);
+      return this.privateRepository.hasByScope(identityId, scope);
     }
 
     return this.runWhilePublic(scope, () =>
-      this.publicRepository.findByScope(identityId, scope),
+      this.publicRepository.hasByScope(identityId, scope),
     );
   }
 
@@ -121,6 +121,19 @@ export default class NotificationScopeSettingsRepositoryRouter extends Notificat
     return communityId
       ? this.publicStorageGuard.isProtected(communityId)
       : false;
+  }
+
+  public async requireByScope(
+    identityId: IdentityId,
+    scope: NotificationSettingScope,
+  ): Promise<NotificationScopeSettings> {
+    if (await this.isPrivateScope(scope)) {
+      return this.privateRepository.requireByScope(identityId, scope);
+    }
+
+    return this.runWhilePublic(scope, () =>
+      this.publicRepository.requireByScope(identityId, scope),
+    );
   }
 
   public async save(

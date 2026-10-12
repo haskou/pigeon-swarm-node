@@ -1,3 +1,4 @@
+import { KeychainExternalIdentifierNotFoundError } from '@app/contexts/keychains/domain/errors/KeychainExternalIdentifierNotFoundError';
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
 import { KeychainCandidate } from '@app/contexts/keychains/domain/KeychainCandidate';
 import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
@@ -173,7 +174,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     );
   }
 
-  public async findByExternalIdentifier(
+  private async loadByExternalIdentifier(
     externalIdentifier: KeychainExternalIdentifier,
   ): Promise<Keychain | undefined> {
     const metadata =
@@ -184,6 +185,26 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     }
 
     return this.findCandidateFromCid(new IPFSId(externalIdentifier.valueOf()));
+  }
+
+  public async hasByExternalIdentifier(
+    externalIdentifier: KeychainExternalIdentifier,
+  ): Promise<boolean> {
+    return (
+      (await this.loadByExternalIdentifier(externalIdentifier)) !== undefined
+    );
+  }
+
+  public async requireByExternalIdentifier(
+    externalIdentifier: KeychainExternalIdentifier,
+  ): Promise<Keychain> {
+    const keychain = await this.loadByExternalIdentifier(externalIdentifier);
+
+    if (!keychain) {
+      throw new KeychainExternalIdentifierNotFoundError(externalIdentifier);
+    }
+
+    return keychain;
   }
 
   public async findCandidatesByOwnerId(

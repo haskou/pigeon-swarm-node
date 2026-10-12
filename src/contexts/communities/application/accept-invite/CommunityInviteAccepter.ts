@@ -1,7 +1,6 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { Community } from '../../domain/Community';
-import { CommunityInviteNotFoundError } from '../../domain/errors/CommunityInviteNotFoundError';
 import CommunityInviteRepository from '../../domain/repositories/CommunityInviteRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityJoinMethod } from '../../domain/value-objects/CommunityJoinMethod';
@@ -20,11 +19,9 @@ export default class CommunityInviteAccepter {
   public async accept(
     message: CommunityInviteAcceptMessage,
   ): Promise<Community> {
-    const invite = await this.inviteRepository.findByToken(message.inviteToken);
-
-    if (!invite) {
-      throw new CommunityInviteNotFoundError();
-    }
+    const invite = await this.inviteRepository.requireByToken(
+      message.inviteToken,
+    );
     const community = await this.communityFinder.findById(
       invite.getCommunityId(),
     );

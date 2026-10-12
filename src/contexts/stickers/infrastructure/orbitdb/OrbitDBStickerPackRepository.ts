@@ -4,6 +4,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 
 import OrbitDBReplicatedStateRegistry from '../../../shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { StickerPackNotFoundError } from '../../domain/errors/StickerPackNotFoundError';
 import StickerPackRepository from '../../domain/repositories/StickerPackRepository';
 import { StickerPack } from '../../domain/StickerPack';
 import { StickerPackId } from '../../domain/value-objects/StickerPackId';
@@ -59,12 +60,14 @@ export default class OrbitDBStickerPackRepository extends StickerPackRepository 
     );
   }
 
-  public async findById(id: StickerPackId): Promise<StickerPack | undefined> {
+  public async requireById(id: StickerPackId): Promise<StickerPack> {
     const document = ((await this.packIndex.find(this.headKey(id))) ?? []).find(
       (candidate) => candidate.id === id.valueOf(),
     );
 
-    return document ? StickerPack.fromPrimitives(document) : undefined;
+    if (!document) throw new StickerPackNotFoundError();
+
+    return StickerPack.fromPrimitives(document);
   }
 
   public async findByOwner(

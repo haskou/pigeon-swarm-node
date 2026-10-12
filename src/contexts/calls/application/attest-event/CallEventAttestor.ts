@@ -32,7 +32,9 @@ export default class CallEventAttestor {
     const deadline = Date.now() + CallEventAttestor.ADMISSION_WAIT_MS;
 
     for (;;) {
-      const call = await this.repository.findById(callId);
+      const call = (await this.repository.hasById(callId))
+        ? await this.repository.requireById(callId)
+        : undefined;
       const attested = call && CallEventAttestation.attest(event, call);
 
       if (attested) return attested;

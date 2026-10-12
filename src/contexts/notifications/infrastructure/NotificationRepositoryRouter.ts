@@ -16,10 +16,16 @@ export default class NotificationRepositoryRouter extends NotificationRepository
     super();
   }
 
-  public findById(id: NotificationId): Promise<Notification | undefined> {
+  public hasById(id: NotificationId): Promise<boolean> {
     return id.isMissedCall()
-      ? this.local.findById(id)
-      : this.replicated.findById(id);
+      ? this.local.hasById(id)
+      : this.replicated.hasById(id);
+  }
+
+  public requireById(id: NotificationId): Promise<Notification> {
+    return id.isMissedCall()
+      ? this.local.requireById(id)
+      : this.replicated.requireById(id);
   }
 
   public async findByRecipient(

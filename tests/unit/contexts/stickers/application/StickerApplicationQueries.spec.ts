@@ -18,7 +18,7 @@ describe('Sticker application queries', () => {
     const repository = mock<StickerPackRepository>();
     const pack = StickerPackMother.create();
 
-    repository.findById.mockResolvedValue(pack);
+    repository.requireById.mockResolvedValue(pack);
 
     await expect(
       new StickerPackFinder(repository).find(
@@ -30,7 +30,7 @@ describe('Sticker application queries', () => {
   it('StickerPackFinder rejects a missing pack', async () => {
     const repository = mock<StickerPackRepository>();
 
-    repository.findById.mockResolvedValue(undefined);
+    repository.requireById.mockRejectedValue(new StickerPackNotFoundError());
 
     await expect(
       new StickerPackFinder(repository).find(
@@ -69,7 +69,8 @@ describe('Sticker application queries', () => {
     const repository = mock<StickerUserLibraryRepository>();
     const library = StickerUserLibraryMother.create();
 
-    repository.findByIdentityId.mockResolvedValue(library);
+    repository.hasByIdentityId.mockResolvedValue(true);
+    repository.requireByIdentityId.mockResolvedValue(library);
 
     await expect(
       new StickerUserLibraryFinder(repository).find(
@@ -83,7 +84,7 @@ describe('Sticker application queries', () => {
   it('StickerUserLibraryFinder creates an empty missing library', async () => {
     const repository = mock<StickerUserLibraryRepository>();
 
-    repository.findByIdentityId.mockResolvedValue(undefined);
+    repository.hasByIdentityId.mockResolvedValue(false);
 
     const library = await new StickerUserLibraryFinder(repository).find(
       new StickerUserLibraryFindMessage(StickerPackMother.ownerIdentityId),

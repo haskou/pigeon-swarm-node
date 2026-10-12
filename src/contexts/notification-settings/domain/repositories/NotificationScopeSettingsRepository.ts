@@ -15,14 +15,19 @@ export default abstract class NotificationScopeSettingsRepository {
     identityId: IdentityId,
   ): Promise<NotificationScopeSettings[]>;
 
-  public abstract findByScope(
+  public abstract hasByScope(
     identityId: IdentityId,
     scope: NotificationSettingScope,
-  ): Promise<NotificationScopeSettings | undefined>;
+  ): Promise<boolean>;
 
   public abstract isPrivateScope(
     scope: NotificationSettingScope,
   ): Promise<boolean>;
+
+  public abstract requireByScope(
+    identityId: IdentityId,
+    scope: NotificationSettingScope,
+  ): Promise<NotificationScopeSettings>;
 
   public abstract save(
     settings: NotificationScopeSettings,

@@ -43,8 +43,10 @@ export default class KeychainPublisher {
     const isValid = await this.validator.isValidChainFor(
       message.ownerIdentityId,
       keychain,
-      (externalIdentifier) =>
-        this.repository.findByExternalIdentifier(externalIdentifier),
+      async (externalIdentifier) =>
+        (await this.repository.hasByExternalIdentifier(externalIdentifier))
+          ? this.repository.requireByExternalIdentifier(externalIdentifier)
+          : undefined,
     );
 
     if (!isValid) {

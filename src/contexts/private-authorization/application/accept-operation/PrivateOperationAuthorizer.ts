@@ -25,13 +25,14 @@ export default class PrivateOperationAuthorizer {
   private async scopeFor(
     operation: PrivateControlOperation,
   ): Promise<PrivateAuthorizationScope> {
-    const scope = await this.repository.findScope(
-      operation.toPrimitives().scopeId,
+    const scopeId = operation.toPrimitives().scopeId;
+
+    assert(
+      await this.repository.hasScope(scopeId),
+      new InvalidPrivateAuthorizationError(),
     );
 
-    assert(scope, new InvalidPrivateAuthorizationError());
-
-    return scope;
+    return this.repository.requireScope(scopeId);
   }
 
   private verify(

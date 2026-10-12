@@ -16,21 +16,30 @@ export default class CallAccessAuthorizer {
     const conversationId = scope.getConversationId();
 
     if (conversationId) {
-      const conversation =
-        await this.conversationRepository.findMetadataById(conversationId);
+      if (!(await this.conversationRepository.hasById(conversationId))) {
+        throw new CallNotFoundError();
+      }
 
-      if (conversation?.hasParticipant(identityId)) return;
+      const conversation =
+        await this.conversationRepository.requireMetadataById(conversationId);
+
+      if (conversation.hasParticipant(identityId)) return;
 
       throw new CallNotFoundError();
     }
 
     const communityId = scope.getCommunityId();
     const channelId = scope.getCommunityChannelId();
-    const community = communityId
-      ? await this.communityRepository.findById(communityId)
-      : undefined;
 
-    if (!community || !channelId) throw new CallNotFoundError();
+    if (
+      !communityId ||
+      !channelId ||
+      !(await this.communityRepository.hasById(communityId))
+    ) {
+      throw new CallNotFoundError();
+    }
+
+    const community = await this.communityRepository.requireById(communityId);
 
     try {
       community.authorizeVoiceChannelCall(identityId, channelId);

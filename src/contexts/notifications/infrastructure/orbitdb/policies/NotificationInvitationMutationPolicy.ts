@@ -87,10 +87,13 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
   ): Promise<void> {
     const community = await this.communities.get(
       record.subjectId as string,
-      () =>
-        this.communityRepository.findById(
-          new CommunityId(record.subjectId as string),
-        ),
+      async () => {
+        const communityId = new CommunityId(record.subjectId as string);
+
+        return (await this.communityRepository.hasById(communityId))
+          ? this.communityRepository.requireById(communityId)
+          : undefined;
+      },
     );
 
     if (!community) throw new InvalidPublicMutationError();
@@ -103,10 +106,13 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
   ): Promise<void> {
     const conversation = await this.conversations.get(
       record.subjectId as string,
-      () =>
-        this.conversationRepository.findMetadataById(
-          new ConversationId(record.subjectId as string),
-        ),
+      async () => {
+        const id = new ConversationId(record.subjectId as string);
+
+        return (await this.conversationRepository.hasById(id))
+          ? this.conversationRepository.requireMetadataById(id)
+          : undefined;
+      },
     );
 
     if (

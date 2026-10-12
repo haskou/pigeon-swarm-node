@@ -22,7 +22,7 @@ export default abstract class PollRepository {
     beforeCreatedAt?: number,
   ): Promise<Poll[]>;
 
-  public abstract findById(id: PollId): Promise<Poll | undefined>;
+  public abstract requireById(id: PollId): Promise<Poll>;
 
   /** Stores the creator-signed poll definition. */
   public abstract save(poll: Poll, proof: PublicMutationProof): Promise<void>;

@@ -52,7 +52,8 @@ describe('WebSocketClientMessageHandler', () => {
 
     conversation.hasParticipant.mockReturnValue(true);
     conversation.getParticipantIds.mockReturnValue([sender, recipient]);
-    conversationRepository.findMetadataById.mockResolvedValue(conversation);
+    conversationRepository.hasById.mockResolvedValue(true);
+    conversationRepository.requireMetadataById.mockResolvedValue(conversation);
 
     await expect(
       handler.findConversationTypingRecipients(
@@ -69,7 +70,8 @@ describe('WebSocketClientMessageHandler', () => {
     const conversation = mock<Conversation>();
 
     conversation.hasParticipant.mockReturnValue(false);
-    conversationRepository.findMetadataById.mockResolvedValue(conversation);
+    conversationRepository.hasById.mockResolvedValue(true);
+    conversationRepository.requireMetadataById.mockResolvedValue(conversation);
 
     await expect(
       handler.findConversationTypingRecipients(
@@ -90,7 +92,8 @@ describe('WebSocketClientMessageHandler', () => {
 
     community.isMember.mockReturnValue(true);
     community.visibleMembersForTextChannel.mockReturnValue([sender, recipient]);
-    communityRepository.findById.mockResolvedValue(community);
+    communityRepository.hasById.mockResolvedValue(true);
+    communityRepository.requireById.mockResolvedValue(community);
 
     await expect(
       handler.findCommunityChannelTypingRecipients(
@@ -108,7 +111,8 @@ describe('WebSocketClientMessageHandler', () => {
     const community = mock<Community>();
 
     community.visibleMembersForTextChannel.mockReturnValue([recipient]);
-    communityRepository.findById.mockResolvedValue(community);
+    communityRepository.hasById.mockResolvedValue(true);
+    communityRepository.requireById.mockResolvedValue(community);
 
     await expect(
       handler.findCommunityChannelEventRecipients('community-id', 'channel-id'),
@@ -116,7 +120,7 @@ describe('WebSocketClientMessageHandler', () => {
   });
 
   it('should not return community channel event recipients for missing communities', async () => {
-    communityRepository.findById.mockResolvedValue(undefined);
+    communityRepository.hasById.mockResolvedValue(false);
 
     await expect(
       handler.findCommunityChannelEventRecipients('community-id', 'channel-id'),

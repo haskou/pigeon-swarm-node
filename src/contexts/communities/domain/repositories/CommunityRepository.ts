@@ -11,12 +11,16 @@ export default abstract class CommunityRepository {
     query?: string;
   }): Promise<Community[]>;
 
-  public abstract findById(id: CommunityId): Promise<Community | undefined>;
-  /** The community folded from the causal past of `frontier`; throws when a head is unknown. */
-  public abstract findAtFrontier(
+  public abstract requireById(id: CommunityId): Promise<Community>;
+  public abstract hasById(id: CommunityId): Promise<boolean>;
+  /**
+   * The community folded from the causal past of `frontier`; throws when a head is unknown
+   * and rejects with CommunityNotFoundError when no active community exists at that frontier.
+   */
+  public abstract requireAtFrontier(
     id: CommunityId,
     frontier: string[],
-  ): Promise<Community | undefined>;
+  ): Promise<Community>;
 
   public abstract findByMember(identityId: IdentityId): Promise<Community[]>;
   /** The operations nobody built on yet: the parents of the next operation. */

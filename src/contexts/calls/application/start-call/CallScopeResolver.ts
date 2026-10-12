@@ -17,11 +17,12 @@ export default class CallScopeResolver {
   ): Promise<ResolvedCallScope> {
     const communityId = message.getCommunityId();
     const channelId = message.getCommunityChannelId();
-    const community = await this.communityRepository.findById(communityId);
 
-    if (!community) {
+    if (!(await this.communityRepository.hasById(communityId))) {
       throw new InvalidCallScopeError();
     }
+
+    const community = await this.communityRepository.requireById(communityId);
     community.authorizeVoiceChannelCall(message.requesterIdentityId, channelId);
 
     return new ResolvedCallScope(
@@ -35,13 +36,15 @@ export default class CallScopeResolver {
     message: CallStartMessage,
   ): Promise<ResolvedCallScope> {
     const conversationId = message.getConversationId();
-    const conversation =
-      await this.conversationRepository.findMetadataById(conversationId);
 
-    if (
-      !conversation ||
-      !conversation.hasParticipant(message.requesterIdentityId)
-    ) {
+    if (!(await this.conversationRepository.hasById(conversationId))) {
+      throw new InvalidCallScopeError();
+    }
+
+    const conversation =
+      await this.conversationRepository.requireMetadataById(conversationId);
+
+    if (!conversation.hasParticipant(message.requesterIdentityId)) {
       throw new InvalidCallScopeError();
     }
 

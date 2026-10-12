@@ -1,4 +1,5 @@
 import { CommunityMembershipRequest } from '@app/contexts/communities/domain/entities/membership/CommunityMembershipRequest';
+import { CommunityRequestNotFoundError } from '@app/contexts/communities/domain/errors/CommunityRequestNotFoundError';
 import CommunityMembershipRequestRepository from '@app/contexts/communities/domain/repositories/CommunityMembershipRequestRepository';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
@@ -123,14 +124,14 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
     });
   }
 
-  public async findById(
+  public async requireById(
     id: CommunityRequestId,
-  ): Promise<CommunityMembershipRequest | undefined> {
+  ): Promise<CommunityMembershipRequest> {
     const [document] = this.newestFirst(
       (await this.requestIndex.find(this.headKey(id))) ?? [],
     );
 
-    if (!document) return undefined;
+    if (!document) throw new CommunityRequestNotFoundError();
 
     return this.publicStorageGuard.runWhilePublic(
       new CommunityId(document.communityId),

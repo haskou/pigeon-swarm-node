@@ -21,12 +21,12 @@ export default class PollTimelineMessageRegistrar {
     message: PollTimelineMessageRegisterMessage,
     conversationId: ConversationId,
   ): Promise<void> {
-    const conversation =
-      await this.conversationRepository.findById(conversationId);
-
-    if (!conversation) {
+    if (!(await this.conversationRepository.hasById(conversationId))) {
       return;
     }
+
+    const conversation =
+      await this.conversationRepository.requireById(conversationId);
     conversation.addPollMessage(
       message.actorIdentityId,
       message.poll.getId(),

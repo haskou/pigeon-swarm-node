@@ -5,9 +5,11 @@ import { Notification } from '../Notification';
 import { NotificationId } from '../value-objects/NotificationId';
 
 export default abstract class NotificationRepository {
-  public abstract findById(
+  public abstract hasById(notificationId: NotificationId): Promise<boolean>;
+
+  public abstract requireById(
     notificationId: NotificationId,
-  ): Promise<Notification | undefined>;
+  ): Promise<Notification>;
 
   public abstract findByRecipient(
     recipientIdentityId: IdentityId,

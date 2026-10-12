@@ -7,7 +7,7 @@ describe('PrivateCommunityPublicStorageGuard', () => {
   it('serializes public filtering with scope protection', async () => {
     const communityId = new CommunityId('community');
     const authorizationRepository = {
-      findScope: jest.fn().mockResolvedValue(undefined),
+      hasScope: jest.fn().mockResolvedValue(false),
     } as unknown as jest.Mocked<PrivateAuthorizationRepository>;
     const coordinator = new PrivateAuthorizationStorageCoordinator();
     const guard = new PrivateCommunityPublicStorageGuard(
@@ -21,7 +21,7 @@ describe('PrivateCommunityPublicStorageGuard', () => {
       async () => {
         protectionStarted.resolve();
         await releaseProtection.promise;
-        authorizationRepository.findScope.mockResolvedValue({} as never);
+        authorizationRepository.hasScope.mockResolvedValue(true);
       },
     );
     await protectionStarted.promise;

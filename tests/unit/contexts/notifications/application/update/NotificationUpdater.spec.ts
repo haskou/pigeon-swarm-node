@@ -38,7 +38,7 @@ describe('NotificationUpdater', () => {
     const id = notification.toPrimitives().id;
     const { proof } = signNotificationState({ notificationId: id, read: true, signer: recipient, state: 'accepted' });
 
-    repository.findById.mockResolvedValue(notification);
+    repository.requireById.mockResolvedValue(notification);
 
     await updater.update(
       new NotificationUpdateMessage(
@@ -65,7 +65,7 @@ describe('NotificationUpdater', () => {
       'MCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=',
     );
 
-    repository.findById.mockResolvedValue(notification);
+    repository.requireById.mockResolvedValue(notification);
 
     await expect(
       updater.update(

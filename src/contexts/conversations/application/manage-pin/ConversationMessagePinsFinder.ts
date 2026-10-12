@@ -25,12 +25,18 @@ export default class ConversationMessagePinsFinder {
     const resources: ConversationMessagePinResource[] = [];
 
     for (const pin of pins) {
-      const pinnedMessage = await this.conversationRepository.findMessageById(
-        message.conversationId,
-        pin.getMessageId(),
-      );
+      if (
+        await this.conversationRepository.hasMessage(
+          message.conversationId,
+          pin.getMessageId(),
+        )
+      ) {
+        const pinnedMessage =
+          await this.conversationRepository.requireMessageById(
+            message.conversationId,
+            pin.getMessageId(),
+          );
 
-      if (pinnedMessage) {
         resources.push({
           createdAt: pin.getCreatedAt().valueOf(),
           message: pinnedMessage,

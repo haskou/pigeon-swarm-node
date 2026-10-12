@@ -66,11 +66,18 @@ describe('call mutation policies', () => {
 
     startPolicy = new CallStartMutationPolicy(
       registry,
-      { findMetadataById: jest.fn(async () => conversation) } as never,
-      { findById: jest.fn(async () => community) } as never,
+      {
+        hasById: jest.fn(async () => true),
+        requireMetadataById: jest.fn(async () => conversation),
+      } as never,
+      {
+        hasById: jest.fn(async () => true),
+        requireById: jest.fn(async () => community),
+      } as never,
     );
     participantPolicy = new CallParticipantMutationPolicy(registry, {
-      findById: jest.fn(async () => community),
+      hasById: jest.fn(async () => true),
+      requireById: jest.fn(async () => community),
     } as never);
     endPolicy = new CallEndMutationPolicy(registry);
   });

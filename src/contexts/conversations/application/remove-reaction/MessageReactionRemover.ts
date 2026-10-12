@@ -2,7 +2,6 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 import { assert } from '@haskou/value-objects';
 
 import { MessageReaction } from '../../domain/entities/messages/MessageReaction';
-import { ConversationNotFoundError } from '../../domain/errors/ConversationNotFoundError';
 import { ConversationParticipantNotFoundError } from '../../domain/errors/ConversationParticipantNotFoundError';
 import { MessageTargetNotFoundError } from '../../domain/errors/MessageTargetNotFoundError';
 import { ConversationMessageReactionWasRemovedEvent } from '../../domain/events/ConversationMessageReactionWasRemovedEvent';
@@ -20,13 +19,12 @@ export default class MessageReactionRemover {
   public async remove(
     message: MessageReactionRemoveMessage,
   ): Promise<MessageReaction> {
-    const conversation = await this.conversationRepository.findMetadataById(
+    const conversation = await this.conversationRepository.requireMetadataById(
       message.conversationId,
     );
 
-    assert(conversation, new ConversationNotFoundError(message.conversationId));
     assert(
-      conversation?.hasParticipant(message.authorId),
+      conversation.hasParticipant(message.authorId),
       new ConversationParticipantNotFoundError(),
     );
     assert(

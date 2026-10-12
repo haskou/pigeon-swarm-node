@@ -1,5 +1,4 @@
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
-import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageWasDeletedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageWasDeletedEvent';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
@@ -14,7 +13,6 @@ import { pigeonEnvironment } from '@app/shared/infrastructure/environment/Pigeon
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
-import { assert } from '@haskou/value-objects';
 
 import { isCommunityPrimitive } from './isCommunityPrimitive';
 
@@ -83,13 +81,14 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
       return;
     }
 
-    const community = await this.communityRepository.findById(
-      new CommunityId(event.attributes.community.id),
-    );
+    const eventCommunityId = new CommunityId(event.attributes.community.id);
 
-    if (!community) {
+    if (!(await this.communityRepository.hasById(eventCommunityId))) {
       return;
     }
+
+    const community =
+      await this.communityRepository.requireById(eventCommunityId);
 
     const communityId = new CommunityId(
       String(event.attributes.communityId || event.aggregateId),
@@ -101,17 +100,16 @@ export default class DeleteCommunityMessageWhenAnnounced extends Consumer {
       String(event.attributes.targetMessageId),
     );
     const actorIdentityId = new IdentityId(deletedByIdentityId);
-    const targetMessage = await this.messageRepository.findById(
-      communityId,
-      channelId,
-      targetMessageId,
-    );
 
     if (!community.isIdentifiedBy(communityId)) {
       return;
     }
 
-    assert(targetMessage, new CommunityChannelMessageNotFoundError());
+    const targetMessage = await this.messageRepository.requireById(
+      communityId,
+      channelId,
+      targetMessageId,
+    );
     const proof = PublicMutationProof.fromPrimitives(
       event.attributes.mutationProof,
     );

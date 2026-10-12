@@ -47,13 +47,13 @@ export default class RegisterCommunityMessageWhenAnnounced extends Consumer {
       return;
     }
 
-    const community = await this.communityRepository.findById(
-      new CommunityId(event.attributes.community.id),
-    );
+    const communityId = new CommunityId(event.attributes.community.id);
 
-    if (!community) {
+    if (!(await this.communityRepository.hasById(communityId))) {
       return;
     }
+
+    const community = await this.communityRepository.requireById(communityId);
 
     await this.messageRegistrar.registerSent(
       community,

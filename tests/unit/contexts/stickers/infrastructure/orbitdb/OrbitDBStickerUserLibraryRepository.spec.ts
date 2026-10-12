@@ -3,6 +3,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { generateKeyPairSync } from 'node:crypto';
 
+import { StickerUserLibraryNotFoundError } from '@app/contexts/stickers/domain/errors/StickerUserLibraryNotFoundError';
 import OrbitDBStickerUserLibraryRepository from '@app/contexts/stickers/infrastructure/orbitdb/OrbitDBStickerUserLibraryRepository';
 import { StickerId } from '@app/contexts/stickers/domain/value-objects/StickerId';
 import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
@@ -91,7 +92,10 @@ describe('OrbitDBStickerUserLibraryRepository', () => {
   });
 
   it('has no library until a record is written', async () => {
-    await expect(repository.findByIdentityId(identity)).resolves.toBeUndefined();
+    await expect(repository.hasByIdentityId(identity)).resolves.toBe(false);
+    await expect(
+      repository.requireByIdentityId(identity),
+    ).rejects.toBeInstanceOf(StickerUserLibraryNotFoundError);
   });
 
   it('projects favorites, saved packs and recents from independent records', async () => {
@@ -117,7 +121,7 @@ describe('OrbitDBStickerUserLibraryRepository', () => {
     );
 
     expect(
-      (await repository.findByIdentityId(identity))?.toPrimitives(),
+      (await repository.requireByIdentityId(identity)).toPrimitives(),
     ).toEqual({
       favoriteStickers: [
         { favoritedAt: 10, packId: 'pack-1', stickerId: 'sticker-1' },
@@ -156,10 +160,12 @@ describe('OrbitDBStickerUserLibraryRepository', () => {
       await proof(savedId, 'delete', 2),
     );
 
-    const library = (await repository.findByIdentityId(identity))?.toPrimitives();
+    const library = (
+      await repository.requireByIdentityId(identity)
+    ).toPrimitives();
 
-    expect(library?.favoriteStickers).toEqual([]);
-    expect(library?.savedPackIds).toEqual([]);
+    expect(library.favoriteStickers).toEqual([]);
+    expect(library.savedPackIds).toEqual([]);
   });
 
   it('refuses to restore a favorite with a proof older than its removal', async () => {
@@ -193,11 +199,11 @@ describe('OrbitDBStickerUserLibraryRepository', () => {
     }
 
     const recents = (
-      await repository.findByIdentityId(identity)
-    )?.toPrimitives().recentStickers;
+      await repository.requireByIdentityId(identity)
+    ).toPrimitives().recentStickers;
 
     expect(recents).toHaveLength(10);
-    expect(recents?.[0].stickerId).toBe('sticker-11');
+    expect(recents[0].stickerId).toBe('sticker-11');
   });
 
   it('ignores flat unsigned library heads written by a peer', async () => {
@@ -209,6 +215,6 @@ describe('OrbitDBStickerUserLibraryRepository', () => {
       savedPackIds: ['pack-1'],
     });
 
-    await expect(repository.findByIdentityId(identity)).resolves.toBeUndefined();
+    await expect(repository.hasByIdentityId(identity)).resolves.toBe(false);
   });
 });

@@ -50,9 +50,13 @@ export default class WebSocketClientMessageHandler {
     callId: string,
     candidates: string[],
   ): Promise<CallRealtimeAudience | undefined> {
-    const call = await this.callRepository.findById(new CallId(callId));
+    const id = new CallId(callId);
 
-    if (!call) return undefined;
+    if (!(await this.callRepository.hasById(id))) {
+      return undefined;
+    }
+
+    const call = await this.callRepository.requireById(id);
 
     const participantsWithClients = candidates.filter(
       (identityId) =>
@@ -82,11 +86,16 @@ export default class WebSocketClientMessageHandler {
     conversationId: string,
   ): Promise<string[]> {
     const actorId = new IdentityId(identityId);
-    const conversation = await this.conversationRepository.findMetadataById(
-      new ConversationId(conversationId),
-    );
+    const id = new ConversationId(conversationId);
 
-    if (!conversation?.hasParticipant(actorId)) {
+    if (!(await this.conversationRepository.hasById(id))) {
+      return [];
+    }
+
+    const conversation =
+      await this.conversationRepository.requireMetadataById(id);
+
+    if (!conversation.hasParticipant(actorId)) {
       return [];
     }
 
@@ -96,13 +105,14 @@ export default class WebSocketClientMessageHandler {
   public async findConversationParticipantIds(
     conversationId: string,
   ): Promise<string[]> {
-    const conversation = await this.conversationRepository.findMetadataById(
-      new ConversationId(conversationId),
-    );
+    const id = new ConversationId(conversationId);
 
-    if (!conversation) {
+    if (!(await this.conversationRepository.hasById(id))) {
       return [];
     }
+
+    const conversation =
+      await this.conversationRepository.requireMetadataById(id);
 
     const participantIds = conversation.getParticipantIds();
 
@@ -115,11 +125,15 @@ export default class WebSocketClientMessageHandler {
     channelId: string,
   ): Promise<string[]> {
     const actorId = new IdentityId(identityId);
-    const community = await this.communityRepository.findById(
-      new CommunityId(communityId),
-    );
+    const id = new CommunityId(communityId);
 
-    if (!community?.isMember(actorId)) {
+    if (!(await this.communityRepository.hasById(id))) {
+      return [];
+    }
+
+    const community = await this.communityRepository.requireById(id);
+
+    if (!community.isMember(actorId)) {
       return [];
     }
 
@@ -139,13 +153,13 @@ export default class WebSocketClientMessageHandler {
     communityId: string,
     channelId: string,
   ): Promise<string[]> {
-    const community = await this.communityRepository.findById(
-      new CommunityId(communityId),
-    );
+    const id = new CommunityId(communityId);
 
-    if (!community) {
+    if (!(await this.communityRepository.hasById(id))) {
       return [];
     }
+
+    const community = await this.communityRepository.requireById(id);
 
     try {
       return community

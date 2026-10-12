@@ -16,7 +16,7 @@ import { signedMutation } from '../../../public-mutations/support/signedMutation
 const publicStorageGuard = () =>
   new PrivateCommunityPublicStorageGuard(
     {
-      findScope: jest.fn().mockResolvedValue(undefined),
+      hasScope: jest.fn().mockResolvedValue(false),
     } as never,
     new PrivateAuthorizationStorageCoordinator(),
   );

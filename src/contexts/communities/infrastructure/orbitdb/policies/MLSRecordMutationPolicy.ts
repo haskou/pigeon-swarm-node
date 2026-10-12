@@ -7,6 +7,7 @@ import { ShortLivedLookup } from '@app/contexts/public-mutations/infrastructure/
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Community } from '../../../domain/Community';
+import { CommunityNotFoundError } from '../../../domain/errors/CommunityNotFoundError';
 import { MLSGroupAccess } from '../../../domain/MLSGroupAccess';
 import CommunityRepository from '../../../domain/repositories/CommunityRepository';
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
@@ -34,7 +35,7 @@ export default class MLSRecordMutationPolicy extends PublicMutationPolicy {
     },
   );
 
-  private readonly communities = new ShortLivedLookup<Community | undefined>();
+  private readonly communities = new ShortLivedLookup<Community>();
 
   public readonly collection = 'mlsRecords';
 
@@ -84,18 +85,21 @@ export default class MLSRecordMutationPolicy extends PublicMutationPolicy {
     frontier: string[],
   ): Promise<Community> {
     const communityId = record.communityId as string;
-    const community = await this.communities.get(
-      PublicMutationFrontier.keyOf(communityId, frontier),
-      () =>
-        this.communityRepository.findAtFrontier(
+
+    return this.communities
+      .get(PublicMutationFrontier.keyOf(communityId, frontier), () =>
+        this.communityRepository.requireAtFrontier(
           new CommunityId(communityId),
           frontier,
         ),
-    );
+      )
+      .catch((error: unknown) => {
+        if (error instanceof CommunityNotFoundError) {
+          throw new InvalidPublicMutationError();
+        }
 
-    if (!community) throw new InvalidPublicMutationError();
-
-    return community;
+        throw error;
+      });
   }
 
   public expectationOf(

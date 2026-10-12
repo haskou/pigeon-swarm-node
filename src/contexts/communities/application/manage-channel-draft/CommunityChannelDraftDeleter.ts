@@ -1,4 +1,3 @@
-import { CommunityNotFoundError } from '../../domain/errors/CommunityNotFoundError';
 import CommunityChannelDraftRepository from '../../domain/repositories/CommunityChannelDraftRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityChannelDraftDeleteMessage } from './messages/CommunityChannelDraftDeleteMessage';
@@ -12,13 +11,9 @@ export default class CommunityChannelDraftDeleter {
   public async delete(
     message: CommunityChannelDraftDeleteMessage,
   ): Promise<void> {
-    const community = await this.communityRepository.findById(
+    const community = await this.communityRepository.requireById(
       message.communityId,
     );
-
-    if (!community) {
-      throw new CommunityNotFoundError();
-    }
 
     community.viewTextChannel(message.actorIdentityId, message.channelId);
     await this.draftRepository.delete(

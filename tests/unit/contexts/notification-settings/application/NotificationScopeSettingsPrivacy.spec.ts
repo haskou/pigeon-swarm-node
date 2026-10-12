@@ -29,7 +29,7 @@ describe('Notification scope settings privacy', () => {
     repository = {
       delete: jest.fn(),
       findByIdentityId: jest.fn(),
-      findByScope: jest.fn(),
+      hasByScope: jest.fn().mockResolvedValue(false),
       isPrivateScope: jest.fn().mockResolvedValue(true),
       save: jest.fn(),
     } as unknown as jest.Mocked<NotificationScopeSettingsRepository>;

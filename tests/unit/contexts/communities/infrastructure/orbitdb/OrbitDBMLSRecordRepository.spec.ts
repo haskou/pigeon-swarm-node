@@ -83,7 +83,7 @@ function createStore(): {
 const publicStorageGuard = () =>
   new PrivateCommunityPublicStorageGuard(
     {
-      findScope: jest.fn().mockResolvedValue(undefined),
+      hasScope: jest.fn().mockResolvedValue(false),
     } as never,
     new PrivateAuthorizationStorageCoordinator(),
   );

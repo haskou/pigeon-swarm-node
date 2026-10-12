@@ -75,7 +75,7 @@ type Replica = {
 
 /** No community exists in this fixture, so community starts cannot be admitted. */
 const noCommunities = {
-  findById: () => Promise.resolve(undefined),
+  hasById: () => Promise.resolve(false),
 } as never;
 const networkId = randomUUID();
 const nodes: Replica[] = [];
@@ -176,7 +176,7 @@ async function open(replica: Replica): Promise<void> {
     projection,
     new InMemoryCallParticipantLeaseRepository(),
     new PrivateCommunityPublicStorageGuard(
-      { findScope: () => Promise.resolve(undefined) } as never,
+      { hasScope: () => Promise.resolve(false) } as never,
       new PrivateAuthorizationStorageCoordinator(),
     ),
   );
@@ -312,7 +312,7 @@ async function main(): Promise<void> {
   await honest.conversations!.saveOperation(genesis.operation, genesis.proof);
   await until('group reached every node', async () => {
     for (const replica of nodes)
-      if (!(await replica.conversations!.findMetadataById(group))) return false;
+      if (!(await replica.conversations!.hasById(group))) return false;
 
     return true;
   });
@@ -345,7 +345,9 @@ async function main(): Promise<void> {
   await honest.repository!.saveStart(call, start.proof);
   const callId = new CallId(start.callId);
   const statusOf = async (replica: Replica): Promise<string | undefined> =>
-    (await replica.repository!.findById(callId))?.toPrimitives().status;
+    (await replica.repository!.hasById(callId))
+      ? (await replica.repository!.requireById(callId)).toPrimitives().status
+      : undefined;
 
   await until('call reached every node', async () => {
     for (const replica of nodes)
@@ -369,11 +371,13 @@ async function main(): Promise<void> {
   );
   await until('join reached every node', async () => {
     for (const replica of nodes) {
-      const found = await replica.repository!.findById(callId);
+      if (!(await replica.repository!.hasById(callId))) return false;
+
+      const found = await replica.repository!.requireById(callId);
 
       if (
         !found
-          ?.toPrimitives()
+          .toPrimitives()
           .participants.some(
             (value) =>
               value.identityId === alice.id && value.status === 'joined',
@@ -504,18 +508,18 @@ async function main(): Promise<void> {
 
   for (const forged of [ringing, unknown, invitesOutsider, future, community])
     assert.equal(
-      await honest.repository!.findById(new CallId(forged.callId)),
-      undefined,
+      await honest.repository!.hasById(new CallId(forged.callId)),
+      false,
       `call ${forged.callId} must not be admitted`,
     );
   assert.deepEqual(
     await honest.repository!.findActiveByParticipant(new IdentityId(alice.id)),
-    [honest.repository && (await honest.repository.findById(callId))].filter(
-      Boolean,
-    ),
+    (await honest.repository!.hasById(callId))
+      ? [await honest.repository!.requireById(callId)]
+      : [],
     'Only the signed call may be active for a participant',
   );
-  const real = (await honest.repository!.findById(callId))!.toPrimitives();
+  const real = (await honest.repository!.requireById(callId)).toPrimitives();
 
   assert.equal(real.status, 'active', 'A forged end must not end the call');
   assert.ok(

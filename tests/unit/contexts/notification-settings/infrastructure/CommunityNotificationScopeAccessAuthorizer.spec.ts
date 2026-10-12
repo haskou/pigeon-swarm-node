@@ -1,4 +1,5 @@
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -21,7 +22,7 @@ describe('CommunityNotificationScopeAccessAuthorizer', () => {
       viewChannel: jest.fn(),
     } as unknown as jest.Mocked<Community>;
     communityRepository = {
-      findById: jest.fn().mockResolvedValue(community),
+      requireById: jest.fn().mockResolvedValue(community),
     } as unknown as jest.Mocked<CommunityRepository>;
     authorizer = new CommunityNotificationScopeAccessAuthorizer(
       communityRepository,
@@ -47,7 +48,9 @@ describe('CommunityNotificationScopeAccessAuthorizer', () => {
   });
 
   it('rejects missing protected projections', async () => {
-    communityRepository.findById.mockResolvedValue(undefined);
+    communityRepository.requireById.mockRejectedValue(
+      new CommunityNotFoundError(),
+    );
 
     await expect(
       authorizer.authorize(

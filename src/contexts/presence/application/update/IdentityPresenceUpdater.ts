@@ -19,9 +19,13 @@ export default class IdentityPresenceUpdater {
   ): Promise<IdentityPresence> {
     const identityId = message.getIdentityId();
     const nodeId = await this.nodeRepository.loadLocalNodeId();
-    const presence =
-      (await this.repository.findByIdentityIdAndNodeId(identityId, nodeId)) ||
-      IdentityPresence.disconnected(identityId, nodeId);
+    const hasPresence = await this.repository.hasByIdentityIdAndNodeId(
+      identityId,
+      nodeId,
+    );
+    const presence = hasPresence
+      ? await this.repository.requireByIdentityIdAndNodeId(identityId, nodeId)
+      : IdentityPresence.disconnected(identityId, nodeId);
     const networkIds = await this.networkResolver.resolve(identityId);
 
     presence.clearCustomMessage(networkIds);
@@ -36,9 +40,13 @@ export default class IdentityPresenceUpdater {
   ): Promise<IdentityPresence> {
     const identityId = message.getIdentityId();
     const nodeId = await this.nodeRepository.loadLocalNodeId();
-    const presence =
-      (await this.repository.findByIdentityIdAndNodeId(identityId, nodeId)) ||
-      IdentityPresence.disconnected(identityId, nodeId);
+    const hasPresence = await this.repository.hasByIdentityIdAndNodeId(
+      identityId,
+      nodeId,
+    );
+    const presence = hasPresence
+      ? await this.repository.requireByIdentityIdAndNodeId(identityId, nodeId)
+      : IdentityPresence.disconnected(identityId, nodeId);
     const networkIds = await this.networkResolver.resolve(identityId);
 
     presence.update(

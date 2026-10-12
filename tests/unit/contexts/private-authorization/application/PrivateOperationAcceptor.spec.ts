@@ -118,12 +118,18 @@ describe('PrivateOperationAcceptor', () => {
     repository = {
       findOutbox: jest.fn(),
       findPending: jest.fn(),
-      findProjection: jest.fn().mockResolvedValue({ members: [] }),
-      findProtectedMlsState: jest.fn(),
-      findReceipt: jest.fn(),
-      findReservation: jest.fn(),
-      findReservationAtRevision: jest.fn(),
-      findScope: jest.fn().mockResolvedValue(scope()),
+      hasProjection: jest.fn().mockResolvedValue(true),
+      hasProtectedMlsState: jest.fn().mockResolvedValue(false),
+      hasReceipt: jest.fn().mockResolvedValue(false),
+      hasReservation: jest.fn().mockResolvedValue(false),
+      hasReservationAtRevision: jest.fn().mockResolvedValue(false),
+      hasScope: jest.fn().mockResolvedValue(true),
+      requireProjection: jest.fn().mockResolvedValue({ members: [] }),
+      requireProtectedMlsState: jest.fn(),
+      requireReceipt: jest.fn(),
+      requireReservation: jest.fn(),
+      requireReservationAtRevision: jest.fn(),
+      requireScope: jest.fn().mockResolvedValue(scope()),
       findScopeIds: jest.fn(),
       hasReplayMarker: jest.fn(),
       savePending: jest.fn(),
@@ -247,7 +253,7 @@ describe('PrivateOperationAcceptor', () => {
     const frozen = scope();
     frozen.quarantine();
     frozen.pullDomainEvents();
-    repository.findScope.mockResolvedValue(frozen);
+    repository.requireScope.mockResolvedValue(frozen);
 
     await expect(
       acceptor.challenge(
@@ -258,7 +264,8 @@ describe('PrivateOperationAcceptor', () => {
   });
 
   it('durably reserves a control child before issuing freshness', async () => {
-    repository.findProtectedMlsState.mockResolvedValue(encoded(32, 14));
+    repository.hasProtectedMlsState.mockResolvedValue(true);
+    repository.requireProtectedMlsState.mockResolvedValue(encoded(32, 14));
     unitOfWork.reserveChild.mockResolvedValue('reserved');
 
     await expect(
@@ -291,7 +298,8 @@ describe('PrivateOperationAcceptor', () => {
   });
 
   it('rejects a competing control child before issuing freshness', async () => {
-    repository.findProtectedMlsState.mockResolvedValue(encoded(32, 14));
+    repository.hasProtectedMlsState.mockResolvedValue(true);
+    repository.requireProtectedMlsState.mockResolvedValue(encoded(32, 14));
     unitOfWork.reserveChild.mockResolvedValue('conflict');
 
     await expect(
@@ -308,7 +316,8 @@ describe('PrivateOperationAcceptor', () => {
   });
 
   it('does not reserve a control claim without an authenticated transition', async () => {
-    repository.findProtectedMlsState.mockResolvedValue(encoded(32, 14));
+    repository.hasProtectedMlsState.mockResolvedValue(true);
+    repository.requireProtectedMlsState.mockResolvedValue(encoded(32, 14));
     transitions.verify.mockRejectedValue(
       new InvalidPrivateAuthorizationError(),
     );
@@ -328,7 +337,8 @@ describe('PrivateOperationAcceptor', () => {
   });
 
   it('does not reserve a control child whose domain mutation is unauthorized', async () => {
-    repository.findProtectedMlsState.mockResolvedValue(encoded(32, 14));
+    repository.hasProtectedMlsState.mockResolvedValue(true);
+    repository.requireProtectedMlsState.mockResolvedValue(encoded(32, 14));
     transitions.verify.mockResolvedValue({
       checkpoint: PrivateAuthorizationCheckpoint.fromPrimitives({
         ...checkpoint().toPrimitives(),
@@ -362,7 +372,7 @@ describe('PrivateOperationAcceptor', () => {
       parentHeadHash: headHash,
       revision: 1,
     });
-    repository.findScope.mockResolvedValue(
+    repository.requireScope.mockResolvedValue(
       PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
     );
 
@@ -451,7 +461,7 @@ describe('PrivateOperationAcceptor', () => {
       parentHeadHash: headHash,
       revision: 1,
     });
-    repository.findScope.mockResolvedValue(
+    repository.requireScope.mockResolvedValue(
       PrivateAuthorizationScope.pin(advanced, 'genesis'),
     );
 
@@ -462,7 +472,8 @@ describe('PrivateOperationAcceptor', () => {
   });
 
   it('authenticates a control transition before evaluating the community mutation', async () => {
-    repository.findProtectedMlsState.mockResolvedValue(encoded(32, 14));
+    repository.hasProtectedMlsState.mockResolvedValue(true);
+    repository.requireProtectedMlsState.mockResolvedValue(encoded(32, 14));
     transitions.verify.mockRejectedValue(
       new InvalidPrivateAuthorizationError(),
     );
@@ -480,7 +491,10 @@ describe('PrivateOperationAcceptor', () => {
   });
 
   it('rejects a corrupt stored protected MLS state before transition verification', async () => {
-    repository.findProtectedMlsState.mockResolvedValue('not canonical base64');
+    repository.hasProtectedMlsState.mockResolvedValue(true);
+    repository.requireProtectedMlsState.mockResolvedValue(
+      'not canonical base64',
+    );
 
     await expect(
       acceptor.accept(
@@ -506,7 +520,8 @@ describe('PrivateOperationAcceptor', () => {
     const decoded = new PrivateControlOperationContract()
       .decode(signed())
       .toPrimitives();
-    repository.findReceipt.mockResolvedValue(decoded);
+    repository.hasReceipt.mockResolvedValue(true);
+    repository.requireReceipt.mockResolvedValue(decoded);
 
     await expect(
       acceptor.accept(new PrivateOperationAcceptMessage(signed(), 'proof')),
@@ -521,7 +536,8 @@ describe('PrivateOperationAcceptor', () => {
       .decode(compact)
       .toPrimitives();
     const formatted = JSON.stringify(JSON.parse(compact), null, 2);
-    repository.findReceipt.mockResolvedValue(receipt);
+    repository.hasReceipt.mockResolvedValue(true);
+    repository.requireReceipt.mockResolvedValue(receipt);
 
     await expect(
       acceptor.accept(new PrivateOperationAcceptMessage(formatted, 'proof')),
@@ -546,10 +562,11 @@ describe('PrivateOperationAcceptor', () => {
       freshnessAuthorityKey: activeKey,
       revokedDeviceKeys: [authorKey],
     });
-    repository.findScope.mockResolvedValue(
+    repository.requireScope.mockResolvedValue(
       PrivateAuthorizationScope.pin(revokedCheckpoint, 'genesis'),
     );
-    repository.findReceipt.mockResolvedValue(decoded);
+    repository.hasReceipt.mockResolvedValue(true);
+    repository.requireReceipt.mockResolvedValue(decoded);
 
     await expect(
       acceptor.accept(new PrivateOperationAcceptMessage(signed(), 'proof')),
@@ -576,10 +593,11 @@ describe('PrivateOperationAcceptor', () => {
     const conflicting = JSON.parse(signed());
     conflicting.payload.change.targetIdentityId = 'different-member';
     const conflictingJson = JSON.stringify(conflicting);
-    repository.findScope.mockResolvedValue(
+    repository.requireScope.mockResolvedValue(
       PrivateAuthorizationScope.pin(revokedCheckpoint, 'genesis'),
     );
-    repository.findReceipt.mockResolvedValue(receipt);
+    repository.hasReceipt.mockResolvedValue(true);
+    repository.requireReceipt.mockResolvedValue(receipt);
 
     await expect(
       acceptor.accept(
@@ -609,12 +627,13 @@ describe('PrivateOperationAcceptor', () => {
     const conflicting = JSON.parse(signed());
     conflicting.payload.change.targetIdentityId = 'different-member';
     const conflictingJson = JSON.stringify(conflicting);
-    repository.findScope.mockResolvedValue(
+    repository.requireScope.mockResolvedValue(
       PrivateAuthorizationScope.pin(revokedCheckpoint, 'genesis'),
     );
-    repository.findReceipt
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce(receipt);
+    repository.hasReceipt
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    repository.requireReceipt.mockResolvedValue(receipt);
 
     await expect(
       acceptor.accept(
@@ -652,12 +671,13 @@ describe('PrivateOperationAcceptor', () => {
         proposalId,
       },
     });
-    repository.findScope.mockResolvedValue(
+    repository.requireScope.mockResolvedValue(
       PrivateAuthorizationScope.pin(competingCheckpoint, 'genesis'),
     );
-    repository.findReceipt
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce(receipt);
+    repository.hasReceipt
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    repository.requireReceipt.mockResolvedValue(receipt);
 
     await expect(
       acceptor.accept(
@@ -689,10 +709,11 @@ describe('PrivateOperationAcceptor', () => {
     const conflicting = JSON.parse(signed());
     conflicting.payload.change.targetIdentityId = 'different-member';
     const conflictingJson = JSON.stringify(conflicting);
-    repository.findScope.mockResolvedValue(
+    repository.requireScope.mockResolvedValue(
       PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
     );
-    repository.findReceipt.mockResolvedValue(receipt);
+    repository.hasReceipt.mockResolvedValue(true);
+    repository.requireReceipt.mockResolvedValue(receipt);
 
     await expect(
       acceptor.accept(
@@ -710,7 +731,8 @@ describe('PrivateOperationAcceptor', () => {
     const conflicting = JSON.parse(signed());
     conflicting.payload.change.targetIdentityId = 'different-member';
     const conflictingJson = JSON.stringify(conflicting);
-    repository.findReceipt.mockResolvedValue(receipt);
+    repository.hasReceipt.mockResolvedValue(true);
+    repository.requireReceipt.mockResolvedValue(receipt);
     deviceAuthorization.assertAuthorized.mockRejectedValue(
       new Error('revoked device'),
     );
@@ -732,9 +754,10 @@ describe('PrivateOperationAcceptor', () => {
     const conflicting = JSON.parse(signed());
     conflicting.payload.change.targetIdentityId = 'different-member';
     const conflictingJson = JSON.stringify(conflicting);
-    repository.findReceipt
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce(receipt);
+    repository.hasReceipt
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+    repository.requireReceipt.mockResolvedValue(receipt);
     deviceAuthorization.assertAuthorized.mockRejectedValue(
       new Error('revoked device'),
     );
@@ -764,7 +787,8 @@ describe('PrivateOperationAcceptor', () => {
         proposalId,
       },
     });
-    repository.findReceipt.mockResolvedValue(receipt);
+    repository.hasReceipt.mockResolvedValue(true);
+    repository.requireReceipt.mockResolvedValue(receipt);
 
     await expect(
       acceptor.accept(
@@ -788,7 +812,8 @@ describe('PrivateOperationAcceptor', () => {
         proposalId,
       },
     });
-    repository.findReceipt.mockResolvedValue(receipt);
+    repository.hasReceipt.mockResolvedValue(true);
+    repository.requireReceipt.mockResolvedValue(receipt);
 
     await expect(
       acceptor.accept(new PrivateOperationAcceptMessage(attacker, 'proof')),
@@ -818,10 +843,11 @@ describe('PrivateOperationAcceptor', () => {
         resultingHeadHash: encoded(32, 12),
       },
     });
-    repository.findScope.mockResolvedValue(
+    repository.requireScope.mockResolvedValue(
       PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
     );
-    repository.findReservationAtRevision.mockResolvedValue(
+    repository.hasReservationAtRevision.mockResolvedValue(true);
+    repository.requireReservationAtRevision.mockResolvedValue(
       PrivateControlTransitionReservation.fromPrimitives({
         authorDeviceKey: authorKey,
         childHeadHash: encoded(32, 11),
@@ -836,12 +862,12 @@ describe('PrivateOperationAcceptor', () => {
       ),
     ).rejects.toThrow('Private authorization conflict');
     expect(verifier.verify).toHaveBeenCalledWith(sibling, authorKey);
-    expect(repository.findReservationAtRevision).toHaveBeenCalledWith(
+    expect(repository.requireReservationAtRevision).toHaveBeenCalledWith(
       expect.objectContaining({ valueOf: expect.any(Function) }),
       expect.objectContaining({ valueOf: expect.any(Function) }),
     );
     const [foundScope, foundRevision] =
-      repository.findReservationAtRevision.mock.calls[0];
+      repository.requireReservationAtRevision.mock.calls[0];
 
     expect(foundScope.valueOf()).toBe(scopeId);
     expect(foundRevision.valueOf()).toBe(0);
@@ -892,10 +918,11 @@ describe('PrivateOperationAcceptor', () => {
         operationId,
         parentCheckpoint: checkpoint().toPrimitives(),
       });
-    repository.findScope.mockResolvedValue(
+    repository.requireScope.mockResolvedValue(
       PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
     );
-    repository.findReservationAtRevision.mockResolvedValue(
+    repository.hasReservationAtRevision.mockResolvedValue(true);
+    repository.requireReservationAtRevision.mockResolvedValue(
       genesisReservation,
     );
 
@@ -904,12 +931,12 @@ describe('PrivateOperationAcceptor', () => {
         new PrivateOperationAcceptMessage(sibling, 'proof', controlFrame),
       ),
     ).rejects.toThrow(PrivateAuthorizationConflictError);
-    expect(repository.findReservationAtRevision).toHaveBeenCalledWith(
+    expect(repository.requireReservationAtRevision).toHaveBeenCalledWith(
       expect.objectContaining({ valueOf: expect.any(Function) }),
       expect.objectContaining({ valueOf: expect.any(Function) }),
     );
     const [foundScope, foundRevision] =
-      repository.findReservationAtRevision.mock.calls[0];
+      repository.requireReservationAtRevision.mock.calls[0];
 
     expect(foundScope.valueOf()).toBe(scopeId);
     expect(foundRevision.valueOf()).toBe(0);
@@ -944,10 +971,11 @@ describe('PrivateOperationAcceptor', () => {
         resultingHeadHash: encoded(32, 11),
       },
     });
-    repository.findScope.mockResolvedValue(
+    repository.requireScope.mockResolvedValue(
       PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
     );
-    repository.findReservationAtRevision.mockResolvedValue(
+    repository.hasReservationAtRevision.mockResolvedValue(true);
+    repository.requireReservationAtRevision.mockResolvedValue(
       PrivateControlTransitionReservation.fromPrimitives({
         authorDeviceKey: authorKey,
         childHeadHash: encoded(32, 11),
@@ -999,10 +1027,11 @@ describe('PrivateOperationAcceptor', () => {
         resultingHeadHash: encoded(32, 11),
       },
     });
-    repository.findScope.mockResolvedValue(
+    repository.requireScope.mockResolvedValue(
       PrivateAuthorizationScope.pin(currentCheckpoint, 'genesis'),
     );
-    repository.findReservationAtRevision.mockResolvedValue(
+    repository.hasReservationAtRevision.mockResolvedValue(true);
+    repository.requireReservationAtRevision.mockResolvedValue(
       PrivateControlTransitionReservation.fromPrimitives({
         authorDeviceKey: authorKey,
         childHeadHash: encoded(32, 11),
@@ -1033,7 +1062,8 @@ describe('PrivateOperationAcceptor', () => {
     const receipt = new PrivateControlOperationContract()
       .decode(signed())
       .toPrimitives();
-    repository.findReceipt.mockResolvedValue({
+    repository.hasReceipt.mockResolvedValue(true);
+    repository.requireReceipt.mockResolvedValue({
       ...receipt,
       digest: encoded(32, 8),
     });
@@ -1046,7 +1076,7 @@ describe('PrivateOperationAcceptor', () => {
 
   it('durably freezes a conflicting queued operation identifier', async () => {
     const pending = new PrivateControlOperationContract().decode(signed());
-    repository.findScope.mockResolvedValue(
+    repository.requireScope.mockResolvedValue(
       PrivateAuthorizationScope.fromPrimitives({
         acceptedOperations: [],
         checkpoint: checkpoint().toPrimitives(),

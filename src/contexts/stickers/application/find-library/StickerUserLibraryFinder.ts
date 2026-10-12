@@ -8,8 +8,8 @@ export default class StickerUserLibraryFinder {
   public async find(
     message: StickerUserLibraryFindMessage,
   ): Promise<StickerUserLibrary> {
-    const library = await this.repository.findByIdentityId(message.identityId);
-
-    return library ?? StickerUserLibrary.create(message.identityId);
+    return (await this.repository.hasByIdentityId(message.identityId))
+      ? await this.repository.requireByIdentityId(message.identityId)
+      : StickerUserLibrary.create(message.identityId);
   }
 }

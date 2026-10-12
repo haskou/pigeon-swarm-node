@@ -1,6 +1,8 @@
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import { ConversationMessagesAround } from '@app/contexts/conversations/domain/ConversationMessagesAround';
 import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
+import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
+import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageTargetNotFoundError';
 import { GroupConversation } from '@app/contexts/conversations/domain/GroupConversation';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { ConversationOperation } from '@app/contexts/conversations/domain/operations/ConversationOperation';
@@ -467,31 +469,37 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     );
   }
 
-  public async findById(
+  public async requireById(
     conversationId: ConversationId,
-  ): Promise<Conversation | undefined> {
+  ): Promise<Conversation> {
     const found = await this.findFolded(conversationId);
 
-    return found
-      ? this.conversationOf(
-          found,
-          await this.findMessagesByConversationId(conversationId),
-        )
-      : undefined;
+    if (!found) throw new ConversationNotFoundError(conversationId);
+
+    return this.conversationOf(
+      found,
+      await this.findMessagesByConversationId(conversationId),
+    );
   }
 
-  public async findMetadataById(
+  public async hasById(conversationId: ConversationId): Promise<boolean> {
+    return (await this.findFolded(conversationId)) !== undefined;
+  }
+
+  public async requireMetadataById(
     conversationId: ConversationId,
-  ): Promise<Conversation | undefined> {
+  ): Promise<Conversation> {
     const found = await this.findFolded(conversationId);
 
-    return found ? this.conversationOf(found) : undefined;
+    if (!found) throw new ConversationNotFoundError(conversationId);
+
+    return this.conversationOf(found);
   }
 
-  public async findMetadataAtFrontier(
+  public async requireMetadataAtFrontier(
     conversationId: ConversationId,
     frontier: string[],
-  ): Promise<Conversation | undefined> {
+  ): Promise<Conversation> {
     const records = await this.operationIndex.findRecords(
       this.headKey(conversationId),
     );
@@ -502,14 +510,23 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       ),
     );
 
-    return roster ? this.conversationOf({ createdAt: 0, roster }) : undefined;
+    if (!roster) throw new ConversationNotFoundError(conversationId);
+
+    return this.conversationOf({ createdAt: 0, roster });
   }
 
-  public async findCandidateMessageById(
+  public async requireCandidateMessageById(
     conversationId: ConversationId,
     messageId: MessageId,
-  ): Promise<Message | undefined> {
-    return this.findMessageById(conversationId, messageId);
+  ): Promise<Message> {
+    const document = await this.findMessageDocumentById(
+      conversationId,
+      messageId,
+    );
+
+    if (!document) throw new ConversationNotFoundError(conversationId);
+
+    return this.messageMapper.toDomain(document);
   }
 
   public findByParticipant(
@@ -555,16 +572,18 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       .map((document) => this.messageMapper.toDomain(document));
   }
 
-  public async findMessageById(
+  public async requireMessageById(
     conversationId: ConversationId,
     messageId: MessageId,
-  ): Promise<Message | undefined> {
+  ): Promise<Message> {
     const document = await this.findMessageDocumentById(
       conversationId,
       messageId,
     );
 
-    return document ? this.messageMapper.toDomain(document) : undefined;
+    if (!document) throw new MessageTargetNotFoundError();
+
+    return this.messageMapper.toDomain(document);
   }
 
   public async hasMessage(
@@ -674,24 +693,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
         recipientIdentityId,
       ),
     );
-  }
-
-  public async findOneToOne(
-    firstIdentityId: IdentityId,
-    secondIdentityId: IdentityId,
-    networkId: NetworkId,
-  ): Promise<OneToOneConversation | undefined> {
-    const conversation = await this.findById(
-      ConversationId.deterministic(
-        firstIdentityId,
-        secondIdentityId,
-        networkId,
-      ),
-    );
-
-    return conversation instanceof OneToOneConversation
-      ? conversation
-      : undefined;
   }
 
   /**

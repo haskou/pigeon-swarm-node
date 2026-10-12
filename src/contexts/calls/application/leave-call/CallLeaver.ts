@@ -1,7 +1,6 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { Call } from '../../domain/Call';
-import { CallNotFoundError } from '../../domain/errors/CallNotFoundError';
 import CallRepository from '../../domain/repositories/CallRepository';
 import CallAccessAuthorizer from '../authorize-call/CallAccessAuthorizer';
 import CallParticipantLeaseReleaser from '../release-participant-lease/CallParticipantLeaseReleaser';
@@ -16,11 +15,7 @@ export default class CallLeaver {
   ) {}
 
   public async leave(message: CallLeaveMessage): Promise<Call> {
-    const call = await this.repository.findById(message.callId);
-
-    if (!call) {
-      throw new CallNotFoundError();
-    }
+    const call = await this.repository.requireById(message.callId);
 
     await this.accessAuthorizer.assertAccess(
       call,

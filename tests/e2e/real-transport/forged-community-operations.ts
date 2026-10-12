@@ -136,7 +136,7 @@ async function open(replica: Replica): Promise<void> {
     registry,
     new PrivateCommunityPublicStorageGuard(
       {
-        findScope: (): Promise<undefined> => Promise.resolve(undefined),
+        hasScope: (): Promise<boolean> => Promise.resolve(false),
       } as never,
       new PrivateAuthorizationStorageCoordinator(),
     ),
@@ -244,7 +244,9 @@ async function converged(
     await until(label, async () => {
       observed.length = 0;
       for (const replica of replicas) {
-        const community = await replica.repository!.findById(id);
+        const community = (await replica.repository!.hasById(id))
+          ? await replica.repository!.requireById(id)
+          : undefined;
         const frontier = await replica.repository!.findFrontier(id);
 
         observed.push(`${replica.name}: frontier=${frontier.join(',')}`);
@@ -539,7 +541,7 @@ async function main(): Promise<void> {
   await pause(3000);
   await assertHeadsIndexOnlySignedOperations(communityId);
   for (const replica of nodes) {
-    const community = await replica.repository!.findById(communityId);
+    const community = await replica.repository!.requireById(communityId);
 
     assert.ok(community, `${replica.name} must still serve the community`);
     assert.deepEqual(
@@ -653,7 +655,7 @@ async function main(): Promise<void> {
   });
 
   await converged('signed tombstone replicated', doomed);
-  assert.equal(await honest.repository!.findById(doomed), undefined);
+  assert.equal(await honest.repository!.hasById(doomed), false);
   const revival = signCommunityOperation({
     action: action('COMMUNITY_UPDATED'),
     args: { description: 'Back from the dead', name: 'Revived' },
@@ -675,8 +677,8 @@ async function main(): Promise<void> {
   await pause(1500);
   for (const replica of nodes)
     assert.equal(
-      await replica.repository!.findById(doomed),
-      undefined,
+      await replica.repository!.hasById(doomed),
+      false,
       `${replica.name} must keep the signed tombstone`,
     );
   console.log(
@@ -713,7 +715,7 @@ async function main(): Promise<void> {
   });
   await pause(1500);
   for (const replica of nodes) {
-    const community = await replica.repository!.findById(communityId);
+    const community = await replica.repository!.requireById(communityId);
 
     assert.ok(
       community
@@ -731,7 +733,7 @@ async function main(): Promise<void> {
   });
   await converged('kick reached every replica', communityId);
   for (const replica of nodes) {
-    const community = await replica.repository!.findById(communityId);
+    const community = await replica.repository!.requireById(communityId);
 
     assert.ok(
       community && !community.isMember(new IdentityId(alice.id)),

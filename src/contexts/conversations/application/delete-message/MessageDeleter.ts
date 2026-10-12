@@ -1,5 +1,4 @@
 import { MessageDeleted } from '@app/contexts/conversations/domain/entities/messages/MessageDeleted';
-import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
@@ -12,13 +11,9 @@ export default class MessageDeleter {
   ) {}
 
   public async delete(message: MessageDeleteMessage): Promise<MessageDeleted> {
-    const conversation = await this.conversationRepository.findById(
+    const conversation = await this.conversationRepository.requireById(
       message.conversationId,
     );
-
-    if (!conversation) {
-      throw new ConversationNotFoundError(message.conversationId);
-    }
 
     const deletedMessage = conversation.deleteMessage(
       message.authorIdentityId,

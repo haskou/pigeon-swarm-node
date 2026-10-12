@@ -8,11 +8,17 @@ import { CommunityChannelMessageId } from '../value-objects/CommunityChannelMess
 import { CommunityId } from '../value-objects/CommunityId';
 
 export default abstract class CommunityChannelMessageRepository {
-  public abstract findById(
+  public abstract requireById(
     communityId: CommunityId,
     channelId: CommunityChannelId,
     messageId: CommunityChannelMessageId,
-  ): Promise<CommunityChannelMessage | undefined>;
+  ): Promise<CommunityChannelMessage>;
+
+  public abstract hasById(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+    messageId: CommunityChannelMessageId,
+  ): Promise<boolean>;
 
   public abstract findByChannel(
     communityId: CommunityId,

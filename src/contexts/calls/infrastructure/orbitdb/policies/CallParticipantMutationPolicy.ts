@@ -47,8 +47,15 @@ export default class CallParticipantMutationPolicy extends PublicMutationPolicy 
     identityId: string,
   ): Promise<void> {
     const scope = start.scope as Record<string, string>;
-    const community = await this.communities.get(scope.communityId, () =>
-      this.communityRepository.findById(new CommunityId(scope.communityId)),
+    const community = await this.communities.get(
+      scope.communityId,
+      async () => {
+        const communityId = new CommunityId(scope.communityId);
+
+        return (await this.communityRepository.hasById(communityId))
+          ? this.communityRepository.requireById(communityId)
+          : undefined;
+      },
     );
 
     if (!community) throw new InvalidPublicMutationError();

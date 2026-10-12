@@ -24,14 +24,14 @@ describe('OrbitDBCommunityRepository', () => {
   const networkId = genesis().getNetworkId().valueOf();
   const documents: Record<string, unknown>[] = [];
   const heads = new Map<string, Record<string, unknown>>();
-  let findScope: jest.Mock;
+  let hasScope: jest.Mock;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBCommunityRepository;
 
   beforeEach(async () => {
     documents.splice(0);
     heads.clear();
-    findScope = jest.fn().mockResolvedValue(undefined);
+    hasScope = jest.fn().mockResolvedValue(false);
     registry = new OrbitDBReplicatedStateRegistry();
     registry.clear();
     await registry.register(networkId, {
@@ -59,7 +59,7 @@ describe('OrbitDBCommunityRepository', () => {
     repository = new OrbitDBCommunityRepository(
       registry,
       new PrivateCommunityPublicStorageGuard(
-        { findScope } as never,
+        { hasScope } as never,
         new PrivateAuthorizationStorageCoordinator(),
       ),
     );
@@ -77,9 +77,9 @@ describe('OrbitDBCommunityRepository', () => {
     await save(joined);
     await flushBackgroundTasks();
 
-    const community = await repository.findById(communityId);
+    const community = await repository.requireById(communityId);
 
-    expect(community?.toPrimitives().memberIds.sort()).toEqual(
+    expect(community.toPrimitives().memberIds.sort()).toEqual(
       [alice.valueOf(), owner.valueOf()].sort(),
     );
     expect(community?.toPrimitives().name).toBe('Community');
@@ -104,7 +104,7 @@ describe('OrbitDBCommunityRepository', () => {
   });
 
   it('knows nothing about a community without a stored operation', async () => {
-    await expect(repository.findById(communityId)).resolves.toBeUndefined();
+    await expect(repository.hasById(communityId)).resolves.toBe(false);
     await expect(repository.findFrontier(communityId)).resolves.toEqual([]);
     await expect(repository.findByMember(owner)).resolves.toEqual([]);
   });
@@ -145,7 +145,7 @@ describe('OrbitDBCommunityRepository', () => {
       for (const index of order) await save(operations[index]);
 
       await flushBackgroundTasks();
-      states.push((await repository.findById(communityId))?.toPrimitives());
+      states.push((await repository.requireById(communityId)).toPrimitives());
     }
 
     expect(states[1]).toEqual(states[0]);
@@ -153,7 +153,7 @@ describe('OrbitDBCommunityRepository', () => {
     expect(states[0]?.bannedMemberIds).toEqual([alice.valueOf()]);
   });
 
-  describe('findAtFrontier', () => {
+  describe('requireAtFrontier', () => {
     it('folds the community as it was at the frontier, not at its latest state', async () => {
       const created = genesis();
       const joined = join([created], alice);
@@ -162,10 +162,10 @@ describe('OrbitDBCommunityRepository', () => {
       for (const op of [created, joined, banned]) await save(op);
       await flushBackgroundTasks();
 
-      const before = await repository.findAtFrontier(communityId, [
+      const before = await repository.requireAtFrontier(communityId, [
         joined.getHash(),
       ]);
-      const after = await repository.findAtFrontier(communityId, [
+      const after = await repository.requireAtFrontier(communityId, [
         banned.getHash(),
       ]);
 
@@ -191,7 +191,7 @@ describe('OrbitDBCommunityRepository', () => {
         for (const index of order) await save(operations[index]);
         await flushBackgroundTasks();
 
-        const community = await repository.findAtFrontier(communityId, [
+        const community = await repository.requireAtFrontier(communityId, [
           joined.getHash(),
         ]);
 
@@ -204,7 +204,7 @@ describe('OrbitDBCommunityRepository', () => {
       await flushBackgroundTasks();
 
       await expect(
-        repository.findAtFrontier(communityId, ['B'.repeat(43)]),
+        repository.requireAtFrontier(communityId, ['B'.repeat(43)]),
       ).rejects.toThrow();
     });
   });
@@ -259,7 +259,7 @@ describe('OrbitDBCommunityRepository', () => {
     await save(left);
     await flushBackgroundTasks();
 
-    await expect(repository.findById(communityId)).resolves.toBeUndefined();
+    await expect(repository.hasById(communityId)).resolves.toBe(false);
     await expect(repository.findByMember(owner)).resolves.toEqual([]);
     await expect(repository.findDiscoverable({})).resolves.toEqual([]);
   });
@@ -283,11 +283,11 @@ describe('OrbitDBCommunityRepository', () => {
     registry.clear();
     await registry.register(networkId, storesOf());
 
-    await expect(repository.findById(communityId)).resolves.toBeUndefined();
+    await expect(repository.hasById(communityId)).resolves.toBe(false);
   });
 
   it('never lets a community that became protected take public operations', async () => {
-    findScope.mockResolvedValue({});
+    hasScope.mockResolvedValue(true);
 
     await expect(save(genesis())).rejects.toBeInstanceOf(
       InvalidPrivateAuthorizationError,
@@ -302,8 +302,8 @@ describe('OrbitDBCommunityRepository', () => {
     await flushBackgroundTasks();
 
     await expect(
-      repository.findById(new CommunityId('another-community')),
-    ).resolves.toBeUndefined();
+      repository.hasById(new CommunityId('another-community')),
+    ).resolves.toBe(false);
   });
 
   async function save(operationToSave: CommunityOperation): Promise<void> {

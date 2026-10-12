@@ -3,6 +3,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { generateKeyPairSync } from 'node:crypto';
 
+import { StickerPackNotFoundError } from '@app/contexts/stickers/domain/errors/StickerPackNotFoundError';
 import { StickerPack } from '@app/contexts/stickers/domain/StickerPack';
 import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
 import OrbitDBStickerPackRepository from '@app/contexts/stickers/infrastructure/orbitdb/OrbitDBStickerPackRepository';
@@ -92,7 +93,7 @@ describe('OrbitDBStickerPackRepository', () => {
     await repository.save(packOf('Moods'), await proof(1));
 
     expect(
-      (await repository.findById(new StickerPackId(packId)))?.toPrimitives()
+      (await repository.requireById(new StickerPackId(packId))).toPrimitives()
         .name,
     ).toBe('Moods');
     expect(await repository.findByOwner(owner)).toHaveLength(1);
@@ -105,7 +106,7 @@ describe('OrbitDBStickerPackRepository', () => {
     await repository.save(packOf('Renamed'), await proof(2));
 
     expect(
-      (await repository.findById(new StickerPackId(packId)))?.toPrimitives()
+      (await repository.requireById(new StickerPackId(packId))).toPrimitives()
         .name,
     ).toBe('Renamed');
   });
@@ -124,7 +125,9 @@ describe('OrbitDBStickerPackRepository', () => {
       id: `sticker-pack:${packId}`,
     });
 
-    expect(await repository.findById(new StickerPackId(packId))).toBeUndefined();
+    await expect(
+      repository.requireById(new StickerPackId(packId)),
+    ).rejects.toBeInstanceOf(StickerPackNotFoundError);
     expect(await repository.findAll()).toEqual([]);
   });
 });

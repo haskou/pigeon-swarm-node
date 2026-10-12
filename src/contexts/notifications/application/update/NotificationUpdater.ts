@@ -1,4 +1,3 @@
-import { NotificationNotFoundError } from '@app/contexts/notifications/domain/errors/NotificationNotFoundError';
 import { NotificationRecipientMismatchError } from '@app/contexts/notifications/domain/errors/NotificationRecipientMismatchError';
 import { Notification } from '@app/contexts/notifications/domain/Notification';
 import NotificationRepository from '@app/contexts/notifications/domain/repositories/NotificationRepository';
@@ -29,11 +28,9 @@ export default class NotificationUpdater {
   public async update(
     message: NotificationUpdateMessage,
   ): Promise<Notification> {
-    const notification = await this.repository.findById(message.notificationId);
-
-    if (!notification) {
-      throw new NotificationNotFoundError();
-    }
+    const notification = await this.repository.requireById(
+      message.notificationId,
+    );
 
     if (!notification.isRecipient(message.recipientIdentityId)) {
       throw new NotificationRecipientMismatchError();

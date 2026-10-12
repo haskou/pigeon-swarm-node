@@ -1,4 +1,3 @@
-import { CommunityNotFoundError } from '../../domain/errors/CommunityNotFoundError';
 import CommunityChannelDraftRepository from '../../domain/repositories/CommunityChannelDraftRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityChannelDraftSaveMessage } from './messages/CommunityChannelDraftSaveMessage';
@@ -10,13 +9,9 @@ export default class CommunityChannelDraftSaver {
   ) {}
 
   public async save(message: CommunityChannelDraftSaveMessage): Promise<void> {
-    const community = await this.communityRepository.findById(
+    const community = await this.communityRepository.requireById(
       message.communityId,
     );
-
-    if (!community) {
-      throw new CommunityNotFoundError();
-    }
 
     community.viewTextChannel(message.actorIdentityId, message.channelId);
     await this.draftRepository.save(

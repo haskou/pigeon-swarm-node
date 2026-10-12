@@ -31,7 +31,7 @@ describe('CallEventAttestor', () => {
     const [started] = call.pullDomainEvents();
     const repository = {
       awaitUpdate: jest.fn().mockResolvedValue(false),
-      findById: jest.fn().mockResolvedValue(undefined),
+      hasById: jest.fn().mockResolvedValue(false),
     };
 
     await expect(
@@ -45,10 +45,11 @@ describe('CallEventAttestor', () => {
     const [started] = call.pullDomainEvents();
     const repository = {
       awaitUpdate: jest.fn().mockResolvedValue(true),
-      findById: jest
+      hasById: jest
         .fn()
-        .mockResolvedValueOnce(undefined)
-        .mockResolvedValue(call),
+        .mockResolvedValueOnce(false)
+        .mockResolvedValue(true),
+      requireById: jest.fn().mockResolvedValue(call),
     };
     const attested = await new CallEventAttestor(repository as never).attest(
       started,
@@ -58,12 +59,12 @@ describe('CallEventAttestor', () => {
   });
 
   it('drops an event whose aggregate is not a call id', async () => {
-    const repository = { awaitUpdate: jest.fn(), findById: jest.fn() };
+    const repository = { awaitUpdate: jest.fn(), hasById: jest.fn() };
     const bogus = new CallStartedEvent('not-a-uuid', {});
 
     await expect(
       new CallEventAttestor(repository as never).attest(bogus),
     ).resolves.toBeUndefined();
-    expect(repository.findById).not.toHaveBeenCalled();
+    expect(repository.hasById).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,5 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
+import { assert } from '@haskou/value-objects';
 
 import { MessageTargetNotFoundError } from '../../domain/errors/MessageTargetNotFoundError';
 import ConversationMessagePinRepository from '../../domain/repositories/ConversationMessagePinRepository';
@@ -21,14 +22,13 @@ export default class ConversationMessagePinner {
       message.conversationId,
       message.identityId,
     );
-    const pinnedMessage = await this.conversationRepository.findMessageById(
-      message.conversationId,
-      message.messageId,
+    assert(
+      await this.conversationRepository.hasMessage(
+        message.conversationId,
+        message.messageId,
+      ),
+      new MessageTargetNotFoundError(),
     );
-
-    if (!pinnedMessage) {
-      throw new MessageTargetNotFoundError();
-    }
 
     await this.pinRepository.pin(
       message.conversationId,

@@ -95,7 +95,7 @@ describe('OrbitDBCallRepository', () => {
 
   const guard = () =>
     new PrivateCommunityPublicStorageGuard(
-      { findScope: jest.fn().mockResolvedValue(undefined) } as never,
+      { hasScope: jest.fn().mockResolvedValue(false) } as never,
       new PrivateAuthorizationStorageCoordinator(),
     );
 
@@ -167,7 +167,9 @@ describe('OrbitDBCallRepository', () => {
     await build(false);
 
     await expect(
-      repository.findById(new CallId('550e8400-e29b-41d4-a716-446655440001')),
+      repository.requireById(
+        new CallId('550e8400-e29b-41d4-a716-446655440001'),
+      ),
     ).rejects.toThrow();
   });
 
@@ -193,9 +195,9 @@ describe('OrbitDBCallRepository', () => {
       scopeType: 'call_start',
     });
     expect(PublicMutationRecord.proofOf(stored)).toBeDefined();
-    const found = await repository.findById(new CallId(callId));
-    expect(found?.isActive()).toBe(true);
-    expect(found?.getParticipantIds().map((id) => id.valueOf())).toEqual(
+    const found = await repository.requireById(new CallId(callId));
+    expect(found.isActive()).toBe(true);
+    expect(found.getParticipantIds().map((id) => id.valueOf())).toEqual(
       expect.arrayContaining([creator.id, peer.id]),
     );
   });
@@ -212,8 +214,8 @@ describe('OrbitDBCallRepository', () => {
     await replicate(start.payload, start.proof);
     await replicate(accepted.payload, accepted.proof);
 
-    let found = await repository.findById(new CallId(start.callId));
-    expect(found?.hasJoinedParticipant(new IdentityId(peer.id))).toBe(true);
+    let found = await repository.requireById(new CallId(start.callId));
+    expect(found.hasJoinedParticipant(new IdentityId(peer.id))).toBe(true);
 
     const end = signCallEnd({
       at: now() + 2,
@@ -222,8 +224,8 @@ describe('OrbitDBCallRepository', () => {
     });
     await replicate(end.payload, end.proof);
 
-    found = await repository.findById(new CallId(start.callId));
-    expect(found?.isActive()).toBe(false);
+    found = await repository.requireById(new CallId(start.callId));
+    expect(found.isActive()).toBe(false);
     await expect(
       repository.findActiveByParticipant(new IdentityId(creator.id)),
     ).resolves.toEqual([]);
@@ -240,12 +242,12 @@ describe('OrbitDBCallRepository', () => {
 
     await replicate(joined.payload, joined.proof);
     await expect(
-      repository.findById(new CallId(start.callId)),
-    ).resolves.toBeUndefined();
+      repository.hasById(new CallId(start.callId)),
+    ).resolves.toBe(false);
 
     await replicate(start.payload, start.proof);
-    const found = await repository.findById(new CallId(start.callId));
-    expect(found?.hasJoinedParticipant(new IdentityId(peer.id))).toBe(true);
+    const found = await repository.requireById(new CallId(start.callId));
+    expect(found.hasJoinedParticipant(new IdentityId(peer.id))).toBe(true);
   });
 
   it('marks a ringing call missed locally without writing a replicated record', async () => {
@@ -261,16 +263,16 @@ describe('OrbitDBCallRepository', () => {
     await repository.markTimedOut(timedOut);
 
     expect(calls.put.mock.calls.length).toBe(writes);
-    const found = await repository.findById(new CallId(start.callId));
-    expect(found?.toPrimitives().status).toBe('missed');
+    const found = await repository.requireById(new CallId(start.callId));
+    expect(found.toPrimitives().status).toBe('missed');
   });
 
   it('ends a call that outlived the maximum duration on every read', async () => {
     const start = conversationStart(now() - 13 * 60 * 60 * 1000);
     await replicate(start.payload, start.proof);
 
-    const found = await repository.findById(new CallId(start.callId));
-    expect(found?.isActive()).toBe(false);
+    const found = await repository.requireById(new CallId(start.callId));
+    expect(found.isActive()).toBe(false);
   });
 
   it('keeps one live call per community channel: the lowest digest wins', async () => {
@@ -299,16 +301,16 @@ describe('OrbitDBCallRepository', () => {
         : rival.callId;
     const loserId = winnerId === first.callId ? rival.callId : first.callId;
 
-    const loser = await repository.findById(new CallId(loserId));
-    expect(loser?.isActive()).toBe(false);
-    const winner = await repository.findById(new CallId(winnerId));
-    expect(winner?.toPrimitives().status).toBe('active');
+    const loser = await repository.requireById(new CallId(loserId));
+    expect(loser.isActive()).toBe(false);
+    const winner = await repository.requireById(new CallId(winnerId));
+    expect(winner.toPrimitives().status).toBe('active');
   });
 
   it('verifies but does not store a community participant record', async () => {
     const start = communityStart();
     await replicate(start.payload, start.proof);
-    const call = (await repository.findById(new CallId(start.callId))) as Call;
+    const call = await repository.requireById(new CallId(start.callId));
     const at = now() + 1;
     const joined = signCallParticipant({
       at,
@@ -335,7 +337,7 @@ describe('OrbitDBCallRepository', () => {
   it('rejects a community join whose proof the gate does not admit', async () => {
     const start = communityStart();
     await replicate(start.payload, start.proof);
-    const call = (await repository.findById(new CallId(start.callId))) as Call;
+    const call = await repository.requireById(new CallId(start.callId));
     const at = now() + 1;
     const joined = signCallParticipant({
       at,
@@ -362,7 +364,7 @@ describe('OrbitDBCallRepository', () => {
   it('still stores a conversation participant record', async () => {
     const start = conversationStart();
     await replicate(start.payload, start.proof);
-    const call = (await repository.findById(new CallId(start.callId))) as Call;
+    const call = await repository.requireById(new CallId(start.callId));
     const at = now() + 1;
     const joined = signCallParticipant({
       at,

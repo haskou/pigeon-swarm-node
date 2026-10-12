@@ -74,8 +74,9 @@ describe('CallLeaver', () => {
       const conversations = mock<ConversationRepository>();
       const publisher = mock<DomainEventPublisher>();
       const leases = mock<CallParticipantLeaseReleaser>();
-      repository.findById.mockResolvedValue(call);
-      conversations.findMetadataById.mockResolvedValue(conversation);
+      repository.requireById.mockResolvedValue(call);
+      conversations.hasById.mockResolvedValue(true);
+      conversations.requireMetadataById.mockResolvedValue(conversation);
       leases.release.mockResolvedValue([]);
       const leaver = new CallLeaver(
         repository,

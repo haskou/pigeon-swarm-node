@@ -532,13 +532,16 @@ package "communities/domain" {
 
   interface CommunityRepository {
     + findDiscoverable(options): Community[]
-    + findById(id): Community?
+    + requireById(id): Community
+    + hasById(id): boolean
+    + requireAtFrontier(id, frontier): Community
     + findByMember(identityId): Community[]
     + findFrontier(id): string[]
     + save(operation, proof): void
   }
   interface CommunityChannelMessageRepository {
-    + findById(communityId, channelId, messageId): CommunityChannelMessage?
+    + requireById(communityId, channelId, messageId): CommunityChannelMessage
+    + hasById(communityId, channelId, messageId): boolean
     + findByChannel(communityId, channelId, limit, beforeMessageId?): CommunityChannelMessage[]
     + findThreadSummariesByChannel(communityId, channelIds, limitPerChannel): Map<string, CommunityChannelThreadSummary[]>
     + searchPublicByChannel(communityId, channelId, query, limit): CommunityChannelMessage[]
@@ -552,13 +555,13 @@ package "communities/domain" {
   }
 
   interface CommunityInviteRepository {
-    + findByToken(token): CommunityInvite?
+    + requireByToken(token): CommunityInvite
     + save(invite): void
   }
 
   interface CommunityMembershipRequestRepository {
     + findByCommunityAndIdentity(communityId, identityId): CommunityMembershipRequest[]
-    + findById(id): CommunityMembershipRequest?
+    + requireById(id): CommunityMembershipRequest
     + findByIdentity(identityId): CommunityMembershipRequest[]
     + findByCommunities(communityIds): CommunityMembershipRequest[]
     + save(request): void

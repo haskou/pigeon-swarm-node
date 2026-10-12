@@ -1,6 +1,5 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
-import { CommunityNotFoundError } from '../../domain/errors/CommunityNotFoundError';
 import { CommunityChannelMessageWasUnpinnedEvent } from '../../domain/events/CommunityChannelMessageWasUnpinnedEvent';
 import CommunityChannelMessagePinRepository from '../../domain/repositories/CommunityChannelMessagePinRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
@@ -16,13 +15,9 @@ export default class CommunityChannelMessageUnpinner {
   public async unpin(
     message: CommunityChannelMessagePinDeleteMessage,
   ): Promise<void> {
-    const community = await this.communityRepository.findById(
+    const community = await this.communityRepository.requireById(
       message.communityId,
     );
-
-    if (!community) {
-      throw new CommunityNotFoundError();
-    }
 
     community.manageChannelMessages(message.actorIdentityId, message.channelId);
     await this.pinRepository.unpin(

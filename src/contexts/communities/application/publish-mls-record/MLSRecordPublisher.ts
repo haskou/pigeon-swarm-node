@@ -1,4 +1,3 @@
-import { CommunityNotFoundError } from '../../domain/errors/CommunityNotFoundError';
 import { MLSGroupAccess } from '../../domain/MLSGroupAccess';
 import { MLSRecord } from '../../domain/MLSRecord';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
@@ -12,11 +11,9 @@ export default class MLSRecordPublisher {
   ) {}
 
   public async publish(message: MLSRecordPublishMessage): Promise<MLSRecord> {
-    const community = await this.communityRepository.findById(
+    const community = await this.communityRepository.requireById(
       message.communityId,
     );
-
-    if (!community) throw new CommunityNotFoundError();
 
     MLSGroupAccess.assert(
       community,

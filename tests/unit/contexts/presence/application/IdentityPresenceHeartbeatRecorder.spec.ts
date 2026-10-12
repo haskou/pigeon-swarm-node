@@ -64,7 +64,8 @@ describe('IdentityPresenceHeartbeatRecorder', () => {
       updatedAt: new Timestamp(1780000000000).valueOf(),
     });
 
-    repository.findByIdentityIdAndNodeId.mockResolvedValue(presence);
+    repository.hasByIdentityIdAndNodeId.mockResolvedValue(true);
+    repository.requireByIdentityIdAndNodeId.mockResolvedValue(presence);
 
     await recorder.record(
       new IdentityPresenceHeartbeatMessage(identityId.valueOf(), true),
@@ -95,7 +96,10 @@ describe('IdentityPresenceHeartbeatRecorder', () => {
       updatedAt: 1780000000000,
     });
 
-    repository.findByIdentityIdAndNodeId.mockResolvedValue(availablePresence);
+    repository.hasByIdentityIdAndNodeId.mockResolvedValue(true);
+    repository.requireByIdentityIdAndNodeId.mockResolvedValue(
+      availablePresence,
+    );
 
     await recorder.record(
       new IdentityPresenceHeartbeatMessage(identityId.valueOf(), true),

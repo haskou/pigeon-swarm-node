@@ -15,9 +15,9 @@ export default abstract class CommunityMembershipRequestRepository {
     communityIds: CommunityId[],
   ): Promise<CommunityMembershipRequest[]>;
 
-  public abstract findById(
+  public abstract requireById(
     id: CommunityRequestId,
-  ): Promise<CommunityMembershipRequest | undefined>;
+  ): Promise<CommunityMembershipRequest>;
 
   public abstract findByIdentity(
     identityId: IdentityId,

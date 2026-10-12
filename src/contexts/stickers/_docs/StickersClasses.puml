@@ -90,13 +90,14 @@ package "stickers/domain" {
 
   interface StickerPackRepository {
     + findAll(): StickerPack[]
-    + findById(id): StickerPack?
+    + requireById(id): StickerPack
     + findByOwner(ownerIdentityId): StickerPack[]
     + save(pack, proof): void
   }
 
   interface StickerUserLibraryRepository {
-    + findByIdentityId(identityId): StickerUserLibrary?
+    + hasByIdentityId(identityId): boolean
+    + requireByIdentityId(identityId): StickerUserLibrary
     + favorite(identityId, packId, stickerId, favoritedAt, proof): void
     + unfavorite(identityId, packId, stickerId, proof): void
     + recordUse(identityId, packId, stickerId, usedAt, proof): void

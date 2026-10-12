@@ -23,7 +23,7 @@ describe('PollScopeAuthorizer', () => {
   it('authorizes community poll creation without exposing a member audience', async () => {
     const authorizeTextChannelPollCreation = jest.fn();
 
-    communityRepository.findById.mockResolvedValue({
+    communityRepository.requireById.mockResolvedValue({
       authorizeTextChannelPollCreation,
     } as never);
 

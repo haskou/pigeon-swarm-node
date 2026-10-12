@@ -148,7 +148,7 @@ describe('OrbitDBPollRepository', () => {
     conversationRepository = mock<ConversationRepository>();
     publicStorageGuard = new PrivateCommunityPublicStorageGuard(
       {
-        findScope: jest.fn().mockResolvedValue(undefined),
+        hasScope: jest.fn().mockResolvedValue(false),
       } as never,
       new PrivateAuthorizationStorageCoordinator(),
     );
@@ -156,10 +156,10 @@ describe('OrbitDBPollRepository', () => {
       heads: createStore(),
       polls,
     } as never);
-    communityRepository.findById.mockResolvedValue({
+    communityRepository.requireById.mockResolvedValue({
       toPrimitives: () => ({ networkId }),
     } as never);
-    conversationRepository.findMetadataById.mockResolvedValue({
+    conversationRepository.requireMetadataById.mockResolvedValue({
       toPrimitives: () => ({ networkId }),
     } as never);
     repository = new OrbitDBPollRepository(
@@ -213,7 +213,7 @@ describe('OrbitDBPollRepository', () => {
     expect(result.map((item) => item.toPrimitives().id)).toEqual([
       savedPoll.getId().valueOf(),
     ]);
-    expect(conversationRepository.findMetadataById).toHaveBeenCalledWith(
+    expect(conversationRepository.requireMetadataById).toHaveBeenCalledWith(
       conversationId,
     );
   });
@@ -241,9 +241,9 @@ describe('OrbitDBPollRepository', () => {
 
     await saveVote(savedPoll, undefined, 3);
 
-    const loaded = await repository.findById(savedPoll.getId());
+    const loaded = await repository.requireById(savedPoll.getId());
 
-    expect(loaded?.toPrimitives().votes).toEqual([]);
+    expect(loaded.toPrimitives().votes).toEqual([]);
   });
 
   it('closes a poll and ignores ballots cast after the close', async () => {
@@ -263,10 +263,10 @@ describe('OrbitDBPollRepository', () => {
       await proofFor(`poll-close:${savedPoll.getId().valueOf()}`),
     );
 
-    const loaded = await repository.findById(savedPoll.getId());
+    const loaded = await repository.requireById(savedPoll.getId());
 
-    expect(loaded?.toPrimitives().status).toBe('closed');
-    expect(loaded?.toPrimitives().votes).toEqual([]);
+    expect(loaded.toPrimitives().status).toBe('closed');
+    expect(loaded.toPrimitives().votes).toEqual([]);
   });
 
   it('rejects a stale ballot', async () => {
@@ -305,9 +305,9 @@ describe('OrbitDBPollRepository', () => {
       ),
     );
 
-    const loaded = await repository.findById(savedPoll.getId());
+    const loaded = await repository.requireById(savedPoll.getId());
 
-    expect(loaded?.toPrimitives().votes).toEqual([]);
+    expect(loaded.toPrimitives().votes).toEqual([]);
   });
 
   it('resolves the community network before acquiring its public storage lock', async () => {
@@ -324,7 +324,7 @@ describe('OrbitDBPollRepository', () => {
         activeScope = undefined;
       }
     });
-    communityRepository.findById.mockImplementation((id) =>
+    communityRepository.requireById.mockImplementation((id) =>
       coordinator.exclusively(
         id.valueOf(),
         async () =>
@@ -338,7 +338,7 @@ describe('OrbitDBPollRepository', () => {
       communityRepository,
       conversationRepository,
       new PrivateCommunityPublicStorageGuard(
-        { findScope: jest.fn().mockResolvedValue(undefined) } as never,
+        { hasScope: jest.fn().mockResolvedValue(false) } as never,
         coordinator,
       ),
     );
@@ -353,7 +353,7 @@ describe('OrbitDBPollRepository', () => {
       conversationRepository,
       new PrivateCommunityPublicStorageGuard(
         {
-          findScope: jest.fn().mockResolvedValue({}),
+          hasScope: jest.fn().mockResolvedValue(true),
         } as never,
         new PrivateAuthorizationStorageCoordinator(),
       ),

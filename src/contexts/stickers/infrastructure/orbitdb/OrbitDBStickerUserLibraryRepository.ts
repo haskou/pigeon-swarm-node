@@ -5,6 +5,7 @@ import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/Or
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
+import { StickerUserLibraryNotFoundError } from '../../domain/errors/StickerUserLibraryNotFoundError';
 import StickerUserLibraryRepository from '../../domain/repositories/StickerUserLibraryRepository';
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
 import { StickerId } from '../../domain/value-objects/StickerId';
@@ -79,28 +80,7 @@ export default class OrbitDBStickerUserLibraryRepository extends StickerUserLibr
     );
   }
 
-  public async favorite(
-    identityId: IdentityId,
-    packId: StickerPackId,
-    stickerId: StickerId,
-    favoritedAt: Timestamp,
-    proof: PublicMutationProof,
-  ): Promise<void> {
-    await this.write(
-      identityId,
-      {
-        favoritedAt: favoritedAt.valueOf(),
-        id: `favorite:${identityId.valueOf()}:${packId.valueOf()}:${stickerId.valueOf()}`,
-        identityId: identityId.valueOf(),
-        packId: packId.valueOf(),
-        scopeType: 'sticker_favorite',
-        stickerId: stickerId.valueOf(),
-      },
-      proof,
-    );
-  }
-
-  public async findByIdentityId(
+  private async loadByIdentityId(
     identityId: IdentityId,
   ): Promise<StickerUserLibrary | undefined> {
     const documents = await this.libraryIndex.find(this.headKey(identityId));
@@ -141,6 +121,41 @@ export default class OrbitDBStickerUserLibraryRepository extends StickerUserLibr
         .sort((left, right) => left.savedAt - right.savedAt)
         .map((document) => document.packId),
     });
+  }
+
+  public async favorite(
+    identityId: IdentityId,
+    packId: StickerPackId,
+    stickerId: StickerId,
+    favoritedAt: Timestamp,
+    proof: PublicMutationProof,
+  ): Promise<void> {
+    await this.write(
+      identityId,
+      {
+        favoritedAt: favoritedAt.valueOf(),
+        id: `favorite:${identityId.valueOf()}:${packId.valueOf()}:${stickerId.valueOf()}`,
+        identityId: identityId.valueOf(),
+        packId: packId.valueOf(),
+        scopeType: 'sticker_favorite',
+        stickerId: stickerId.valueOf(),
+      },
+      proof,
+    );
+  }
+
+  public async hasByIdentityId(identityId: IdentityId): Promise<boolean> {
+    return (await this.loadByIdentityId(identityId)) !== undefined;
+  }
+
+  public async requireByIdentityId(
+    identityId: IdentityId,
+  ): Promise<StickerUserLibrary> {
+    const library = await this.loadByIdentityId(identityId);
+
+    if (!library) throw new StickerUserLibraryNotFoundError();
+
+    return library;
   }
 
   public async forgetPack(

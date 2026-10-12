@@ -1,4 +1,3 @@
-import { CommunityNotFoundError } from '../../domain/errors/CommunityNotFoundError';
 import { MLSGroupAccess } from '../../domain/MLSGroupAccess';
 import { MLSRecord } from '../../domain/MLSRecord';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
@@ -13,11 +12,9 @@ export default class MLSRecordsFinder {
 
   /** Records of one group the actor may read; welcomes only reach their recipient. */
   public async find(message: MLSRecordsFindMessage): Promise<MLSRecord[]> {
-    const community = await this.communityRepository.findById(
+    const community = await this.communityRepository.requireById(
       message.communityId,
     );
-
-    if (!community) throw new CommunityNotFoundError();
 
     MLSGroupAccess.assert(community, message.groupId, message.actorIdentityId);
 

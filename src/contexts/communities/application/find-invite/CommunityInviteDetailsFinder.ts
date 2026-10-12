@@ -1,4 +1,3 @@
-import { CommunityInviteNotFoundError } from '../../domain/errors/CommunityInviteNotFoundError';
 import CommunityInviteRepository from '../../domain/repositories/CommunityInviteRepository';
 import CommunityFinder from '../find-community/CommunityFinder';
 import { CommunityInviteDetails } from './CommunityInviteDetails';
@@ -13,11 +12,9 @@ export default class CommunityInviteDetailsFinder {
   public async find(
     message: CommunityInviteFindMessage,
   ): Promise<CommunityInviteDetails> {
-    const invite = await this.inviteRepository.findByToken(message.inviteToken);
-
-    if (!invite) {
-      throw new CommunityInviteNotFoundError();
-    }
+    const invite = await this.inviteRepository.requireByToken(
+      message.inviteToken,
+    );
     const uses = await this.inviteRepository.countUses(invite);
 
     invite.checkAcceptanceAvailability(uses);

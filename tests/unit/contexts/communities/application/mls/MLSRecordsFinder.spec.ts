@@ -82,7 +82,7 @@ describe('MLSRecordsFinder', () => {
     ];
     const communities = mock<CommunityRepository>();
     const repository = mock<MLSRecordRepository>();
-    communities.findById.mockResolvedValue(community);
+    communities.requireById.mockResolvedValue(community);
     repository.findByCommunity.mockResolvedValue(records);
     finder = new MLSRecordsFinder(communities, repository);
   });

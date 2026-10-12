@@ -15,9 +15,9 @@ export default class NotificationScopeSettingsUpdater {
   ): Promise<NotificationScopeSettings> {
     const identityId = message.getIdentityId();
     const scope = message.getScope();
-    const settings =
-      (await this.repository.findByScope(identityId, scope)) ??
-      NotificationScopeSettings.defaultForScope(identityId, scope);
+    const settings = (await this.repository.hasByScope(identityId, scope))
+      ? await this.repository.requireByScope(identityId, scope)
+      : NotificationScopeSettings.defaultForScope(identityId, scope);
 
     settings.update(message.getPreferences(), message.getUpdatedAt());
 

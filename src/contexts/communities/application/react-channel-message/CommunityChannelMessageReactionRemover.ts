@@ -1,8 +1,6 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
-import { assert } from '@haskou/value-objects';
 
 import { CommunityChannelMessageReaction } from '../../domain/entities/messages/CommunityChannelMessageReaction';
-import { CommunityChannelMessageNotFoundError } from '../../domain/errors/CommunityChannelMessageNotFoundError';
 import { CommunityChannelMessageReactionRemovedEvent } from '../../domain/events/CommunityChannelMessageReactionWasRemovedEvent';
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import CommunityMessageReactionRepository from '../../domain/repositories/CommunityMessageReactionRepository';
@@ -22,13 +20,10 @@ export default class CommunityChannelMessageReactionRemover {
   ): Promise<CommunityChannelMessageReaction> {
     const community = await this.communityFinder.findById(message.communityId);
 
-    assert(
-      await this.messageRepository.findById(
-        message.communityId,
-        message.channelId,
-        message.messageId,
-      ),
-      new CommunityChannelMessageNotFoundError(),
+    await this.messageRepository.requireById(
+      message.communityId,
+      message.channelId,
+      message.messageId,
     );
     const reaction = community.reactWithSticker(
       message.actorIdentityId,

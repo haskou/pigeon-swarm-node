@@ -13,11 +13,11 @@ export default class CallSignalAcknowledger {
   public async acknowledge(
     message: CallSignalAcknowledgeMessage,
   ): Promise<void> {
-    const delivery = await this.repository.findById(message.signalId);
-
-    if (!delivery) {
+    if (!(await this.repository.hasById(message.signalId))) {
       return;
     }
+
+    const delivery = await this.repository.requireById(message.signalId);
 
     if (!delivery.acknowledge(message.recipientIdentityId, Timestamp.now())) {
       return;

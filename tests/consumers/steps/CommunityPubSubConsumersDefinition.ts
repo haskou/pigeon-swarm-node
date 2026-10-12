@@ -4,6 +4,7 @@ import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelMessageReaction } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessageReaction';
 import { CommunityChannelMessageReactionWasAddedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasAddedEvent';
 import { CommunityChannelMessageReactionRemovedEvent } from '@app/contexts/communities/domain/events/CommunityChannelMessageReactionWasRemovedEvent';
+import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import CommunityMessageReactionRepository from '@app/contexts/communities/domain/repositories/CommunityMessageReactionRepository';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
@@ -35,8 +36,16 @@ class FakeCommunityRepository {
 
   constructor(private readonly community: Community) {}
 
-  public async findById(id: CommunityId): Promise<Community | undefined> {
-    return this.community.isIdentifiedBy(id) ? this.community : undefined;
+  public async hasById(id: CommunityId): Promise<boolean> {
+    return this.community.isIdentifiedBy(id);
+  }
+
+  public async requireById(id: CommunityId): Promise<Community> {
+    if (!this.community.isIdentifiedBy(id)) {
+      throw new CommunityNotFoundError();
+    }
+
+    return this.community;
   }
 
   public async save(operation: unknown): Promise<void> {
@@ -45,8 +54,8 @@ class FakeCommunityRepository {
 }
 
 class FakeCommunityMessageRepository {
-  public async findById(): Promise<object> {
-    return {};
+  public async hasById(): Promise<boolean> {
+    return true;
   }
 }
 

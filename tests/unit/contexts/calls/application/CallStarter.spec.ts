@@ -102,7 +102,8 @@ describe('CallStarter', () => {
 
   const communityRepositoryFor = () => {
     const communityRepository = mock<CommunityRepository>();
-    communityRepository.findById.mockResolvedValue({
+    communityRepository.hasById.mockResolvedValue(true);
+    communityRepository.requireById.mockResolvedValue({
       authorizeVoiceChannelCall: jest.fn(),
       getNetworkId: () => networkId,
     } as never);
@@ -124,7 +125,8 @@ describe('CallStarter', () => {
     );
     const repository = mock<CallRepository>();
     const conversationRepository = mock<ConversationRepository>();
-    conversationRepository.findMetadataById.mockResolvedValue(conversation);
+    conversationRepository.hasById.mockResolvedValue(true);
+    conversationRepository.requireMetadataById.mockResolvedValue(conversation);
     const { eventPublisher, leaseRenewer, starter } = build(
       repository,
       conversationRepository,
@@ -149,7 +151,7 @@ describe('CallStarter', () => {
 
   it('starts a community channel call with only the requester joined', async () => {
     const repository = mock<CallRepository>();
-    repository.findActiveByCommunityChannel.mockResolvedValue(undefined);
+    repository.hasActiveByCommunityChannel.mockResolvedValue(false);
     const { starter } = build(repository, undefined, communityRepositoryFor());
     const message = startMessage(
       {
@@ -179,7 +181,8 @@ describe('CallStarter', () => {
       ...callStartArgs(),
     );
     const repository = mock<CallRepository>();
-    repository.findActiveByCommunityChannel.mockResolvedValue(active);
+    repository.hasActiveByCommunityChannel.mockResolvedValue(true);
+    repository.requireActiveByCommunityChannel.mockResolvedValue(active);
     const { eventPublisher, starter } = build(
       repository,
       undefined,
@@ -206,7 +209,7 @@ describe('CallStarter', () => {
     // A forged gossiped start is never in the repository, so the lookup is
     // empty and the requester's own signed start is stored.
     const repository = mock<CallRepository>();
-    repository.findActiveByCommunityChannel.mockResolvedValue(undefined);
+    repository.hasActiveByCommunityChannel.mockResolvedValue(false);
     const { starter } = build(repository, undefined, communityRepositoryFor());
 
     await starter.start(
@@ -226,7 +229,7 @@ describe('CallStarter', () => {
   it('rejects a conversation the requester is not part of', async () => {
     const repository = mock<CallRepository>();
     const conversationRepository = mock<ConversationRepository>();
-    conversationRepository.findMetadataById.mockResolvedValue(undefined);
+    conversationRepository.hasById.mockResolvedValue(false);
     const { starter } = build(repository, conversationRepository);
 
     await expect(

@@ -1,4 +1,4 @@
-import { CommunityNotFoundError } from '../../domain/errors/CommunityNotFoundError';
+import { CommunityChannelMessageNotFoundError } from '../../domain/errors/CommunityChannelMessageNotFoundError';
 import CommunityChannelMessagePinRepository from '../../domain/repositories/CommunityChannelMessagePinRepository';
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
@@ -15,13 +15,9 @@ export default class CommunityChannelMessagePinsFinder {
   public async find(
     message: CommunityChannelMessagePinsFindMessage,
   ): Promise<CommunityChannelMessagePinDetails[]> {
-    const community = await this.communityRepository.findById(
+    const community = await this.communityRepository.requireById(
       message.communityId,
     );
-
-    if (!community) {
-      throw new CommunityNotFoundError();
-    }
 
     community.viewTextChannel(message.actorIdentityId, message.channelId);
 
@@ -32,14 +28,17 @@ export default class CommunityChannelMessagePinsFinder {
     const details: CommunityChannelMessagePinDetails[] = [];
 
     for (const pin of pins) {
-      const pinnedMessage = await this.messageRepository.findById(
-        message.communityId,
-        message.channelId,
-        pin.getMessageId(),
-      );
+      try {
+        const pinnedMessage = await this.messageRepository.requireById(
+          message.communityId,
+          message.channelId,
+          pin.getMessageId(),
+        );
 
-      if (pinnedMessage) {
         details.push(new CommunityChannelMessagePinDetails(pin, pinnedMessage));
+      } catch (error) {
+        if (!(error instanceof CommunityChannelMessageNotFoundError))
+          throw error;
       }
     }
 

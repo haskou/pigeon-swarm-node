@@ -7,10 +7,13 @@ export default class CallSignalAcknowledgementRegistrar {
   public async register(
     message: CallSignalAcknowledgementRegisterMessage,
   ): Promise<void> {
-    const delivery = await this.repository.findById(message.signalId);
+    if (!(await this.repository.hasById(message.signalId))) {
+      return;
+    }
+
+    const delivery = await this.repository.requireById(message.signalId);
 
     if (
-      !delivery ||
       !delivery.confirmAcknowledgement(
         message.recipientIdentityId,
         message.acknowledgedAt,

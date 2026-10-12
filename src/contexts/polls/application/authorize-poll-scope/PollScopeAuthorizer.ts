@@ -1,6 +1,4 @@
-import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
-import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { InvalidPollScopeError } from '@app/contexts/polls/domain/errors/InvalidPollScopeError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -22,13 +20,9 @@ export default class PollScopeAuthorizer {
     message: CommunityChannelPollScopeAuthorizeMessage,
     action: 'create' | 'vote',
   ): Promise<PollScopeResolution> {
-    const community = await this.communityRepository.findById(
+    const community = await this.communityRepository.requireById(
       message.communityId,
     );
-
-    if (!community) {
-      throw new CommunityNotFoundError();
-    }
 
     if (action === 'create') {
       community.authorizeTextChannelPollCreation(
@@ -90,13 +84,9 @@ export default class PollScopeAuthorizer {
   public async authorizeGroupConversation(
     message: GroupConversationPollScopeAuthorizeMessage,
   ): Promise<PollScopeResolution> {
-    const conversation = await this.conversationRepository.findById(
+    const conversation = await this.conversationRepository.requireMetadataById(
       message.conversationId,
     );
-
-    if (!conversation) {
-      throw new ConversationNotFoundError(message.conversationId);
-    }
 
     if (
       !conversation.isGroup() ||

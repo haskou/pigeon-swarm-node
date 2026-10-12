@@ -1,4 +1,5 @@
 import { Call } from '@app/contexts/calls/domain/Call';
+import { CallNotFoundError } from '@app/contexts/calls/domain/errors/CallNotFoundError';
 import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
@@ -208,7 +209,7 @@ export default class OrbitDBCallRepository extends CallRepository {
     );
   }
 
-  public async findById(id: CallId): Promise<Call | undefined> {
+  private async findCallById(id: CallId): Promise<Call | undefined> {
     const document = await this.callProjection.findById(id);
 
     if (!document) return undefined;
@@ -228,6 +229,39 @@ export default class OrbitDBCallRepository extends CallRepository {
     return communityId
       ? this.publicStorageGuard.runWhilePublic(communityId, read)
       : read();
+  }
+
+  private async findActiveCallByCommunityChannel(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+  ): Promise<Call | undefined> {
+    const call = await this.publicStorageGuard.runWhilePublic(
+      communityId,
+      async () => {
+        const document = await this.callProjection.findActiveByCommunityChannel(
+          communityId,
+          channelId,
+        );
+
+        return document ? this.hydrate(document) : undefined;
+      },
+    );
+
+    return call?.isActive() ? call : undefined;
+  }
+
+  public async hasById(id: CallId): Promise<boolean> {
+    return (await this.findCallById(id)) !== undefined;
+  }
+
+  public async requireById(id: CallId): Promise<Call> {
+    const call = await this.findCallById(id);
+
+    if (!call) {
+      throw new CallNotFoundError();
+    }
+
+    return call;
   }
 
   public async findActiveByParticipant(
@@ -275,20 +309,32 @@ export default class OrbitDBCallRepository extends CallRepository {
     );
   }
 
-  public async findActiveByCommunityChannel(
+  public async hasActiveByCommunityChannel(
     communityId: CommunityId,
     channelId: CommunityChannelId,
-  ): Promise<Call | undefined> {
-    return this.publicStorageGuard.runWhilePublic(communityId, async () => {
-      const document = await this.callProjection.findActiveByCommunityChannel(
-        communityId,
-        channelId,
-      );
+  ): Promise<boolean> {
+    const call = await this.findActiveCallByCommunityChannel(
+      communityId,
+      channelId,
+    );
 
-      const call = document ? await this.hydrate(document) : undefined;
+    return call !== undefined;
+  }
 
-      return call?.isActive() ? call : undefined;
-    });
+  public async requireActiveByCommunityChannel(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+  ): Promise<Call> {
+    const call = await this.findActiveCallByCommunityChannel(
+      communityId,
+      channelId,
+    );
+
+    if (!call) {
+      throw new CallNotFoundError();
+    }
+
+    return call;
   }
 
   public async findActiveByCommunity(

@@ -1,6 +1,7 @@
 import { CommunityChannelMessageRecordId } from '@app/contexts/communities/domain/CommunityChannelMessageRecordId';
 import { CommunityChannelThreadSummary } from '@app/contexts/communities/domain/CommunityChannelThreadSummary';
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
+import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
@@ -86,11 +87,11 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
     return this.messageIndex.findByChannel(communityId, channelId);
   }
 
-  public async findById(
+  public async requireById(
     communityId: CommunityId,
     channelId: CommunityChannelId,
     messageId: CommunityChannelMessageId,
-  ): Promise<CommunityChannelMessage | undefined> {
+  ): Promise<CommunityChannelMessage> {
     return this.publicStorageGuard.runWhilePublic(communityId, async () => {
       const document = (
         await this.findMessageDocumentsByChannel(communityId, channelId)
@@ -100,8 +101,25 @@ export default class OrbitDBCommunityChannelMessageRepository extends CommunityC
         ).isEqual(messageId),
       );
 
-      return document ? this.mapper.toDomain(document) : undefined;
+      if (!document) throw new CommunityChannelMessageNotFoundError();
+
+      return this.mapper.toDomain(document);
     });
+  }
+
+  public async hasById(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+    messageId: CommunityChannelMessageId,
+  ): Promise<boolean> {
+    return this.publicStorageGuard.runWhilePublic(communityId, async () =>
+      (await this.findMessageDocumentsByChannel(communityId, channelId)).some(
+        (candidate) =>
+          new CommunityChannelMessageId(
+            this.messageIndex.getMessageId(candidate),
+          ).isEqual(messageId),
+      ),
+    );
   }
 
   public async findByChannel(

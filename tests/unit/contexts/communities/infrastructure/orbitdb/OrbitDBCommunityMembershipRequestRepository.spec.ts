@@ -1,4 +1,5 @@
 import { CommunityMembershipRequest } from '@app/contexts/communities/domain/entities/membership/CommunityMembershipRequest';
+import { CommunityRequestNotFoundError } from '@app/contexts/communities/domain/errors/CommunityRequestNotFoundError';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBCommunityMembershipRequestMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMembershipRequestMapper';
 import OrbitDBCommunityMembershipRequestRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityMembershipRequestRepository';
@@ -13,7 +14,7 @@ import { signedMutation } from '../../../public-mutations/support/signedMutation
 const publicStorageGuard = () =>
   new PrivateCommunityPublicStorageGuard(
     {
-      findScope: jest.fn().mockResolvedValue(undefined),
+      hasScope: jest.fn().mockResolvedValue(false),
     } as never,
     new PrivateAuthorizationStorageCoordinator(),
   );
@@ -102,7 +103,7 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     await store.save(request, await proofOf(request));
     await flushBackgroundTasks();
 
-    const byId = await store.findById(request.getId());
+    const byId = await store.requireById(request.getId());
     const byIdentity = await store.findByIdentity(invitedIdentityId);
     const byCommunityAndIdentity = await store.findByCommunityAndIdentity(
       communityId,
@@ -110,7 +111,7 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     );
     const byCommunity = await store.findByCommunities([communityId]);
 
-    expect(byId?.toPrimitives()).toEqual(request.toPrimitives());
+    expect(byId.toPrimitives()).toEqual(request.toPrimitives());
     expect(byIdentity).toHaveLength(1);
     expect(byCommunityAndIdentity).toHaveLength(1);
     expect(byCommunity).toHaveLength(1);
@@ -131,7 +132,9 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     );
     await flushBackgroundTasks();
 
-    await expect(store.findById(request.getId())).resolves.toBeUndefined();
+    await expect(store.requireById(request.getId())).rejects.toBeInstanceOf(
+      CommunityRequestNotFoundError,
+    );
     await expect(store.findByIdentity(invitedIdentityId)).resolves.toEqual([]);
     expect(
       heads.has(`community-membership-request:${request.getId().valueOf()}`),
@@ -160,9 +163,9 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     ).rejects.toThrow('resolution write failed');
     await flushBackgroundTasks();
 
-    const found = await store.findById(request.getId());
+    const found = await store.requireById(request.getId());
 
-    expect(found?.toPrimitives().status).toBe('pending');
+    expect(found.toPrimitives().status).toBe('pending');
   });
 
   it('should find membership requests from fresh heads when identity indexes lag', async () => {

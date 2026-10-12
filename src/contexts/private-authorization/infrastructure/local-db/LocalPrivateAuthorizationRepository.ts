@@ -1,4 +1,9 @@
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
+import { PrivateAuthorizationProjectionNotFoundError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationProjectionNotFoundError';
+import { PrivateAuthorizationProtectedMlsStateNotFoundError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationProtectedMlsStateNotFoundError';
+import { PrivateAuthorizationReceiptNotFoundError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationReceiptNotFoundError';
+import { PrivateAuthorizationReservationNotFoundError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationReservationNotFoundError';
+import { PrivateAuthorizationScopeNotFoundError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationScopeNotFoundError';
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationCheckpointPrimitives } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpointPrimitives';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
@@ -98,6 +103,123 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
     }));
   }
 
+  private async projectionOf(
+    scopeId: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    const document = await this.database.findOne(
+      PrivateAuthorizationLocalNamespaces.projections,
+      scopeId,
+    );
+
+    if (!document) return undefined;
+    const projection = { ...document };
+    delete projection._id;
+
+    return projection;
+  }
+
+  private async protectedMlsStateOf(
+    scopeId: string,
+  ): Promise<string | undefined> {
+    const document = await this.database.findOne(
+      PrivateAuthorizationLocalNamespaces.mls,
+      scopeId,
+    );
+
+    return typeof document?.state === 'string' ? document.state : undefined;
+  }
+
+  private async receiptOf(
+    scopeId: string,
+    operationId: string,
+  ): Promise<PrivateControlOperationPrimitives | undefined> {
+    const document = await this.database.findOne(
+      PrivateAuthorizationLocalNamespaces.receipts,
+      privateAuthorizationLocalId(scopeId, operationId),
+    );
+
+    if (!document || !this.isOperation(document)) return undefined;
+    const receipt = { ...document };
+    delete receipt._id;
+
+    return receipt as unknown as PrivateControlOperationPrimitives;
+  }
+
+  private async reservationOf(
+    scopeId: string,
+    parentHeadHash: string,
+  ): Promise<PrivateControlTransitionReservation | undefined> {
+    const document = await this.database.findOne(
+      PrivateAuthorizationLocalNamespaces.reservations,
+      privateAuthorizationLocalId(scopeId, parentHeadHash),
+    );
+
+    const reservation = this.reservationFrom(document);
+
+    if (!reservation) return undefined;
+    reservation.assertParent(scopeId, parentHeadHash);
+
+    return reservation;
+  }
+
+  private async reservationAtRevisionOf(
+    scopeId: PrivateAuthorizationScopeId,
+    revision: PrivateAuthorizationRevision,
+  ): Promise<PrivateControlTransitionReservation | undefined> {
+    const scope = scopeId.valueOf();
+    const prefix = `${scope}:`;
+    const documents = await this.database.find(
+      PrivateAuthorizationLocalNamespaces.reservations,
+      (document) => {
+        const checkpoint = document.parentCheckpoint as
+          Record<string, unknown> | undefined;
+
+        return (
+          typeof document._id === 'string' &&
+          document._id.startsWith(prefix) &&
+          checkpoint?.revision === revision.valueOf()
+        );
+      },
+    );
+
+    assert(documents.length <= 1, new InvalidPrivateAuthorizationError());
+    const reservation = this.reservationFrom(documents[0]);
+
+    if (!reservation) return undefined;
+    const parent = reservation.getParentCheckpoint();
+
+    assert(
+      parent.getScopeId().isEqual(scopeId) &&
+        parent.getRevision().isEqual(revision),
+      new InvalidPrivateAuthorizationError(),
+    );
+
+    return reservation;
+  }
+
+  private async scopeOf(
+    scopeId: string,
+  ): Promise<PrivateAuthorizationScope | undefined> {
+    const document = await this.database.findOne(
+      PrivateAuthorizationLocalNamespaces.scopes,
+      scopeId,
+    );
+
+    if (!document) return undefined;
+    const pendingOperations = (await this.findPending(scopeId)).map((pending) =>
+      pending.toPrimitives(),
+    );
+
+    try {
+      return PrivateAuthorizationScope.fromPrimitives({
+        ...(document as unknown as PrivateAuthorizationScopePrimitives),
+        pendingOperations,
+      });
+    } catch {
+      throw new InvalidPrivateAuthorizationError();
+    }
+  }
+
   public async findOutbox(
     scopeId: string,
   ): Promise<Array<Record<string, unknown>>> {
@@ -133,121 +255,112 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
       );
   }
 
-  public async findProjection(
-    scopeId: string,
-  ): Promise<Record<string, unknown> | undefined> {
-    const document = await this.database.findOne(
-      PrivateAuthorizationLocalNamespaces.projections,
-      scopeId,
-    );
+  public async hasProjection(scopeId: string): Promise<boolean> {
+    return (await this.projectionOf(scopeId)) !== undefined;
+  }
 
-    if (!document) return undefined;
-    const projection = { ...document };
-    delete projection._id;
+  public async requireProjection(
+    scopeId: string,
+  ): Promise<Record<string, unknown>> {
+    const projection = await this.projectionOf(scopeId);
+
+    if (projection === undefined) {
+      throw new PrivateAuthorizationProjectionNotFoundError();
+    }
 
     return projection;
   }
 
-  public async findProtectedMlsState(
-    scopeId: string,
-  ): Promise<string | undefined> {
-    const document = await this.database.findOne(
-      PrivateAuthorizationLocalNamespaces.mls,
-      scopeId,
-    );
-
-    return typeof document?.state === 'string' ? document.state : undefined;
+  public async hasProtectedMlsState(scopeId: string): Promise<boolean> {
+    return (await this.protectedMlsStateOf(scopeId)) !== undefined;
   }
 
-  public async findReceipt(
+  public async requireProtectedMlsState(scopeId: string): Promise<string> {
+    const state = await this.protectedMlsStateOf(scopeId);
+
+    if (state === undefined) {
+      throw new PrivateAuthorizationProtectedMlsStateNotFoundError();
+    }
+
+    return state;
+  }
+
+  public async hasReceipt(
     scopeId: string,
     operationId: string,
-  ): Promise<PrivateControlOperationPrimitives | undefined> {
-    const document = await this.database.findOne(
-      PrivateAuthorizationLocalNamespaces.receipts,
-      privateAuthorizationLocalId(scopeId, operationId),
-    );
-
-    if (!document || !this.isOperation(document)) return undefined;
-    const receipt = { ...document };
-    delete receipt._id;
-
-    return receipt as unknown as PrivateControlOperationPrimitives;
+  ): Promise<boolean> {
+    return (await this.receiptOf(scopeId, operationId)) !== undefined;
   }
 
-  public async findReservation(
+  public async requireReceipt(
+    scopeId: string,
+    operationId: string,
+  ): Promise<PrivateControlOperationPrimitives> {
+    const receipt = await this.receiptOf(scopeId, operationId);
+
+    if (receipt === undefined) {
+      throw new PrivateAuthorizationReceiptNotFoundError();
+    }
+
+    return receipt;
+  }
+
+  public async hasReservation(
     scopeId: string,
     parentHeadHash: string,
-  ): Promise<PrivateControlTransitionReservation | undefined> {
-    const document = await this.database.findOne(
-      PrivateAuthorizationLocalNamespaces.reservations,
-      privateAuthorizationLocalId(scopeId, parentHeadHash),
-    );
+  ): Promise<boolean> {
+    return (await this.reservationOf(scopeId, parentHeadHash)) !== undefined;
+  }
 
-    const reservation = this.reservationFrom(document);
+  public async requireReservation(
+    scopeId: string,
+    parentHeadHash: string,
+  ): Promise<PrivateControlTransitionReservation> {
+    const reservation = await this.reservationOf(scopeId, parentHeadHash);
 
-    if (!reservation) return undefined;
-    reservation.assertParent(scopeId, parentHeadHash);
+    if (reservation === undefined) {
+      throw new PrivateAuthorizationReservationNotFoundError();
+    }
 
     return reservation;
   }
 
-  public async findReservationAtRevision(
+  public async hasReservationAtRevision(
     scopeId: PrivateAuthorizationScopeId,
     revision: PrivateAuthorizationRevision,
-  ): Promise<PrivateControlTransitionReservation | undefined> {
-    const scope = scopeId.valueOf();
-    const prefix = `${scope}:`;
-    const documents = await this.database.find(
-      PrivateAuthorizationLocalNamespaces.reservations,
-      (document) => {
-        const checkpoint = document.parentCheckpoint as
-          Record<string, unknown> | undefined;
+  ): Promise<boolean> {
+    const reservation = await this.reservationAtRevisionOf(scopeId, revision);
 
-        return (
-          typeof document._id === 'string' &&
-          document._id.startsWith(prefix) &&
-          checkpoint?.revision === revision.valueOf()
-        );
-      },
-    );
+    return reservation !== undefined;
+  }
 
-    assert(documents.length <= 1, new InvalidPrivateAuthorizationError());
-    const reservation = this.reservationFrom(documents[0]);
+  public async requireReservationAtRevision(
+    scopeId: PrivateAuthorizationScopeId,
+    revision: PrivateAuthorizationRevision,
+  ): Promise<PrivateControlTransitionReservation> {
+    const reservation = await this.reservationAtRevisionOf(scopeId, revision);
 
-    if (!reservation) return undefined;
-    const parent = reservation.getParentCheckpoint();
-
-    assert(
-      parent.getScopeId().isEqual(scopeId) &&
-        parent.getRevision().isEqual(revision),
-      new InvalidPrivateAuthorizationError(),
-    );
+    if (reservation === undefined) {
+      throw new PrivateAuthorizationReservationNotFoundError();
+    }
 
     return reservation;
   }
 
-  public async findScope(
+  public async hasScope(scopeId: string): Promise<boolean> {
+    return (await this.scopeOf(scopeId)) !== undefined;
+  }
+
+  public async requireScope(
     scopeId: string,
-  ): Promise<PrivateAuthorizationScope | undefined> {
-    const document = await this.database.findOne(
-      PrivateAuthorizationLocalNamespaces.scopes,
-      scopeId,
-    );
+  ): Promise<PrivateAuthorizationScope> {
+    const scope = await this.scopeOf(scopeId);
 
-    if (!document) return undefined;
-    const pendingOperations = (await this.findPending(scopeId)).map((pending) =>
-      pending.toPrimitives(),
-    );
-
-    try {
-      return PrivateAuthorizationScope.fromPrimitives({
-        ...(document as unknown as PrivateAuthorizationScopePrimitives),
-        pendingOperations,
-      });
-    } catch {
-      throw new InvalidPrivateAuthorizationError();
+    if (scope === undefined) {
+      throw new PrivateAuthorizationScopeNotFoundError();
     }
+
+    return scope;
   }
 
   public async findScopeIds(): Promise<string[]> {
@@ -318,7 +431,7 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
     operation: PrivateControlOperation,
   ): Promise<void> {
     const primitives = operation.toPrimitives();
-    const existing = await this.findReceipt(scopeId, primitives.id);
+    const existing = await this.receiptOf(scopeId, primitives.id);
 
     if (existing && existing.digest !== primitives.digest) {
       throw new Error('Private authorization conflict');
@@ -341,7 +454,7 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
     authorDeviceKey: string,
     parentCheckpoint: PrivateAuthorizationCheckpoint,
   ): Promise<void> {
-    const existing = await this.findReservation(scopeId, parentHeadHash);
+    const existing = await this.reservationOf(scopeId, parentHeadHash);
     const candidate = PrivateControlTransitionReservation.fromPrimitives({
       authorDeviceKey,
       childHeadHash,

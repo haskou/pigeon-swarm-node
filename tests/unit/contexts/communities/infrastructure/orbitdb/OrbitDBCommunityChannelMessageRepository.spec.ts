@@ -17,7 +17,7 @@ const identityMother = new IdentityMother();
 const publicStorageGuard = () =>
   new PrivateCommunityPublicStorageGuard(
     {
-      findScope: jest.fn().mockResolvedValue(undefined),
+      hasScope: jest.fn().mockResolvedValue(false),
     } as never,
     new PrivateAuthorizationStorageCoordinator(),
   );
@@ -132,7 +132,7 @@ describe('OrbitDBCommunityChannelMessageRepository', () => {
       new OrbitDBCommunityChannelMessageMapper(),
       new PrivateCommunityPublicStorageGuard(
         {
-          findScope: jest.fn().mockResolvedValue({}),
+          hasScope: jest.fn().mockResolvedValue(true),
         } as never,
         new PrivateAuthorizationStorageCoordinator(),
       ),

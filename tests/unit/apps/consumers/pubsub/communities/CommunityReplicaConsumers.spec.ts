@@ -88,11 +88,12 @@ describe.each([
       registrar,
       repository,
     } = fixture();
-    repository.findById.mockResolvedValue(community);
+    repository.hasById.mockResolvedValue(true);
+    repository.requireById.mockResolvedValue(community);
 
     await consumer.handler(event);
 
-    expect(repository.findById).toHaveBeenCalledWith(community.getId());
+    expect(repository.requireById).toHaveBeenCalledWith(community.getId());
     expect(registrar[method]).toHaveBeenCalledWith(
       community,
       message,
@@ -103,7 +104,8 @@ describe.each([
 
   it('never writes the community document it validated against', async () => {
     const { community, consumer, event, repository } = fixture();
-    repository.findById.mockResolvedValue(community);
+    repository.hasById.mockResolvedValue(true);
+    repository.requireById.mockResolvedValue(community);
 
     await consumer.handler(event);
 
@@ -112,7 +114,7 @@ describe.each([
 
   it('ignores a message whose community has no signed operations locally', async () => {
     const { consumer, event, registrar, repository } = fixture();
-    repository.findById.mockResolvedValue(undefined);
+    repository.hasById.mockResolvedValue(false);
 
     await consumer.handler(event);
 
@@ -145,7 +147,8 @@ describe.each([
     };
     const folded = Community.fromPrimitives(snapshot);
     folded.kickMember(owner, author.id);
-    repository.findById.mockResolvedValue(folded);
+    repository.hasById.mockResolvedValue(true);
+    repository.requireById.mockResolvedValue(folded);
     const messages = mock<CommunityChannelMessageRepository>();
     const candidate: CommunityChannelMessageCandidate = {
       authorIdentityId: author.id.valueOf(),
@@ -161,7 +164,7 @@ describe.each([
       replyToMessageId: undefined,
       type: 'sent' as const,
     };
-    messages.findById.mockResolvedValue(
+    messages.requireById.mockResolvedValue(
       CommunityChannelMessage.fromPrimitives({
         ...candidate,
         editedAt: undefined,
@@ -196,7 +199,8 @@ describe.each([
 
   it('does not fall back to the snapshot when the local lookup fails', async () => {
     const { consumer, event, registrar, repository } = fixture();
-    repository.findById.mockRejectedValue(new Error('Storage unavailable'));
+    repository.hasById.mockResolvedValue(true);
+    repository.requireById.mockRejectedValue(new Error('Storage unavailable'));
 
     await expect(consumer.handler(event)).rejects.toThrow(
       'Storage unavailable',

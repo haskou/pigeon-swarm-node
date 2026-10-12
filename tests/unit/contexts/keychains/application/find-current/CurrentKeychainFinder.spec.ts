@@ -55,6 +55,7 @@ describe('CurrentKeychainFinder', () => {
 
     expect(result.getKeychain()).toEqual(keychain);
     expect(validator.isValidChainFor).not.toHaveBeenCalled();
-    expect(repository.findByExternalIdentifier).not.toHaveBeenCalled();
+    expect(repository.hasByExternalIdentifier).not.toHaveBeenCalled();
+    expect(repository.requireByExternalIdentifier).not.toHaveBeenCalled();
   });
 });

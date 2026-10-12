@@ -3,7 +3,6 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 import { CommunityModerationLogDetails } from '../../domain/entities/moderation/CommunityModerationLogDetails';
 import { CommunityModerationLogEntry } from '../../domain/entities/moderation/CommunityModerationLogEntry';
 import { CommunityModerationTarget } from '../../domain/entities/moderation/CommunityModerationTarget';
-import { CommunityChannelMessageNotFoundError } from '../../domain/errors/CommunityChannelMessageNotFoundError';
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import CommunityModerationLogRepository from '../../domain/repositories/CommunityModerationLogRepository';
 import { CommunityModerationAction } from '../../domain/value-objects/CommunityModerationAction';
@@ -23,15 +22,11 @@ export default class CommunityChannelMessageDeleter {
     message: CommunityChannelMessageDeleteMessage,
   ): Promise<void> {
     const community = await this.communityFinder.findById(message.communityId);
-    const targetMessage = await this.messageRepository.findById(
+    const targetMessage = await this.messageRepository.requireById(
       message.communityId,
       message.channelId,
       message.targetMessageId,
     );
-
-    if (!targetMessage) {
-      throw new CommunityChannelMessageNotFoundError();
-    }
 
     community.deleteChannelMessage(
       message.actorIdentityId,

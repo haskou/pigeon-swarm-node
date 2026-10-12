@@ -5,9 +5,11 @@ import { CallSignalDelivery } from '../CallSignalDelivery';
 import { CallSignalId } from '../value-objects/CallSignalId';
 
 export default abstract class CallSignalDeliveryRepository {
-  public abstract findById(
+  public abstract hasById(signalId: CallSignalId): Promise<boolean>;
+
+  public abstract requireById(
     signalId: CallSignalId,
-  ): Promise<CallSignalDelivery | undefined>;
+  ): Promise<CallSignalDelivery>;
 
   public abstract findRetryableOwnedBy(
     ownerNodeId: NodeId,

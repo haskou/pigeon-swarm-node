@@ -101,7 +101,7 @@ describe('OrbitDBConversationRepository', () => {
 
     await repository.save(conversation, proofsOf(conversation));
 
-    const found = await repository.findById(conversation.getId());
+    const found = await repository.requireById(conversation.getId());
     const latestMessages = await repository.findLatestMessages(
       conversation.getId(),
       10,
@@ -111,7 +111,7 @@ describe('OrbitDBConversationRepository', () => {
       10,
     );
 
-    expect(found?.toPrimitives().messages).toHaveLength(2);
+    expect(found.toPrimitives().messages).toHaveLength(2);
     expect(latestMessages.map((message) => message.toPrimitives())).toEqual([
       expect.objectContaining({
         encryptedPayload: 'first',

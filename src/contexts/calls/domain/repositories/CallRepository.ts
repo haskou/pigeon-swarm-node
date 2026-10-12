@@ -13,10 +13,15 @@ export default abstract class CallRepository {
     communityId: CommunityId,
   ): Promise<Call[]>;
 
-  public abstract findActiveByCommunityChannel(
+  public abstract hasActiveByCommunityChannel(
     communityId: CommunityId,
     channelId: CommunityChannelId,
-  ): Promise<Call | undefined>;
+  ): Promise<boolean>;
+
+  public abstract requireActiveByCommunityChannel(
+    communityId: CommunityId,
+    channelId: CommunityChannelId,
+  ): Promise<Call>;
 
   public abstract findActiveByParticipant(
     participantId: IdentityId,
@@ -31,7 +36,8 @@ export default abstract class CallRepository {
     conversationId: ConversationId,
   ): Promise<Call[]>;
 
-  public abstract findById(id: CallId): Promise<Call | undefined>;
+  public abstract hasById(id: CallId): Promise<boolean>;
+  public abstract requireById(id: CallId): Promise<Call>;
   public abstract findByParticipant(participantId: IdentityId): Promise<Call[]>;
 
   public abstract findTimedOutRingingCalls(

@@ -1,9 +1,7 @@
-import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
-import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
@@ -13,6 +11,7 @@ import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/Or
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Timestamp } from '@haskou/value-objects';
 
+import { PollNotFoundError } from '../../domain/errors/PollNotFoundError';
 import { Poll } from '../../domain/Poll';
 import PollRepository from '../../domain/repositories/PollRepository';
 import { PollId } from '../../domain/value-objects/PollId';
@@ -87,21 +86,14 @@ export default class OrbitDBPollRepository extends PollRepository {
   private async resolveNetworkId(poll: Poll): Promise<string> {
     return poll.getScope().match<Promise<string>>({
       communityChannel: async (communityId) => {
-        const community = await this.communityRepository.findById(communityId);
-
-        if (!community) {
-          throw new CommunityNotFoundError();
-        }
+        const community =
+          await this.communityRepository.requireById(communityId);
 
         return community.toPrimitives().networkId;
       },
       groupConversation: async (conversationId) => {
         const conversation =
-          await this.conversationRepository.findMetadataById(conversationId);
-
-        if (!conversation) {
-          throw new ConversationNotFoundError(conversationId);
-        }
+          await this.conversationRepository.requireMetadataById(conversationId);
 
         return conversation.toPrimitives().networkId;
       },
@@ -275,7 +267,7 @@ export default class OrbitDBPollRepository extends PollRepository {
     });
   }
 
-  public async findById(id: PollId): Promise<Poll | undefined> {
+  private async loadLocked(id: PollId): Promise<Poll | undefined> {
     const poll = await this.load(id.valueOf());
 
     if (!poll) return undefined;
@@ -285,6 +277,14 @@ export default class OrbitDBPollRepository extends PollRepository {
 
       return locked?.getScope().isEqual(poll.getScope()) ? locked : undefined;
     });
+  }
+
+  public async requireById(id: PollId): Promise<Poll> {
+    const poll = await this.loadLocked(id);
+
+    if (!poll) throw new PollNotFoundError();
+
+    return poll;
   }
 
   public findByCommunityChannel(

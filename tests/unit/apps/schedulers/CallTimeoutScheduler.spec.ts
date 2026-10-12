@@ -34,7 +34,7 @@ describe('CallTimeoutScheduler', () => {
       publish: jest.fn().mockResolvedValue(undefined),
     };
     const notificationRepository = {
-      findById: jest.fn().mockResolvedValue(undefined),
+      hasById: jest.fn().mockResolvedValue(false),
       saveMissedCall: jest.fn().mockResolvedValue(undefined),
     };
     const scheduler = new CallTimeoutScheduler(
@@ -70,7 +70,7 @@ describe('CallTimeoutScheduler', () => {
       publish: jest.fn().mockResolvedValue(undefined),
     };
     const notificationRepository = {
-      findById: jest.fn().mockResolvedValue(undefined),
+      hasById: jest.fn().mockResolvedValue(false),
       saveMissedCall: jest.fn().mockResolvedValue(undefined),
     };
     const scheduler = new CallTimeoutScheduler(

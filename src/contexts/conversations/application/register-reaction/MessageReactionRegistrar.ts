@@ -1,7 +1,6 @@
 import { assert } from '@haskou/value-objects';
 
 import { MessageReaction } from '../../domain/entities/messages/MessageReaction';
-import { ConversationNotFoundError } from '../../domain/errors/ConversationNotFoundError';
 import { ConversationParticipantNotFoundError } from '../../domain/errors/ConversationParticipantNotFoundError';
 import { MessageTargetNotFoundError } from '../../domain/errors/MessageTargetNotFoundError';
 import ConversationRepository from '../../domain/repositories/ConversationRepository';
@@ -15,13 +14,12 @@ export default class MessageReactionRegistrar {
   ) {}
 
   public async register(message: RegisterMessageReaction): Promise<void> {
-    const conversation = await this.conversationRepository.findMetadataById(
+    const conversation = await this.conversationRepository.requireMetadataById(
       message.conversationId,
     );
 
-    assert(conversation, new ConversationNotFoundError(message.conversationId));
     assert(
-      conversation?.hasParticipant(message.authorId),
+      conversation.hasParticipant(message.authorId),
       new ConversationParticipantNotFoundError(),
     );
     assert(

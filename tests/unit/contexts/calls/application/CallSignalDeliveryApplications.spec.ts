@@ -66,7 +66,7 @@ describe('Call signal delivery applications', () => {
     await registrar.register(registerMessage());
 
     await expect(
-      repository.findById(new CallSignalId(signalId)),
+      repository.requireById(new CallSignalId(signalId)),
     ).resolves.toBeDefined();
   });
 
@@ -83,9 +83,8 @@ describe('Call signal delivery applications', () => {
     );
 
     expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
-    expect(
-      (await repository.findById(new CallSignalId(signalId)))?.isAcknowledged(),
-    ).toBe(true);
+    const stored = await repository.requireById(new CallSignalId(signalId));
+    expect(stored.isAcknowledged()).toBe(true);
   });
 
   it('republishes an acknowledgement when the recipient repeats it', async () => {
@@ -129,9 +128,8 @@ describe('Call signal delivery applications', () => {
       ),
     );
 
-    expect(
-      (await repository.findById(new CallSignalId(signalId)))?.isAcknowledged(),
-    ).toBe(true);
+    const stored = await repository.requireById(new CallSignalId(signalId));
+    expect(stored.isAcknowledged()).toBe(true);
   });
 
   it('retries only deliveries owned by the local node', async () => {
@@ -150,10 +148,8 @@ describe('Call signal delivery applications', () => {
     ).retry(new Timestamp(1_770_000_001_000));
 
     expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
-    expect(
-      (await repository.findById(new CallSignalId(signalId)))?.toPrimitives()
-        .attempt,
-    ).toBe(2);
+    const stored = await repository.requireById(new CallSignalId(signalId));
+    expect(stored.toPrimitives().attempt).toBe(2);
   });
 
   it('purges expired deliveries', async () => {
@@ -166,8 +162,8 @@ describe('Call signal delivery applications', () => {
     );
 
     await expect(
-      repository.findById(new CallSignalId(signalId)),
-    ).resolves.toBeUndefined();
+      repository.hasById(new CallSignalId(signalId)),
+    ).resolves.toBe(false);
   });
 
   it('creates and publishes a pending delivery when sending', async () => {
@@ -185,7 +181,7 @@ describe('Call signal delivery applications', () => {
       ...callStartArgs(),
     );
 
-    callRepository.findById.mockResolvedValue(call);
+    callRepository.requireById.mockResolvedValue(call);
     nodeRepository.loadLocalNodeId.mockResolvedValue(new NodeId(ownerNodeId));
     const sender = new CallSignalSender(
       callRepository,
@@ -208,7 +204,7 @@ describe('Call signal delivery applications', () => {
     expect(delivery.getId()).toBeInstanceOf(CallSignalId);
     expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
     await expect(
-      deliveryRepository.findById(delivery.getId()),
+      deliveryRepository.requireById(delivery.getId()),
     ).resolves.toBeDefined();
   });
 });

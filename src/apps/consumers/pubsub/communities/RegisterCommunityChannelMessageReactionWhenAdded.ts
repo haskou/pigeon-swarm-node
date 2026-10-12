@@ -59,13 +59,14 @@ export default class RegisterCommunityReactionWhenAdded extends Consumer {
       return;
     }
 
-    const community = await this.communityRepository.findById(
-      new CommunityId(communityAttributes.id),
-    );
+    const eventCommunityId = new CommunityId(communityAttributes.id);
 
-    if (!community) {
+    if (!(await this.communityRepository.hasById(eventCommunityId))) {
       return;
     }
+
+    const community =
+      await this.communityRepository.requireById(eventCommunityId);
 
     const communityId = new CommunityId(event.attributes.communityId);
     const channelId = new CommunityChannelId(event.attributes.channelId);
@@ -77,7 +78,7 @@ export default class RegisterCommunityReactionWhenAdded extends Consumer {
     }
 
     assert(
-      await this.messageRepository.findById(communityId, channelId, messageId),
+      await this.messageRepository.hasById(communityId, channelId, messageId),
       new CommunityChannelMessageNotFoundError(),
     );
     const reaction = community.reactWithSticker(

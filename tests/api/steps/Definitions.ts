@@ -1298,15 +1298,19 @@ export default class Definitions {
     const networkId = String(this.currentNetworkId);
 
     if (body.scopeType === 'conversation') {
-      const conversation = await Kernel.di
-        .getService<ConversationRepository>(ConversationRepository)
-        .findMetadataById(new ConversationId(String(body.conversationId)));
+      const conversationId = new ConversationId(String(body.conversationId));
+      const conversations = Kernel.di.getService<ConversationRepository>(
+        ConversationRepository,
+      );
+      const participantIds = (await conversations.hasById(conversationId))
+        ? (
+            await conversations.requireMetadataById(conversationId)
+          ).getParticipantIds()
+        : [];
       const signed = signCallStart({
         networkId,
         nonce,
-        participantIds: (conversation?.getParticipantIds() ?? [])
-          .map((id) => id.valueOf())
-          .sort(),
+        participantIds: participantIds.map((id) => id.valueOf()).sort(),
         scope: {
           conversationId: String(body.conversationId),
           type: 'conversation',
@@ -1738,11 +1742,11 @@ export default class Definitions {
       PrivateAuthorizationRepository,
     );
 
-    expect(await repository.findScope(scopeId)).not.to.equal(undefined);
-    expect(await repository.findProjection(scopeId)).to.containSubset({
+    expect(await repository.hasScope(scopeId)).to.equal(true);
+    expect(await repository.requireProjection(scopeId)).to.containSubset({
       id: scopeId,
     });
-    expect(await repository.findProtectedMlsState(scopeId)).to.equal(
+    expect(await repository.requireProtectedMlsState(scopeId)).to.equal(
       Buffer.from('private-genesis-state').toString('base64url'),
     );
   }

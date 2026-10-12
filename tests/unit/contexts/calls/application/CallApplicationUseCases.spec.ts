@@ -78,7 +78,7 @@ describe('Call application use cases', () => {
       CallScope.conversation(new ConversationId('conversation')),
     );
 
-    repository.findById.mockResolvedValue(call);
+    repository.requireById.mockResolvedValue(call);
     call.hasParticipant.mockReturnValue(true);
 
     await expect(
@@ -95,7 +95,7 @@ describe('Call application use cases', () => {
       CallScope.conversation(new ConversationId('conversation')),
     );
 
-    repository.findById.mockResolvedValue(call);
+    repository.requireById.mockResolvedValue(call);
     call.hasParticipant.mockReturnValue(false);
 
     await expect(
@@ -112,7 +112,7 @@ describe('Call application use cases', () => {
     call.getScope.mockReturnValue(
       CallScope.conversation(new ConversationId('conversation')),
     );
-    repository.findById.mockResolvedValue(call);
+    repository.requireById.mockResolvedValue(call);
     repository.findActiveByParticipant.mockResolvedValue([call]);
     repository.findByParticipant.mockResolvedValue([call]);
     call.hasParticipant.mockReturnValue(true);
@@ -176,7 +176,7 @@ describe('Call application use cases', () => {
     );
     const events = [mock<DomainEvent>()];
 
-    repository.findById.mockResolvedValue(call);
+    repository.requireById.mockResolvedValue(call);
     call.pullDomainEvents.mockReturnValue(events);
 
     await expect(
@@ -204,7 +204,7 @@ describe('Call application use cases', () => {
     );
     const lease = mock<CallParticipantLease>();
 
-    repository.findById.mockResolvedValue(call);
+    repository.requireById.mockResolvedValue(call);
     call.pullDomainEvents.mockReturnValue([]);
     lease.pullDomainEvents.mockReturnValue([]);
     leaseRenewer.renew.mockResolvedValue(lease);
@@ -240,7 +240,7 @@ describe('Call application use cases', () => {
     );
     const lease = mock<CallParticipantLease>();
 
-    repository.findById.mockResolvedValue(call);
+    repository.requireById.mockResolvedValue(call);
     call.pullDomainEvents.mockReturnValue([]);
     lease.pullDomainEvents.mockReturnValue([]);
     leaseReleaser.release.mockResolvedValue([lease]);
@@ -330,7 +330,7 @@ describe('Call application use cases', () => {
   ])('%s rejects a missing call', async (_name, run) => {
     const repository = mock<CallRepository>();
 
-    repository.findById.mockResolvedValue(undefined);
+    repository.requireById.mockRejectedValue(new CallNotFoundError());
 
     await expect(run(repository)).rejects.toBeInstanceOf(CallNotFoundError);
     expect(repository.saveStart).not.toHaveBeenCalled();

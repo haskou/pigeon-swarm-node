@@ -3,6 +3,7 @@ import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/Publ
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
+import { NotificationNotFoundError } from '../../domain/errors/NotificationNotFoundError';
 import { Notification } from '../../domain/Notification';
 import NotificationRepository from '../../domain/repositories/NotificationRepository';
 import { NotificationId } from '../../domain/value-objects/NotificationId';
@@ -81,15 +82,27 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
     );
   }
 
-  public async findById(
+  private async invitationOf(
     notificationId: NotificationId,
-  ): Promise<Notification | undefined> {
+  ): Promise<Record<string, unknown> | undefined> {
     const [invitation] = await this.query(
       'notification_invitation',
       (document) => document.id === notificationId.valueOf(),
     );
 
-    if (!invitation) return undefined;
+    return invitation;
+  }
+
+  public async hasById(notificationId: NotificationId): Promise<boolean> {
+    return (await this.invitationOf(notificationId)) !== undefined;
+  }
+
+  public async requireById(
+    notificationId: NotificationId,
+  ): Promise<Notification> {
+    const invitation = await this.invitationOf(notificationId);
+
+    if (!invitation) throw new NotificationNotFoundError();
 
     return this.mapper.toDomain(
       this.payloadOf<OrbitDBNotificationInvitationDocument>(invitation),

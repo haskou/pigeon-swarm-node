@@ -355,7 +355,7 @@ async function main(): Promise<void> {
   await honest.conversations!.saveOperation(genesis.operation, genesis.proof);
   await until('group reached every node', async () => {
     for (const replica of nodes)
-      if (!(await replica.conversations!.findMetadataById(group))) return false;
+      if (!(await replica.conversations!.hasById(group))) return false;
 
     return true;
   });
@@ -382,7 +382,7 @@ async function main(): Promise<void> {
   await honest.repository!.saveInvitation(invitation, signed.proof);
   await until('invitation reached every node', async () => {
     for (const replica of nodes)
-      if (!(await replica.repository!.findById(new NotificationId(id))))
+      if (!(await replica.repository!.hasById(new NotificationId(id))))
         return false;
 
     return true;
@@ -398,9 +398,15 @@ async function main(): Promise<void> {
     stateNotification(invitation, 'accepted', true),
     accepted.proof,
   );
-  const stateOf = async (replica: Replica): Promise<string | undefined> =>
-    (await replica.repository!.findById(new NotificationId(id)))?.toPrimitives()
-      .state;
+  const stateOf = async (replica: Replica): Promise<string | undefined> => {
+    const notificationId = new NotificationId(id);
+
+    if (!(await replica.repository!.hasById(notificationId))) return undefined;
+
+    const notification = await replica.repository!.requireById(notificationId);
+
+    return notification.toPrimitives().state;
+  };
 
   await until('accepted state reached every node', async () => {
     for (const replica of nodes)
@@ -544,8 +550,8 @@ async function main(): Promise<void> {
     );
     for (const record of ids.filter((value) => value.startsWith('invitation:')))
       assert.equal(
-        await replica.repository!.findById(new NotificationId(record)),
-        undefined,
+        await replica.repository!.hasById(new NotificationId(record)),
+        false,
         `${record} must not be admitted`,
       );
     for (const other of [bob, outsider, mallory])
@@ -669,8 +675,8 @@ async function main(): Promise<void> {
   );
   for (const hidden of overQuota)
     assert.equal(
-      await honest.repository!.findById(new NotificationId(hidden)),
-      undefined,
+      await honest.repository!.hasById(new NotificationId(hidden)),
+      false,
       `${hidden} is over the inviter quota and must not be admitted`,
     );
   assert.deepEqual(
@@ -733,7 +739,7 @@ async function main(): Promise<void> {
     );
   await until('alice invitations reached the honest node', async () => {
     for (const value of invited)
-      if (!(await honest.repository!.findById(new NotificationId(value.id))))
+      if (!(await honest.repository!.hasById(new NotificationId(value.id))))
         return false;
 
     return true;
@@ -776,7 +782,7 @@ async function main(): Promise<void> {
       : 'pending';
     const stateOn = async (replica: Replica): Promise<string | undefined> =>
       (
-        await replica.repository!.findById(new NotificationId(value.id))
+        await replica.repository!.requireById(new NotificationId(value.id))
       )?.toPrimitives().state;
 
     assert.equal(
