@@ -124,13 +124,14 @@ Checks, in order:
 
 1. Freshness and device proof against the current head. Failure: `401`.
 2. Replay guard on the request signature. Failure: `401`.
-3. Body shape, limits: `generation` integer ≥ 1; `entries` 1..128;
-   `sealedSecret` 1..4096 characters from `[A-Za-z0-9+/=.-]`; `signature` a
-   non-empty string. Failure: `400`.
+3. Body shape, limits: `generation` integer ≥ 1; `entries` 1..128; no duplicate
+   `recipientCredential`; `sealedSecret` 1..4096 characters from
+   `[A-Za-z0-9+/=.-]`; `signature` a non-empty string. Failure: `400`
+   (`InvalidDeviceSealedSecretBundleError`).
 4. `authorizationRevision` equals the head revision. Failure: `409`
    (`DeviceSealedSecretRevisionMismatchError`).
 5. Recipients are exactly the head's authorized credentials: none missing, none
-   revoked or unknown, no duplicates. Failure: `409`
+   revoked or unknown. Failure: `409`
    (`DeviceSealedSecretRecipientsMismatchError`).
 6. Every entry signature verifies under the publisher credential. Failure:
    `409` (`InvalidDeviceSealedSecretSignatureError`).

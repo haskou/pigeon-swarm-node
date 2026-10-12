@@ -217,9 +217,14 @@ export default class PigeonApplication {
     this.kernel.loadEnvironmentVariables(environment);
   }
 
-  public async dependencyInjection(): Promise<void> {
+  public async dependencyInjection(
+    options: { containerBuild?: boolean; servicesYamlPath?: string } = {},
+  ): Promise<void> {
     await this.kernel.dependencyInjection({
-      containerBuild: this.resolveContainerBuild(),
+      containerBuild: options.containerBuild ?? this.resolveContainerBuild(),
+      ...(options.servicesYamlPath
+        ? { servicesYamlPath: options.servicesYamlPath }
+        : {}),
       overrides: [
         {
           token: CallSignalDeliveryRepository,

@@ -10,7 +10,7 @@ import { DomainEvent } from '@haskou/ddd-kernel/domain';
 // the event proceeds. The keychain is recorded when the replicated document is
 // projected into the metadata index, or on a later lookup that finds a routing
 // record. The event is not retried.
-export default async function findPublishedKeychain(
+export async function findPublishedKeychain(
   finder: CurrentKeychainFinder,
   event: DomainEvent,
 ): Promise<void> {

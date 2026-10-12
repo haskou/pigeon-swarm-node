@@ -1896,6 +1896,23 @@ export default class Definitions {
     });
   }
 
+  @given('I set a duplicate recipient sealed secret bundle body')
+  public async iSetADuplicateRecipientSealedSecretBundleBody(): Promise<void> {
+    const device = await this.ensureIdentityDeviceOwnerKeyPair();
+    const entry = {
+      recipientCredential: new IdentityId(
+        device.toPrimitives().publicKey,
+      ).valueOf(),
+      sealedSecret: 'c2VhbGVk',
+      signature: 'unsigned-signature',
+    };
+    this.body = JSON.stringify({
+      authorizationRevision: 0,
+      entries: [entry, entry],
+      generation: 1,
+    });
+  }
+
   @given('I sign the current sealed secret delivery request')
   public async iSignTheCurrentSealedSecretDeliveryRequest(): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;
@@ -1905,6 +1922,27 @@ export default class Definitions {
     const timestamp = this.headers['x-timestamp'] as string;
     const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
       'GET',
+      path,
+      timestamp,
+      this.getCurrentRequestBody(),
+    );
+    const device = await this.ensureIdentityDeviceOwnerKeyPair();
+    this.headers['x-device-credential'] = new IdentityId(
+      device.toPrimitives().publicKey,
+    ).valueOf();
+    this.headers['x-device-signature'] = device
+      .sign(JSON.stringify(payload))
+      .valueOf();
+  }
+
+  @given('I sign the current sealed secret bundle request')
+  public async iSignTheCurrentSealedSecretBundleRequest(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}/sealed-secrets`;
+    await this.signCurrentRequest('PUT', path);
+    const timestamp = this.headers['x-timestamp'] as string;
+    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
+      'PUT',
       path,
       timestamp,
       this.getCurrentRequestBody(),
