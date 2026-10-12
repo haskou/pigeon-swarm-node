@@ -8,6 +8,11 @@ import { UniqueObjectArray, assert } from '@haskou/value-objects';
 import { DeviceAuthorizationPrimitives } from './DeviceAuthorizationPrimitives';
 import { MAX_DEVICE_CREDENTIALS } from './DeviceCredentialLimits';
 import { InvalidDeviceAuthorizationTransitionError } from './errors/InvalidDeviceAuthorizationTransitionError';
+import { DeviceAuthorizationEventAttributes } from './events/DeviceAuthorizationEventAttributes';
+import { DeviceAuthorizationWasRecoveredEvent } from './events/DeviceAuthorizationWasRecoveredEvent';
+import { DeviceCredentialWasCompromisedEvent } from './events/DeviceCredentialWasCompromisedEvent';
+import { DeviceCredentialWasEnrolledEvent } from './events/DeviceCredentialWasEnrolledEvent';
+import { DeviceCredentialWasRevokedEvent } from './events/DeviceCredentialWasRevokedEvent';
 import { DeviceAuthorizationEpoch } from './value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
 
@@ -107,13 +112,21 @@ export class DeviceAuthorization extends AggregateRoot {
     return this.revision.isEqual(revision);
   }
 
+  private eventAttributes(): DeviceAuthorizationEventAttributes {
+    return {
+      epoch: this.epoch.valueOf(),
+      identityId: this.identityId.valueOf(),
+      revision: this.revision.valueOf(),
+    };
+  }
+
   public enroll(credential: DeviceCredential): DeviceAuthorization {
     assert(
       !this.isAuthorized(credential),
       new InvalidDeviceAuthorizationTransitionError(),
     );
 
-    return new DeviceAuthorization(
+    const next = new DeviceAuthorization(
       this.identityId,
       this.networkIds,
       this.recoveryAuthority,
@@ -121,6 +134,14 @@ export class DeviceAuthorization extends AggregateRoot {
       this.epoch,
       UniqueObjectArray.fromArray([...this.credentials.toArray(), credential]),
     );
+    next.record(
+      new DeviceCredentialWasEnrolledEvent(
+        this.identityId.valueOf(),
+        next.eventAttributes(),
+      ),
+    );
+
+    return next;
   }
 
   public enrollConcurrently(
@@ -142,7 +163,7 @@ export class DeviceAuthorization extends AggregateRoot {
       new InvalidDeviceAuthorizationTransitionError(),
     );
 
-    return new DeviceAuthorization(
+    const next = new DeviceAuthorization(
       this.identityId,
       this.networkIds,
       this.recoveryAuthority,
@@ -153,15 +174,26 @@ export class DeviceAuthorization extends AggregateRoot {
         ...newCredentials,
       ]),
     );
+    next.record(
+      new DeviceCredentialWasEnrolledEvent(
+        this.identityId.valueOf(),
+        next.eventAttributes(),
+      ),
+    );
+
+    return next;
   }
 
-  public revoke(credential: DeviceCredential): DeviceAuthorization {
+  public revoke(
+    credential: DeviceCredential,
+    compromisedSince?: DeviceAuthorizationRevision,
+  ): DeviceAuthorization {
     assert(
       this.isAuthorized(credential) && this.credentials.length > 1,
       new InvalidDeviceAuthorizationTransitionError(),
     );
 
-    return new DeviceAuthorization(
+    const next = new DeviceAuthorization(
       this.identityId,
       this.networkIds,
       this.recoveryAuthority,
@@ -173,6 +205,22 @@ export class DeviceAuthorization extends AggregateRoot {
           .filter((authorized) => !authorized.isEqual(credential)),
       ),
     );
+    next.record(
+      new DeviceCredentialWasRevokedEvent(
+        this.identityId.valueOf(),
+        next.eventAttributes(),
+      ),
+    );
+    if (compromisedSince !== undefined) {
+      next.record(
+        new DeviceCredentialWasCompromisedEvent(this.identityId.valueOf(), {
+          ...next.eventAttributes(),
+          compromisedSince: compromisedSince.valueOf(),
+        }),
+      );
+    }
+
+    return next;
   }
 
   public revokeConcurrently(
@@ -203,7 +251,7 @@ export class DeviceAuthorization extends AggregateRoot {
               )[0],
           ];
 
-    return new DeviceAuthorization(
+    const next = new DeviceAuthorization(
       this.identityId,
       this.networkIds,
       this.recoveryAuthority,
@@ -211,13 +259,21 @@ export class DeviceAuthorization extends AggregateRoot {
       this.epoch,
       UniqueObjectArray.fromArray(survivors),
     );
+    next.record(
+      new DeviceCredentialWasRevokedEvent(
+        this.identityId.valueOf(),
+        next.eventAttributes(),
+      ),
+    );
+
+    return next;
   }
 
   public recover(
     credential: DeviceCredential,
     epoch: DeviceAuthorizationEpoch,
   ): DeviceAuthorization {
-    return new DeviceAuthorization(
+    const next = new DeviceAuthorization(
       this.identityId,
       this.networkIds,
       this.recoveryAuthority,
@@ -225,6 +281,14 @@ export class DeviceAuthorization extends AggregateRoot {
       epoch,
       UniqueObjectArray.fromArray([credential]),
     );
+    next.record(
+      new DeviceAuthorizationWasRecoveredEvent(
+        this.identityId.valueOf(),
+        next.eventAttributes(),
+      ),
+    );
+
+    return next;
   }
 
   public recoverAt(
@@ -237,7 +301,7 @@ export class DeviceAuthorization extends AggregateRoot {
       new InvalidDeviceAuthorizationTransitionError(),
     );
 
-    return new DeviceAuthorization(
+    const next = new DeviceAuthorization(
       this.identityId,
       this.networkIds,
       this.recoveryAuthority,
@@ -245,6 +309,14 @@ export class DeviceAuthorization extends AggregateRoot {
       epoch,
       UniqueObjectArray.fromArray([credential]),
     );
+    next.record(
+      new DeviceAuthorizationWasRecoveredEvent(
+        this.identityId.valueOf(),
+        next.eventAttributes(),
+      ),
+    );
+
+    return next;
   }
 
   public requireRecoveryAt(
