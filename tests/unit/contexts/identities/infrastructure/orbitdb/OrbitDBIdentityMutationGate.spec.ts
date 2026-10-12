@@ -1,4 +1,5 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import IdentityRecordAdmissionDomainService from '@app/contexts/identities/domain/services/IdentityRecordAdmissionDomainService';
 import IpfsIdentityMapper from '@app/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import { OrbitDBIdentityMutationGate } from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMutationGate';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
@@ -183,7 +184,9 @@ describe('OrbitDBIdentityMutationGate', () => {
     await expect(
       gate.accepts('identities', {
         ...record,
-        handle: 'x'.repeat(OrbitDBIdentityMutationGate.MAX_RECORD_BYTES),
+        handle: 'x'.repeat(
+          IdentityRecordAdmissionDomainService.MAX_RECORD_BYTES,
+        ),
       }),
     ).resolves.toBe(false);
   });
@@ -191,7 +194,7 @@ describe('OrbitDBIdentityMutationGate', () => {
   it('should reject an identity with too many networks', async () => {
     const signer = await SignedIdentityMother.create();
     const networks = Array.from(
-      { length: OrbitDBIdentityMutationGate.MAX_NETWORKS + 1 },
+      { length: IdentityRecordAdmissionDomainService.MAX_NETWORKS + 1 },
       (_, index) =>
         `550e8400-e29b-41d4-a716-${String(index).padStart(12, '0')}`,
     );
