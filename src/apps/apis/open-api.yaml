@@ -123,6 +123,8 @@ paths:
         nudge: clients must GET the mailbox envelopes to read data, and that
         GET response is the source of truth. There is no subscription ack and
         no unsubscribe message; closing the socket ends its subscriptions.
+        Revoking the reader that authorised a subscription, or deleting the
+        mailbox (including by retention), ends it at once; the socket stays open.
         A socket holds at most 256 mailbox subscriptions.
 
         Clients may also send ephemeral typing indicators. Conversation typing:
