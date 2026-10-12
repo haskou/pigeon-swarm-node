@@ -37,7 +37,7 @@ export default class MarkMessagesReadWhenAnnounced extends Consumer {
     const readProof = event.attributes.readProof;
 
     if (
-      !MessageReadProof.isAuthentic(readProof, {
+      !MessageReadProof.isReceivable(readProof, {
         conversationId,
         messageId,
         readerIdentityId,

@@ -145,4 +145,66 @@ describe('MessageReadProof', () => {
       false,
     );
   });
+
+  describe('isReceivable', () => {
+    const now = Date.UTC(2026, 5, 10, 12);
+    const day = 24 * 60 * 60 * 1000;
+
+    it('accepts a receipt signed inside the freshness window so late offline delivery still works', async () => {
+      const reader = await KeyPair.generate();
+      const proof = await signedReadReceipt({
+        conversationId,
+        keyPair: reader,
+        messageId,
+        timestamp: now - 13 * day,
+      });
+
+      expect(MessageReadProof.isReceivable(proof, claimFor(reader), now)).toBe(
+        true,
+      );
+    });
+
+    it('rejects an authentic receipt signed before the freshness window', async () => {
+      const reader = await KeyPair.generate();
+      const proof = await signedReadReceipt({
+        conversationId,
+        keyPair: reader,
+        messageId,
+        timestamp: now - MessageReadProof.MAX_AGE_MS - 1,
+      });
+
+      expect(MessageReadProof.isAuthentic(proof, claimFor(reader))).toBe(true);
+      expect(MessageReadProof.isReceivable(proof, claimFor(reader), now)).toBe(
+        false,
+      );
+    });
+
+    it('accepts a receipt dated at most the clock skew ahead of now', async () => {
+      const reader = await KeyPair.generate();
+      const proof = await signedReadReceipt({
+        conversationId,
+        keyPair: reader,
+        messageId,
+        timestamp: now + MessageReadProof.MAX_FUTURE_SKEW_MS,
+      });
+
+      expect(MessageReadProof.isReceivable(proof, claimFor(reader), now)).toBe(
+        true,
+      );
+    });
+
+    it('rejects a receipt dated beyond the clock skew ahead of now', async () => {
+      const reader = await KeyPair.generate();
+      const proof = await signedReadReceipt({
+        conversationId,
+        keyPair: reader,
+        messageId,
+        timestamp: now + MessageReadProof.MAX_FUTURE_SKEW_MS + 1,
+      });
+
+      expect(MessageReadProof.isReceivable(proof, claimFor(reader), now)).toBe(
+        false,
+      );
+    });
+  });
 });

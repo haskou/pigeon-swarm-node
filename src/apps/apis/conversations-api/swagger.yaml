@@ -249,7 +249,7 @@ paths:
       tags:
         - conversations
       summary: Mark conversation messages as read up to a message
-      description: Moves the reader's read marker forward to the given message id and deletes local unread flags up to and including it, then publishes a read event so other nodes can apply the same projection update. A marker never moves backwards: an id older than the stored marker is rejected with 409 and nothing is published. The signed request is kept as the event's `readProof`; receivers act on the event only after the proof verifies.
+      description: Moves the reader's read marker forward to the given message id and deletes local unread flags up to and including it, then publishes a read event so other nodes can apply the same projection update. A marker never moves backwards. An id older than the stored marker is rejected with 409 and nothing is published. The signed request is kept as the event's `readProof`; receivers act on the event only after the proof verifies and while its timestamp is at most 14 days old and at most 30 seconds ahead of their clock.
       parameters:
         - $ref: '#/components/parameters/ConversationId'
         - $ref: '#/components/parameters/XIdentityId'

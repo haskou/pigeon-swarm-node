@@ -19,7 +19,10 @@ export type MessageReadClaim = {
 /**
  * Proves a read receipt was signed by the reader's identity key for this exact
  * conversation and message. Receipts without a valid proof are not authentic
- * and must neither change read state nor reach clients.
+ * and must neither change read state nor reach clients. Authentic receipts are
+ * only receivable inside a freshness window, which stops a captured receipt
+ * from being replayed indefinitely. Late offline delivery inside the window
+ * still works.
  *
  * The signed path is `request.path`, so it carries any configured
  * `ROUTE_PREFIX` before `/conversations`.
@@ -31,6 +34,11 @@ export type MessageReadClaim = {
 export class MessageReadProof {
   private static readonly READ_UNTIL_PATH =
     /^(?:\/[^/]+)*\/conversations\/([^/]+)\/messages\/read-until$/;
+
+  /** Oldest receipt age still applied. Matches the mailbox retention default. */
+  public static readonly MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+  /** Largest lead over this node's clock still applied. Matches the HTTP replay guard. */
+  public static readonly MAX_FUTURE_SKEW_MS = 30_000;
 
   private static hasShape(value: unknown): value is MessageReadProofData {
     if (typeof value !== 'object' || value === null) {
@@ -47,6 +55,13 @@ export class MessageReadProof {
       typeof candidate.path === 'string' &&
       typeof candidate.signature === 'string' &&
       Number.isInteger(candidate.timestamp)
+    );
+  }
+
+  private static isFresh(timestamp: number, now = Date.now()): boolean {
+    return (
+      timestamp >= now - MessageReadProof.MAX_AGE_MS &&
+      timestamp <= now + MessageReadProof.MAX_FUTURE_SKEW_MS
     );
   }
 
@@ -87,5 +102,16 @@ export class MessageReadProof {
     } catch {
       return false;
     }
+  }
+
+  public static isReceivable(
+    value: unknown,
+    claim: MessageReadClaim,
+    now = Date.now(),
+  ): value is MessageReadProofData {
+    return (
+      MessageReadProof.isAuthentic(value, claim) &&
+      MessageReadProof.isFresh(value.timestamp, now)
+    );
   }
 }
