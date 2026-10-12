@@ -1723,16 +1723,26 @@ reads, are not written to OrbitDB/IPFS, and reset when the node restarts.
 
 Who can see presence:
 
-- Over HTTP, a signed viewer reads another identity's presence only when they
-  share a conversation or community with it that this node knows about.
-  Otherwise the identity reads as `disconnected` with no custom message.
-  Invisible identities read as `disconnected` to everyone except themselves.
+- Over HTTP, a signed viewer reads another identity's presence in full only
+  when they share a conversation or community with it that this node knows
+  about. At most 500 of the viewer's conversations are checked. Otherwise the
+  response carries only `identityId`, `status: disconnected` and `updatedAt`,
+  with no custom message, `lastActivityAt` or `lastHeartbeatAt`. An identity
+  with `invisible` status reads the same way to everyone except itself.
 - Over WebSocket, presence events are delivered only to the connections of the
-  identity they describe.
-- Presence updates, including the custom message, are gossiped on each network
-  the identity belongs to. Nodes subscribed to that network keep them and serve
-  them to their own clients, so a custom message is visible beyond this node.
-  Do not put private text in it.
+  identity they describe. Related identities do not receive them.
+- Presence gossip reaches a wider audience than HTTP visibility. Each update,
+  including the custom message, is published to each of the identity's networks
+  that this node is configured with (every configured network when the identity
+  has none). Every node subscribed to those networks stores the update, including
+  nodes that share no conversation or community with the identity, so unrelated
+  nodes receive it. Those nodes apply the HTTP rules above when they serve it.
+  Do not put private text in a custom message.
+- Narrowing gossip to related identities would need per-scope gossip topics.
+  Gossipsub subscriptions are not authenticated, so such a topic limits only
+  honest nodes, and nodes would have to subscribe and unsubscribe as membership
+  changes. That design depends on haskou/pigeon-swarm#30; see
+  `docs/privacy/ADR-001-private-data.md` in that repository.
 
 Statuses:
 
