@@ -1,12 +1,18 @@
 import { MailboxAppendRateLimitedError } from './errors/MailboxAppendRateLimitedError';
 import { MailboxFullError } from './errors/MailboxFullError';
+import { MailboxLastReaderError } from './errors/MailboxLastReaderError';
+import { MailboxReaderLimitReachedError } from './errors/MailboxReaderLimitReachedError';
+import { MailboxReaderNotFoundError } from './errors/MailboxReaderNotFoundError';
 import { MailboxCapability } from './MailboxCapability';
 import MailboxPolicy from './MailboxPolicy';
-import { MailboxPrimitives } from './MailboxPrimitives';
+import {
+  MailboxPrimitives,
+  MailboxReaderPrimitives,
+} from './MailboxPrimitives';
 
 /**
  * Queue owned by one receiving relationship direction. It stores no identity,
- * conversation or participant: only two capability hashes and counters.
+ * conversation or participant: only capability hashes, reader acknowledgements and counters.
  */
 export class Mailbox {
   public static create(params: {
@@ -27,12 +33,15 @@ export class Mailbox {
       lastReadAt: params.now,
       nextCursor: params.firstCursor,
       postTokenHash: params.postTokenHash,
-      readTokenHash: params.readTokenHash,
+      readers: [{ ackedCursor: 0, readTokenHash: params.readTokenHash }],
     });
   }
 
   public static fromPrimitives(primitives: MailboxPrimitives): Mailbox {
-    return new Mailbox({ ...primitives });
+    return new Mailbox({
+      ...primitives,
+      readers: primitives.readers.map((reader) => ({ ...reader })),
+    });
   }
 
   private constructor(private primitives: MailboxPrimitives) {}
@@ -42,7 +51,45 @@ export class Mailbox {
   }
 
   public acceptsRead(token: string): boolean {
-    return MailboxCapability.matches(token, this.primitives.readTokenHash);
+    return this.readerFor(token) !== undefined;
+  }
+
+  /**
+   * Records that the reader holding `token` has processed everything up to
+   * `upTo`. The cursor only moves forward and never past the newest envelope.
+   * Returns false when no reader holds the token.
+   */
+  public acknowledge(token: string, upTo: number): boolean {
+    const reader = this.readerFor(token);
+
+    if (!reader) {
+      return false;
+    }
+
+    reader.ackedCursor = Math.max(
+      reader.ackedCursor,
+      Math.min(upTo, this.highestCursor()),
+    );
+
+    return true;
+  }
+
+  /**
+   * Adds a reader with nothing acknowledged, so it receives the retained
+   * backlog. Returns false when the hash already belongs to a reader.
+   */
+  public addReader(readTokenHash: string, policy: MailboxPolicy): boolean {
+    if (this.hasReader(readTokenHash)) {
+      return false;
+    }
+
+    if (this.primitives.readers.length >= policy.maxReaders()) {
+      throw new MailboxReaderLimitReachedError();
+    }
+
+    this.primitives.readers.push({ ackedCursor: 0, readTokenHash });
+
+    return true;
   }
 
   public getId(): string {
@@ -56,7 +103,13 @@ export class Mailbox {
   public hasHashes(postTokenHash: string, readTokenHash: string): boolean {
     return (
       this.primitives.postTokenHash === postTokenHash &&
-      this.primitives.readTokenHash === readTokenHash
+      this.hasReader(readTokenHash)
+    );
+  }
+
+  public hasReader(readTokenHash: string): boolean {
+    return this.primitives.readers.some(
+      (reader) => reader.readTokenHash === readTokenHash,
     );
   }
 
@@ -130,7 +183,57 @@ export class Mailbox {
     this.primitives.bytes -= bytes;
   }
 
+  /** Copies, so reader state only changes through this entity. */
+  public readers(): MailboxReaderPrimitives[] {
+    return this.primitives.readers.map((reader) => ({ ...reader }));
+  }
+
+  /**
+   * Revokes one reader. The last reader cannot be revoked: a mailbox with no
+   * reader could never be read or settled again.
+   */
+  public removeReader(readTokenHash: string): void {
+    const index = this.primitives.readers.findIndex(
+      (reader) => reader.readTokenHash === readTokenHash,
+    );
+
+    if (index === -1) {
+      throw new MailboxReaderNotFoundError();
+    }
+
+    if (this.primitives.readers.length === 1) {
+      throw new MailboxLastReaderError();
+    }
+
+    this.primitives.readers.splice(index, 1);
+  }
+
+  /**
+   * The cursor every reader has acknowledged. Envelopes at or below it can be
+   * deleted. Zero with no readers, so nothing is deleted.
+   */
+  public settledCursor(): number {
+    const cursors = this.primitives.readers.map((reader) => reader.ackedCursor);
+
+    return cursors.length === 0 ? 0 : Math.min(...cursors);
+  }
+
   public toPrimitives(): MailboxPrimitives {
-    return { ...this.primitives };
+    return { ...this.primitives, readers: this.readers() };
+  }
+
+  /**
+   * Scans every reader so the timing does not reveal which one matched.
+   */
+  private readerFor(token: string): MailboxReaderPrimitives | undefined {
+    let match: MailboxReaderPrimitives | undefined;
+
+    for (const reader of this.primitives.readers) {
+      if (MailboxCapability.matches(token, reader.readTokenHash)) {
+        match = reader;
+      }
+    }
+
+    return match;
   }
 }

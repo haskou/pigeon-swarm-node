@@ -5,14 +5,21 @@ import MailboxCreator from '@app/contexts/mailboxes/application/MailboxCreator';
 import MailboxEnvelopeNotifier from '@app/contexts/mailboxes/application/MailboxEnvelopeNotifier';
 import MailboxExpirer from '@app/contexts/mailboxes/application/MailboxExpirer';
 import MailboxReader from '@app/contexts/mailboxes/application/MailboxReader';
+import MailboxReaderAdder from '@app/contexts/mailboxes/application/MailboxReaderAdder';
+import MailboxReaderLister from '@app/contexts/mailboxes/application/MailboxReaderLister';
+import MailboxReaderRevoker from '@app/contexts/mailboxes/application/MailboxReaderRevoker';
 import MailboxRemover from '@app/contexts/mailboxes/application/MailboxRemover';
+import MailboxSettler from '@app/contexts/mailboxes/application/MailboxSettler';
 import { MailboxAppendRateLimitedError } from '@app/contexts/mailboxes/domain/errors/MailboxAppendRateLimitedError';
 import { MailboxConflictError } from '@app/contexts/mailboxes/domain/errors/MailboxConflictError';
 import { MailboxCreationProofInvalidError } from '@app/contexts/mailboxes/domain/errors/MailboxCreationProofInvalidError';
 import { MailboxEnvelopeInvalidError } from '@app/contexts/mailboxes/domain/errors/MailboxEnvelopeInvalidError';
 import { MailboxFullError } from '@app/contexts/mailboxes/domain/errors/MailboxFullError';
+import { MailboxLastReaderError } from '@app/contexts/mailboxes/domain/errors/MailboxLastReaderError';
 import { MailboxLimitReachedError } from '@app/contexts/mailboxes/domain/errors/MailboxLimitReachedError';
 import { MailboxNotFoundError } from '@app/contexts/mailboxes/domain/errors/MailboxNotFoundError';
+import { MailboxReaderLimitReachedError } from '@app/contexts/mailboxes/domain/errors/MailboxReaderLimitReachedError';
+import { MailboxReaderNotFoundError } from '@app/contexts/mailboxes/domain/errors/MailboxReaderNotFoundError';
 import { MailboxCreationDifficulty } from '@app/contexts/mailboxes/domain/MailboxCreationDifficulty';
 import { MailboxCreationProof } from '@app/contexts/mailboxes/domain/MailboxCreationProof';
 import MailboxPolicy from '@app/contexts/mailboxes/domain/MailboxPolicy';
@@ -37,6 +44,8 @@ const SECOND = 'o'.repeat(43);
 const THIRD = 'p'.repeat(43);
 const POST_HASH = sha(POST);
 const READ_HASH = sha(READ);
+const OTHER_READ = 's'.repeat(43);
+const OTHER_READ_HASH = sha(OTHER_READ);
 const DAY = 24 * 60 * 60 * 1000;
 const IDLE_MS = MailboxPolicy.EVICTION_IDLE_MS;
 /**
@@ -76,6 +85,9 @@ describe('mailboxes', () => {
   let acknowledger: MailboxAcknowledger;
   let remover: MailboxRemover;
   let expirer: MailboxExpirer;
+  let adder: MailboxReaderAdder;
+  let lister: MailboxReaderLister;
+  let revoker: MailboxReaderRevoker;
   const saved: Record<string, string | undefined> = {};
   const envKeys = [
     'PIGEON_LOCAL_DB_PATH',
@@ -84,6 +96,7 @@ describe('mailboxes', () => {
     'MAILBOX_MAX_COUNT',
     'MAILBOX_RETENTION_MS',
     'MAILBOX_APPEND_RATE_PER_MINUTE',
+    'MAILBOX_MAX_READERS',
   ];
 
   const wire = (): void => {
@@ -96,9 +109,13 @@ describe('mailboxes', () => {
     notifier = mock<MailboxEnvelopeNotifier>();
     appender = new MailboxAppender(repository, policy, coordinator, notifier);
     reader = new MailboxReader(repository, coordinator);
-    acknowledger = new MailboxAcknowledger(repository, coordinator);
+    const settler = new MailboxSettler(repository);
+    acknowledger = new MailboxAcknowledger(repository, coordinator, settler);
     remover = new MailboxRemover(repository, coordinator);
     expirer = new MailboxExpirer(repository, policy, coordinator);
+    adder = new MailboxReaderAdder(repository, policy, coordinator);
+    lister = new MailboxReaderLister(repository, policy);
+    revoker = new MailboxReaderRevoker(repository, coordinator, settler);
   };
 
   const createMailbox = (
@@ -112,6 +129,14 @@ describe('mailboxes', () => {
       postHash,
       readHash,
       MailboxCreationProof.mine(id, postHash, readHash, difficultyBits),
+    );
+
+  const readCursors = async (
+    mailboxId: string,
+    readToken: string,
+  ): Promise<number[]> =>
+    (await reader.read(mailboxId, readToken, 0, 10)).envelopes.map(
+      (envelope) => envelope.cursor,
     );
 
   beforeEach(async () => {
@@ -586,5 +611,148 @@ describe('mailboxes', () => {
     }
 
     expect((await reader.read(RATED, READ, 0, 10)).envelopes).toHaveLength(5);
+  });
+
+  it('lets a sender never add a reader', async () => {
+    await expect(
+      createMailbox(MAILBOX, sha(POST), OTHER_READ_HASH),
+    ).rejects.toBeInstanceOf(MailboxConflictError);
+    await expect(
+      adder.add(MAILBOX, POST, OTHER_READ_HASH),
+    ).rejects.toBeInstanceOf(MailboxNotFoundError);
+    await expect(lister.list(MAILBOX, POST)).rejects.toBeInstanceOf(
+      MailboxNotFoundError,
+    );
+    await expect(
+      revoker.revoke(MAILBOX, POST, READ_HASH),
+    ).rejects.toBeInstanceOf(MailboxNotFoundError);
+    await expect(
+      reader.read(MAILBOX, OTHER_READ, 0, 10),
+    ).rejects.toBeInstanceOf(MailboxNotFoundError);
+  });
+
+  it('adds a reader idempotently, and the new reader gets the backlog', async () => {
+    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+
+    await expect(adder.add(MAILBOX, READ, OTHER_READ_HASH)).resolves.toBe(true);
+    await expect(
+      adder.add(MAILBOX, OTHER_READ, OTHER_READ_HASH),
+    ).resolves.toBe(false);
+    await expect(
+      createMailbox(MAILBOX, sha(POST), OTHER_READ_HASH),
+    ).resolves.toBe(false);
+    expect(await readCursors(MAILBOX, OTHER_READ)).toEqual([1]);
+  });
+
+  it('deletes an envelope only after every reader has acknowledged it', async () => {
+    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+    await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
+    await adder.add(MAILBOX, READ, OTHER_READ_HASH);
+
+    await acknowledger.acknowledge(MAILBOX, READ, 2);
+    expect(await readCursors(MAILBOX, OTHER_READ)).toEqual([1, 2]);
+
+    await acknowledger.acknowledge(MAILBOX, OTHER_READ, 1);
+    expect(await readCursors(MAILBOX, READ)).toEqual([2]);
+  });
+
+  it('never acknowledges envelopes that do not exist yet', async () => {
+    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+
+    await acknowledger.acknowledge(MAILBOX, READ, 99);
+    await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
+
+    expect(await readCursors(MAILBOX, READ)).toEqual([2]);
+  });
+
+  it('caps readers at MAILBOX_MAX_READERS and frees a slot when one is revoked', async () => {
+    process.env.MAILBOX_MAX_READERS = '2';
+    await adder.add(MAILBOX, READ, OTHER_READ_HASH);
+
+    await expect(adder.add(MAILBOX, READ, sha(THIRD))).rejects.toBeInstanceOf(
+      MailboxReaderLimitReachedError,
+    );
+
+    await revoker.revoke(MAILBOX, READ, OTHER_READ_HASH);
+    await expect(adder.add(MAILBOX, READ, sha(THIRD))).resolves.toBe(true);
+  });
+
+  it('lists readers with their acknowledged cursors, for readers only', async () => {
+    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+    await adder.add(MAILBOX, READ, OTHER_READ_HASH);
+    await acknowledger.acknowledge(MAILBOX, READ, 1);
+
+    await expect(lister.list(MAILBOX, OTHER_READ)).resolves.toEqual({
+      maxReaders: 8,
+      readers: [
+        { ackedCursor: 1, readTokenHash: READ_HASH },
+        { ackedCursor: 0, readTokenHash: OTHER_READ_HASH },
+      ],
+    });
+  });
+
+  it('revoking a silent reader deletes what the remaining readers acknowledged', async () => {
+    await adder.add(MAILBOX, READ, OTHER_READ_HASH);
+    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+    await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
+    await acknowledger.acknowledge(MAILBOX, READ, 2);
+    expect(await readCursors(MAILBOX, READ)).toEqual([1, 2]);
+
+    await revoker.revoke(MAILBOX, READ, OTHER_READ_HASH);
+
+    expect(await readCursors(MAILBOX, READ)).toEqual([]);
+    await expect(
+      reader.read(MAILBOX, OTHER_READ, 0, 10),
+    ).rejects.toBeInstanceOf(MailboxNotFoundError);
+  });
+
+  it('refuses to revoke the last reader or a reader that is not registered', async () => {
+    await expect(
+      revoker.revoke(MAILBOX, READ, READ_HASH),
+    ).rejects.toBeInstanceOf(MailboxLastReaderError);
+
+    await adder.add(MAILBOX, READ, OTHER_READ_HASH);
+    await expect(
+      revoker.revoke(MAILBOX, READ, sha(THIRD)),
+    ).rejects.toBeInstanceOf(MailboxReaderNotFoundError);
+  });
+
+  it('keeps envelopes a silent reader has not acknowledged until retention expires them', async () => {
+    process.env.MAILBOX_RETENTION_MS = '1000';
+    const start = Date.now();
+    const clock = jest.spyOn(Date, 'now').mockReturnValue(start);
+
+    await adder.add(MAILBOX, READ, OTHER_READ_HASH);
+    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+    clock.mockReturnValue(start + 800);
+    await acknowledger.acknowledge(MAILBOX, READ, 1);
+    expect(await readCursors(MAILBOX, READ)).toEqual([1]);
+
+    clock.mockReturnValue(start + 1200);
+    await expirer.expire(start + 1200);
+    expect(await readCursors(MAILBOX, READ)).toEqual([]);
+    clock.mockRestore();
+  });
+
+  it('reads a document written with one read hash as a single reader', async () => {
+    const legacy = 'l'.repeat(43);
+    await database.save('mailboxes', legacy, {
+      appendRefilledAt: Date.now(),
+      appendTokens: 120,
+      bytes: 0,
+      createdAt: Date.now(),
+      envelopeCount: 0,
+      id: legacy,
+      lastReadAt: Date.now(),
+      nextCursor: 1,
+      postTokenHash: sha(POST),
+      readTokenHash: READ_HASH,
+    });
+
+    await expect(lister.list(legacy, READ)).resolves.toEqual({
+      maxReaders: 8,
+      readers: [{ ackedCursor: 0, readTokenHash: READ_HASH }],
+    });
+    await expect(adder.add(legacy, READ, OTHER_READ_HASH)).resolves.toBe(true);
   });
 });

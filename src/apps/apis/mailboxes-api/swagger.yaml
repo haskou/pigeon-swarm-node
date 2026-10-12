@@ -31,6 +31,7 @@ paths:
                 readTokenHash:
                   type: string
                   pattern: '^[0-9a-f]{64}$'
+                  description: Becomes the mailbox's first reader. Further readers join through POST /mailboxes/{mailboxId}/readers.
                 creationNonce:
                   type: string
                   pattern: '^[A-Za-z0-9_-]{1,64}$'
@@ -158,12 +159,104 @@ paths:
                           type: string
         '404':
           description: Unknown mailbox or wrong capability.
+  /mailboxes/{mailboxId}/readers:
+    get:
+      tags:
+        - mailboxes
+      summary: List the readers of a mailbox
+      description: Authorized by a read capability. Returns each reader's hash and acknowledged cursor, never tokens. `maxReaders` is `MAILBOX_MAX_READERS`.
+      security:
+        - readCapability: []
+      parameters:
+        - $ref: '#/components/parameters/MailboxId'
+      responses:
+        '200':
+          description: The reader set.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - maxReaders
+                  - readers
+                properties:
+                  maxReaders:
+                    type: integer
+                  readers:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - ackedCursor
+                        - readTokenHash
+                      properties:
+                        ackedCursor:
+                          type: integer
+                        readTokenHash:
+                          type: string
+                          pattern: '^[0-9a-f]{64}$'
+        '404':
+          description: Unknown mailbox or wrong capability.
+    post:
+      tags:
+        - mailboxes
+      summary: Add a reader
+      description: Authorized by an existing read capability; a post token cannot add a reader. The new reader starts with nothing acknowledged, so it receives the retained backlog.
+      security:
+        - readCapability: []
+      parameters:
+        - $ref: '#/components/parameters/MailboxId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - readTokenHash
+              properties:
+                readTokenHash:
+                  type: string
+                  pattern: '^[0-9a-f]{64}$'
+      responses:
+        '200':
+          description: The hash is already a reader.
+        '201':
+          description: Reader added.
+        '404':
+          description: Unknown mailbox, wrong capability, or a post token.
+        '409':
+          description: The mailbox already has `MAILBOX_MAX_READERS` readers.
+  /mailboxes/{mailboxId}/readers/{readTokenHash}:
+    delete:
+      tags:
+        - mailboxes
+      summary: Revoke a reader
+      description: Authorized by a read capability that is still a reader. Envelopes the revoked reader was holding back are deleted once the remaining readers have acked them. The last reader cannot be revoked.
+      security:
+        - readCapability: []
+      parameters:
+        - $ref: '#/components/parameters/MailboxId'
+        - name: readTokenHash
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{64}$'
+      responses:
+        '204':
+          description: Revoked.
+        '404':
+          description: Unknown mailbox, wrong capability, or unknown reader.
+        '409':
+          description: The last reader cannot be revoked.
+[/Users/hasko/Projects/.worktrees/pigeon-mailbox-reader-set-289/src/apps/apis/open-api.yaml#0832]
   /mailboxes/{mailboxId}/ack:
     post:
       tags:
         - mailboxes
       summary: Acknowledge envelopes
-      description: Authorized by the read capability. Deletes every envelope with cursor up to and including `upTo`.
+      description: Authorized by the read capability. Records this reader's cursor. Deletes envelopes up to and including `upTo` once every reader has acked them.
       security:
         - readCapability: []
       parameters:

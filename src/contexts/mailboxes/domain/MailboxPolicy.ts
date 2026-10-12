@@ -33,6 +33,10 @@ export default class MailboxPolicy {
     return pigeonEnvironment().MAILBOX_MAX_COUNT;
   }
 
+  public maxReaders(): number {
+    return pigeonEnvironment().MAILBOX_MAX_READERS;
+  }
+
   public retentionMs(): number {
     return pigeonEnvironment().MAILBOX_RETENTION_MS;
   }

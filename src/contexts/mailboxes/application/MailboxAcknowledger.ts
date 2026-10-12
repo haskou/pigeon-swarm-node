@@ -1,14 +1,16 @@
 import { MailboxNotFoundError } from '../domain/errors/MailboxNotFoundError';
 import MailboxRepository from '../domain/repositories/MailboxRepository';
 import MailboxCoordinator from './MailboxCoordinator';
+import MailboxSettler from './MailboxSettler';
 
 export default class MailboxAcknowledger {
   constructor(
     private readonly repository: MailboxRepository,
     private readonly coordinator: MailboxCoordinator,
+    private readonly settler: MailboxSettler,
   ) {}
 
-  /** Deletes every envelope up to and including the cursor. */
+  /** Records this reader's progress, then deletes what all readers passed. */
   public acknowledge(
     mailboxId: string,
     readToken: string,
@@ -17,23 +19,15 @@ export default class MailboxAcknowledger {
     return this.coordinator.run(async (): Promise<void> => {
       const mailbox = await this.repository.findById(mailboxId);
 
-      if (!mailbox || !mailbox.acceptsRead(readToken)) {
+      if (!mailbox || !mailbox.acknowledge(readToken, upTo)) {
         throw new MailboxNotFoundError();
       }
 
-      const all = await this.repository.listEnvelopes(
-        mailboxId,
-        0,
-        Number.MAX_SAFE_INTEGER,
-      );
-      const removed = all.filter((envelope) => envelope.cursor <= upTo);
-
-      mailbox.releaseEnvelopes(
-        removed.length,
-        removed.reduce((sum, envelope) => sum + envelope.size, 0),
-      );
       mailbox.markRead(Date.now());
-      await this.repository.commitRemoval(mailbox, removed);
+      await this.repository.commitRemoval(
+        mailbox,
+        await this.settler.settle(mailbox),
+      );
     });
   }
 }

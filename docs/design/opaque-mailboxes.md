@@ -77,10 +77,13 @@ of access logs.
 
 | Operation | Capability | Effect |
 | --- | --- | --- |
-| `PUT /mailboxes/{mailboxId}` | recipient supplies `postTokenHash`, `readTokenHash`, `creationNonce` | creates the queue; `creationNonce` is a proof of work bound to the id and both hashes, 16 leading zero bits rising to 20 as the node fills (see Limits); idempotent for identical hashes and nonce |
+| `PUT /mailboxes/{mailboxId}` | recipient supplies `postTokenHash`, `readTokenHash`, `creationNonce` | creates the queue with its first reader; `creationNonce` is a proof of work bound to the id and both hashes, 16 leading zero bits rising to 20 as the node fills (see Limits); idempotent for identical hashes and nonce; further readers join through the readers endpoints |
 | `POST /mailboxes/{mailboxId}/envelopes` | `postToken` | appends an envelope, returns its server cursor |
 | `GET /mailboxes/{mailboxId}/envelopes?after=<cursor>&limit=N` | `readToken` | pages pending envelopes in cursor order |
-| `POST /mailboxes/{mailboxId}/ack` | `readToken` | body `{ upTo: cursor }`; deletes envelopes up to the cursor |
+| `POST /mailboxes/{mailboxId}/ack` | `readToken` | body `{ upTo: cursor }`; records this reader's cursor and deletes envelopes every reader has passed |
+| `GET /mailboxes/{mailboxId}/readers` | `readToken` | `{ maxReaders, readers: [{ readTokenHash, ackedCursor }] }`; hashes only, never tokens |
+| `POST /mailboxes/{mailboxId}/readers` | `readToken` | body `{ readTokenHash }`; adds a device reader (`201`), `200` if already a reader, `409` at `MAILBOX_MAX_READERS` |
+| `DELETE /mailboxes/{mailboxId}/readers/{readTokenHash}` | `readToken` | revokes one reader (`204`); the last reader cannot be revoked (`409`) |
 | `DELETE /mailboxes/{mailboxId}` | `readToken` | deletes queue and envelopes |
 
 Realtime: a connected recipient subscribes with the `readToken` over the
@@ -149,16 +152,57 @@ means no server holds a conversation-to-recipient table. Large groups may batch
 appends to one availability server in a single request; the server still sees
 independent mailboxes.
 
-## Open limitation: devices of one identity share one inbox
+## Per-device read capabilities
 
-Every device of an identity derives the same read token for a mailbox id, so
-they share one inbox: one cursor and one acknowledgement. `POST /mailboxes/{mailboxId}/ack`
-deletes every envelope up to `upTo` for all devices, so a device that acknowledges
-before another device has read those envelopes hides them from that device. The
-node keeps one `readTokenHash` per mailbox and cannot tell devices apart, so this
-is not solved on the server. Creation is idempotent across devices because they
-present identical hashes. Fixing it needs either per-device read capabilities or
-per-device mailboxes; neither is designed yet.
+Every device of one identity derives the same root read token for a mailbox id
+(`readToken` above). With one shared cursor, an acknowledgement from one device
+hid envelopes from the others. A mailbox now holds a bounded set of readers,
+each `{ readTokenHash, ackedCursor }`, capped by `MAILBOX_MAX_READERS` (default
+`8`). The root reader from `PUT` stays registered. A device that holds the root
+key adds its own random per-device read token with
+`POST /mailboxes/{mailboxId}/readers`; the node stores only its hash. Each device
+then reads, acks and revokes with its own token.
+
+Deletion: an envelope is deleted once every reader has acked past it, or once
+retention expires it. The settled cursor is the lowest acked cursor across
+readers. A cursor only moves forward and never past the newest envelope. With no
+readers nothing is deleted.
+
+Policy:
+
+- The sender cannot add a reader. The post token authenticates appends only, and
+  every reader route returns `404` for it. A `PUT` whose read hash is not already
+  a reader returns `409`.
+- `POST /readers` returns `201` when it adds a reader and `200` when the hash is
+  already a reader. A full set returns `409`.
+- `DELETE /readers/{readTokenHash}` returns `204`. The last reader cannot be
+  revoked (`409`).
+- A reader added later starts at cursor `0` and receives the retained backlog.
+  Envelopes deleted before it joined are not recoverable.
+
+Threat model:
+
+- Readers of one identity are trusted equally. Any reader can read, ack, add
+  readers, revoke other readers and delete the mailbox. The set bounds how many
+  devices hold this power; it does not limit what one device can do. Revoke a
+  lost device.
+- The node sees reader hashes, acked cursors, the reader count and when readers
+  join, ack and leave. It never sees tokens.
+
+Silent devices (trade-off): a reader that stops acking holds every envelope above
+its cursor until `MAILBOX_RETENTION_MS` expires them. While it is silent, the
+mailbox can fill to `MAILBOX_MAX_ENVELOPES` or `MAILBOX_MAX_BYTES`, and appends
+return `409`. Memory stays bounded. Revoking the silent reader frees its backlog
+at once. The node cannot tell a lost device from a sleeping one, so it never
+revokes automatically.
+
+Observability: `GET /readers` returns `maxReaders` and each reader's
+`ackedCursor`, so a device can see how many devices share its mailbox and how far
+each has acked.
+
+Recovery: the root reader must stay registered. The node cannot tell which reader
+is the derived root, so it cannot protect it. Pruning the root forfeits
+total-loss recovery and future joins from the root key.
 
 ## Observable metadata (documented residual leakage)
 

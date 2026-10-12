@@ -83,3 +83,53 @@ Feature: Opaque mailbox routes
     When I read the mailbox envelopes after 2 limit 10 with the read capability
     Then response code is equal to 200
     And the mailbox page should hold only cursors greater than 2
+
+  Scenario: A sender cannot add, list or revoke readers
+    When I create a mailbox
+    And I create the mailbox again with a new read capability
+    Then response code is equal to 409
+    When I add a second reader to the mailbox with the post capability
+    Then response code is equal to 404
+    When I list the mailbox readers with the post capability
+    Then response code is equal to 404
+    When I revoke the read reader of the mailbox with the post capability
+    Then response code is equal to 404
+
+  Scenario: An envelope stays until every reader has acknowledged it
+    When I create a mailbox
+    And I append an envelope "a" of 1024 bytes to the mailbox with the post capability
+    When I add a second reader to the mailbox with the read capability
+    Then response code is equal to 201
+    When I add a second reader to the mailbox with the read capability
+    Then response code is equal to 200
+    When I acknowledge the mailbox up to 1 with the read capability
+    Then response code is equal to 204
+    When I read the mailbox envelopes after 0 limit 10 with the second capability
+    Then the mailbox page should hold cursors "1"
+    When I acknowledge the mailbox up to 1 with the second capability
+    Then response code is equal to 204
+    When I read the mailbox envelopes after 0 limit 10 with the read capability
+    Then the mailbox page should hold cursors ""
+
+  Scenario: Any reader lists the readers and how far each has acknowledged
+    When I create a mailbox
+    And I append an envelope "a" of 1024 bytes to the mailbox with the post capability
+    And I add a second reader to the mailbox with the read capability
+    And I acknowledge the mailbox up to 1 with the read capability
+    When I list the mailbox readers with the second capability
+    Then response code is equal to 200
+    And the mailbox readers should report acked cursors "1,0"
+
+  Scenario: A silent reader can be revoked, but the last reader cannot
+    When I create a mailbox
+    And I append an envelope "a" of 1024 bytes to the mailbox with the post capability
+    And I add a second reader to the mailbox with the read capability
+    And I acknowledge the mailbox up to 1 with the read capability
+    When I revoke the second reader of the mailbox with the read capability
+    Then response code is equal to 204
+    When I read the mailbox envelopes after 0 limit 10 with the read capability
+    Then the mailbox page should hold cursors ""
+    When I read the mailbox envelopes after 0 limit 10 with the second capability
+    Then response code is equal to 404
+    When I revoke the read reader of the mailbox with the read capability
+    Then response code is equal to 409

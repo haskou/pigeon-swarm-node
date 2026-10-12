@@ -5430,6 +5430,7 @@ export default class Definitions {
     id: string;
     postToken: string;
     readToken: string;
+    secondReadToken?: string;
   };
 
   private mailboxHeaders(capability: string): Record<string, string> {
@@ -5443,9 +5444,19 @@ export default class Definitions {
       return {};
     }
 
-    return {
-      authorization: `Bearer ${capability === 'post' ? mailbox.postToken : mailbox.readToken}`,
-    };
+    if (capability === 'post') {
+      return { authorization: `Bearer ${mailbox.postToken}` };
+    }
+
+    if (capability === 'second') {
+      if (!mailbox.secondReadToken) {
+        throw new Error('Second reader must be added first.');
+      }
+
+      return { authorization: `Bearer ${mailbox.secondReadToken}` };
+    }
+
+    return { authorization: `Bearer ${mailbox.readToken}` };
   }
 
   private mailboxHash(token: string): string {
@@ -5612,6 +5623,80 @@ export default class Definitions {
       `/mailboxes/${this.mailbox.id}`,
       undefined,
       this.mailboxHeaders(capability),
+    );
+  }
+
+  @when('I add a second reader to the mailbox with the {word} capability')
+  public async iAddASecondReaderToTheMailbox(capability: string): Promise<void> {
+    if (!this.mailbox) {
+      throw new Error('Mailbox must be created first.');
+    }
+
+    this.mailbox.secondReadToken ??= randomBytes(32).toString('base64url');
+    this.response = await this.restClient.post(
+      `/mailboxes/${this.mailbox.id}/readers`,
+      { readTokenHash: this.mailboxHash(this.mailbox.secondReadToken) },
+      this.mailboxHeaders(capability),
+    );
+  }
+
+  @when('I list the mailbox readers with the {word} capability')
+  public async iListTheMailboxReaders(capability: string): Promise<void> {
+    if (!this.mailbox) {
+      throw new Error('Mailbox must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/mailboxes/${this.mailbox.id}/readers`,
+      this.mailboxHeaders(capability),
+    );
+  }
+
+  @when('I revoke the {word} reader of the mailbox with the {word} capability')
+  public async iRevokeAReaderOfTheMailbox(
+    reader: string,
+    capability: string,
+  ): Promise<void> {
+    if (!this.mailbox) {
+      throw new Error('Mailbox must be created first.');
+    }
+
+    const token =
+      reader === 'second'
+        ? this.mailbox.secondReadToken
+        : this.mailbox.readToken;
+
+    if (!token) {
+      throw new Error('Reader must be added first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/mailboxes/${this.mailbox.id}/readers/${this.mailboxHash(token)}`,
+      undefined,
+      this.mailboxHeaders(capability),
+    );
+  }
+
+  @when('I create the mailbox again with a new read capability')
+  public async iCreateTheMailboxAgainWithANewReadCapability(): Promise<void> {
+    if (!this.mailbox) {
+      throw new Error('Mailbox must be created first.');
+    }
+
+    await this.putMailbox({
+      ...this.mailbox,
+      readToken: randomBytes(32).toString('base64url'),
+    });
+  }
+
+  @then('the mailbox readers should report acked cursors {string}')
+  public theMailboxReadersShouldReportAckedCursors(expected: string): void {
+    const data = this.response.data as unknown as {
+      readers: Array<{ ackedCursor: number }>;
+    };
+
+    expect(data.readers.map((reader) => reader.ackedCursor).join(',')).to.equal(
+      expected,
     );
   }
 

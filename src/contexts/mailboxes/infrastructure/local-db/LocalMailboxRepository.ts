@@ -53,10 +53,23 @@ export default class LocalMailboxRepository extends MailboxRepository {
     };
   }
 
+  /**
+   * A document written before the reader set holds one `readTokenHash`. It
+   * becomes the only reader with nothing acknowledged, so its envelopes stay
+   * until that reader acks. The legacy field is dropped on the next write.
+   */
   private toMailbox(document: Record<string, unknown>): Mailbox {
     const primitives = { ...document };
 
     delete primitives._id;
+
+    if (!Array.isArray(primitives.readers)) {
+      primitives.readers = [
+        { ackedCursor: 0, readTokenHash: primitives.readTokenHash },
+      ];
+    }
+
+    delete primitives.readTokenHash;
 
     return Mailbox.fromPrimitives(primitives as unknown as MailboxPrimitives);
   }

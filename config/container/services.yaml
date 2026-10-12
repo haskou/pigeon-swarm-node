@@ -1176,16 +1176,38 @@ services:
     arguments:
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
       - '@contexts/mailboxes/application/MailboxCoordinator'
+      - '@contexts/mailboxes/application/MailboxSettler'
   contexts/mailboxes/application/MailboxReader:
     class: /contexts/mailboxes/application/MailboxReader
     arguments:
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
       - '@contexts/mailboxes/application/MailboxCoordinator'
+  contexts/mailboxes/application/MailboxReaderAdder:
+    class: /contexts/mailboxes/application/MailboxReaderAdder
+    arguments:
+      - '@contexts/mailboxes/domain/repositories/MailboxRepository'
+      - '@contexts/mailboxes/domain/MailboxPolicy'
+      - '@contexts/mailboxes/application/MailboxCoordinator'
+  contexts/mailboxes/application/MailboxReaderLister:
+    class: /contexts/mailboxes/application/MailboxReaderLister
+    arguments:
+      - '@contexts/mailboxes/domain/repositories/MailboxRepository'
+      - '@contexts/mailboxes/domain/MailboxPolicy'
+  contexts/mailboxes/application/MailboxReaderRevoker:
+    class: /contexts/mailboxes/application/MailboxReaderRevoker
+    arguments:
+      - '@contexts/mailboxes/domain/repositories/MailboxRepository'
+      - '@contexts/mailboxes/application/MailboxCoordinator'
+      - '@contexts/mailboxes/application/MailboxSettler'
   contexts/mailboxes/application/MailboxRemover:
     class: /contexts/mailboxes/application/MailboxRemover
     arguments:
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
       - '@contexts/mailboxes/application/MailboxCoordinator'
+  contexts/mailboxes/application/MailboxSettler:
+    class: /contexts/mailboxes/application/MailboxSettler
+    arguments:
+      - '@contexts/mailboxes/domain/repositories/MailboxRepository'
   contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository:
     class: /contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository
     arguments:

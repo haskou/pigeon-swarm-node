@@ -39,6 +39,6 @@ export default abstract class MailboxRepository {
 
   public abstract remove(mailboxId: string): Promise<void>;
 
-  /** Persists counters only (a read marks the mailbox as live). */
+  /** Persists the whole mailbox document: counters, readers and last read. */
   public abstract save(mailbox: Mailbox): Promise<void>;
 }
