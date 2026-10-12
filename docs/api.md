@@ -5613,8 +5613,14 @@ This endpoint requires the normal signed HTTP headers, and the stable identity
 signing key must match the requested identity. A client performing total device
 recovery can therefore read the checkpoint after recovering that key, before it
 has an authorized device credential. Missing or invalid authentication and a
-different signer all return the same generic `401`. The response contains only
-`epoch`, `identityId` and `revision`. The authorized-device list is a
+different signer all return the same generic `401`. The response contains
+`compromisedCredentials`, `epoch`, `identityId` and `revision`. The
+`compromisedCredentials` array lists the compromise caps in effect, sorted
+ascending by credential, each with its `compromisedSince` revision; it is empty
+when no device is capped. The checkpoint and the caps are read in two steps on
+the node, so a client that combines a revision from one read with caps from the
+other can build a recovery that admission refuses; it must re-read both before
+signing. The authorized-device list is a
 separate owner-only endpoint (below). Restricting the endpoint to the identity owner avoids
 creating a public identity-target lookup or cross-identity access relationship.
 
@@ -5686,13 +5692,28 @@ uses the proof envelope above, and the recovery authority signs the transition
 envelope. Credentials and signatures use their API string representation
 without decoding or normalization.
 
+A recovery may carry `compromisedCredentials`, a list of one to 32
+`{compromisedSince, credential}` entries strictly ascending by `credential`,
+each with `compromisedSince` no greater than `previousRevision`. The list must
+equal the caps in effect on the current head (same credentials and revisions),
+otherwise the recovery is refused as an invalid transition. Omit the field when
+no cap is in effect: an empty list is refused, and a recovery without the field
+is accepted only when no cap is in effect. The list is covered by the target
+proof and the recovery authority signature. In the signed envelope
+`compromisedCredentials` follows `authorizedAt` and precedes `compromisedSince`,
+and each entry writes `compromisedSince` before `credential`. A carried cap
+refuses the credential's records claiming that revision or a later one, and
+enrolling the same key again does not lift it, so the list only narrows what is
+accepted.
+
 The endpoint is unauthenticated until signatures are verified, so each node
 rate limits it before any lookup or lock: 20 submissions per identity and 300
 per node per minute. Excess requests return `429` with code `429030`.
 
-The response contains only the identity identifier, current recovery epoch and
-deterministic current revision; the authorized-device list is only served by the
-owner-only `GET /identity-devices/{identityId}/devices`.
+The response has the same shape as the checkpoint read: the identity identifier,
+current recovery epoch, deterministic current revision and the
+`compromisedCredentials` in effect after the transition. The authorized-device
+list is only served by the owner-only `GET /identity-devices/{identityId}/devices`.
 Replayed operation or pairing identifiers, stale predecessors, wrong recovery
 epochs, pairing authorizations signed after their declared expiry, substituted
 identities or credentials, revoked authors and unrelated recovery authorities
