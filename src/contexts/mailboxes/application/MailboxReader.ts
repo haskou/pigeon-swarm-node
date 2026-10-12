@@ -1,3 +1,5 @@
+import { Timestamp } from '@haskou/value-objects';
+
 import { MailboxNotFoundError } from '../domain/errors/MailboxNotFoundError';
 import { MailboxEnvelope } from '../domain/MailboxEnvelope';
 import MailboxPolicy from '../domain/MailboxPolicy';
@@ -35,7 +37,7 @@ export default class MailboxReader {
         bounded + 1,
       );
 
-      mailbox.markRead(Date.now());
+      mailbox.markRead(Timestamp.now());
       await this.repository.save(mailbox);
 
       return {

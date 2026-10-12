@@ -1,3 +1,5 @@
+import { Timestamp } from '@haskou/value-objects';
+
 import { MailboxNotFoundError } from '../domain/errors/MailboxNotFoundError';
 import MailboxRepository from '../domain/repositories/MailboxRepository';
 import MailboxCoordinator from './MailboxCoordinator';
@@ -23,7 +25,7 @@ export default class MailboxAcknowledger {
         throw new MailboxNotFoundError();
       }
 
-      mailbox.markRead(Date.now());
+      mailbox.markRead(Timestamp.now());
       await this.repository.commitRemoval(
         mailbox,
         await this.settler.settle(mailbox),

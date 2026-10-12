@@ -1,9 +1,14 @@
+import { Timestamp } from '@haskou/value-objects';
+
 import { MailboxAppendRateLimitedError } from './errors/MailboxAppendRateLimitedError';
+import { MailboxConflictError } from './errors/MailboxConflictError';
 import { MailboxFullError } from './errors/MailboxFullError';
 import { MailboxLastReaderError } from './errors/MailboxLastReaderError';
+import { MailboxLimitReachedError } from './errors/MailboxLimitReachedError';
 import { MailboxReaderLimitReachedError } from './errors/MailboxReaderLimitReachedError';
 import { MailboxReaderNotFoundError } from './errors/MailboxReaderNotFoundError';
 import { MailboxCapability } from './MailboxCapability';
+import { MailboxEnvelope } from './MailboxEnvelope';
 import MailboxPolicy from './MailboxPolicy';
 import { MailboxPrimitives } from './MailboxPrimitives';
 import { MailboxReaderPrimitives } from './MailboxReaderPrimitives';
@@ -15,20 +20,20 @@ import { MailboxReaderPrimitives } from './MailboxReaderPrimitives';
 export class Mailbox {
   public static create(params: {
     id: string;
-    now: number;
+    now: Timestamp;
     postTokenHash: string;
     readTokenHash: string;
     appendTokens: number;
     firstCursor: number;
   }): Mailbox {
     return new Mailbox({
-      appendRefilledAt: params.now,
+      appendRefilledAt: params.now.toMilliseconds(),
       appendTokens: params.appendTokens,
       bytes: 0,
-      createdAt: params.now,
+      createdAt: params.now.toMilliseconds(),
       envelopeCount: 0,
       id: params.id,
-      lastReadAt: params.now,
+      lastReadAt: params.now.toMilliseconds(),
       nextCursor: params.firstCursor,
       postTokenHash: params.postTokenHash,
       readers: [{ ackedCursor: 0, readTokenHash: params.readTokenHash }],
@@ -40,6 +45,29 @@ export class Mailbox {
       ...primitives,
       readers: primitives.readers.map((reader) => ({ ...reader })),
     });
+  }
+
+  /**
+   * Picks the victims for `needed` freed slots: the least recently read
+   * mailboxes that are empty and idle. All or nothing: with too few such
+   * mailboxes nothing is picked and the creation is refused.
+   */
+  public static selectEvictions(
+    mailboxes: Mailbox[],
+    now: Timestamp,
+    needed: number,
+  ): Mailbox[] {
+    const candidates = mailboxes
+      .filter((mailbox) =>
+        mailbox.isIdleAndEmpty(now, MailboxPolicy.EVICTION_IDLE_MS),
+      )
+      .sort((a, b) => a.getLastReadAt() - b.getLastReadAt());
+
+    if (candidates.length < needed) {
+      throw new MailboxLimitReachedError();
+    }
+
+    return candidates.slice(0, needed);
   }
 
   private constructor(private primitives: MailboxPrimitives) {}
@@ -113,11 +141,14 @@ export class Mailbox {
     return this.primitives.lastReadAt;
   }
 
-  public hasHashes(postTokenHash: string, readTokenHash: string): boolean {
-    return (
-      this.primitives.postTokenHash === postTokenHash &&
-      this.hasReader(readTokenHash)
-    );
+  /** Throws unless the hashes match: a repeated create must carry the same ones. */
+  public requireHashes(postTokenHash: string, readTokenHash: string): void {
+    if (
+      this.primitives.postTokenHash !== postTokenHash ||
+      !this.hasReader(readTokenHash)
+    ) {
+      throw new MailboxConflictError();
+    }
   }
 
   public hasReader(readTokenHash: string): boolean {
@@ -130,16 +161,25 @@ export class Mailbox {
     return this.primitives.nextCursor - 1;
   }
 
+  /** Unread for the whole retention window: the mailbox itself is removed. */
+  public isExpired(now: Timestamp, policy: MailboxPolicy): boolean {
+    return new Timestamp(this.primitives.lastReadAt)
+      .addMilliseconds(policy.retentionMs())
+      .isBeforeOrEqual(now);
+  }
+
   /** Empty and unread for `idleMs`: the only mailboxes eviction may remove. */
-  public isIdleAndEmpty(now: number, idleMs: number): boolean {
+  public isIdleAndEmpty(now: Timestamp, idleMs: number): boolean {
     return (
       this.primitives.envelopeCount === 0 &&
-      this.primitives.lastReadAt + idleMs <= now
+      new Timestamp(this.primitives.lastReadAt)
+        .addMilliseconds(idleMs)
+        .isBeforeOrEqual(now)
     );
   }
 
-  public markRead(now: number): void {
-    this.primitives.lastReadAt = now;
+  public markRead(now: Timestamp): void {
+    this.primitives.lastReadAt = now.toMilliseconds();
   }
 
   /** Never drops older envelopes: past a limit the append fails. */
@@ -165,7 +205,9 @@ export class Mailbox {
    * rate, capped at one minute of appends. The state lives on the mailbox, so
    * a restart does not reset it. A refused append leaves the state untouched.
    */
-  public consumeAppend(now: number, policy: MailboxPolicy): void {
+  public consumeAppend(now: Timestamp, policy: MailboxPolicy): void {
+    const nowMs = now.toMilliseconds();
+
     const perMinute = policy.maxAppendsPerMinute();
 
     if (perMinute === 0) {
@@ -178,9 +220,9 @@ export class Mailbox {
       : perMinute;
     const refilledAt = Number.isFinite(this.primitives.appendRefilledAt)
       ? this.primitives.appendRefilledAt
-      : now;
+      : nowMs;
     const refilled =
-      stored + (Math.max(0, now - refilledAt) * perMinute) / 60_000;
+      stored + (Math.max(0, nowMs - refilledAt) * perMinute) / 60_000;
     const available = Math.min(perMinute, refilled);
 
     if (available < 1) {
@@ -188,12 +230,15 @@ export class Mailbox {
     }
 
     this.primitives.appendTokens = available - 1;
-    this.primitives.appendRefilledAt = now;
+    this.primitives.appendRefilledAt = nowMs;
   }
 
-  public releaseEnvelopes(count: number, bytes: number): void {
-    this.primitives.envelopeCount -= count;
-    this.primitives.bytes -= bytes;
+  public releaseEnvelopes(removed: MailboxEnvelope[]): void {
+    this.primitives.envelopeCount -= removed.length;
+    this.primitives.bytes -= removed.reduce(
+      (sum, envelope) => sum + envelope.size,
+      0,
+    );
   }
 
   /** Copies, so reader state only changes through this entity. */

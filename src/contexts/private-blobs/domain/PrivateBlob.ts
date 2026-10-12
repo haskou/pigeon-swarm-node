@@ -1,3 +1,4 @@
+import { Timestamp } from '@haskou/value-objects';
 import { randomUUID } from 'crypto';
 
 import { PrivateBlobCapability } from './PrivateBlobCapability';
@@ -14,7 +15,7 @@ export class PrivateBlob {
   }
 
   public static reserve(params: {
-    now: number;
+    now: Timestamp;
     ownerKey: string;
     retentionMs: number;
     size: number;
@@ -22,11 +23,13 @@ export class PrivateBlob {
   }): { blob: PrivateBlob; downloadToken: string; uploadToken: string } {
     const upload = PrivateBlobCapability.generate();
     const download = PrivateBlobCapability.generate();
-    const uploadDeadline = params.now + params.uploadWindowMs;
+    const uploadDeadline = params.now
+      .addMilliseconds(params.uploadWindowMs)
+      .toMilliseconds();
 
     return {
       blob: new PrivateBlob({
-        createdAt: params.now,
+        createdAt: params.now.toMilliseconds(),
         downloadTokenHash: download.hash,
         expiresAt: uploadDeadline,
         id: randomUUID(),
@@ -77,8 +80,8 @@ export class PrivateBlob {
     return this.primitives.size;
   }
 
-  public isExpired(now: number): boolean {
-    return this.primitives.expiresAt <= now;
+  public isExpired(now: Timestamp): boolean {
+    return new Timestamp(this.primitives.expiresAt).isBeforeOrEqual(now);
   }
 
   public isStored(): boolean {
@@ -86,10 +89,12 @@ export class PrivateBlob {
   }
 
   /** From now on the blob lives for the retention window and is immutable. */
-  public markStored(now: number): void {
+  public markStored(now: Timestamp): void {
     this.primitives = {
       ...this.primitives,
-      expiresAt: now + this.primitives.retentionMs,
+      expiresAt: now
+        .addMilliseconds(this.primitives.retentionMs)
+        .toMilliseconds(),
       state: 'stored',
     };
   }

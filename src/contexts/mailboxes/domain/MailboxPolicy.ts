@@ -1,7 +1,13 @@
-import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { Timestamp } from '@haskou/value-objects';
 
-/** Operator-configurable bounds, read per call. None of them uses a user identifier. */
+import { MailboxEnvelopeInvalidError } from './errors/MailboxEnvelopeInvalidError';
+import { MailboxEnvelope } from './MailboxEnvelope';
+import { MailboxLimits } from './MailboxLimits';
+
+/** Operator-configurable bounds, bound by composition. None of them uses a user identifier. */
 export default class MailboxPolicy {
+  private static readonly BASE64URL = /^[A-Za-z0-9_-]+$/;
+
   /**
    * Envelope bodies must be exactly one of these decoded sizes. Clients pad up
    * to the next bucket, so the node only ever sees a few distinct sizes.
@@ -13,31 +19,61 @@ export default class MailboxPolicy {
   /** Empty and unread for this long: only such mailboxes may be evicted at capacity. */
   public static readonly EVICTION_IDLE_MS = 7 * 24 * 60 * 60 * 1000;
 
-  public isAllowedBodySize(size: number): boolean {
-    return MailboxPolicy.SIZE_BUCKETS.includes(size);
+  constructor(private readonly limits: MailboxLimits) {}
+
+  /**
+   * Decoded size of a base64url body. Throws unless the body is base64url
+   * and its decoded size is one of the buckets.
+   */
+  public decodedBodySize(body: string): number {
+    if (!MailboxPolicy.BASE64URL.test(body)) {
+      throw new MailboxEnvelopeInvalidError(MailboxPolicy.SIZE_BUCKETS);
+    }
+
+    const size = Buffer.from(body, 'base64url').length;
+
+    if (!MailboxPolicy.SIZE_BUCKETS.includes(size)) {
+      throw new MailboxEnvelopeInvalidError(MailboxPolicy.SIZE_BUCKETS);
+    }
+
+    return size;
+  }
+
+  /** Envelopes whose retention has ended by `now`. */
+  public expiredEnvelopes(
+    envelopes: MailboxEnvelope[],
+    now: Timestamp,
+  ): MailboxEnvelope[] {
+    const retentionMs = this.retentionMs();
+
+    return envelopes.filter((envelope) =>
+      new Timestamp(envelope.storedAt)
+        .addMilliseconds(retentionMs)
+        .isBeforeOrEqual(now),
+    );
   }
 
   public maxAppendsPerMinute(): number {
-    return pigeonEnvironment().MAILBOX_APPEND_RATE_PER_MINUTE;
+    return this.limits.maxAppendsPerMinute;
   }
 
   public maxBytesPerMailbox(): number {
-    return pigeonEnvironment().MAILBOX_MAX_BYTES;
+    return this.limits.maxBytesPerMailbox;
   }
 
   public maxEnvelopesPerMailbox(): number {
-    return pigeonEnvironment().MAILBOX_MAX_ENVELOPES;
+    return this.limits.maxEnvelopesPerMailbox;
   }
 
   public maxMailboxes(): number {
-    return pigeonEnvironment().MAILBOX_MAX_COUNT;
+    return this.limits.maxMailboxes;
   }
 
   public maxReaders(): number {
-    return pigeonEnvironment().MAILBOX_MAX_READERS;
+    return this.limits.maxReaders;
   }
 
   public retentionMs(): number {
-    return pigeonEnvironment().MAILBOX_RETENTION_MS;
+    return this.limits.retentionMs;
   }
 }

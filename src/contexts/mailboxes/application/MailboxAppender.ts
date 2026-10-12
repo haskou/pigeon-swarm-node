@@ -1,4 +1,5 @@
-import { MailboxEnvelopeInvalidError } from '../domain/errors/MailboxEnvelopeInvalidError';
+import { Timestamp } from '@haskou/value-objects';
+
 import { MailboxNotFoundError } from '../domain/errors/MailboxNotFoundError';
 import MailboxPolicy from '../domain/MailboxPolicy';
 import MailboxRepository from '../domain/repositories/MailboxRepository';
@@ -6,28 +7,12 @@ import MailboxCoordinator from './MailboxCoordinator';
 import MailboxEnvelopeNotifier from './MailboxEnvelopeNotifier';
 
 export default class MailboxAppender {
-  private static readonly BASE64URL = /^[A-Za-z0-9_-]+$/;
-
   constructor(
     private readonly repository: MailboxRepository,
     private readonly policy: MailboxPolicy,
     private readonly coordinator: MailboxCoordinator,
     private readonly notifier: MailboxEnvelopeNotifier,
   ) {}
-
-  private decodedSize(body: string): number {
-    if (!MailboxAppender.BASE64URL.test(body)) {
-      throw new MailboxEnvelopeInvalidError(MailboxPolicy.SIZE_BUCKETS);
-    }
-
-    const size = Buffer.from(body, 'base64url').length;
-
-    if (!this.policy.isAllowedBodySize(size)) {
-      throw new MailboxEnvelopeInvalidError(MailboxPolicy.SIZE_BUCKETS);
-    }
-
-    return size;
-  }
 
   /**
    * Appending the same envelopeId twice returns the first cursor and stores
@@ -46,7 +31,7 @@ export default class MailboxAppender {
         throw new MailboxNotFoundError();
       }
 
-      const size = this.decodedSize(body);
+      const size = this.policy.decodedBodySize(body);
       const known = await this.repository.findCursorByEnvelopeId(
         mailboxId,
         envelopeId,
@@ -56,7 +41,7 @@ export default class MailboxAppender {
         return { created: false, cursor: known };
       }
 
-      const now = Date.now();
+      const now = Timestamp.now();
       mailbox.consumeAppend(now, this.policy);
 
       const cursor = mailbox.reserveEnvelope(size, this.policy);
@@ -66,7 +51,7 @@ export default class MailboxAppender {
         cursor,
         envelopeId,
         size,
-        storedAt: now,
+        storedAt: now.toMilliseconds(),
       });
       this.notifier.envelopeAppended(mailboxId, cursor);
 

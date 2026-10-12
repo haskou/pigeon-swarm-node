@@ -19,10 +19,7 @@ export default class MailboxSettler {
     );
     const removed = all.filter((envelope) => envelope.cursor <= settled);
 
-    mailbox.releaseEnvelopes(
-      removed.length,
-      removed.reduce((sum, envelope) => sum + envelope.size, 0),
-    );
+    mailbox.releaseEnvelopes(removed);
 
     return removed;
   }

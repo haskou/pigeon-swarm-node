@@ -1,4 +1,5 @@
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import { Timestamp } from '@haskou/value-objects';
 import { createHmac, randomBytes } from 'crypto';
 
 import { PrivateBlob } from '../../domain/PrivateBlob';
@@ -76,7 +77,7 @@ export default class LocalPrivateBlobRepository extends PrivateBlobRepository {
     return document ? this.toBlob(document) : undefined;
   }
 
-  public findExpired(now: number): Promise<PrivateBlob[]> {
+  public findExpired(now: Timestamp): Promise<PrivateBlob[]> {
     return this.all((blob) => blob.isExpired(now));
   }
 
@@ -92,7 +93,10 @@ export default class LocalPrivateBlobRepository extends PrivateBlobRepository {
       .digest('hex');
   }
 
-  public async reservedBytes(now: number, ownerKey?: string): Promise<number> {
+  public async reservedBytes(
+    now: Timestamp,
+    ownerKey?: string,
+  ): Promise<number> {
     const blobs = await this.all(
       (blob) =>
         !blob.isExpired(now) &&

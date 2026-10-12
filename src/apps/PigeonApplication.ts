@@ -25,7 +25,9 @@ import { DeviceAuthorizationRepository } from '../contexts/identity-devices/doma
 import { DeviceSealedSecretRepository } from '../contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository';
 import LocalDeviceSealedSecretRepository from '../contexts/identity-devices/infrastructure/local-db/LocalDeviceSealedSecretRepository';
 import OrbitDBDeviceAuthorizationRepository from '../contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationRepository';
+import { MailboxLimits } from '../contexts/mailboxes/domain/MailboxLimits';
 import MailboxRepository from '../contexts/mailboxes/domain/repositories/MailboxRepository';
+import { MailboxLimitsFromEnvironment } from '../contexts/mailboxes/infrastructure/environment/MailboxLimitsFromEnvironment';
 import LocalMailboxRepository from '../contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository';
 import NodeNetworkSynchronizationMonitor from '../contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
@@ -53,8 +55,10 @@ import VerifiedPrivateControlTransitionProcessor from '../contexts/private-autho
 import InMemoryPrivateFreshnessGate from '../contexts/private-authorization/infrastructure/freshness/InMemoryPrivateFreshnessGate';
 import LocalPrivateAuthorizationRepository from '../contexts/private-authorization/infrastructure/local-db/LocalPrivateAuthorizationRepository';
 import LocalPrivateOperationUnitOfWork from '../contexts/private-authorization/infrastructure/local-db/LocalPrivateOperationUnitOfWork';
+import { PrivateBlobLimits } from '../contexts/private-blobs/domain/PrivateBlobLimits';
 import PrivateBlobBytesStore from '../contexts/private-blobs/domain/repositories/PrivateBlobBytesStore';
 import PrivateBlobRepository from '../contexts/private-blobs/domain/repositories/PrivateBlobRepository';
+import { PrivateBlobLimitsFromEnvironment } from '../contexts/private-blobs/infrastructure/environment/PrivateBlobLimitsFromEnvironment';
 import FilePrivateBlobBytesStore from '../contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore';
 import LocalPrivateBlobRepository from '../contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository';
 import { pigeonEnvironmentSchema } from '../shared/infrastructure/environment/PigeonEnvironment';
@@ -306,6 +310,14 @@ export default class PigeonApplication {
         {
           token: NotificationRepository,
           useClass: NotificationRepositoryRouter,
+        },
+        {
+          token: MailboxLimits,
+          useFactory: () => MailboxLimitsFromEnvironment.load(),
+        },
+        {
+          token: PrivateBlobLimits,
+          useFactory: () => PrivateBlobLimitsFromEnvironment.load(),
         },
       ],
     });

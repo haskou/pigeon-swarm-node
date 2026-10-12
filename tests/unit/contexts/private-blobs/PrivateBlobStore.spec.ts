@@ -6,8 +6,10 @@ import PrivateBlobUploader from '@app/contexts/private-blobs/application/Private
 import { PrivateBlob } from '@app/contexts/private-blobs/domain/PrivateBlob';
 import PrivateBlobPolicy from '@app/contexts/private-blobs/domain/PrivateBlobPolicy';
 import PrivateBlobRepository from '@app/contexts/private-blobs/domain/repositories/PrivateBlobRepository';
+import { PrivateBlobLimitsFromEnvironment } from '@app/contexts/private-blobs/infrastructure/environment/PrivateBlobLimitsFromEnvironment';
 import FilePrivateBlobBytesStore from '@app/contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { Timestamp } from '@haskou/value-objects';
 import { randomUUID } from 'crypto';
 import {
   existsSync,
@@ -31,7 +33,7 @@ class MemoryRepository extends PrivateBlobRepository {
     return this.blobs.get(id);
   }
 
-  public async findExpired(now: number): Promise<PrivateBlob[]> {
+  public async findExpired(now: Timestamp): Promise<PrivateBlob[]> {
     return [...this.blobs.values()].filter((blob) => blob.isExpired(now));
   }
 
@@ -47,7 +49,10 @@ class MemoryRepository extends PrivateBlobRepository {
     return `owner:${Buffer.from(identityId).toString('hex')}`;
   }
 
-  public async reservedBytes(now: number, ownerKey?: string): Promise<number> {
+  public async reservedBytes(
+    now: Timestamp,
+    ownerKey?: string,
+  ): Promise<number> {
     return [...this.blobs.values()]
       .filter(
         (blob) =>
@@ -90,7 +95,9 @@ describe('private blob store', () => {
     process.env.PRIVATE_BLOB_MAX_BYTES = '80';
     repository = new MemoryRepository();
     store = new FilePrivateBlobBytesStore();
-    const policy = new PrivateBlobPolicy();
+    const policy = new PrivateBlobPolicy(
+      PrivateBlobLimitsFromEnvironment.load(),
+    );
 
     reserver = new PrivateBlobReserver(repository, policy);
     uploader = new PrivateBlobUploader(repository, store);
@@ -214,12 +221,12 @@ describe('private blob store', () => {
     const expirer = new PrivateBlobExpirer(
       repository,
       store,
-      new PrivateBlobPolicy(),
+      new PrivateBlobPolicy(PrivateBlobLimitsFromEnvironment.load()),
     );
     const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
 
-    expect(await expirer.expire(Date.now())).toBe(0);
-    expect(await expirer.expire(farFuture)).toBe(2);
+    expect(await expirer.expire(Timestamp.now())).toBe(0);
+    expect(await expirer.expire(new Timestamp(farFuture))).toBe(2);
     expect(repository.blobs.size).toBe(0);
     expect(readdirSync(directory)).toEqual([]);
     await expect(
@@ -248,15 +255,17 @@ describe('private blob store', () => {
     const expirer = new PrivateBlobExpirer(
       repository,
       store,
-      new PrivateBlobPolicy(),
+      new PrivateBlobPolicy(PrivateBlobLimitsFromEnvironment.load()),
     );
     const farFuture = Date.now() + 365 * 24 * 60 * 60 * 1000;
 
-    await expect(expirer.expire(farFuture)).rejects.toThrow('1 of 2');
+    await expect(expirer.expire(new Timestamp(farFuture))).rejects.toThrow(
+      '1 of 2',
+    );
     expect([...repository.blobs.keys()]).toEqual([first.blobId]);
 
     broken = false;
-    expect(await expirer.expire(farFuture)).toBe(1);
+    expect(await expirer.expire(new Timestamp(farFuture))).toBe(1);
     expect(repository.blobs.size).toBe(0);
   });
 
@@ -273,10 +282,10 @@ describe('private blob store', () => {
     const expirer = new PrivateBlobExpirer(
       repository,
       store,
-      new PrivateBlobPolicy(),
+      new PrivateBlobPolicy(PrivateBlobLimitsFromEnvironment.load()),
     );
 
-    expect(await expirer.expire(Date.now())).toBe(0);
+    expect(await expirer.expire(Timestamp.now())).toBe(0);
     expect(readdirSync(directory).sort()).toEqual(
       ['notes.txt', `${kept.blobId}.blob`].sort(),
     );
@@ -341,11 +350,13 @@ describe('private blob store', () => {
       const expirer = new PrivateBlobExpirer(
         repository,
         store,
-        new PrivateBlobPolicy(),
+        new PrivateBlobPolicy(PrivateBlobLimitsFromEnvironment.load()),
       );
 
       // Envelopes appended at storage time expire at now + mailbox retention.
-      expect(await expirer.expire(now + mailboxRetentionMs - 1)).toBe(0);
+      expect(
+        await expirer.expire(new Timestamp(now + mailboxRetentionMs - 1)),
+      ).toBe(0);
       expect(
         await collect((await reader.open(blobId, downloadToken)).stream),
       ).toBe('abc');
@@ -373,10 +384,10 @@ describe('private blob store', () => {
       const expirer = new PrivateBlobExpirer(
         repository,
         store,
-        new PrivateBlobPolicy(),
+        new PrivateBlobPolicy(PrivateBlobLimitsFromEnvironment.load()),
       );
 
-      expect(await expirer.expire(now + 2 * dayMs)).toBe(0);
+      expect(await expirer.expire(new Timestamp(now + 2 * dayMs))).toBe(0);
       expect(repository.blobs.get(blobId)?.getExpiresAt()).toBe(
         now + pigeonEnvironment().MAILBOX_RETENTION_MS,
       );
@@ -399,9 +410,15 @@ describe('private blob store', () => {
 
     process.env.PRIVATE_BLOB_RETENTION_MS = '1000';
     process.env.MAILBOX_RETENTION_MS = '5000';
-    expect(new PrivateBlobPolicy().retentionMs()).toBe(5000);
+    const floored = new PrivateBlobPolicy(
+      PrivateBlobLimitsFromEnvironment.load(),
+    );
+    expect(floored.retentionMs()).toBe(5000);
 
     process.env.PRIVATE_BLOB_RETENTION_MS = '9000';
-    expect(new PrivateBlobPolicy().retentionMs()).toBe(9000);
+    const widened = new PrivateBlobPolicy(
+      PrivateBlobLimitsFromEnvironment.load(),
+    );
+    expect(widened.retentionMs()).toBe(9000);
   });
 });

@@ -1,3 +1,5 @@
+import { Timestamp } from '@haskou/value-objects';
+
 import PrivateBlobPolicy from '../domain/PrivateBlobPolicy';
 import PrivateBlobBytesStore from '../domain/repositories/PrivateBlobBytesStore';
 import PrivateBlobRepository from '../domain/repositories/PrivateBlobRepository';
@@ -53,7 +55,7 @@ export default class PrivateBlobExpirer {
    * files back without their records, and an upload that lands after the
    * expirer removed its record leaves a file behind. Those are removed here.
    */
-  public async expire(now: number): Promise<number> {
+  public async expire(now: Timestamp): Promise<number> {
     const alignmentFailed = await this.alignRetention();
     const expired = await this.repository.findExpired(now);
     let removed = 0;

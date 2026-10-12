@@ -1,3 +1,5 @@
+import { Timestamp } from '@haskou/value-objects';
+
 import { PrivateBlob } from '../PrivateBlob';
 
 export default abstract class PrivateBlobRepository {
@@ -6,7 +8,7 @@ export default abstract class PrivateBlobRepository {
   public abstract findById(id: string): Promise<PrivateBlob | undefined>;
 
   /** Blobs whose deadline passed, reserved or stored. */
-  public abstract findExpired(now: number): Promise<PrivateBlob[]>;
+  public abstract findExpired(now: Timestamp): Promise<PrivateBlob[]>;
 
   /** Stored blobs whose retention is shorter than `retentionMs`. */
   public abstract findStoredRetainedBelow(
@@ -23,7 +25,7 @@ export default abstract class PrivateBlobRepository {
 
   /** Sum of reserved sizes of live blobs, optionally for one owner. */
   public abstract reservedBytes(
-    now: number,
+    now: Timestamp,
     ownerKey?: string,
   ): Promise<number>;
 }
