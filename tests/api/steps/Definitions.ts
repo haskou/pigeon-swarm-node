@@ -4344,13 +4344,24 @@ export default class Definitions {
     'I sign the current content replication registration for the published content',
   )
   public async iSignTheCurrentContentReplicationRegistration(): Promise<void> {
+    await this.iSignTheCurrentContentReplicationRegistrationWithContext(
+      'ipfs_public_upload',
+    );
+  }
+
+  @given(
+    'I sign the current content replication registration for the published content with context {string}',
+  )
+  public async iSignTheCurrentContentReplicationRegistrationWithContext(
+    context: string,
+  ): Promise<void> {
     const keyPair = await this.ensureIdentityKeyPair();
     const identityId = keyPair.toPrimitives().publicKey;
     const cid = String(this.response?.data?.cid);
     const networkId = String(this.currentNetworkId);
     const payload = {
       cid,
-      context: 'ipfs_private_upload',
+      context,
       id: `content:${networkId}:${cid}`,
       networkId,
       ownerIdentityId: identityId,

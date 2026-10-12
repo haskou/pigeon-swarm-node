@@ -83,7 +83,6 @@ import { PostDeviceAuthorizationTransitionRoute } from '@app/apps/apis/identity-
 import { DeleteContentReplicationRoute } from '@app/apps/apis/ipfs-api/routes/DeleteContentReplicationRoute';
 import { GetContentReplicationStatusRoute } from '@app/apps/apis/ipfs-api/routes/GetContentReplicationStatusRoute';
 import { GetIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/GetIPFSContentRoute';
-import { PostNetworkIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/PostNetworkIPFSContentRoute';
 import { PostPublicIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/PostPublicIPFSContentRoute';
 import { PutContentReplicationRoute } from '@app/apps/apis/ipfs-api/routes/PutContentReplicationRoute';
 import { GetKeychainRoute } from '@app/apps/apis/keychains-api/routes/GetKeychainRoute';
@@ -212,7 +211,6 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   DeleteContentReplicationRoute,
   GetIPFSContentRoute,
   PostPublicIPFSContentRoute,
-  PostNetworkIPFSContentRoute,
   GetClientContractRoute,
   GetNodeRoute,
   GetNodeNetworksRoute,

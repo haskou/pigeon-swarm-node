@@ -461,8 +461,8 @@ non-responsible uploaders is the price; it is bounded by the per-identity quota.
 
 ### UI/API contract changes
 
-- Upload endpoints (`POST /ipfs/public`, `POST /ipfs/{networkId}`) no longer
-  announce replication. Replication registration is a second request,
+- The upload endpoint (`POST /ipfs/public`) no longer announces replication.
+  Replication registration is a second request,
   `PUT /ipfs/replication/{cid}` (or equivalent) with `{networkId, context,
   sizeBytes, mutation}` after the client has the CID. For public uploads of an
   unpublished identity (avatar before the identity is published, which the

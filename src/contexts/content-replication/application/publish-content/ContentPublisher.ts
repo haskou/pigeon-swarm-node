@@ -3,16 +3,15 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
 import ReplicatedContentStorage from '../content-storage/ReplicatedContentStorage';
-import { ContentDocument } from './ContentDocument';
 import { ContentPublishMessage } from './messages/ContentPublishMessage';
-import { PrivateContentPublishMessage } from './messages/PrivateContentPublishMessage';
 import { PublishedContent } from './PublishedContent';
 
 const defaultContentType = 'application/octet-stream';
 
 /**
- * Stores uploaded bytes on this node. Replication to other nodes is a separate,
- * owner-signed registration: an upload alone never announces anything.
+ * Stores uploaded public bytes on this node. Replication to other nodes is a
+ * separate, owner-signed registration: an upload alone never announces anything.
+ * Private content lives in private blobs and never enters IPFS.
  */
 export default class ContentPublisher {
   constructor(
@@ -20,46 +19,12 @@ export default class ContentPublisher {
     private readonly identityRepository: IdentityRepository,
   ) {}
 
-  private commonDocument(
-    message: ContentPublishMessage | PrivateContentPublishMessage,
-  ): Omit<ContentDocument, 'encrypted' | 'encryptedData'> {
-    return {
-      contentType: message.contentType || defaultContentType,
-      filename: message.filename,
-      size: message.body.length,
-      uploadedAt: Date.now(),
-      uploadedByIdentityId: message.ownerIdentityId.valueOf(),
-    };
-  }
-
   private async ownerNetworkIds(
     ownerIdentityId: IdentityId,
   ): Promise<NetworkId[]> {
     const identity = await this.identityRepository.findById(ownerIdentityId);
 
     return identity.getNetworkIds();
-  }
-
-  public async publishPrivate(
-    message: PrivateContentPublishMessage,
-  ): Promise<PublishedContent> {
-    const document: ContentDocument = {
-      ...this.commonDocument(message),
-      encrypted: true,
-      encryptedData: message.body.toString('base64'),
-    };
-    const cid = await this.contentStorage.publishDocumentToNetwork(
-      document,
-      message.networkId,
-    );
-
-    return {
-      cid: cid.valueOf(),
-      contentType: document.contentType,
-      encrypted: document.encrypted,
-      filename: message.filename,
-      size: message.body.length,
-    };
   }
 
   public async publishPublic(

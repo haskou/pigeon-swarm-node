@@ -1486,49 +1486,11 @@ WebP, AVIF, MP4, WebM, MP3, OGG, WAV). Anything else is served as
 `application/octet-stream` with `Content-Disposition: attachment`. Neither a
 content type nor a filename is replicated, so a remote peer cannot choose them.
 If the CID points to existing JSON content, the endpoint still returns that JSON
-document, because identities, keychains and private upload documents are stored
+document, because identities, keychains and legacy encrypted uploads are stored
 as JSON. Reading a CID may populate Helia's local block cache, but it does not
 pin the content or advertise this node as a provider.
 
 Unknown CIDs return `404` with body `{ "error": "CID not found in any network" }`.
-
-### Publish private content
-
-```http
-POST /ipfs/{networkId}
-```
-
-Requires signed request headers. The backend never encrypts, decrypts or
-inspects the original private file. Clients must encrypt the file bytes locally
-before sending the request. `networkId` is the target IPFS network id where the
-encrypted document must be stored.
-
-Request body is the encrypted raw binary content. `Content-Type` and
-`X-Filename` are kept only inside the stored private document.
-
-Response:
-
-```json
-{
-  "cid": "<privateContentCid>",
-  "contentType": "application/octet-stream",
-  "encrypted": true,
-  "filename": "encrypted-photo.bin",
-  "size": 215040
-}
-```
-
-Implemented:
-
-- publish client-encrypted private content only to the selected IPFS network
-- NOT announce replication; register with `PUT /ipfs/replication/{cid}` once the identity is published
-- accept raw encrypted request bytes instead of wrapping the content in
-  JSON/base64
-- store content as a JSON IPFS document with `encrypted: true`,
-  `contentType`, base64 `encryptedData`, optional `filename`, `size`,
-  `uploadedAt` and `uploadedByIdentityId`
-- limit encrypted content size to 50 MiB
-- return the CID to place inside encrypted message payloads
 
 ### Register content replication
 
@@ -1542,14 +1504,16 @@ Requires signed request headers. Call it only after the identity is published
 ```json
 {
   "networkId": "<networkId>",
-  "context": "ipfs_private_upload",
+  "context": "ipfs_public_upload",
   "sizeBytes": 2048,
   "mutation": { "...": "PublicMutationProof primitives" }
 }
 ```
 
-`context` is `ipfs_private_upload` or `ipfs_public_upload`; `sizeBytes` is
-1..52428800. Response: `204`.
+`context` must be `ipfs_public_upload`, the context for content from
+`POST /ipfs/public`. `ipfs_private_upload` is rejected with `400`: private
+content is never published to IPFS. `sizeBytes` is 1..52428800. Response:
+`204`.
 
 The replicated record is stored in the gated `contentReplication` collection:
 
@@ -2687,8 +2651,8 @@ Implemented:
   `mutationProof`, `networkId` and `participantIds`
 - derive unread state from OrbitDB replicated read markers and message metadata
 - attachment CIDs and metadata belong inside the client-encrypted payload; private
-  attachment bytes must be encrypted by the client and published first with
-  `POST /ipfs/{networkId}`
+  attachment bytes must be encrypted by the client and uploaded first as a
+  private blob (`POST /private-blobs`, then `PUT /private-blobs/{blobId}`)
 
 ### Edit message
 
@@ -4122,8 +4086,8 @@ Implemented:
   communities
 - store `plaintextPayload` as indexable plain text for public communities
 - attachment CIDs and metadata belong inside the client-encrypted payload; private
-  attachment bytes must be encrypted by the client and published first with
-  `POST /ipfs/{networkId}`
+  attachment bytes must be encrypted by the client and uploaded first as a
+  private blob (`POST /private-blobs`, then `PUT /private-blobs/{blobId}`)
 - allow threads by sending `replyToMessageId` with the id of an existing
   channel message in the same community channel
 - validate the message signature against this canonical payload:
