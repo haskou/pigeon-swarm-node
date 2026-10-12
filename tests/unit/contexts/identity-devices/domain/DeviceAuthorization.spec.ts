@@ -498,11 +498,13 @@ describe(DeviceAuthorization.name, () => {
     );
 
     expect(eventNames(authorization.enroll(candidateCredential))).toEqual([
-      'identity-devices.v1.device_authorization.credential_enrolled',
+      'identity_devices.v1.device_authorization.credential_enrolled',
     ]);
     expect(
       eventNames(authorization.enrollConcurrently([candidateCredential])),
-    ).toEqual(['identity-devices.v1.device_authorization.credential_enrolled']);
+    ).toEqual([
+      'identity_devices.v1.device_authorization.credential_enrolled',
+    ]);
   });
 
   it('records a revocation event for revoke and revokeConcurrently', () => {
@@ -513,11 +515,41 @@ describe(DeviceAuthorization.name, () => {
     enrolled.pullDomainEvents();
 
     expect(eventNames(enrolled.revoke(candidateCredential))).toEqual([
-      'identity-devices.v1.device_authorization.credential_revoked',
+      'identity_devices.v1.device_authorization.credential_revoked',
     ]);
     expect(
       eventNames(enrolled.revokeConcurrently([candidateCredential])),
-    ).toEqual(['identity-devices.v1.device_authorization.credential_revoked']);
+    ).toEqual([
+      'identity_devices.v1.device_authorization.credential_revoked',
+    ]);
+  });
+
+  it('records compromise events for a signed revocation carrying compromisedSince', async () => {
+    const enrolled = policy.apply(authorization, await enrollment());
+    const candidateCredential = DeviceCredential.fromString(
+      candidate.toPrimitives().publicKey,
+    );
+    enrolled.pullDomainEvents();
+    const unsignedRevocation = DeviceAuthorizationTransition.revocation(
+      identityId,
+      DeviceAuthorizationOperationId.generate(),
+      enrolled.getRevision(),
+      DeviceCredential.fromString(owner.toPrimitives().publicKey),
+      candidateCredential,
+      DeviceAuthorizationEpoch.genesis(),
+      enrolled.getRevision(),
+    );
+    const revoked = policy.apply(
+      enrolled,
+      unsignedRevocation.authorize(
+        owner.sign(unsignedRevocation.getSigningPayload()),
+      ),
+    );
+
+    expect(eventNames(revoked)).toEqual([
+      'identity_devices.v1.device_authorization.credential_revoked',
+      'identity_devices.v1.device_authorization.credential_compromised',
+    ]);
   });
 
   it('records a recovery event for recover and recoverAt', () => {
@@ -530,7 +562,7 @@ describe(DeviceAuthorization.name, () => {
 
     expect(
       eventNames(authorization.recover(candidateCredential, epoch)),
-    ).toEqual(['identity-devices.v1.device_authorization.recovered']);
+    ).toEqual(['identity_devices.v1.device_authorization.recovered']);
     expect(
       eventNames(
         authorization.recoverAt(
@@ -539,7 +571,7 @@ describe(DeviceAuthorization.name, () => {
           epoch,
         ),
       ),
-    ).toEqual(['identity-devices.v1.device_authorization.recovered']);
+    ).toEqual(['identity_devices.v1.device_authorization.recovered']);
   });
 
   it('keeps domain event attributes to identifiers and revision', () => {
