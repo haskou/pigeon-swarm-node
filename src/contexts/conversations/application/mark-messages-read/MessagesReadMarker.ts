@@ -13,14 +13,11 @@ export default class MessagesReadMarker {
   ) {}
 
   public async mark(message: MessagesReadMarkMessage): Promise<void> {
-    const conversation = await this.conversationRepository.findMetadataById(
+    const conversation = await this.conversationRepository.requireMetadataById(
       message.conversationId,
     );
 
-    if (
-      !conversation ||
-      !conversation.hasParticipant(message.readerIdentityId)
-    ) {
+    if (!conversation.hasParticipant(message.readerIdentityId)) {
       throw new ConversationNotFoundError(message.conversationId);
     }
 

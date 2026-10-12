@@ -93,7 +93,7 @@ describe('OrbitDBNotificationScopeSettingsRepository', () => {
 
     expect((await repository.findByIdentityId(identityId)).length).toBe(1);
     expect(
-      (await repository.findByScope(identityId, scope))?.getScope().key(),
+      (await repository.requireByScope(identityId, scope)).getScope().key(),
     ).toBe(scope.key());
   });
 
@@ -108,9 +108,7 @@ describe('OrbitDBNotificationScopeSettingsRepository', () => {
     );
     await repository.delete(identityId, scope, await proof('delete', 2));
 
-    await expect(
-      repository.findByScope(identityId, scope),
-    ).resolves.toBeUndefined();
+    await expect(repository.hasByScope(identityId, scope)).resolves.toBe(false);
   });
 
   it('refuses to bring settings back with a proof older than the reset', async () => {
@@ -126,9 +124,7 @@ describe('OrbitDBNotificationScopeSettingsRepository', () => {
     await expect(
       repository.save(settings, await proof('put', 1)),
     ).rejects.toBeInstanceOf(StalePublicMutationError);
-    await expect(
-      repository.findByScope(identityId, scope),
-    ).resolves.toBeUndefined();
+    await expect(repository.hasByScope(identityId, scope)).resolves.toBe(false);
   });
 
   it('ignores replicated documents with malformed notification scopes', async () => {

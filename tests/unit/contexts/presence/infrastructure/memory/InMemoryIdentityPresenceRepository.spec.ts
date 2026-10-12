@@ -1,4 +1,5 @@
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
+import { IdentityPresenceNotFoundError } from '@app/contexts/presence/domain/errors/IdentityPresenceNotFoundError';
 import InMemoryIdentityPresenceRepository from '@app/contexts/presence/infrastructure/memory/InMemoryIdentityPresenceRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
@@ -54,9 +55,9 @@ describe('InMemoryIdentityPresenceRepository', () => {
     await repository.save(newerPresence);
     await repository.save(olderPresence);
 
-    const storedPresence = await repository.findByIdentityId(identityId);
+    const storedPresence = await repository.requireByIdentityId(identityId);
 
-    expect(storedPresence?.toPrimitives()).toEqual(
+    expect(storedPresence.toPrimitives()).toEqual(
       expect.objectContaining({
         lastHeartbeatAt: 300,
         status: 'available',
@@ -89,14 +90,14 @@ describe('InMemoryIdentityPresenceRepository', () => {
     await repository.save(firstNodePresence);
     await repository.save(secondNodePresence);
 
-    const effectivePresence = await repository.findByIdentityId(identityId);
-    const firstLease = await repository.findByIdentityIdAndNodeId(
+    const effectivePresence = await repository.requireByIdentityId(identityId);
+    const firstLease = await repository.requireByIdentityIdAndNodeId(
       identityId,
       firstNodeId,
     );
 
-    expect(effectivePresence?.isConnected()).toBe(true);
-    expect(firstLease?.belongsToNode(firstNodeId)).toBe(true);
+    expect(effectivePresence.isConnected()).toBe(true);
+    expect(firstLease.belongsToNode(firstNodeId)).toBe(true);
   });
 
   it('keeps the newest selected preference when a later heartbeat arrives from another node', async () => {
@@ -123,8 +124,17 @@ describe('InMemoryIdentityPresenceRepository', () => {
     await repository.save(selectedBusyPresence);
     await repository.save(laterAvailableHeartbeat);
 
-    const effectivePresence = await repository.findByIdentityId(identityId);
+    const effectivePresence = await repository.requireByIdentityId(identityId);
 
-    expect(effectivePresence?.isBusy()).toBe(true);
+    expect(effectivePresence.isBusy()).toBe(true);
+  });
+
+  it('reports absence through has and rejects require when nothing is stored', async () => {
+    const repository = new InMemoryIdentityPresenceRepository();
+
+    await expect(repository.hasByIdentityId(identityId)).resolves.toBe(false);
+    await expect(
+      repository.requireByIdentityId(identityId),
+    ).rejects.toBeInstanceOf(IdentityPresenceNotFoundError);
   });
 });

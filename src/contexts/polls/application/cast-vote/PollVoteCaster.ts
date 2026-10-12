@@ -1,6 +1,5 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
-import { PollNotFoundError } from '../../domain/errors/PollNotFoundError';
 import { PollVoteWasCastEvent } from '../../domain/events/PollVoteWasCastEvent';
 import { Poll } from '../../domain/Poll';
 import PollRepository from '../../domain/repositories/PollRepository';
@@ -13,11 +12,7 @@ export class PollVoteCaster {
   ) {}
 
   public async cast(message: PollVoteCastMessage): Promise<Poll> {
-    const poll = await this.repository.findById(message.pollId);
-
-    if (!poll) {
-      throw new PollNotFoundError();
-    }
+    const poll = await this.repository.requireById(message.pollId);
 
     poll.castVote(
       message.voterIdentityId,

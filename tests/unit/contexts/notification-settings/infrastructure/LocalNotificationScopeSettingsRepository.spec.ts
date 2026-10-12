@@ -1,6 +1,7 @@
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
 import { NotificationScopeSettingsPreferences } from '@app/contexts/notification-settings/domain/NotificationScopeSettingsPreferences';
+import { NotificationScopeSettingsNotFoundError } from '@app/contexts/notification-settings/domain/errors/NotificationScopeSettingsNotFoundError';
 import { NotificationSettingsStorageCapacityExceededError } from '@app/contexts/notification-settings/domain/errors/NotificationSettingsStorageCapacityExceededError';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import LocalNotificationScopeSettingsRepository from '@app/contexts/notification-settings/infrastructure/local-db/LocalNotificationScopeSettingsRepository';
@@ -53,8 +54,8 @@ describe('LocalNotificationScopeSettingsRepository', () => {
 
     await expect(
       repository
-        .findByScope(identityId, scope)
-        .then((value) => value?.toPrimitives()),
+        .requireByScope(identityId, scope)
+        .then((value) => value.toPrimitives()),
     ).resolves.toEqual(settings.toPrimitives());
     await expect(
       repository
@@ -64,9 +65,10 @@ describe('LocalNotificationScopeSettingsRepository', () => {
 
     await repository.delete(identityId, scope);
 
+    await expect(repository.hasByScope(identityId, scope)).resolves.toBe(false);
     await expect(
-      repository.findByScope(identityId, scope),
-    ).resolves.toBeUndefined();
+      repository.requireByScope(identityId, scope),
+    ).rejects.toBeInstanceOf(NotificationScopeSettingsNotFoundError);
   });
 
   it('bounds the number of settings stored for one identity', async () => {

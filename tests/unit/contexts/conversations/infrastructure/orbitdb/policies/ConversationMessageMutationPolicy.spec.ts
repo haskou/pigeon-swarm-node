@@ -60,7 +60,7 @@ describe('ConversationMessageMutationPolicy', () => {
   it('accepts a conversation participant author', async () => {
     const conversation = mother.build();
 
-    repository.findMetadataAtFrontier.mockResolvedValue(conversation);
+    repository.requireMetadataAtFrontier.mockResolvedValue(conversation);
 
     await expect(
       policy.assertPermitted(record(), mother.author.valueOf(), false, [
@@ -72,7 +72,7 @@ describe('ConversationMessageMutationPolicy', () => {
   it('rejects an author that is not a participant', async () => {
     const outsider = await ConversationMother.generateIdentityId();
 
-    repository.findMetadataAtFrontier.mockResolvedValue(mother.build());
+    repository.requireMetadataAtFrontier.mockResolvedValue(mother.build());
 
     await expect(
       policy.assertPermitted(record(), outsider.valueOf(), false, [

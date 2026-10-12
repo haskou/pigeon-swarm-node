@@ -11,9 +11,9 @@ export default abstract class CommunityInviteRepository {
     invite: CommunityInvite,
   ): Promise<CommunityInviteUses>;
 
-  public abstract findByToken(
+  public abstract requireByToken(
     token: CommunityInviteToken,
-  ): Promise<CommunityInvite | undefined>;
+  ): Promise<CommunityInvite>;
 
   public abstract recordUse(
     invite: CommunityInvite,

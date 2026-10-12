@@ -16,9 +16,11 @@ export default abstract class StickerUserLibraryRepository {
     proof: PublicMutationProof,
   ): Promise<void>;
 
-  public abstract findByIdentityId(
+  public abstract hasByIdentityId(identityId: IdentityId): Promise<boolean>;
+
+  public abstract requireByIdentityId(
     identityId: IdentityId,
-  ): Promise<StickerUserLibrary | undefined>;
+  ): Promise<StickerUserLibrary>;
 
   public abstract forgetPack(
     identityId: IdentityId,

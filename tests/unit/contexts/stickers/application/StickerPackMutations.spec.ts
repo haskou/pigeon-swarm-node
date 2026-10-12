@@ -34,7 +34,7 @@ describe('Sticker pack application mutations', () => {
     const repository = mock<StickerPackRepository>();
     const pack = StickerPackMother.create();
 
-    repository.findById.mockResolvedValue(pack);
+    repository.requireById.mockResolvedValue(pack);
 
     const updated = await new StickerPackUpdater(repository).update(
       new StickerPackUpdateMessage(
@@ -57,7 +57,7 @@ describe('Sticker pack application mutations', () => {
   it('StickerPackUpdater rejects a missing pack', async () => {
     const repository = mock<StickerPackRepository>();
 
-    repository.findById.mockResolvedValue(undefined);
+    repository.requireById.mockRejectedValue(new StickerPackNotFoundError());
 
     await expect(
       new StickerPackUpdater(repository).update(
@@ -77,7 +77,7 @@ describe('Sticker pack application mutations', () => {
     const repository = mock<StickerPackRepository>();
     const pack = StickerPackMother.create({ withSticker: true });
 
-    repository.findById.mockResolvedValue(pack);
+    repository.requireById.mockResolvedValue(pack);
 
     const updated = await new StickerUpdater(repository).update(
       new StickerUpdateMessage(
@@ -101,7 +101,7 @@ describe('Sticker pack application mutations', () => {
     const repository = mock<StickerPackRepository>();
     const pack = StickerPackMother.create();
 
-    repository.findById.mockResolvedValue(pack);
+    repository.requireById.mockResolvedValue(pack);
 
     await expect(
       new StickerUpdater(repository).update(
@@ -122,7 +122,7 @@ describe('Sticker pack application mutations', () => {
     const repository = mock<StickerPackRepository>();
     const pack = StickerPackMother.create({ withSticker: true });
 
-    repository.findById.mockResolvedValue(pack);
+    repository.requireById.mockResolvedValue(pack);
 
     const updated = await new StickerDeleter(repository).delete(
       new StickerDeleteMessage(
@@ -146,7 +146,7 @@ describe('Sticker pack application mutations', () => {
     const repository = mock<StickerPackRepository>();
     const pack = StickerPackMother.create();
 
-    repository.findById.mockResolvedValue(pack);
+    repository.requireById.mockResolvedValue(pack);
 
     await expect(
       new StickerDeleter(repository).delete(

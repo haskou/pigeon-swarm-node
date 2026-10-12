@@ -10,6 +10,7 @@ import { Community } from '../../../domain/Community';
 import { CommunityChannelMessageRecordId } from '../../../domain/CommunityChannelMessageRecordId';
 import { CommunityChannelMessage } from '../../../domain/entities/messages/CommunityChannelMessage';
 import { CommunityChannelMessagePayload } from '../../../domain/entities/messages/CommunityChannelMessagePayload';
+import { CommunityNotFoundError } from '../../../domain/errors/CommunityNotFoundError';
 import CommunityRepository from '../../../domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '../../../domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../../../domain/value-objects/CommunityChannelMessageId';
@@ -33,7 +34,7 @@ export default class CommunityChannelMessageMutationPolicy extends PublicMutatio
     },
   );
 
-  private readonly communities = new ShortLivedLookup<Community | undefined>();
+  private readonly communities = new ShortLivedLookup<Community>();
 
   public readonly collection = 'messages';
 
@@ -91,18 +92,21 @@ export default class CommunityChannelMessageMutationPolicy extends PublicMutatio
     frontier: string[],
   ): Promise<Community> {
     const communityId = record.communityId as string;
-    const community = await this.communities.get(
-      PublicMutationFrontier.keyOf(communityId, frontier),
-      () =>
-        this.communityRepository.findAtFrontier(
+
+    return this.communities
+      .get(PublicMutationFrontier.keyOf(communityId, frontier), () =>
+        this.communityRepository.requireAtFrontier(
           new CommunityId(communityId),
           frontier,
         ),
-    );
+      )
+      .catch((error: unknown) => {
+        if (error instanceof CommunityNotFoundError) {
+          throw new InvalidPublicMutationError();
+        }
 
-    if (!community) throw new InvalidPublicMutationError();
-
-    return community;
+        throw error;
+      });
   }
 
   public expectationOf(

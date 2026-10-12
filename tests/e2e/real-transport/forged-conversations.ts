@@ -263,9 +263,9 @@ async function observedView(
   replica: Replica,
   id: ConversationId,
 ): Promise<unknown> {
-  const conversation = await replica.repository!.findMetadataById(id);
+  if (!(await replica.repository!.hasById(id))) return undefined;
 
-  if (!conversation) return undefined;
+  const conversation = await replica.repository!.requireMetadataById(id);
 
   return viewOf(
     JSON.parse(JSON.stringify(conversation.toPrimitives())) as Parameters<
@@ -782,10 +782,10 @@ async function main(): Promise<void> {
     'The honest node must hold exactly the honest operations',
   );
   assert.equal(
-    await honest.repository!.findMetadataById(
+    await honest.repository!.hasById(
       ConversationId.deriveGroup(networkId, mallory.id, spoofedGroup.nonce),
     ),
-    undefined,
+    false,
     'A spoofed genesis must not create a conversation',
   );
   // Without the gate nothing checks signatures, so the control node adopts the
@@ -855,7 +855,7 @@ async function main(): Promise<void> {
   );
   await assertNoForgedOperation('1:1 after genesis', oneToOneId, honest);
   assert.deepEqual(
-    (await honest.repository!.findMetadataById(oneToOneId))?.toPrimitives()
+    (await honest.repository!.requireMetadataById(oneToOneId)).toPrimitives()
       .participantIds,
     [owner.id, erin.id].sort(),
   );

@@ -1,5 +1,4 @@
 import { MessageEdited } from '@app/contexts/conversations/domain/entities/messages/MessageEdited';
-import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { MessageEditOptions } from '@app/contexts/conversations/domain/value-objects/MessageEditOptions';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
@@ -13,13 +12,9 @@ export default class MessageEditor {
   ) {}
 
   public async edit(message: MessageEditMessage): Promise<MessageEdited> {
-    const conversation = await this.conversationRepository.findById(
+    const conversation = await this.conversationRepository.requireById(
       message.conversationId,
     );
-
-    if (!conversation) {
-      throw new ConversationNotFoundError(message.conversationId);
-    }
 
     const editedMessage = conversation.editMessage(
       message.authorIdentityId,

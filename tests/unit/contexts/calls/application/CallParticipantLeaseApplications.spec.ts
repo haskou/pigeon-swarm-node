@@ -34,7 +34,7 @@ describe('call participant lease application services', () => {
     const leaseRenewer = mock<CallParticipantLeaseRenewer>();
     const eventPublisher = mock<DomainEventPublisher>();
     const lease = mock<CallParticipantLease>();
-    callRepository.findById.mockResolvedValue(call);
+    callRepository.requireById.mockResolvedValue(call);
     leaseRenewer.renew.mockResolvedValue(lease);
     lease.pullDomainEvents.mockReturnValue([]);
     const recorder = new CallParticipantHeartbeatRecorder(
@@ -168,7 +168,7 @@ describe('call participant lease application services', () => {
   it('restores a persisted conversation participant after local runtime leases are lost', async () => {
     const call = activeCall();
     const calls = mock<CallRepository>();
-    calls.findById.mockResolvedValue(call);
+    calls.requireById.mockResolvedValue(call);
     const leases = new InMemoryCallParticipantLeaseRepository();
     const nodes = mock<NodeRepository>();
     nodes.loadLocalNodeId.mockResolvedValue(nodeId);

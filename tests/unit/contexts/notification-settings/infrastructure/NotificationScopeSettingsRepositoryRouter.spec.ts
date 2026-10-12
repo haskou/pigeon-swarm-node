@@ -35,13 +35,13 @@ describe('NotificationScopeSettingsRepositoryRouter', () => {
     publicRepository = {
       delete: jest.fn(),
       findByIdentityId: jest.fn().mockResolvedValue([]),
-      findByScope: jest.fn(),
+      hasByScope: jest.fn(),
       save: jest.fn(),
     } as unknown as jest.Mocked<OrbitDBNotificationScopeSettingsRepository>;
     privateRepository = {
       delete: jest.fn(),
       findByIdentityId: jest.fn().mockResolvedValue([]),
-      findByScope: jest.fn(),
+      hasByScope: jest.fn(),
       save: jest.fn(),
     } as unknown as jest.Mocked<LocalNotificationScopeSettingsRepository>;
     guard = {
@@ -144,13 +144,13 @@ describe('NotificationScopeSettingsRepositoryRouter', () => {
   });
 
   it('reads private community settings only from local storage', async () => {
-    await repository.findByScope(identityId, privateScope);
+    await repository.hasByScope(identityId, privateScope);
 
-    expect(privateRepository.findByScope).toHaveBeenCalledWith(
+    expect(privateRepository.hasByScope).toHaveBeenCalledWith(
       identityId,
       privateScope,
     );
-    expect(publicRepository.findByScope).not.toHaveBeenCalled();
+    expect(publicRepository.hasByScope).not.toHaveBeenCalled();
   });
 
   it('deletes private community settings only from local storage', async () => {

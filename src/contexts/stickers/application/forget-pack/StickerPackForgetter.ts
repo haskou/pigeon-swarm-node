@@ -14,9 +14,8 @@ export default class StickerPackForgetter {
       message.proof,
     );
 
-    return (
-      (await this.repository.findByIdentityId(message.identityId)) ??
-      StickerUserLibrary.create(message.identityId)
-    );
+    return (await this.repository.hasByIdentityId(message.identityId))
+      ? await this.repository.requireByIdentityId(message.identityId)
+      : StickerUserLibrary.create(message.identityId);
   }
 }

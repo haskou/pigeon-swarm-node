@@ -1,5 +1,4 @@
 import { MessageSent } from '@app/contexts/conversations/domain/entities/messages/MessageSent';
-import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
@@ -12,13 +11,9 @@ export default class MessageSender {
   ) {}
 
   public async send(message: MessageSendMessage): Promise<MessageSent> {
-    const conversation = await this.conversationRepository.findById(
+    const conversation = await this.conversationRepository.requireById(
       message.getConversationId(),
     );
-
-    if (!conversation) {
-      throw new ConversationNotFoundError(message.getConversationId());
-    }
 
     const sentMessage = conversation.sendMessage(
       message.getAuthorIdentityId(),

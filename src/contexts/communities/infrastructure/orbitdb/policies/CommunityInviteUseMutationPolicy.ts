@@ -7,6 +7,8 @@ import { ShortLivedLookup } from '@app/contexts/public-mutations/infrastructure/
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Community } from '../../../domain/Community';
+import { CommunityInviteNotFoundError } from '../../../domain/errors/CommunityInviteNotFoundError';
+import { CommunityNotFoundError } from '../../../domain/errors/CommunityNotFoundError';
 import CommunityInviteRepository from '../../../domain/repositories/CommunityInviteRepository';
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
 import { CommunityInviteToken } from '../../../domain/value-objects/CommunityInviteToken';
@@ -19,7 +21,7 @@ export default class CommunityInviteUseMutationPolicy extends PublicMutationPoli
     'community_invite_use',
   );
 
-  private readonly communities = new ShortLivedLookup<Community | undefined>();
+  private readonly communities = new ShortLivedLookup<Community>();
 
   public readonly collection = 'requests';
 
@@ -33,6 +35,28 @@ export default class CommunityInviteUseMutationPolicy extends PublicMutationPoli
     private readonly inviteRepository: CommunityInviteRepository,
   ) {
     super();
+  }
+
+  private async findCommunity(
+    record: Record<string, unknown>,
+    frontier: string[],
+  ): Promise<Community> {
+    const communityId = record.communityId as string;
+
+    return this.communities
+      .get(PublicMutationFrontier.keyOf(communityId, frontier), () =>
+        this.communityRepository.requireAtFrontier(
+          new CommunityId(communityId),
+          frontier,
+        ),
+      )
+      .catch((error: unknown) => {
+        if (error instanceof CommunityNotFoundError) {
+          throw new InvalidPublicMutationError();
+        }
+
+        throw error;
+      });
   }
 
   public expectationOf(
@@ -59,24 +83,21 @@ export default class CommunityInviteUseMutationPolicy extends PublicMutationPoli
     _isDeletion: boolean,
     frontier: string[],
   ): Promise<void> {
-    const invite = await this.inviteRepository.findByToken(
-      new CommunityInviteToken(record.token as string),
-    );
+    const invite = await this.inviteRepository
+      .requireByToken(new CommunityInviteToken(record.token as string))
+      .catch((error: unknown) => {
+        if (error instanceof CommunityInviteNotFoundError) {
+          throw new InvalidPublicMutationError();
+        }
 
-    if (!invite || invite.getCommunityId().valueOf() !== record.communityId) {
+        throw error;
+      });
+
+    if (invite.getCommunityId().valueOf() !== record.communityId) {
       throw new InvalidPublicMutationError();
     }
 
-    const community = await this.communities.get(
-      PublicMutationFrontier.keyOf(record.communityId as string, frontier),
-      () =>
-        this.communityRepository.findAtFrontier(
-          new CommunityId(record.communityId as string),
-          frontier,
-        ),
-    );
-
-    if (!community) throw new InvalidPublicMutationError();
+    const community = await this.findCommunity(record, frontier);
     community.requestMembership(new IdentityId(authorIdentityId));
   }
 }

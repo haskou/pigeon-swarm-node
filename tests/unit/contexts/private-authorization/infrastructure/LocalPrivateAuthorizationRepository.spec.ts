@@ -3,6 +3,8 @@ import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infras
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
+import { PrivateAuthorizationReceiptNotFoundError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationReceiptNotFoundError';
+import { PrivateAuthorizationScopeNotFoundError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationScopeNotFoundError';
 import { PrivateAuthorizationRevision } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationRevision';
 import { PrivateAuthorizationScopeId } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationScopeId';
 import LocalPrivateAuthorizationRepository from '@app/contexts/private-authorization/infrastructure/local-db/LocalPrivateAuthorizationRepository';
@@ -85,7 +87,7 @@ describe('LocalPrivateAuthorizationRepository', () => {
       coordinator,
     );
 
-    await expect(restarted.findScope('scope')).resolves.toEqual(
+    await expect(restarted.requireScope('scope')).resolves.toEqual(
       expect.objectContaining({
         toPrimitives: expect.any(Function),
       }),
@@ -124,20 +126,36 @@ describe('LocalPrivateAuthorizationRepository', () => {
     );
     await repository.saveProjection('scope', { members: ['member'] });
 
-    await expect(repository.findReceipt('scope', 'accepted')).resolves.toEqual(
-      receipt.toPrimitives(),
-    );
-    const reservation = await repository.findReservation('scope', 'head-0');
+    await expect(
+      repository.requireReceipt('scope', 'accepted'),
+    ).resolves.toEqual(receipt.toPrimitives());
+    const reservation = await repository.requireReservation('scope', 'head-0');
 
-    expect(reservation?.toPrimitives()).toEqual({
+    expect(reservation.toPrimitives()).toEqual({
       authorDeviceKey: 'owner',
       childHeadHash: 'head-1',
       operationId: 'accepted',
       parentCheckpoint: checkpoint().toPrimitives(),
     });
-    await expect(repository.findProjection('scope')).resolves.toEqual({
+    await expect(repository.requireProjection('scope')).resolves.toEqual({
       members: ['member'],
     });
+  });
+
+  it('reports absent scoped records through has and rejects their require', async () => {
+    const repository = new LocalPrivateAuthorizationRepository(
+      database,
+      coordinator,
+    );
+
+    await expect(repository.hasScope('missing')).resolves.toBe(false);
+    await expect(repository.hasProjection('missing')).resolves.toBe(false);
+    await expect(repository.requireScope('missing')).rejects.toBeInstanceOf(
+      PrivateAuthorizationScopeNotFoundError,
+    );
+    await expect(
+      repository.requireReceipt('missing', 'accepted'),
+    ).rejects.toBeInstanceOf(PrivateAuthorizationReceiptNotFoundError);
   });
 
   it('finds a retained transition reservation by its parent revision', async () => {
@@ -154,12 +172,12 @@ describe('LocalPrivateAuthorizationRepository', () => {
       checkpoint(),
     );
 
-    const reservation = await repository.findReservationAtRevision(
+    const reservation = await repository.requireReservationAtRevision(
       new PrivateAuthorizationScopeId('scope'),
       new PrivateAuthorizationRevision(0),
     );
 
-    expect(reservation?.toPrimitives()).toEqual({
+    expect(reservation.toPrimitives()).toEqual({
       authorDeviceKey: 'owner',
       childHeadHash: 'head-1',
       operationId: 'accepted',
@@ -198,7 +216,7 @@ describe('LocalPrivateAuthorizationRepository', () => {
     );
 
     await expect(
-      repository.findReservationAtRevision(
+      repository.requireReservationAtRevision(
         new PrivateAuthorizationScopeId('scope'),
         new PrivateAuthorizationRevision(0),
       ),
@@ -249,7 +267,7 @@ describe('LocalPrivateAuthorizationRepository', () => {
     );
 
     await expect(
-      repository.findReservation('scope', 'head-0'),
+      repository.requireReservation('scope', 'head-0'),
     ).rejects.toThrow('Invalid private authorization');
   });
 
@@ -264,7 +282,7 @@ describe('LocalPrivateAuthorizationRepository', () => {
       status: 'active',
     });
 
-    await expect(repository.findScope('scope')).rejects.toThrow(
+    await expect(repository.requireScope('scope')).rejects.toThrow(
       'Invalid private authorization',
     );
   });

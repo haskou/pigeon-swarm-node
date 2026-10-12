@@ -1,7 +1,6 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import LatestMessagesFinder from '@app/contexts/conversations/application/find-latest-messages/LatestMessagesFinder';
 import { ThreadMessagesFindMessage } from '@app/contexts/conversations/application/find-latest-messages/messages/ThreadMessagesFindMessage';
-import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageTargetNotFoundError';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
@@ -87,9 +86,6 @@ export class GetConversationMessagesRoute extends Route {
       ).getMessage(),
     );
 
-    if (!message) {
-      throw new MessageTargetNotFoundError();
-    }
     const reactions = await this.finder.findReactionsFor(
       new GetConversationMessageRequest(
         conversationId,

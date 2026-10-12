@@ -126,7 +126,8 @@ describe('NotificationInvitationMutationPolicy', () => {
   });
 
   it('accepts participants of the signed conversation', async () => {
-    conversations.findMetadataById.mockResolvedValue(mother.build());
+    conversations.hasById.mockResolvedValue(true);
+    conversations.requireMetadataById.mockResolvedValue(mother.build());
 
     await expect(
       policy.assertPermitted(record(), mother.author.valueOf(), false),
@@ -136,7 +137,8 @@ describe('NotificationInvitationMutationPolicy', () => {
   it('rejects an inviter outside the conversation', async () => {
     const outsider = await ConversationMother.generateIdentityId();
 
-    conversations.findMetadataById.mockResolvedValue(mother.build());
+    conversations.hasById.mockResolvedValue(true);
+    conversations.requireMetadataById.mockResolvedValue(mother.build());
 
     await expect(
       policy.assertPermitted(
@@ -150,7 +152,8 @@ describe('NotificationInvitationMutationPolicy', () => {
   it('rejects a recipient outside the conversation', async () => {
     const outsider = await ConversationMother.generateIdentityId();
 
-    conversations.findMetadataById.mockResolvedValue(mother.build());
+    conversations.hasById.mockResolvedValue(true);
+    conversations.requireMetadataById.mockResolvedValue(mother.build());
 
     await expect(
       policy.assertPermitted(
@@ -162,7 +165,7 @@ describe('NotificationInvitationMutationPolicy', () => {
   });
 
   it('rejects an unknown conversation and deletions', async () => {
-    conversations.findMetadataById.mockResolvedValue(undefined);
+    conversations.hasById.mockResolvedValue(false);
 
     await expect(
       policy.assertPermitted(record(), mother.author.valueOf(), false),
@@ -222,7 +225,8 @@ describe('NotificationInvitationMutationPolicy', () => {
     }
 
     beforeEach(() => {
-      conversations.findMetadataById.mockResolvedValue(mother.build());
+      conversations.hasById.mockResolvedValue(true);
+      conversations.requireMetadataById.mockResolvedValue(mother.build());
     });
 
     it('admits an invitation while fewer genuine invitations sort before it', async () => {

@@ -1,5 +1,4 @@
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
-import { CommunityChannelMessageNotFoundError } from '@app/contexts/communities/domain/errors/CommunityChannelMessageNotFoundError';
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
@@ -20,15 +19,11 @@ export default class CommunityChannelMessageSender {
       return;
     }
 
-    const replyTarget = await this.messageRepository.findById(
+    await this.messageRepository.requireById(
       message.communityId,
       message.channelId,
       message.replyToMessageId,
     );
-
-    if (!replyTarget) {
-      throw new CommunityChannelMessageNotFoundError();
-    }
   }
 
   public async send(

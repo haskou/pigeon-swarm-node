@@ -240,14 +240,14 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       ),
     ).resolves.toBe('committed');
 
-    await expect(repository.findReceipt('scope', 'operation')).resolves.toEqual(
-      operation().toPrimitives(),
-    );
+    await expect(
+      repository.requireReceipt('scope', 'operation'),
+    ).resolves.toEqual(operation().toPrimitives());
     await expect(repository.findPending('scope')).resolves.toEqual([]);
-    await expect(repository.findProjection('scope')).resolves.toEqual({
+    await expect(repository.requireProjection('scope')).resolves.toEqual({
       members: ['member'],
     });
-    await expect(repository.findProtectedMlsState('scope')).resolves.toBe(
+    await expect(repository.requireProtectedMlsState('scope')).resolves.toBe(
       'encrypted-mls-state',
     );
     await expect(repository.hasReplayMarker('scope', 'request')).resolves.toBe(
@@ -309,10 +309,10 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       ),
     ).rejects.toThrow(PrivateAuthorizationStorageCapacityExceededError);
 
-    await expect(repository.findProjection('scope')).resolves.toBeUndefined();
+    await expect(repository.hasProjection('scope')).resolves.toBe(false);
     await expect(
-      repository.findReceipt('scope', 'operation'),
-    ).resolves.toBeUndefined();
+      repository.hasReceipt('scope', 'operation'),
+    ).resolves.toBe(false);
     await expect(
       database.findOne(
         PrivateAuthorizationLocalNamespaces.provisioning,
@@ -344,7 +344,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       ),
     ).resolves.toBe('committed');
 
-    const storedScope = await repository.findScope('scope');
+    const storedScope = await repository.requireScope('scope');
     const reservation = await database.findOne(
       PrivateAuthorizationLocalNamespaces.provisioning,
       'scope',
@@ -354,9 +354,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       await provisionedDocumentBytes('scope'),
     );
     expect(
-      storedScope
-        ?.toPrimitives()
-        .pendingOperations.map((pending) => pending.id),
+      storedScope.toPrimitives().pendingOperations.map((pending) => pending.id),
     ).toEqual(['future', 'operation']);
   });
 
@@ -418,13 +416,13 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       ]),
     ).resolves.toEqual(['committed', 'duplicate']);
     expect(databaseCommit).toHaveBeenCalledTimes(1);
-    await expect(repository.findScope('new-scope')).resolves.toBeDefined();
-    await expect(repository.findProjection('new-scope')).resolves.toEqual({
+    await expect(repository.requireScope('new-scope')).resolves.toBeDefined();
+    await expect(repository.requireProjection('new-scope')).resolves.toEqual({
       id: 'new-scope',
     });
-    await expect(repository.findProtectedMlsState('new-scope')).resolves.toBe(
-      'protected-genesis-state',
-    );
+    await expect(
+      repository.requireProtectedMlsState('new-scope'),
+    ).resolves.toBe('protected-genesis-state');
     await expect(
       database.findOne(
         PrivateAuthorizationLocalNamespaces.provisioning,
@@ -439,8 +437,8 @@ describe('LocalPrivateOperationUnitOfWork', () => {
   it('accepts an exact genesis retry after the live scope has advanced', async () => {
     const commit = genesis('advanced-scope');
     await unitOfWork.commitGenesis(commit);
-    const stored = await repository.findScope('advanced-scope');
-    const primitives = stored!.toPrimitives();
+    const stored = await repository.requireScope('advanced-scope');
+    const primitives = stored.toPrimitives();
     await repository.saveScope(
       PrivateAuthorizationScope.fromPrimitives({
         ...primitives,
@@ -464,17 +462,19 @@ describe('LocalPrivateOperationUnitOfWork', () => {
 
     await expect(unitOfWork.commitGenesis(commit)).resolves.toBe('duplicate');
     expect(
-      (await repository.findScope('advanced-scope'))?.toPrimitives(),
+      (await repository.requireScope('advanced-scope')).toPrimitives(),
     ).toMatchObject({
       checkpoint: { headHash: 'advanced-head', revision: 1 },
       status: 'active',
     });
-    await expect(repository.findProjection('advanced-scope')).resolves.toEqual({
+    await expect(
+      repository.requireProjection('advanced-scope'),
+    ).resolves.toEqual({
       id: 'advanced-scope',
       members: ['member'],
     });
     await expect(
-      repository.findProtectedMlsState('advanced-scope'),
+      repository.requireProtectedMlsState('advanced-scope'),
     ).resolves.toBe('advanced-protected-state');
   });
 
@@ -524,7 +524,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
   });
 
   it('waits for an in-flight public write before protecting its scope', async () => {
-    const findScope = jest.spyOn(repository, 'findScope');
+    const hasScope = jest.spyOn(repository, 'hasScope');
     let releasePublicWrite!: () => void;
     let publicWriteStarted!: () => void;
     const publicWriteReleased = new Promise<void>((resolve) => {
@@ -536,9 +536,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     const publicWrite = storageCoordinator.exclusively(
       'racing-scope',
       async () => {
-        await expect(
-          repository.findScope('racing-scope'),
-        ).resolves.toBeUndefined();
+        await expect(repository.hasScope('racing-scope')).resolves.toBe(false);
         publicWriteStarted();
         await publicWriteReleased;
       },
@@ -556,8 +554,8 @@ describe('LocalPrivateOperationUnitOfWork', () => {
 
     await new Promise<void>((resolve) => setImmediate(resolve));
     expect(provisioned).toBe(false);
-    expect(findScope).toHaveBeenCalledTimes(1);
-    await expect(repository.findScope('racing-scope')).resolves.toBeUndefined();
+    expect(hasScope).toHaveBeenCalledTimes(1);
+    await expect(repository.hasScope('racing-scope')).resolves.toBe(false);
     releasePublicWrite();
     await publicWrite;
     await expect(provisioning).resolves.toBe('committed');
@@ -572,10 +570,12 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       ),
     ).rejects.toThrow(PrivateAuthorizationConflictError);
     expect(
-      (await repository.findScope('conflicting-scope'))?.toPrimitives().status,
+      (await repository.requireScope('conflicting-scope'))
+        .toPrimitives()
+        .status,
     ).toBe('frozen');
     await expect(
-      repository.findProjection('conflicting-scope'),
+      repository.requireProjection('conflicting-scope'),
     ).resolves.toEqual({ id: 'conflicting-scope' });
   });
 
@@ -595,11 +595,11 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       ),
     ).rejects.toThrow(InvalidPrivateAuthorizationError);
     expect(
-      (await repository.findScope('protected-scope'))?.toPrimitives().status,
+      (await repository.requireScope('protected-scope')).toPrimitives().status,
     ).toBe('active');
-    await expect(repository.findProjection('protected-scope')).resolves.toEqual(
-      { id: 'protected-scope' },
-    );
+    await expect(
+      repository.requireProjection('protected-scope'),
+    ).resolves.toEqual({ id: 'protected-scope' });
   });
 
   it('atomically removes pending operations invalidated by a checkpoint', async () => {
@@ -762,20 +762,20 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     ).resolves.toBe('committed');
 
     await expect(
-      repository.findReceipt('scope', oldest.id),
-    ).resolves.toBeUndefined();
+      repository.hasReceipt('scope', oldest.id),
+    ).resolves.toBe(false);
     await expect(
       repository.hasReplayMarker('scope', 'retired-replay'),
     ).resolves.toBe(false);
     await expect(
-      repository.findReservation('scope', 'retired-parent'),
+      repository.requireReservation('scope', 'retired-parent'),
     ).resolves.toEqual(
       expect.objectContaining({
         toPrimitives: expect.any(Function),
       }),
     );
     await expect(
-      repository.findReservationAtRevision(
+      repository.requireReservationAtRevision(
         new PrivateAuthorizationScopeId('scope'),
         new PrivateAuthorizationRevision(0),
       ),
@@ -854,13 +854,13 @@ describe('LocalPrivateOperationUnitOfWork', () => {
         ),
       ]),
     ).resolves.toEqual(['committed', 'committed']);
-    await expect(repository.findScope('scope')).resolves.toEqual(
+    await expect(repository.requireScope('scope')).resolves.toEqual(
       expect.objectContaining({ toPrimitives: expect.any(Function) }),
     );
-    const stored = await repository.findScope('scope');
+    const stored = await repository.requireScope('scope');
     expect(
       stored
-        ?.toPrimitives()
+        .toPrimitives()
         .acceptedOperations.map(({ id }) => id)
         .sort(),
     ).toEqual(['proposal-a', 'proposal-b']);
@@ -926,8 +926,8 @@ describe('LocalPrivateOperationUnitOfWork', () => {
     ).resolves.toBe('committed');
 
     expect(
-      (await repository.findScope('scope'))
-        ?.toPrimitives()
+      (await repository.requireScope('scope'))
+        .toPrimitives()
         .acceptedOperations.map(({ id }) => id),
     ).toEqual(['proposal', 'revocation']);
   });
@@ -957,7 +957,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       reason: expect.any(PrivateAuthorizationConflictError),
       status: 'rejected',
     });
-    expect((await repository.findScope('scope'))?.toPrimitives().status).toBe(
+    expect((await repository.requireScope('scope')).toPrimitives().status).toBe(
       'frozen',
     );
   });
@@ -988,7 +988,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       reason: expect.any(InvalidPrivateAuthorizationError),
       status: 'rejected',
     });
-    expect((await repository.findScope('scope'))?.toPrimitives().status).toBe(
+    expect((await repository.requireScope('scope')).toPrimitives().status).toBe(
       'active',
     );
   });
@@ -1026,7 +1026,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
         accepted,
       ),
     ).rejects.toThrow(PrivateAuthorizationConflictError);
-    expect((await repository.findScope('scope'))?.toPrimitives().status).toBe(
+    expect((await repository.requireScope('scope')).toPrimitives().status).toBe(
       'frozen',
     );
   });
@@ -1051,7 +1051,7 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       ),
     ).resolves.toBe('stale');
     expect(
-      (await repository.findScope('scope'))?.toPrimitives().checkpoint,
+      (await repository.requireScope('scope')).toPrimitives().checkpoint,
     ).toMatchObject({ headHash: 'head-1', revision: 1 });
   });
 
@@ -1073,9 +1073,9 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       ),
     ).rejects.toBeInstanceOf(PrivateAuthorizationConflictError);
     await expect(
-      repository.findReceipt('scope', 'operation'),
-    ).resolves.toBeUndefined();
-    expect((await repository.findScope('scope'))?.toPrimitives().status).toBe(
+      repository.hasReceipt('scope', 'operation'),
+    ).resolves.toBe(false);
+    expect((await repository.requireScope('scope')).toPrimitives().status).toBe(
       'frozen',
     );
   });
@@ -1098,9 +1098,9 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       ),
     ).rejects.toBeInstanceOf(PrivateAuthorizationConflictError);
     await expect(
-      repository.findReceipt('scope', 'operation'),
-    ).resolves.toBeUndefined();
-    expect((await repository.findScope('scope'))?.toPrimitives().status).toBe(
+      repository.hasReceipt('scope', 'operation'),
+    ).resolves.toBe(false);
+    expect((await repository.requireScope('scope')).toPrimitives().status).toBe(
       'frozen',
     );
   });
@@ -1137,9 +1137,9 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       ),
     ).rejects.toBeInstanceOf(InvalidPrivateAuthorizationError);
     await expect(
-      repository.findReceipt('scope', 'device-operation'),
-    ).resolves.toBeUndefined();
-    expect((await repository.findScope('scope'))?.toPrimitives().status).toBe(
+      repository.hasReceipt('scope', 'device-operation'),
+    ).resolves.toBe(false);
+    expect((await repository.requireScope('scope')).toPrimitives().status).toBe(
       'active',
     );
   });
@@ -1179,12 +1179,12 @@ describe('LocalPrivateOperationUnitOfWork', () => {
         sibling,
       ),
     ).rejects.toBeInstanceOf(PrivateAuthorizationConflictError);
-    expect((await repository.findScope('scope'))?.toPrimitives()).toMatchObject(
-      {
-        checkpoint: { headHash: 'head-1' },
-        status: 'frozen',
-      },
-    );
+    expect(
+      (await repository.requireScope('scope')).toPrimitives(),
+    ).toMatchObject({
+      checkpoint: { headHash: 'head-1' },
+      status: 'frozen',
+    });
   });
 
   it('serializes concurrent compare-and-swap acceptance per scope', async () => {
@@ -1268,12 +1268,12 @@ describe('LocalPrivateOperationUnitOfWork', () => {
       ),
     ).rejects.toThrow();
     await expect(
-      repository.findReceipt('scope', 'operation'),
-    ).resolves.toBeUndefined();
-    await expect(repository.findScope('scope')).resolves.toEqual(
+      repository.hasReceipt('scope', 'operation'),
+    ).resolves.toBe(false);
+    await expect(repository.requireScope('scope')).resolves.toEqual(
       expect.objectContaining({ toPrimitives: expect.any(Function) }),
     );
-    await expect(repository.findProjection('scope')).resolves.toBeUndefined();
+    await expect(repository.hasProjection('scope')).resolves.toBe(false);
     await expect(repository.findPending('scope')).resolves.toHaveLength(1);
   });
 });

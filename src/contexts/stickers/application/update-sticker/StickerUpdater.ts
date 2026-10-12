@@ -1,4 +1,3 @@
-import { StickerPackNotFoundError } from '../../domain/errors/StickerPackNotFoundError';
 import StickerPackRepository from '../../domain/repositories/StickerPackRepository';
 import { StickerPack } from '../../domain/StickerPack';
 import { StickerUpdateMessage } from './messages/StickerUpdateMessage';
@@ -7,11 +6,7 @@ export default class StickerUpdater {
   constructor(private readonly repository: StickerPackRepository) {}
 
   public async update(message: StickerUpdateMessage): Promise<StickerPack> {
-    const pack = await this.repository.findById(message.packId);
-
-    if (!pack) {
-      throw new StickerPackNotFoundError();
-    }
+    const pack = await this.repository.requireById(message.packId);
 
     pack.updateSticker(
       message.actorIdentityId,

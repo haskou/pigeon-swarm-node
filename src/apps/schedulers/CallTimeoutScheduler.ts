@@ -36,11 +36,12 @@ export default class CallTimeoutScheduler extends Scheduler {
       await this.eventPublisher.publish(call.pullDomainEvents());
 
       for (const participant of missedParticipants) {
-        const existing = await this.notificationRepository.findById(
-          NotificationId.missedCall(primitives.id, participant.valueOf()),
+        const notificationId = NotificationId.missedCall(
+          primitives.id,
+          participant.valueOf(),
         );
 
-        if (existing) continue;
+        if (await this.notificationRepository.hasById(notificationId)) continue;
 
         const notification = Notification.missedCall(
           MissedCallPayload.fromPrimitives({

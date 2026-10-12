@@ -1,43 +1,57 @@
 import LocalPrivateCommunityRepository from '@app/contexts/communities/infrastructure/local-db/LocalPrivateCommunityRepository';
+import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
+import { PrivateAuthorizationProjectionNotFoundError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationProjectionNotFoundError';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { generateKeyPairSync } from 'node:crypto';
 
 describe('LocalPrivateCommunityRepository', () => {
   const authorization = {
-    findProjection: jest.fn(),
+    requireProjection: jest.fn(),
     findScopeIds: jest.fn(),
   } as unknown as jest.Mocked<PrivateAuthorizationRepository>;
   const repository = new LocalPrivateCommunityRepository(authorization);
 
   beforeEach(() => jest.clearAllMocks());
 
-  it('returns no community when the local private projection is absent', async () => {
-    authorization.findProjection.mockResolvedValue(undefined);
+  it('rejects a community whose local private projection is absent', async () => {
+    authorization.requireProjection.mockRejectedValue(
+      new PrivateAuthorizationProjectionNotFoundError(),
+    );
 
     await expect(
-      repository.findById(new CommunityId('protected')),
-    ).resolves.toBeUndefined();
+      repository.requireById(new CommunityId('protected')),
+    ).rejects.toBeInstanceOf(CommunityNotFoundError);
+  });
+
+  it('reports no community when the local private projection is absent', async () => {
+    authorization.requireProjection.mockRejectedValue(
+      new PrivateAuthorizationProjectionNotFoundError(),
+    );
+
+    await expect(
+      repository.hasById(new CommunityId('protected')),
+    ).resolves.toBe(false);
   });
 
   it('fails closed when the private projection is malformed', async () => {
-    authorization.findProjection.mockResolvedValue({ id: 'protected' });
+    authorization.requireProjection.mockResolvedValue({ id: 'protected' });
 
     await expect(
-      repository.findById(new CommunityId('protected')),
+      repository.requireById(new CommunityId('protected')),
     ).rejects.toBeInstanceOf(InvalidPrivateAuthorizationError);
   });
 
   it('fails closed when a stored role lacks its built-in flag', async () => {
-    authorization.findProjection.mockResolvedValue({
+    authorization.requireProjection.mockResolvedValue({
       ...projection('protected', []),
       roles: [{ id: 'admin', name: 'Admin', permissions: [] }],
     });
 
     await expect(
-      repository.findById(new CommunityId('protected')),
+      repository.requireById(new CommunityId('protected')),
     ).rejects.toBeInstanceOf(InvalidPrivateAuthorizationError);
   });
 
@@ -48,7 +62,7 @@ describe('LocalPrivateCommunityRepository', () => {
       'member-community',
       'other-community',
     ]);
-    authorization.findProjection.mockImplementation((scopeId) =>
+    authorization.requireProjection.mockImplementation((scopeId) =>
       Promise.resolve(
         projection(
           scopeId,
@@ -68,12 +82,12 @@ describe('LocalPrivateCommunityRepository', () => {
 
   it('fails closed when a projection is stored under another scope identifier', async () => {
     const identityId = validIdentityId();
-    authorization.findProjection.mockResolvedValue(
+    authorization.requireProjection.mockResolvedValue(
       projection('different-community', [identityId.valueOf()]),
     );
 
     await expect(
-      repository.findById(new CommunityId('protected')),
+      repository.requireById(new CommunityId('protected')),
     ).rejects.toBeInstanceOf(InvalidPrivateAuthorizationError);
   });
 });

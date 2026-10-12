@@ -108,10 +108,15 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
     authorIdentityId: string,
   ): Promise<void> {
     const conversationId = this.scopeOf(record).conversationId as string;
-    const conversation = await this.conversations.get(conversationId, () =>
-      this.conversationRepository.findMetadataById(
-        new ConversationId(conversationId),
-      ),
+    const conversation = await this.conversations.get(
+      conversationId,
+      async () => {
+        const id = new ConversationId(conversationId);
+
+        return (await this.conversationRepository.hasById(id))
+          ? this.conversationRepository.requireMetadataById(id)
+          : undefined;
+      },
     );
 
     if (!conversation) throw new InvalidPublicMutationError();
@@ -140,10 +145,13 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
     const scope = this.scopeOf(record);
     const community = await this.communities.get(
       scope.communityId as string,
-      () =>
-        this.communityRepository.findById(
-          new CommunityId(scope.communityId as string),
-        ),
+      async () => {
+        const communityId = new CommunityId(scope.communityId as string);
+
+        return (await this.communityRepository.hasById(communityId))
+          ? this.communityRepository.requireById(communityId)
+          : undefined;
+      },
     );
 
     if (!community || community.getNetworkId().valueOf() !== record.networkId) {

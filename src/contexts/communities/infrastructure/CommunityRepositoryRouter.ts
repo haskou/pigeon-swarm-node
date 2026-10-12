@@ -21,8 +21,8 @@ export default class CommunityRepositoryRouter extends CommunityRepository {
     super();
   }
 
-  private async isProtected(id: CommunityId): Promise<boolean> {
-    return Boolean(await this.authorizationRepository.findScope(id.valueOf()));
+  private isProtected(id: CommunityId): Promise<boolean> {
+    return this.authorizationRepository.hasScope(id.valueOf());
   }
 
   private async removeProtected(
@@ -55,27 +55,37 @@ export default class CommunityRepositoryRouter extends CommunityRepository {
     );
   }
 
-  public async findById(id: CommunityId): Promise<Community | undefined> {
+  public async requireById(id: CommunityId): Promise<Community> {
     return this.storageCoordinator.exclusively(id.valueOf(), async () => {
       if (await this.isProtected(id)) {
-        return this.privateRepository.findById(id);
+        return this.privateRepository.requireById(id);
       }
 
-      return this.publicRepository.findById(id);
+      return this.publicRepository.requireById(id);
+    });
+  }
+
+  public async hasById(id: CommunityId): Promise<boolean> {
+    return this.storageCoordinator.exclusively(id.valueOf(), async () => {
+      if (await this.isProtected(id)) {
+        return this.privateRepository.hasById(id);
+      }
+
+      return this.publicRepository.hasById(id);
     });
   }
 
   /** A protected community has no replicated operation log: its local state is the only one. */
-  public async findAtFrontier(
+  public async requireAtFrontier(
     id: CommunityId,
     frontier: string[],
-  ): Promise<Community | undefined> {
+  ): Promise<Community> {
     return this.storageCoordinator.exclusively(id.valueOf(), async () => {
       if (await this.isProtected(id)) {
-        return this.privateRepository.findById(id);
+        return this.privateRepository.requireById(id);
       }
 
-      return this.publicRepository.findAtFrontier(id, frontier);
+      return this.publicRepository.requireAtFrontier(id, frontier);
     });
   }
 

@@ -14,10 +14,8 @@ export default class PrivateCommunityPublicStorageGuard {
     return !(await this.isProtected(communityId));
   }
 
-  public async isProtected(communityId: CommunityId): Promise<boolean> {
-    return Boolean(
-      await this.authorizationRepository.findScope(communityId.valueOf()),
-    );
+  public isProtected(communityId: CommunityId): Promise<boolean> {
+    return this.authorizationRepository.hasScope(communityId.valueOf());
   }
 
   public async assertPublic(communityId: CommunityId): Promise<void> {

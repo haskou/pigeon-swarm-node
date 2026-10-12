@@ -1,6 +1,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 
+import { NotificationNotFoundError } from '../../domain/errors/NotificationNotFoundError';
 import { Notification } from '../../domain/Notification';
 import { NotificationId } from '../../domain/value-objects/NotificationId';
 
@@ -20,13 +21,24 @@ export default class LocalNotificationRepository {
     );
   }
 
-  public async findById(id: NotificationId): Promise<Notification | undefined> {
+  public async hasById(id: NotificationId): Promise<boolean> {
     const document = await this.database.findOne(
       LocalNotificationRepository.NAMESPACE,
       id.valueOf(),
     );
 
-    return document ? this.toDomain(document) : undefined;
+    return document !== undefined;
+  }
+
+  public async requireById(id: NotificationId): Promise<Notification> {
+    const document = await this.database.findOne(
+      LocalNotificationRepository.NAMESPACE,
+      id.valueOf(),
+    );
+
+    if (!document) throw new NotificationNotFoundError();
+
+    return this.toDomain(document);
   }
 
   public async findByRecipient(

@@ -1,5 +1,4 @@
 import { StickerNotFoundError } from '../../domain/errors/StickerNotFoundError';
-import { StickerPackNotFoundError } from '../../domain/errors/StickerPackNotFoundError';
 import StickerPackRepository from '../../domain/repositories/StickerPackRepository';
 import StickerUserLibraryRepository from '../../domain/repositories/StickerUserLibraryRepository';
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
@@ -14,11 +13,7 @@ export default class StickerFavoriter {
   public async favorite(
     message: StickerFavoriteMessage,
   ): Promise<StickerUserLibrary> {
-    const pack = await this.packRepository.findById(message.packId);
-
-    if (!pack) {
-      throw new StickerPackNotFoundError();
-    }
+    const pack = await this.packRepository.requireById(message.packId);
 
     if (!pack.hasSticker(message.stickerId)) {
       throw new StickerNotFoundError();
@@ -32,9 +27,8 @@ export default class StickerFavoriter {
       message.proof,
     );
 
-    return (
-      (await this.libraryRepository.findByIdentityId(message.identityId)) ??
-      StickerUserLibrary.create(message.identityId)
-    );
+    return (await this.libraryRepository.hasByIdentityId(message.identityId))
+      ? await this.libraryRepository.requireByIdentityId(message.identityId)
+      : StickerUserLibrary.create(message.identityId);
   }
 }

@@ -2,6 +2,7 @@ import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { CallSignalDelivery } from '../../domain/CallSignalDelivery';
+import { CallSignalDeliveryNotFoundError } from '../../domain/errors/CallSignalDeliveryNotFoundError';
 import CallSignalDeliveryRepository from '../../domain/repositories/CallSignalDeliveryRepository';
 import { CallSignalId } from '../../domain/value-objects/CallSignalId';
 
@@ -25,12 +26,24 @@ export default class InMemoryCallSignalDeliveryRepository extends CallSignalDeli
     }
   }
 
-  public findById(
-    signalId: CallSignalId,
-  ): Promise<CallSignalDelivery | undefined> {
+  private findCurrent(signalId: CallSignalId): CallSignalDelivery | undefined {
     const primitives = this.deliveries.get(signalId.valueOf());
 
-    return Promise.resolve(primitives ? this.hydrate(primitives) : undefined);
+    return primitives ? this.hydrate(primitives) : undefined;
+  }
+
+  public hasById(signalId: CallSignalId): Promise<boolean> {
+    return Promise.resolve(this.deliveries.has(signalId.valueOf()));
+  }
+
+  public requireById(signalId: CallSignalId): Promise<CallSignalDelivery> {
+    const delivery = this.findCurrent(signalId);
+
+    if (!delivery) {
+      return Promise.reject(new CallSignalDeliveryNotFoundError());
+    }
+
+    return Promise.resolve(delivery);
   }
 
   public findRetryableOwnedBy(
@@ -83,15 +96,17 @@ export default class InMemoryCallSignalDeliveryRepository extends CallSignalDeli
     this.changedListeners.add(listener);
   }
 
-  public async save(delivery: CallSignalDelivery): Promise<void> {
+  public save(delivery: CallSignalDelivery): Promise<void> {
     const signalId = delivery.getId();
-    const current = await this.findById(signalId);
+    const current = this.findCurrent(signalId);
 
     if (current && !delivery.supersedes(current)) {
-      return;
+      return Promise.resolve();
     }
 
     this.deliveries.set(signalId.valueOf(), delivery.toPrimitives());
     this.notifyChanged();
+
+    return Promise.resolve();
   }
 }

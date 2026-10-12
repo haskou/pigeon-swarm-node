@@ -8,6 +8,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 
 import { Community } from '../../../domain/Community';
 import { CommunityInvite } from '../../../domain/entities/invites/CommunityInvite';
+import { CommunityNotFoundError } from '../../../domain/errors/CommunityNotFoundError';
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
 import { CommunityInviteToken } from '../../../domain/value-objects/CommunityInviteToken';
 import OrbitDBCommunityRepository from '../OrbitDBCommunityRepository';
@@ -20,7 +21,7 @@ export default class CommunityInviteMutationPolicy extends PublicMutationPolicy 
     { optionalIntegers: ['expiresAt'] },
   );
 
-  private readonly communities = new ShortLivedLookup<Community | undefined>();
+  private readonly communities = new ShortLivedLookup<Community>();
 
   public readonly collection = 'requests';
 
@@ -33,6 +34,28 @@ export default class CommunityInviteMutationPolicy extends PublicMutationPolicy 
     private readonly communityRepository: OrbitDBCommunityRepository,
   ) {
     super();
+  }
+
+  private async findCommunity(
+    record: Record<string, unknown>,
+    frontier: string[],
+  ): Promise<Community> {
+    const communityId = record.communityId as string;
+
+    return this.communities
+      .get(PublicMutationFrontier.keyOf(communityId, frontier), () =>
+        this.communityRepository.requireAtFrontier(
+          new CommunityId(communityId),
+          frontier,
+        ),
+      )
+      .catch((error: unknown) => {
+        if (error instanceof CommunityNotFoundError) {
+          throw new InvalidPublicMutationError();
+        }
+
+        throw error;
+      });
   }
 
   public expectationOf(
@@ -76,16 +99,7 @@ export default class CommunityInviteMutationPolicy extends PublicMutationPolicy 
     _isDeletion: boolean,
     frontier: string[],
   ): Promise<void> {
-    const community = await this.communities.get(
-      PublicMutationFrontier.keyOf(record.communityId as string, frontier),
-      () =>
-        this.communityRepository.findAtFrontier(
-          new CommunityId(record.communityId as string),
-          frontier,
-        ),
-    );
-
-    if (!community) throw new InvalidPublicMutationError();
+    const community = await this.findCommunity(record, frontier);
     community.assertCanCreateInvite(new IdentityId(authorIdentityId));
   }
 }

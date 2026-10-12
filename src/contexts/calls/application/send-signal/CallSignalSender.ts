@@ -2,7 +2,6 @@ import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeReposito
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { CallSignalDelivery } from '../../domain/CallSignalDelivery';
-import { CallNotFoundError } from '../../domain/errors/CallNotFoundError';
 import CallRepository from '../../domain/repositories/CallRepository';
 import CallSignalDeliveryRepository from '../../domain/repositories/CallSignalDeliveryRepository';
 import { CallSignalId } from '../../domain/value-objects/CallSignalId';
@@ -22,11 +21,7 @@ export default class CallSignalSender {
     message: CallSignalSendMessage,
     onCallFound?: () => Promise<void>,
   ): Promise<CallSignalDelivery> {
-    const call = await this.repository.findById(message.callId);
-
-    if (!call) {
-      throw new CallNotFoundError();
-    }
+    const call = await this.repository.requireById(message.callId);
 
     await this.accessAuthorizer.assertAccess(call, message.senderIdentityId);
 

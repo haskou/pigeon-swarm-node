@@ -1,6 +1,5 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
-import { PollNotFoundError } from '../../domain/errors/PollNotFoundError';
 import { PollWasClosedEvent } from '../../domain/events/PollWasClosedEvent';
 import { Poll } from '../../domain/Poll';
 import PollRepository from '../../domain/repositories/PollRepository';
@@ -13,11 +12,7 @@ export class PollCloser {
   ) {}
 
   public async close(message: PollCloseMessage): Promise<Poll> {
-    const poll = await this.repository.findById(message.pollId);
-
-    if (!poll) {
-      throw new PollNotFoundError();
-    }
+    const poll = await this.repository.requireById(message.pollId);
 
     poll.close(message.closedAt);
     await this.repository.saveClose(

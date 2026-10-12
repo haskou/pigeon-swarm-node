@@ -1,3 +1,4 @@
+import { NotificationScopeSettingsNotFoundError } from '@app/contexts/notification-settings/domain/errors/NotificationScopeSettingsNotFoundError';
 import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
 import { NotificationSettingsStorageQuota } from '@app/contexts/notification-settings/domain/NotificationSettingsStorageQuota';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
@@ -107,6 +108,18 @@ export default class LocalNotificationScopeSettingsRepository {
     }
   }
 
+  private async readByScope(
+    identityId: IdentityId,
+    scope: NotificationSettingScope,
+  ): Promise<NotificationScopeSettings | undefined> {
+    const document = await this.database.findOne(
+      LocalNotificationScopeSettingsRepository.NAMESPACE,
+      this.documentId(identityId, scope),
+    );
+
+    return document ? this.toDomain(document) : undefined;
+  }
+
   public async delete(
     identityId: IdentityId,
     scope: NotificationSettingScope,
@@ -136,16 +149,24 @@ export default class LocalNotificationScopeSettingsRepository {
       );
   }
 
-  public async findByScope(
+  public async hasByScope(
     identityId: IdentityId,
     scope: NotificationSettingScope,
-  ): Promise<NotificationScopeSettings | undefined> {
-    const document = await this.database.findOne(
-      LocalNotificationScopeSettingsRepository.NAMESPACE,
-      this.documentId(identityId, scope),
-    );
+  ): Promise<boolean> {
+    return (await this.readByScope(identityId, scope)) !== undefined;
+  }
 
-    return document ? this.toDomain(document) : undefined;
+  public async requireByScope(
+    identityId: IdentityId,
+    scope: NotificationSettingScope,
+  ): Promise<NotificationScopeSettings> {
+    const settings = await this.readByScope(identityId, scope);
+
+    if (!settings) {
+      throw new NotificationScopeSettingsNotFoundError();
+    }
+
+    return settings;
   }
 
   public async save(settings: NotificationScopeSettings): Promise<void> {

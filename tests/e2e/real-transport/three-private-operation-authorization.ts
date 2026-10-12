@@ -496,10 +496,8 @@ async function main(): Promise<void> {
     }
 
     for (const node of nodes) {
-      const storedProjection = await node.repository.findProjection(scopeId);
-      const storedScope = await node.repository.findScope(scopeId);
-      assert.ok(storedProjection);
-      assert.ok(storedScope);
+      const storedProjection = await node.repository.requireProjection(scopeId);
+      const storedScope = await node.repository.requireScope(scopeId);
       assert.deepEqual(storedProjection.bannedMemberIds, [targetIdentityId]);
       assert.deepEqual(storedProjection.memberIds, [ownerIdentityId]);
       assert.equal(storedScope.toPrimitives().checkpoint.revision, 2);
@@ -527,7 +525,7 @@ async function main(): Promise<void> {
       'duplicate',
     );
     assert.equal(
-      (await restarted.repository.findScope(scopeId))?.toPrimitives()
+      (await restarted.repository.requireScope(scopeId)).toPrimitives()
         .checkpoint.revision,
       2,
     );
@@ -641,7 +639,7 @@ async function main(): Promise<void> {
       }),
     );
     assert.equal(
-      (await nodes[0].repository.findScope(scopeId))?.toPrimitives().status,
+      (await nodes[0].repository.requireScope(scopeId)).toPrimitives().status,
       'frozen',
     );
 
@@ -664,7 +662,7 @@ async function main(): Promise<void> {
     for (const node of nodes) {
       await assert.rejects(() => node.accept(equivocation, owner));
       assert.equal(
-        (await node.repository.findScope(scopeId))?.toPrimitives().status,
+        (await node.repository.requireScope(scopeId)).toPrimitives().status,
         'frozen',
       );
     }

@@ -39,7 +39,7 @@ describe('MLSRecordMutationPolicy', () => {
     );
     community.addMember(owner, member);
     const communities = mock<CommunityRepository>();
-    communities.findAtFrontier.mockResolvedValue(community);
+    communities.requireAtFrontier.mockResolvedValue(community);
     policy = new MLSRecordMutationPolicy(communities);
   });
 

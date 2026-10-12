@@ -5,6 +5,7 @@ import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/Or
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { Community } from '../../domain/Community';
+import { CommunityNotFoundError } from '../../domain/errors/CommunityNotFoundError';
 import { CommunityOperation } from '../../domain/operations/CommunityOperation';
 import { CommunityOperationLimits } from '../../domain/operations/CommunityOperationLimits';
 import { CommunityOperationPrimitives } from '../../domain/operations/CommunityOperationPrimitives';
@@ -210,12 +211,22 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     return Community.fromPrimitives(community.toPrimitives());
   }
 
-  public async findById(id: CommunityId): Promise<Community | undefined> {
-    const state = await this.findState(id);
+  private activeCommunityOf(
+    state: CommunityState | undefined,
+  ): Community | undefined {
+    return state?.community && !state.deleted ? state.community : undefined;
+  }
 
-    return state?.community && !state.deleted
-      ? this.copyOf(state.community)
-      : undefined;
+  public async requireById(id: CommunityId): Promise<Community> {
+    const community = this.activeCommunityOf(await this.findState(id));
+
+    if (!community) throw new CommunityNotFoundError();
+
+    return this.copyOf(community);
+  }
+
+  public async hasById(id: CommunityId): Promise<boolean> {
+    return this.activeCommunityOf(await this.findState(id)) !== undefined;
   }
 
   /**
@@ -223,10 +234,10 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
    * in the causal past of those heads. A head this node does not hold yet makes
    * the lookup fail, so the record is retried once the operations replicated.
    */
-  public async findAtFrontier(
+  public async requireAtFrontier(
     id: CommunityId,
     frontier: string[],
-  ): Promise<Community | undefined> {
+  ): Promise<Community> {
     const records = await this.operationIndex.findRecords(this.headKey(id));
     const state = CommunityStateFold.fold(
       CommunityStateFold.closureOf(
@@ -234,10 +245,11 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
         frontier,
       ),
     );
+    const community = this.activeCommunityOf(state);
 
-    return state.community && !state.deleted
-      ? this.copyOf(state.community)
-      : undefined;
+    if (!community) throw new CommunityNotFoundError();
+
+    return this.copyOf(community);
   }
 
   /** The operations nobody built on yet: the parents of the next operation. */

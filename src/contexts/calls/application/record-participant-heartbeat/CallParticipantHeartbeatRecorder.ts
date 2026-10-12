@@ -18,9 +18,9 @@ export default class CallParticipantHeartbeatRecorder {
   public async record(
     message: CallParticipantHeartbeatRecordMessage,
   ): Promise<Call> {
-    const call = await this.callRepository.findById(message.callId);
+    const call = await this.callRepository.requireById(message.callId);
 
-    if (!call || !call.isActive()) {
+    if (!call.isActive()) {
       throw new CallNotFoundError();
     }
 

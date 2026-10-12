@@ -20,8 +20,7 @@ export default class CommunityNotificationScopeAccessAuthorizer extends Notifica
     const communityId = scope.getCommunityId();
 
     assert(communityId, new CommunityNotFoundError());
-    const community = await this.communityRepository.findById(communityId);
-    assert(community, new CommunityNotFoundError());
+    const community = await this.communityRepository.requireById(communityId);
     const channelId = scope.getChannelId();
 
     if (channelId) {

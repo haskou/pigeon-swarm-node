@@ -1,5 +1,4 @@
 import { Community } from '../../domain/Community';
-import { CommunityNotFoundError } from '../../domain/errors/CommunityNotFoundError';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 import { CommunityFindMessage } from './messages/CommunityFindMessage';
@@ -12,13 +11,7 @@ export default class CommunityFinder {
   }
 
   public async findById(communityId: CommunityId): Promise<Community> {
-    const community = await this.repository.findById(communityId);
-
-    if (!community) {
-      throw new CommunityNotFoundError();
-    }
-
-    return community;
+    return this.repository.requireById(communityId);
   }
 
   /** The parents the next signed operation of the community must reference. */

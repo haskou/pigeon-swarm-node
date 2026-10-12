@@ -100,7 +100,7 @@ describe('Community invitation use cases', () => {
     const invite = mock<CommunityInvite>();
     invite.getCommunityId.mockReturnValue(created.getId());
     invite.getToken.mockReturnValue(new CommunityInviteToken(INVITE_TOKEN));
-    inviteRepository.findByToken.mockResolvedValue(invite);
+    inviteRepository.requireByToken.mockResolvedValue(invite);
     inviteRepository.countUses.mockResolvedValue(new CommunityInviteUses(0));
     communityFinder.findById.mockResolvedValue(created);
 
@@ -140,7 +140,9 @@ describe('Community invitation use cases', () => {
   });
 
   it('rejects an unknown invite token without mutating a community', async () => {
-    inviteRepository.findByToken.mockResolvedValue(undefined);
+    inviteRepository.requireByToken.mockRejectedValue(
+      new CommunityInviteNotFoundError(),
+    );
 
     await expect(
       new CommunityInviteAccepter(

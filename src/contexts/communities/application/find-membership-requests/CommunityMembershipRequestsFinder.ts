@@ -33,10 +33,10 @@ export default class CommunityMembershipRequestsFinder {
     const requests = [...requestsById.values()];
     const existence = await Promise.all(
       requests.map((membershipRequest) =>
-        this.communityRepository.findById(membershipRequest.getCommunityId()),
+        this.communityRepository.hasById(membershipRequest.getCommunityId()),
       ),
     );
 
-    return requests.filter((_, index) => existence[index] !== undefined);
+    return requests.filter((_, index) => existence[index]);
   }
 }

@@ -1,7 +1,4 @@
-import { assert } from '@haskou/value-objects';
-
 import { Conversation } from '../../domain/Conversation';
-import { ConversationNotFoundError } from '../../domain/errors/ConversationNotFoundError';
 import { ConversationStateFold } from '../../domain/operations/ConversationStateFold';
 import ConversationRepository from '../../domain/repositories/ConversationRepository';
 import { ConversationMemberChangeMessage } from './messages/ConversationMemberChangeMessage';
@@ -18,11 +15,9 @@ export default class ConversationMemberChanger {
   public async change(
     message: ConversationMemberChangeMessage,
   ): Promise<Conversation> {
-    const conversation = await this.repository.findMetadataById(
+    const conversation = await this.repository.requireMetadataById(
       message.conversationId,
     );
-
-    assert(conversation, new ConversationNotFoundError(message.conversationId));
 
     const operation = message.operation.build({
       action: message.action,
@@ -40,10 +35,6 @@ export default class ConversationMemberChanger {
     );
     await this.repository.saveOperation(operation, message.operation.proof);
 
-    const changed = await this.repository.findById(message.conversationId);
-
-    assert(changed, new ConversationNotFoundError(message.conversationId));
-
-    return changed;
+    return this.repository.requireById(message.conversationId);
   }
 }

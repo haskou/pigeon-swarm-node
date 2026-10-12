@@ -4,6 +4,7 @@ import NotificationDeliveryPreferenceChecker from '@app/contexts/notification-se
 import { NotificationDeliveryShouldSendPushMessage } from '@app/contexts/notification-settings/application/should-deliver/messages/NotificationDeliveryShouldSendPushMessage';
 import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
 import { NotificationScopeSettingsPreferences } from '@app/contexts/notification-settings/domain/NotificationScopeSettingsPreferences';
+import { NotificationScopeSettingsNotFoundError } from '@app/contexts/notification-settings/domain/errors/NotificationScopeSettingsNotFoundError';
 import NotificationScopeSettingsRepository from '@app/contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
 import { NotificationLevel } from '@app/contexts/notification-settings/domain/value-objects/NotificationLevel';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
@@ -30,11 +31,24 @@ class InMemoryNotificationScopeSettingsRepository
     return Array.from(this.settings.values());
   }
 
-  public async findByScope(
+  public async hasByScope(
     identityId: IdentityId,
     scope: NotificationSettingScope,
-  ): Promise<NotificationScopeSettings | undefined> {
-    return this.settings.get(this.key(identityId, scope));
+  ): Promise<boolean> {
+    return this.settings.has(this.key(identityId, scope));
+  }
+
+  public async requireByScope(
+    identityId: IdentityId,
+    scope: NotificationSettingScope,
+  ): Promise<NotificationScopeSettings> {
+    const settings = this.settings.get(this.key(identityId, scope));
+
+    if (!settings) {
+      throw new NotificationScopeSettingsNotFoundError();
+    }
+
+    return settings;
   }
 
   public async isPrivateScope(): Promise<boolean> {

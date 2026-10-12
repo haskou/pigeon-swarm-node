@@ -1,4 +1,5 @@
 import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
+import { CommunityInviteNotFoundError } from '@app/contexts/communities/domain/errors/CommunityInviteNotFoundError';
 import CommunityInviteRepository from '@app/contexts/communities/domain/repositories/CommunityInviteRepository';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
@@ -126,14 +127,14 @@ export default class OrbitDBCommunityInviteRepository extends CommunityInviteRep
     );
   }
 
-  public async findByToken(
+  public async requireByToken(
     token: CommunityInviteToken,
-  ): Promise<CommunityInvite | undefined> {
+  ): Promise<CommunityInvite> {
     const [document] = (
       (await this.inviteIndex.find(this.tokenHeadKey(token.valueOf()))) ?? []
     ).filter((candidate) => candidate.token === token.valueOf());
 
-    if (!document) return undefined;
+    if (!document) throw new CommunityInviteNotFoundError();
 
     return this.publicStorageGuard.runWhilePublic(
       new CommunityId(document.communityId),

@@ -2,6 +2,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
+import { IdentityPresenceNotFoundError } from '../../domain/errors/IdentityPresenceNotFoundError';
 import { IdentityPresence } from '../../domain/IdentityPresence';
 import IdentityPresenceRepository from '../../domain/repositories/IdentityPresenceRepository';
 import { PresenceStatus } from '../../domain/value-objects/PresenceStatus';
@@ -29,9 +30,9 @@ export default class InMemoryIdentityPresenceRepository extends IdentityPresence
     return current !== undefined && snapshot.updatedAt < current.updatedAt;
   }
 
-  public findByIdentityId(
+  private readByIdentityId(
     identityId: IdentityId,
-  ): Promise<IdentityPresence | undefined> {
+  ): IdentityPresence | undefined {
     const leases = [
       ...(this.presences.get(identityId.valueOf())?.values() ?? []),
     ];
@@ -54,30 +55,66 @@ export default class InMemoryIdentityPresenceRepository extends IdentityPresence
       );
     }
 
-    return Promise.resolve(effectivePresence);
+    return effectivePresence;
   }
 
-  public findByIdentityIdAndNodeId(
+  private readByIdentityIdAndNodeId(
     identityId: IdentityId,
     nodeId: NodeId,
-  ): Promise<IdentityPresence | undefined> {
-    return Promise.resolve(
-      this.presenceFrom(
-        this.presences.get(identityId.valueOf())?.get(nodeId.valueOf()),
-      ),
+  ): IdentityPresence | undefined {
+    return this.presenceFrom(
+      this.presences.get(identityId.valueOf())?.get(nodeId.valueOf()),
     );
   }
 
-  public async findByIdentityIds(
+  public findByIdentityIds(
     identityIds: IdentityId[],
   ): Promise<IdentityPresence[]> {
-    const presences = await Promise.all(
-      identityIds.map((identityId) => this.findByIdentityId(identityId)),
-    );
+    const presences = identityIds
+      .map((identityId) => this.readByIdentityId(identityId))
+      .filter(
+        (presence): presence is IdentityPresence => presence !== undefined,
+      );
 
-    return presences.filter(
-      (presence): presence is IdentityPresence => presence !== undefined,
+    return Promise.resolve(presences);
+  }
+
+  public hasByIdentityId(identityId: IdentityId): Promise<boolean> {
+    return Promise.resolve(this.readByIdentityId(identityId) !== undefined);
+  }
+
+  public hasByIdentityIdAndNodeId(
+    identityId: IdentityId,
+    nodeId: NodeId,
+  ): Promise<boolean> {
+    return Promise.resolve(
+      this.readByIdentityIdAndNodeId(identityId, nodeId) !== undefined,
     );
+  }
+
+  public requireByIdentityId(
+    identityId: IdentityId,
+  ): Promise<IdentityPresence> {
+    const presence = this.readByIdentityId(identityId);
+
+    if (!presence) {
+      return Promise.reject(new IdentityPresenceNotFoundError());
+    }
+
+    return Promise.resolve(presence);
+  }
+
+  public requireByIdentityIdAndNodeId(
+    identityId: IdentityId,
+    nodeId: NodeId,
+  ): Promise<IdentityPresence> {
+    const presence = this.readByIdentityIdAndNodeId(identityId, nodeId);
+
+    if (!presence) {
+      return Promise.reject(new IdentityPresenceNotFoundError());
+    }
+
+    return Promise.resolve(presence);
   }
 
   public findPotentiallyExpired(

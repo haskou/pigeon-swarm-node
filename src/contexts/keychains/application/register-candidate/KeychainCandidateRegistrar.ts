@@ -12,19 +12,25 @@ export default class KeychainCandidateRegistrar {
   public async register(
     message: RegisterKeychainCandidateMessage,
   ): Promise<void> {
-    const candidate = await this.repository.findByExternalIdentifier(
+    const hasCandidate = await this.repository.hasByExternalIdentifier(
       message.externalIdentifier,
     );
 
-    if (!candidate) {
+    if (!hasCandidate) {
       throw new InvalidKeychainCandidateError();
     }
+
+    const candidate = await this.repository.requireByExternalIdentifier(
+      message.externalIdentifier,
+    );
 
     const isValid = await this.validator.isValidChainFor(
       candidate.getOwnerIdentityId(),
       candidate,
-      (externalIdentifier) =>
-        this.repository.findByExternalIdentifier(externalIdentifier),
+      async (externalIdentifier) =>
+        (await this.repository.hasByExternalIdentifier(externalIdentifier))
+          ? this.repository.requireByExternalIdentifier(externalIdentifier)
+          : undefined,
     );
 
     if (!isValid) {

@@ -6,7 +6,7 @@ import { StickerPackId } from '../value-objects/StickerPackId';
 
 export default abstract class StickerPackRepository {
   public abstract findAll(): Promise<StickerPack[]>;
-  public abstract findById(id: StickerPackId): Promise<StickerPack | undefined>;
+  public abstract requireById(id: StickerPackId): Promise<StickerPack>;
   public abstract findByOwner(
     ownerIdentityId: IdentityId,
   ): Promise<StickerPack[]>;

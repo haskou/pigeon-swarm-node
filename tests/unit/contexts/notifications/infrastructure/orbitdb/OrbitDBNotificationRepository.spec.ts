@@ -72,9 +72,9 @@ describe('OrbitDBNotificationRepository', () => {
     expect(PublicMutationRecord.payloadOf(stored[0])).toEqual(signed.payload);
     expect(registry.replicateHeadInBackground).toHaveBeenCalledWith(`notification:${id}`, expect.anything());
 
-    const found = await repository.findById(new NotificationId(id));
+    const found = await repository.requireById(new NotificationId(id));
 
-    expect(found?.toPrimitives()).toMatchObject({ id, state: 'pending', status: 'unread' });
+    expect(found.toPrimitives()).toMatchObject({ id, state: 'pending', status: 'unread' });
 
     const state = signNotificationState({ notificationId: id, read: true, signer: recipient, state: 'accepted' });
 

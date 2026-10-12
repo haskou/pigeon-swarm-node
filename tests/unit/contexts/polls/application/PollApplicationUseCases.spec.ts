@@ -81,9 +81,9 @@ describe('Poll application use cases', () => {
     const poll = createPoll();
     const message = new PollFindMessage(poll.getId().valueOf());
 
-    repository.findById
+    repository.requireById
       .mockResolvedValueOnce(poll)
-      .mockResolvedValueOnce(undefined);
+      .mockRejectedValueOnce(new PollNotFoundError());
 
     await expect(new PollFinder(repository).find(message)).resolves.toBe(poll);
     await expect(
@@ -96,7 +96,7 @@ describe('Poll application use cases', () => {
     const publisher = mock<DomainEventPublisher>();
     const poll = createPoll();
 
-    repository.findById.mockResolvedValue(poll);
+    repository.requireById.mockResolvedValue(poll);
 
     await expect(
       new PollVoteCaster(repository, publisher).cast(
@@ -128,7 +128,7 @@ describe('Poll application use cases', () => {
       [new PollOptionId('a')],
       new Timestamp(createdAt),
     );
-    repository.findById.mockResolvedValue(poll);
+    repository.requireById.mockResolvedValue(poll);
 
     await expect(
       new PollVoteRemover(repository, publisher).remove(
@@ -154,7 +154,7 @@ describe('Poll application use cases', () => {
     const publisher = mock<DomainEventPublisher>();
     const poll = createPoll();
 
-    repository.findById.mockResolvedValue(poll);
+    repository.requireById.mockResolvedValue(poll);
 
     await expect(
       new PollCloser(repository, publisher).close(
@@ -182,7 +182,7 @@ describe('Poll application use cases', () => {
     const publisher = mock<DomainEventPublisher>();
     const missingPollId = 'missing-poll';
 
-    repository.findById.mockResolvedValue(undefined);
+    repository.requireById.mockRejectedValue(new PollNotFoundError());
 
     await expect(
       new PollVoteCaster(repository, publisher).cast(
@@ -239,7 +239,8 @@ describe('Poll application use cases', () => {
       { allowsMultipleVotes: false },
     );
 
-    conversationRepository.findById.mockResolvedValue(conversation);
+    conversationRepository.hasById.mockResolvedValue(true);
+    conversationRepository.requireById.mockResolvedValue(conversation);
 
     await new PollTimelineMessageRegistrar(
       conversationRepository,

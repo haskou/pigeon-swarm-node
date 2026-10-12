@@ -169,11 +169,11 @@ describe('IpfsKeychainRepository', () => {
       version: 3,
     });
 
-    const result = await repository.findByExternalIdentifier(
+    const result = await repository.requireByExternalIdentifier(
       new KeychainExternalIdentifier('bafy-keychain-v3'),
     );
 
-    expect(result?.toPrimitives()).toEqual(keychain.toPrimitives());
+    expect(result.toPrimitives()).toEqual(keychain.toPrimitives());
     expect(ipfs.getJSON).not.toHaveBeenCalled();
     expect(ipfs.getBytes).not.toHaveBeenCalled();
   });

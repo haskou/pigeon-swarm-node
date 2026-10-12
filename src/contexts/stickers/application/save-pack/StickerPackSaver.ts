@@ -1,6 +1,5 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
-import { StickerPackNotFoundError } from '../../domain/errors/StickerPackNotFoundError';
 import StickerPackRepository from '../../domain/repositories/StickerPackRepository';
 import StickerUserLibraryRepository from '../../domain/repositories/StickerUserLibraryRepository';
 import { StickerUserLibrary } from '../../domain/StickerUserLibrary';
@@ -17,9 +16,12 @@ export default class StickerPackSaver {
   private async findLibrary(
     message: StickerPackSaveMessage,
   ): Promise<StickerUserLibraryLookup> {
-    const library = await this.libraryRepository.findByIdentityId(
+    const hasLibrary = await this.libraryRepository.hasByIdentityId(
       message.identityId,
     );
+    const library = hasLibrary
+      ? await this.libraryRepository.requireByIdentityId(message.identityId)
+      : undefined;
 
     return library
       ? StickerUserLibraryLookup.existing(library)
@@ -31,11 +33,7 @@ export default class StickerPackSaver {
   public async save(
     message: StickerPackSaveMessage,
   ): Promise<StickerUserLibrary> {
-    const pack = await this.packRepository.findById(message.packId);
-
-    if (!pack) {
-      throw new StickerPackNotFoundError();
-    }
+    await this.packRepository.requireById(message.packId);
 
     const lookup = await this.findLibrary(message);
 
@@ -49,9 +47,8 @@ export default class StickerPackSaver {
       lookup.created ? lookup.library.pullDomainEvents() : [],
     );
 
-    return (
-      (await this.libraryRepository.findByIdentityId(message.identityId)) ??
-      lookup.library
-    );
+    return (await this.libraryRepository.hasByIdentityId(message.identityId))
+      ? await this.libraryRepository.requireByIdentityId(message.identityId)
+      : lookup.library;
   }
 }

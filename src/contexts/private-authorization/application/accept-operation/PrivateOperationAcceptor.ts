@@ -40,10 +40,13 @@ export default class PrivateOperationAcceptor {
     operation: PrivateControlOperation,
   ): Promise<boolean> {
     const value = operation.toPrimitives();
-    const receipt = await this.repository.findReceipt(value.scopeId, value.id);
 
-    if (!receipt) return false;
-    const committed = PrivateControlOperation.fromPrimitives(receipt);
+    if (!(await this.repository.hasReceipt(value.scopeId, value.id))) {
+      return false;
+    }
+    const committed = PrivateControlOperation.fromPrimitives(
+      await this.repository.requireReceipt(value.scopeId, value.id),
+    );
 
     assert(
       committed.isAuthoredBy(operation.getAuthorDeviceKey()),
@@ -92,11 +95,14 @@ export default class PrivateOperationAcceptor {
     routed: PrivateControlOperation,
   ): Promise<boolean> {
     const value = routed.toPrimitives();
-    const receipt = await this.repository.findReceipt(value.scopeId, value.id);
 
-    if (!receipt) return false;
+    if (!(await this.repository.hasReceipt(value.scopeId, value.id))) {
+      return false;
+    }
 
-    const committed = PrivateControlOperation.fromPrimitives(receipt);
+    const committed = PrivateControlOperation.fromPrimitives(
+      await this.repository.requireReceipt(value.scopeId, value.id),
+    );
 
     if (committed.hasSameDigestAs(routed)) return true;
 
@@ -109,6 +115,14 @@ export default class PrivateOperationAcceptor {
     throw new PrivateAuthorizationConflictError();
   }
 
+  private async projectionOrEmpty(
+    scopeId: string,
+  ): Promise<Record<string, unknown>> {
+    if (!(await this.repository.hasProjection(scopeId))) return {};
+
+    return this.repository.requireProjection(scopeId);
+  }
+
   private async historicalReservation(
     operation: PrivateControlOperation,
     checkpoint: PrivateAuthorizationCheckpoint,
@@ -117,10 +131,13 @@ export default class PrivateOperationAcceptor {
 
     if (!revision.isLessThan(checkpoint.getRevision())) return undefined;
 
-    return this.repository.findReservationAtRevision(
-      operation.getScopeId(),
-      revision,
-    );
+    const scopeId = operation.getScopeId();
+
+    if (!(await this.repository.hasReservationAtRevision(scopeId, revision))) {
+      return undefined;
+    }
+
+    return this.repository.requireReservationAtRevision(scopeId, revision);
   }
 
   private reservationConflict(
@@ -169,9 +186,10 @@ export default class PrivateOperationAcceptor {
     const value = routed.toPrimitives();
 
     if (value.kind === 'membership.propose') return;
-    const scope = await this.repository.findScope(value.scopeId);
 
-    if (!scope) return;
+    if (!(await this.repository.hasScope(value.scopeId))) return;
+    const scope = await this.repository.requireScope(value.scopeId);
+
     const checkpoint = scope.getCheckpoint();
     const reservedChild = await this.historicalReservation(routed, checkpoint);
     const candidateHead = value.control?.resultingHeadHash;
@@ -204,7 +222,12 @@ export default class PrivateOperationAcceptor {
   ) {
     assert(controlFrame, new InvalidPrivateAuthorizationError());
     const scopeId = checkpoint.toPrimitives().scopeId;
-    const protectedState = await this.repository.findProtectedMlsState(scopeId);
+    assert(
+      await this.repository.hasProtectedMlsState(scopeId),
+      new InvalidPrivateAuthorizationError(),
+    );
+    const protectedState =
+      await this.repository.requireProtectedMlsState(scopeId);
 
     assert(protectedState, new InvalidPrivateAuthorizationError());
     new PrivateProtectedMlsState(protectedState);
@@ -257,8 +280,7 @@ export default class PrivateOperationAcceptor {
     }
 
     if (result !== 'accepted') throw new InvalidPrivateAuthorizationError();
-    const currentProjection =
-      (await this.repository.findProjection(value.scopeId)) ?? {};
+    const currentProjection = await this.projectionOrEmpty(value.scopeId);
     const candidateProjection = await this.applyMutation(
       currentCheckpoint,
       operation,
@@ -404,10 +426,9 @@ export default class PrivateOperationAcceptor {
     );
 
     if (operation.isAuthorizedBy(checkpoint)) {
-      const projection =
-        (await this.repository.findProjection(
-          operation.getScopeId().valueOf(),
-        )) ?? {};
+      const projection = await this.projectionOrEmpty(
+        operation.getScopeId().valueOf(),
+      );
 
       await this.applyMutation(checkpoint, operation, projection);
     }

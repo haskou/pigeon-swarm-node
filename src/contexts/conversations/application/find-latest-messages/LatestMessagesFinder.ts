@@ -2,7 +2,6 @@ import CallRepository from '@app/contexts/calls/domain/repositories/CallReposito
 import { ConversationMessagesAround } from '@app/contexts/conversations/domain/ConversationMessagesAround';
 import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
 import { MessageReaction } from '@app/contexts/conversations/domain/entities/messages/MessageReaction';
-import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import MessageReactionRepository from '@app/contexts/conversations/domain/repositories/MessageReactionRepository';
@@ -25,13 +24,9 @@ export default class LatestMessagesFinder {
   private async ensureRequesterCanReadConversation(
     message: LatestMessagesFindMessage | MessageFindMessage,
   ): Promise<void> {
-    const conversation = await this.conversationRepository.findMetadataById(
+    const conversation = await this.conversationRepository.requireMetadataById(
       message.conversationId,
     );
-
-    if (!conversation) {
-      throw new ConversationNotFoundError(message.conversationId);
-    }
 
     if (!conversation.hasParticipant(message.requesterIdentityId)) {
       throw new ConversationParticipantNotFoundError();
@@ -102,12 +97,10 @@ export default class LatestMessagesFinder {
     );
   }
 
-  public async findById(
-    message: MessageFindMessage,
-  ): Promise<Message | undefined> {
+  public async findById(message: MessageFindMessage): Promise<Message> {
     await this.ensureRequesterCanReadConversation(message);
 
-    return this.conversationRepository.findMessageById(
+    return this.conversationRepository.requireMessageById(
       message.conversationId,
       message.messageId,
     );

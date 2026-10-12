@@ -5,30 +5,38 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Conversation } from '../Conversation';
 import { ConversationMessagesAround } from '../ConversationMessagesAround';
 import { Message } from '../entities/messages/Message';
-import { OneToOneConversation } from '../OneToOneConversation';
 import { ConversationOperation } from '../operations/ConversationOperation';
 import { ConversationId } from '../value-objects/ConversationId';
 import { MessageId } from '../value-objects/MessageId';
 
 export default abstract class ConversationRepository {
-  public abstract findById(
+  /** Rejects with ConversationNotFoundError when the conversation is not stored. */
+  public abstract requireById(
     conversationId: ConversationId,
-  ): Promise<Conversation | undefined>;
+  ): Promise<Conversation>;
 
-  public abstract findMetadataById(
+  public abstract hasById(conversationId: ConversationId): Promise<boolean>;
+
+  /** Rejects with ConversationNotFoundError when the conversation is not stored. */
+  public abstract requireMetadataById(
     conversationId: ConversationId,
-  ): Promise<Conversation | undefined>;
+  ): Promise<Conversation>;
 
-  /** The conversation folded from the causal past of `frontier`; throws when a head is unknown. */
-  public abstract findMetadataAtFrontier(
+  /**
+   * The conversation folded from the causal past of `frontier`. Rejects with
+   * ConversationNotFoundError when that past does not fold to a roster; throws
+   * when a head is unknown.
+   */
+  public abstract requireMetadataAtFrontier(
     conversationId: ConversationId,
     frontier: string[],
-  ): Promise<Conversation | undefined>;
+  ): Promise<Conversation>;
 
-  public abstract findCandidateMessageById(
+  /** Rejects with ConversationNotFoundError when the candidate is not stored. */
+  public abstract requireCandidateMessageById(
     conversationId: ConversationId,
     messageId: MessageId,
-  ): Promise<Message | undefined>;
+  ): Promise<Message>;
 
   /**
    * The conversations `participantId` belongs to in the folded state, newest
@@ -56,10 +64,11 @@ export default abstract class ConversationRepository {
     beforeMessageId?: MessageId,
   ): Promise<Message[]>;
 
-  public abstract findMessageById(
+  /** Rejects with MessageTargetNotFoundError when the message is not stored. */
+  public abstract requireMessageById(
     conversationId: ConversationId,
     messageId: MessageId,
-  ): Promise<Message | undefined>;
+  ): Promise<Message>;
 
   public abstract hasMessage(
     conversationId: ConversationId,
@@ -89,12 +98,6 @@ export default abstract class ConversationRepository {
     conversationId: ConversationId,
     messageId: MessageId,
   ): Promise<boolean>;
-
-  public abstract findOneToOne(
-    firstIdentityId: IdentityId,
-    secondIdentityId: IdentityId,
-    networkId: NetworkId,
-  ): Promise<OneToOneConversation | undefined>;
 
   /**
    * Advances the reader's marker to the message. Resolves to `false` when the

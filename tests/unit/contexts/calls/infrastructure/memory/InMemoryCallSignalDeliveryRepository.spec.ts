@@ -65,9 +65,9 @@ describe('InMemoryCallSignalDeliveryRepository', () => {
     await repository.save(pending);
     await repository.save(delayedRetry);
 
-    const stored = await repository.findById(pending.getId());
+    const stored = await repository.requireById(pending.getId());
 
-    expect(stored?.isAcknowledged()).toBe(true);
+    expect(stored.isAcknowledged()).toBe(true);
   });
 
   it('purges expired deliveries', async () => {
@@ -77,6 +77,6 @@ describe('InMemoryCallSignalDeliveryRepository', () => {
     await repository.save(expired);
     await repository.purgeExpired(new Timestamp(1_770_000_020_000));
 
-    await expect(repository.findById(expired.getId())).resolves.toBeUndefined();
+    await expect(repository.hasById(expired.getId())).resolves.toBe(false);
   });
 });

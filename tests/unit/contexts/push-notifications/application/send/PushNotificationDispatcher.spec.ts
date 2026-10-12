@@ -1,8 +1,10 @@
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
+import { IdentityPresenceNotFoundError } from '@app/contexts/presence/domain/errors/IdentityPresenceNotFoundError';
 import IdentityPresenceRepository from '@app/contexts/presence/domain/repositories/IdentityPresenceRepository';
 import NotificationDeliveryPreferenceChecker from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
 import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
+import { NotificationScopeSettingsNotFoundError } from '@app/contexts/notification-settings/domain/errors/NotificationScopeSettingsNotFoundError';
 import NotificationScopeSettingsRepository from '@app/contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import PushNotificationDelivery from '@app/contexts/push-notifications/application/send/PushNotificationDelivery';
@@ -457,16 +459,34 @@ function mockPresenceRepository(options: {
   busyIdentityIds: string[];
   presences: IdentityPresence[];
 }): IdentityPresenceRepository {
-  return {
-    findByIdentityId: jest.fn(async (identityId: IdentityId) => {
-      if (options.busyIdentityIds.includes(identityId.valueOf())) {
-        return createBusyPresence(identityId.valueOf());
-      }
+  const presenceOf = (
+    identityId: IdentityId,
+  ): IdentityPresence | undefined => {
+    if (options.busyIdentityIds.includes(identityId.valueOf())) {
+      return createBusyPresence(identityId.valueOf());
+    }
 
-      return options.presences.find((presence) =>
-        presence.getIdentityId().isEqual(identityId),
-      );
-    }),
+    return options.presences.find((presence) =>
+      presence.getIdentityId().isEqual(identityId),
+    );
+  };
+
+  return {
+    hasByIdentityId: jest.fn(
+      async (identityId: IdentityId): Promise<boolean> =>
+        presenceOf(identityId) !== undefined,
+    ),
+    requireByIdentityId: jest.fn(
+      async (identityId: IdentityId): Promise<IdentityPresence> => {
+        const presence = presenceOf(identityId);
+
+        if (!presence) {
+          throw new IdentityPresenceNotFoundError();
+        }
+
+        return presence;
+      },
+    ),
   } as unknown as IdentityPresenceRepository;
 }
 
@@ -513,13 +533,21 @@ function emptySettingsRepository(): NotificationScopeSettingsRepository {
     findByIdentityId: jest.fn(
       async (): Promise<NotificationScopeSettings[]> => [],
     ),
-    findByScope: jest.fn(
+    hasByScope: jest.fn(
       async (
         _identityId: IdentityId,
         _scope: NotificationSettingScope,
-      ): Promise<NotificationScopeSettings | undefined> => undefined,
+      ): Promise<boolean> => false,
     ),
     isPrivateScope: jest.fn(async (): Promise<boolean> => false),
+    requireByScope: jest.fn(
+      async (
+        _identityId: IdentityId,
+        _scope: NotificationSettingScope,
+      ): Promise<NotificationScopeSettings> => {
+        throw new NotificationScopeSettingsNotFoundError();
+      },
+    ),
     save: jest.fn(),
   };
 }

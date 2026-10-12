@@ -7,6 +7,8 @@ import { StickerFavoriteMessage } from '@app/contexts/stickers/application/favor
 import StickerFavoriter from '@app/contexts/stickers/application/favorite-sticker/StickerFavoriter';
 import { StickerUseRecordMessage } from '@app/contexts/stickers/application/record-sticker-use/messages/StickerUseRecordMessage';
 import StickerUseRecorder from '@app/contexts/stickers/application/record-sticker-use/StickerUseRecorder';
+import { StickerPackNotFoundError } from '@app/contexts/stickers/domain/errors/StickerPackNotFoundError';
+import { StickerUserLibraryNotFoundError } from '@app/contexts/stickers/domain/errors/StickerUserLibraryNotFoundError';
 import StickerPackRepository from '@app/contexts/stickers/domain/repositories/StickerPackRepository';
 import StickerUserLibraryRepository from '@app/contexts/stickers/domain/repositories/StickerUserLibraryRepository';
 import { StickerPack } from '@app/contexts/stickers/domain/StickerPack';
@@ -26,8 +28,16 @@ class InMemoryStickerPackRepository implements StickerPackRepository {
     return this.savedPacks;
   }
 
-  public async findById(id: StickerPackId): Promise<StickerPack | undefined> {
-    return this.savedPacks.find((pack) => pack.getId().isEqual(id));
+  public async requireById(id: StickerPackId): Promise<StickerPack> {
+    const pack = this.savedPacks.find((savedPack) =>
+      savedPack.getId().isEqual(id),
+    );
+
+    if (!pack) {
+      throw new StickerPackNotFoundError();
+    }
+
+    return pack;
   }
 
   public async findByOwner(ownerIdentityId: IdentityId): Promise<StickerPack[]> {
@@ -68,11 +78,15 @@ class InMemoryStickerUserLibraryRepository
     this.favorites.add(`${packId.valueOf()}:${stickerId.valueOf()}`);
   }
 
-  public async findByIdentityId(
+  public async hasByIdentityId(_identityId: IdentityId): Promise<boolean> {
+    return this.touched;
+  }
+
+  public async requireByIdentityId(
     identityId: IdentityId,
-  ): Promise<StickerUserLibrary | undefined> {
+  ): Promise<StickerUserLibrary> {
     if (!this.touched) {
-      return undefined;
+      throw new StickerUserLibraryNotFoundError();
     }
 
     return StickerUserLibrary.fromPrimitives({
@@ -182,14 +196,14 @@ describe('Sticker pack application services', () => {
         mutation,
       ),
     );
-    const library = await libraryRepository.findByIdentityId(
+    const library = await libraryRepository.requireByIdentityId(
       new IdentityId(ownerIdentityId),
     );
 
     expect(packRepository.savedPacks).toHaveLength(1);
     expect(pack.getId().valueOf()).toBe(packId);
     expect(pack.toPrimitives().createdAt).toBe(createdAt);
-    expect(library?.toPrimitives().savedPackIds).toEqual([packId]);
+    expect(library.toPrimitives().savedPackIds).toEqual([packId]);
     expect(
       eventPublisher.publishedEvents.map((event) => event.eventName()),
     ).toEqual([

@@ -6,9 +6,14 @@ import { Keychain } from '../Keychain';
 import { KeychainExternalIdentifier } from '../value-objects/KeychainExternalIdentifier';
 
 export default abstract class KeychainRepository {
-  public abstract findByExternalIdentifier(
+  public abstract hasByExternalIdentifier(
     externalIdentifier: KeychainExternalIdentifier,
-  ): Promise<Keychain | undefined>;
+  ): Promise<boolean>;
+
+  /** Rejects with KeychainExternalIdentifierNotFoundError when not stored. */
+  public abstract requireByExternalIdentifier(
+    externalIdentifier: KeychainExternalIdentifier,
+  ): Promise<Keychain>;
 
   public abstract findCandidateReferencesByOwnerId(
     ownerIdentityId: IdentityId,

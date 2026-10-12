@@ -33,7 +33,8 @@ describe('CallAccessAuthorizer', () => {
       ...callStartArgs(),
     );
     const conversation = mock<Conversation>();
-    conversations.findMetadataById.mockResolvedValue(conversation);
+    conversations.hasById.mockResolvedValue(true);
+    conversations.requireMetadataById.mockResolvedValue(conversation);
     conversation.hasParticipant.mockReturnValue(true);
     await expect(
       authorizer.assertAccess(call, identity),
@@ -56,7 +57,8 @@ describe('CallAccessAuthorizer', () => {
       ...callStartArgs(),
     );
     const community = mock<Community>();
-    communities.findById.mockResolvedValue(community);
+    communities.hasById.mockResolvedValue(true);
+    communities.requireById.mockResolvedValue(community);
     await expect(
       authorizer.assertAccess(call, identity),
     ).resolves.toBeUndefined();
@@ -70,7 +72,7 @@ describe('CallAccessAuthorizer', () => {
     await expect(
       authorizer.assertAccess(call, identity),
     ).rejects.toBeInstanceOf(CallNotFoundError);
-    communities.findById.mockResolvedValue(undefined);
+    communities.hasById.mockResolvedValue(false);
     await expect(
       authorizer.assertAccess(call, identity),
     ).rejects.toBeInstanceOf(CallNotFoundError);

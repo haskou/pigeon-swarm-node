@@ -18,9 +18,7 @@ export default class ConversationMessagePinMutationPolicy extends PublicMutation
     'conversation',
   );
 
-  private readonly conversations = new ShortLivedLookup<
-    Conversation | undefined
-  >();
+  private readonly conversations = new ShortLivedLookup<Conversation>();
 
   public readonly collection = 'pins';
 
@@ -59,13 +57,13 @@ export default class ConversationMessagePinMutationPolicy extends PublicMutation
     const conversation = await this.conversations.get(
       PublicMutationFrontier.keyOf(record.conversationId as string, frontier),
       () =>
-        this.conversationRepository.findMetadataAtFrontier(
+        this.conversationRepository.requireMetadataAtFrontier(
           new ConversationId(record.conversationId as string),
           frontier,
         ),
     );
 
-    if (!conversation?.hasParticipant(new IdentityId(authorIdentityId))) {
+    if (!conversation.hasParticipant(new IdentityId(authorIdentityId))) {
       throw new InvalidPublicMutationError();
     }
   }

@@ -20,7 +20,7 @@ import { signedMutation } from '../../../public-mutations/support/signedMutation
 const publicStorageGuard = () =>
   new PrivateCommunityPublicStorageGuard(
     {
-      findScope: jest.fn().mockResolvedValue(undefined),
+      hasScope: jest.fn().mockResolvedValue(false),
     } as never,
     new PrivateAuthorizationStorageCoordinator(),
   );
@@ -93,7 +93,7 @@ describe('OrbitDBCommunityInviteRepository', () => {
         store: 'requests',
       }),
     );
-    const found = await repository.findByToken(invite.getToken());
+    const found = await repository.requireByToken(invite.getToken());
     const before = await repository.countUses(invite);
 
     for (const identityId of [creatorIdentityId, otherIdentityId]) {
@@ -111,7 +111,7 @@ describe('OrbitDBCommunityInviteRepository', () => {
       );
     }
 
-    expect(found?.toPrimitives()).toEqual(invite.toPrimitives());
+    expect(found.toPrimitives()).toEqual(invite.toPrimitives());
     expect(before.valueOf()).toBe(0);
     expect((await repository.countUses(invite)).valueOf()).toBe(2);
   });
@@ -145,7 +145,7 @@ describe('OrbitDBCommunityInviteRepository', () => {
         [
           new CommunityInviteUseMutationPolicy(
             {
-              findAtFrontier: async () => ({ requestMembership }),
+              requireAtFrontier: async () => ({ requestMembership }),
             } as never,
             repository,
           ),

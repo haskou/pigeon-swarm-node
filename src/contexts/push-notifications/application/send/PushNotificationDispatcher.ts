@@ -312,9 +312,14 @@ export default class PushNotificationDispatcher {
       return false;
     }
 
-    const presence = await this.presenceRepository.findByIdentityId(identityId);
+    if (!(await this.presenceRepository.hasByIdentityId(identityId))) {
+      return false;
+    }
 
-    return presence?.isBusy() || false;
+    const presence =
+      await this.presenceRepository.requireByIdentityId(identityId);
+
+    return presence.isBusy();
   }
 
   private async shouldSkipForReadMessage(

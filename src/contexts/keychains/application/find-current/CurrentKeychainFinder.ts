@@ -27,8 +27,10 @@ export default class CurrentKeychainFinder {
     return this.validator.isValidChainFor(
       message.ownerIdentityId,
       candidate.getKeychain(),
-      (externalIdentifier) =>
-        this.repository.findByExternalIdentifier(externalIdentifier),
+      async (externalIdentifier) =>
+        (await this.repository.hasByExternalIdentifier(externalIdentifier))
+          ? this.repository.requireByExternalIdentifier(externalIdentifier)
+          : undefined,
     );
   }
 

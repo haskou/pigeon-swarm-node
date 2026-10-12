@@ -9,6 +9,7 @@ import { PrivateAuthorizationProvisioningQuota } from '@app/contexts/private-aut
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
 import { PrivateAuthorizationStorageReservationPrimitives } from '@app/contexts/private-authorization/domain/PrivateAuthorizationStorageReservationPrimitives';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
+import { PrivateControlOperationPrimitives } from '@app/contexts/private-authorization/domain/PrivateControlOperationPrimitives';
 import { PrivateControlTransitionReservation } from '@app/contexts/private-authorization/domain/PrivateControlTransitionReservation';
 import { PrivateAuthorizationDeviceKey } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationDeviceKey';
 import { PrivateAuthorizationGenesisFingerprint } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationGenesisFingerprint';
@@ -49,6 +50,36 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     private readonly storageCoordinator: PrivateAuthorizationStorageCoordinator,
   ) {
     super();
+  }
+
+  private async scopeIfPresent(
+    scopeId: string,
+  ): Promise<PrivateAuthorizationScope | undefined> {
+    if (!(await this.repository.hasScope(scopeId))) return undefined;
+
+    return this.repository.requireScope(scopeId);
+  }
+
+  private async receiptIfPresent(
+    scopeId: string,
+    operationId: string,
+  ): Promise<PrivateControlOperationPrimitives | undefined> {
+    if (!(await this.repository.hasReceipt(scopeId, operationId))) {
+      return undefined;
+    }
+
+    return this.repository.requireReceipt(scopeId, operationId);
+  }
+
+  private async reservationIfPresent(
+    scopeId: string,
+    parentHeadHash: string,
+  ): Promise<PrivateControlTransitionReservation | undefined> {
+    if (!(await this.repository.hasReservation(scopeId, parentHeadHash))) {
+      return undefined;
+    }
+
+    return this.repository.requireReservation(scopeId, parentHeadHash);
   }
 
   private getScopeQueues(): Map<string, Promise<void>> {
@@ -383,7 +414,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   ): Promise<'committed' | 'duplicate'> {
     const candidate = genesis.scope.toPrimitives();
     const scopeId = candidate.checkpoint.scopeId;
-    const current = await this.repository.findScope(scopeId);
+    const current = await this.scopeIfPresent(scopeId);
     const candidateFingerprint = this.genesisFingerprint(genesis);
 
     if (!current) {
@@ -620,7 +651,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
       return 'committed';
     }
 
-    const currentScope = await this.repository.findScope(scopeId);
+    const currentScope = await this.scopeIfPresent(scopeId);
     const currentCheckpoint = currentScope?.toPrimitives().checkpoint;
     const acceptedScopeId = acceptance.scope.toPrimitives().checkpoint.scopeId;
 
@@ -678,9 +709,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   }
 
   private async rebasePersistingQuarantine(
-    currentScope: NonNullable<
-      Awaited<ReturnType<LocalPrivateAuthorizationRepository['findScope']>>
-    >,
+    currentScope: PrivateAuthorizationScope,
     acceptance: PrivateOperationAcceptance,
   ): Promise<PrivateOperationAcceptance> {
     try {
@@ -695,9 +724,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   }
 
   private rebaseAcceptance(
-    currentScope: NonNullable<
-      Awaited<ReturnType<LocalPrivateAuthorizationRepository['findScope']>>
-    >,
+    currentScope: PrivateAuthorizationScope,
     acceptance: PrivateOperationAcceptance,
   ): PrivateOperationAcceptance {
     const pendingBefore = new Set(
@@ -743,13 +770,11 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
 
   private async assertReservationCompatible(
     scopeId: string,
-    scope: NonNullable<
-      Awaited<ReturnType<LocalPrivateAuthorizationRepository['findScope']>>
-    >,
+    scope: PrivateAuthorizationScope,
     acceptance: PrivateOperationAcceptance,
   ): Promise<void> {
     if (!acceptance.reservation) return;
-    const reservedChild = await this.repository.findReservation(
+    const reservedChild = await this.reservationIfPresent(
       scopeId,
       acceptance.reservation.parentHeadHash,
     );
@@ -780,7 +805,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     operation: PrivateControlOperation,
   ): Promise<boolean> {
     const candidate = operation.toPrimitives();
-    const existing = await this.repository.findReceipt(scopeId, candidate.id);
+    const existing = await this.receiptIfPresent(scopeId, candidate.id);
 
     if (!existing) return false;
 
@@ -790,7 +815,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
         receipt.isAuthoredBy(operation.getAuthorDeviceKey()),
         new InvalidPrivateAuthorizationError(),
       );
-      const scope = await this.repository.findScope(scopeId);
+      const scope = await this.scopeIfPresent(scopeId);
 
       if (scope) {
         scope.quarantine();
@@ -818,9 +843,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   }
 
   private checkpointMatches(
-    scope: NonNullable<
-      Awaited<ReturnType<LocalPrivateAuthorizationRepository['findScope']>>
-    >,
+    scope: PrivateAuthorizationScope,
     expected: PrivateExpectedCheckpoint,
   ): boolean {
     const checkpoint = scope.toPrimitives().checkpoint;
@@ -836,7 +859,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     expectedCheckpoint: PrivateExpectedCheckpoint,
     operation: PrivateControlOperation,
   ): Promise<'committed' | 'stale'> {
-    const scope = await this.repository.findScope(scopeId);
+    const scope = await this.scopeIfPresent(scopeId);
 
     if (!scope || !this.checkpointMatches(scope, expectedCheckpoint)) {
       return 'stale';
@@ -854,16 +877,13 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
     }
 
     if (assessment === 'ready') return 'stale';
-    const [projection, protectedMlsState] = await Promise.all([
-      this.repository.findProjection(scopeId),
-      this.repository.findProtectedMlsState(scopeId),
+    const [hasProjection, hasProtectedMlsState] = await Promise.all([
+      this.repository.hasProjection(scopeId),
+      this.repository.hasProtectedMlsState(scopeId),
     ]);
 
-    assert(projection, new InvalidPrivateAuthorizationError());
-    assert(
-      typeof protectedMlsState === 'string',
-      new InvalidPrivateAuthorizationError(),
-    );
+    assert(hasProjection, new InvalidPrivateAuthorizationError());
+    assert(hasProtectedMlsState, new InvalidPrivateAuthorizationError());
     await this.persistScopeState(scope);
 
     return 'committed';
@@ -917,7 +937,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   public async quarantine(scopeId: string): Promise<void> {
     return this.exclusivelyProvisioning(() =>
       this.exclusively(scopeId, async () => {
-        const scope = await this.repository.findScope(scopeId);
+        const scope = await this.scopeIfPresent(scopeId);
 
         if (!scope) throw new PrivateAuthorizationConflictError();
         scope.quarantine();
@@ -936,7 +956,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
 
     return this.exclusivelyProvisioning(() =>
       this.exclusively(scopeId, async () => {
-        const existing = await this.repository.findReservation(
+        const existing = await this.reservationIfPresent(
           scopeId,
           parentHeadHash,
         );
@@ -944,7 +964,7 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
 
         if (existing) {
           if (existing.matches(candidate)) return 'same';
-          const scope = await this.repository.findScope(scopeId);
+          const scope = await this.scopeIfPresent(scopeId);
 
           if (scope) {
             scope.quarantine();

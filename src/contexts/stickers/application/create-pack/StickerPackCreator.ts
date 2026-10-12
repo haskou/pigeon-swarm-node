@@ -17,9 +17,14 @@ export default class StickerPackCreator {
   private async findLibrary(
     message: StickerPackCreateMessage,
   ): Promise<StickerUserLibraryLookup> {
-    const library = await this.libraryRepository.findByIdentityId(
+    const hasLibrary = await this.libraryRepository.hasByIdentityId(
       message.ownerIdentityId,
     );
+    const library = hasLibrary
+      ? await this.libraryRepository.requireByIdentityId(
+          message.ownerIdentityId,
+        )
+      : undefined;
 
     return library
       ? StickerUserLibraryLookup.existing(library)

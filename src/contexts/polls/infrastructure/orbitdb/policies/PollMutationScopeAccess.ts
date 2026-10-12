@@ -1,7 +1,11 @@
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
+import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationFrontier } from '@app/contexts/public-mutations/domain/PublicMutationFrontier';
 import { ShortLivedLookup } from '@app/contexts/public-mutations/infrastructure/ShortLivedLookup';
@@ -22,6 +26,38 @@ export default class PollMutationScopeAccess {
     private readonly conversationRepository: ConversationRepository,
   ) {}
 
+  private async loadCommunityAtFrontier(
+    communityId: CommunityId,
+    frontier: string[],
+  ): Promise<Community | undefined> {
+    try {
+      return await this.communityRepository.requireAtFrontier(
+        communityId,
+        frontier,
+      );
+    } catch (error) {
+      if (error instanceof CommunityNotFoundError) return undefined;
+
+      throw error;
+    }
+  }
+
+  private async loadConversationAtFrontier(
+    conversationId: ConversationId,
+    frontier: string[],
+  ): Promise<Conversation | undefined> {
+    try {
+      return await this.conversationRepository.requireMetadataAtFrontier(
+        conversationId,
+        frontier,
+      );
+    } catch (error) {
+      if (error instanceof ConversationNotFoundError) return undefined;
+
+      throw error;
+    }
+  }
+
   private assert(
     scope: PollScope,
     frontier: string[],
@@ -34,7 +70,7 @@ export default class PollMutationScopeAccess {
       communityChannel: async (communityId, channelId) => {
         const community = await this.communities.get(
           PublicMutationFrontier.keyOf(communityId.valueOf(), frontier),
-          () => this.communityRepository.findAtFrontier(communityId, frontier),
+          () => this.loadCommunityAtFrontier(communityId, frontier),
         );
 
         if (!community) throw new InvalidPublicMutationError();
@@ -48,11 +84,7 @@ export default class PollMutationScopeAccess {
       groupConversation: async (conversationId) => {
         const conversation = await this.conversations.get(
           PublicMutationFrontier.keyOf(conversationId.valueOf(), frontier),
-          () =>
-            this.conversationRepository.findMetadataAtFrontier(
-              conversationId,
-              frontier,
-            ),
+          () => this.loadConversationAtFrontier(conversationId, frontier),
         );
 
         if (!conversation?.isGroup() || !conversation.hasParticipant(actor)) {

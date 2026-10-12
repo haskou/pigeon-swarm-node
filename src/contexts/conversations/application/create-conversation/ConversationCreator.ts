@@ -20,16 +20,27 @@ export default class ConversationCreator {
   private async assertKeychainBelongsToOwner(
     message: ConversationCreateMessage,
   ): Promise<void> {
-    const keychain = await this.keychainRepository.findByExternalIdentifier(
+    const hasKeychain = await this.keychainRepository.hasByExternalIdentifier(
       message.keychainExternalIdentifier,
     );
+    const keychain = hasKeychain
+      ? await this.keychainRepository.requireByExternalIdentifier(
+          message.keychainExternalIdentifier,
+        )
+      : undefined;
     const isValid =
       keychain &&
       (await this.keychainValidator.isValidChainFor(
         message.ownerIdentityId,
         keychain,
-        (externalIdentifier) =>
-          this.keychainRepository.findByExternalIdentifier(externalIdentifier),
+        async (externalIdentifier) =>
+          (await this.keychainRepository.hasByExternalIdentifier(
+            externalIdentifier,
+          ))
+            ? this.keychainRepository.requireByExternalIdentifier(
+                externalIdentifier,
+              )
+            : undefined,
       ));
 
     if (!isValid) {
@@ -49,10 +60,9 @@ export default class ConversationCreator {
     await this.assertKeychainBelongsToOwner(message);
 
     const conversationId = message.genesis.getConversationId();
-    const existing = await this.conversationRepository.findById(conversationId);
 
-    if (existing) {
-      return existing;
+    if (await this.conversationRepository.hasById(conversationId)) {
+      return this.conversationRepository.requireById(conversationId);
     }
 
     // The roster rules (participants, sizes) are checked before anything is stored.
@@ -62,10 +72,11 @@ export default class ConversationCreator {
       message.operation.proof,
     );
 
-    const created = await this.conversationRepository.findById(conversationId);
+    assert(
+      await this.conversationRepository.hasById(conversationId),
+      new InvalidConversationOperationError(),
+    );
 
-    assert(created, new InvalidConversationOperationError());
-
-    return created;
+    return this.conversationRepository.requireById(conversationId);
   }
 }

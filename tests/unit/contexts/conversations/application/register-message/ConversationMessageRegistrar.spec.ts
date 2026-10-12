@@ -47,8 +47,8 @@ describe('ConversationMessageRegistrar', () => {
     const messageId = MessageId.generate();
     const candidate = buildCandidate(conversationId, messageId);
 
-    repository.findById.mockResolvedValue(conversation);
-    repository.findCandidateMessageById.mockResolvedValue(candidate);
+    repository.requireById.mockResolvedValue(conversation);
+    repository.requireCandidateMessageById.mockResolvedValue(candidate);
 
     await registrar.register(
       new RegisterConversationMessage(
@@ -68,8 +68,8 @@ describe('ConversationMessageRegistrar', () => {
     const candidate = buildCandidate(conversationId, messageId);
 
     conversation.registerMessage(candidate);
-    repository.findById.mockResolvedValue(conversation);
-    repository.findCandidateMessageById.mockResolvedValue(candidate);
+    repository.requireById.mockResolvedValue(conversation);
+    repository.requireCandidateMessageById.mockResolvedValue(candidate);
 
     await registrar.register(
       new RegisterConversationMessage(
@@ -88,8 +88,8 @@ describe('ConversationMessageRegistrar', () => {
     const announcedMessageId = MessageId.generate();
     const candidate = buildCandidate(conversationId, MessageId.generate());
 
-    repository.findById.mockResolvedValue(conversation);
-    repository.findCandidateMessageById.mockResolvedValue(candidate);
+    repository.requireById.mockResolvedValue(conversation);
+    repository.requireCandidateMessageById.mockResolvedValue(candidate);
 
     await expect(
       registrar.register(
@@ -112,8 +112,8 @@ describe('ConversationMessageRegistrar', () => {
       messageId,
     );
 
-    repository.findById.mockResolvedValue(conversation);
-    repository.findCandidateMessageById.mockResolvedValue(candidate);
+    repository.requireById.mockResolvedValue(conversation);
+    repository.requireCandidateMessageById.mockResolvedValue(candidate);
 
     await expect(
       registrar.register(
@@ -134,7 +134,7 @@ describe('ConversationMessageRegistrar', () => {
     const candidate = buildCandidate(conversationId, messageId);
     const proof = messageProof(messageId.valueOf());
 
-    repository.findById.mockResolvedValue(conversation);
+    repository.requireById.mockResolvedValue(conversation);
 
     await registrar.registerCandidate(
       new RegisterConversationMessage(
@@ -167,8 +167,8 @@ describe('ConversationMessageRegistrar', () => {
       new EncryptedMessagePayload('encrypted-payload'),
     );
 
-    repository.findById.mockResolvedValue(conversation);
-    repository.findCandidateMessageById.mockResolvedValue(candidate);
+    repository.requireById.mockResolvedValue(conversation);
+    repository.requireCandidateMessageById.mockResolvedValue(candidate);
 
     await expect(
       registrar.register(

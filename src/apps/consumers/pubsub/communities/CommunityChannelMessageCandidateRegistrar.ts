@@ -93,13 +93,14 @@ export default class CommunityChannelMessageCandidateRegistrar {
       return;
     }
 
-    const replyTarget = await this.messageRepository.findById(
-      communityId,
-      channelId,
-      new CommunityChannelMessageId(replyToMessageId),
+    assert(
+      await this.messageRepository.hasById(
+        communityId,
+        channelId,
+        new CommunityChannelMessageId(replyToMessageId),
+      ),
+      new CommunityChannelMessageNotFoundError(),
     );
-
-    assert(replyTarget, new CommunityChannelMessageNotFoundError());
   }
 
   public async registerSent(
@@ -162,13 +163,11 @@ export default class CommunityChannelMessageCandidateRegistrar {
       return undefined;
     }
 
-    const targetMessage = await this.messageRepository.findById(
+    const targetMessage = await this.messageRepository.requireById(
       communityId,
       channelId,
       messageId,
     );
-
-    assert(targetMessage, new CommunityChannelMessageNotFoundError());
     const mentions = this.mentionsFrom(primitives);
 
     const editedMessage = community.editChannelMessage(

@@ -1,4 +1,5 @@
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
 import { CommunityOperation } from '@app/contexts/communities/domain/operations/CommunityOperation';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import CommunityRepositoryRouter from '@app/contexts/communities/infrastructure/CommunityRepositoryRouter';
@@ -20,18 +21,18 @@ describe('CommunityRepositoryRouter', () => {
 
   beforeEach(() => {
     publicRepository = {
-      findById: jest.fn(),
+      requireById: jest.fn(),
       findByMember: jest.fn().mockResolvedValue([]),
       findDiscoverable: jest.fn().mockResolvedValue([]),
       findFrontier: jest.fn().mockResolvedValue(['head']),
       save: jest.fn(),
     } as unknown as jest.Mocked<OrbitDBCommunityRepository>;
     privateRepository = {
-      findById: jest.fn(),
+      requireById: jest.fn(),
       findByMember: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<LocalPrivateCommunityRepository>;
     authorizationRepository = {
-      findScope: jest.fn().mockResolvedValue({}),
+      hasScope: jest.fn().mockResolvedValue(true),
       findScopeIds: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<PrivateAuthorizationRepository>;
     storageCoordinator = new PrivateAuthorizationStorageCoordinator();
@@ -44,45 +45,50 @@ describe('CommunityRepositoryRouter', () => {
   });
 
   it('reads a protected identifier only from its local projection', async () => {
-    publicRepository.findById.mockResolvedValue({} as Community);
+    privateRepository.requireById.mockResolvedValue({} as Community);
+    publicRepository.requireById.mockResolvedValue({} as Community);
 
-    await router.findById(id);
+    await router.requireById(id);
 
-    expect(privateRepository.findById).toHaveBeenCalledWith(id);
-    expect(publicRepository.findById).not.toHaveBeenCalled();
+    expect(privateRepository.requireById).toHaveBeenCalledWith(id);
+    expect(publicRepository.requireById).not.toHaveBeenCalled();
   });
 
   it('does not fall back to a colliding public document', async () => {
-    privateRepository.findById.mockResolvedValue(undefined);
-    publicRepository.findById.mockResolvedValue({} as Community);
+    privateRepository.requireById.mockRejectedValue(
+      new CommunityNotFoundError(),
+    );
+    publicRepository.requireById.mockResolvedValue({} as Community);
 
-    await expect(router.findById(id)).resolves.toBeUndefined();
-    expect(publicRepository.findById).not.toHaveBeenCalled();
+    await expect(router.requireById(id)).rejects.toBeInstanceOf(
+      CommunityNotFoundError,
+    );
+    expect(publicRepository.requireById).not.toHaveBeenCalled();
   });
 
   it('serializes lookup with scope protection', async () => {
     const provisioningStarted = deferred<void>();
     const releaseProvisioning = deferred<void>();
     const privateCommunity = {} as Community;
-    authorizationRepository.findScope.mockResolvedValue(undefined);
-    privateRepository.findById.mockResolvedValue(privateCommunity);
-    publicRepository.findById.mockResolvedValue({} as Community);
+    authorizationRepository.hasScope.mockResolvedValue(false);
+    privateRepository.requireById.mockResolvedValue(privateCommunity);
+    publicRepository.requireById.mockResolvedValue({} as Community);
     const provisioning = storageCoordinator.exclusively(
       id.valueOf(),
       async () => {
-        authorizationRepository.findScope.mockResolvedValue({} as never);
+        authorizationRepository.hasScope.mockResolvedValue(true);
         provisioningStarted.resolve();
         await releaseProvisioning.promise;
       },
     );
     await provisioningStarted.promise;
 
-    const lookup = router.findById(id);
+    const lookup = router.requireById(id);
     releaseProvisioning.resolve();
     await provisioning;
 
     await expect(lookup).resolves.toBe(privateCommunity);
-    expect(publicRepository.findById).not.toHaveBeenCalled();
+    expect(publicRepository.requireById).not.toHaveBeenCalled();
   });
 
   it('rejects ordinary writes to a protected scope', async () => {
@@ -101,7 +107,7 @@ describe('CommunityRepositoryRouter', () => {
       getCommunityId: () => id,
     } as CommunityOperation;
     const proof = {} as PublicMutationProof;
-    authorizationRepository.findScope.mockResolvedValue(undefined);
+    authorizationRepository.hasScope.mockResolvedValue(false);
 
     await router.save(operation, proof);
 
@@ -112,7 +118,7 @@ describe('CommunityRepositoryRouter', () => {
     await expect(router.findFrontier(id)).resolves.toEqual([]);
     expect(publicRepository.findFrontier).not.toHaveBeenCalled();
 
-    authorizationRepository.findScope.mockResolvedValue(undefined);
+    authorizationRepository.hasScope.mockResolvedValue(false);
 
     await expect(router.findFrontier(id)).resolves.toEqual(['head']);
   });
@@ -128,8 +134,8 @@ describe('CommunityRepositoryRouter', () => {
       protectedCommunity,
       publicCommunity,
     ]);
-    authorizationRepository.findScope.mockImplementation(async (scopeId) =>
-      scopeId === 'protected' ? ({} as never) : undefined,
+    authorizationRepository.hasScope.mockImplementation(
+      async (scopeId) => scopeId === 'protected',
     );
 
     await expect(router.findDiscoverable({})).resolves.toEqual([
@@ -160,8 +166,8 @@ describe('CommunityRepositoryRouter', () => {
       publicCommunity,
     ]);
     privateRepository.findByMember.mockResolvedValue([privateCommunity]);
-    authorizationRepository.findScope.mockImplementation(async (scopeId) =>
-      scopeId === id.valueOf() ? ({} as never) : undefined,
+    authorizationRepository.hasScope.mockImplementation(
+      async (scopeId) => scopeId === id.valueOf(),
     );
 
     await expect(router.findByMember(identityId)).resolves.toEqual([

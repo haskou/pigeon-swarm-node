@@ -34,8 +34,8 @@ describe('Sticker user library application mutations', () => {
     const eventPublisher = mock<DomainEventPublisher>();
     const pack = StickerPackMother.create();
 
-    packRepository.findById.mockResolvedValue(pack);
-    libraryRepository.findByIdentityId.mockResolvedValue(undefined);
+    packRepository.requireById.mockResolvedValue(pack);
+    libraryRepository.hasByIdentityId.mockResolvedValue(false);
 
     const library = await new StickerPackSaver(
       packRepository,
@@ -67,7 +67,9 @@ describe('Sticker user library application mutations', () => {
     const libraryRepository = mock<StickerUserLibraryRepository>();
     const eventPublisher = mock<DomainEventPublisher>();
 
-    packRepository.findById.mockResolvedValue(undefined);
+    packRepository.requireById.mockRejectedValue(
+      new StickerPackNotFoundError(),
+    );
 
     await expect(
       new StickerPackSaver(
@@ -90,7 +92,8 @@ describe('Sticker user library application mutations', () => {
     const repository = mock<StickerUserLibraryRepository>();
     const library = StickerUserLibraryMother.create({ savedPack: true });
 
-    repository.findByIdentityId.mockResolvedValue(library);
+    repository.hasByIdentityId.mockResolvedValue(true);
+    repository.requireByIdentityId.mockResolvedValue(library);
 
     const updated = await new StickerPackForgetter(repository).forget(
       new StickerPackForgetMessage(
@@ -112,7 +115,8 @@ describe('Sticker user library application mutations', () => {
     const repository = mock<StickerUserLibraryRepository>();
     const library = StickerUserLibraryMother.create({ favoriteSticker: true });
 
-    repository.findByIdentityId.mockResolvedValue(library);
+    repository.hasByIdentityId.mockResolvedValue(true);
+    repository.requireByIdentityId.mockResolvedValue(library);
 
     const updated = await new StickerUnfavoriter(repository).unfavorite(
       new StickerUnfavoriteMessage(

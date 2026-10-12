@@ -210,7 +210,7 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
     replica.registry,
     new PrivateCommunityPublicStorageGuard(
       {
-        findScope: (): Promise<undefined> => Promise.resolve(undefined),
+        hasScope: (): Promise<boolean> => Promise.resolve(false),
       } as never,
       new PrivateAuthorizationStorageCoordinator(),
     ),
@@ -220,7 +220,7 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
     new OrbitDBCommunityInviteMapper(),
     new PrivateCommunityPublicStorageGuard(
       {
-        findScope: (): Promise<undefined> => Promise.resolve(undefined),
+        hasScope: (): Promise<boolean> => Promise.resolve(false),
       } as never,
       new PrivateAuthorizationStorageCoordinator(),
     ),
@@ -234,16 +234,16 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
   replica.polls = new OrbitDBPollRepository(
     replica.registry,
     {
-      findById: (): Promise<unknown> =>
+      requireById: (): Promise<unknown> =>
         Promise.resolve({ toPrimitives: () => ({ networkId }) }),
     } as never,
     {
-      findMetadataById: (): Promise<unknown> =>
+      requireMetadataById: (): Promise<unknown> =>
         Promise.resolve({ toPrimitives: () => ({ networkId }) }),
     } as never,
     new PrivateCommunityPublicStorageGuard(
       {
-        findScope: (): Promise<undefined> => Promise.resolve(undefined),
+        hasScope: (): Promise<boolean> => Promise.resolve(false),
       } as never,
       new PrivateAuthorizationStorageCoordinator(),
     ),
@@ -253,7 +253,7 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
     new OrbitDBCommunityChannelMessageMapper(),
     new PrivateCommunityPublicStorageGuard(
       {
-        findScope: (): Promise<undefined> => Promise.resolve(undefined),
+        hasScope: (): Promise<boolean> => Promise.resolve(false),
       } as never,
       new PrivateAuthorizationStorageCoordinator(),
     ),
@@ -262,7 +262,7 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
     replica.registry,
     new PrivateCommunityPublicStorageGuard(
       {
-        findScope: (): Promise<undefined> => Promise.resolve(undefined),
+        hasScope: (): Promise<boolean> => Promise.resolve(false),
       } as never,
       new PrivateAuthorizationStorageCoordinator(),
     ),
@@ -315,15 +315,15 @@ async function main(): Promise<void> {
     viewTextChannel: (): void => undefined,
   } as unknown as Community;
   const communities = {
-    findAtFrontier: (): Promise<Community> => Promise.resolve(community),
-    findById: (): Promise<Community> => Promise.resolve(community),
+    requireAtFrontier: (): Promise<Community> => Promise.resolve(community),
+    requireById: (): Promise<Community> => Promise.resolve(community),
   } as unknown as CommunityRepository;
   const conversations = {
-    findMetadataAtFrontier: (): Promise<Conversation> =>
+    requireMetadataAtFrontier: (): Promise<Conversation> =>
       Promise.resolve({
         hasParticipant: () => true,
       } as unknown as Conversation),
-    findMetadataById: (): Promise<Conversation> =>
+    requireMetadataById: (): Promise<Conversation> =>
       Promise.resolve({
         hasParticipant: () => true,
       } as unknown as Conversation),
@@ -746,7 +746,7 @@ async function main(): Promise<void> {
   });
   await pause(3000);
   assert.equal(
-    (await honest.invites!.findByToken(inviteToken))?.toPrimitives().maxUses,
+    (await honest.invites!.requireByToken(inviteToken)).toPrimitives().maxUses,
     1,
     'forged unsigned invite rewrite must be ignored',
   );
@@ -906,7 +906,8 @@ async function main(): Promise<void> {
     );
   };
   const voteOf = async (): Promise<string[] | undefined> =>
-    (await honest.polls!.findById(pollId))?.toPrimitives().votes[0]?.optionIds;
+    (await honest.polls!.requireById(pollId)).toPrimitives()
+      .votes[0]?.optionIds;
 
   await castVote(poll, 'a', 0);
   assert.deepEqual(await voteOf(), ['a']);
@@ -934,11 +935,11 @@ async function main(): Promise<void> {
     ),
   });
   await pause(3000);
-  const afterForgery = (await honest.polls!.findById(pollId))?.toPrimitives();
+  const afterForgery = (await honest.polls!.requireById(pollId)).toPrimitives();
 
-  assert.deepEqual(afterForgery?.votes[0]?.optionIds, ['a']);
-  assert.equal(afterForgery?.question, 'Which?');
-  assert.equal(afterForgery?.status, 'open');
+  assert.deepEqual(afterForgery.votes[0]?.optionIds, ['a']);
+  assert.equal(afterForgery.question, 'Which?');
+  assert.equal(afterForgery.status, 'open');
   console.log('PASS forged poll records rejected by the honest node');
 
   await castVote(poll, 'b', 1);
@@ -958,7 +959,7 @@ async function main(): Promise<void> {
     ),
   );
   assert.equal(
-    (await honest.polls!.findById(pollId))?.toPrimitives().status,
+    (await honest.polls!.requireById(pollId)).toPrimitives().status,
     'closed',
   );
   console.log('PASS poll signed ballot and close applied');
@@ -1016,12 +1017,24 @@ async function main(): Promise<void> {
     removed: true,
     scopeType: 'community_channel',
   };
-  const storedMessage = (replica: Replica) =>
-    replica.messages!.findById(
+  const storedMessage = async (
+    replica: Replica,
+  ): Promise<CommunityChannelMessage | undefined> => {
+    const messageId = new CommunityChannelMessageId('message-forged-1');
+    const present = await replica.messages!.hasById(
       messageCommunityId,
       messageChannelId,
-      new CommunityChannelMessageId('message-forged-1'),
+      messageId,
     );
+
+    return present
+      ? replica.messages!.requireById(
+          messageCommunityId,
+          messageChannelId,
+          messageId,
+        )
+      : undefined;
+  };
 
   await honest.messages!.save(message, messageProof('put', 0, messageDocument));
   await until('message reached the malicious store', async () => {
@@ -1114,9 +1127,13 @@ async function main(): Promise<void> {
     scopeType: 'sticker_favorite',
     stickerId: stickerId.valueOf(),
   };
-  const favoriteCount = async (replica: Replica): Promise<number> =>
-    (await replica.stickerLibraries!.findByIdentityId(identity))?.toPrimitives()
-      .favoriteStickers.length ?? 0;
+  const favoriteCount = async (replica: Replica): Promise<number> => {
+    if (!(await replica.stickerLibraries!.hasByIdentityId(identity))) return 0;
+
+    const library = await replica.stickerLibraries!.requireByIdentityId(identity);
+
+    return library.toPrimitives().favoriteStickers.length;
+  };
 
   await honest.stickerPacks!.save(
     pack,
@@ -1176,13 +1193,16 @@ async function main(): Promise<void> {
     'forged tombstone must not remove the favorite',
   );
   assert.equal(
-    (await honest.stickerPacks!.findById(stickerPackId))?.toPrimitives().name,
+    (await honest.stickerPacks!.requireById(stickerPackId)).toPrimitives().name,
     'Forgery target',
     'forged pack document must not replace the signed pack',
   );
+
+  const honestLibrary =
+    await honest.stickerLibraries!.requireByIdentityId(identity);
+
   assert.deepEqual(
-    (await honest.stickerLibraries!.findByIdentityId(identity))?.toPrimitives()
-      .savedPackIds,
+    honestLibrary.toPrimitives().savedPackIds,
     [],
     'forged flat library head must be ignored',
   );

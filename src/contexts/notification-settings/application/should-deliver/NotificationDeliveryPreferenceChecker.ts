@@ -12,10 +12,9 @@ export default class NotificationDeliveryPreferenceChecker {
   ): Promise<NotificationScopeSettings | undefined> {
     const identityId = message.getIdentityId();
     const scope = message.getScope();
-    const directSettings = await this.repository.findByScope(identityId, scope);
 
-    if (directSettings) {
-      return directSettings;
+    if (await this.repository.hasByScope(identityId, scope)) {
+      return this.repository.requireByScope(identityId, scope);
     }
 
     const parentScope = scope.getCommunityScope();
@@ -24,7 +23,11 @@ export default class NotificationDeliveryPreferenceChecker {
       return undefined;
     }
 
-    return this.repository.findByScope(identityId, parentScope);
+    if (!(await this.repository.hasByScope(identityId, parentScope))) {
+      return undefined;
+    }
+
+    return this.repository.requireByScope(identityId, parentScope);
   }
 
   public async shouldSendPush(

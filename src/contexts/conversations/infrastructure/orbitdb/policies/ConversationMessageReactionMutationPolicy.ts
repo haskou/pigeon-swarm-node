@@ -19,9 +19,7 @@ export default class ConversationMessageReactionMutationPolicy extends PublicMut
     'conversation',
   );
 
-  private readonly conversations = new ShortLivedLookup<
-    Conversation | undefined
-  >();
+  private readonly conversations = new ShortLivedLookup<Conversation>();
 
   public readonly collection = 'reactions';
 
@@ -64,13 +62,13 @@ export default class ConversationMessageReactionMutationPolicy extends PublicMut
     const conversation = await this.conversations.get(
       PublicMutationFrontier.keyOf(record.conversationId as string, frontier),
       () =>
-        this.conversationRepository.findMetadataAtFrontier(
+        this.conversationRepository.requireMetadataAtFrontier(
           new ConversationId(record.conversationId as string),
           frontier,
         ),
     );
 
-    if (!conversation?.hasParticipant(new IdentityId(authorIdentityId))) {
+    if (!conversation.hasParticipant(new IdentityId(authorIdentityId))) {
       throw new InvalidPublicMutationError();
     }
   }

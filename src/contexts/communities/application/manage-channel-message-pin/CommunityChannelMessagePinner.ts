@@ -1,7 +1,5 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
-import { CommunityChannelMessageNotFoundError } from '../../domain/errors/CommunityChannelMessageNotFoundError';
-import { CommunityNotFoundError } from '../../domain/errors/CommunityNotFoundError';
 import { CommunityChannelMessageWasPinnedEvent } from '../../domain/events/CommunityChannelMessageWasPinnedEvent';
 import CommunityChannelMessagePinRepository from '../../domain/repositories/CommunityChannelMessagePinRepository';
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
@@ -19,25 +17,17 @@ export default class CommunityChannelMessagePinner {
   public async pin(
     message: CommunityChannelMessagePinCreateMessage,
   ): Promise<void> {
-    const community = await this.communityRepository.findById(
+    const community = await this.communityRepository.requireById(
       message.communityId,
     );
 
-    if (!community) {
-      throw new CommunityNotFoundError();
-    }
-
     community.manageChannelMessages(message.actorIdentityId, message.channelId);
 
-    const pinnedMessage = await this.messageRepository.findById(
+    await this.messageRepository.requireById(
       message.communityId,
       message.channelId,
       message.messageId,
     );
-
-    if (!pinnedMessage) {
-      throw new CommunityChannelMessageNotFoundError();
-    }
 
     await this.pinRepository.pin(
       message.communityId,

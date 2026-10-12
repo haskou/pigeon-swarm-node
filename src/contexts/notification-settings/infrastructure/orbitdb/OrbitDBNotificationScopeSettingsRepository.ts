@@ -4,6 +4,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
+import { NotificationScopeSettingsNotFoundError } from '../../domain/errors/NotificationScopeSettingsNotFoundError';
 import { NotificationScopeSettings } from '../../domain/NotificationScopeSettings';
 import NotificationScopeSettingsRepository from '../../domain/repositories/NotificationScopeSettingsRepository';
 import { NotificationSettingScope } from '../../domain/value-objects/NotificationSettingScope';
@@ -110,6 +111,19 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
     });
   }
 
+  private async readByScope(
+    identityId: IdentityId,
+    scope: NotificationSettingScope,
+  ): Promise<NotificationScopeSettings | undefined> {
+    const id = this.documentId(identityId, scope);
+    const document = (
+      (await this.settingsIndex.find(this.identityIndexHeadKey(identityId))) ??
+      []
+    ).find((candidate) => candidate.id === id);
+
+    return document ? this.toDomain(document) : undefined;
+  }
+
   private async write(
     identityId: IdentityId,
     payload: Record<string, unknown>,
@@ -162,17 +176,24 @@ export default class OrbitDBNotificationScopeSettingsRepository extends Notifica
       .map((document) => this.toDomain(document));
   }
 
-  public async findByScope(
+  public async hasByScope(
     identityId: IdentityId,
     scope: NotificationSettingScope,
-  ): Promise<NotificationScopeSettings | undefined> {
-    const id = this.documentId(identityId, scope);
-    const document = (
-      (await this.settingsIndex.find(this.identityIndexHeadKey(identityId))) ??
-      []
-    ).find((candidate) => candidate.id === id);
+  ): Promise<boolean> {
+    return (await this.readByScope(identityId, scope)) !== undefined;
+  }
 
-    return document ? this.toDomain(document) : undefined;
+  public async requireByScope(
+    identityId: IdentityId,
+    scope: NotificationSettingScope,
+  ): Promise<NotificationScopeSettings> {
+    const settings = await this.readByScope(identityId, scope);
+
+    if (!settings) {
+      throw new NotificationScopeSettingsNotFoundError();
+    }
+
+    return settings;
   }
 
   public isPrivateScope(): Promise<boolean> {

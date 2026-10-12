@@ -1,9 +1,11 @@
 import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
+import { PrivateAuthorizationProjectionNotFoundError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationProjectionNotFoundError';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Community } from '../../domain/Community';
 import { CommunityPrimitivesShape } from '../../domain/CommunityPrimitivesShape';
+import { CommunityNotFoundError } from '../../domain/errors/CommunityNotFoundError';
 import { CommunityId } from '../../domain/value-objects/CommunityId';
 
 export default class LocalPrivateCommunityRepository {
@@ -11,10 +13,18 @@ export default class LocalPrivateCommunityRepository {
     private readonly authorizationRepository: PrivateAuthorizationRepository,
   ) {}
 
-  public async findById(id: CommunityId): Promise<Community | undefined> {
-    const projection = await this.authorizationRepository.findProjection(
-      id.valueOf(),
-    );
+  private async findProjectedCommunity(
+    id: CommunityId,
+  ): Promise<Community | undefined> {
+    const projection = await this.authorizationRepository
+      .requireProjection(id.valueOf())
+      .catch((error: unknown): undefined => {
+        if (error instanceof PrivateAuthorizationProjectionNotFoundError) {
+          return undefined;
+        }
+
+        throw error;
+      });
 
     if (!projection) return undefined;
 
@@ -35,10 +45,22 @@ export default class LocalPrivateCommunityRepository {
     }
   }
 
+  public async requireById(id: CommunityId): Promise<Community> {
+    const community = await this.findProjectedCommunity(id);
+
+    if (!community) throw new CommunityNotFoundError();
+
+    return community;
+  }
+
+  public async hasById(id: CommunityId): Promise<boolean> {
+    return (await this.findProjectedCommunity(id)) !== undefined;
+  }
+
   public async findByMember(identityId: IdentityId): Promise<Community[]> {
     const communities = await Promise.all(
       (await this.authorizationRepository.findScopeIds()).map((scopeId) =>
-        this.findById(new CommunityId(scopeId)),
+        this.findProjectedCommunity(new CommunityId(scopeId)),
       ),
     );
 
