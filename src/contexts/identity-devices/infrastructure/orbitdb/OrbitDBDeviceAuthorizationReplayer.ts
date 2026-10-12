@@ -2,6 +2,7 @@ import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/Devic
 import { DeviceAuthorizationCandidate } from '@app/contexts/identity-devices/domain/DeviceAuthorizationCandidate';
 import { DeviceAuthorizationTimeline } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTimeline';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
+import { DeviceCompromiseCaps } from '@app/contexts/identity-devices/domain/DeviceCompromiseCaps';
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
 import { assert } from '@haskou/value-objects';
@@ -58,62 +59,42 @@ export default class OrbitDBDeviceAuthorizationReplayer {
 
   /**
    * Every state from the replay base (the genesis, or the recovery checkpoint)
-   * to the head, in ascending revision order, plus the revision each
-   * compromised credential is capped at. The checkpoint's carried caps merge
-   * with every compromised revocation and carried recovery replayed on top.
+   * to the head, in ascending revision order, plus the compromise caps in
+   * effect at the head. The checkpoint's carried caps merge with every
+   * compromised revocation and carried recovery replayed on top.
    */
   private statesOf(
     genesis: DeviceAuthorization,
     checkpoint: OrbitDBDeviceAuthorizationDocument['checkpoint'],
     history: OrbitDBDeviceAuthorizationTransitionRecord[],
   ): {
-    compromisedSince: Map<string, number>;
+    compromiseCaps: DeviceCompromiseCaps;
     states: DeviceAuthorization[];
   } {
     const base = checkpoint
       ? this.checkpointState(genesis, checkpoint)
       : {
           authorization: genesis,
-          compromisedSince: new Map<string, number>(),
+          compromiseCaps: DeviceCompromiseCaps.none(),
         };
     const replay = this.policy.replay(
       base.authorization,
       this.candidatesOf(history),
     );
-    const states = [base.authorization, ...replay.checkpoints];
-    const { compromisedSince } = base;
-    const cap = (credential: string, since: number): void => {
-      compromisedSince.set(
-        credential,
-        Math.min(
-          since,
-          compromisedSince.get(credential) ?? Number.POSITIVE_INFINITY,
-        ),
-      );
+
+    return {
+      compromiseCaps: replay.accepted.reduce(
+        (caps, { transition }) => caps.withCompromise(transition),
+        base.compromiseCaps,
+      ),
+      states: [base.authorization, ...replay.checkpoints],
     };
-
-    for (const {
-      payload: { transition },
-    } of replay.accepted) {
-      for (const entry of transition.compromisedCredentials ?? []) {
-        cap(entry.credential, entry.compromisedSince);
-      }
-
-      if (
-        transition.operation === 'revoke' &&
-        transition.compromisedSince !== undefined
-      ) {
-        cap(transition.targetCredential, transition.compromisedSince);
-      }
-    }
-
-    return { compromisedSince, states };
   }
 
-  private compromisedSinceOfSources(
+  private compromiseCapsOfSources(
     genesis: DeviceAuthorization,
     sources: OrbitDBDeviceAuthorizationSource[],
-  ): ReadonlyMap<string, number> {
+  ): DeviceCompromiseCaps {
     const checkpoint = this.sources.preferredSourceCheckpoint(sources);
     const checkpointRevision = checkpoint?.authorization.revision ?? 0;
     const history = this.sources
@@ -122,7 +103,7 @@ export default class OrbitDBDeviceAuthorizationReplayer {
         (record) => record.transition.previousRevision >= checkpointRevision,
       );
 
-    return this.statesOf(genesis, checkpoint, history).compromisedSince;
+    return this.statesOf(genesis, checkpoint, history).compromiseCaps;
   }
 
   public transitionFromRecord(
@@ -162,91 +143,72 @@ export default class OrbitDBDeviceAuthorizationReplayer {
     if (document.overflow) {
       return new DeviceAuthorizationTimeline(
         [DeviceAuthorization.fromPrimitives(document.authorization)],
-        this.compromisedSinceOf(genesis, document),
+        this.compromiseCapsOf(genesis, document),
       );
     }
 
-    const { compromisedSince, states } = this.statesOf(
+    const { compromiseCaps, states } = this.statesOf(
       genesis,
       document.checkpoint,
       document.history,
     );
 
-    return new DeviceAuthorizationTimeline(states, compromisedSince);
+    return new DeviceAuthorizationTimeline(states, compromiseCaps);
   }
 
   /**
-   * The caps in effect at a document's head, keyed by compromised credential.
+   * The compromise caps in effect at a document's head.
    */
-  public compromisedSinceOf(
+  public compromiseCapsOf(
     genesis: DeviceAuthorization,
     document: OrbitDBDeviceAuthorizationDocument,
-  ): ReadonlyMap<string, number> {
+  ): DeviceCompromiseCaps {
     if (document.overflow) {
-      return this.compromisedSinceOfSources(
+      return this.compromiseCapsOfSources(
         genesis,
         this.sources.documentSources(document),
       );
     }
 
     return this.statesOf(genesis, document.checkpoint, document.history)
-      .compromisedSince;
+      .compromiseCaps;
   }
 
   /**
    * The replay base of a recovery checkpoint: the authorization it recovered
-   * to and the compromised caps it carries forward. Every recovery in the
-   * lineage must replay, and a later recovery may only tighten or add caps,
-   * so no checkpoint can re-admit a credential an earlier one capped.
+   * to and the compromise caps it carries forward. The whole lineage must
+   * replay, and the stored authorization must match what it replays to.
    */
   public checkpointState(
     genesis: DeviceAuthorization,
     checkpoint: NonNullable<OrbitDBDeviceAuthorizationDocument['checkpoint']>,
   ): {
     authorization: DeviceAuthorization;
-    compromisedSince: Map<string, number>;
+    compromiseCaps: DeviceCompromiseCaps;
   } {
-    let authorization = genesis;
-    let compromisedSince = new Map<string, number>();
+    const recoveries = [...checkpoint.lineage, checkpoint.transition].map(
+      (record) => {
+        const transition = this.transitionFromRecord(record);
 
-    for (const record of [...checkpoint.lineage, checkpoint.transition]) {
-      const transition = this.transitionFromRecord(record);
-
-      assert(
-        transition !== undefined && transition.isRecovery(),
-        new InvalidDeviceAuthorizationTransitionError(),
-      );
-
-      authorization = this.policy.applyRecoveryCheckpoint(
-        authorization,
-        transition,
-      );
-
-      const carried = new Map(
-        transition
-          .getCompromisedCredentials()
-          .map((entry): [string, number] => [
-            entry.credential.valueOf(),
-            entry.compromisedSince.valueOf(),
-          ]),
-      );
-
-      for (const [credential, since] of compromisedSince) {
         assert(
-          (carried.get(credential) ?? Number.POSITIVE_INFINITY) <= since,
+          transition !== undefined,
           new InvalidDeviceAuthorizationTransitionError(),
         );
-      }
 
-      compromisedSince = carried;
-    }
+        return transition;
+      },
+    );
+    const state = this.policy.replayRecoveryLineage(genesis, recoveries);
 
     assert(
-      isDeepStrictEqual(checkpoint.authorization, authorization.toPrimitives()),
+      isDeepStrictEqual(
+        checkpoint.authorization,
+        state.authorization.toPrimitives(),
+      ),
       new InvalidDeviceAuthorizationTransitionError(),
     );
 
-    return { authorization, compromisedSince };
+    return state;
   }
 
   public authorizationFromCheckpoint(
