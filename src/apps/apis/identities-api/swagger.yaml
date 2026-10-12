@@ -25,7 +25,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/IdentityResource'
         '429':
-          description: Identity publication rate limit exceeded (code 429040, IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE publications per identity per minute). Identity admission network quota exceeded (code 429041, IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE, off by default).
+          description: Identity publication rate limit exceeded (code 429040, IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE publications per identity per minute). Identity admission network quota exceeded (code 429041, IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE, off by default). Identity admission rate limit per client address exceeded (code 429042, IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE, default 30).
   /identities/{reference}:
     get:
       tags:
@@ -86,7 +86,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/IdentityResource'
         '429':
-          description: Identity publication rate limit exceeded (code 429040). Identity admission network quota exceeded (code 429041, off by default).
+          description: Identity publication rate limit exceeded (code 429040). Identity admission network quota exceeded (code 429041, off by default). Identity admission rate limit per client address exceeded (code 429042).
 components:
   schemas:
     PostIdentityBody:

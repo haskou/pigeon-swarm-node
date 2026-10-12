@@ -688,6 +688,7 @@ under a victim head) and that the gated nodes never serve them.
   (`429`, code `429040`). The per-network admission cap
   (`IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE`, default off, `429041`)
   is local to each node and is not replicated.
+- The per-source admission cap (`IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE`, default 30, `429`, code `429042`) is also local to each node, keyed by client address, and is not replicated.
 - Device authorization history is replayed from a genesis derived from the
   verified identity chain, so an identity the node has never seen has a trusted
   genesis too (see [Identity device authorization convergence](#identity-device-authorization-convergence)).
