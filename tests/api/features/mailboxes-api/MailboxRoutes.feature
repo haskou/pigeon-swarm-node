@@ -69,3 +69,17 @@ Feature: Opaque mailbox routes
       "requiredDifficultyBits": 16
     }
     """
+
+  Scenario: A recreated mailbox never reuses a cursor a client may still hold
+    When I create a mailbox
+    And I append an envelope "a" of 1024 bytes to the mailbox with the post capability
+    And I append an envelope "b" of 1024 bytes to the mailbox with the post capability
+    When I delete the mailbox with the read capability
+    Then response code is equal to 204
+    When I create the same mailbox again
+    Then response code is equal to 201
+    When I append an envelope "c" of 1024 bytes to the mailbox with the post capability
+    Then the mailbox response cursor should be greater than 2
+    When I read the mailbox envelopes after 2 limit 10 with the read capability
+    Then response code is equal to 200
+    And the mailbox page should hold only cursors greater than 2

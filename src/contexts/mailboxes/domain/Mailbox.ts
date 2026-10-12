@@ -15,6 +15,7 @@ export class Mailbox {
     postTokenHash: string;
     readTokenHash: string;
     appendTokens: number;
+    firstCursor: number;
   }): Mailbox {
     return new Mailbox({
       appendRefilledAt: params.now,
@@ -24,7 +25,7 @@ export class Mailbox {
       envelopeCount: 0,
       id: params.id,
       lastReadAt: params.now,
-      nextCursor: 1,
+      nextCursor: params.firstCursor,
       postTokenHash: params.postTokenHash,
       readTokenHash: params.readTokenHash,
     });
@@ -57,6 +58,10 @@ export class Mailbox {
       this.primitives.postTokenHash === postTokenHash &&
       this.primitives.readTokenHash === readTokenHash
     );
+  }
+
+  public highestCursor(): number {
+    return this.primitives.nextCursor - 1;
   }
 
   /** Empty and unread for `idleMs`: the only mailboxes eviction may remove. */

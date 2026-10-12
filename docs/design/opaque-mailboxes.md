@@ -96,6 +96,7 @@ existing WebSocket and receives `mailbox_envelope` hints that contain only the
   the same `envelopeId` to the same mailbox twice returns the first cursor and
   stores nothing new. The client also deduplicates on decrypted message ID, so
   redelivery never creates a duplicate message.
+- `cursor` is unique per mailbox id across its lifetimes. The node stores one number, the highest cursor any removed mailbox reached, and a recreated mailbox starts above it, so no cursor a client still holds can match a new envelope. That number is the only disclosure: a new mailbox's first cursor reveals an upper bound on how many envelopes the largest removed mailbox on this node ever accepted, with no identity or time.
 - Bodies are padded to size buckets (for example 1 KiB, 4 KiB, 16 KiB, 64 KiB) to
   reduce size correlation. This reduces, and does not eliminate, it.
 - Sender identity, conversation ID and message type exist only inside `body`.

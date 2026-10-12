@@ -110,7 +110,7 @@ paths:
       tags:
         - mailboxes
       summary: Page pending envelopes
-      description: Authorized by the read capability. Returns envelopes with cursor greater than `after`, oldest first. Reading marks the mailbox live for retention.
+      description: Authorized by the read capability. Returns envelopes with cursor greater than `after`, oldest first. Reading marks the mailbox live for retention. Cursors are unique per mailbox id across its lifetimes. A mailbox recreated after deletion, expiry or eviction issues cursors above every cursor the node has retired, so an `after` kept from an earlier life never hides its envelopes.
       security:
         - readCapability: []
       parameters:
@@ -210,3 +210,4 @@ components:
       properties:
         cursor:
           type: integer
+          description: Unique per mailbox id across its lifetimes. A recreated mailbox issues cursors above every cursor the node has retired.

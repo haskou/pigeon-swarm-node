@@ -308,6 +308,44 @@ describe('mailboxes', () => {
     expect((await reader.read(MAILBOX, READ, 0, 10)).envelopes).toEqual([]);
   });
 
+  it('never reuses a cursor when a deleted mailbox is recreated under the same id', async () => {
+    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+    await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
+    await remover.remove(MAILBOX, READ);
+    await createMailbox(MAILBOX, sha(POST), sha(READ));
+
+    // A client still holding cursor 2 from the old queue must receive the new envelope.
+    await expect(
+      appender.append(MAILBOX, POST, 'c'.repeat(22), body(1024)),
+    ).resolves.toEqual({ created: true, cursor: 3 });
+    expect(
+      (await reader.read(MAILBOX, READ, 2, 10)).envelopes.map((e) => e.cursor),
+    ).toEqual([3]);
+  });
+
+  it('keeps the retired cursor across eviction at capacity and a restart', async () => {
+    process.env.MAILBOX_MAX_COUNT = '1';
+    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+    await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
+    await acknowledger.acknowledge(MAILBOX, READ, 2);
+    const clock = jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(Date.now() + IDLE_MS + 1000);
+
+    await expect(
+      creator.create(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+    ).resolves.toBe(true);
+    clock.mockRestore();
+    await database.close();
+    wire();
+    process.env.MAILBOX_MAX_COUNT = '2';
+    await createMailbox(MAILBOX, sha(POST), sha(READ));
+
+    await expect(
+      appender.append(MAILBOX, POST, 'c'.repeat(22), body(1024)),
+    ).resolves.toEqual({ created: true, cursor: 3 });
+  });
+
   it('expires old envelopes and idle mailboxes but keeps recently read ones', async () => {
     process.env.MAILBOX_RETENTION_MS = '1000';
     const t0 = Date.now();
