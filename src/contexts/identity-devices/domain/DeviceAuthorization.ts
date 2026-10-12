@@ -78,6 +78,14 @@ export class DeviceAuthorization extends AggregateRoot {
     );
   }
 
+  private eventAttributes(): DeviceAuthorizationEventAttributes {
+    return {
+      epoch: this.epoch.valueOf(),
+      identityId: this.identityId.valueOf(),
+      revision: this.revision.valueOf(),
+    };
+  }
+
   public getIdentityId(): IdentityId {
     return this.identityId;
   }
@@ -110,14 +118,6 @@ export class DeviceAuthorization extends AggregateRoot {
 
   public isAtRevision(revision: DeviceAuthorizationRevision): boolean {
     return this.revision.isEqual(revision);
-  }
-
-  private eventAttributes(): DeviceAuthorizationEventAttributes {
-    return {
-      epoch: this.epoch.valueOf(),
-      identityId: this.identityId.valueOf(),
-      revision: this.revision.valueOf(),
-    };
   }
 
   public enroll(credential: DeviceCredential): DeviceAuthorization {
@@ -211,6 +211,7 @@ export class DeviceAuthorization extends AggregateRoot {
         next.eventAttributes(),
       ),
     );
+
     if (compromisedSince !== undefined) {
       next.record(
         new DeviceCredentialWasCompromisedEvent(this.identityId.valueOf(), {
