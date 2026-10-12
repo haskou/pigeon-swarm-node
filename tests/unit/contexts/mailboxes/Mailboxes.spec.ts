@@ -24,6 +24,7 @@ import { MailboxReaderNotFoundError } from '@app/contexts/mailboxes/domain/error
 import { MailboxCreationDifficulty } from '@app/contexts/mailboxes/domain/MailboxCreationDifficulty';
 import { MailboxCreationProof } from '@app/contexts/mailboxes/domain/MailboxCreationProof';
 import MailboxPolicy from '@app/contexts/mailboxes/domain/MailboxPolicy';
+import { MailboxLimitsFromEnvironment } from '@app/contexts/mailboxes/infrastructure/environment/MailboxLimitsFromEnvironment';
 import LocalMailboxRepository from '@app/contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { createHash } from 'crypto';
@@ -79,6 +80,7 @@ describe('mailboxes', () => {
   let databasePath: string;
   let database: EmbeddedLocalDatabase;
   let repository: LocalMailboxRepository;
+  let coordinator: MailboxCoordinator;
   let creator: MailboxCreator;
   let appender: MailboxAppender;
   let notifier: MockProxy<MailboxEnvelopeNotifier>;
@@ -100,28 +102,32 @@ describe('mailboxes', () => {
     'MAILBOX_MAX_READERS',
   ];
 
-  const wire = (): void => {
-    const policy = new MailboxPolicy();
-    const coordinator = new MailboxCoordinator();
+  const wirePolicy = (): void => {
+    const policy = new MailboxPolicy(MailboxLimitsFromEnvironment.load());
 
+    creator = new MailboxCreator(repository, policy, coordinator);
+    appender = new MailboxAppender(repository, policy, coordinator, notifier);
+    expirer = new MailboxExpirer(repository, policy, coordinator, notifier);
+    adder = new MailboxReaderAdder(repository, policy, coordinator);
+    lister = new MailboxReaderLister(repository, policy);
+  };
+
+  const wire = (): void => {
+    coordinator = new MailboxCoordinator();
     database = new EmbeddedLocalDatabase();
     repository = new LocalMailboxRepository(database);
-    creator = new MailboxCreator(repository, policy, coordinator);
     notifier = mock<MailboxEnvelopeNotifier>();
-    appender = new MailboxAppender(repository, policy, coordinator, notifier);
     reader = new MailboxReader(repository, coordinator);
     const settler = new MailboxSettler(repository);
     acknowledger = new MailboxAcknowledger(repository, coordinator, settler);
     remover = new MailboxRemover(repository, coordinator, notifier);
-    expirer = new MailboxExpirer(repository, policy, coordinator, notifier);
-    adder = new MailboxReaderAdder(repository, policy, coordinator);
-    lister = new MailboxReaderLister(repository, policy);
     revoker = new MailboxReaderRevoker(
       repository,
       coordinator,
       settler,
       notifier,
     );
+    wirePolicy();
   };
 
   const createMailbox = (
@@ -179,6 +185,7 @@ describe('mailboxes', () => {
 
   it('stops creating at MAILBOX_MAX_COUNT', async () => {
     process.env.MAILBOX_MAX_COUNT = '1';
+    wirePolicy();
 
     await expect(
       creator.create(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
@@ -271,6 +278,7 @@ describe('mailboxes', () => {
 
   it('refuses instead of dropping when the envelope or byte limit is reached', async () => {
     process.env.MAILBOX_MAX_ENVELOPES = '2';
+    wirePolicy();
     await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
     await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
 
@@ -283,6 +291,7 @@ describe('mailboxes', () => {
 
     process.env.MAILBOX_MAX_ENVELOPES = '100';
     process.env.MAILBOX_MAX_BYTES = '3000';
+    wirePolicy();
 
     await expect(
       appender.append(MAILBOX, POST, 'c'.repeat(22), body(1024)),
@@ -316,6 +325,7 @@ describe('mailboxes', () => {
 
   it('frees capacity on acknowledge and never reuses cursors', async () => {
     process.env.MAILBOX_MAX_ENVELOPES = '2';
+    wirePolicy();
     await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
     await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
     await acknowledger.acknowledge(MAILBOX, READ, 1);
@@ -362,6 +372,7 @@ describe('mailboxes', () => {
 
   it('keeps the retired cursor across eviction at capacity and a restart', async () => {
     process.env.MAILBOX_MAX_COUNT = '1';
+    wirePolicy();
     await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
     await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
     await acknowledger.acknowledge(MAILBOX, READ, 2);
@@ -376,6 +387,7 @@ describe('mailboxes', () => {
     await database.close();
     wire();
     process.env.MAILBOX_MAX_COUNT = '2';
+    wirePolicy();
     await createMailbox(MAILBOX, sha(POST), sha(READ));
 
     await expect(
@@ -385,6 +397,7 @@ describe('mailboxes', () => {
 
   it('expires old envelopes and idle mailboxes but keeps recently read ones', async () => {
     process.env.MAILBOX_RETENTION_MS = '1000';
+    wirePolicy();
     const t0 = Date.now();
     const clock = jest.spyOn(Date, 'now');
     const idle = 'i'.repeat(43);
@@ -407,6 +420,7 @@ describe('mailboxes', () => {
 
   it('tells realtime listeners when expiry deletes an idle mailbox', async () => {
     process.env.MAILBOX_RETENTION_MS = '1000';
+    wirePolicy();
     const t0 = Date.now();
     const clock = jest.spyOn(Date, 'now');
     const idle = 'i'.repeat(43);
@@ -470,6 +484,7 @@ describe('mailboxes', () => {
 
   it('admits a 16-bit proof while the node is at most half full', async () => {
     process.env.MAILBOX_MAX_COUNT = '2';
+    wirePolicy();
 
     await expect(createMailbox(FRESH, POST_HASH, READ_HASH)).resolves.toBe(
       true,
@@ -478,6 +493,7 @@ describe('mailboxes', () => {
 
   it('raises the required difficulty as the node fills past half', async () => {
     process.env.MAILBOX_MAX_COUNT = '4';
+    wirePolicy();
     await createMailbox(SECOND, POST_HASH, READ_HASH);
     await createMailbox(THIRD, POST_HASH, READ_HASH);
 
@@ -498,6 +514,7 @@ describe('mailboxes', () => {
 
   it('reports the required difficulty when a proof falls short at capacity', async () => {
     process.env.MAILBOX_MAX_COUNT = '1';
+    wirePolicy();
     const weak = proofMeeting(FRESH, POST_HASH, READ_HASH, 16, 20);
     const refusal = await creator
       .create(FRESH, POST_HASH, READ_HASH, weak)
@@ -512,6 +529,7 @@ describe('mailboxes', () => {
 
   it('evicts an idle, empty mailbox at capacity so an honest creation succeeds', async () => {
     process.env.MAILBOX_MAX_COUNT = '1';
+    wirePolicy();
     const clock = jest
       .spyOn(Date, 'now')
       .mockReturnValue(Date.now() + IDLE_MS + 1000);
@@ -526,6 +544,7 @@ describe('mailboxes', () => {
 
   it('never evicts a mailbox that still holds envelopes', async () => {
     process.env.MAILBOX_MAX_COUNT = '1';
+    wirePolicy();
     await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
     const clock = jest
       .spyOn(Date, 'now')
@@ -540,6 +559,7 @@ describe('mailboxes', () => {
 
   it('keeps an empty mailbox that was read within the idle window', async () => {
     process.env.MAILBOX_MAX_COUNT = '1';
+    wirePolicy();
     const t0 = Date.now();
     const clock = jest.spyOn(Date, 'now').mockReturnValue(t0 + DAY);
     await reader.read(MAILBOX, READ, 0, 10);
@@ -553,6 +573,7 @@ describe('mailboxes', () => {
 
   it('evicts the least recently read idle mailbox first', async () => {
     process.env.MAILBOX_MAX_COUNT = '2';
+    wirePolicy();
     const t0 = Date.now();
     const clock = jest.spyOn(Date, 'now').mockReturnValue(t0 + 1000);
     await createMailbox(SECOND, POST_HASH, READ_HASH);
@@ -574,6 +595,7 @@ describe('mailboxes', () => {
     clock.mockReturnValue(t0 + DAY);
     await reader.read(THIRD, READ, 0, 10);
     process.env.MAILBOX_MAX_COUNT = '1';
+    wirePolicy();
     clock.mockReturnValue(t0 + IDLE_MS + 2000);
 
     await expect(
@@ -587,6 +609,7 @@ describe('mailboxes', () => {
 
   it('rate limits appends per mailbox and refills one per interval', async () => {
     process.env.MAILBOX_APPEND_RATE_PER_MINUTE = '3';
+    wirePolicy();
     const t0 = Date.now();
     const clock = jest.spyOn(Date, 'now').mockReturnValue(t0);
     await createMailbox(RATED, sha(POST), sha(READ));
@@ -608,6 +631,7 @@ describe('mailboxes', () => {
 
   it('keeps the append rate across a restart', async () => {
     process.env.MAILBOX_APPEND_RATE_PER_MINUTE = '1';
+    wirePolicy();
     await createMailbox(RATED, sha(POST), sha(READ));
     await appender.append(RATED, POST, 'a'.repeat(22), body(1024));
 
@@ -621,6 +645,7 @@ describe('mailboxes', () => {
 
   it('does not charge the append rate for a replayed envelope', async () => {
     process.env.MAILBOX_APPEND_RATE_PER_MINUTE = '1';
+    wirePolicy();
     await createMailbox(RATED, sha(POST), sha(READ));
     await appender.append(RATED, POST, 'a'.repeat(22), body(1024));
 
@@ -631,6 +656,7 @@ describe('mailboxes', () => {
 
   it('turns the append rate off with MAILBOX_APPEND_RATE_PER_MINUTE=0', async () => {
     process.env.MAILBOX_APPEND_RATE_PER_MINUTE = '0';
+    wirePolicy();
     await createMailbox(RATED, sha(POST), sha(READ));
 
     for (const letter of ['a', 'b', 'c', 'd', 'e']) {
@@ -694,6 +720,7 @@ describe('mailboxes', () => {
 
   it('caps readers at MAILBOX_MAX_READERS and frees a slot when one is revoked', async () => {
     process.env.MAILBOX_MAX_READERS = '2';
+    wirePolicy();
     await adder.add(MAILBOX, READ, OTHER_READ_HASH);
 
     await expect(adder.add(MAILBOX, READ, sha(THIRD))).rejects.toBeInstanceOf(
@@ -706,6 +733,7 @@ describe('mailboxes', () => {
 
   it('admits a reader for each device an identity may hold, plus the root, by default', async () => {
     delete process.env.MAILBOX_MAX_READERS;
+    wirePolicy();
 
     for (let device = 1; device <= MAX_DEVICE_CREDENTIALS; device += 1) {
       await expect(
@@ -778,6 +806,7 @@ describe('mailboxes', () => {
 
   it('keeps envelopes a silent reader has not acknowledged until retention expires them', async () => {
     process.env.MAILBOX_RETENTION_MS = '1000';
+    wirePolicy();
     const start = Date.now();
     const clock = jest.spyOn(Date, 'now').mockReturnValue(start);
 

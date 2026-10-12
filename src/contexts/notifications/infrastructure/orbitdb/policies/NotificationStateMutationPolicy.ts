@@ -7,9 +7,9 @@ import PublicMutationVerifier, {
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
-import { NotificationReplicationLimits } from '../../../domain/NotificationReplicationLimits';
 import { NotificationId } from '../../../domain/value-objects/NotificationId';
 import { NotificationState } from '../../../domain/value-objects/NotificationState';
+import { NotificationReplicationLimitsFromEnvironment } from '../../environment/NotificationReplicationLimitsFromEnvironment';
 import { GenuineRecordQuota } from './GenuineRecordQuota';
 
 /**
@@ -43,7 +43,7 @@ export default class NotificationStateMutationPolicy extends PublicMutationPolic
 
   public readonly scopeType = 'notification_state';
 
-  public limits = NotificationReplicationLimits.fromEnvironment();
+  public limits = NotificationReplicationLimitsFromEnvironment.load();
 
   public static idOf(notificationId: string, state: string): string {
     return `notification-state:${notificationId}:${state}`;

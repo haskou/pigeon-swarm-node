@@ -1,27 +1,30 @@
-import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { PrivateBlobLimits } from './PrivateBlobLimits';
 
-/** Operator-configurable bounds. Read per call so a restart is not needed in tests. */
+/** Operator-configurable bounds, bound by composition. */
 export default class PrivateBlobPolicy {
+  constructor(private readonly limits: PrivateBlobLimits) {}
+
   public maxBytes(): number {
-    return pigeonEnvironment().PRIVATE_BLOB_MAX_BYTES;
+    return this.limits.maxBytes;
   }
 
   public ownerQuotaBytes(): number {
-    return pigeonEnvironment().PRIVATE_BLOB_QUOTA_BYTES_PER_OWNER;
+    return this.limits.ownerQuotaBytes;
   }
 
   public retentionMs(): number {
-    const env = pigeonEnvironment();
-
     // A blob must outlive every mailbox envelope that may reference it.
-    return Math.max(env.PRIVATE_BLOB_RETENTION_MS, env.MAILBOX_RETENTION_MS);
+    return Math.max(
+      this.limits.blobRetentionMs,
+      this.limits.mailboxRetentionMs,
+    );
   }
 
   public totalQuotaBytes(): number {
-    return pigeonEnvironment().PRIVATE_BLOB_QUOTA_BYTES_TOTAL;
+    return this.limits.totalQuotaBytes;
   }
 
   public uploadWindowMs(): number {
-    return pigeonEnvironment().PRIVATE_BLOB_UPLOAD_WINDOW_MS;
+    return this.limits.uploadWindowMs;
   }
 }

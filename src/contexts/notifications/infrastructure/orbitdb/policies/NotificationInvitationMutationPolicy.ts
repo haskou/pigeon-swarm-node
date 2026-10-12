@@ -14,11 +14,11 @@ import { ShortLivedLookup } from '@app/contexts/public-mutations/infrastructure/
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
-import { NotificationReplicationLimits } from '../../../domain/NotificationReplicationLimits';
 import { EncryptedConversationKey } from '../../../domain/value-objects/EncryptedConversationKey';
 import { InvitationNonce } from '../../../domain/value-objects/InvitationNonce';
 import { NotificationId } from '../../../domain/value-objects/NotificationId';
 import { NotificationType } from '../../../domain/value-objects/NotificationType';
+import { NotificationReplicationLimitsFromEnvironment } from '../../environment/NotificationReplicationLimitsFromEnvironment';
 import { GenuineRecordQuota } from './GenuineRecordQuota';
 
 /**
@@ -66,7 +66,7 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
 
   public readonly collection = 'notifications';
 
-  public limits = NotificationReplicationLimits.fromEnvironment();
+  public limits = NotificationReplicationLimitsFromEnvironment.load();
 
   public readonly scopeType = 'notification_invitation';
 
