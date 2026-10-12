@@ -11,7 +11,10 @@ export default class PrivateBlobPolicy {
   }
 
   public retentionMs(): number {
-    return pigeonEnvironment().PRIVATE_BLOB_RETENTION_MS;
+    const env = pigeonEnvironment();
+
+    // A blob must outlive every mailbox envelope that may reference it.
+    return Math.max(env.PRIVATE_BLOB_RETENTION_MS, env.MAILBOX_RETENTION_MS);
   }
 
   public totalQuotaBytes(): number {

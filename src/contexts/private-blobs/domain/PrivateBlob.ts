@@ -69,6 +69,10 @@ export class PrivateBlob {
     return this.primitives.ownerKey;
   }
 
+  public getRetentionMs(): number {
+    return this.primitives.retentionMs;
+  }
+
   public getSize(): number {
     return this.primitives.size;
   }
@@ -87,6 +91,23 @@ export class PrivateBlob {
       ...this.primitives,
       expiresAt: now + this.primitives.retentionMs,
       state: 'stored',
+    };
+  }
+
+  /**
+   * Raises the retention of a stored blob. Its store time is kept, so the new
+   * deadline is store time plus the new retention.
+   */
+  public extendRetentionTo(retentionMs: number): void {
+    if (!this.isStored() || this.primitives.retentionMs >= retentionMs) {
+      return;
+    }
+
+    this.primitives = {
+      ...this.primitives,
+      expiresAt:
+        this.primitives.expiresAt + retentionMs - this.primitives.retentionMs,
+      retentionMs,
     };
   }
 

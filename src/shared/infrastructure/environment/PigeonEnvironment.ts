@@ -1,6 +1,8 @@
 import { MAX_DEVICE_CREDENTIALS } from '@app/contexts/identity-devices/domain/DeviceCredentialLimits';
 import { Kernel, KernelEnvironment } from '@haskou/ddd-kernel';
 
+const MAILBOX_RETENTION_DEFAULT_MS = 14 * 24 * 60 * 60 * 1000;
+
 export const pigeonEnvironmentSchema = {
   API_PORT: { defaultValue: 8080, type: 'number' },
   API_TRUST_PROXY: { defaultValue: 'false', type: 'string' },
@@ -61,7 +63,7 @@ export const pigeonEnvironmentSchema = {
     type: 'number',
   },
   MAILBOX_RETENTION_MS: {
-    defaultValue: 14 * 24 * 60 * 60 * 1000,
+    defaultValue: MAILBOX_RETENTION_DEFAULT_MS,
     type: 'number',
   },
   NODE_ENV: { defaultValue: 'local', type: 'string' },
@@ -126,8 +128,9 @@ export const pigeonEnvironmentSchema = {
     defaultValue: 10 * 1024 * 1024 * 1024,
     type: 'number',
   },
+  // Effective value is never below MAILBOX_RETENTION_MS; see PrivateBlobPolicy.
   PRIVATE_BLOB_RETENTION_MS: {
-    defaultValue: 7 * 24 * 60 * 60 * 1000,
+    defaultValue: MAILBOX_RETENTION_DEFAULT_MS,
     type: 'number',
   },
   PRIVATE_BLOB_STORAGE_PATH: {

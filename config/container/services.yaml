@@ -1300,6 +1300,7 @@ services:
     arguments:
       - '@contexts/private-blobs/domain/repositories/PrivateBlobRepository'
       - '@contexts/private-blobs/domain/repositories/PrivateBlobBytesStore'
+      - '@contexts/private-blobs/domain/PrivateBlobPolicy'
   contexts/private-blobs/application/PrivateBlobReader:
     class: /contexts/private-blobs/application/PrivateBlobReader
     arguments:

@@ -8,6 +8,11 @@ export default abstract class PrivateBlobRepository {
   /** Blobs whose deadline passed, reserved or stored. */
   public abstract findExpired(now: number): Promise<PrivateBlob[]>;
 
+  /** Stored blobs whose retention is shorter than `retentionMs`. */
+  public abstract findStoredRetainedBelow(
+    retentionMs: number,
+  ): Promise<PrivateBlob[]>;
+
   /**
    * Pseudonymous owner key used only for quota accounting. It is salted per
    * node, so it cannot be matched against public identity keys.
