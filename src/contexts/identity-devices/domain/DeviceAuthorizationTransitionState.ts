@@ -10,6 +10,7 @@ import { PairingAuthorization } from './value-objects/PairingAuthorization';
 
 export interface DeviceAuthorizationTransitionState {
   authorCredential?: DeviceCredential;
+  compromisedCredentials?: DeviceCompromisedCredential[];
   compromisedSince?: DeviceAuthorizationRevision;
   epoch: DeviceAuthorizationEpoch;
   identityId: IdentityId;
@@ -20,4 +21,9 @@ export interface DeviceAuthorizationTransitionState {
   proofOfPossession?: Signature;
   signature?: Signature;
   targetCredential: DeviceCredential;
+}
+
+export interface DeviceCompromisedCredential {
+  compromisedSince: DeviceAuthorizationRevision;
+  credential: DeviceCredential;
 }

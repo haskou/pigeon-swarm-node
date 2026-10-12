@@ -20,6 +20,11 @@ export abstract class DeviceAuthorizationRepository {
     identityId: IdentityId,
   ): Promise<DeviceAuthorizationTimeline | undefined>;
 
+  /** The caps in effect at the head, keyed by compromised credential. */
+  public abstract findCompromisedSince(
+    identityId: IdentityId,
+  ): Promise<ReadonlyMap<string, number>>;
+
   public abstract provision(
     authorization: DeviceAuthorization,
     identityVersion: IdentityVersion,

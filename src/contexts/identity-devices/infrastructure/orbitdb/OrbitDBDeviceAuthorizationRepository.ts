@@ -259,27 +259,27 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     return this.lock.run(identityId, async () => {
       const document = await this.resolveDocument(identityId);
 
-      if (!document) {
-        return undefined;
-      }
+      return document
+        ? this.replayer.timelineOf(
+            DeviceAuthorization.fromPrimitives(document.genesis),
+            document,
+          )
+        : undefined;
+    });
+  }
 
-      if (document.overflow) {
-        return new DeviceAuthorizationTimeline([
-          DeviceAuthorization.fromPrimitives(document.authorization),
-        ]);
-      }
+  public findCompromisedSince(
+    identityId: IdentityId,
+  ): Promise<ReadonlyMap<string, number>> {
+    return this.lock.run(identityId, async () => {
+      const document = await this.resolveDocument(identityId);
 
-      const { compromisedSince, states } = this.replayer.statesOf(
-        document.checkpoint
-          ? this.replayer.authorizationFromCheckpoint(
-              DeviceAuthorization.fromPrimitives(document.genesis),
-              document.checkpoint,
-            )
-          : DeviceAuthorization.fromPrimitives(document.genesis),
-        document.history,
-      );
-
-      return new DeviceAuthorizationTimeline(states, compromisedSince);
+      return document
+        ? this.replayer.compromisedSinceOf(
+            DeviceAuthorization.fromPrimitives(document.genesis),
+            document,
+          )
+        : new Map<string, number>();
     });
   }
 

@@ -54,10 +54,18 @@ export class GetDeviceAuthorizationRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     const authorization = await this.findForOwner(identityId, request);
+    const compromisedSince = await this.finder.findCompromisedSince(
+      new DeviceAuthorizationFindMessage(authorization.getIdentityId()),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new DeviceAuthorizationViewModel(authorization).toResource());
+      .send(
+        new DeviceAuthorizationViewModel(
+          authorization,
+          compromisedSince,
+        ).toResource(),
+      );
   }
 
   @Get('/:identityId/devices')

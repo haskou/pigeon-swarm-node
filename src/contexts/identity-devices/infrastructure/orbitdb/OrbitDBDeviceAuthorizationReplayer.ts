@@ -1,4 +1,5 @@
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
+import { DeviceAuthorizationTimeline } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTimeline';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
@@ -180,6 +181,74 @@ export default class OrbitDBDeviceAuthorizationReplayer {
     };
   }
 
+  /**
+   * Every state from the replay base (the genesis, or the recovery checkpoint)
+   * to the head, in ascending revision order, plus the revision each
+   * compromised credential is capped at. The checkpoint's carried caps merge
+   * with every compromised revocation and carried recovery replayed on top.
+   */
+  private statesOf(
+    genesis: DeviceAuthorization,
+    checkpoint: OrbitDBDeviceAuthorizationDocument['checkpoint'],
+    history: OrbitDBDeviceAuthorizationTransitionRecord[],
+  ): {
+    compromisedSince: Map<string, number>;
+    states: DeviceAuthorization[];
+  } {
+    const base = checkpoint
+      ? this.checkpointState(genesis, checkpoint)
+      : {
+          authorization: genesis,
+          compromisedSince: new Map<string, number>(),
+        };
+    const states = [base.authorization];
+    const replay = this.replayFrom(
+      base.authorization,
+      this.transitionRecordsByRevision(history),
+      states,
+    );
+    const { compromisedSince } = base;
+    const cap = (credential: string, since: number): void => {
+      compromisedSince.set(
+        credential,
+        Math.min(
+          since,
+          compromisedSince.get(credential) ?? Number.POSITIVE_INFINITY,
+        ),
+      );
+    };
+
+    for (const { transition } of replay.history) {
+      for (const entry of transition.compromisedCredentials ?? []) {
+        cap(entry.credential, entry.compromisedSince);
+      }
+
+      if (
+        transition.operation === 'revoke' &&
+        transition.compromisedSince !== undefined
+      ) {
+        cap(transition.targetCredential, transition.compromisedSince);
+      }
+    }
+
+    return { compromisedSince, states };
+  }
+
+  private compromisedSinceOfSources(
+    genesis: DeviceAuthorization,
+    sources: OrbitDBDeviceAuthorizationSource[],
+  ): ReadonlyMap<string, number> {
+    const checkpoint = this.sources.preferredSourceCheckpoint(sources);
+    const checkpointRevision = checkpoint?.authorization.revision ?? 0;
+    const history = this.sources
+      .uniqueTransitionRecords(sources.map((source) => source.history))
+      .filter(
+        (record) => record.transition.previousRevision >= checkpointRevision,
+      );
+
+    return this.statesOf(genesis, checkpoint, history).compromisedSince;
+  }
+
   public transitionFromRecord(
     record: OrbitDBDeviceAuthorizationTransitionRecord,
   ): DeviceAuthorizationTransition | undefined {
@@ -203,68 +272,109 @@ export default class OrbitDBDeviceAuthorizationReplayer {
   }
 
   /**
-   * Every state of the replay, from `base` (the genesis or a recovery
-   * checkpoint) to the head, in ascending revision order, plus the revision
-   * each compromised-revoked credential is capped at.
+   * The timeline of one document: every state from its replay base to the
+   * head, with the caps in effect at the head. An overflowed document keeps
+   * only its suspended state, so its caps come from its witness sources.
    */
-  public statesOf(
-    base: DeviceAuthorization,
-    history: OrbitDBDeviceAuthorizationTransitionRecord[],
-  ): {
-    compromisedSince: Map<string, number>;
-    states: DeviceAuthorization[];
-  } {
-    const states = [base];
-    const replay = this.replayFrom(
-      base,
-      this.transitionRecordsByRevision(history),
-      states,
-    );
-    const compromisedSince = new Map<string, number>();
-
-    for (const { transition } of replay.history) {
-      if (
-        transition.operation === 'revoke' &&
-        transition.compromisedSince !== undefined
-      ) {
-        compromisedSince.set(
-          transition.targetCredential,
-          Math.min(
-            transition.compromisedSince,
-            compromisedSince.get(transition.targetCredential) ??
-              Number.POSITIVE_INFINITY,
-          ),
-        );
-      }
+  public timelineOf(
+    genesis: DeviceAuthorization,
+    document: OrbitDBDeviceAuthorizationDocument,
+  ): DeviceAuthorizationTimeline {
+    if (document.overflow) {
+      return new DeviceAuthorizationTimeline(
+        [DeviceAuthorization.fromPrimitives(document.authorization)],
+        this.compromisedSinceOf(genesis, document),
+      );
     }
 
-    return { compromisedSince, states };
+    const { compromisedSince, states } = this.statesOf(
+      genesis,
+      document.checkpoint,
+      document.history,
+    );
+
+    return new DeviceAuthorizationTimeline(states, compromisedSince);
   }
 
-  public authorizationFromCheckpoint(
+  /**
+   * The caps in effect at a document's head, keyed by compromised credential.
+   */
+  public compromisedSinceOf(
+    genesis: DeviceAuthorization,
+    document: OrbitDBDeviceAuthorizationDocument,
+  ): ReadonlyMap<string, number> {
+    if (document.overflow) {
+      return this.compromisedSinceOfSources(
+        genesis,
+        this.sources.documentSources(document),
+      );
+    }
+
+    return this.statesOf(genesis, document.checkpoint, document.history)
+      .compromisedSince;
+  }
+
+  /**
+   * The replay base of a recovery checkpoint: the authorization it recovered
+   * to and the compromised caps it carries forward. Every recovery in the
+   * lineage must replay, and a later recovery may only tighten or add caps,
+   * so no checkpoint can re-admit a credential an earlier one capped.
+   */
+  public checkpointState(
     genesis: DeviceAuthorization,
     checkpoint: NonNullable<OrbitDBDeviceAuthorizationDocument['checkpoint']>,
-  ): DeviceAuthorization {
-    const authorization = [...checkpoint.lineage, checkpoint.transition].reduce(
-      (current, record) => {
-        const transition = this.transitionFromRecord(record);
+  ): {
+    authorization: DeviceAuthorization;
+    compromisedSince: Map<string, number>;
+  } {
+    let authorization = genesis;
+    let compromisedSince = new Map<string, number>();
 
+    for (const record of [...checkpoint.lineage, checkpoint.transition]) {
+      const transition = this.transitionFromRecord(record);
+
+      assert(
+        transition !== undefined && transition.isRecovery(),
+        new InvalidDeviceAuthorizationTransitionError(),
+      );
+
+      authorization = this.policy.applyRecoveryCheckpoint(
+        authorization,
+        transition,
+      );
+
+      const carried = new Map(
+        transition
+          .getCompromisedCredentials()
+          .map((entry): [string, number] => [
+            entry.credential.valueOf(),
+            entry.compromisedSince.valueOf(),
+          ]),
+      );
+
+      for (const [credential, since] of compromisedSince) {
         assert(
-          transition !== undefined && transition.isRecovery(),
+          (carried.get(credential) ?? Number.POSITIVE_INFINITY) <= since,
           new InvalidDeviceAuthorizationTransitionError(),
         );
+      }
 
-        return this.policy.applyRecoveryCheckpoint(current, transition);
-      },
-      genesis,
-    );
+      compromisedSince = carried;
+    }
 
     assert(
       isDeepStrictEqual(checkpoint.authorization, authorization.toPrimitives()),
       new InvalidDeviceAuthorizationTransitionError(),
     );
 
-    return authorization;
+    return { authorization, compromisedSince };
+  }
+
+  public authorizationFromCheckpoint(
+    genesis: DeviceAuthorization,
+    checkpoint: NonNullable<OrbitDBDeviceAuthorizationDocument['checkpoint']>,
+  ): DeviceAuthorization {
+    return this.checkpointState(genesis, checkpoint).authorization;
   }
 
   public sourceReplay(

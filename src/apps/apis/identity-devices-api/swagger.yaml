@@ -9,8 +9,9 @@ paths:
         - identity-devices
       summary: Read the authenticated identity authorization checkpoint
       description: |
-        Returns only the current recovery epoch and deterministic revision for
-        the authenticated identity. The path identity must equal the identity
+        Returns the current recovery epoch, deterministic revision and the
+        compromise caps in effect (compromisedCredentials) for the authenticated
+        identity. The path identity must equal the identity
         that signed the HTTP request. A client performing total device recovery
         authenticates with the recovered stable identity signing key and the
         separate recovery authority.
@@ -100,9 +101,11 @@ paths:
         {"domain":"pigeon:device-authorization:transition:v3",
         "proofOfPossession":"<target signature>",
         "transition":<unsigned transition>}. The unsigned transition key order
-        is authorCredential, authorizedAt, compromisedSince, epoch, identityId, operation,
-        operationId, pairingExpiration, pairingId, previousRevision, revision,
-        targetCredential, targetCredentialCommitment.
+        is authorCredential, authorizedAt, compromisedCredentials,
+        compromisedSince, epoch, identityId, operation, operationId,
+        pairingExpiration, pairingId, previousRevision, revision,
+        targetCredential, targetCredentialCommitment. Each compromisedCredentials
+        entry writes compromisedSince before credential.
       requestBody:
         required: true
         content:
@@ -185,6 +188,13 @@ components:
           type: integer
           format: int64
           description: Time accepted by both device signatures; required for enrollment and no later than pairingExpiration.
+        compromisedCredentials:
+          type: array
+          minItems: 1
+          maxItems: 32
+          items:
+            $ref: '#/components/schemas/DeviceCompromisedCredential'
+          description: Recovery only. Compromise caps carried across the checkpoint, exactly the caps in effect on the head the recovery follows, strictly ascending by credential, each compromisedSince no greater than previousRevision. Covered by the target proof and the recovery authority signature. Omit when no cap is in effect; an empty array is refused.
         compromisedSince:
           type: integer
           minimum: 0
@@ -243,13 +253,31 @@ components:
         revision:
           type: integer
           minimum: 0
+    DeviceCompromisedCredential:
+      type: object
+      additionalProperties: false
+      required:
+        - compromisedSince
+        - credential
+      properties:
+        compromisedSince:
+          type: integer
+          minimum: 0
+        credential:
+          type: string
     DeviceAuthorization:
       type: object
       required:
+        - compromisedCredentials
         - epoch
         - identityId
         - revision
       properties:
+        compromisedCredentials:
+          type: array
+          description: Compromise caps in effect at this checkpoint, sorted ascending by credential. Empty when no device is capped.
+          items:
+            $ref: '#/components/schemas/DeviceCompromisedCredential'
         epoch:
           type: string
         identityId:

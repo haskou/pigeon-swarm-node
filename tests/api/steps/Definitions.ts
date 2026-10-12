@@ -1940,6 +1940,7 @@ export default class Definitions {
   @then('response is the current device authorization checkpoint')
   public responseIsTheCurrentDeviceAuthorizationCheckpoint(): void {
     expect(this.response?.data).to.deep.equal({
+      compromisedCredentials: [],
       epoch: 'genesis',
       identityId: this.ownerIdentityId?.valueOf(),
       revision: 0,
