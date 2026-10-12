@@ -1,9 +1,10 @@
 import PrivateBlobReader from '@app/contexts/private-blobs/application/PrivateBlobReader';
-import { PrivateBlobRangeNotSatisfiableError } from '@app/contexts/private-blobs/domain/errors/PrivateBlobRangeNotSatisfiableError';
+import { PrivateBlobRangeOutOfBoundsError } from '@app/contexts/private-blobs/domain/errors/PrivateBlobRangeOutOfBoundsError';
 import { Request, Response } from 'express';
 import { Get, JsonController, Param, Req, Res } from 'routing-controllers';
 import { pipeline } from 'stream/promises';
 
+import { PrivateBlobRangeHeader } from '../headers/PrivateBlobRangeHeader';
 import { PrivateBlobRouteSupport } from './PrivateBlobRouteSupport';
 
 @JsonController('/private-blobs')
@@ -20,7 +21,7 @@ export class GetPrivateBlobRoute extends PrivateBlobRouteSupport {
       const download = await this.reader.open(
         blobId,
         this.bearerToken(request),
-        request.header('range'),
+        PrivateBlobRangeHeader.parse(request.header('range')),
       );
       const { range, size, stream } = download;
       const length = range ? range.end - range.start + 1 : size;
@@ -45,7 +46,7 @@ export class GetPrivateBlobRoute extends PrivateBlobRouteSupport {
 
       return response;
     } catch (error: unknown) {
-      if (error instanceof PrivateBlobRangeNotSatisfiableError) {
+      if (error instanceof PrivateBlobRangeOutOfBoundsError) {
         return response
           .status(416)
           .setHeader('Content-Range', `bytes */${error.size}`)
