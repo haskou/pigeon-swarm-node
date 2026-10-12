@@ -328,6 +328,8 @@ async function main(): Promise<void> {
     // The exact request Alice already had accepted, sent again.
     const replayedStatus = await sendReadUntil(nodeA, proofForSecond);
     const staleStatus = await sendReadUntil(nodeA, staleForFirst);
+    // The same stale marker, sent to the replica that already replicated the second marker.
+    const staleStatusOnReplica = await sendReadUntil(nodeB, staleForFirst);
 
     await pause(SETTLE_MS);
 
@@ -335,6 +337,11 @@ async function main(): Promise<void> {
     assertStatus('forged read marker is rejected', forgedStatus, 401);
     assertStatus('replayed read marker is rejected', replayedStatus, 401);
     assertStatus('older read marker is rejected', staleStatus, 409);
+    assertStatus(
+      'older read marker is rejected by node B',
+      staleStatusOnReplica,
+      409,
+    );
     assertSame(
       'node A unread after rejected markers',
       await unreadCountOf(nodeA, alice, conversationId),
