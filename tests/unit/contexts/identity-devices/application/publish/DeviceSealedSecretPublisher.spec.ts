@@ -29,11 +29,7 @@ class InMemoryDeviceSealedSecretRepository extends DeviceSealedSecretRepository 
 
   public async replaceIfNewer(bundle: DeviceSealedSecretBundle): Promise<void> {
     const key = bundle.getIdentityId().valueOf();
-    const current = this.stored.get(key);
-
-    if (current && current.getGeneration() >= bundle.getGeneration()) {
-      throw new DeviceSealedSecretGenerationStaleError();
-    }
+    bundle.assertSupersedes(this.stored.get(key));
     this.stored.set(key, bundle);
   }
 }
