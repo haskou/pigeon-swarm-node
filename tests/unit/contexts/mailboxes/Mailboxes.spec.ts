@@ -635,9 +635,9 @@ describe('mailboxes', () => {
     await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
 
     await expect(adder.add(MAILBOX, READ, OTHER_READ_HASH)).resolves.toBe(true);
-    await expect(
-      adder.add(MAILBOX, OTHER_READ, OTHER_READ_HASH),
-    ).resolves.toBe(false);
+    await expect(adder.add(MAILBOX, OTHER_READ, OTHER_READ_HASH)).resolves.toBe(
+      false,
+    );
     await expect(
       createMailbox(MAILBOX, sha(POST), OTHER_READ_HASH),
     ).resolves.toBe(false);

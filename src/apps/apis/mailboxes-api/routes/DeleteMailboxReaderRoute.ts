@@ -7,9 +7,8 @@ import { MailboxRouteSupport } from './MailboxRouteSupport';
 
 @JsonController('/mailboxes')
 export class DeleteMailboxReaderRoute extends MailboxRouteSupport {
-  private readonly revoker = this.get<MailboxReaderRevoker>(
-    MailboxReaderRevoker,
-  );
+  private readonly revoker =
+    this.get<MailboxReaderRevoker>(MailboxReaderRevoker);
 
   @Delete('/:mailboxId/readers/:readTokenHash')
   public async request(

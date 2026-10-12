@@ -5627,7 +5627,9 @@ export default class Definitions {
   }
 
   @when('I add a second reader to the mailbox with the {word} capability')
-  public async iAddASecondReaderToTheMailbox(capability: string): Promise<void> {
+  public async iAddASecondReaderToTheMailbox(
+    capability: string,
+  ): Promise<void> {
     if (!this.mailbox) {
       throw new Error('Mailbox must be created first.');
     }
