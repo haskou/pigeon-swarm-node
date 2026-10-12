@@ -262,16 +262,6 @@ export default class IPFS {
     return network.addJSON(data);
   }
 
-  public async addJSONToAll(data: unknown): Promise<IPFSId> {
-    await this.initialize();
-
-    const results = await Promise.all(
-      this.registry.getAll().map((network) => network.addJSON(data)),
-    );
-
-    return results[0];
-  }
-
   public async addBytesToAll(bytes: Uint8Array): Promise<IPFSId> {
     await this.initialize();
 

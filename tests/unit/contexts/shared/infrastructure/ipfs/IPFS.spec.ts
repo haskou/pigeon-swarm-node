@@ -337,19 +337,6 @@ describe('IPFS', () => {
     });
   });
 
-  describe('addJSONToAll', () => {
-    it('should add JSON to all networks and return first CID', async () => {
-      const expectedCid = new IPFSId('bafyresult');
-
-      mockNetwork.addJSON.mockResolvedValue(expectedCid);
-
-      const result = await ipfs.addJSONToAll({ test: true });
-
-      expect(mockNetwork.addJSON).toHaveBeenCalled();
-      expect(result).toEqual(expectedCid);
-    });
-  });
-
   describe('addBytesToNetworksReturningFirst', () => {
     it('should return the first successful add from the selected networks', async () => {
       const firstNetwork = mock<IPFSNetwork>();

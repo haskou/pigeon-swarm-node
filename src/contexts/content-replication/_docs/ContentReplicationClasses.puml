@@ -32,7 +32,6 @@ package "content-replication/application" {
   class ContentGetter
   class ContentGetResult
   class ContentPublisher
-  class ContentDocument
   class ContentUploadLimits
   class PublishedContent
   class ContentReplicationSummaryRefresher
@@ -60,7 +59,6 @@ ContentGetter ..> ContentReplicationRepository
 ContentGetter ..> ContentGetResult
 ContentPublisher ..> ReplicatedContentStorage
 ContentPublisher ..> ContentReplicaUploadCompletion
-ContentPublisher ..> ContentDocument
 ContentPublisher ..> PublishedContent
 ContentUploadLimits ..> ContentSize
 ContentReplicationStatusSummaryFinder ..> ContentReplicationStatusSummaryRepository
