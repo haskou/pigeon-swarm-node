@@ -513,11 +513,18 @@ async function main(): Promise<void> {
   const recovered = await KeyPair.generate();
   const unsignedRecovery = DeviceAuthorizationTransition.recovery(
     identityId,
-    new DeviceAuthorizationOperationId(
-      '00000000-0000-4000-8000-000000000017',
-    ),
+    new DeviceAuthorizationOperationId('00000000-0000-4000-8000-000000000017'),
     new DeviceAuthorizationRevision(6),
     DeviceCredential.fromString(recovered.toPrimitives().publicKey),
+    undefined,
+    [
+      {
+        compromisedSince: new DeviceAuthorizationRevision(5),
+        credential: DeviceCredential.fromString(
+          tablet.toPrimitives().publicKey,
+        ),
+      },
+    ],
   );
   const provenRecovery = unsignedRecovery.provePossession(
     recovered.sign(unsignedRecovery.getProofOfPossessionPayload()),
