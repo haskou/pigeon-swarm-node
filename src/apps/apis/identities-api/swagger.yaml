@@ -125,6 +125,11 @@ components:
           type: string
           pattern: '^[a-f0-9]{64}$'
           description: SHA-256 commitment to the canonical genesis device signing credential.
+        mailboxHome:
+          type: string
+          pattern: '^https?://[^/?#@\s]+$'
+          maxLength: 255
+          description: Optional origin of the node hosting this identity's mailbox, in the form scheme://host[:port]. Covered by the identity signature; omit when no mailbox home is advertised.
         recoveryAuthority:
           type: string
           description: Public recovery authority key in canonical PEM form. No recovery secret is published.
@@ -199,6 +204,9 @@ components:
           type: string
           pattern: '^[a-f0-9]{64}$'
           example: 97f378b2eceeac872a5deeafeaf28e4ca6af31e98aa9302651df30386de067c8
+        mailboxHome:
+          type: string
+          example: https://node.example
         recoveryAuthority:
           type: string
           description: Public recovery authority key in canonical PEM form. No recovery secret is published.

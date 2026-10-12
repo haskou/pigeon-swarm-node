@@ -3,12 +3,14 @@ import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { Profile } from './Profile';
 import { IdentityExternalIdentifier } from './value-objects/IdentityExternalIdentifier';
+import { IdentityMailboxHome } from './value-objects/IdentityMailboxHome';
 import { IdentityVersion } from './value-objects/IdentityVersion';
 import { ProfileHandle } from './value-objects/ProfileHandle';
 
 export class IdentityPublication {
   public static fromPrimitives(primitives: {
     admissionNonce?: string;
+    mailboxHome?: string;
     previousIdentityExternalIdentifier?: string;
     profile: PrimitiveOf<Profile>;
     signature: string;
@@ -26,6 +28,9 @@ export class IdentityPublication {
           )
         : undefined,
       primitives.admissionNonce,
+      primitives.mailboxHome === undefined
+        ? undefined
+        : new IdentityMailboxHome(primitives.mailboxHome),
     );
   }
 
@@ -36,6 +41,7 @@ export class IdentityPublication {
     private readonly version: IdentityVersion,
     private readonly previousIdentityExternalIdentifier?: IdentityExternalIdentifier,
     private readonly admissionNonce?: string,
+    private readonly mailboxHome?: IdentityMailboxHome,
   ) {}
 
   public getAdmissionNonce(): string | undefined {
@@ -81,6 +87,7 @@ export class IdentityPublication {
   public toPrimitives() {
     return {
       admissionNonce: this.admissionNonce,
+      mailboxHome: this.mailboxHome?.valueOf(),
       previousIdentityExternalIdentifier:
         this.previousIdentityExternalIdentifier?.valueOf(),
       profile: this.profile.toPrimitives(),

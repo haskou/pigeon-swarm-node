@@ -1,6 +1,7 @@
 import { IpfsIdentityDocument } from '../../../../../../src/contexts/identities/infrastructure/ipfs/documents/IpfsIdentityDocument';
 import IpfsIdentityMapper from '../../../../../../src/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
+import { SignedIdentityMother } from '../../../../mothers/SignedIdentityMother';
 
 describe('IpfsIdentityMapper', () => {
   let mapper: IpfsIdentityMapper;
@@ -75,6 +76,29 @@ describe('IpfsIdentityMapper', () => {
       const restored = mapper.toDomain(document);
 
       expect(restored.toPrimitives()).toEqual(originalPrimitives);
+    });
+  });
+
+  describe('mailbox home', () => {
+    it('should map the mailbox home to and from the IPFS document', async () => {
+      const identity = (await SignedIdentityMother.create()).build({
+        mailboxHome: 'https://node.example',
+      });
+
+      const document = mapper.toDocument(identity);
+
+      expect(document.mailboxHome).toBe('https://node.example');
+      expect(mapper.toDomain(document).toPrimitives()).toEqual(
+        identity.toPrimitives(),
+      );
+    });
+
+    it('should omit the mailbox home from documents of identities without one', async () => {
+      const json = JSON.parse(
+        JSON.stringify(mapper.toDocument(await mother.build())),
+      );
+
+      expect(json).not.toHaveProperty('mailboxHome');
     });
   });
 });

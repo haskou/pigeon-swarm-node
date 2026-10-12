@@ -12,6 +12,7 @@ import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 export interface SignedIdentityOptions {
   admissionNonce?: string;
   handle?: string;
+  mailboxHome?: string;
   networks?: string[];
   previousIdentityExternalIdentifier?: string;
   timestamp?: number;
@@ -68,6 +69,7 @@ export class SignedIdentityMother {
         .getCommitment()
         .valueOf(),
       id: this.id,
+      mailboxHome: options.mailboxHome,
       networks,
       previousIdentityExternalIdentifier:
         options.previousIdentityExternalIdentifier,

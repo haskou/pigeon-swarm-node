@@ -10,6 +10,7 @@ export class IdentitySignaturePayload {
       deviceCredential: primitives.deviceCredential,
       deviceCredentialCommitment: primitives.deviceCredentialCommitment,
       id: primitives.id,
+      mailboxHome: primitives.mailboxHome,
       networks: primitives.networks,
       previousIdentityExternalIdentifier:
         primitives.previousIdentityExternalIdentifier,
@@ -31,6 +32,7 @@ export class IdentitySignaturePayload {
       deviceCredential: this.primitives.deviceCredential,
       deviceCredentialCommitment: this.primitives.deviceCredentialCommitment,
       id: this.primitives.id,
+      mailboxHome: this.primitives.mailboxHome,
       networks: this.primitives.networks,
       previousIdentityExternalIdentifier:
         this.primitives.previousIdentityExternalIdentifier,
