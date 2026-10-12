@@ -70,6 +70,14 @@ export default class ClientRateWindows {
 
   constructor(private readonly windowMs: number) {}
 
+  private prune(now: number): void {
+    for (const [address, window] of this.windows) {
+      if (window.resetAt <= now) {
+        this.windows.delete(address);
+      }
+    }
+  }
+
   public get size(): number {
     return this.windows.size;
   }
@@ -77,14 +85,6 @@ export default class ClientRateWindows {
   /** Test seam: forgets every window. */
   public reset(): void {
     this.windows.clear();
-  }
-
-  private prune(now: number): void {
-    for (const [address, window] of this.windows) {
-      if (window.resetAt <= now) {
-        this.windows.delete(address);
-      }
-    }
   }
 
   /** Charges one event to the client address and returns its count in the current window. */

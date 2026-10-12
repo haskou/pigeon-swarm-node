@@ -54,9 +54,9 @@ describe('IdentityAdmissionSourceRateLimiter', () => {
 
     limiter.consume('203.0.113.7', 0);
 
-    expect(
-      refusalOf(() => limiter.consume('203.0.113.7', 0)),
-    ).toMatchObject({ code: 429042 });
+    expect(refusalOf(() => limiter.consume('203.0.113.7', 0))).toMatchObject({
+      code: 429042,
+    });
   });
 
   it('admits again once the one minute window has passed', () => {

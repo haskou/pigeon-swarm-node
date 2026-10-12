@@ -1794,9 +1794,7 @@ export default class Definitions {
   }
 
   @given('identity admissions are limited to {int} per source per minute')
-  public identityAdmissionsAreLimitedToPerSourcePerMinute(
-    limit: number,
-  ): void {
+  public identityAdmissionsAreLimitedToPerSourcePerMinute(limit: number): void {
     process.env.IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE =
       String(limit);
   }
