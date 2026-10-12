@@ -437,8 +437,10 @@ Chosen bound: the whole interval in which the device was authorized
 (`N < revocation revision`), no wall-clock grace window, because a window would
 make the verdict depend on when a node first saw the record. Recovery discards
 the pre-checkpoint chain, so earlier records of pre-recovery devices become
-unverifiable. Threat model, rejected alternatives and the restart behaviour are
-in `docs/design/causal-device-authorization.md`.
+unverifiable. The recovery carries the compromise caps in effect as
+`compromisedCredentials`, so a capped device stays refused after the checkpoint.
+Threat model, rejected alternatives, the restart behaviour and the open residuals
+of carried caps are in `docs/design/causal-device-authorization.md`.
 
 Residual: community and conversation **operations** are evaluated against the
 state folded from their causal past, but the permissions of channel messages,
@@ -781,7 +783,9 @@ records, unknown unsigned fields, transition records above 16 KiB and more than
 128 concurrent siblings from one predecessor, 256 post-checkpoint records and
 1 MiB of aggregate post-checkpoint history before parsing or verifying them.
 An authority-signed recovery becomes a new verified checkpoint and discards the
-older transition history, so those limits bound replay work without imposing a
+older transition history, except the compromise caps in effect, which it carries
+as `compromisedCredentials` (at most 32). Those limits bound replay work without
+imposing a
 lifetime operation limit. Public-network heads are rejected. An identity whose
 networks are all public keeps its authorization only in the node's local
 database: nothing is published or replicated, so a device catalog never reaches
