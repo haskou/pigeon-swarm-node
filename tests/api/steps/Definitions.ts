@@ -5620,6 +5620,13 @@ export default class Definitions {
     expect((this.response.data as { cursor: number }).cursor).to.equal(cursor);
   }
 
+  @then('the mailbox response cursor should be greater than {int}')
+  public theMailboxResponseCursorShouldBeGreaterThan(cursor: number): void {
+    const { cursor: actual } = this.response.data as { cursor: number };
+
+    expect(actual).to.be.greaterThan(cursor);
+  }
+
   @then('the mailbox page should hold cursors {string}')
   public theMailboxPageShouldHoldCursors(expected: string): void {
     const data = this.response.data as unknown as {
@@ -5629,6 +5636,17 @@ export default class Definitions {
     expect(
       data.envelopes.map((envelope) => envelope.cursor).join(','),
     ).to.equal(expected);
+  }
+
+  @then('the mailbox page should hold only cursors greater than {int}')
+  public theMailboxPageShouldHoldOnlyCursorsGreaterThan(cursor: number): void {
+    const data = this.response.data as unknown as {
+      envelopes: Array<{ cursor: number }>;
+    };
+    const cursors = data.envelopes.map((envelope) => envelope.cursor);
+
+    expect(cursors).to.not.be.empty;
+    expect(Math.min(...cursors)).to.be.greaterThan(cursor);
   }
 
   @then('the mailbox page should report more {word}')

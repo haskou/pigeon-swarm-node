@@ -25,6 +25,9 @@ export default abstract class MailboxRepository {
     envelopeId: string,
   ): Promise<number | undefined>;
 
+  /** Highest cursor any removed mailbox reached on this node; 0 when none. */
+  public abstract highestRetiredCursor(): Promise<number>;
+
   public abstract listAll(): Promise<Mailbox[]>;
 
   /** Envelopes with cursor greater than `after`, in cursor order. */

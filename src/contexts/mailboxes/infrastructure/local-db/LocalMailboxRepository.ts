@@ -16,6 +16,7 @@ export default class LocalMailboxRepository extends MailboxRepository {
   private static readonly MAILBOXES = 'mailboxes';
   private static readonly COUNTERS = 'mailbox_counters';
   private static readonly MAILBOX_COUNT_ID = 'mailboxes';
+  private static readonly RETIRED_CURSOR_ID = 'retired_cursor';
 
   constructor(private readonly database: EmbeddedLocalDatabase) {
     super();
@@ -175,6 +176,20 @@ export default class LocalMailboxRepository extends MailboxRepository {
     return typeof document?.cursor === 'number' ? document.cursor : undefined;
   }
 
+  /**
+   * Highest cursor any removed mailbox reached; 0 when none. A recreated
+   * mailbox starts above it, so no cursor a client still holds can match a
+   * new envelope. One number for the node, not one per mailbox: no tombstones.
+   */
+  public async highestRetiredCursor(): Promise<number> {
+    const floor = await this.database.findOne(
+      LocalMailboxRepository.COUNTERS,
+      LocalMailboxRepository.RETIRED_CURSOR_ID,
+    );
+
+    return typeof floor?.cursor === 'number' ? floor.cursor : 0;
+  }
+
   public async listAll(): Promise<Mailbox[]> {
     const documents = await this.database.find(
       LocalMailboxRepository.MAILBOXES,
@@ -204,6 +219,10 @@ export default class LocalMailboxRepository extends MailboxRepository {
       mailboxId,
     );
     const count = await this.readCount();
+    const retired = await this.highestRetiredCursor();
+    const floor = existing
+      ? Math.max(retired, this.toMailbox(existing).highestCursor())
+      : retired;
     const envelopes = await this.database.find(
       this.envelopeNamespace(mailboxId),
     );
@@ -217,6 +236,12 @@ export default class LocalMailboxRepository extends MailboxRepository {
       {
         document: { count: existing ? count - 1 : count },
         id: LocalMailboxRepository.MAILBOX_COUNT_ID,
+        namespace: LocalMailboxRepository.COUNTERS,
+        type: 'put',
+      },
+      {
+        document: { cursor: floor },
+        id: LocalMailboxRepository.RETIRED_CURSOR_ID,
         namespace: LocalMailboxRepository.COUNTERS,
         type: 'put',
       },

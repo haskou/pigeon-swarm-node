@@ -84,9 +84,12 @@ export default class MailboxCreator {
         await this.evictIdleEmpty(count - max + 1, now);
       }
 
+      const firstCursor = (await this.repository.highestRetiredCursor()) + 1;
+
       await this.repository.create(
         Mailbox.create({
           appendTokens: this.policy.maxAppendsPerMinute(),
+          firstCursor,
           id: mailboxId,
           now,
           postTokenHash,
