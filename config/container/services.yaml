@@ -1292,6 +1292,7 @@ services:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - '@contexts/identities/domain/repositories/IdentityRepository'
       - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
+      - '@contexts/content-replication/domain/ContentReplicationLimits'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/conversations/application/add-reaction/MessageReactionAdder:
     class: /contexts/conversations/application/add-reaction/MessageReactionAdder
@@ -2074,6 +2075,7 @@ services:
       - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
+      - '@contexts/notifications/domain/NotificationReplicationLimits'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/notifications/infrastructure/orbitdb/policies/NotificationStateMutationPolicy:
     class: >-
@@ -2081,6 +2083,7 @@ services:
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
+      - '@contexts/notifications/domain/NotificationReplicationLimits'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/polls/application/authorize-poll-scope/PollScopeAuthorizer:
     class: /contexts/polls/application/authorize-poll-scope/PollScopeAuthorizer
@@ -2686,6 +2689,10 @@ services:
     synthetic: true
   ddd-kernel.override.factory.PrivateBlobLimits:
     synthetic: true
+  ddd-kernel.override.factory.ContentReplicationLimits:
+    synthetic: true
+  ddd-kernel.override.factory.NotificationReplicationLimits:
+    synthetic: true
   shared/infrastructure/lifecycle/Runtime: '@apps/apis/calls-api/CallRelayRuntime'
   shared/infrastructure/http/HttpClient: '@shared/infrastructure/http/FetchHttpClient'
   shared/infrastructure/logs/Log: '@shared/infrastructure/logs/WinstonLogger'
@@ -2721,3 +2728,5 @@ services:
     @contexts/public-mutations/infrastructure/DeviceAuthorizationPublicMutationAuthorization
   contexts/mailboxes/domain/MailboxLimits: '@ddd-kernel.override.factory.MailboxLimits'
   contexts/private-blobs/domain/PrivateBlobLimits: '@ddd-kernel.override.factory.PrivateBlobLimits'
+  contexts/content-replication/domain/ContentReplicationLimits: '@ddd-kernel.override.factory.ContentReplicationLimits'
+  contexts/notifications/domain/NotificationReplicationLimits: '@ddd-kernel.override.factory.NotificationReplicationLimits'

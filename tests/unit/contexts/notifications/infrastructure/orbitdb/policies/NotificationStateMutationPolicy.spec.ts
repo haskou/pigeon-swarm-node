@@ -49,8 +49,11 @@ describe('NotificationStateMutationPolicy', () => {
         throw new InvalidPublicMutationError();
       }
     });
-    policy = new NotificationStateMutationPolicy(registry, verifier);
-    policy.limits = new NotificationReplicationLimits(100, 3);
+    policy = new NotificationStateMutationPolicy(
+      registry,
+      verifier,
+      new NotificationReplicationLimits(100, 3),
+    );
   });
 
   const record = (
@@ -270,6 +273,19 @@ describe('NotificationStateMutationPolicy', () => {
       await expect(
         policy.assertPermitted(latest(), RECIPIENT, false),
       ).resolves.toBeUndefined();
+    });
+
+    it('enforces the limits it is constructed with', async () => {
+      policy = new NotificationStateMutationPolicy(
+        registry,
+        verifier,
+        new NotificationReplicationLimits(100, 2),
+      );
+      docs.push(...(await Promise.all([1, 2].map((index) => stored(index)))));
+
+      await expect(
+        policy.assertPermitted(latest(), RECIPIENT, false),
+      ).rejects.toBeInstanceOf(InvalidPublicMutationError);
     });
 
     it('refuses once the genuine states fill the quota', async () => {

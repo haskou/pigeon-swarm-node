@@ -11,8 +11,8 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 
 import { maxContentSizeBytes } from '../../../application/publish-content/ContentUploadLimits';
 import { ContentReplication } from '../../../domain/ContentReplication';
+import { ContentReplicationLimits } from '../../../domain/ContentReplicationLimits';
 import { ContentReplicationContext } from '../../../domain/value-objects/ContentReplicationContext';
-import { ContentReplicationLimitsFromEnvironment } from '../../environment/ContentReplicationLimitsFromEnvironment';
 
 /**
  * A replication registration is a request by its owner that the network hold a
@@ -32,14 +32,13 @@ export default class ContentReplicationMutationPolicy extends PublicMutationPoli
 
   public readonly collection = 'contentReplication';
 
-  public limits = ContentReplicationLimitsFromEnvironment.load();
-
   public readonly scopeType = 'content_replication';
 
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly identityRepository: IdentityRepository,
     private readonly verifier: PublicMutationVerifier,
+    public limits: ContentReplicationLimits,
   ) {
     super();
   }

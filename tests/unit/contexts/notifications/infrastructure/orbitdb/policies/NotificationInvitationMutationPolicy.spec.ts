@@ -45,8 +45,8 @@ describe('NotificationInvitationMutationPolicy', () => {
       mock<OrbitDBCommunityRepository>(),
       registry,
       verifier,
+      new NotificationReplicationLimits(3, 100),
     );
-    policy.limits = new NotificationReplicationLimits(3, 100);
   });
 
   function nonceOf(index: number): string {
@@ -310,6 +310,25 @@ describe('NotificationInvitationMutationPolicy', () => {
           false,
         ),
       ).resolves.toBeUndefined();
+    });
+
+    it('enforces the limits it is constructed with', async () => {
+      policy = new NotificationInvitationMutationPolicy(
+        conversations,
+        mock<OrbitDBCommunityRepository>(),
+        registry,
+        verifier,
+        new NotificationReplicationLimits(2, 100),
+      );
+      storedDocuments = await Promise.all([1, 2].map((index) => stored(index)));
+
+      await expect(
+        policy.assertPermitted(
+          latestAfter(storedDocuments),
+          mother.author.valueOf(),
+          false,
+        ),
+      ).rejects.toBeInstanceOf(InvalidPublicMutationError);
     });
 
     it('refuses once the genuine invitations fill the quota', async () => {

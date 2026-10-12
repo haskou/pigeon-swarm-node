@@ -76,8 +76,8 @@ describe('ContentReplicationMutationPolicy', () => {
       registry,
       identityRepository,
       verifier,
+      new ContentReplicationLimits(10_000, 3),
     );
-    policy.limits = new ContentReplicationLimits(10_000, 3);
     registry.queryUnadmittedDocuments.mockResolvedValue([]);
     identityRepository.findById.mockResolvedValue({
       getNetworkIds: () => [{ valueOf: () => NETWORK }],
@@ -99,14 +99,17 @@ describe('ContentReplicationMutationPolicy', () => {
       ).toThrow(InvalidPublicMutationError);
     });
 
-    it.each(['contentType', 'filename', 'priority', 'claimedBy', 'withdrawnAt'])(
-      'refuses the replicated field %s',
-      (field) => {
-        expect(() =>
-          policy.expectationOf(record({ [field]: 'x' })),
-        ).toThrow(InvalidPublicMutationError);
-      },
-    );
+    it.each([
+      'contentType',
+      'filename',
+      'priority',
+      'claimedBy',
+      'withdrawnAt',
+    ])('refuses the replicated field %s', (field) => {
+      expect(() => policy.expectationOf(record({ [field]: 'x' }))).toThrow(
+        InvalidPublicMutationError,
+      );
+    });
 
     it('expects a tombstone to be signed by the owner it names', () => {
       expect(
@@ -160,6 +163,22 @@ describe('ContentReplicationMutationPolicy', () => {
       await expect(admit()).rejects.toThrow(InvalidPublicMutationError);
     });
 
+    it('enforces the limits it is constructed with', async () => {
+      policy = new ContentReplicationMutationPolicy(
+        registry,
+        identityRepository,
+        verifier,
+        new ContentReplicationLimits(2048, 10),
+      );
+      registry.queryUnadmittedDocuments.mockResolvedValue([
+        await stored(cidOf(0), 1500),
+      ]);
+
+      await expect(admit({ sizeBytes: 1024 }, cidOf(2))).rejects.toThrow(
+        InvalidPublicMutationError,
+      );
+    });
+
     it('refuses a registration over the byte quota', async () => {
       policy.limits = new ContentReplicationLimits(2048, 10);
       registry.queryUnadmittedDocuments.mockResolvedValue([
@@ -189,7 +208,9 @@ describe('ContentReplicationMutationPolicy', () => {
         await stored(cidOf(9), 2000),
       ]);
 
-      await expect(admit({ sizeBytes: 1024 }, cidOf(2))).resolves.toBeUndefined();
+      await expect(
+        admit({ sizeBytes: 1024 }, cidOf(2)),
+      ).resolves.toBeUndefined();
     });
 
     it('ignores stored records whose proof does not verify', async () => {
@@ -199,7 +220,9 @@ describe('ContentReplicationMutationPolicy', () => {
       ]);
       verifier.verify.mockRejectedValue(new InvalidPublicMutationError());
 
-      await expect(admit({ sizeBytes: 1024 }, cidOf(2))).resolves.toBeUndefined();
+      await expect(
+        admit({ sizeBytes: 1024 }, cidOf(2)),
+      ).resolves.toBeUndefined();
     });
 
     it('lets a deletion through the policy: only the expected author can sign it', async () => {
