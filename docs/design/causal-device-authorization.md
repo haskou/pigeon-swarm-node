@@ -103,6 +103,12 @@ total-compromise reset: records signed by pre-recovery devices stop being
 verifiable. This is unchanged from today (they were rejected against the new
 head) and is a residual below.
 
+Compromise caps are the one exception that survives the checkpoint. A recovery
+carries the caps in effect as `compromisedCredentials` (see Compromise
+frontier), so a credential capped before the checkpoint stays refused after it,
+including when the same key is enrolled again on a post-recovery device. Caps
+only refuse: a carried cap never restores validity to a pre-recovery record.
+
 ## Threat model
 
 Attacker `A` holds the key of a device `D` that was revoked at revision `R`
@@ -182,7 +188,10 @@ transition history, 256 records at most). `OrbitDBDeviceAuthorizationRepository
 .findTimeline` replays it; the verifier caches the result for one second like
 before. The `overflow` document (history over the shape limits, which
 suspends the identity until recovery) yields a timeline with no credentials, so
-every proof is refused: fail closed, as with the old head check.
+every proof is refused: fail closed, as with the old head check. Its compromise
+caps are derived from the witness sources the document keeps
+(`overflow.sources`), not from its frontier, so a recovery built over an
+overflowed timeline carries the same caps as the replayed chain.
 
 After a restart the document is read back and the same timeline is produced; the
 registry replays stored records through the gate again, and the verdict for each
@@ -222,8 +231,9 @@ the previous behaviour, so no existing signature or document changes.
   no new power.
 - A credential capped this way stays capped while the replayed history holds the
   revocation: enrolling the same key again within that history does not lift
-  it. Use a fresh key. A recovery checkpoint discards the cap with the rest of
-  the pre-checkpoint chain (see Residuals).
+  it. Use a fresh key. A recovery carries the caps in effect as
+  `compromisedCredentials` (see Recovery), so the cap also survives the
+  checkpoint, and re-enrolling the key on a post-recovery device does not lift it.
 
 ## Residuals
 
@@ -243,19 +253,33 @@ the previous behaviour, so no existing signature or document changes.
 - **Backdating inside the authorized interval** (threat 3) cannot be bounded
   by time. For a device revoked as compromised it is bounded by the owner's
   compromise frontier (below); a plain retirement keeps the whole interval.
-- **Compromise caps do not outlive a recovery.** The checkpoint carries only
-  recovery transitions, so a `compromisedSince` cap set before a recovery is not
-  replayed after it. A pre-recovery credential is still absent from the
-  recovered credential set, so its records are refused; but an owner who enrols
-  the same key again on a post-recovery device re-admits it from that enrolment
-  revision. Carrying the caps across the checkpoint would change the replicated
-  checkpoint shape, so it is an open design decision (#386): use a fresh key for
-  every device.
+- **Carried caps depend on the authorizing device's view.** A recovery must
+  carry exactly the caps the admitting node has in effect. An authorizing device
+  that has not received a capping revocation builds a recovery without it: a
+  node holding that revocation refuses the recovery, while a node lacking it
+  accepts it, and the cap is then lost on that node because the pre-checkpoint
+  revocation is discarded with the chain. The nodes disagree about that recovery.
+- **A fresh replica cannot check the first recovery's caps.** The checkpoint
+  check compares a recovery's carried caps only with caps carried by earlier
+  recoveries of its lineage. Before the first recovery there are none, and a
+  fresh replica no longer holds the pre-recovery revocations, so it accepts the
+  carried list as written.
+- **Concurrent recoveries at one revision are not settled by their caps.** The
+  lowest operation UUID wins the tie-break (pubsub protocol). The replayed state
+  merges the caps of every retained candidate at that revision, keeping the
+  minimum per credential, so a losing candidate's caps may still apply. No test
+  covers that interaction; it is an open point.
+- **More than 32 capped credentials fails closed.** A recovery that would carry
+  more is refused, and nothing is trimmed.
+- **The caps are read in two steps.** The checkpoint and the caps come from
+  separate reads on the node. A client that combines a revision from one read
+  with caps from the other can build a recovery that admission refuses. This
+  fails closed; the client has to re-read both before signing.
 
 ## Verification
 
-- Unit: `DeviceAuthorizationTimeline` (compromise cap), `DeviceAuthorizationTransition` (shape, signature coverage), `OrbitDBDeviceAuthorizationRepository`
-  timeline (replay, restart), `DeviceAuthorizationPublicMutationAuthorization`
+- Unit: `DeviceAuthorizationTimeline` (compromise cap), `DeviceAuthorizationTransition` (shape, canonical order and bound of carried caps, signature coverage), `OrbitDBDeviceAuthorizationRepository`
+  timeline (replay, restart, caps carried across a recovery and refused when a carried cap is dropped, invented or replicated without it, overflowed timeline caps derived from witness sources), `DeviceAuthorizationPublicMutationAuthorization`
   (late delivery, backdating at and after the revocation, not-yet-enrolled,
   unreached revision then healed, shuffled state order),
   `PublicMutationVerifier` (version and revision decoding, tampered revision),
@@ -266,7 +290,7 @@ the previous behaviour, so no existing signature or document changes.
 - Real transport: `yarn test:integration:causal-device-authorization` (two real
   private Helia/OrbitDB replicas: partitioned authorization history, healing,
   late delivery, backdating, unreplicated revision and a restart; then a recovery
-  checkpoint at revision 7 verified on the author, a healed, a restarted and a
+  checkpoint at revision 7 carrying the stolen tablet's compromise cap, verified on the author, a healed, a restarted and a
   fresh replica: the pre-recovery owner, phone, stolen tablet and watch are
   refused, and the recovered device is accepted only at its checkpoint revision;
   in `test:ci`).
