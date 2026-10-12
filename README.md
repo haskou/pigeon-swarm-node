@@ -189,7 +189,8 @@ The backend is responsible for:
 * verifying signed HTTP/WebSocket requests;
 * validating domain invariants;
 * storing opaque encrypted payloads;
-* routing events only to related identities;
+* routing WebSocket events only to related identities (pub/sub gossip is per
+  network, not per identity; see the presence rules in `docs/api.md`);
 * syncing public domain metadata across configured networks.
 
 ## Project Status

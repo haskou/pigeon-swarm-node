@@ -66,6 +66,20 @@ The response starts with a four-byte unsigned big-endian body length, followed b
 `presence.v1.identity_presence.was_updated` replicates ephemeral presence over
 the domain-event pub/sub transport. It is never persisted in OrbitDB or IPFS.
 
+Each update is published once per target network on
+`pigeon-swarm.networks.<networkId>.presence.v1.announcements`. The default
+prefix is `pigeon-swarm`; `PUBSUB_TOPIC_PREFIX` overrides it. The targets are
+the networks named in `networkIds` that the publishing node is configured with.
+An empty `networkIds` targets every configured network. Every node subscribed to
+a target topic receives the event and keeps the lease, whether or not it shares
+a conversation or community with the identity. Receivers do not filter by
+relationship, and nodes do not republish received presence events. HTTP reads
+apply the visibility rules in `docs/api.md`.
+
+Public-network envelopes carry the event as plain JSON. Private-network
+envelopes encrypt it with AES-256-GCM under a key derived from the network key,
+so any node admitted to that private network can decrypt it.
+
 Each event identifies the lease owner with `ownerNodeId`. Nodes keep leases by
 `(identityId, ownerNodeId)`, ignore an older snapshot only within that same
 pair, and select the newest connected lease when serving presence reads.
@@ -94,16 +108,16 @@ The event attributes are:
   "status": "available",
   "customMessage": "Building the swarm",
   "lastHeartbeatAt": 1770000000000,
-  "lastRenewedAt": 1770000000000,
   "lastActivityAt": 1770000000000,
   "updatedAt": 1770000000000,
   "networkIds": ["<networkId>"]
 }
 ```
 
-`customMessage`, `lastHeartbeatAt`, `lastActivityAt`, and `networkIds` may be
-absent. `identityId`, `ownerNodeId`, `preferenceUpdatedAt`, `selectedStatus`,
-`status`, and `updatedAt` are required.
+`customMessage`, `lastHeartbeatAt`, and `lastActivityAt` may be absent.
+`identityId`, `networkIds`, `ownerNodeId`, `preferenceUpdatedAt`,
+`selectedStatus`, `status`, and `updatedAt` are always present. `networkIds`
+may be empty, which targets every configured network (see above).
 
 ## Conversation read receipts
 
