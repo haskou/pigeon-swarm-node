@@ -5765,10 +5765,10 @@ The node checks, in order:
 
 1. Freshness and device proof against the head: `401`.
 2. Replay guard on the request signature: `401`.
-3. Body shape and limits: `400`.
+3. Body shape and limits, and no duplicate `recipientCredential` values: `400`.
 4. `authorizationRevision` equals the head revision: `409`.
 5. `recipientCredential` values are exactly the authorized device credentials at
-   the head: none missing, revoked, unknown or duplicated: `409`.
+   the head: none missing, revoked or unknown: `409`.
 6. Every entry signature verifies under the publisher credential: `409`.
 7. `generation` is strictly greater than the stored generation: `409`.
 

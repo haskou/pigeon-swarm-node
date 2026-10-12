@@ -135,11 +135,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/DeviceSealedSecretReceipt'
         '400':
-          description: Malformed body or a field outside its limits.
+          description: Malformed body, a field outside its limits, or duplicate recipient credentials.
         '401':
           description: Timestamp outside the 30 second window, missing or invalid device proof, revoked or unknown credential, replayed request, or X-Recovery-Signature supplied.
         '409':
-          description: Authorization revision mismatch, recipients mismatch (missing, revoked, unknown or duplicate credential), invalid entry signature, or generation not greater than the stored generation.
+          description: Authorization revision mismatch, recipients mismatch (missing, revoked or unknown credential), invalid entry signature, or generation not greater than the stored generation.
     get:
       tags:
         - identity-devices
