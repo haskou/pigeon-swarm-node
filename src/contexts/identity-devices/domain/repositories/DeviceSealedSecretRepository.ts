@@ -8,5 +8,7 @@ export abstract class DeviceSealedSecretRepository {
   ): Promise<DeviceSealedSecretBundle | undefined>;
 
   /** Stores the bundle only when its generation is newer than the stored one. */
-  public abstract replaceIfNewer(bundle: DeviceSealedSecretBundle): Promise<void>;
+  public abstract replaceIfNewer(
+    bundle: DeviceSealedSecretBundle,
+  ): Promise<void>;
 }

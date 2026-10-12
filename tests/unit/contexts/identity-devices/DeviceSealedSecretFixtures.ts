@@ -18,7 +18,8 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
-export const SEALED_SECRET = 'v2.x25519-hkdf-sha256-aes-256-gcm.ZXBo.aXY.Y3Q.dGFn';
+export const SEALED_SECRET =
+  'v2.x25519-hkdf-sha256-aes-256-gcm.ZXBo.aXY.Y3Q.dGFn';
 
 export interface SingleDeviceFixture {
   authorization: DeviceAuthorization;
@@ -89,7 +90,9 @@ export async function enrolledDeviceFixture(): Promise<EnrolledDeviceFixture> {
   return { ...base, authorization, candidate };
 }
 
-export function sealedEntry(input: SealInput): DeviceSealedSecretEntryPrimitives {
+export function sealedEntry(
+  input: SealInput,
+): DeviceSealedSecretEntryPrimitives {
   const payload = DeviceSealedSecretBundle.signingPayload({
     authorizationRevision: input.authorizationRevision,
     generation: input.generation,

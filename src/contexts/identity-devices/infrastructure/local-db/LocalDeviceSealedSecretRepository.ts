@@ -16,6 +16,26 @@ export default class LocalDeviceSealedSecretRepository extends DeviceSealedSecre
     super();
   }
 
+  private serialize<T>(
+    identityId: IdentityId,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const key = identityId.valueOf();
+    const run = (this.pending.get(key) ?? Promise.resolve())
+      .catch((): undefined => undefined)
+      .then(operation);
+    const tail = run.catch((): undefined => undefined);
+
+    this.pending.set(key, tail);
+    void tail.then(() => {
+      if (this.pending.get(key) === tail) {
+        this.pending.delete(key);
+      }
+    });
+
+    return run;
+  }
+
   public async find(
     identityId: IdentityId,
   ): Promise<DeviceSealedSecretBundle | undefined> {
@@ -49,25 +69,5 @@ export default class LocalDeviceSealedSecretRepository extends DeviceSealedSecre
         bundle.toPrimitives() as unknown as Record<string, unknown>,
       );
     });
-  }
-
-  private serialize<T>(
-    identityId: IdentityId,
-    operation: () => Promise<T>,
-  ): Promise<T> {
-    const key = identityId.valueOf();
-    const run = (this.pending.get(key) ?? Promise.resolve())
-      .catch((): undefined => undefined)
-      .then(operation);
-    const tail = run.catch((): undefined => undefined);
-
-    this.pending.set(key, tail);
-    void tail.then(() => {
-      if (this.pending.get(key) === tail) {
-        this.pending.delete(key);
-      }
-    });
-
-    return run;
   }
 }

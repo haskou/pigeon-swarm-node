@@ -30,6 +30,7 @@ class InMemoryDeviceSealedSecretRepository extends DeviceSealedSecretRepository 
   public async replaceIfNewer(bundle: DeviceSealedSecretBundle): Promise<void> {
     const key = bundle.getIdentityId().valueOf();
     const current = this.stored.get(key);
+
     if (current && current.getGeneration() >= bundle.getGeneration()) {
       throw new DeviceSealedSecretGenerationStaleError();
     }
@@ -161,8 +162,7 @@ describe(DeviceSealedSecretPublisher.name, () => {
   });
 
   it('rejects a bundle built for a superseded authorization revision and stores nothing', async () => {
-    const { authorization, identityId, owner } =
-      await enrolledDeviceFixture();
+    const { authorization, identityId, owner } = await enrolledDeviceFixture();
     const stale = bundleOf({
       authorizationRevision: 0,
       entries: [

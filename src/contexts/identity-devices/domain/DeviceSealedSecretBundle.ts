@@ -24,8 +24,7 @@ export interface DeviceSealedSecretBundlePrimitives {
   entries: DeviceSealedSecretEntryPrimitives[];
 }
 
-export interface DeviceSealedSecretDeliveryPrimitives
-  extends DeviceSealedSecretEntryPrimitives {
+export interface DeviceSealedSecretDeliveryPrimitives extends DeviceSealedSecretEntryPrimitives {
   identityId: string;
   publisherCredential: string;
   authorizationRevision: number;
@@ -55,14 +54,6 @@ function parseCredential(value: string, reason: string): IdentityId {
 
 export class DeviceSealedSecretBundle {
   public static readonly MAX_SEALED_SECRET_LENGTH = 4096;
-
-  private constructor(
-    private readonly identityId: IdentityId,
-    private readonly publisherCredential: string,
-    private readonly authorizationRevision: number,
-    private readonly generation: number,
-    private readonly entries: readonly DeviceSealedSecretEntryPrimitives[],
-  ) {}
 
   public static fromPrimitives(
     primitives: DeviceSealedSecretBundlePrimitives,
@@ -144,14 +135,43 @@ export class DeviceSealedSecretBundle {
 
   public static signingPayload(input: DeviceSealedSecretSigningInput): string {
     return JSON.stringify({
-      purpose: SIGNING_PURPOSE,
-      identityId: input.identityId,
-      generation: input.generation,
       authorizationRevision: input.authorizationRevision,
+      generation: input.generation,
+      identityId: input.identityId,
       publisherCredential: input.publisherCredential,
+      purpose: SIGNING_PURPOSE,
       recipientCredential: input.recipientCredential,
       sealedSecret: input.sealedSecret,
     });
+  }
+
+  private constructor(
+    private readonly identityId: IdentityId,
+    private readonly publisherCredential: string,
+    private readonly authorizationRevision: number,
+    private readonly generation: number,
+    private readonly entries: readonly DeviceSealedSecretEntryPrimitives[],
+  ) {}
+
+  private hasValidSignature(
+    publisher: DeviceCredential,
+    entry: DeviceSealedSecretEntryPrimitives,
+  ): boolean {
+    try {
+      return publisher.isValidSignature(
+        DeviceSealedSecretBundle.signingPayload({
+          authorizationRevision: this.authorizationRevision,
+          generation: this.generation,
+          identityId: this.identityId.valueOf(),
+          publisherCredential: this.publisherCredential,
+          recipientCredential: entry.recipientCredential,
+          sealedSecret: entry.sealedSecret,
+        }),
+        new Signature(entry.signature),
+      );
+    } catch {
+      return false;
+    }
   }
 
   public assertPublishableBy(authorization: DeviceAuthorization): void {
@@ -206,10 +226,10 @@ export class DeviceSealedSecretBundle {
     }
 
     return {
-      identityId: this.identityId.valueOf(),
-      publisherCredential: this.publisherCredential,
       authorizationRevision: this.authorizationRevision,
       generation: this.generation,
+      identityId: this.identityId.valueOf(),
+      publisherCredential: this.publisherCredential,
       ...entry,
     };
   }
@@ -228,32 +248,11 @@ export class DeviceSealedSecretBundle {
 
   public toPrimitives(): DeviceSealedSecretBundlePrimitives {
     return {
+      authorizationRevision: this.authorizationRevision,
+      entries: this.entries.map((entry) => ({ ...entry })),
+      generation: this.generation,
       identityId: this.identityId.valueOf(),
       publisherCredential: this.publisherCredential,
-      authorizationRevision: this.authorizationRevision,
-      generation: this.generation,
-      entries: this.entries.map((entry) => ({ ...entry })),
     };
-  }
-
-  private hasValidSignature(
-    publisher: DeviceCredential,
-    entry: DeviceSealedSecretEntryPrimitives,
-  ): boolean {
-    try {
-      return publisher.isValidSignature(
-        DeviceSealedSecretBundle.signingPayload({
-          authorizationRevision: this.authorizationRevision,
-          generation: this.generation,
-          identityId: this.identityId.valueOf(),
-          publisherCredential: this.publisherCredential,
-          recipientCredential: entry.recipientCredential,
-          sealedSecret: entry.sealedSecret,
-        }),
-        new Signature(entry.signature),
-      );
-    } catch {
-      return false;
-    }
   }
 }

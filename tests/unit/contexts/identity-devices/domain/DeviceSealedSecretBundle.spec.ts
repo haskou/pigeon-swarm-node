@@ -80,7 +80,12 @@ async function enrolledDeviceFixture(): Promise<
     DeviceAuthorizationTransition.fromPrimitives(transition.toPrimitives()),
   );
 
-  return { authorization, candidate, identityId: base.identityId, owner: base.owner };
+  return {
+    authorization,
+    candidate,
+    identityId: base.identityId,
+    owner: base.owner,
+  };
 }
 
 interface SealInput {
@@ -148,9 +153,9 @@ describe(DeviceSealedSecretBundle.name, () => {
   });
 
   it('rejects a bundle that omits an authorized credential', async () => {
-    const { authorization, identityId, owner } =
-      await enrolledDeviceFixture();
+    const { authorization, identityId, owner } = await enrolledDeviceFixture();
     const bundle = bundleOf({
+      authorizationRevision: 1,
       entries: [
         sealedEntry({
           authorizationRevision: 1,
@@ -160,7 +165,6 @@ describe(DeviceSealedSecretBundle.name, () => {
           recipient: owner,
         }),
       ],
-      authorizationRevision: 1,
       identityId,
       publisher: owner,
     });
@@ -332,7 +336,9 @@ describe(DeviceSealedSecretBundle.name, () => {
 
   it('rejects an oversized or malformed sealed secret', async () => {
     const { identityId, owner } = await singleDeviceFixture();
-    const oversized = 'a'.repeat(DeviceSealedSecretBundle.MAX_SEALED_SECRET_LENGTH + 1);
+    const oversized = 'a'.repeat(
+      DeviceSealedSecretBundle.MAX_SEALED_SECRET_LENGTH + 1,
+    );
     const malformed = 'bad secret!';
 
     for (const sealedSecret of [oversized, malformed]) {

@@ -6,7 +6,9 @@ import { DeviceSealedSecretRepository } from '../../domain/repositories/DeviceSe
 import { DeviceSealedSecretFindMessage } from './messages/DeviceSealedSecretFindMessage';
 
 export default class DeviceSealedSecretFinder {
-  public constructor(private readonly repository: DeviceSealedSecretRepository) {}
+  public constructor(
+    private readonly repository: DeviceSealedSecretRepository,
+  ) {}
 
   public async find(
     message: DeviceSealedSecretFindMessage,

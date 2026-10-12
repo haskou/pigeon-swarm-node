@@ -31,8 +31,14 @@ describe('assertSignedRequestTimestampIsFresh', () => {
   });
 
   it.each([
-    ['one millisecond past the bound', now - SignedRequestReplayGuard.MAX_CLOCK_SKEW_MS - 1],
-    ['one millisecond beyond the future bound', now + SignedRequestReplayGuard.MAX_CLOCK_SKEW_MS + 1],
+    [
+      'one millisecond past the bound',
+      now - SignedRequestReplayGuard.MAX_CLOCK_SKEW_MS - 1,
+    ],
+    [
+      'one millisecond beyond the future bound',
+      now + SignedRequestReplayGuard.MAX_CLOCK_SKEW_MS + 1,
+    ],
     ['a timestamp from the distant past', 0],
   ])('rejects %s', (_label, timestamp) => {
     expect(() =>
