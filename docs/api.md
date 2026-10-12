@@ -1970,9 +1970,7 @@ Undefined optional properties are omitted before signing. Handles must already
 be normalized. Current requests reject `encryptedKeyPair`,
 `encryptedPrivateKey`, `encryptedMasterKey` and `masterKeyDerivation`.
 
-`mailboxHome` is an optional origin (`http` or `https`, with scheme, host and
-optional port, and no path, query, fragment or credentials) where the identity's
-mailbox is hosted. It is covered by the identity signature, so it cannot be
+`mailboxHome` is an optional base URL (`http` or `https`, with scheme, host, optional port and optional path prefix) of the node that hosts the identity's mailboxes. It must be canonical: no trailing slash, no empty or dot path segments, and no query, fragment or credentials. Mailbox routes are served under it, so an append goes to `<mailboxHome>/mailboxes`. It is covered by the identity signature, so it cannot be
 changed without a new signed publication. An update replaces the publication
 and omits `mailboxHome` unless it is sent again.
 
