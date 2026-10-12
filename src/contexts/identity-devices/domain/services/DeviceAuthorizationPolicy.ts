@@ -1,9 +1,17 @@
 import { Timestamp, assert } from '@haskou/value-objects';
 
 import { DeviceAuthorization } from '../DeviceAuthorization';
+import { DeviceAuthorizationApplication } from '../DeviceAuthorizationApplication';
+import { DeviceAuthorizationCandidate } from '../DeviceAuthorizationCandidate';
+import { DeviceAuthorizationReplayResult } from '../DeviceAuthorizationReplayResult';
 import { DeviceAuthorizationTransition } from '../DeviceAuthorizationTransition';
 import { InvalidDeviceAuthorizationTransitionError } from '../errors/InvalidDeviceAuthorizationTransitionError';
 import { DeviceAuthorizationEpoch } from '../value-objects/DeviceAuthorizationEpoch';
+
+interface Admitted<T> {
+  authorization: DeviceAuthorization;
+  candidate: DeviceAuthorizationCandidate<T>;
+}
 
 export default class DeviceAuthorizationPolicy {
   private verifyCommon(
@@ -97,6 +105,103 @@ export default class DeviceAuthorizationPolicy {
     );
   }
 
+  private groupByRevision<T>(
+    candidates: DeviceAuthorizationCandidate<T>[],
+  ): Map<number, DeviceAuthorizationCandidate<T>[]> {
+    const groups = new Map<number, DeviceAuthorizationCandidate<T>[]>();
+
+    for (const candidate of candidates) {
+      const revision = candidate.transition.getPreviousRevision().valueOf();
+      const group = groups.get(revision) ?? [];
+
+      group.push(candidate);
+      groups.set(revision, group);
+    }
+
+    for (const group of groups.values()) {
+      group.sort((left, right) => {
+        const operationOrder = left.transition
+          .getOperationId()
+          .valueOf()
+          .localeCompare(right.transition.getOperationId().valueOf());
+
+        return operationOrder || left.encoding.localeCompare(right.encoding);
+      });
+    }
+
+    return groups;
+  }
+
+  private admittedAt<T>(
+    authorization: DeviceAuthorization,
+    groups: Map<number, DeviceAuthorizationCandidate<T>[]>,
+  ): Admitted<T>[] {
+    const admitted: Admitted<T>[] = [];
+
+    const candidates = groups.get(authorization.getRevision().valueOf()) ?? [];
+
+    for (const candidate of candidates) {
+      const application = this.tryApply(authorization, candidate.transition);
+
+      if (application.applied) {
+        admitted.push({ authorization: application.authorization, candidate });
+      }
+    }
+
+    return admitted;
+  }
+
+  private compactEquivalent<T>(admitted: Admitted<T>[]): Admitted<T>[] {
+    const compacted: Admitted<T>[] = [];
+
+    for (const entry of admitted) {
+      const index = compacted.findIndex(({ candidate }) =>
+        candidate.transition.hasSameEffectAs(entry.candidate.transition),
+      );
+
+      if (index === -1) {
+        compacted.push(entry);
+      } else if (
+        entry.candidate.encoding < compacted[index].candidate.encoding
+      ) {
+        compacted[index] = entry;
+      }
+    }
+
+    return compacted;
+  }
+
+  private checkpointOf<T>(
+    authorization: DeviceAuthorization,
+    admitted: Admitted<T>[],
+  ): DeviceAuthorization {
+    const recovery = admitted.find(({ candidate }) =>
+      candidate.transition.isRecovery(),
+    );
+
+    if (recovery) {
+      return recovery.authorization;
+    }
+
+    const revocations = admitted.filter(({ candidate }) =>
+      candidate.transition.isRevocation(),
+    );
+
+    if (revocations.length > 0) {
+      return authorization.revokeConcurrently(
+        revocations.map(({ candidate }) =>
+          candidate.transition.getTargetCredential(),
+        ),
+      );
+    }
+
+    return authorization.enrollConcurrently(
+      admitted.map(({ candidate }) =>
+        candidate.transition.getTargetCredential(),
+      ),
+    );
+  }
+
   public verifyFirstAcceptance(
     transition: DeviceAuthorizationTransition,
     acceptedAt: Timestamp,
@@ -162,5 +267,57 @@ export default class DeviceAuthorizationPolicy {
     );
 
     return this.recover(authorization, transition);
+  }
+
+  /**
+   * A transition the policy rejects is inapplicable at this state. It is an
+   * explicit outcome, so the replay can exclude it instead of failing.
+   */
+  public tryApply(
+    authorization: DeviceAuthorization,
+    transition: DeviceAuthorizationTransition,
+  ): DeviceAuthorizationApplication {
+    try {
+      return {
+        applied: true,
+        authorization: this.apply(authorization, transition),
+      };
+    } catch {
+      return { applied: false };
+    }
+  }
+
+  /**
+   * Replays candidates from a base. At each revision the admitted candidates
+   * are compacted by effect and one checkpoint is taken: a recovery first,
+   * then concurrent revocations, otherwise concurrent enrollments.
+   */
+  public replay<T>(
+    base: DeviceAuthorization,
+    candidates: DeviceAuthorizationCandidate<T>[],
+  ): DeviceAuthorizationReplayResult<T> {
+    const groups = this.groupByRevision(candidates);
+    const accepted: DeviceAuthorizationCandidate<T>[] = [];
+    const checkpoints: DeviceAuthorization[] = [];
+    let authorization = base;
+    let admitted = this.admittedAt(authorization, groups);
+
+    while (admitted.length > 0) {
+      const compacted = this.compactEquivalent(admitted);
+      const checkpoint = this.checkpointOf(authorization, compacted);
+
+      assert(
+        checkpoint.getRevision().valueOf() >
+          authorization.getRevision().valueOf(),
+        new InvalidDeviceAuthorizationTransitionError(),
+      );
+
+      accepted.push(...compacted.map(({ candidate }) => candidate));
+      checkpoints.push(checkpoint);
+      authorization = checkpoint;
+      admitted = this.admittedAt(authorization, groups);
+    }
+
+    return { accepted, authorization, checkpoints };
   }
 }

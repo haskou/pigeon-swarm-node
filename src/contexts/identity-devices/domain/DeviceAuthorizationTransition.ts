@@ -138,12 +138,12 @@ export class DeviceAuthorizationTransition {
     compromisedCredentials?: DeviceCompromisedCredential[],
   ): DeviceAuthorizationTransition {
     return new DeviceAuthorizationTransition({
+      compromisedCredentials,
       epoch,
       identityId,
       operation: DeviceAuthorizationOperation.recovery(),
       operationId,
       previousRevision,
-      compromisedCredentials,
       targetCredential,
     });
   }
@@ -382,6 +382,27 @@ export class DeviceAuthorizationTransition {
 
   public isRecovery(): boolean {
     return this.state.operation.isRecovery();
+  }
+
+  /**
+   * Whether two transitions have the same effect on an authorization: the same
+   * operation on the same revision, targeting the same credential, compromised
+   * from the same revision. Equivalent effects are compacted by the replay.
+   */
+  public hasSameEffectAs(other: DeviceAuthorizationTransition): boolean {
+    const compromisedSince = this.getCompromisedSince();
+    const otherCompromisedSince = other.getCompromisedSince();
+    const hasSameCompromisedSince =
+      compromisedSince === undefined || otherCompromisedSince === undefined
+        ? compromisedSince === otherCompromisedSince
+        : compromisedSince.isEqual(otherCompromisedSince);
+
+    return (
+      this.getOperation().isEqual(other.getOperation()) &&
+      this.getPreviousRevision().isEqual(other.getPreviousRevision()) &&
+      this.getTargetCredential().isEqual(other.getTargetCredential()) &&
+      hasSameCompromisedSince
+    );
   }
 
   public getSigningPayload(): DeviceAuthorizationPayload {
