@@ -44,10 +44,13 @@ function connect(
   node: NodeRuntime,
   target: string,
   protocols: string[],
+  headers: Record<string, string> = {},
 ): Promise<Attempt> {
   const { promise, resolve } = Promise.withResolvers<Attempt>();
   const messages: ServerMessage[] = [];
-  const ws = new WebSocket(`ws://127.0.0.1:${node.port}${target}`, protocols);
+  const ws = new WebSocket(`ws://127.0.0.1:${node.port}${target}`, protocols, {
+    headers,
+  });
 
   ws.on('message', (data) => {
     messages.push(JSON.parse(data.toString()) as ServerMessage);
@@ -127,6 +130,23 @@ async function verify(node: NodeRuntime): Promise<void> {
     realtimeQuery.status,
     401,
     'signed query on /realtime/v1 was not refused with 401',
+  );
+
+  const ambientCookie = await connect(
+    node,
+    REALTIME_WS_PATH,
+    [REALTIME_PROTOCOL_VERSION],
+    { Cookie: 'session=abc; identityId=victim' },
+  );
+
+  assert.ok(
+    'status' in ambientCookie,
+    'ambient cookie authenticated /realtime/v1 without a ticket',
+  );
+  assert.equal(
+    ambientCookie.status,
+    401,
+    'ambient cookie on /realtime/v1 was not refused with 401',
   );
 }
 
