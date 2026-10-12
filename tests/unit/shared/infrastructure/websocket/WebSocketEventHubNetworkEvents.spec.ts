@@ -1,5 +1,6 @@
 import { CallStartedEvent } from '@app/contexts/calls/domain/events/CallStartedEvent';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
+import { MessageReadProof } from '@app/contexts/conversations/domain/value-objects/MessageReadProof';
 import { WebSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
@@ -86,6 +87,7 @@ describe('WebSocketEventHub.publishFromNetwork read receipts', () => {
   async function receiptFrom(
     keyPair: KeyPair,
     proofMessageId = messageId,
+    timestamp?: number,
   ): Promise<ConversationMessagesWereReadEvent> {
     return new ConversationMessagesWereReadEvent(conversationId, {
       messageId,
@@ -95,6 +97,7 @@ describe('WebSocketEventHub.publishFromNetwork read receipts', () => {
         conversationId,
         keyPair,
         messageId: proofMessageId,
+        timestamp,
       }),
       readerIdentityId: keyPair.toPrimitives().publicKey,
     });
@@ -153,5 +156,31 @@ describe('WebSocketEventHub.publishFromNetwork read receipts', () => {
     hub.publishFromNetwork([forged]);
 
     expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('drops a read receipt signed outside the freshness window', async () => {
+    const { hub, publish } = build();
+    const stale = await receiptFrom(
+      await KeyPair.generate(),
+      messageId,
+      Date.now() - MessageReadProof.MAX_AGE_MS - 1,
+    );
+
+    hub.publishFromNetwork([stale]);
+
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it('publishes a late read receipt that is still inside the freshness window', async () => {
+    const { hub, publish } = build();
+    const late = await receiptFrom(
+      await KeyPair.generate(),
+      messageId,
+      Date.now() - 3 * 24 * 60 * 60 * 1000,
+    );
+
+    hub.publishFromNetwork([late]);
+
+    expect(publish).toHaveBeenCalledWith([late]);
   });
 });
