@@ -5,7 +5,11 @@ import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp, assert } from '@haskou/value-objects';
 
 import { DeviceAuthorizationTransitionPrimitives } from './DeviceAuthorizationTransitionPrimitives';
-import { DeviceAuthorizationTransitionState } from './DeviceAuthorizationTransitionState';
+import {
+  DeviceAuthorizationTransitionState,
+  DeviceCompromisedCredential,
+} from './DeviceAuthorizationTransitionState';
+import { MAX_COMPROMISED_CREDENTIALS } from './DeviceCredentialLimits';
 import { InvalidDeviceAuthorizationTransitionError } from './errors/InvalidDeviceAuthorizationTransitionError';
 import { DeviceAuthorizationEpoch } from './value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperation } from './value-objects/DeviceAuthorizationOperation';
@@ -60,6 +64,14 @@ export class DeviceAuthorizationTransition {
       authorCredential: primitives.authorCredential
         ? DeviceCredential.fromString(primitives.authorCredential)
         : undefined,
+      compromisedCredentials: primitives.compromisedCredentials?.map(
+        (entry) => ({
+          compromisedSince: new DeviceAuthorizationRevision(
+            entry.compromisedSince,
+          ),
+          credential: DeviceCredential.fromString(entry.credential),
+        }),
+      ),
       compromisedSince: DeviceAuthorizationTransition.revisionOrUndefined(
         primitives.compromisedSince,
       ),
@@ -128,6 +140,7 @@ export class DeviceAuthorizationTransition {
     previousRevision: DeviceAuthorizationRevision,
     targetCredential: DeviceCredential,
     epoch = DeviceAuthorizationEpoch.genesis(),
+    compromisedCredentials?: DeviceCompromisedCredential[],
   ): DeviceAuthorizationTransition {
     return new DeviceAuthorizationTransition({
       epoch,
@@ -136,6 +149,7 @@ export class DeviceAuthorizationTransition {
       operationId,
       previousRevision,
       targetCredential,
+      compromisedCredentials,
     });
   }
 
@@ -143,7 +157,7 @@ export class DeviceAuthorizationTransition {
     private readonly state: DeviceAuthorizationTransitionState,
   ) {
     assert(
-      this.hasValidOperationShape(),
+      this.hasValidOperationShape() && this.hasValidCompromisedCredentials(),
       new InvalidDeviceAuthorizationTransitionError(),
     );
   }
@@ -184,6 +198,27 @@ export class DeviceAuthorizationTransition {
     );
   }
 
+  private hasValidCompromisedCredentials(): boolean {
+    const entries = this.state.compromisedCredentials;
+
+    if (entries === undefined) {
+      return true;
+    }
+
+    return (
+      this.state.operation.isRecovery() &&
+      entries.length > 0 &&
+      entries.length <= MAX_COMPROMISED_CREDENTIALS &&
+      entries.every(
+        (entry, index) =>
+          !entry.compromisedSince.isGreaterThan(this.state.previousRevision) &&
+          (index === 0 ||
+            entries[index - 1].credential.valueOf() <
+              entry.credential.valueOf()),
+      )
+    );
+  }
+
   private hasValidProofShape(): boolean {
     return this.isRevocation()
       ? this.state.proofOfPossession === undefined
@@ -194,6 +229,12 @@ export class DeviceAuthorizationTransition {
     return {
       authorCredential: this.state.authorCredential?.valueOf(),
       authorizedAt: this.state.pairing?.getAuthorizedAt().valueOf(),
+      compromisedCredentials: this.state.compromisedCredentials?.map(
+        (entry) => ({
+          compromisedSince: entry.compromisedSince.valueOf(),
+          credential: entry.credential.valueOf(),
+        }),
+      ),
       compromisedSince: this.state.compromisedSince?.valueOf(),
       epoch: this.state.epoch.valueOf(),
       identityId: this.state.identityId.valueOf(),
@@ -288,6 +329,10 @@ export class DeviceAuthorizationTransition {
     return this.state.compromisedSince;
   }
 
+  public getCompromisedCredentials(): DeviceCompromisedCredential[] {
+    return this.state.compromisedCredentials ?? [];
+  }
+
   public getTargetCredential(): DeviceCredential {
     return this.state.targetCredential;
   }
@@ -367,6 +412,12 @@ export class DeviceAuthorizationTransition {
     return {
       authorCredential: this.state.authorCredential?.valueOf(),
       authorizedAt: this.state.pairing?.getAuthorizedAt().valueOf(),
+      compromisedCredentials: this.state.compromisedCredentials?.map(
+        (entry) => ({
+          compromisedSince: entry.compromisedSince.valueOf(),
+          credential: entry.credential.valueOf(),
+        }),
+      ),
       compromisedSince: this.state.compromisedSince?.valueOf(),
       epoch: this.state.epoch.valueOf(),
       identityId: this.state.identityId.valueOf(),

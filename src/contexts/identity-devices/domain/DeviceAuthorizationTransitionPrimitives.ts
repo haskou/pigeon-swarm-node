@@ -3,6 +3,7 @@ import { DeviceAuthorizationOperationValue } from './value-objects/DeviceAuthori
 export interface DeviceAuthorizationTransitionPrimitives {
   authorizedAt?: number;
   authorCredential?: string;
+  compromisedCredentials?: DeviceCompromisedCredentialPrimitives[];
   compromisedSince?: number;
   epoch: string;
   identityId: string;
@@ -16,4 +17,9 @@ export interface DeviceAuthorizationTransitionPrimitives {
   signature: string;
   targetCredential: string;
   targetCredentialCommitment: string;
+}
+
+export interface DeviceCompromisedCredentialPrimitives {
+  compromisedSince: number;
+  credential: string;
 }
