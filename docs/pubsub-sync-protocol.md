@@ -113,8 +113,11 @@ absent. `identityId`, `ownerNodeId`, `preferenceUpdatedAt`, `selectedStatus`,
 with the reader's identity key over the canonical payload that
 `SignedHttpRequestVerifier` uses. A receipt updates read state, reaches
 WebSocket clients and clears push notifications only when the proof verifies
-for the event's conversation, message and reader. Push clearing sends
-`notifications_cleared` only to that verified reader.
+for the event's conversation, message and reader, and its `timestamp` is no
+older than 14 days (`MessageReadProof.MAX_AGE_MS`) and no more than 30 seconds
+ahead of the receiving node's clock (`MessageReadProof.MAX_FUTURE_SKEW_MS`).
+Late receipts from readers that were offline still apply inside that window.
+Push clearing sends `notifications_cleared` only to that verified reader.
 
 A receipt that marks an earlier message than the reader's stored marker is
 refused by the store, so the marker never moves back. Such a receipt is not
@@ -124,11 +127,16 @@ and forwarded (see residual risks).
 
 Residual risks accepted for this change:
 
-- Receipt replay has no freshness window. HTTP requests are limited to a 30
-  second clock skew and a replay guard; a receipt proof verifies for as long as
-  the reader's key does.
-- The replicated read-marker head is unsigned. Nodes apply the stored head, so
-  a writer to that store can change it without a receipt.
+- A receipt replayed inside the 14 day window is applied again. The marker
+  stays monotonic, so a replay cannot move it back, but a replay of the receipt
+  for the stored marker's own message is forwarded to WebSocket clients and
+  re-clears push. Receipts carry no nonce, so the window bounds replay instead
+  of preventing it.
+- The replicated read-marker head is unsigned and has no freshness gate. Nodes
+  apply the stored head, so a writer to that store can change it without a
+  receipt. A time window on the head is not applied: heads are read on every
+  lookup, so a window would drop valid markers once it closed, and message ids
+  are opaque, so a head cannot be bound to a signed message id.
 - Other conversation gossip is not signed per event; only receipts carry proofs.
 - `network_synchronization_status` is reported for the whole node, not per
   private network.

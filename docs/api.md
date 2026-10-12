@@ -391,8 +391,9 @@ Implemented:
   event carries `participantIds`
 - deliver `conversations.v1.messages.were_read` receipts only to the conversation
   participants this node already knows, and only after `readProof` verifies for
-  the event's conversation, message and reader; the `participantIds` on a receipt
-  are not used for routing because they arrive from the network unverified
+  the event's conversation, message and reader and its `timestamp` is inside the
+  14 day freshness window; the `participantIds` on a receipt are not used for
+  routing because they arrive from the network unverified
 - deliver presence events only to the connections of the identity they describe
 - deliver conversation call snapshots only to currently authorized participants;
   community call snapshots go to clients with current voice-channel access
@@ -2769,8 +2770,10 @@ Implemented:
   signed request)
 - consuming nodes verify `readProof` against the reader's identity key before
   they apply the same replicated read marker update locally; unproven receipts
-  are dropped (residual risks: "Conversation read receipts" in
-  `docs/pubsub-sync-protocol.md`)
+  are dropped. A receipt whose `timestamp` is more than 14 days old, or more
+  than 30 seconds ahead of the consumer's clock, is dropped the same way; late
+  receipts inside the window still apply (residual risks: "Conversation read
+  receipts" in `docs/pubsub-sync-protocol.md`)
 - send a Web Push control payload of type `notifications_cleared` to the
   reader identity subscriptions so service workers can close displayed
   notifications sharing the conversation's opaque group tag (see
