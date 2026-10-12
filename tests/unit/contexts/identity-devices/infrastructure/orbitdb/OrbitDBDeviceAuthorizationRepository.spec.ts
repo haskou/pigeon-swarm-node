@@ -244,6 +244,40 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     await expect(repository.compareAndApply(transition)).rejects.toThrow();
   });
 
+  it('returns only the events of the applied transition after replicated history', async () => {
+    const { genesis, identityId, owner } = await fixture();
+    const phone = await KeyPair.generate();
+    const laptop = await KeyPair.generate();
+    const { repository } = repositoryFixture();
+    await provisionAuthorization(repository, genesis);
+    await repository.compareAndApply(
+      enrollment(
+        identityId,
+        owner,
+        phone,
+        '00000000-0000-4000-8000-000000000011',
+        '10000000-0000-4000-8000-000000000011',
+      ),
+    );
+
+    const applied = await repository.compareAndApply(
+      enrollment(
+        identityId,
+        owner,
+        laptop,
+        '00000000-0000-4000-8000-000000000012',
+        '10000000-0000-4000-8000-000000000012',
+        DeviceAuthorizationRevision.initial().next(),
+      ),
+    );
+    const found = await repository.find(identityId);
+
+    expect(
+      applied.pullDomainEvents().map((event) => event.eventName()),
+    ).toEqual(['identity_devices.v1.device_authorization.credential_enrolled']);
+    expect(found?.pullDomainEvents()).toEqual([]);
+  });
+
   it('replicates authorization state only through registered private networks', async () => {
     const { genesis, identityId } = await fixture();
     const publicNetworkId = '550e8400-e29b-41d4-a716-446655440099';

@@ -70,7 +70,10 @@ export default class DeviceAuthorizationPolicy {
   ): DeviceAuthorization {
     this.verifyDeviceAuthor(authorization, transition);
 
-    return authorization.revoke(transition.getTargetCredential());
+    return authorization.revoke(
+      transition.getTargetCredential(),
+      transition.getCompromisedSince(),
+    );
   }
 
   private recover(

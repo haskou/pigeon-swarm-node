@@ -237,7 +237,12 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
 
       const saved = await this.save(document);
 
-      return DeviceAuthorization.fromPrimitives(saved.authorization);
+      const persisted = DeviceAuthorization.fromPrimitives(saved.authorization);
+      const applied =
+        JSON.stringify(persisted.toPrimitives()) ===
+        JSON.stringify(authorization.toPrimitives());
+
+      return applied ? authorization : persisted;
     });
   }
 
