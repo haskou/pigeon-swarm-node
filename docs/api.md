@@ -1510,10 +1510,10 @@ Requires signed request headers. Call it only after the identity is published
 }
 ```
 
-`context` is `ipfs_public_upload` for content from `POST /ipfs/public`. The
-`ipfs_private_upload` context only tracks legacy encrypted JSON documents
-published before private blobs; the node no longer creates them. `sizeBytes`
-is 1..52428800. Response: `204`.
+`context` must be `ipfs_public_upload`, the context for content from
+`POST /ipfs/public`. `ipfs_private_upload` is rejected with `400`: private
+content is never published to IPFS. `sizeBytes` is 1..52428800. Response:
+`204`.
 
 The replicated record is stored in the gated `contentReplication` collection:
 

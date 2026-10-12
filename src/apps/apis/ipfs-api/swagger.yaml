@@ -86,7 +86,7 @@ paths:
       tags:
         - ipfs
       summary: Register owner-signed content replication
-      description: Call only after the identity is published. Body carries networkId, context (ipfs_private_upload or ipfs_public_upload), sizeBytes (1..52428800) and a PublicMutationProof for the contentReplication store. Subject to a per identity per network quota.
+      description: Call only after the identity is published. Body carries networkId, context (ipfs_public_upload), sizeBytes (1..52428800) and a PublicMutationProof for the contentReplication store. Subject to a per identity per network quota.
       security:
         - signedRequest: []
       parameters:
@@ -109,7 +109,7 @@ paths:
                   type: string
                 context:
                   type: string
-                  enum: [ipfs_private_upload, ipfs_public_upload]
+                  enum: [ipfs_public_upload]
                 sizeBytes:
                   type: number
                 mutation:
