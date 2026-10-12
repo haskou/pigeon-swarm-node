@@ -251,6 +251,10 @@ package "conversations.application" {
     +register(message): Promise<void>
   }
 
+  class MessageReadProofVerifier {
+    +verify(message)
+  }
+
   class MessageReactionRegistrar {
     +register(message): Promise<void>
     +unregister(message): Promise<void>

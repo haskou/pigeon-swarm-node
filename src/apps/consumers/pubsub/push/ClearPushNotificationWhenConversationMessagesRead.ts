@@ -1,3 +1,5 @@
+import { MessageReadProofVerifier } from '@app/contexts/conversations/application/verify-message-read-proof/MessageReadProofVerifier';
+import { MessageReadProofVerifyMessage } from '@app/contexts/conversations/application/verify-message-read-proof/messages/MessageReadProofVerifyMessage';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { MessageReadProof } from '@app/contexts/conversations/domain/value-objects/MessageReadProof';
 import PushNotificationDispatcher from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
@@ -9,6 +11,8 @@ import SendPushNotificationWhenEventReceived from './SendPushNotificationWhenEve
 export default class ClearPushNotificationWhenConversationMessagesRead extends SendPushNotificationWhenEventReceived {
   public static QUEUE_NAME =
     'pigeon-swarm.clear-push-when-conversation-messages-read';
+
+  private readonly readProofVerifier = new MessageReadProofVerifier();
 
   constructor(
     eventConsumer: DomainEventConsumer,
@@ -22,13 +26,17 @@ export default class ClearPushNotificationWhenConversationMessagesRead extends S
    * an unproven receipt must never reach the dispatcher.
    */
   public async handler(event: DomainEvent): Promise<void> {
-    if (
-      !MessageReadProof.isReceivable(event.attributes.readProof, {
-        conversationId: event.aggregateId,
-        messageId: String(event.attributes.messageId),
-        readerIdentityId: String(event.attributes.readerIdentityId),
-      })
-    ) {
+    const now = Date.now();
+    const verified = this.readProofVerifier.verify(
+      new MessageReadProofVerifyMessage(
+        event.aggregateId,
+        String(event.attributes.readerIdentityId),
+        String(event.attributes.messageId),
+        event.attributes.readProof,
+      ),
+    );
+
+    if (!verified || !MessageReadProof.isFresh(verified.claim, now)) {
       return;
     }
 
