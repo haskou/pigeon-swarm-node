@@ -64,13 +64,8 @@ export class DeviceAuthorizationTransition {
       authorCredential: primitives.authorCredential
         ? DeviceCredential.fromString(primitives.authorCredential)
         : undefined,
-      compromisedCredentials: primitives.compromisedCredentials?.map(
-        (entry) => ({
-          compromisedSince: new DeviceAuthorizationRevision(
-            entry.compromisedSince,
-          ),
-          credential: DeviceCredential.fromString(entry.credential),
-        }),
+      compromisedCredentials: compromisedCredentialsOrUndefined(
+        primitives.compromisedCredentials,
       ),
       compromisedSince: DeviceAuthorizationTransition.revisionOrUndefined(
         primitives.compromisedSince,
@@ -148,8 +143,8 @@ export class DeviceAuthorizationTransition {
       operation: DeviceAuthorizationOperation.recovery(),
       operationId,
       previousRevision,
-      targetCredential,
       compromisedCredentials,
+      targetCredential,
     });
   }
 
@@ -434,4 +429,17 @@ export class DeviceAuthorizationTransition {
         this.getTargetCredentialCommitment().valueOf(),
     };
   }
+}
+
+function compromisedCredentialsOrUndefined(
+  entries: { compromisedSince: number; credential: string }[] | undefined,
+): DeviceCompromisedCredential[] | undefined {
+  if (entries === undefined) {
+    return undefined;
+  }
+
+  return entries.map((entry) => ({
+    compromisedSince: new DeviceAuthorizationRevision(entry.compromisedSince),
+    credential: DeviceCredential.fromString(entry.credential),
+  }));
 }
