@@ -272,6 +272,19 @@ describe('NotificationStateMutationPolicy', () => {
       ).resolves.toBeUndefined();
     });
 
+    it('enforces the limits it is constructed with', async () => {
+      policy = new NotificationStateMutationPolicy(
+        registry,
+        verifier,
+        new NotificationReplicationLimits(100, 2),
+      );
+      docs.push(...(await Promise.all([1, 2].map((index) => stored(index)))));
+
+      await expect(
+        policy.assertPermitted(latest(), RECIPIENT, false),
+      ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+    });
+
     it('refuses once the genuine states fill the quota', async () => {
       docs.push(
         ...(await Promise.all([1, 2, 3].map((index) => stored(index)))),
