@@ -1,3 +1,4 @@
+import { MAX_DEVICE_CREDENTIALS } from '@app/contexts/identity-devices/domain/DeviceCredentialLimits';
 import MailboxAcknowledger from '@app/contexts/mailboxes/application/MailboxAcknowledger';
 import MailboxAppender from '@app/contexts/mailboxes/application/MailboxAppender';
 import MailboxCoordinator from '@app/contexts/mailboxes/application/MailboxCoordinator';
@@ -677,13 +678,26 @@ describe('mailboxes', () => {
     await expect(adder.add(MAILBOX, READ, sha(THIRD))).resolves.toBe(true);
   });
 
+  it('admits a reader for each device an identity may hold, plus the root, by default', async () => {
+    delete process.env.MAILBOX_MAX_READERS;
+
+    for (let device = 1; device <= MAX_DEVICE_CREDENTIALS; device += 1) {
+      await expect(
+        adder.add(MAILBOX, READ, sha(`device-${device}`)),
+      ).resolves.toBe(true);
+    }
+
+    const { readers } = await lister.list(MAILBOX, READ);
+    expect(readers).toHaveLength(MAX_DEVICE_CREDENTIALS + 1);
+  });
+
   it('lists readers with their acknowledged cursors, for readers only', async () => {
     await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
     await adder.add(MAILBOX, READ, OTHER_READ_HASH);
     await acknowledger.acknowledge(MAILBOX, READ, 1);
 
     await expect(lister.list(MAILBOX, OTHER_READ)).resolves.toEqual({
-      maxReaders: 8,
+      maxReaders: MAX_DEVICE_CREDENTIALS + 1,
       readers: [
         { ackedCursor: 1, readTokenHash: READ_HASH },
         { ackedCursor: 0, readTokenHash: OTHER_READ_HASH },
@@ -750,7 +764,7 @@ describe('mailboxes', () => {
     });
 
     await expect(lister.list(legacy, READ)).resolves.toEqual({
-      maxReaders: 8,
+      maxReaders: MAX_DEVICE_CREDENTIALS + 1,
       readers: [{ ackedCursor: 0, readTokenHash: READ_HASH }],
     });
     await expect(adder.add(legacy, READ, OTHER_READ_HASH)).resolves.toBe(true);

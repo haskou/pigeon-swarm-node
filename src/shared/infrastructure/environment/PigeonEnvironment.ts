@@ -1,3 +1,4 @@
+import { MAX_DEVICE_CREDENTIALS } from '@app/contexts/identity-devices/domain/DeviceCredentialLimits';
 import { Kernel, KernelEnvironment } from '@haskou/ddd-kernel';
 
 export const pigeonEnvironmentSchema = {
@@ -54,7 +55,11 @@ export const pigeonEnvironmentSchema = {
   MAILBOX_MAX_BYTES: { defaultValue: 8 * 1024 * 1024, type: 'number' },
   MAILBOX_MAX_COUNT: { defaultValue: 10_000, type: 'number' },
   MAILBOX_MAX_ENVELOPES: { defaultValue: 1000, type: 'number' },
-  MAILBOX_MAX_READERS: { defaultValue: 8, type: 'number' },
+  // The root reader plus one per device an identity may hold.
+  MAILBOX_MAX_READERS: {
+    defaultValue: MAX_DEVICE_CREDENTIALS + 1,
+    type: 'number',
+  },
   MAILBOX_RETENTION_MS: {
     defaultValue: 14 * 24 * 60 * 60 * 1000,
     type: 'number',

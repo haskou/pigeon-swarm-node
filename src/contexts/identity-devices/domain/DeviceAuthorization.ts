@@ -6,13 +6,12 @@ import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import { UniqueObjectArray, assert } from '@haskou/value-objects';
 
 import { DeviceAuthorizationPrimitives } from './DeviceAuthorizationPrimitives';
+import { MAX_DEVICE_CREDENTIALS } from './DeviceCredentialLimits';
 import { InvalidDeviceAuthorizationTransitionError } from './errors/InvalidDeviceAuthorizationTransitionError';
 import { DeviceAuthorizationEpoch } from './value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
 
 export class DeviceAuthorization extends AggregateRoot {
-  private static readonly MAX_CREDENTIALS = 128;
-
   public static fromPrimitives(
     primitives: DeviceAuthorizationPrimitives,
   ): DeviceAuthorization {
@@ -62,7 +61,7 @@ export class DeviceAuthorization extends AggregateRoot {
       new InvalidDeviceAuthorizationTransitionError(),
     );
     assert(
-      this.credentials.length <= DeviceAuthorization.MAX_CREDENTIALS,
+      this.credentials.length <= MAX_DEVICE_CREDENTIALS,
       new InvalidDeviceAuthorizationTransitionError(),
     );
     assert(
@@ -128,7 +127,7 @@ export class DeviceAuthorization extends AggregateRoot {
     credentials: DeviceCredential[],
   ): DeviceAuthorization {
     const availableCredentials =
-      DeviceAuthorization.MAX_CREDENTIALS - this.credentials.length;
+      MAX_DEVICE_CREDENTIALS - this.credentials.length;
     const newCredentials = [
       ...new Map(
         credentials.map((credential) => [credential.valueOf(), credential]),
