@@ -1874,6 +1874,7 @@ Response:
   "authorizationRevision": 0,
   "deviceCredential": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
   "deviceCredentialCommitment": "<64 lowercase hexadecimal characters>",
+  "mailboxHome": "https://node.example",
   "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
   "identityExternalIdentifier": "<currentIdentityCid>",
   "networks": ["<networkId>"],
@@ -1905,6 +1906,7 @@ Request:
   "authorizationRevision": 0,
   "deviceCredential": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
   "deviceCredentialCommitment": "<64 lowercase hexadecimal characters>",
+  "mailboxHome": "https://node.example",
   "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\n<base64>\n-----END PUBLIC KEY-----\n",
   "networks": ["<networkId>"],
   "profile": {
@@ -1933,6 +1935,7 @@ The signature covers this canonical property order:
   "deviceCredential": "<genesisDeviceCredential>",
   "deviceCredentialCommitment": "<commitment>",
   "id": "<identityId>",
+  "mailboxHome": "https://node.example",
   "networks": ["<networkId>"],
   "profile": {
     "handle": "alice",
@@ -1956,6 +1959,12 @@ practice: without it the identity is refused.
 Undefined optional properties are omitted before signing. Handles must already
 be normalized. Current requests reject `encryptedKeyPair`,
 `encryptedPrivateKey`, `encryptedMasterKey` and `masterKeyDerivation`.
+
+`mailboxHome` is an optional origin (`http` or `https`, with scheme, host and
+optional port, and no path, query, fragment or credentials) where the identity's
+mailbox is hosted. It is covered by the identity signature, so it cannot be
+changed without a new signed publication. An update replaces the publication
+and omits `mailboxHome` unless it is sent again.
 
 At most `IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE` (default 30, `0` disables)
 identity publications are accepted per identity per minute, on `POST /identities`
