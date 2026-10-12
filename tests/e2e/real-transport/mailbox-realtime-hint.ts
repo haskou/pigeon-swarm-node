@@ -160,7 +160,81 @@ async function verify(node: NodeRuntime): Promise<void> {
     'wrong-capability socket received a hint',
   );
 
-  for (const socket of [subscriber, unsubscribed, wrongCapability]) {
+  // A second reader joins through the root capability, then is revoked.
+  const revokedReadToken = randomBytes(32).toString('base64url');
+  const revokedReadTokenHash = createHash('sha256')
+    .update(revokedReadToken)
+    .digest('hex');
+  const added = await fetch(`${node.baseUrl}/mailboxes/${mailboxId}/readers`, {
+    body: JSON.stringify({ readTokenHash: revokedReadTokenHash }),
+    headers: {
+      authorization: `Bearer ${readToken}`,
+      'content-type': 'application/json',
+    },
+    method: 'POST',
+  });
+
+  assert.ok(added.ok, `reader POST returned ${added.status}`);
+
+  const revoked = await openSocket(node, 'revoked-reader');
+
+  revoked.ws.send(
+    JSON.stringify({
+      mailboxId,
+      readToken: revokedReadToken,
+      type: 'mailbox_subscribe',
+    }),
+  );
+
+  await waitFor(async () => {
+    postedCursors.add(await postEnvelope(node, mailboxId, postToken));
+
+    return hintsOf(revoked).length > 0;
+  }, 'revoked-reader socket to receive a hint before revocation');
+
+  const revocation = await fetch(
+    `${node.baseUrl}/mailboxes/${mailboxId}/readers/${revokedReadTokenHash}`,
+    {
+      headers: { authorization: `Bearer ${readToken}` },
+      method: 'DELETE',
+    },
+  );
+
+  assert.equal(
+    revocation.status,
+    204,
+    `reader DELETE returned ${revocation.status}`,
+  );
+
+  // Hints already in flight from before the revocation may still land.
+  const grace = Promise.withResolvers<void>();
+
+  setTimeout(grace.resolve, HINT_GRACE_MS);
+  await grace.promise;
+
+  const revokedHintsBefore = hintsOf(revoked).length;
+  const subscriberHintsBefore = hintsOf(subscriber).length;
+
+  for (let index = 0; index < 2; index += 1) {
+    postedCursors.add(await postEnvelope(node, mailboxId, postToken));
+  }
+
+  const settled = Promise.withResolvers<void>();
+
+  setTimeout(settled.resolve, HINT_GRACE_MS);
+  await settled.promise;
+
+  assert.equal(
+    hintsOf(revoked).length,
+    revokedHintsBefore,
+    'revoked reader socket received a hint after its revocation',
+  );
+  assert.ok(
+    hintsOf(subscriber).length > subscriberHintsBefore,
+    'root subscriber stopped receiving hints after another reader was revoked',
+  );
+
+  for (const socket of [subscriber, unsubscribed, wrongCapability, revoked]) {
     socket.ws.close();
   }
 }

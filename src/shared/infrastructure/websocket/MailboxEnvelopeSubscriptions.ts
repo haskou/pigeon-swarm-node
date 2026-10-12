@@ -2,60 +2,146 @@ import { WebSocket } from 'ws';
 
 export const MAX_MAILBOX_SUBSCRIPTIONS_PER_CLIENT = 256;
 
-export default class MailboxEnvelopeSubscriptions {
-  private readonly clientsByMailbox = new Map<string, Set<WebSocket>>();
-  private readonly mailboxesByClient = new Map<WebSocket, Set<string>>();
+type Subscription = { mailboxId: string; readTokenHash: string };
 
-  public add(client: WebSocket, mailboxId: string): void {
-    const mailboxes = this.mailboxesByClient.get(client) || new Set<string>();
+/**
+ * Hint routing for mailbox subscriptions. A subscription is bound to the read
+ * token hash that authorised it, so revoking that reader or deleting the
+ * mailbox stops its hints at once. The socket stays open: the protocol has no
+ * unsubscribe message.
+ */
+export default class MailboxEnvelopeSubscriptions {
+  private readonly clientsByMailbox = new Map<
+    string,
+    Map<string, Set<WebSocket>>
+  >();
+
+  private readonly subscriptionsByClient = new Map<
+    WebSocket,
+    Map<string, Subscription>
+  >();
+
+  private detach(
+    client: WebSocket,
+    mailboxId: string,
+    readTokenHash: string,
+  ): void {
+    const readers = this.clientsByMailbox.get(mailboxId);
+    const clients = readers?.get(readTokenHash);
+
+    if (!readers || !clients) {
+      return;
+    }
+
+    clients.delete(client);
+
+    if (clients.size === 0) {
+      readers.delete(readTokenHash);
+    }
+
+    if (readers.size === 0) {
+      this.clientsByMailbox.delete(mailboxId);
+    }
+  }
+
+  public add(
+    client: WebSocket,
+    mailboxId: string,
+    readTokenHash: string,
+  ): void {
+    const subscriptions =
+      this.subscriptionsByClient.get(client) || new Map<string, Subscription>();
+    // The key is JSON so a mailbox id can never collide with a hash.
+    const key = JSON.stringify([mailboxId, readTokenHash]);
 
     if (
-      mailboxes.has(mailboxId) ||
-      mailboxes.size >= MAX_MAILBOX_SUBSCRIPTIONS_PER_CLIENT
+      subscriptions.has(key) ||
+      subscriptions.size >= MAX_MAILBOX_SUBSCRIPTIONS_PER_CLIENT
     ) {
       return;
     }
 
-    mailboxes.add(mailboxId);
-    this.mailboxesByClient.set(client, mailboxes);
+    subscriptions.set(key, { mailboxId, readTokenHash });
+    this.subscriptionsByClient.set(client, subscriptions);
 
-    const clients =
-      this.clientsByMailbox.get(mailboxId) || new Set<WebSocket>();
+    const readers =
+      this.clientsByMailbox.get(mailboxId) || new Map<string, Set<WebSocket>>();
+    const clients = readers.get(readTokenHash) || new Set<WebSocket>();
 
     clients.add(client);
-    this.clientsByMailbox.set(mailboxId, clients);
+    readers.set(readTokenHash, clients);
+    this.clientsByMailbox.set(mailboxId, readers);
   }
 
-  public remove(client: WebSocket): void {
-    const mailboxes = this.mailboxesByClient.get(client);
+  public removeSubscription(
+    client: WebSocket,
+    mailboxId: string,
+    readTokenHash: string,
+  ): void {
+    const subscriptions = this.subscriptionsByClient.get(client);
 
-    if (!mailboxes) {
+    if (!subscriptions) {
       return;
     }
 
-    mailboxes.forEach((mailboxId) => {
-      const clients = this.clientsByMailbox.get(mailboxId);
+    subscriptions.delete(JSON.stringify([mailboxId, readTokenHash]));
 
-      if (!clients) {
-        return;
-      }
+    if (subscriptions.size === 0) {
+      this.subscriptionsByClient.delete(client);
+    }
 
-      clients.delete(client);
+    this.detach(client, mailboxId, readTokenHash);
+  }
 
-      if (clients.size === 0) {
-        this.clientsByMailbox.delete(mailboxId);
-      }
-    });
+  public remove(client: WebSocket): void {
+    const subscriptions = this.subscriptionsByClient.get(client);
 
-    this.mailboxesByClient.delete(client);
+    if (!subscriptions) {
+      return;
+    }
+
+    for (const { mailboxId, readTokenHash } of [...subscriptions.values()]) {
+      this.removeSubscription(client, mailboxId, readTokenHash);
+    }
+  }
+
+  /** Only the revoked reader's subscriptions stop; the socket's other readers keep theirs. */
+  public dropReader(mailboxId: string, readTokenHash: string): void {
+    const clients = [
+      ...(this.clientsByMailbox.get(mailboxId)?.get(readTokenHash) || []),
+    ];
+
+    for (const client of clients) {
+      this.removeSubscription(client, mailboxId, readTokenHash);
+    }
+  }
+
+  public dropMailbox(mailboxId: string): void {
+    const readers = this.clientsByMailbox.get(mailboxId);
+
+    if (!readers) {
+      return;
+    }
+
+    for (const readTokenHash of [...readers.keys()]) {
+      this.dropReader(mailboxId, readTokenHash);
+    }
   }
 
   public subscribersOf(mailboxId: string): WebSocket[] {
-    return [...(this.clientsByMailbox.get(mailboxId) || [])];
+    const readers = this.clientsByMailbox.get(mailboxId);
+
+    if (!readers) {
+      return [];
+    }
+
+    const clients = [...readers.values()].flatMap((set) => [...set]);
+
+    return [...new Set(clients)];
   }
 
   public clear(): void {
     this.clientsByMailbox.clear();
-    this.mailboxesByClient.clear();
+    this.subscriptionsByClient.clear();
   }
 }

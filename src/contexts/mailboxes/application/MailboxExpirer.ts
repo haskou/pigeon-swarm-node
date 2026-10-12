@@ -2,6 +2,7 @@ import { Mailbox } from '../domain/Mailbox';
 import MailboxPolicy from '../domain/MailboxPolicy';
 import MailboxRepository from '../domain/repositories/MailboxRepository';
 import MailboxCoordinator from './MailboxCoordinator';
+import MailboxEnvelopeNotifier from './MailboxEnvelopeNotifier';
 
 /** Retention: expired envelopes go, and a mailbox idle for the window is deleted. */
 export default class MailboxExpirer {
@@ -9,6 +10,7 @@ export default class MailboxExpirer {
     private readonly repository: MailboxRepository,
     private readonly policy: MailboxPolicy,
     private readonly coordinator: MailboxCoordinator,
+    private readonly notifier: MailboxEnvelopeNotifier,
   ) {}
 
   private async expireOne(mailbox: Mailbox, now: number): Promise<void> {
@@ -16,6 +18,7 @@ export default class MailboxExpirer {
 
     if (mailbox.getLastReadAt() + retention <= now) {
       await this.repository.remove(mailbox.getId());
+      this.notifier.mailboxRemoved(mailbox.getId());
 
       return;
     }

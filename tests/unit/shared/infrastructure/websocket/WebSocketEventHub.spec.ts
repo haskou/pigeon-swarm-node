@@ -1,6 +1,7 @@
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { MailboxCapability } from '@app/contexts/mailboxes/domain/MailboxCapability';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import WebSocketClientMessageHandler from '@app/shared/infrastructure/websocket/WebSocketClientMessageHandler';
@@ -1121,6 +1122,99 @@ describe('WebSocketEventHub', () => {
     closeHandler();
     (client.send as jest.Mock).mockClear();
     hub.publishMailboxEnvelope(mailboxId, 2);
+
+    expect(client.send).not.toHaveBeenCalled();
+  });
+
+  it('stops sending mailbox envelope hints once the subscribing reader is revoked', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+    const clientMessageHandler = buildClientMessageHandler();
+    const mailboxId = 'm'.repeat(43);
+    const readToken = 'r'.repeat(32);
+
+    clientMessageHandler.canReadMailbox.mockResolvedValue(true);
+    hub.setClientMessageHandler(clientMessageHandler);
+    hub.register(identityId, client);
+    const messageHandler = getClientMessageHandler(client);
+
+    messageHandler(
+      Buffer.from(
+        JSON.stringify({ mailboxId, readToken, type: 'mailbox_subscribe' }),
+      ),
+    );
+    await flushPromises();
+    (client.send as jest.Mock).mockClear();
+    hub.publishMailboxEnvelope(mailboxId, 3);
+    expect(client.send).toHaveBeenCalledTimes(1);
+
+    hub.dropMailboxReaderSubscriptions(
+      mailboxId,
+      MailboxCapability.hash(readToken),
+    );
+    (client.send as jest.Mock).mockClear();
+    hub.publishMailboxEnvelope(mailboxId, 4);
+
+    expect(client.send).not.toHaveBeenCalled();
+  });
+
+  it('does not keep a mailbox subscription whose reader is revoked while subscribing', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+    const clientMessageHandler = buildClientMessageHandler();
+    const mailboxId = 'm'.repeat(43);
+
+    clientMessageHandler.canReadMailbox
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    hub.setClientMessageHandler(clientMessageHandler);
+    hub.register(identityId, client);
+    const messageHandler = getClientMessageHandler(client);
+
+    messageHandler(
+      Buffer.from(
+        JSON.stringify({
+          mailboxId,
+          readToken: 'r'.repeat(32),
+          type: 'mailbox_subscribe',
+        }),
+      ),
+    );
+    await flushPromises();
+    (client.send as jest.Mock).mockClear();
+    hub.publishMailboxEnvelope(mailboxId, 5);
+
+    expect(clientMessageHandler.canReadMailbox).toHaveBeenCalledTimes(2);
+    expect(client.send).not.toHaveBeenCalled();
+  });
+
+  it('stops sending mailbox envelope hints once the mailbox is removed', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+    const clientMessageHandler = buildClientMessageHandler();
+    const mailboxId = 'm'.repeat(43);
+
+    clientMessageHandler.canReadMailbox.mockResolvedValue(true);
+    hub.setClientMessageHandler(clientMessageHandler);
+    hub.register(identityId, client);
+    const messageHandler = getClientMessageHandler(client);
+
+    messageHandler(
+      Buffer.from(
+        JSON.stringify({
+          mailboxId,
+          readToken: 'r'.repeat(32),
+          type: 'mailbox_subscribe',
+        }),
+      ),
+    );
+    await flushPromises();
+    hub.dropMailboxSubscriptions(mailboxId);
+    (client.send as jest.Mock).mockClear();
+    hub.publishMailboxEnvelope(mailboxId, 6);
 
     expect(client.send).not.toHaveBeenCalled();
   });

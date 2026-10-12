@@ -233,7 +233,7 @@ paths:
       tags:
         - mailboxes
       summary: Revoke a reader
-      description: Authorized by a read capability that is still a reader. Envelopes the revoked reader was holding back are deleted once the remaining readers have acked them. The last reader cannot be revoked.
+      description: Authorized by a read capability that is still a reader. Envelopes the revoked reader was holding back are deleted once the remaining readers have acked them. The last reader cannot be revoked. Closes the revoked reader's realtime subscriptions.
       security:
         - readCapability: []
       parameters:

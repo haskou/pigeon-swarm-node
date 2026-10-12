@@ -3,6 +3,7 @@ import CallEventAttestor from '@app/contexts/calls/application/attest-event/Call
 import { CallEventAttestation } from '@app/contexts/calls/domain/CallEventAttestation';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { MessageReadProof } from '@app/contexts/conversations/domain/value-objects/MessageReadProof';
+import { MailboxCapability } from '@app/contexts/mailboxes/domain/MailboxCapability';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Kernel from '@haskou/ddd-kernel';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
@@ -516,8 +517,27 @@ export class WebSocketEventHub {
       message.readToken,
     );
 
-    if (authorized && client.readyState === WebSocket.OPEN) {
-      this.mailboxSubscriptions.add(client, message.mailboxId);
+    if (!authorized || client.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const readTokenHash = MailboxCapability.hash(message.readToken);
+
+    this.mailboxSubscriptions.add(client, message.mailboxId, readTokenHash);
+
+    // A revocation committed between the check and the add dropped nothing,
+    // because this subscription did not exist yet. Check again now that it does.
+    const stillAuthorized = await this.clientMessageHandler?.canReadMailbox(
+      message.mailboxId,
+      message.readToken,
+    );
+
+    if (!stillAuthorized) {
+      this.mailboxSubscriptions.removeSubscription(
+        client,
+        message.mailboxId,
+        readTokenHash,
+      );
     }
   }
 
@@ -770,6 +790,18 @@ export class WebSocketEventHub {
     this.mailboxSubscriptions.subscribersOf(mailboxId).forEach((client) => {
       this.send(client, message);
     });
+  }
+
+  /** Stops hints for one revoked reader; the socket and its other readers keep theirs. */
+  public dropMailboxReaderSubscriptions(
+    mailboxId: string,
+    readTokenHash: string,
+  ): void {
+    this.mailboxSubscriptions.dropReader(mailboxId, readTokenHash);
+  }
+
+  public dropMailboxSubscriptions(mailboxId: string): void {
+    this.mailboxSubscriptions.dropMailbox(mailboxId);
   }
 
   public setNetworkSynchronizationStatusProvider(
