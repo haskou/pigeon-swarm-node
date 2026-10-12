@@ -142,6 +142,9 @@ export default class Definitions {
   private privateAuthorizationScopeId: string | undefined;
   private otherIdentityId: IdentityId | undefined;
   private otherIdentityKeyPair: KeyPair | undefined;
+  private rememberedCallJoinRequest:
+    | { body: string | undefined; headers: Record<string, string> }
+    | undefined;
 
   private ownerIdentityId: IdentityId | undefined;
   private privateBlob:
@@ -3586,6 +3589,17 @@ export default class Definitions {
     expect(this.response.data.participantIds).to.deep.equal([]);
   }
 
+  @then('the current call does not list the other identity as a participant')
+  public theCurrentCallDoesNotListTheOtherIdentity(): void {
+    if (!this.otherIdentityId) {
+      throw new Error('Other identity must be created first.');
+    }
+
+    expect(this.response.data.participantIds).to.not.include(
+      this.otherIdentityId.valueOf(),
+    );
+  }
+
   @then('the current voice channel has {int} connected identities')
   public theCurrentVoiceChannelHasConnectedIdentities(count: number): void {
     const channels = this.response.data.channels;
@@ -6176,6 +6190,28 @@ export default class Definitions {
       `/calls/${this.callId}/participants`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
+    );
+  }
+
+  @given('I remember the current call join request')
+  public iRememberTheCurrentCallJoinRequest(): void {
+    this.rememberedCallJoinRequest = {
+      body: this.body,
+      headers: { ...this.headers },
+    };
+  }
+
+  @when('I POST the remembered participant join to the current call')
+  public async iPOSTTheRememberedParticipantJoinToTheCurrentCall(): Promise<void> {
+    if (!this.callId || !this.rememberedCallJoinRequest) {
+      throw new Error('Call and join request must be remembered first.');
+    }
+
+    this.response = await this.restClient.post(
+      `/calls/${this.callId}/participants`,
+      this.rememberedCallJoinRequest.body &&
+        JSON.parse(this.rememberedCallJoinRequest.body),
+      { headers: this.rememberedCallJoinRequest.headers },
     );
   }
 
