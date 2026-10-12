@@ -2,7 +2,6 @@ import {
   DeviceSealedSecretBundle,
   DeviceSealedSecretBundlePrimitives,
 } from '@app/contexts/identity-devices/domain/DeviceSealedSecretBundle';
-import { DeviceSealedSecretGenerationStaleError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretGenerationStaleError';
 import { DeviceSealedSecretRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
@@ -58,10 +57,7 @@ export default class LocalDeviceSealedSecretRepository extends DeviceSealedSecre
 
     return this.serialize(identityId, async () => {
       const stored = await this.find(identityId);
-
-      if (stored && stored.getGeneration() >= bundle.getGeneration()) {
-        throw new DeviceSealedSecretGenerationStaleError();
-      }
+      bundle.assertSupersedes(stored);
 
       await this.database.save(
         NAMESPACE,
