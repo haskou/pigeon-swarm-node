@@ -124,7 +124,7 @@ paths:
       tags:
         - calls
       summary: Join an active call
-      description: The participant signs a `call_participant` record with state `joined` (`call-participant:<callId>:<identityId>`). Joining the live call of a community channel is how a caller who received the active call from `POST /calls` takes part.
+      description: The participant signs a `call_participant` record with state `joined` (`call-participant:<callId>:<identityId>`). Joining the live call of a community channel is how a caller who received the active call from `POST /calls` takes part. A community channel join is verified but not stored; its roster is the lease set.
       parameters:
         - $ref: '#/components/parameters/CallId'
       requestBody:
@@ -147,7 +147,7 @@ paths:
       tags:
         - calls
       summary: Leave an active call
-      description: The participant signs a `call_participant` record with state `left`, or `declined` while still ringing (the record state follows the participant's current state on the node). Leaving a one-to-one call ends it for everybody.
+      description: The participant signs a `call_participant` record with state `left`, or `declined` while still ringing (the record state follows the participant's current state on the node). Leaving a one-to-one call ends it for everybody. A community channel leave is verified but not stored.
       parameters:
         - $ref: '#/components/parameters/CallId'
       requestBody:

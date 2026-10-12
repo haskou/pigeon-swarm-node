@@ -192,9 +192,11 @@ ancestors fail initialization instead of presenting partial call state as ready.
 Failed replays discard only their own staged changes and restore the previous
 traversal frontier so a retry can read the same entries again.
 
-Community calls persist no participant identities in the fold: community
-participation is runtime lease state, and a signed join of a community call proves
-the identity may connect but is not replayed into a roster.
+Community calls persist no participant records. A signed join or leave of a
+community call is verified against the admission rules and then discarded: it
+is neither written to OrbitDB nor replicated. Its freshness rests on the signed
+request and the record clock bound, not on a stored sequence. Community
+participation is runtime lease state, and the roster is the lease set.
 
 Heads for `call:`, `call-participant:` and `call-end:` records are not replicated:
 records reach other nodes through the gated `calls` store and its history replay
@@ -263,6 +265,46 @@ participant. Reports remain node-to-node only; browser live snapshots omit
 ICE diagnostics, lease ownership and heartbeat timestamps. Only presence
 changes trigger browser snapshots. Reports are cleared when the lease
 disconnects and are never persisted in OrbitDB/IPFS.
+
+## Call event visibility
+
+Call records and call gossip reach every member of the network that carries
+them, whether or not that member takes part in the call. Gossip topics are per
+network, not per call or conversation. Subscriptions are not authenticated, so
+the topic is not a relationship boundary. Receivers do not filter by
+participation, and nodes do not republish call events.
+
+Members of a network can observe:
+
+- `call_start` records: call id, creator, nonce, network id, `startedAt`, the
+  scope (a conversation id, or a community id, channel id and `sessionEpoch`)
+  and, for conversation calls, the participant identity ids.
+- `call_participant` records of conversation calls: the participant identity
+  id, state and signed time. Community joins and leaves are verified and not
+  stored or replicated.
+- `call_end` records: the call id and the identity that ended the call.
+- Lease events (`calls.v1.participant_lease.was_updated`) for conversation and
+  community calls: the connected roster in `participantIds` and
+  `participantIdentityId`, heartbeat timestamps, and the relay URL and candidate
+  types of each media connection. Leases are not stored.
+- Signal events (`calls.v1.signal.sent`): sender and recipient identity ids,
+  `signalType` and `payload`. The node treats `payload` as opaque and does not
+  encrypt it, so network members can read it.
+- Signal acknowledgements (`calls.v1.signal.acknowledged`): the signal id and
+  both identity ids.
+
+Envelopes follow the rule in [Identity presence leases](#identity-presence-leases):
+public-network events are plain JSON. Private-network events are encrypted with
+a key derived from the network key, so every admitted node can read them.
+
+Local WebSocket clients receive a call event only when this node's authorization
+check places them in the call's audience. Lifecycle events are attested by this
+node before they reach clients. Signal acknowledgements are never forwarded to
+clients.
+
+Narrowing these observers to a call's participants requires per-call topics or
+encrypted payloads. That is a protocol change, not an adapter filter, so the
+relationship-scoping part of #291 remains a documented residual risk.
 
 ## Call signal delivery
 

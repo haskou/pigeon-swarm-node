@@ -695,7 +695,7 @@ and are checked by the `CallEventVectors` unit spec.
 | Record | id | Author | Written by |
 | --- | --- | --- | --- |
 | `call_start` | `call:<callId>` | the creator | `POST /calls` |
-| `call_participant` | `call-participant:<callId>:<identityId>` | the participant | `POST /calls/{callId}/participants`, `DELETE /calls/{callId}/participants/me` |
+| `call_participant` | `call-participant:<callId>:<identityId>` | the participant | `POST /calls/{callId}/participants`, `DELETE /calls/{callId}/participants/me`; community calls verify the record and store nothing |
 | `call_end` | `call-end:<callId>` | the ender | `DELETE /calls/{callId}` |
 
 **Call id.** The id is derived, never chosen: the first 16 bytes of
@@ -745,7 +745,7 @@ is a positive integer:
 }
 ```
 
-`call_participant`, `state` is `joined`, `left` or `declined`:
+`call_participant` of a conversation call, `state` is `joined`, `left` or `declined`. Community joins and leaves are not stored:
 
 ```json
 {
@@ -866,7 +866,8 @@ End (`call_end`):
   channel with a huge epoch.
 - `call_participant`: the identity is the proof author; the admitted start
   exists; the identity takes part in the signed conversation, or may connect to
-  the community voice channel.
+  the community voice channel. A community record passes this check and is then
+  discarded, not stored.
 - `call_end`: the author is the creator, or any participant of a conversation
   call. A community call is ended by its creator only; everybody else leaves.
 - A record whose claimed time (`startedAt`, `at`) lies more than 10 minutes
@@ -874,6 +875,12 @@ End (`call_end`):
 - Rate cap: at most `CALLS_RECORD_RATE_LIMIT_PER_MINUTE` (default 30) call records
   per identity per minute, enforced on the write path (`429`, code `429021`);
   the replication gate cannot rate-limit deterministically.
+
+**Visibility.** Records and call gossip reach every member of the call's
+network, whether or not that member takes part in the call. The observable
+fields, including the signal payload that the node does not encrypt, are listed
+in [Call event visibility](pubsub-sync-protocol.md#call-event-visibility). Local
+WebSocket clients receive a call event only when they are in the call's audience.
 
 **Derived state.** Every node folds the same admitted records into the same call,
 independent of arrival order: participant and end events apply sorted by their
@@ -1007,9 +1014,10 @@ Implemented:
 - leaving removes the authenticated identity from the active snapshot
 - leaving a one-to-one conversation ends its call; leaving a group (including a two-member group) or community call does not terminate other participants
 - explicit community call termination retires its call ID
-- community session documents do not persist participant identities, creator or
-  ender attribution. Runtime participation expires and persisted rosters cannot
-  restore it after restart. Existing immutable history is not erased; see
+- community joins and leaves are verified and never stored, so no persisted
+  roster exists. Runtime participation expires and cannot be restored from
+  storage after a restart. The start record keeps its creator and the end record
+  its ender, as signed. Existing immutable history is not erased; see
   [the synchronization contract](pubsub-sync-protocol.md) for retention limits
 - deleting yourself while `ringing` declines the call instead of leaving it
 - joins emit `calls.v1.participant.joined`
