@@ -4350,7 +4350,7 @@ export default class Definitions {
     const networkId = String(this.currentNetworkId);
     const payload = {
       cid,
-      context: 'ipfs_private_upload',
+      context: 'ipfs_public_upload',
       id: `content:${networkId}:${cid}`,
       networkId,
       ownerIdentityId: identityId,

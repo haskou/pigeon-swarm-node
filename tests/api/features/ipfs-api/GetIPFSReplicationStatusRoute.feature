@@ -45,8 +45,8 @@ Feature: Get IPFS replication status route
     Then response code is equal to 200
     And I register a test IPFS network "api-replication-register-network"
     And I set raw IPFS content with content type "application/octet-stream" and text "hello"
-    And I sign the current network IPFS content request
-    When I POST to the current IPFS network
+    And I sign the current public IPFS content request
+    When I POST to "/ipfs/public"
     Then response code is equal to 201
     Given I sign the current content replication registration for the published content
     When I PUT the signed content replication registration
