@@ -2,7 +2,6 @@ name: Real Transport E2E
 
 on:
   pull_request:
-    branches: ['main']
   workflow_dispatch:
 
 concurrency:
@@ -15,9 +14,31 @@ permissions:
 
 # One step per script, each with a timeout, so a hang names the script.
 # `yarn test:e2e:real-transport` is the local equivalent of all of them.
+#
+# `changes` decides whether the jobs below run. Documentation-only changes skip
+# them; skipped jobs keep their names, so required checks still report. Workflow
+# and action changes always run everything. See .github/actions/classify-changes.
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      heavy: ${{ steps.classify.outputs.heavy }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Classify changes
+        id: classify
+        uses: ./.github/actions/classify-changes
+
   real-transport:
     name: Real transport scripts
+    needs: changes
+    if: always() && needs.changes.outputs.heavy != 'false'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -75,6 +96,8 @@ jobs:
 
   turn:
     name: Backend credentials against coturn
+    needs: changes
+    if: always() && needs.changes.outputs.heavy != 'false'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:

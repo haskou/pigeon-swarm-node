@@ -2,7 +2,6 @@ name: Node.js CI
 
 on:
   pull_request:
-    branches: ['main']
   push:
     branches: ['main']
 
@@ -14,9 +13,31 @@ permissions:
 # script runs in its own step with a timeout, so a hang fails fast and names the
 # script instead of consuming the job limit. `yarn test:ci` remains the local
 # equivalent of the test jobs below.
+#
+# `changes` decides whether the heavy jobs run. Documentation-only changes skip
+# them; skipped jobs keep their names, so required checks still report. Workflow
+# and action changes always run everything. See .github/actions/classify-changes.
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      heavy: ${{ steps.classify.outputs.heavy }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Classify changes
+        id: classify
+        uses: ./.github/actions/classify-changes
+
   static:
     name: Static checks
+    needs: changes
+    if: always() && needs.changes.outputs.heavy != 'false'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -48,6 +69,8 @@ jobs:
 
   unit:
     name: Unit tests
+    needs: changes
+    if: always() && needs.changes.outputs.heavy != 'false'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -65,6 +88,8 @@ jobs:
 
   unit-device-authorization:
     name: Device authorization repository spec
+    needs: changes
+    if: always() && needs.changes.outputs.heavy != 'false'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -82,6 +107,8 @@ jobs:
 
   cucumber:
     name: Cucumber suites
+    needs: changes
+    if: always() && needs.changes.outputs.heavy != 'false'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -111,6 +138,8 @@ jobs:
 
   container:
     name: Container image (non-root smoke)
+    needs: changes
+    if: always() && needs.changes.outputs.heavy != 'false'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
@@ -126,6 +155,8 @@ jobs:
 
   integration:
     name: In-process integration scripts
+    needs: changes
+    if: always() && needs.changes.outputs.heavy != 'false'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
