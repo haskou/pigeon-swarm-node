@@ -126,17 +126,29 @@ describe('private blob store', () => {
       await collect((await reader.open(blobId, downloadToken)).stream),
     ).toBe('0123456789');
 
-    const ranged = await reader.open(blobId, downloadToken, 'bytes=2-4');
+    const ranged = await reader.open(blobId, downloadToken, {
+      first: 2,
+      kind: 'from',
+      last: 4,
+    });
 
     expect(ranged.range).toEqual({ end: 4, start: 2 });
     expect(await collect(ranged.stream)).toBe('234');
     expect(
       await collect(
-        (await reader.open(blobId, downloadToken, 'bytes=-3')).stream,
+        (
+          await reader.open(blobId, downloadToken, {
+            kind: 'suffix',
+            length: 3,
+          })
+        ).stream,
       ),
     ).toBe('789');
     await expect(
-      reader.open(blobId, downloadToken, 'bytes=10-'),
+      reader.open(blobId, downloadToken, { first: 10, kind: 'from' }),
+    ).rejects.toMatchObject({ size: 10 });
+    await expect(
+      reader.open(blobId, downloadToken, { kind: 'invalid' }),
     ).rejects.toMatchObject({ size: 10 });
   });
 
