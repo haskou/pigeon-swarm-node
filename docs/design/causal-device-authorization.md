@@ -235,6 +235,23 @@ the previous behaviour, so no existing signature or document changes.
   `compromisedCredentials` (see Recovery), so the cap also survives the
   checkpoint, and re-enrolling the key on a post-recovery device does not lift it.
 
+## Local domain events (#460)
+
+Device authorization transitions record domain events on the aggregate, and the
+repository returns them with the applied state. The events are local-only: they
+are not published, not replicated and not pushed over WebSocket.
+
+| Transition                       | Event                                                                  |
+| -------------------------------- | ---------------------------------------------------------------------- |
+| `enroll`, `enrollConcurrently`   | `identity_devices.v1.device_authorization.credential_enrolled`         |
+| `revoke`, `revokeConcurrently`   | `identity_devices.v1.device_authorization.credential_revoked`          |
+| `revoke` with `compromisedSince` | also `identity_devices.v1.device_authorization.credential_compromised` |
+| `recover`, `recoverAt`           | `identity_devices.v1.device_authorization.recovered`                   |
+
+Hydration, replay and `requireRecoveryAt` record nothing. Replay discards the
+intermediate states it rebuilds, so only the events of the applied transition
+reach the caller.
+
 ## Residuals
 
 - **Backdating a scoped record's frontier.** Non-operation community and
