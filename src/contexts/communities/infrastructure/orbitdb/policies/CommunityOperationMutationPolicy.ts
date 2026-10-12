@@ -9,7 +9,6 @@ import { InvalidCommunityOperationError } from '../../../domain/errors/InvalidCo
 import { CommunityOperation } from '../../../domain/operations/CommunityOperation';
 import { CommunityOperationArgumentReader } from '../../../domain/operations/CommunityOperationArgumentReader';
 import { CommunityOperationLedger } from '../../../domain/operations/CommunityOperationLedger';
-import { CommunityOperationPrimitives } from '../../../domain/operations/CommunityOperationPrimitives';
 import { CommunityJoinMethod } from '../../../domain/value-objects/CommunityJoinMethod';
 import { CommunityOperationAction } from '../../../domain/value-objects/CommunityOperationAction';
 
@@ -40,9 +39,7 @@ export default class CommunityOperationMutationPolicy extends PublicMutationPoli
 
   private toOperation(record: Record<string, unknown>): CommunityOperation {
     try {
-      return CommunityOperation.fromPrimitives(
-        record as unknown as CommunityOperationPrimitives,
-      );
+      return CommunityOperation.fromPrimitives(record);
     } catch {
       throw new InvalidPublicMutationError();
     }

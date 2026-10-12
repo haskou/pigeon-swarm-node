@@ -1,5 +1,6 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
+import { IdentityPrimitivesShape } from '@app/contexts/identities/domain/IdentityPrimitivesShape';
 import IpfsIdentityMapper from '@app/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { OrbitDBMutationGate } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
@@ -52,11 +53,11 @@ export class OrbitDBIdentityMutationGate extends OrbitDBMutationGate {
   private identityFrom(record: Record<string, unknown>): Identity | undefined {
     const { identity } = record;
 
-    if (typeof identity !== 'object' || identity === null) {
+    if (!IdentityPrimitivesShape.isIdentityPrimitives(identity)) {
       return undefined;
     }
 
-    return Identity.fromPrimitives(identity as IdentityPrimitives);
+    return Identity.fromPrimitives(identity);
   }
 
   private repeatsSignedFields(

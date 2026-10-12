@@ -30,6 +30,17 @@ describe('LocalPrivateCommunityRepository', () => {
     ).rejects.toBeInstanceOf(InvalidPrivateAuthorizationError);
   });
 
+  it('fails closed when a stored role lacks its built-in flag', async () => {
+    authorization.findProjection.mockResolvedValue({
+      ...projection('protected', []),
+      roles: [{ id: 'admin', name: 'Admin', permissions: [] }],
+    });
+
+    await expect(
+      repository.findById(new CommunityId('protected')),
+    ).rejects.toBeInstanceOf(InvalidPrivateAuthorizationError);
+  });
+
   it('lists only protected projections containing the requested member', async () => {
     const identityId = validIdentityId();
     const otherIdentityId = validIdentityId();

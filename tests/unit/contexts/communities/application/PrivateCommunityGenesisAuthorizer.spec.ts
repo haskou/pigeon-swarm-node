@@ -44,6 +44,11 @@ describe('PrivateCommunityGenesisAuthorizer', () => {
     ['public visibility', { visibility: 'public' }],
     ['discovery enabled', { discoverable: true }],
     ['automatic joins enabled', { autoJoinEnabled: true }],
+    ['a missing name', { name: undefined }],
+    [
+      'a role without a built-in flag',
+      { roles: [{ id: 'admin', name: 'Admin', permissions: [] }] },
+    ],
   ])('rejects %s', (_label, change) => {
     expect(() =>
       authorizer.authorize(scopeId, owner, {

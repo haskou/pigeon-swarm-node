@@ -12,14 +12,22 @@ export default class OrbitDBCommunityChannelMessageMapper {
     message: CommunityChannelMessage,
   ): OrbitDBCommunityChannelMessageDocument {
     const primitives = message.toPrimitives();
+    const {
+      editedAt,
+      encryptedPayload,
+      plaintextPayload,
+      pollId,
+      replyToMessageId,
+    } = primitives;
 
-    const document = {
+    // Undefined fields are not part of the signed record.
+    return {
       authorIdentityId: primitives.authorIdentityId,
       channelId: primitives.channelId,
       communityId: primitives.communityId,
       createdAt: primitives.createdAt,
-      editedAt: primitives.editedAt,
-      encryptedPayload: primitives.encryptedPayload,
+      ...(editedAt === undefined ? {} : { editedAt }),
+      ...(encryptedPayload === undefined ? {} : { encryptedPayload }),
       id: CommunityChannelMessageRecordId.of(
         new CommunityId(primitives.communityId),
         new CommunityChannelId(primitives.channelId),
@@ -32,17 +40,12 @@ export default class OrbitDBCommunityChannelMessageMapper {
           : { targetId: mention.targetId, type: mention.type },
       ),
       messageId: primitives.id,
-      plaintextPayload: primitives.plaintextPayload,
-      pollId: primitives.pollId,
-      replyToMessageId: primitives.replyToMessageId,
+      ...(plaintextPayload === undefined ? {} : { plaintextPayload }),
+      ...(pollId === undefined ? {} : { pollId }),
+      ...(replyToMessageId === undefined ? {} : { replyToMessageId }),
       scopeType: 'community_channel',
       type: primitives.type,
     };
-
-    // Undefined fields are not part of the signed record.
-    return Object.fromEntries(
-      Object.entries(document).filter(([, value]) => value !== undefined),
-    ) as unknown as OrbitDBCommunityChannelMessageDocument;
   }
 
   public toDomain(
@@ -56,7 +59,10 @@ export default class OrbitDBCommunityChannelMessageMapper {
       editedAt: document.editedAt,
       encryptedPayload: document.encryptedPayload,
       id: document.messageId,
-      mentions: document.mentions || [],
+      mentions: (document.mentions || []).map((mention) => ({
+        targetId: mention.targetId,
+        type: mention.type,
+      })),
       plaintextPayload: document.plaintextPayload,
       pollId: document.pollId,
       replyToMessageId: document.replyToMessageId,

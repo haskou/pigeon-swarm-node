@@ -5,14 +5,17 @@ import { PrivateControlOperation } from '@app/contexts/private-authorization/dom
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Community } from '../../domain/Community';
+import { CommunityPrimitivesShape } from '../../domain/CommunityPrimitivesShape';
 import { CommunityRoleId } from '../../domain/value-objects/CommunityRoleId';
 
 export default class PrivateCommunityControlApplier extends PrivateControlMutationAuthorizer {
   private community(projection: Record<string, unknown>): Community {
+    if (!CommunityPrimitivesShape.isCommunityPrimitives(projection)) {
+      throw new InvalidPrivateAuthorizationError();
+    }
+
     try {
-      return Community.fromPrimitives(
-        projection as ReturnType<Community['toPrimitives']>,
-      );
+      return Community.fromPrimitives(projection);
     } catch {
       throw new InvalidPrivateAuthorizationError();
     }

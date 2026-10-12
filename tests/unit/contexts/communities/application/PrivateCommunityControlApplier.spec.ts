@@ -40,14 +40,18 @@ describe('PrivateCommunityControlApplier', () => {
     const owner = await KeyPair.generate();
     const ownerDevice = await KeyPair.generate();
     const target = await KeyPair.generate();
-    ownerIdentityId = owner.toPrimitives().publicKey.replace(
-      /-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s/g,
-      '',
-    );
-    targetIdentityId = target.toPrimitives().publicKey.replace(
-      /-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s/g,
-      '',
-    );
+    ownerIdentityId = owner
+      .toPrimitives()
+      .publicKey.replace(
+        /-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s/g,
+        '',
+      );
+    targetIdentityId = target
+      .toPrimitives()
+      .publicKey.replace(
+        /-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s/g,
+        '',
+      );
     ownerDeviceKey = deviceKeyFor(ownerDevice);
     checkpoint = PrivateAuthorizationCheckpoint.genesis({
       admittedDeviceKeys: [ownerDeviceKey],
@@ -108,12 +112,21 @@ describe('PrivateCommunityControlApplier', () => {
     projection = {
       ...projection,
       roles: [
-        { id: roleId, name: 'Moderator', permissions: ['manage_members'] },
+        {
+          builtIn: false,
+          id: roleId,
+          name: 'Moderator',
+          permissions: ['manage_members'],
+        },
       ],
     };
     const assigned = await applier.apply(
       checkpoint,
-      operation({ roleIds: [roleId], targetIdentityId, type: 'member.roles.set' }),
+      operation({
+        roleIds: [roleId],
+        targetIdentityId,
+        type: 'member.roles.set',
+      }),
       projection,
     );
     const removed = await applier.apply(
@@ -142,10 +155,12 @@ describe('PrivateCommunityControlApplier', () => {
   it('applies identical community permission checks to any accepted ingress', async () => {
     const member = await KeyPair.generate();
     const memberDevice = await KeyPair.generate();
-    const memberIdentityId = member.toPrimitives().publicKey.replace(
-      /-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s/g,
-      '',
-    );
+    const memberIdentityId = member
+      .toPrimitives()
+      .publicKey.replace(
+        /-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s/g,
+        '',
+      );
     const memberDeviceKey = deviceKeyFor(memberDevice);
     const memberCheckpoint = PrivateAuthorizationCheckpoint.genesis({
       admittedDeviceKeys: [memberDeviceKey],
