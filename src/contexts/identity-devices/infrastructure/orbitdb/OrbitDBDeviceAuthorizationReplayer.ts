@@ -1,4 +1,5 @@
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
+import { DeviceAuthorizationCandidate } from '@app/contexts/identity-devices/domain/DeviceAuthorizationCandidate';
 import { DeviceAuthorizationTimeline } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTimeline';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
@@ -13,6 +14,9 @@ import { OrbitDBDeviceAuthorizationTransitionRecord } from './documents/OrbitDBD
 import OrbitDBDeviceAuthorizationCanonicalizer from './OrbitDBDeviceAuthorizationCanonicalizer';
 import OrbitDBDeviceAuthorizationSources from './OrbitDBDeviceAuthorizationSources';
 
+type RecordCandidate =
+  DeviceAuthorizationCandidate<OrbitDBDeviceAuthorizationTransitionRecord>;
+
 export default class OrbitDBDeviceAuthorizationReplayer {
   public constructor(
     private readonly policy: DeviceAuthorizationPolicy,
@@ -20,165 +24,36 @@ export default class OrbitDBDeviceAuthorizationReplayer {
     private readonly sources: OrbitDBDeviceAuthorizationSources,
   ) {}
 
-  private transitionRecordsByRevision(
+  private candidatesOf(
     history: OrbitDBDeviceAuthorizationTransitionRecord[],
-  ): Map<number, OrbitDBDeviceAuthorizationTransitionRecord[]> {
-    const recordsByRevision = new Map<
-      number,
-      OrbitDBDeviceAuthorizationTransitionRecord[]
-    >();
+  ): RecordCandidate[] {
+    const candidates: RecordCandidate[] = [];
 
     for (const record of history) {
-      const revision = record.transition.previousRevision;
-      const records = recordsByRevision.get(revision) ?? [];
+      const transition = this.parsedTransitionOf(record);
 
-      records.push(record);
-      recordsByRevision.set(revision, records);
-    }
-
-    for (const records of recordsByRevision.values()) {
-      records.sort((left, right) => {
-        const operationOrder = left.transition.operationId.localeCompare(
-          right.transition.operationId,
-        );
-
-        return (
-          operationOrder ||
-          this.canonicalizer
-            .serialize(left)
-            .localeCompare(this.canonicalizer.serialize(right))
-        );
-      });
-    }
-
-    return recordsByRevision;
-  }
-
-  private concurrentAuthorizations(
-    authorization: DeviceAuthorization,
-    candidates: Array<{
-      authorization: DeviceAuthorization;
-      transition: DeviceAuthorizationTransition;
-    }>,
-  ): DeviceAuthorization[] {
-    const recoveries = candidates.filter(({ transition }) =>
-      transition.isRecovery(),
-    );
-
-    if (recoveries.length > 0) {
-      return [recoveries[0].authorization];
-    }
-
-    const revocations = candidates.filter(({ transition }) =>
-      transition.isRevocation(),
-    );
-
-    if (revocations.length > 0) {
-      return [
-        authorization.revokeConcurrently(
-          revocations.map(({ transition }) => transition.getTargetCredential()),
-        ),
-      ];
-    }
-
-    return [
-      authorization.enrollConcurrently(
-        candidates.map(({ transition }) => transition.getTargetCredential()),
-      ),
-    ];
-  }
-
-  private compactEquivalentCandidates(
-    candidates: Array<{
-      authorization: DeviceAuthorization;
-      record: OrbitDBDeviceAuthorizationTransitionRecord;
-      transition: DeviceAuthorizationTransition;
-    }>,
-  ): Array<{
-    authorization: DeviceAuthorization;
-    record: OrbitDBDeviceAuthorizationTransitionRecord;
-    transition: DeviceAuthorizationTransition;
-  }> {
-    const candidatesByEffect = new Map<string, (typeof candidates)[number]>();
-
-    for (const candidate of candidates) {
-      const effect = this.canonicalizer.serialize({
-        compromisedSince: candidate.transition.getCompromisedSince()?.valueOf(),
-        operation: candidate.transition.getOperation().valueOf(),
-        previousRevision: candidate.transition.getPreviousRevision().valueOf(),
-        targetCredential: candidate.transition.getTargetCredential().valueOf(),
-      });
-      const current = candidatesByEffect.get(effect);
-
-      if (
-        !current ||
-        this.canonicalizer.serialize(candidate.record) <
-          this.canonicalizer.serialize(current.record)
-      ) {
-        candidatesByEffect.set(effect, candidate);
+      if (transition) {
+        candidates.push({
+          encoding: this.canonicalizer.serialize(record),
+          payload: record,
+          transition,
+        });
       }
     }
 
-    return [...candidatesByEffect.values()];
+    return candidates;
   }
 
-  private replayFrom(
-    authorization: DeviceAuthorization,
-    recordsByRevision: Map<
-      number,
-      OrbitDBDeviceAuthorizationTransitionRecord[]
-    >,
-    states?: DeviceAuthorization[],
-  ): OrbitDBDeviceAuthorizationReplay {
-    const records =
-      recordsByRevision.get(authorization.getRevision().valueOf()) ?? [];
-    const candidates: Array<{
-      authorization: DeviceAuthorization;
-      record: OrbitDBDeviceAuthorizationTransitionRecord;
-      transition: DeviceAuthorizationTransition;
-    }> = [];
-
-    for (const record of records) {
-      try {
-        const transition = this.transitionFromRecord(record);
-
-        if (transition) {
-          candidates.push({
-            authorization: this.policy.apply(authorization, transition),
-            record,
-            transition,
-          });
-        }
-      } catch {
-        continue;
-      }
+  private parsedTransitionOf(
+    record: OrbitDBDeviceAuthorizationTransitionRecord,
+  ): DeviceAuthorizationTransition | undefined {
+    try {
+      return this.transitionFromRecord(record);
+    } catch {
+      // A malformed record never enters the replay. A transition the policy
+      // rejects is excluded by its explicit application outcome instead.
+      return undefined;
     }
-
-    const compactedCandidates = this.compactEquivalentCandidates(candidates);
-
-    if (compactedCandidates.length === 0) {
-      return { authorization, history: [] };
-    }
-
-    const [checkpoint] = this.concurrentAuthorizations(
-      authorization,
-      compactedCandidates,
-    );
-
-    assert(
-      checkpoint !== undefined,
-      new InvalidDeviceAuthorizationTransitionError(),
-    );
-    states?.push(checkpoint);
-    const replay = this.replayFrom(checkpoint, recordsByRevision, states);
-
-    return {
-      authorization: replay.authorization,
-      history: [
-        ...compactedCandidates.map(({ record }) => record),
-        ...replay.history,
-      ],
-    };
   }
 
   /**
@@ -201,12 +76,11 @@ export default class OrbitDBDeviceAuthorizationReplayer {
           authorization: genesis,
           compromisedSince: new Map<string, number>(),
         };
-    const states = [base.authorization];
-    const replay = this.replayFrom(
+    const replay = this.policy.replay(
       base.authorization,
-      this.transitionRecordsByRevision(history),
-      states,
+      this.candidatesOf(history),
     );
+    const states = [base.authorization, ...replay.checkpoints];
     const { compromisedSince } = base;
     const cap = (credential: string, since: number): void => {
       compromisedSince.set(
@@ -218,7 +92,9 @@ export default class OrbitDBDeviceAuthorizationReplayer {
       );
     };
 
-    for (const { transition } of replay.history) {
+    for (const {
+      payload: { transition },
+    } of replay.accepted) {
       for (const entry of transition.compromisedCredentials ?? []) {
         cap(entry.credential, entry.compromisedSince);
       }
@@ -266,9 +142,12 @@ export default class OrbitDBDeviceAuthorizationReplayer {
     genesis: DeviceAuthorization,
     history: OrbitDBDeviceAuthorizationTransitionRecord[],
   ): OrbitDBDeviceAuthorizationReplay {
-    const recordsByRevision = this.transitionRecordsByRevision(history);
+    const replay = this.policy.replay(genesis, this.candidatesOf(history));
 
-    return this.replayFrom(genesis, recordsByRevision);
+    return {
+      authorization: replay.authorization,
+      history: replay.accepted.map(({ payload }) => payload),
+    };
   }
 
   /**
