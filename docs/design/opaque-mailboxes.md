@@ -180,6 +180,16 @@ Policy:
   revoked (`409`).
 - A reader added later starts at cursor `0` and receives the retained backlog.
   Envelopes deleted before it joined are not recoverable.
+- Realtime: revoking a reader closes its hint subscriptions at once; deleting a
+  mailbox, including by retention, closes all of them. The socket stays open.
+- Root authority is a bearer secret the owner's devices hold, so the node cannot
+  revoke it per device. To cut it off, the owner rotates the root key, registers
+  the new root-derived hash with `POST /readers`, then loops `GET /readers` and
+  `DELETE`s every hash outside {owner hash, new root hash} until a `GET` shows
+  none. Live devices then re-register their per-device tokens. This is a client
+  procedure; the node adds no endpoint.
+- Product decision: reader slots are not tied to device credentials at the node,
+  because that would link mailboxes to identities, which the node never observes.
 
 Threat model:
 

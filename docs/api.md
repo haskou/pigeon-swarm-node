@@ -1623,8 +1623,8 @@ Node-local queues of opaque ciphertext envelopes. Mailboxes are never written to
 | `POST /mailboxes/{mailboxId}/ack` | `Bearer <readToken>` | Body `{ upTo }`. Records this reader's cursor, only forward and capped at the newest envelope. Envelopes up to and including `upTo` are deleted once every reader has acked them. `204`. |
 | `GET /mailboxes/{mailboxId}/readers` | `Bearer <readToken>` | `200` with `{ maxReaders, readers: [{ ackedCursor, readTokenHash }] }`. Lists reader hashes and each reader's acknowledged cursor, never tokens. `Cache-Control: no-store`. `404` for an unknown mailbox or wrong capability. |
 | `POST /mailboxes/{mailboxId}/readers` | `Bearer <readToken>` | Body `{ readTokenHash }` (hex SHA-256 of the new device's read token). Adds a reader with nothing acknowledged, so it receives the retained backlog. `201` added, `200` already a reader, `409` at `MAILBOX_MAX_READERS`, `404` for a post token or wrong capability. |
-| `DELETE /mailboxes/{mailboxId}/readers/{readTokenHash}` | `Bearer <readToken>` | Revokes that reader. `204`. `404` for an unknown reader hash. `409` for the last reader, which cannot be revoked. Envelopes it was holding back are deleted once the remaining readers have acked them. |
-| `DELETE /mailboxes/{mailboxId}` | `Bearer <readToken>` | Deletes the mailbox and its envelopes. `204`. |
+| `DELETE /mailboxes/{mailboxId}/readers/{readTokenHash}` | `Bearer <readToken>` | Revokes that reader. `204`. `404` for an unknown reader hash. `409` for the last reader, which cannot be revoked. Envelopes it was holding back are deleted once the remaining readers have acked them. Closes that reader's realtime subscriptions. |
+| `DELETE /mailboxes/{mailboxId}` | `Bearer <readToken>` | Deletes the mailbox and its envelopes. `204`. Closes every realtime subscription to it. |
 
 - `mailboxId` is 32 bytes base64url; capabilities are sent only in `Authorization`, never the URL.
 - A wrong, swapped or missing capability, a malformed id and an unknown mailbox all return the same `404`.
@@ -1640,6 +1640,7 @@ Node-local queues of opaque ciphertext envelopes. Mailboxes are never written to
 - Silent-device trade-off: a reader that stops acking holds every envelope above its cursor until `MAILBOX_RETENTION_MS` expires them. While it is silent the mailbox can fill to `MAILBOX_MAX_ENVELOPES` or `MAILBOX_MAX_BYTES`, and appends return `409`. Memory stays bounded. Revoking the silent reader frees its backlog at once. The node cannot tell a lost device from a sleeping one, so it never revokes automatically.
 - Late reader: a reader added after envelopes were deleted sees only the retained backlog. Deleted envelopes are not recoverable.
 - Realtime: `mailbox_subscribe` over the authenticated WebSocket with `mailboxId` and `readToken`; a wrong or missing capability is ignored, like an unknown mailbox. The node pushes `{ "type": "mailbox_envelope", "mailboxId", "cursor" }` to subscribed sockets for each envelope appended on that node. The hint is content-free: clients must GET the mailbox envelopes, which remain the source of truth. There is no subscription ack and no unsubscribe message; closing the socket ends its subscriptions. A socket holds at most 256 subscriptions.
+- Revocation ends realtime: revoking a reader closes its hint subscriptions at once, and deleting a mailbox (including by retention) closes all of them. The socket stays open.
 - Status: client key schedule, send/receive and cursor recovery are merged in `pigeon-swarm-ui` (#252, #257). Not yet done: mailbox key rotation, direct-message wiring (#258), wrapper integration, and retiring the replicated message collections.
 
 ## Private Blob HTTP API
