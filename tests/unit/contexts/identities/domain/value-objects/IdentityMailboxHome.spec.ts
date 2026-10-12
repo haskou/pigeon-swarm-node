@@ -6,19 +6,26 @@ describe('IdentityMailboxHome', () => {
     'https://node.example',
     'https://node.example:8443',
     'http://localhost:3000',
-  ])('should accept the origin %s', (origin) => {
-    expect(new IdentityMailboxHome(origin).valueOf()).toBe(origin);
+    'https://node.example/api',
+    'https://node.example:8443/pigeon/api',
+  ])('should accept the base URL %s', (baseUrl) => {
+    expect(new IdentityMailboxHome(baseUrl).valueOf()).toBe(baseUrl);
   });
 
   it.each([
     ['an empty string', ''],
     ['a bare host', 'node.example'],
     ['an unsupported scheme', 'ftp://node.example'],
-    ['a trailing slash', 'https://node.example/'],
-    ['a path', 'https://node.example/api'],
-    ['a query', 'https://node.example?x=1'],
-    ['a fragment', 'https://node.example#x'],
-    ['user information', 'https://user:secret@node.example'],
+    ['a trailing slash on the origin', 'https://node.example/'],
+    ['a trailing slash on a path', 'https://node.example/api/'],
+    ['a dot segment', 'https://node.example/api/../admin'],
+    ['an empty path segment', 'https://node.example//api'],
+    ['an uppercase host', 'https://NODE.example'],
+    ['a default port', 'https://node.example:443'],
+    ['a query', 'https://node.example/api?x=1'],
+    ['an empty query', 'https://node.example/api?'],
+    ['a fragment', 'https://node.example/api#x'],
+    ['user information', 'https://user:secret@node.example/api'],
     ['surrounding whitespace', ' https://node.example'],
     ['a value over the length bound', `https://${'a'.repeat(250)}.example`],
   ])('should reject %s', (_description, value) => {
