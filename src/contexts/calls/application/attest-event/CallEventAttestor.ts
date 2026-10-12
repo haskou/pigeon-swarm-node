@@ -1,4 +1,5 @@
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { Timestamp } from '@haskou/value-objects';
 
 import { CallEventAttestation } from '../../domain/CallEventAttestation';
 import CallRepository from '../../domain/repositories/CallRepository';
@@ -29,7 +30,8 @@ export default class CallEventAttestor {
 
     if (!callId) return undefined;
 
-    const deadline = Date.now() + CallEventAttestor.ADMISSION_WAIT_MS;
+    const deadline =
+      Timestamp.now().toMilliseconds() + CallEventAttestor.ADMISSION_WAIT_MS;
 
     for (;;) {
       const call = (await this.repository.hasById(callId))
@@ -39,7 +41,7 @@ export default class CallEventAttestor {
 
       if (attested) return attested;
 
-      const remaining = deadline - Date.now();
+      const remaining = deadline - Timestamp.now().toMilliseconds();
 
       if (
         remaining <= 0 ||

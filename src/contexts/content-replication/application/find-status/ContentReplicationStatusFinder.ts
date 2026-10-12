@@ -1,6 +1,7 @@
 import { NodePeer } from '@app/contexts/nodes/domain/NodePeer';
 import NodePeerRepository from '@app/contexts/nodes/domain/repositories/NodePeerRepository';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import { Timestamp } from '@haskou/value-objects';
 import { createHash } from 'crypto';
 
 import { ContentReplication } from '../../domain/ContentReplication';
@@ -121,7 +122,8 @@ export default class ContentReplicationStatusFinder {
       this.localNodeId(),
       this.nodePeerRepository.findActive(
         new Date(
-          Date.now() - ContentReplicationStatusFinder.ACTIVE_PEER_WINDOW_MS,
+          Timestamp.now().toMilliseconds() -
+            ContentReplicationStatusFinder.ACTIVE_PEER_WINDOW_MS,
         ),
       ),
     ]);
