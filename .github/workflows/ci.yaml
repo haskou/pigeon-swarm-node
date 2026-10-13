@@ -232,6 +232,14 @@ jobs:
         run: yarn test:e2e:real-transport:realtime-ticket
         timeout-minutes: 4
 
+      - name: Device sealed secret bundle vectors
+        run: yarn test:e2e:real-transport:sealed-secret-bundle
+        timeout-minutes: 4
+
+      - name: Signed HTTP request vectors
+        run: yarn test:e2e:real-transport:signed-http-request
+        timeout-minutes: 4
+
       - name: Mailbox two-node proof
         run: yarn test:e2e:real-transport:mailbox-two-node
         timeout-minutes: 4

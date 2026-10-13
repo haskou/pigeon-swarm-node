@@ -74,6 +74,21 @@ checked by the `SignedHttpRequestVectors` unit spec. They cover a lowercase
 method, a request without a body, and a raw binary body, and they require that a
 changed path, method, body or timestamp is rejected.
 
+Because each vector carries a fixed timestamp, a live node refuses it as stale,
+so the vectors are pinned against a real node by
+`tests/e2e/real-transport/signed-http-request.ts`
+(`yarn test:e2e:real-transport:signed-http-request`). The script first rebuilds
+every vector's `signingContent` and signature byte for byte with `node:crypto`
+only (body hash, key order, Ed25519 from the fixture key), without the node's
+canonicalization code. It then publishes an identity for the fixture key,
+re-signs the same request shapes with a fresh `Date.now()` timestamp and sends
+them to real signed endpoints: a body-less `GET /notification-settings/`, a
+JSON `POST /private-blobs` and a raw binary `POST /ipfs/public` with the
+vector's bytes. All are accepted. The fixed vector timestamp, a timestamp
+outside the window in either direction, a JSON or binary body changed after
+signing, another path or method than signed, and a replayed `POST` are each
+refused with `401` and code `401020`.
+
 ## Public mutation proof (authorization revision)
 
 Every client-signed record (`SignedPublicMutation`) is a proof body plus its
@@ -6077,6 +6092,19 @@ Success returns `200`:
 The response never includes other devices' entries, the authorized-device list,
 head commitments or decrypted material. Recipients verify `signature` against
 `publisherCredential` and the preimage above; the node is not trusted for that.
+
+Byte-exact vectors for the entry preimage, its Ed25519 signature, credential
+normalization and accepted or rejected bundles are in
+[`tests/fixtures/device-sealed-secret-vectors.json`](../tests/fixtures/device-sealed-secret-vectors.json),
+checked by the `DeviceSealedSecretVectors` unit spec against the domain code.
+`tests/e2e/real-transport/device-sealed-secret-bundle.ts`
+(`yarn test:e2e:real-transport:sealed-secret-bundle`) rebuilds the preimages
+and signatures with `node:crypto` only, publishes the vector identity on a real
+node and submits the vector bundle over HTTP. The node accepts it and returns
+the vector signature from `GET`. The fixture's rejected bundles and a flipped
+signature byte get `409` with code `InvalidDeviceSealedSecretSignatureError`,
+and a republished generation gets `DeviceSealedSecretGenerationStaleError`.
+Sealed secrets are node-local, so there is no second-node assertion.
 
 ## Planned API
 
