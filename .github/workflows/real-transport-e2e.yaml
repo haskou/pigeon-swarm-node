@@ -110,6 +110,10 @@ jobs:
         run: yarn test:e2e:real-transport:identity-admission-load
         timeout-minutes: 4
 
+      - name: Restart with a missing log block proof
+        run: yarn test:e2e:real-transport:restart-missing-block
+        timeout-minutes: 5
+
   turn:
     name: Backend credentials against coturn
     needs: changes
