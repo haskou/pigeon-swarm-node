@@ -25,7 +25,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/IdentityResource'
         '400':
-          description: Invalid body, or an admissionNonce below the difficulty this node asks while a network is busy here. A short proof gets `requiredDifficultyBits`; mine again at that difficulty and retry.
+          description: Invalid body, or an admissionNonce below the difficulty this node asks while a network is busy (admissions this node accepted plus fresh ones replicated from other nodes), or 20 bits when the identity timestamp is more than 10 minutes from the node clock. A short proof gets `requiredDifficultyBits`; mine again at that difficulty and retry.
           content:
             application/json:
               schema:
@@ -92,7 +92,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/IdentityResource'
         '400':
-          description: Invalid body, or an admissionNonce below the difficulty this node asks for networks the update adds while they are busy here. A short proof gets `requiredDifficultyBits`. Updates that keep their networks are never asked for more.
+          description: Invalid body, or an admissionNonce below the difficulty this node asks for networks the update adds while they are busy (admissions this node accepted plus fresh ones replicated from other nodes), or 20 bits for added networks when the identity timestamp is more than 10 minutes from the node clock. A short proof gets `requiredDifficultyBits`. Updates that keep their networks are never asked for more.
           content:
             application/json:
               schema:

@@ -125,22 +125,39 @@ charge each client address against `IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_M
 cannot spend the identity or network counters. The count is in memory and local
 to the node, and it is keyed by address, not by network.
 
-Load-adaptive difficulty (API only): `IdentityPublisher` asks more of the proof
-while a network is busy on this node. For each network an identity enters
-through this node's API (all networks of a genesis, only the added ones of an
-update), `LocalIdentityAdmissionLoadRepository` counts the admissions this node
-accepted into it in a fixed 60 s window, keyed by network id only. Up to
-`IdentityAdmissionDifficulty.FREE_ADMISSIONS_PER_WINDOW` (60) the floor of 16
-bits applies; beyond that one bit is added per doubling of the count (60: 17,
+Load-adaptive difficulty: `IdentityPublisher` asks more of the proof while a
+network is busy. For each network an identity enters (all networks of a
+genesis, only the added ones of an update), `LocalIdentityAdmissionLoadRepository`
+counts the admissions into it in a fixed 60 s window, keyed by network id only.
+Up to `IdentityAdmissionDifficulty.FREE_ADMISSIONS_PER_WINDOW` (60) the floor of
+16 bits applies; beyond that one bit is added per doubling of the count (60: 17,
 120: 18, 240: 19, 480 and above: 20, `MAX_BITS`), and the hardest network sets
 the requirement. A proof below it gets `400` with `requiredDifficultyBits`, so
 the client mines again. A published version is charged after it is saved;
 rejected or failed publications charge nothing. Updates that keep their
 networks reuse their proof and are never asked for more. Normal use pays no
-extra latency: at fewer than 60 new admissions per minute into a network on
-one node, the requirement stays at the floor. This is admission policy, not a
-validity rule: the gate and chain validation still check every record at 16
-bits, so validity converges while each node prices its own API.
+extra latency: at fewer than 60 new admissions per minute into a network, the
+requirement stays at the floor. This is admission policy, not a validity rule:
+the gate and chain validation still check every record at 16 bits, so validity
+converges while each node prices its own API.
+
+Network-wide load: the count includes admissions other nodes accepted, so every
+node prices from the rate of the whole network, not only its own API.
+`OrbitDBIdentityAdmissionObservationProjection` hands each identity version
+replicating in to `IdentityAdmissionObserver`, which charges the networks the
+version enters when it is fresh (signed within
+`IdentityAdmissionDifficulty.FRESHNESS_HORIZON_MS`, 10 minutes, of this node's
+clock), its cid is the canonical one for its content, and its proof meets what
+this node currently asks. Stale records are skipped on their signed time before
+any signature or cid work, so replaying history or bootstrapping a store costs
+nothing; forged cid copies of one version cannot be counted twice, and
+underpaid floods cannot raise honest prices. The repository counts each
+version once per network: it keeps a sighting per `(network, cid)` for twice the
+horizon, the longest a version can stay fresh, so a version admitted locally and
+then replicated back, or seen again after a restart, is not counted again.
+Backdating does not dodge observation cheaply: the API asks the 20-bit maximum
+of any admission signed outside the horizon that enters a network. Updates that
+enter no network keep the floor whatever their timestamp.
 
 ## Order and convergence
 
@@ -161,6 +178,7 @@ heal yields the same owner and the same latest identity.
 | Admissions per network per minute on this node        | `IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE`, default 0 (off), `429` code `429041`                           |
 | Admissions per client address per minute on this node | `IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE`, default 30, `429` code `429042`                                 |
 | Admission proof asked through this node's API         | 16 bits up to 60 admissions per network per minute, +1 bit per doubling, max 20; `400` with `requiredDifficultyBits` |
+| Admission freshness horizon                           | 10 minutes either side of this node's clock; outside it the API asks 20 bits and observers never count it            |
 
 The protocol admission cost is a fixed constant. Difficulty derived from
 observed load or record counts would not converge as a validity rule, because
@@ -168,7 +186,10 @@ nodes see different record subsets; that is why load only raises what a node
 asks through its own API (above) and never what it accepts over replication. A
 network-wide admission cap is not enforced either: 16-bit proofs are cheap to
 produce, so a convergent cap turns a sybil flood into a registration outage for
-everyone (DoS amplification). The per-node network quota is off by default for
+everyone (DoS amplification). Counting observed admissions bounds the
+network-wide rate by price instead: every node raises its price as the whole
+network admits more, so a flood spread over many nodes or addresses gets dearer
+everywhere and nobody is refused. The per-node network quota is off by default for
 the same reason: it lets a flood at one node block registrations there for the
 window, where adaptive difficulty only makes them dearer. Measured proof cost
 (Node `sha256`, mean nonce about 66k): 16 bits median 41 ms (p90 157 ms, max
@@ -217,7 +238,12 @@ claiming that handle, which is the sybil non-goal below.
   and `IdentityPublisher.spec.ts` (raised requirement, charging after save,
   network-keeping updates exempt); the busy-network POST scenarios in
   `PostIdentityRoute.feature`.
-- `yarn test:integration:forged-identities` (real-transport e2e).
+- `IdentityAdmissionPricingDomainService.spec.ts`, `IdentityAdmissionObserver.spec.ts`
+  and `OrbitDBIdentityAdmissionObservationProjection.spec.ts`: observed
+  admissions are counted once, only when fresh, canonical and paid; the stale
+  POST scenario in `PostIdentityRoute.feature`.
+- `yarn test:integration:forged-identities` and
+  `yarn test:e2e:real-transport:identity-admission-load` (real-transport e2e).
 
 ## Remaining non-goals
 
@@ -227,11 +253,23 @@ claiming that handle, which is the sybil non-goal below.
   but not prevented; only an admission authority could do that. The caps bound
   the cost to honest nodes.
 - GPU-scale minting is slowed by a constant factor, not stopped. Adaptive
-  difficulty and the per-source limit bind only the HTTP routes of each node:
-  an attacker publishing through their own node, or straight into replication,
-  pays the 16-bit floor, and an attacker with many addresses spread over many
-  nodes stays below each node's free allowance. No convergent network-wide
-  bound on minting exists without an admission authority.
+  difficulty and the per-source limit bind only the HTTP routes of each node.
+  The network-wide count makes admissions through every honest node's API
+  dearer as the whole network admits more, but an attacker publishing through
+  their own node, or straight into replication, still pays only the 16-bit
+  floor: their records stay valid, observers merely do not count the ones that
+  paid less than they ask or are signed outside the horizon, so such a flood
+  does not raise honest prices either. Observed load is advisory: there is no
+  validity-level cap, and no convergent network-wide bound on minting exists
+  without an admission authority.
+- A flood that pays the current price raises the price for honest clients of
+  that network on every node that sees it, up to 20 bits (about 0.8 s on a
+  laptop, several seconds on mobile). This is the intended trade: dearer, never
+  refused.
+- Observation is eventual. A partition delays it, a node that joins sees the
+  fresh admissions of the last horizon at once, and losing the local database
+  can count a version seen in the last horizon once more. An update whose
+  previous version this node does not retain is charged for all its networks.
 - A handle is a claim, not an authority: the identity id (public key) remains
   the authoritative reference.
 - The identity-key holder can equivocate on its own genesis; a peer without the
