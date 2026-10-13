@@ -1,0 +1,168 @@
+{
+  "algorithms": {
+    "bodyHash": "lowercase hex SHA-256 of the raw body bytes when the body is a Buffer, otherwise of utf8(JSON.stringify(body || {})).",
+    "canonicalPayload": "canonicalSignedRequestPayload(method, path, timestamp, body): object with keys bodyHash, method (upper-cased), path, timestamp in this order.",
+    "signature": "Ed25519 over utf8(JSON.stringify(canonicalPayload)), standard base64 with padding.",
+    "signingContent": "JSON.stringify(canonicalPayload)."
+  },
+  "cases": [
+    {
+      "derived": {
+        "canonicalPayload": {
+          "bodyHash": "a0e6bf8991482606b5d4e23e5aa4ede95dbefb95f70d4da54c17ee31f5e6263a",
+          "method": "POST",
+          "path": "/conversations/conv-1/messages",
+          "timestamp": 1778536870557
+        },
+        "signature": "Lzh8yYf36NhFfjDNMKezu3HiL9c+9w36iI6ZEEclVmd8NAd8jhi0uQ9qGiE15a6wThnJxBtEpndIUu9aUbIXCQ==",
+        "signingContent": "{\"bodyHash\":\"a0e6bf8991482606b5d4e23e5aa4ede95dbefb95f70d4da54c17ee31f5e6263a\",\"method\":\"POST\",\"path\":\"/conversations/conv-1/messages\",\"timestamp\":1778536870557}"
+      },
+      "headers": {
+        "x-identity-id": "MCowBQYDK2VwAyEAHINjqiTxz/1T6rJjkG8ywJVJjSih9iy/YFVChpz3lec=",
+        "x-signature": "Lzh8yYf36NhFfjDNMKezu3HiL9c+9w36iI6ZEEclVmd8NAd8jhi0uQ9qGiE15a6wThnJxBtEpndIUu9aUbIXCQ==",
+        "x-timestamp": "1778536870557"
+      },
+      "input": {
+        "body": {
+          "messageId": "msg-1",
+          "text": "hello"
+        },
+        "method": "post",
+        "name": "json body with a lowercase method",
+        "path": "/conversations/conv-1/messages",
+        "timestamp": 1778536870557
+      },
+      "name": "json body with a lowercase method"
+    },
+    {
+      "derived": {
+        "canonicalPayload": {
+          "bodyHash": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "method": "GET",
+          "path": "/identities/alice",
+          "timestamp": 1778536870558
+        },
+        "signature": "JzBIhR3SydfrNUJRBuegeKcY+0/rTIZoOuZA0cCAFM6zu9gMrrTsUL7DT6rV/0LaTvw/njLRqfQo4M/GjXe1DQ==",
+        "signingContent": "{\"bodyHash\":\"44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a\",\"method\":\"GET\",\"path\":\"/identities/alice\",\"timestamp\":1778536870558}"
+      },
+      "headers": {
+        "x-identity-id": "MCowBQYDK2VwAyEAHINjqiTxz/1T6rJjkG8ywJVJjSih9iy/YFVChpz3lec=",
+        "x-signature": "JzBIhR3SydfrNUJRBuegeKcY+0/rTIZoOuZA0cCAFM6zu9gMrrTsUL7DT6rV/0LaTvw/njLRqfQo4M/GjXe1DQ==",
+        "x-timestamp": "1778536870558"
+      },
+      "input": {
+        "method": "GET",
+        "name": "request without a body",
+        "path": "/identities/alice",
+        "timestamp": 1778536870558
+      },
+      "name": "request without a body"
+    },
+    {
+      "derived": {
+        "canonicalPayload": {
+          "bodyHash": "d4f5ce33d4008a25a8a601149ada8fe648a8e6f450f38edea8a06aa35cbc6411",
+          "method": "PUT",
+          "path": "/private-blobs/blob-1",
+          "timestamp": 1778536870559
+        },
+        "signature": "HWCCBde12n+GatVd+qmMxrfNN6gLxvmFO6uu05SznGDda8mFaUKMwJ/7Btt57+C8lCjj2WfNzL8yXCJU79eZBQ==",
+        "signingContent": "{\"bodyHash\":\"d4f5ce33d4008a25a8a601149ada8fe648a8e6f450f38edea8a06aa35cbc6411\",\"method\":\"PUT\",\"path\":\"/private-blobs/blob-1\",\"timestamp\":1778536870559}"
+      },
+      "headers": {
+        "x-identity-id": "MCowBQYDK2VwAyEAHINjqiTxz/1T6rJjkG8ywJVJjSih9iy/YFVChpz3lec=",
+        "x-signature": "HWCCBde12n+GatVd+qmMxrfNN6gLxvmFO6uu05SznGDda8mFaUKMwJ/7Btt57+C8lCjj2WfNzL8yXCJU79eZBQ==",
+        "x-timestamp": "1778536870559"
+      },
+      "input": {
+        "bodyBase64": "AAECA/r/",
+        "method": "put",
+        "name": "raw binary body hashed over its bytes",
+        "path": "/private-blobs/blob-1",
+        "timestamp": 1778536870559
+      },
+      "name": "raw binary body hashed over its bytes"
+    }
+  ],
+  "description": "Fixed, byte-exact vectors for the signed HTTP request canonical form (canonicalSignedRequestPayload) and the SignedHttpRequestVerifier outcome. The UI request signer pins the same signingContent and signature bytes.",
+  "key": {
+    "identityId": "MCowBQYDK2VwAyEAHINjqiTxz/1T6rJjkG8ywJVJjSih9iy/YFVChpz3lec=",
+    "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIP3kKxnXmXzLVG88no3oeHOU0sjsv9TkwQgAnjUrph03\n-----END PRIVATE KEY-----\n",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAHINjqiTxz/1T6rJjkG8ywJVJjSih9iy/YFVChpz3lec=\n-----END PUBLIC KEY-----\n",
+    "seedHex": "fde42b19d7997ccb546f3c9e8de8787394d2c8ecbfd4e4c108009e352ba61d37"
+  },
+  "rejected": [
+    {
+      "headers": {
+        "x-identity-id": "MCowBQYDK2VwAyEAHINjqiTxz/1T6rJjkG8ywJVJjSih9iy/YFVChpz3lec=",
+        "x-signature": "Lzh8yYf36NhFfjDNMKezu3HiL9c+9w36iI6ZEEclVmd8NAd8jhi0uQ9qGiE15a6wThnJxBtEpndIUu9aUbIXCQ==",
+        "x-timestamp": "1778536870557"
+      },
+      "input": {
+        "body": {
+          "messageId": "msg-1",
+          "text": "hello"
+        },
+        "method": "post",
+        "name": "json body with a lowercase method",
+        "path": "/conversations/conv-2/messages",
+        "timestamp": 1778536870557
+      },
+      "name": "path changed after signing"
+    },
+    {
+      "headers": {
+        "x-identity-id": "MCowBQYDK2VwAyEAHINjqiTxz/1T6rJjkG8ywJVJjSih9iy/YFVChpz3lec=",
+        "x-signature": "Lzh8yYf36NhFfjDNMKezu3HiL9c+9w36iI6ZEEclVmd8NAd8jhi0uQ9qGiE15a6wThnJxBtEpndIUu9aUbIXCQ==",
+        "x-timestamp": "1778536870557"
+      },
+      "input": {
+        "body": {
+          "messageId": "msg-1",
+          "text": "hello"
+        },
+        "method": "DELETE",
+        "name": "json body with a lowercase method",
+        "path": "/conversations/conv-1/messages",
+        "timestamp": 1778536870557
+      },
+      "name": "method changed after signing"
+    },
+    {
+      "headers": {
+        "x-identity-id": "MCowBQYDK2VwAyEAHINjqiTxz/1T6rJjkG8ywJVJjSih9iy/YFVChpz3lec=",
+        "x-signature": "Lzh8yYf36NhFfjDNMKezu3HiL9c+9w36iI6ZEEclVmd8NAd8jhi0uQ9qGiE15a6wThnJxBtEpndIUu9aUbIXCQ==",
+        "x-timestamp": "1778536870557"
+      },
+      "input": {
+        "body": {
+          "messageId": "msg-1",
+          "text": "bye"
+        },
+        "method": "post",
+        "name": "json body with a lowercase method",
+        "path": "/conversations/conv-1/messages",
+        "timestamp": 1778536870557
+      },
+      "name": "body changed after signing"
+    },
+    {
+      "headers": {
+        "x-identity-id": "MCowBQYDK2VwAyEAHINjqiTxz/1T6rJjkG8ywJVJjSih9iy/YFVChpz3lec=",
+        "x-signature": "Lzh8yYf36NhFfjDNMKezu3HiL9c+9w36iI6ZEEclVmd8NAd8jhi0uQ9qGiE15a6wThnJxBtEpndIUu9aUbIXCQ==",
+        "x-timestamp": "1778536870600"
+      },
+      "input": {
+        "body": {
+          "messageId": "msg-1",
+          "text": "hello"
+        },
+        "method": "post",
+        "name": "json body with a lowercase method",
+        "path": "/conversations/conv-1/messages",
+        "timestamp": 1778536870600
+      },
+      "name": "timestamp changed after signing"
+    }
+  ]
+}
