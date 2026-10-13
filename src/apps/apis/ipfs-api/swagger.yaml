@@ -20,7 +20,7 @@ paths:
           description: CID of the IPFS content.
       responses:
         '200':
-          description: Public binary content or JSON content found. Bytes are sniffed: allowlisted passive media is served inline with its sniffed type, anything else as application/octet-stream with Content-Disposition attachment. X-Content-Type-Options: nosniff is always set.
+          description: "Public binary content or JSON content found. Bytes are sniffed: allowlisted passive media is served inline with its sniffed type, anything else as application/octet-stream with Content-Disposition attachment. X-Content-Type-Options: nosniff is always set."
           content:
             application/octet-stream:
               schema:

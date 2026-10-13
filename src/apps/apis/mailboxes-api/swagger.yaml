@@ -251,7 +251,6 @@ paths:
           description: Unknown mailbox, wrong capability, or unknown reader.
         '409':
           description: The last reader cannot be revoked.
-[/Users/hasko/Projects/.worktrees/pigeon-mailbox-reader-set-289/src/apps/apis/open-api.yaml#0832]
   /mailboxes/{mailboxId}/ack:
     post:
       tags:

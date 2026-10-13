@@ -2213,7 +2213,7 @@ components:
           $ref: '#/components/schemas/CommunityModerationLogBody'
     CommunityOperationBody:
       type: object
-      description: Client-signed community operation. The community is the deterministic fold of the operations its members signed, so peers cannot forge roles, bans, memberships, settings or deletion. The mutation signs {id 'community:<communityId>:op:<digest>', scopeType 'community_operation', communityId, networkId, authorIdentityId, action, args, parents, createdAt} in store communityOperations, kind put, sequence 0, predecessor null, signer = the authenticated identity. digest is base64url(sha256(canonicalize(payload without id))). authorIdentityId and args.identityId are the base64 public key without PEM headers. The node rebuilds the payload from the path, the actor, the endpoint action, the args derived from the other body fields, createdAt and parents, so the signature only verifies if the client signed exactly that. parents are the sorted frontier read from GET /communities/{communityId} immediately before signing (empty for the genesis). An operation whose author lacks the permission in the history named by parents, or that names an unknown parent, is rejected. Limits (409 CommunityOperationLimitExceededError): args is at most 4096 bytes of JSON and an identity signs at most 1000 operations per community; later operations of an author are skipped by every node.
+      description: "Client-signed community operation. The community is the deterministic fold of the operations its members signed, so peers cannot forge roles, bans, memberships, settings or deletion. The mutation signs {id 'community:<communityId>:op:<digest>', scopeType 'community_operation', communityId, networkId, authorIdentityId, action, args, parents, createdAt} in store communityOperations, kind put, sequence 0, predecessor null, signer = the authenticated identity. digest is base64url(sha256(canonicalize(payload without id))). authorIdentityId and args.identityId are the base64 public key without PEM headers. The node rebuilds the payload from the path, the actor, the endpoint action, the args derived from the other body fields, createdAt and parents, so the signature only verifies if the client signed exactly that. parents are the sorted frontier read from GET /communities/{communityId} immediately before signing (empty for the genesis). An operation whose author lacks the permission in the history named by parents, or that names an unknown parent, is rejected. Limits (409 CommunityOperationLimitExceededError): args is at most 4096 bytes of JSON and an identity signs at most 1000 operations per community; later operations of an author are skipped by every node."
       required:
         - createdAt
         - parents
@@ -2493,60 +2493,7 @@ components:
           maxItems: 64
           items:
             type: string
-            pattern: '^[A-Za-z0-9_-]{43}        predecessor:
-          type: string
-          nullable: true
-          description: Digest of the previous mutation. Null if and only if sequence is 0.
-        sequence:
-          type: integer
-          minimum: 0
-        author:
-          type: object
-          required: [identityId, deviceCredential, authorizationRevision]
-          properties:
-            identityId:
-              type: string
-            deviceCredential:
-              type: string
-            authorizationRevision:
-              type: integer
-              minimum: 0
-              description: Revision of the author's device-authorization chain (GET /identity-devices/authorization) observed when signing. The device is checked against the chain at this revision, not the current head.
-        signature:
-          type: string
-    CommunityChannelMessagePinBody:
-      type: object
-      required: [createdAt, mutation]
-      properties:
-        createdAt:
-          type: integer
-          minimum: 0
-        mutation:
-          $ref: '#/components/schemas/SignedPublicMutation'
-    CommunityChannelMessageUnpinBody:
-      type: object
-      required: [mutation]
-      properties:
-        mutation:
-          $ref: '#/components/schemas/SignedPublicMutation'
-    CommunityChannelMessageReactionBody:
-      type: object
-      required:
-        - emoji
-        - mutation
-      properties:
-        createdAt:
-          type: integer
-          minimum: 0
-          description: Creation time committed by the mutation proof. Ignored on removal.
-        mutation:
-          $ref: '#/components/schemas/SignedPublicMutation'
-        emoji:
-          type: string
-          description: Emoji reaction to add or remove. Unique by community, channel, message, author and emoji.
-          maxLength: 64
-          example: 👍
-
+            pattern: '^[A-Za-z0-9_-]{43}$'
           description: Digests of the community or conversation operations observed when signing, strictly ascending. Required, and only allowed, on records scoped to a community or conversation (channel messages and their reactions and pins, invites, membership requests, moderation log, MLS records, polls, conversation messages); the record's permission is judged against the scope folded at exactly this frontier. Read it from GET /communities/{id}/frontier or the conversation frontier before signing.
         predecessor:
           type: string
