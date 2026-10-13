@@ -1,10 +1,10 @@
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Timestamp } from '@haskou/value-objects';
 
 import { Identity } from '../Identity';
 import IdentityAdmissionLoadRepository from '../repositories/IdentityAdmissionLoadRepository';
 import { IdentityAdmissionDifficulty } from '../value-objects/IdentityAdmissionDifficulty';
-import { IdentityExternalIdentifier } from '../value-objects/IdentityExternalIdentifier';
 
 /**
  * Prices identity admissions from the load this node counted per network, and
@@ -40,11 +40,11 @@ export default class IdentityAdmissionPricingDomainService {
   }
 
   public async charge(
-    externalIdentifier: IdentityExternalIdentifier,
+    identityId: IdentityId,
     networkIds: NetworkId[],
   ): Promise<void> {
     if (networkIds.length === 0) return;
 
-    await this.load.record(externalIdentifier, networkIds);
+    await this.load.record(identityId, networkIds);
   }
 }

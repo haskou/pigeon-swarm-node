@@ -94,7 +94,7 @@ export default class IdentityPublisher {
       throw error;
     }
 
-    await this.pricing.charge(externalIdentifier, admittedNetworks);
+    await this.pricing.charge(new IdentityId(primitives.id), admittedNetworks);
 
     const events = identity.pullDomainEvents();
 

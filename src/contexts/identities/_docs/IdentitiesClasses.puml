@@ -240,15 +240,18 @@ package "identities.infrastructure" {
 
   class LocalIdentityAdmissionLoadRepository {
     +countRecent(networkId): Promise<number>
-    +record(externalIdentifier, networkIds): Promise<void>
+    +record(identityId, networkIds): Promise<void>
   }
 
   note right of LocalIdentityAdmissionLoadRepository
     Fixed 60 s window in the node's local
     database, keyed by network id only.
-    A (network, cid) sighting is kept for
-    twice the freshness horizon, so each
-    version counts once per network.
+    A (network, identityId) sighting is kept
+    for twice the freshness horizon, so
+    re-signed versions count once per network.
+    Stops counting a network at 480 (price
+    saturated), prunes once per window and
+    drops sightings beyond 1024 pending.
   end note
 
   class OrbitDBIdentityAdmissionObservationProjection {
@@ -258,7 +261,8 @@ package "identities.infrastructure" {
   note right of OrbitDBIdentityAdmissionObservationProjection
     Skips stale documents on their signed
     time before any verification; counts
-    only canonical-cid records.
+    only canonical-cid records, and only
+    into networks this node hosts.
   end note
 
   class IpfsIdentityRepository {

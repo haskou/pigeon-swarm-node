@@ -2038,6 +2038,11 @@ export default class OrbitDBReplicatedStateRegistry {
     await this.bootstrapDocumentUpdateListeners(stores);
   }
 
+  /** Whether this node replicates state for `networkId`, i.e. hosts it. */
+  public hostsNetwork(networkId: string): boolean {
+    return this.storesByNetworkId.has(networkId);
+  }
+
   public async unregister(networkId: string): Promise<void> {
     const stores = this.storesByNetworkId.get(networkId);
 

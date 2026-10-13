@@ -23,7 +23,6 @@ import { MessageId } from '@app/contexts/conversations/domain/value-objects/Mess
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import IdentityAdmissionLoadRepository from '@app/contexts/identities/domain/repositories/IdentityAdmissionLoadRepository';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
-import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
 import { DeviceAuthorizationOperationId } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperationId';
@@ -1836,7 +1835,11 @@ export default class Definitions {
 
     for (let admission = 0; admission < admissions; admission += 1) {
       await load.record(
-        new IdentityExternalIdentifier(`bafk-seeded-admission-${admission}`),
+        new IdentityId(
+          generateKeyPairSync('ed25519')
+            .publicKey.export({ format: 'pem', type: 'spki' })
+            .toString(),
+        ),
         [network],
       );
     }

@@ -59,6 +59,9 @@ export default class OrbitDBIdentityAdmissionObservationProjection {
       new IdentityAdmissionObservationMessage(
         record.identity,
         record.cid,
+        record.networkIds.filter((networkId) =>
+          this.registry.hostsNetwork(networkId),
+        ),
         previous,
       ),
     );

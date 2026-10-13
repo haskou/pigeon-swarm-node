@@ -1,6 +1,5 @@
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-
-import { IdentityExternalIdentifier } from '../value-objects/IdentityExternalIdentifier';
 
 /**
  * Identity admissions this node counted into each network during the current
@@ -10,9 +9,13 @@ import { IdentityExternalIdentifier } from '../value-objects/IdentityExternalIde
 export default abstract class IdentityAdmissionLoadRepository {
   public abstract countRecent(networkId: NetworkId): Promise<number>;
 
-  /** Counts the published version once per network, however often it is seen. */
+  /**
+   * Counts the identity once per network while any of its versions can still
+   * be fresh, however often it is re-signed or seen. A network stops counting
+   * once its load saturates the price.
+   */
   public abstract record(
-    externalIdentifier: IdentityExternalIdentifier,
+    identityId: IdentityId,
     networkIds: NetworkId[],
   ): Promise<void>;
 }

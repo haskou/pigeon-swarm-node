@@ -145,19 +145,27 @@ Network-wide load: the count includes admissions other nodes accepted, so every
 node prices from the rate of the whole network, not only its own API.
 `OrbitDBIdentityAdmissionObservationProjection` hands each identity version
 replicating in to `IdentityAdmissionObserver`, which charges the networks the
-version enters when it is fresh (signed within
+version enters that this node hosts when it is fresh (signed within
 `IdentityAdmissionDifficulty.FRESHNESS_HORIZON_MS`, 10 minutes, of this node's
 clock), its cid is the canonical one for its content, and its proof meets what
 this node currently asks. Stale records are skipped on their signed time before
 any signature or cid work, so replaying history or bootstrapping a store costs
 nothing; forged cid copies of one version cannot be counted twice, and
-underpaid floods cannot raise honest prices. The repository counts each
-version once per network: it keeps a sighting per `(network, cid)` for twice the
-horizon, the longest a version can stay fresh, so a version admitted locally and
-then replicated back, or seen again after a restart, is not counted again.
-Backdating does not dodge observation cheaply: the API asks the 20-bit maximum
-of any admission signed outside the horizon that enters a network. Updates that
-enter no network keep the floor whatever their timestamp.
+underpaid floods cannot raise honest prices. Networks the node does not host
+are never counted, so listing up to 32 foreign networks in one record inflates
+nothing here. The repository counts each identity once per network: it keeps a
+sighting per `(network, identityId)` for twice the horizon, the longest any
+version can stay fresh, so re-signing an identity, an update whose previous
+version is not retained here, a version admitted locally and then replicated
+back, or one seen again after a restart is not counted again. A network stops
+counting at `SATURATING_ADMISSIONS_PER_WINDOW` (480), the first load that asks
+the 20-bit cap, so counters and sightings stay bounded at 480 per hosted network
+per window. Expired sightings and windows are pruned at most once per window,
+and at most 1024 records wait for the serialized writer; beyond that, sightings
+are dropped uncounted. Backdating does not dodge observation cheaply: the API
+asks the 20-bit maximum of any admission signed outside the horizon that enters
+a network. Updates that enter no network keep the floor whatever their
+timestamp.
 
 ## Order and convergence
 
@@ -268,8 +276,22 @@ claiming that handle, which is the sybil non-goal below.
   refused.
 - Observation is eventual. A partition delays it, a node that joins sees the
   fresh admissions of the last horizon at once, and losing the local database
-  can count a version seen in the last horizon once more. An update whose
-  previous version this node does not retain is charged for all its networks.
+  can count an identity seen in the last horizon once more. An update whose
+  previous version this node does not retain is charged for every hosted
+  network it lists, once per identity and network within the sighting
+  retention.
+- An identity counts again on a network once its 20-minute sighting expires, so
+  re-signing it keeps adding one count per network every 20 minutes. Holding a
+  network at the 20-bit cap this way still takes about 480 × 20 mined
+  identities.
+- Counting covers every network the node hosts, so a member of one network can
+  raise the price of another network both are hosted with, but only by paying
+  that network's current price per count.
+- Sightings beyond 1024 waiting records are dropped uncounted, so a large
+  replication burst under-counts.
+- The API path still counts the networks it is asked to admit, hosted or not.
+  Those counts cost the full price per network and are bounded by the
+  per-source limit, the saturation cap and pruning.
 - A handle is a claim, not an authority: the identity id (public key) remains
   the authoritative reference.
 - The identity-key holder can equivocate on its own genesis; a peer without the

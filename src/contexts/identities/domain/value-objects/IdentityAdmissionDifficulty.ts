@@ -24,6 +24,13 @@ export class IdentityAdmissionDifficulty extends Integer {
    * history cannot inflate load and backdating cannot dodge observation.
    */
   public static readonly FRESHNESS_HORIZON_MS = 10 * 60_000;
+  /** The first load that asks MAX_BITS; counting beyond it cannot raise the price. */
+  public static readonly SATURATING_ADMISSIONS_PER_WINDOW =
+    IdentityAdmissionDifficulty.FREE_ADMISSIONS_PER_WINDOW *
+    2 **
+      (IdentityAdmissionDifficulty.MAX_BITS -
+        IdentityAdmissionProof.DIFFICULTY_BITS -
+        1);
 
   public static floor(): IdentityAdmissionDifficulty {
     return new IdentityAdmissionDifficulty(
