@@ -59,6 +59,22 @@
       }
     }
   ],
+  "equivalent": [
+    {
+      "name": "empty recipient is omitted like an absent one",
+      "input": {
+        "groupId": "xYNd_IvZ349vIYp8ZJhU1f1Imo9uPtllZlvbuZC3Tm4",
+        "kind": "key_package",
+        "payload": "cGlnZW9uLXZlY3RvcjptbHMtcmVjb3JkOnBheWxvYWQ=",
+        "recipientIdentityId": ""
+      },
+      "derived": {
+        "canonical": "{\"groupId\":\"xYNd_IvZ349vIYp8ZJhU1f1Imo9uPtllZlvbuZC3Tm4\",\"kind\":\"key_package\",\"payload\":\"cGlnZW9uLXZlY3RvcjptbHMtcmVjb3JkOnBheWxvYWQ=\"}",
+        "recordId": "BfA3Tyoh5wvrWEQKuk-i269SNx6AnrwMhucgCZeODeM",
+        "documentId": "community:xYNd_IvZ349vIYp8ZJhU1f1Imo9uPtllZlvbuZC3Tm4:mls:BfA3Tyoh5wvrWEQKuk-i269SNx6AnrwMhucgCZeODeM"
+      }
+    }
+  ],
   "distinct": [
     {
       "name": "reversed key order",
