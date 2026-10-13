@@ -4,6 +4,7 @@ import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { UniqueObjectArray } from '@haskou/value-objects';
 
 import { DeviceAuthorization } from './DeviceAuthorization';
+import { DeviceSealedSecretEntry } from './DeviceSealedSecretEntry';
 import { DeviceSealedSecretGenerationStaleError } from './errors/DeviceSealedSecretGenerationStaleError';
 import { DeviceSealedSecretNotFoundError } from './errors/DeviceSealedSecretNotFoundError';
 import { DeviceSealedSecretPublisherNotAuthorizedError } from './errors/DeviceSealedSecretPublisherNotAuthorizedError';
@@ -42,12 +43,6 @@ export interface DeviceSealedSecretSigningInput {
   publisherCredential: string;
   recipientCredential: string;
   sealedSecret: string;
-}
-
-interface DeviceSealedSecretEntry {
-  recipientCredential: DeviceCredential;
-  sealedSecret: string;
-  signature: string;
 }
 
 const SIGNING_PURPOSE = 'pigeon:device-sealed-secret:v1';
