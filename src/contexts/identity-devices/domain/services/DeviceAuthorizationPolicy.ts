@@ -3,12 +3,17 @@ import { Timestamp, assert } from '@haskou/value-objects';
 import { DeviceAuthorization } from '../DeviceAuthorization';
 import { DeviceAuthorizationApplication } from '../DeviceAuthorizationApplication';
 import { DeviceAuthorizationCandidate } from '../DeviceAuthorizationCandidate';
+import { DeviceAuthorizationCheckpointCandidate } from '../DeviceAuthorizationCheckpointCandidate';
+import { DeviceAuthorizationCheckpointPrecedence } from '../DeviceAuthorizationCheckpointPrecedence';
+import { DeviceAuthorizationOverflowBound } from '../DeviceAuthorizationOverflowBound';
 import { DeviceAuthorizationRecoveryState } from '../DeviceAuthorizationRecoveryState';
 import { DeviceAuthorizationReplayResult } from '../DeviceAuthorizationReplayResult';
+import { DeviceAuthorizationSourceCandidate } from '../DeviceAuthorizationSourceCandidate';
 import { DeviceAuthorizationTransition } from '../DeviceAuthorizationTransition';
 import { DeviceCompromiseCaps } from '../DeviceCompromiseCaps';
 import { InvalidDeviceAuthorizationTransitionError } from '../errors/InvalidDeviceAuthorizationTransitionError';
 import { DeviceAuthorizationEpoch } from '../value-objects/DeviceAuthorizationEpoch';
+import { DeviceAuthorizationRevision } from '../value-objects/DeviceAuthorizationRevision';
 import { RevisionGroup } from './RevisionGroup';
 
 interface Admitted<T> {
@@ -149,16 +154,55 @@ export default class DeviceAuthorizationPolicy {
     }
 
     for (const group of groups) {
-      group.candidates.sort((left, right) => {
-        const operationOrder = left.transition
-          .getOperationId()
-          .compareTo(right.transition.getOperationId());
-
-        return operationOrder || left.encoding.localeCompare(right.encoding);
-      });
+      group.candidates.sort((left, right) => this.replayOrder(left, right));
     }
 
     return groups;
+  }
+
+  /**
+   * Candidates at one revision replay by operation id. Equal operation ids
+   * fall back to the canonical encoding: the protocol tie-break, the only
+   * order every replica derives from the record itself. It decides which
+   * recovery is admitted first, so it MUST stay byte-identical across nodes.
+   */
+  private replayOrder<T>(
+    left: DeviceAuthorizationCandidate<T>,
+    right: DeviceAuthorizationCandidate<T>,
+  ): number {
+    const operationOrder = left.transition
+      .getOperationId()
+      .compareTo(right.transition.getOperationId());
+
+    return operationOrder || left.encoding.localeCompare(right.encoding);
+  }
+
+  /**
+   * Replicated sources take precedence by the highest revision they reach;
+   * sources reaching one revision fall back to their canonical encoding.
+   */
+  private precedenceOrder<T>(
+    left: DeviceAuthorizationSourceCandidate<T>,
+    right: DeviceAuthorizationSourceCandidate<T>,
+  ): number {
+    return (
+      right.revision.compareTo(left.revision) ||
+      left.encoding.localeCompare(right.encoding)
+    );
+  }
+
+  /**
+   * An overflow witness is measured by its sources while the history they
+   * replay to fits the bound, and by its projection once it does not.
+   */
+  private fitsOverflowMeasure<T>(
+    bound: DeviceAuthorizationOverflowBound<T>,
+    completeHistoryFits: boolean,
+    sources: T[],
+  ): boolean {
+    return completeHistoryFits
+      ? bound.fitsSources(sources)
+      : bound.fitsProjection(sources);
   }
 
   private admittedAt<T>(
@@ -248,6 +292,20 @@ export default class DeviceAuthorizationPolicy {
     );
   }
 
+  /**
+   * A transition is never accepted twice: it is rejected when it replays any
+   * transition already recorded for the identity.
+   */
+  public verifyNotReplayed(
+    transition: DeviceAuthorizationTransition,
+    recorded: DeviceAuthorizationTransition[],
+  ): void {
+    assert(
+      !recorded.some((existing) => transition.replays(existing)),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+  }
+
   public applyRecoveryCheckpoint(
     authorization: DeviceAuthorization,
     transition: DeviceAuthorizationTransition,
@@ -310,8 +368,7 @@ export default class DeviceAuthorizationPolicy {
       assert(
         last !== undefined &&
           sibling.getPreviousRevision().isEqual(last.getPreviousRevision()) &&
-          sibling.getOperationId().valueOf() !==
-            last.getOperationId().valueOf(),
+          sibling.getOperationId().isNotEqual(last.getOperationId()),
         new InvalidDeviceAuthorizationTransitionError(),
       );
       this.recoverLineage(previous, sibling);
@@ -394,5 +451,111 @@ export default class DeviceAuthorizationPolicy {
     }
 
     return { accepted, authorization, checkpoints };
+  }
+
+  /**
+   * The preferred recovery checkpoint is the one at the highest revision,
+   * ties broken by canonical encoding. Checkpoints at that revision on the
+   * same lineage contend with it and are kept as concurrent recoveries.
+   */
+  public preferCheckpoint<T>(
+    candidates: DeviceAuthorizationCheckpointCandidate<T>[],
+  ): DeviceAuthorizationCheckpointPrecedence<T> | undefined {
+    const ordered = [...candidates].sort((left, right) =>
+      this.precedenceOrder(left, right),
+    );
+    const [preferred] = ordered;
+
+    if (!preferred) {
+      return undefined;
+    }
+
+    return {
+      contenders: ordered
+        .filter(
+          (candidate) =>
+            candidate.revision.isEqual(preferred.revision) &&
+            candidate.sharesLineageWith(preferred),
+        )
+        .map(({ payload }) => payload),
+      preferred: preferred.payload,
+    };
+  }
+
+  /**
+   * The frontier of replicated sources is the source reaching the highest
+   * revision, ties broken by canonical encoding.
+   */
+  public preferFrontier<T>(
+    candidates: DeviceAuthorizationSourceCandidate<T>[],
+  ): T {
+    const [frontier] = [...candidates].sort((left, right) =>
+      this.precedenceOrder(left, right),
+    );
+
+    assert(
+      frontier !== undefined,
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return frontier.payload;
+  }
+
+  /**
+   * The witness of an overflow is the shortest prefix of the ordered sources
+   * exceeding the bound. Sources within the bound witness no overflow.
+   */
+  public minimalOverflowWitness<T>(
+    sources: T[],
+    bound: DeviceAuthorizationOverflowBound<T>,
+  ): T[] {
+    const completeHistoryFits = bound.fitsReplayedHistory(sources);
+
+    for (let length = 1; length <= sources.length; length += 1) {
+      const witness = sources.slice(0, length);
+
+      if (!this.fitsOverflowMeasure(bound, completeHistoryFits, witness)) {
+        return witness;
+      }
+    }
+
+    assert(false, new InvalidDeviceAuthorizationTransitionError());
+  }
+
+  /**
+   * An overflow is admitted only for a minimal witness: non-empty, exceeding
+   * the bound, and fitting it without its last source.
+   */
+  public isMinimalOverflowWitness<T>(
+    sources: T[],
+    bound: DeviceAuthorizationOverflowBound<T>,
+  ): boolean {
+    if (sources.length === 0) {
+      return false;
+    }
+
+    const completeHistoryFits = bound.fitsReplayedHistory(sources);
+
+    return (
+      !(completeHistoryFits && bound.fitsSources(sources)) &&
+      this.fitsOverflowMeasure(bound, completeHistoryFits, sources.slice(0, -1))
+    );
+  }
+
+  /**
+   * An overflow suspends the authorization replayed from its witness: every
+   * credential is dropped and recovery is required past the latest revision
+   * known from the witness or the frontier.
+   */
+  public suspendAtOverflow(
+    replayed: DeviceAuthorization,
+    frontierRevision: DeviceAuthorizationRevision,
+  ): DeviceAuthorization {
+    const replayedRevision = replayed.getRevision();
+    const latestRevision = replayedRevision.isGreaterThan(frontierRevision)
+      ? replayedRevision
+      : frontierRevision;
+
+    return replayed.requireRecoveryAt(latestRevision.next());
   }
 }

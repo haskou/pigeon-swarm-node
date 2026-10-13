@@ -83,6 +83,19 @@ export default class OrbitDBDeviceAuthorizationReplayer {
     }
   }
 
+  private requireTransitionFromRecord(
+    record: OrbitDBDeviceAuthorizationTransitionRecord,
+  ): DeviceAuthorizationTransition {
+    const transition = this.transitionFromRecord(record);
+
+    assert(
+      transition !== undefined,
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return transition;
+  }
+
   /**
    * Every state from the replay base (the genesis, or the recovery checkpoint)
    * to the head, in ascending revision order, plus the compromise caps in
@@ -143,6 +156,22 @@ export default class OrbitDBDeviceAuthorizationReplayer {
       this.canonicalizer.serialize(record.transition)
       ? transition
       : undefined;
+  }
+
+  /**
+   * Every transition recorded in a document: its effective history and the
+   * recovery of its effective checkpoint. A record that does not map back to
+   * a canonical transition fails closed.
+   */
+  public recordedTransitions(
+    document: OrbitDBDeviceAuthorizationDocument,
+  ): DeviceAuthorizationTransition[] {
+    const checkpoint = this.sources.effectiveCheckpoint(document);
+
+    return [
+      ...this.sources.effectiveHistory(document),
+      ...(checkpoint ? [checkpoint.transition] : []),
+    ].map((record) => this.requireTransitionFromRecord(record));
   }
 
   public rebuild(
@@ -214,16 +243,7 @@ export default class OrbitDBDeviceAuthorizationReplayer {
       [...checkpoint.lineage, checkpoint.transition],
       checkpoint.concurrent ?? [],
     ].map((records) =>
-      records.map((record) => {
-        const transition = this.transitionFromRecord(record);
-
-        assert(
-          transition !== undefined,
-          new InvalidDeviceAuthorizationTransitionError(),
-        );
-
-        return transition;
-      }),
+      records.map((record) => this.requireTransitionFromRecord(record)),
     );
     const state = this.policy.replayRecoveryLineage(
       genesis,

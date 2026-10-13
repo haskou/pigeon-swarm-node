@@ -1,5 +1,9 @@
+import { DeviceAuthorizationCheckpointCandidate } from '@app/contexts/identity-devices/domain/DeviceAuthorizationCheckpointCandidate';
+import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
+import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { isDeepStrictEqual } from 'node:util';
 
+import { OrbitDBDeviceAuthorizationContendingCheckpoint } from './documents/OrbitDBDeviceAuthorizationContendingCheckpoint';
 import { OrbitDBDeviceAuthorizationDocument } from './documents/OrbitDBDeviceAuthorizationDocument';
 import { OrbitDBDeviceAuthorizationSource } from './documents/OrbitDBDeviceAuthorizationSource';
 import { OrbitDBDeviceAuthorizationTransitionRecord } from './documents/OrbitDBDeviceAuthorizationTransitionRecord';
@@ -7,6 +11,7 @@ import OrbitDBDeviceAuthorizationCanonicalizer from './OrbitDBDeviceAuthorizatio
 
 export default class OrbitDBDeviceAuthorizationSources {
   public constructor(
+    private readonly policy: DeviceAuthorizationPolicy,
     private readonly canonicalizer: OrbitDBDeviceAuthorizationCanonicalizer,
   ) {}
 
@@ -83,52 +88,53 @@ export default class OrbitDBDeviceAuthorizationSources {
   }
 
   /**
-   * The checkpoint of the highest recovery, ties broken by its canonical
-   * form. Every other recovery at that revision on the same lineage lost it:
-   * it is kept as concurrent, so the caps it carries still hold.
+   * Maps source checkpoints to the domain checkpoint precedence. Recoveries
+   * contending with the preferred one are kept as concurrent, so the caps
+   * they carry still hold.
    */
   public preferredSourceCheckpoint(
     sources: OrbitDBDeviceAuthorizationSource[],
   ): OrbitDBDeviceAuthorizationDocument['checkpoint'] {
-    const checkpoints = sources
-      .map((source) => source.checkpoint)
-      .filter(
-        (
-          checkpoint,
-        ): checkpoint is NonNullable<
-          OrbitDBDeviceAuthorizationDocument['checkpoint']
-        > => checkpoint !== undefined,
-      )
-      .map(({ authorization, concurrent, lineage, transition }) => ({
-        concurrent: concurrent ?? [],
-        recovery: { authorization, lineage, transition },
-      }))
-      .sort(
-        (left, right) =>
-          right.recovery.authorization.revision -
-            left.recovery.authorization.revision ||
-          this.canonicalizer
-            .serialize(left.recovery)
-            .localeCompare(this.canonicalizer.serialize(right.recovery)),
-      );
-    const preferred = checkpoints[0]?.recovery;
+    const precedence = this.policy.preferCheckpoint(
+      sources
+        .map((source) => source.checkpoint)
+        .filter(
+          (
+            checkpoint,
+          ): checkpoint is NonNullable<
+            OrbitDBDeviceAuthorizationDocument['checkpoint']
+          > => checkpoint !== undefined,
+        )
+        .map(
+          ({
+            authorization,
+            concurrent,
+            lineage,
+            transition,
+          }): DeviceAuthorizationCheckpointCandidate<OrbitDBDeviceAuthorizationContendingCheckpoint> => {
+            const recovery = { authorization, lineage, transition };
 
-    if (!preferred) {
+            return {
+              encoding: this.canonicalizer.serialize(recovery),
+              payload: { concurrent: concurrent ?? [], recovery },
+              revision: new DeviceAuthorizationRevision(authorization.revision),
+              sharesLineageWith: (other) =>
+                isDeepStrictEqual(other.payload.recovery.lineage, lineage),
+            };
+          },
+        ),
+    );
+
+    if (!precedence) {
       return undefined;
     }
 
+    const preferred = precedence.preferred.recovery;
     const concurrent = this.uniqueTransitionRecords(
-      checkpoints
-        .filter(
-          ({ recovery }) =>
-            recovery.authorization.revision ===
-              preferred.authorization.revision &&
-            isDeepStrictEqual(recovery.lineage, preferred.lineage),
-        )
-        .map(({ concurrent: lost, recovery }) => [
-          recovery.transition,
-          ...lost,
-        ]),
+      precedence.contenders.map(({ concurrent: lost, recovery }) => [
+        recovery.transition,
+        ...lost,
+      ]),
     ).filter((record) => !isDeepStrictEqual(record, preferred.transition));
 
     return concurrent.length > 0 ? { ...preferred, concurrent } : preferred;
