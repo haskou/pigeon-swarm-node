@@ -12,7 +12,7 @@ import {
 import type { NodeRuntime } from './two-real-node-gossipsub';
 
 import { mineAdmissionNonce } from '../../support/mineAdmissionNonce';
-import { NETWORK_ID, request } from './two-real-node-gossipsub';
+import { NETWORK_ID } from './two-real-node-gossipsub';
 
 /**
  * Builds signed-request and signed-record bytes from the documented algorithms
@@ -158,18 +158,25 @@ export async function publishIdentityWithKeys(
     timestamp: Date.now(),
     version: 1,
   };
-  const response = await request<{
-    authorizationRevision: number;
-    id: string;
-  }>(node, 'POST', '/identities/', {
-    ...signaturePayload,
-    signature: ed25519Sign(
-      keys.identity.privateKeyPem,
-      JSON.stringify(signaturePayload),
-    ),
-  });
+  const response = await fetchJson(
+    node,
+    'POST',
+    '/identities/',
+    { 'content-type': 'application/json' },
+    JSON.stringify({
+      ...signaturePayload,
+      signature: ed25519Sign(
+        keys.identity.privateKeyPem,
+        JSON.stringify(signaturePayload),
+      ),
+    }),
+  );
 
-  assert.equal(response.id, id, 'published identity id differs');
+  assert.ok(
+    response.status >= 200 && response.status < 300,
+    `publishing identity ${handle}: ${JSON.stringify(response)}`,
+  );
+  assert.equal(response.data.id, id, 'published identity id differs');
 
-  return response;
+  return response.data as { authorizationRevision: number; id: string };
 }
