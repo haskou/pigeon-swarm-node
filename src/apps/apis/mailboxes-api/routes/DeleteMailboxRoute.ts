@@ -1,4 +1,5 @@
-import MailboxRemover from '@app/contexts/mailboxes/application/MailboxRemover';
+import MailboxRemover from '@app/contexts/mailboxes/application/remove/MailboxRemover';
+import { MailboxRemoveMessage } from '@app/contexts/mailboxes/application/remove/messages/MailboxRemoveMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -19,7 +20,7 @@ export class DeleteMailboxRoute extends MailboxRouteSupport {
     const token = this.bearerToken(request);
 
     try {
-      await this.remover.remove(id, token);
+      await this.remover.remove(new MailboxRemoveMessage(id, token));
 
       return response.status(HttpRouteStatusEnum.NO_CONTENT).send();
     } catch (error: unknown) {

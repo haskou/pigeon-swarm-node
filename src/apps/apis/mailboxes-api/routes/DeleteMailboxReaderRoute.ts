@@ -1,4 +1,5 @@
-import MailboxReaderRevoker from '@app/contexts/mailboxes/application/MailboxReaderRevoker';
+import MailboxReaderRevoker from '@app/contexts/mailboxes/application/revoke-reader/MailboxReaderRevoker';
+import { MailboxReaderRevokeMessage } from '@app/contexts/mailboxes/application/revoke-reader/messages/MailboxReaderRevokeMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -22,7 +23,9 @@ export class DeleteMailboxReaderRoute extends MailboxRouteSupport {
     const token = this.bearerToken(request);
 
     try {
-      await this.revoker.revoke(id, token, hash);
+      await this.revoker.revoke(
+        new MailboxReaderRevokeMessage(id, token, hash),
+      );
 
       return response.status(HttpRouteStatusEnum.NO_CONTENT).send();
     } catch (error: unknown) {

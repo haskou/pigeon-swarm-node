@@ -1,12 +1,13 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import { MailboxCreationProofInvalidError } from '../domain/errors/MailboxCreationProofInvalidError';
-import { Mailbox } from '../domain/Mailbox';
-import { MailboxCreationDifficulty } from '../domain/MailboxCreationDifficulty';
-import { MailboxCreationProof } from '../domain/MailboxCreationProof';
-import MailboxPolicy from '../domain/MailboxPolicy';
-import MailboxRepository from '../domain/repositories/MailboxRepository';
-import MailboxCoordinator from './MailboxCoordinator';
+import { MailboxCreationProofInvalidError } from '../../domain/errors/MailboxCreationProofInvalidError';
+import { Mailbox } from '../../domain/Mailbox';
+import { MailboxCreationDifficulty } from '../../domain/MailboxCreationDifficulty';
+import { MailboxCreationProof } from '../../domain/MailboxCreationProof';
+import MailboxPolicy from '../../domain/MailboxPolicy';
+import MailboxRepository from '../../domain/repositories/MailboxRepository';
+import MailboxCoordinator from '../coordinate/MailboxCoordinator';
+import { MailboxCreateMessage } from './messages/MailboxCreateMessage';
 
 export default class MailboxCreator {
   constructor(
@@ -38,12 +39,12 @@ export default class MailboxCreator {
    * learns nothing about which mailbox ids exist. The required difficulty
    * follows how full the node is, and a short proof is told what it needs.
    */
-  public async create(
-    mailboxId: string,
-    postTokenHash: string,
-    readTokenHash: string,
-    creationNonce: string,
-  ): Promise<boolean> {
+  public async create(message: MailboxCreateMessage): Promise<boolean> {
+    const mailboxId = message.mailboxId.valueOf();
+    const postTokenHash = message.postTokenHash.valueOf();
+    const readTokenHash = message.readTokenHash.valueOf();
+    const creationNonce = message.creationNonce.valueOf();
+
     const requiredBits = MailboxCreationDifficulty.bitsFor(
       await this.repository.count(),
       this.policy.maxMailboxes(),

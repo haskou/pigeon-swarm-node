@@ -1,6 +1,6 @@
-import { Mailbox } from '../domain/Mailbox';
-import { MailboxEnvelope } from '../domain/MailboxEnvelope';
-import MailboxRepository from '../domain/repositories/MailboxRepository';
+import { Mailbox } from '../../domain/Mailbox';
+import { MailboxEnvelope } from '../../domain/MailboxEnvelope';
+import MailboxRepository from '../../domain/repositories/MailboxRepository';
 
 /**
  * Finds the envelopes every reader has acknowledged and releases their

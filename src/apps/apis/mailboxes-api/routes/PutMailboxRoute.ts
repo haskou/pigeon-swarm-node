@@ -1,4 +1,5 @@
-import MailboxCreator from '@app/contexts/mailboxes/application/MailboxCreator';
+import MailboxCreator from '@app/contexts/mailboxes/application/create/MailboxCreator';
+import { MailboxCreateMessage } from '@app/contexts/mailboxes/application/create/messages/MailboxCreateMessage';
 import { MailboxCreationProofInvalidError } from '@app/contexts/mailboxes/domain/errors/MailboxCreationProofInvalidError';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
@@ -37,10 +38,12 @@ export class PutMailboxRoute extends MailboxRouteSupport {
       this.rateLimiter.consume(request.ip ?? 'unknown');
 
       const created = await this.creator.create(
-        id,
-        body.postTokenHash,
-        body.readTokenHash,
-        body.creationNonce,
+        new MailboxCreateMessage(
+          id,
+          body.postTokenHash,
+          body.readTokenHash,
+          body.creationNonce,
+        ),
       );
 
       return response

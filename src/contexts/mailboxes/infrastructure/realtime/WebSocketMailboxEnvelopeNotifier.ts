@@ -1,4 +1,4 @@
-import MailboxEnvelopeNotifier from '@app/contexts/mailboxes/application/MailboxEnvelopeNotifier';
+import MailboxEnvelopeNotifier from '@app/contexts/mailboxes/application/notify/MailboxEnvelopeNotifier';
 import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 
 export default class WebSocketMailboxEnvelopeNotifier extends MailboxEnvelopeNotifier {

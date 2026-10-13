@@ -1,4 +1,5 @@
-import MailboxAppender from '@app/contexts/mailboxes/application/MailboxAppender';
+import MailboxAppender from '@app/contexts/mailboxes/application/append/MailboxAppender';
+import { MailboxAppendMessage } from '@app/contexts/mailboxes/application/append/messages/MailboxAppendMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
@@ -33,10 +34,12 @@ export class PostMailboxEnvelopeRoute extends MailboxRouteSupport {
 
     try {
       const result = await this.appender.append(
-        id,
-        token,
-        body.envelopeId,
-        body.body,
+        new MailboxAppendMessage(
+          id,
+          token,
+          body.envelopeId,
+          body.body,
+        ),
       );
 
       return response

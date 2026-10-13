@@ -1,10 +1,11 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import { MailboxNotFoundError } from '../domain/errors/MailboxNotFoundError';
-import MailboxPolicy from '../domain/MailboxPolicy';
-import MailboxRepository from '../domain/repositories/MailboxRepository';
-import MailboxCoordinator from './MailboxCoordinator';
-import MailboxEnvelopeNotifier from './MailboxEnvelopeNotifier';
+import { MailboxNotFoundError } from '../../domain/errors/MailboxNotFoundError';
+import MailboxPolicy from '../../domain/MailboxPolicy';
+import MailboxRepository from '../../domain/repositories/MailboxRepository';
+import MailboxCoordinator from '../coordinate/MailboxCoordinator';
+import MailboxEnvelopeNotifier from '../notify/MailboxEnvelopeNotifier';
+import { MailboxAppendMessage } from './messages/MailboxAppendMessage';
 
 export default class MailboxAppender {
   constructor(
@@ -19,11 +20,13 @@ export default class MailboxAppender {
    * nothing new. A missing mailbox or wrong capability is one uniform error.
    */
   public append(
-    mailboxId: string,
-    postToken: string,
-    envelopeId: string,
-    body: string,
+    message: MailboxAppendMessage,
   ): Promise<{ created: boolean; cursor: number }> {
+    const mailboxId = message.mailboxId.valueOf();
+    const postToken = message.postToken.valueOf();
+    const envelopeId = message.envelopeId.valueOf();
+    const body = message.body.valueOf();
+
     return this.coordinator.run(async () => {
       const mailbox = await this.repository.findById(mailboxId);
 

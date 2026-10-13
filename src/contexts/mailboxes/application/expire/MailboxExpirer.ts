@@ -1,10 +1,10 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import { Mailbox } from '../domain/Mailbox';
-import MailboxPolicy from '../domain/MailboxPolicy';
-import MailboxRepository from '../domain/repositories/MailboxRepository';
-import MailboxCoordinator from './MailboxCoordinator';
-import MailboxEnvelopeNotifier from './MailboxEnvelopeNotifier';
+import { Mailbox } from '../../domain/Mailbox';
+import MailboxPolicy from '../../domain/MailboxPolicy';
+import MailboxRepository from '../../domain/repositories/MailboxRepository';
+import MailboxCoordinator from '../coordinate/MailboxCoordinator';
+import MailboxEnvelopeNotifier from '../notify/MailboxEnvelopeNotifier';
 
 /** Retention: expired envelopes go, and a mailbox idle for the window is deleted. */
 export default class MailboxExpirer {

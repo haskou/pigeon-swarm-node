@@ -1,8 +1,9 @@
-import { MailboxNotFoundError } from '../domain/errors/MailboxNotFoundError';
-import MailboxRepository from '../domain/repositories/MailboxRepository';
-import MailboxCoordinator from './MailboxCoordinator';
-import MailboxEnvelopeNotifier from './MailboxEnvelopeNotifier';
-import MailboxSettler from './MailboxSettler';
+import { MailboxNotFoundError } from '../../domain/errors/MailboxNotFoundError';
+import MailboxRepository from '../../domain/repositories/MailboxRepository';
+import MailboxCoordinator from '../coordinate/MailboxCoordinator';
+import MailboxEnvelopeNotifier from '../notify/MailboxEnvelopeNotifier';
+import MailboxSettler from '../settle/MailboxSettler';
+import { MailboxReaderRevokeMessage } from './messages/MailboxReaderRevokeMessage';
 
 /**
  * Removes one reader. Envelopes that reader was holding back become
@@ -17,11 +18,11 @@ export default class MailboxReaderRevoker {
     private readonly notifier: MailboxEnvelopeNotifier,
   ) {}
 
-  public async revoke(
-    mailboxId: string,
-    readToken: string,
-    readTokenHash: string,
-  ): Promise<void> {
+  public async revoke(message: MailboxReaderRevokeMessage): Promise<void> {
+    const mailboxId = message.mailboxId.valueOf();
+    const readToken = message.readToken.valueOf();
+    const readTokenHash = message.readTokenHash.valueOf();
+
     await this.coordinator.run(async (): Promise<void> => {
       const mailbox = await this.repository.findById(mailboxId);
 

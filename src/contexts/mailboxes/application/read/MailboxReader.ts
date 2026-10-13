@@ -1,10 +1,11 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import { MailboxNotFoundError } from '../domain/errors/MailboxNotFoundError';
-import { MailboxEnvelope } from '../domain/MailboxEnvelope';
-import MailboxPolicy from '../domain/MailboxPolicy';
-import MailboxRepository from '../domain/repositories/MailboxRepository';
-import MailboxCoordinator from './MailboxCoordinator';
+import { MailboxNotFoundError } from '../../domain/errors/MailboxNotFoundError';
+import { MailboxEnvelope } from '../../domain/MailboxEnvelope';
+import MailboxPolicy from '../../domain/MailboxPolicy';
+import MailboxRepository from '../../domain/repositories/MailboxRepository';
+import MailboxCoordinator from '../coordinate/MailboxCoordinator';
+import { MailboxReadMessage } from './messages/MailboxReadMessage';
 
 export interface MailboxPage {
   envelopes: MailboxEnvelope[];
@@ -17,12 +18,10 @@ export default class MailboxReader {
     private readonly coordinator: MailboxCoordinator,
   ) {}
 
-  public read(
-    mailboxId: string,
-    readToken: string,
-    after: number,
-    limit: number,
-  ): Promise<MailboxPage> {
+  public read(message: MailboxReadMessage): Promise<MailboxPage> {
+    const mailboxId = message.mailboxId.valueOf();
+    const readToken = message.readToken.valueOf();
+
     return this.coordinator.run(async (): Promise<MailboxPage> => {
       const mailbox = await this.repository.findById(mailboxId);
 
@@ -30,10 +29,13 @@ export default class MailboxReader {
         throw new MailboxNotFoundError();
       }
 
-      const bounded = Math.min(Math.max(limit, 1), MailboxPolicy.MAX_PAGE);
+      const bounded = Math.min(
+        Math.max(message.limit, 1),
+        MailboxPolicy.MAX_PAGE,
+      );
       const page = await this.repository.listEnvelopes(
         mailboxId,
-        after,
+        message.after,
         bounded + 1,
       );
 

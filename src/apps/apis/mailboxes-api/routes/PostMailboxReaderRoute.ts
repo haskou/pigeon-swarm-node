@@ -1,4 +1,5 @@
-import MailboxReaderAdder from '@app/contexts/mailboxes/application/MailboxReaderAdder';
+import MailboxReaderAdder from '@app/contexts/mailboxes/application/add-reader/MailboxReaderAdder';
+import { MailboxReaderAddMessage } from '@app/contexts/mailboxes/application/add-reader/messages/MailboxReaderAddMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
@@ -29,7 +30,9 @@ export class PostMailboxReaderRoute extends MailboxRouteSupport {
     const token = this.bearerToken(request);
 
     try {
-      const added = await this.adder.add(id, token, body.readTokenHash);
+      const added = await this.adder.add(
+        new MailboxReaderAddMessage(id, token, body.readTokenHash),
+      );
 
       return response
         .status(added ? HttpRouteStatusEnum.CREATED : HttpRouteStatusEnum.OK)

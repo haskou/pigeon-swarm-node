@@ -1,4 +1,5 @@
-import MailboxReaderLister from '@app/contexts/mailboxes/application/MailboxReaderLister';
+import MailboxReaderLister from '@app/contexts/mailboxes/application/list-readers/MailboxReaderLister';
+import { MailboxReaderListMessage } from '@app/contexts/mailboxes/application/list-readers/messages/MailboxReaderListMessage';
 import { Request, Response } from 'express';
 import { Get, JsonController, Param, Req, Res } from 'routing-controllers';
 
@@ -18,7 +19,9 @@ export class GetMailboxReadersRoute extends MailboxRouteSupport {
     const token = this.bearerToken(request);
 
     try {
-      const listing = await this.lister.list(id, token);
+      const listing = await this.lister.list(
+        new MailboxReaderListMessage(id, token),
+      );
 
       return response.setHeader('Cache-Control', 'no-store').json(listing);
     } catch (error: unknown) {

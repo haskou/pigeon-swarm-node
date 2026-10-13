@@ -1,9 +1,10 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import { MailboxNotFoundError } from '../domain/errors/MailboxNotFoundError';
-import MailboxPolicy from '../domain/MailboxPolicy';
-import MailboxRepository from '../domain/repositories/MailboxRepository';
-import MailboxCoordinator from './MailboxCoordinator';
+import { MailboxNotFoundError } from '../../domain/errors/MailboxNotFoundError';
+import MailboxPolicy from '../../domain/MailboxPolicy';
+import MailboxRepository from '../../domain/repositories/MailboxRepository';
+import MailboxCoordinator from '../coordinate/MailboxCoordinator';
+import { MailboxReaderAddMessage } from './messages/MailboxReaderAddMessage';
 
 /**
  * Joins a device to a mailbox. Only an existing reader can add one: a post
@@ -17,11 +18,11 @@ export default class MailboxReaderAdder {
   ) {}
 
   /** Returns false when the hash is already a reader. */
-  public add(
-    mailboxId: string,
-    readToken: string,
-    readTokenHash: string,
-  ): Promise<boolean> {
+  public add(message: MailboxReaderAddMessage): Promise<boolean> {
+    const mailboxId = message.mailboxId.valueOf();
+    const readToken = message.readToken.valueOf();
+    const readTokenHash = message.readTokenHash.valueOf();
+
     return this.coordinator.run(async (): Promise<boolean> => {
       const mailbox = await this.repository.findById(mailboxId);
 

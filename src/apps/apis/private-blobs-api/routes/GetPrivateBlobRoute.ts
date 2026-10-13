@@ -1,4 +1,5 @@
-import PrivateBlobReader from '@app/contexts/private-blobs/application/PrivateBlobReader';
+import PrivateBlobReader from '@app/contexts/private-blobs/application/read/PrivateBlobReader';
+import { PrivateBlobReadMessage } from '@app/contexts/private-blobs/application/read/messages/PrivateBlobReadMessage';
 import { PrivateBlobRangeOutOfBoundsError } from '@app/contexts/private-blobs/domain/errors/PrivateBlobRangeOutOfBoundsError';
 import { Request, Response } from 'express';
 import { Get, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -19,9 +20,11 @@ export class GetPrivateBlobRoute extends PrivateBlobRouteSupport {
   ): Promise<Response> {
     try {
       const download = await this.reader.open(
-        blobId,
-        this.bearerToken(request),
-        PrivateBlobRangeHeader.parse(request.header('range')),
+        new PrivateBlobReadMessage(
+          blobId,
+          this.bearerToken(request),
+          PrivateBlobRangeHeader.parse(request.header('range')),
+        ),
       );
       const { range, size, stream } = download;
       const length = range ? range.end - range.start + 1 : size;

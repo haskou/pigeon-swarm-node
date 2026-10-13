@@ -1,7 +1,8 @@
-import { MailboxNotFoundError } from '../domain/errors/MailboxNotFoundError';
-import MailboxPolicy from '../domain/MailboxPolicy';
-import { MailboxReaderPrimitives } from '../domain/MailboxReaderPrimitives';
-import MailboxRepository from '../domain/repositories/MailboxRepository';
+import { MailboxNotFoundError } from '../../domain/errors/MailboxNotFoundError';
+import MailboxPolicy from '../../domain/MailboxPolicy';
+import { MailboxReaderPrimitives } from '../../domain/MailboxReaderPrimitives';
+import MailboxRepository from '../../domain/repositories/MailboxRepository';
+import { MailboxReaderListMessage } from './messages/MailboxReaderListMessage';
 
 /**
  * Lists reader hashes and acknowledged cursors for any reader. Only hashes
@@ -14,9 +15,11 @@ export default class MailboxReaderLister {
   ) {}
 
   public async list(
-    mailboxId: string,
-    readToken: string,
+    message: MailboxReaderListMessage,
   ): Promise<{ maxReaders: number; readers: MailboxReaderPrimitives[] }> {
+    const mailboxId = message.mailboxId.valueOf();
+    const readToken = message.readToken.valueOf();
+
     const mailbox = await this.repository.findById(mailboxId);
 
     if (!mailbox || !mailbox.acceptsRead(readToken)) {

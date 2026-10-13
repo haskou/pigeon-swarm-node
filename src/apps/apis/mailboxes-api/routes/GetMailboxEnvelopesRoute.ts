@@ -1,4 +1,5 @@
-import MailboxReader from '@app/contexts/mailboxes/application/MailboxReader';
+import MailboxReader from '@app/contexts/mailboxes/application/read/MailboxReader';
+import { MailboxReadMessage } from '@app/contexts/mailboxes/application/read/messages/MailboxReadMessage';
 import MailboxPolicy from '@app/contexts/mailboxes/domain/MailboxPolicy';
 import { Request, Response } from 'express';
 import {
@@ -29,12 +30,14 @@ export class GetMailboxEnvelopesRoute extends MailboxRouteSupport {
 
     try {
       const page = await this.reader.read(
-        id,
-        token,
-        Number.isSafeInteger(Number(after)) ? Math.max(Number(after), 0) : 0,
-        Number.isSafeInteger(Number(limit))
-          ? Number(limit)
-          : MailboxPolicy.MAX_PAGE,
+        new MailboxReadMessage(
+          id,
+          token,
+          Number.isSafeInteger(Number(after)) ? Math.max(Number(after), 0) : 0,
+          Number.isSafeInteger(Number(limit))
+            ? Number(limit)
+            : MailboxPolicy.MAX_PAGE,
+        ),
       );
 
       return response.setHeader('Cache-Control', 'no-store').json({

@@ -1,7 +1,8 @@
-import { MailboxNotFoundError } from '../domain/errors/MailboxNotFoundError';
-import MailboxRepository from '../domain/repositories/MailboxRepository';
-import MailboxCoordinator from './MailboxCoordinator';
-import MailboxEnvelopeNotifier from './MailboxEnvelopeNotifier';
+import { MailboxNotFoundError } from '../../domain/errors/MailboxNotFoundError';
+import MailboxRepository from '../../domain/repositories/MailboxRepository';
+import MailboxCoordinator from '../coordinate/MailboxCoordinator';
+import MailboxEnvelopeNotifier from '../notify/MailboxEnvelopeNotifier';
+import { MailboxRemoveMessage } from './messages/MailboxRemoveMessage';
 
 export default class MailboxRemover {
   constructor(
@@ -10,7 +11,10 @@ export default class MailboxRemover {
     private readonly notifier: MailboxEnvelopeNotifier,
   ) {}
 
-  public async remove(mailboxId: string, readToken: string): Promise<void> {
+  public async remove(message: MailboxRemoveMessage): Promise<void> {
+    const mailboxId = message.mailboxId.valueOf();
+    const readToken = message.readToken.valueOf();
+
     await this.coordinator.run(async (): Promise<void> => {
       const mailbox = await this.repository.findById(mailboxId);
 

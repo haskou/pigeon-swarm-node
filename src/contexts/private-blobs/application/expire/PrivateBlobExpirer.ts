@@ -1,8 +1,8 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import PrivateBlobPolicy from '../domain/PrivateBlobPolicy';
-import PrivateBlobBytesStore from '../domain/repositories/PrivateBlobBytesStore';
-import PrivateBlobRepository from '../domain/repositories/PrivateBlobRepository';
+import PrivateBlobPolicy from '../../domain/PrivateBlobPolicy';
+import PrivateBlobBytesStore from '../../domain/repositories/PrivateBlobBytesStore';
+import PrivateBlobRepository from '../../domain/repositories/PrivateBlobRepository';
 
 /** Retention, abandoned-upload cleanup and removal of orphaned bytes. */
 export default class PrivateBlobExpirer {
