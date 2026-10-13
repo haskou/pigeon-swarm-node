@@ -2,6 +2,7 @@ import IdentityAdmissionObserver from '@app/contexts/identities/application/obse
 import { IdentityAdmissionObservationMessage } from '@app/contexts/identities/application/observe-admission/messages/IdentityAdmissionObservationMessage';
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import { IdentityAdmissionDifficulty } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionDifficulty';
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { IdentityMetadataRecord } from '@app/contexts/identities/infrastructure/metadata/IdentityMetadataRecord';
 import OrbitDBIdentityAdmissionObservationProjection from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityAdmissionObservationProjection';
 import OrbitDBIdentityMetadataIndex from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex';
@@ -55,7 +56,6 @@ describe(OrbitDBIdentityAdmissionObservationProjection.name, () => {
 
       return Promise.resolve();
     });
-    metadataIndex.findByIdentityId.mockResolvedValue([]);
     projection = new OrbitDBIdentityAdmissionObservationProjection(
       registry,
       metadataIndex,
@@ -87,7 +87,7 @@ describe(OrbitDBIdentityAdmissionObservationProjection.name, () => {
     expect(observer.observe).toHaveBeenCalledWith(
       new IdentityAdmissionObservationMessage(record.identity, record.cid),
     );
-    expect(metadataIndex.findByIdentityId).not.toHaveBeenCalled();
+    expect(metadataIndex.findRetainedVersion).not.toHaveBeenCalled();
   });
 
   it('observes an update together with its known previous version', async () => {
@@ -95,12 +95,13 @@ describe(OrbitDBIdentityAdmissionObservationProjection.name, () => {
     const previous = recordOf(mother.build(), 'bafypreviousidentity');
     const update = recordOf(await mother.buildNext(), 'bafkupdate');
     metadataIndex.verifiedRecordOf.mockResolvedValue(update);
-    metadataIndex.findByIdentityId.mockResolvedValue([update, previous]);
+    metadataIndex.findRetainedVersion.mockReturnValue(previous);
 
     await listener(documentOf(update));
 
-    expect(metadataIndex.findByIdentityId).toHaveBeenCalledWith(
+    expect(metadataIndex.findRetainedVersion).toHaveBeenCalledWith(
       new IdentityId(update.identityId),
+      new IdentityExternalIdentifier(previous.cid),
     );
     expect(observer.observe).toHaveBeenCalledWith(
       new IdentityAdmissionObservationMessage(

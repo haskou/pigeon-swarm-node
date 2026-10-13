@@ -1,7 +1,7 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
-import { UniqueObjectArray, assert } from '@haskou/value-objects';
+import { Timestamp, UniqueObjectArray, assert } from '@haskou/value-objects';
 
 import { IdentitySignatureDomainService } from './domain-services/IdentitySignatureDomainService';
 import { IdentityMustHaveAtLeastOneNetworkError } from './errors/IdentityMustHaveAtLeastOneNetworkError';
@@ -104,6 +104,11 @@ export class Identity extends AggregateRoot {
       this.publication.getAdmissionNonce(),
       difficulty.valueOf(),
     );
+  }
+
+  /** Whether this version was signed close enough to `now` to count as a new admission. */
+  public isFreshAdmissionAt(now: Timestamp): boolean {
+    return this.publication.isFreshAdmissionAt(now);
   }
 
   /** Networks this version enters that `previous` was not already in. */

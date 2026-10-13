@@ -141,7 +141,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
       await Promise.all(
         this.registry
           .findCachedHeadsByPrefix('identity:')
-          .map((document) => this.verifiedRecord(document)),
+          .map((document) => this.verifiedRecordOf(document)),
       )
     ).filter(
       (document): document is IdentityMetadataRecord =>
@@ -152,22 +152,12 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     return [...this.retainedRecords(identityId), ...projected];
   }
 
-  private async verifiedRecord(
-    document: Record<string, unknown>,
-  ): Promise<IdentityMetadataRecord | undefined> {
-    const record = this.toRecord(document);
-
-    return record && (await this.hasCanonicalIdentity(record))
-      ? record
-      : undefined;
-  }
-
   private async findHead(
     key: string,
   ): Promise<IdentityMetadataRecord | undefined> {
     const document = await this.registry.findHead(key);
 
-    return document ? this.verifiedRecord(document) : undefined;
+    return document ? this.verifiedRecordOf(document) : undefined;
   }
 
   private async hasCanonicalIdentity(
@@ -346,9 +336,30 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     await this.projectPersistedDocument(document, true);
   }
 
+  /** A retained version of an identity, without touching the store or IPFS. */
+  public findRetainedVersion(
+    identityId: IdentityId,
+    externalIdentifier: IdentityExternalIdentifier,
+  ): IdentityMetadataRecord | undefined {
+    return this.candidatesByIdentityId
+      .get(identityId.valueOf())
+      ?.get(externalIdentifier.valueOf());
+  }
+
   public async projectDocument(
     document: Record<string, unknown>,
   ): Promise<void> {
     await this.projectPersistedDocument(document, false);
+  }
+
+  /** The record a replicated document holds, when its cid is the canonical one for its identity. */
+  public async verifiedRecordOf(
+    document: Record<string, unknown>,
+  ): Promise<IdentityMetadataRecord | undefined> {
+    const record = this.toRecord(document);
+
+    return record && (await this.hasCanonicalIdentity(record))
+      ? record
+      : undefined;
   }
 }

@@ -3,6 +3,7 @@ import CallSignalDeliveryMaintenanceRuntime from '@app/apps/runtimes/call-signal
 import CallTurnConfigurationRuntime from '@app/apps/runtimes/call-turn-configuration-runtime/CallTurnConfigurationRuntime';
 import IPFSRuntime from '@app/apps/runtimes/ipfs-runtime/IPFSRuntime';
 import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime';
+import OrbitDBIdentityAdmissionObservationRuntime from '@app/apps/runtimes/orbitdb-identity-admission-observation-runtime/OrbitDBIdentityAdmissionObservationRuntime';
 import OrbitDBIdentityMetadataProjectionRuntime from '@app/apps/runtimes/orbitdb-identity-metadata-projection-runtime/OrbitDBIdentityMetadataProjectionRuntime';
 import OrbitDBKeychainMetadataProjectionRuntime from '@app/apps/runtimes/orbitdb-keychain-metadata-projection-runtime/OrbitDBKeychainMetadataProjectionRuntime';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
@@ -18,6 +19,7 @@ export const applicationRuntimes: ApplicationServiceClass<Runtime>[] = [
   IPFSRuntime,
   OrbitDBReplicatedStateRuntime,
   OrbitDBIdentityMetadataProjectionRuntime,
+  OrbitDBIdentityAdmissionObservationRuntime,
   OrbitDBKeychainMetadataProjectionRuntime,
   OrbitDBCallProjectionRuntime,
   CallSignalDeliveryMaintenanceRuntime,

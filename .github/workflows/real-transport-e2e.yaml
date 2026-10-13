@@ -106,6 +106,10 @@ jobs:
         run: yarn test:e2e:real-transport:read-until
         timeout-minutes: 4
 
+      - name: Network-wide identity admission load
+        run: yarn test:e2e:real-transport:identity-admission-load
+        timeout-minutes: 4
+
   turn:
     name: Backend credentials against coturn
     needs: changes

@@ -14,6 +14,7 @@ package "identities.domain" {
     -publication: IdentityPublication
     +fromSignedPublication(primitives): Identity
     +hasValidAdmissionProof(difficulty = floor): boolean
+    +isFreshAdmissionAt(now): boolean
     +networksAddedSince(previous: Identity): NetworkId[]
   }
 
@@ -39,15 +40,20 @@ package "identities.domain" {
   class IdentityAdmissionDifficulty <<ValueObject>> {
     +FREE_ADMISSIONS_PER_WINDOW = 60
     +MAX_BITS = 20
+    +FRESHNESS_HORIZON_MS = 10 min
     +floor(): IdentityAdmissionDifficulty
+    +max(): IdentityAdmissionDifficulty
     +forRecentAdmissions(count): IdentityAdmissionDifficulty
+    +isFreshAdmission(signedAt, now): boolean
     +hardest(other): IdentityAdmissionDifficulty
   }
 
   note right of IdentityAdmissionDifficulty
-    Local API policy only: floor 16 bits,
+    API policy only: floor 16 bits,
     +1 bit per doubling above 60 admissions
-    per network per window, max 20.
+    per network per window (local plus
+    observed), max 20; max when signed
+    outside the freshness horizon.
     Replicated records stay valid at 16.
   end note
 
@@ -103,7 +109,12 @@ package "identities.domain" {
 
   interface IdentityAdmissionLoadRepository {
     +countRecent(networkId: NetworkId): Promise<number>
-    +record(networkIds: NetworkId[]): Promise<void>
+    +record(externalIdentifier, networkIds: NetworkId[]): Promise<void>
+  }
+
+  class IdentityAdmissionPricingDomainService {
+    +requiredFor(identity, networkIds, now): Promise<IdentityAdmissionDifficulty>
+    +charge(externalIdentifier, networkIds): Promise<void>
   }
 
   class IdentitySaverService {
@@ -134,6 +145,8 @@ package "identities.domain" {
   Identity ..> IdentitySignatureDomainService
   IdentityResolutionDomainService --> Identity
   IdentitySaverService --> IdentityRepository
+  IdentityAdmissionPricingDomainService --> IdentityAdmissionLoadRepository
+  IdentityAdmissionPricingDomainService ..> IdentityAdmissionDifficulty
   IdentityFinderService --> IdentityRepository
   IdentityFinderService --> IdentityResolutionDomainService
 }
@@ -156,10 +169,14 @@ package "identities.application" {
     +find(identityId: IdentityId): Promise<NetworkId[]>
   }
 
+  class IdentityAdmissionObserver {
+    +observe(message: IdentityAdmissionObservationMessage): Promise<void>
+  }
+
   IdentityPublisher --> IdentitySaverService
   IdentityPublisher --> IdentityRepository
-  IdentityPublisher --> IdentityAdmissionLoadRepository
-  IdentityPublisher ..> IdentityAdmissionDifficulty
+  IdentityPublisher --> IdentityAdmissionPricingDomainService
+  IdentityAdmissionObserver --> IdentityAdmissionPricingDomainService
   IdentityFinder --> IdentityFinderService
   IdentityCandidateRegistrar --> IdentityRepository
   IdentityNetworksFinder --> IdentityNetworkRepository
@@ -213,6 +230,8 @@ package "identities.infrastructure" {
     +save(identity, externalIdentifier): Promise<void>
     +findByIdentityId(identityId): Promise<IdentityMetadataRecord[]>
     +findByHandle(handle): Promise<IdentityMetadataRecord[]>
+    +findRetainedVersion(identityId, externalIdentifier): IdentityMetadataRecord
+    +verifiedRecordOf(document): Promise<IdentityMetadataRecord>
   }
 
   class MetadataIdentityNetworkRepository {
@@ -221,12 +240,25 @@ package "identities.infrastructure" {
 
   class LocalIdentityAdmissionLoadRepository {
     +countRecent(networkId): Promise<number>
-    +record(networkIds): Promise<void>
+    +record(externalIdentifier, networkIds): Promise<void>
   }
 
   note right of LocalIdentityAdmissionLoadRepository
     Fixed 60 s window in the node's local
     database, keyed by network id only.
+    A (network, cid) sighting is kept for
+    twice the freshness horizon, so each
+    version counts once per network.
+  end note
+
+  class OrbitDBIdentityAdmissionObservationProjection {
+    +start(): Promise<void>
+  }
+
+  note right of OrbitDBIdentityAdmissionObservationProjection
+    Skips stale documents on their signed
+    time before any verification; counts
+    only canonical-cid records.
   end note
 
   class IpfsIdentityRepository {
@@ -249,6 +281,8 @@ package "identities.infrastructure" {
   MetadataIdentityNetworkRepository ..|> IdentityNetworkRepository
   LocalIdentityAdmissionLoadRepository ..|> IdentityAdmissionLoadRepository
   OrbitDBIdentityMetadataIndex ..|> IdentityMetadataIndex
+  OrbitDBIdentityAdmissionObservationProjection --> OrbitDBIdentityMetadataIndex
+  OrbitDBIdentityAdmissionObservationProjection --> IdentityAdmissionObserver
   OrbitDBIdentityMetadataIndex --> IdentityHandleOwnershipDomainService
   IpfsIdentityRepository --> IdentityHandleOwnershipDomainService
   IpfsIdentityRepository --> IpfsIdentityDocument
