@@ -32,7 +32,9 @@ export class IdentityAdmissionDifficulty extends Integer {
   }
 
   public static max(): IdentityAdmissionDifficulty {
-    return new IdentityAdmissionDifficulty(IdentityAdmissionDifficulty.MAX_BITS);
+    return new IdentityAdmissionDifficulty(
+      IdentityAdmissionDifficulty.MAX_BITS,
+    );
   }
 
   /** Difficulty for a network that counted `recentAdmissions` admissions in the current window. */

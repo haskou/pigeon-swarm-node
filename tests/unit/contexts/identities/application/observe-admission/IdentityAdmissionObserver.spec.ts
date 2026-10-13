@@ -83,10 +83,7 @@ describe(IdentityAdmissionObserver.name, () => {
   });
 
   it('ignores admissions signed outside the freshness horizon', async () => {
-    for (const timestamp of [
-      signedAt - HORIZON - 1,
-      signedAt + HORIZON + 1,
-    ]) {
+    for (const timestamp of [signedAt - HORIZON - 1, signedAt + HORIZON + 1]) {
       const identity = await genesisProvenAt(16, timestamp);
 
       await observer.observe(

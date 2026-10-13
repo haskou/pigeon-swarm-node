@@ -39,8 +39,8 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { teardownAndExit } from './RealTransportTeardown';
 import { mineAdmissionNonce } from '../../support/mineAdmissionNonce';
+import { teardownAndExit } from './RealTransportTeardown';
 
 /**
  * Node `admitting` saves identity admissions into a network over real libp2p
@@ -223,7 +223,10 @@ async function admission(timestamp: number, bits: number): Promise<Identity> {
     ),
   );
 
-  return Identity.fromPrimitives({ ...unsigned, signature: signature.valueOf() });
+  return Identity.fromPrimitives({
+    ...unsigned,
+    signature: signature.valueOf(),
+  });
 }
 
 async function admissions(
@@ -361,7 +364,9 @@ async function main(): Promise<void> {
 }
 
 const watchdog = setTimeout(() => {
-  console.error(`FAIL two-node identity admission load deadline during ${stage}`);
+  console.error(
+    `FAIL two-node identity admission load deadline during ${stage}`,
+  );
   process.exit(1);
 }, 220000);
 

@@ -10,6 +10,8 @@ export class IdentityAdmissionObservationMessage {
     externalIdentifier: string,
     public readonly previous?: Identity,
   ) {
-    this.externalIdentifier = new IdentityExternalIdentifier(externalIdentifier);
+    this.externalIdentifier = new IdentityExternalIdentifier(
+      externalIdentifier,
+    );
   }
 }

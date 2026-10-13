@@ -12,9 +12,10 @@ export default class LocalIdentityAdmissionLoadRepository extends IdentityAdmiss
   /** A version stays fresh for at most twice the horizon after it is first seen. */
   private static readonly SIGHTING_RETENTION_MS =
     2 * IdentityAdmissionDifficulty.FRESHNESS_HORIZON_MS;
-  private pending: Promise<void> = Promise.resolve();
 
   public static readonly OBSERVED_NAMESPACE = 'identity_admission_observed';
+
+  private pending: Promise<void> = Promise.resolve();
 
   constructor(private readonly database: EmbeddedLocalDatabase) {
     super();
@@ -72,7 +73,7 @@ export default class LocalIdentityAdmissionLoadRepository extends IdentityAdmiss
       }
     });
 
-    this.pending = recorded.catch(() => undefined);
+    this.pending = recorded.catch((): void => undefined);
 
     return recorded;
   }

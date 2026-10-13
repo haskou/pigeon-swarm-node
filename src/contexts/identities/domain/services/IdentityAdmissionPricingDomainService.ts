@@ -21,6 +21,7 @@ export default class IdentityAdmissionPricingDomainService {
     now: Timestamp = Timestamp.now(),
   ): Promise<IdentityAdmissionDifficulty> {
     if (networkIds.length === 0) return IdentityAdmissionDifficulty.floor();
+
     if (!identity.isFreshAdmissionAt(now)) {
       return IdentityAdmissionDifficulty.max();
     }

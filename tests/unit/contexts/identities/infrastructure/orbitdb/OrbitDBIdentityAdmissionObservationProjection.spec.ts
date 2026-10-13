@@ -114,9 +114,9 @@ describe(OrbitDBIdentityAdmissionObservationProjection.name, () => {
 
   it('skips stale documents before verifying them', async () => {
     const record = recordOf(new IdentityMother().build(), 'bafkstale');
-    jest.spyOn(Date, 'now').mockReturnValue(
-      new IdentityMother().timestamp.valueOf() + HORIZON + 1,
-    );
+    jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(new IdentityMother().timestamp.valueOf() + HORIZON + 1);
 
     await listener(documentOf(record));
 

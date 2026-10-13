@@ -10,7 +10,9 @@ import { IdentityAdmissionObservationMessage } from './messages/IdentityAdmissio
  * replayed history and underpaid floods cannot raise honest prices.
  */
 export default class IdentityAdmissionObserver {
-  constructor(private readonly pricing: IdentityAdmissionPricingDomainService) {}
+  constructor(
+    private readonly pricing: IdentityAdmissionPricingDomainService,
+  ) {}
 
   public async observe(
     message: IdentityAdmissionObservationMessage,

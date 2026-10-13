@@ -40,7 +40,9 @@ describe(IdentityAdmissionPricingDomainService.name, () => {
       new Timestamp(signedAt),
     );
 
-    expect(required.valueOf()).toBe(IdentityAdmissionDifficulty.floor().valueOf());
+    expect(required.valueOf()).toBe(
+      IdentityAdmissionDifficulty.floor().valueOf(),
+    );
   });
 
   it('asks the hardest requirement among the entered networks', async () => {
@@ -80,7 +82,9 @@ describe(IdentityAdmissionPricingDomainService.name, () => {
       new Timestamp(signedAt + HORIZON * 100),
     );
 
-    expect(required.valueOf()).toBe(IdentityAdmissionDifficulty.floor().valueOf());
+    expect(required.valueOf()).toBe(
+      IdentityAdmissionDifficulty.floor().valueOf(),
+    );
     expect(load.countRecent).not.toHaveBeenCalled();
   });
 
