@@ -3,14 +3,14 @@ import { assert, StringValueObject } from '@haskou/value-objects';
 import { InvalidContentReplicationContextError } from '../errors/InvalidContentReplicationContextError';
 
 export class ContentReplicationContext extends StringValueObject {
-  public static readonly PRIVATE_UPLOAD = 'ipfs_private_upload';
   public static readonly PUBLIC_UPLOAD = 'ipfs_public_upload';
 
+  /**
+   * Only public uploads are replicated. Private attachments never reach IPFS
+   * (#290), so the former `ipfs_private_upload` context is refused.
+   */
   public static isKnown(value: string): boolean {
-    return [
-      ContentReplicationContext.PRIVATE_UPLOAD,
-      ContentReplicationContext.PUBLIC_UPLOAD,
-    ].includes(value);
+    return value === ContentReplicationContext.PUBLIC_UPLOAD;
   }
 
   constructor(value: string | StringValueObject) {
@@ -19,13 +19,5 @@ export class ContentReplicationContext extends StringValueObject {
       ContentReplicationContext.isKnown(this.valueOf()),
       new InvalidContentReplicationContextError(this.valueOf()),
     );
-  }
-
-  public isPublicUpload(): boolean {
-    return this.valueOf() === ContentReplicationContext.PUBLIC_UPLOAD;
-  }
-
-  public isReplicatedAsBytes(): boolean {
-    return this.isPublicUpload();
   }
 }

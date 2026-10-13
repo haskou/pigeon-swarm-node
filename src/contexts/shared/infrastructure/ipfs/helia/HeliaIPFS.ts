@@ -733,25 +733,31 @@ export abstract class HeliaIPFS implements IPFSConnection {
     }
   }
 
+  private async enqueueProviderPublication(
+    task: () => Promise<void>,
+  ): Promise<void> {
+    const previousPublication = this.providerPublicationQueue;
+    const { promise, resolve } = Promise.withResolvers<void>();
+
+    this.providerPublicationQueue = promise;
+
+    await previousPublication;
+
+    try {
+      await task();
+    } finally {
+      resolve();
+    }
+  }
+
   private async publishContentProvider(
     parsedCid: ParsedCidLike,
     cid: IPFSId,
     signal?: AbortSignal,
   ): Promise<void> {
-    const previousPublication = this.providerPublicationQueue;
-    let release: () => void = () => undefined;
-
-    this.providerPublicationQueue = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-
-    await previousPublication;
-
-    try {
-      await this.publishContentProviderNow(parsedCid, cid, signal);
-    } finally {
-      release();
-    }
+    await this.enqueueProviderPublication(() =>
+      this.publishContentProviderNow(parsedCid, cid, signal),
+    );
   }
 
   private queueContentProviderRetry(cid: IPFSId): void {
@@ -1131,6 +1137,27 @@ export abstract class HeliaIPFS implements IPFSConnection {
     }
 
     await this.publishContentProvider(parsedCid, cid, signal);
+  }
+
+  public async stopProvidingContent(cid: IPFSId): Promise<void> {
+    const services = this.heliaCore.libp2p.services as unknown as {
+      dht?: { cancelReprovide(cid: ParsedCidLike): Promise<void> };
+    };
+    const dht = services.dht;
+
+    if (!dht) {
+      return;
+    }
+
+    const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
+      cid.valueOf(),
+    );
+
+    await this.enqueueProviderPublication(async () => {
+      this.pendingContentProviderCids.delete(cid.valueOf());
+      this.automaticProviderPublicationAttempts.delete(cid.valueOf());
+      await dht.cancelReprovide(parsedCid);
+    });
   }
 
   public async putRecord(

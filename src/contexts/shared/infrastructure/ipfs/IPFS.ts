@@ -167,18 +167,6 @@ export default class IPFS {
     );
   }
 
-  public async getJSONFromNetwork<T>(
-    cid: IPFSId,
-    networkId: string,
-    maxBytes?: number,
-  ): Promise<T> {
-    await this.initialize();
-
-    const network = this.registry.find(networkId);
-
-    return network.getJSON<T>(cid, undefined, maxBytes);
-  }
-
   public async getJSONFromNetworks<T>(
     cid: IPFSId,
     networkIds: string[],
@@ -229,6 +217,17 @@ export default class IPFS {
     const network = this.registry.find(networkId);
 
     await network.provideContent(cid, signal);
+  }
+
+  public async stopProvidingContentFromNetwork(
+    cid: IPFSId,
+    networkId: string,
+  ): Promise<void> {
+    await this.initialize();
+
+    const network = this.registry.find(networkId);
+
+    await network.stopProvidingContent(cid);
   }
 
   public async getRecord(key: string): Promise<string | undefined> {

@@ -19,13 +19,13 @@ export default abstract class ReplicatedContentStorage {
     maxBytes?: number,
   ): Promise<Buffer>;
 
-  public abstract findJSONInNetwork<T>(
+  public abstract provideInNetwork(
     contentId: ContentId,
     networkId: NetworkId,
-    maxBytes?: number,
-  ): Promise<T>;
+  ): Promise<void>;
 
-  public abstract provideInNetwork(
+  /** Stops announcing this node's provider record; the bytes stay pinned. */
+  public abstract stopProvidingInNetwork(
     contentId: ContentId,
     networkId: NetworkId,
   ): Promise<void>;

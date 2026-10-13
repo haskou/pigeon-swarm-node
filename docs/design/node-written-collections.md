@@ -424,7 +424,7 @@ per `(networkId, cid)`:
   "id": "content:<networkId>:<cid>",
   "cid": "<cid>",
   "networkId": "<networkId>",
-  "context": "ipfs_public_upload | ipfs_private_upload",
+  "context": "ipfs_public_upload",
   "sizeBytes": 215040,
   "ownerIdentityId": "<identityId>",
   "mutation": { /* PublicMutationProof, author == ownerIdentityId */ }
@@ -439,8 +439,9 @@ entirely. Deletion (`kind: delete`) by the owner removes the replication intent.
 ### Admission policy
 
 - id recomputes; author == `ownerIdentityId`; `networkId` is a network of the
-  owner identity; `context` is one of the two known values; `sizeBytes` is an
-  integer in `[1, maxContentSizeBytes]`.
+  owner identity; `context` is `ipfs_public_upload` (private attachments are
+  never replicated, see `private-blob-store.md`); `sizeBytes` is an integer in
+  `[1, maxContentSizeBytes]`.
 - Per-identity, per-network quota: the sum of `sizeBytes` of the owner's live
   records (derived locally) must stay within a configurable quota; records over
   quota are rejected. This bounds abuse by a registered identity (without it a

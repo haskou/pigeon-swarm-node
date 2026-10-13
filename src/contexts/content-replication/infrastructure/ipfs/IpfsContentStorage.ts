@@ -62,20 +62,6 @@ export default class IpfsContentStorage extends ReplicatedContentStorage {
     );
   }
 
-  public findJSONInNetwork<T>(
-    contentId: ContentId,
-    networkId: NetworkId,
-    maxBytes?: number,
-  ): Promise<T> {
-    return this.translateNotFound(contentId, () =>
-      this.ipfs.getJSONFromNetwork<T>(
-        this.toIpfsId(contentId),
-        networkId.valueOf(),
-        maxBytes,
-      ),
-    );
-  }
-
   public async provideInNetwork(
     contentId: ContentId,
     networkId: NetworkId,
@@ -92,6 +78,16 @@ export default class IpfsContentStorage extends ReplicatedContentStorage {
 
       await this.ipfs.provideContentFromNetwork(ipfsId, networkId.valueOf());
     });
+  }
+
+  public async stopProvidingInNetwork(
+    contentId: ContentId,
+    networkId: NetworkId,
+  ): Promise<void> {
+    await this.ipfs.stopProvidingContentFromNetwork(
+      this.toIpfsId(contentId),
+      networkId.valueOf(),
+    );
   }
 
   public isRawContent(contentId: ContentId): Promise<boolean> {

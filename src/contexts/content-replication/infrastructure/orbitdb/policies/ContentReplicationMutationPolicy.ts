@@ -78,30 +78,6 @@ export default class ContentReplicationMutationPolicy extends PublicMutationPoli
     throw new InvalidPublicMutationError();
   }
 
-  private async isGenuine(record: Record<string, unknown>): Promise<boolean> {
-    const proof = PublicMutationRecord.proofOf(record);
-
-    if (!proof || record.removed === true) return false;
-
-    try {
-      const expectation = this.expectationOf(
-        PublicMutationRecord.payloadOf(record),
-      );
-
-      if (this.verifiedDigests.has(proof.digest())) return true;
-
-      await this.verifier.verify(proof, {
-        ...expectation,
-        payload: PublicMutationRecord.payloadOf(record),
-      });
-      this.verifiedDigests.add(proof.digest());
-
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
   /**
    * Admission depends only on the set of the owner's genuine records, ordered
    * by id, so every node reaches the same verdict whatever order they arrived in.
@@ -138,6 +114,30 @@ export default class ContentReplicationMutationPolicy extends PublicMutationPoli
       usedBytes + (record.sizeBytes as number) > this.limits.quotaBytes
     ) {
       throw new InvalidPublicMutationError();
+    }
+  }
+
+  public async isGenuine(record: Record<string, unknown>): Promise<boolean> {
+    const proof = PublicMutationRecord.proofOf(record);
+
+    if (!proof || record.removed === true) return false;
+
+    try {
+      const expectation = this.expectationOf(
+        PublicMutationRecord.payloadOf(record),
+      );
+
+      if (this.verifiedDigests.has(proof.digest())) return true;
+
+      await this.verifier.verify(proof, {
+        ...expectation,
+        payload: PublicMutationRecord.payloadOf(record),
+      });
+      this.verifiedDigests.add(proof.digest());
+
+      return true;
+    } catch {
+      return false;
     }
   }
 
