@@ -5782,11 +5782,12 @@ The node checks, in order:
 
 Success returns `200` with `{ identityId, generation, authorizationRevision }`.
 
-Each entry signature covers this preimage, serialized with `JSON.stringify` in
-exactly this key order:
+Each entry signature covers this preimage, serialized with `JSON.stringify`
+with keys in exactly this (alphabetical) order. Every credential and the
+identity id is the body-only base64 form, without the PEM header and footer:
 
 ```json
-{"purpose":"pigeon:device-sealed-secret:v1","identityId":"<identity id>","generation":3,"authorizationRevision":2,"publisherCredential":"<device credential>","recipientCredential":"<device credential>","sealedSecret":"v2.x25519-hkdf-sha256-aes-256-gcm.…"}
+{"authorizationRevision":2,"generation":3,"identityId":"<identity id>","publisherCredential":"<device credential>","purpose":"pigeon:device-sealed-secret:v1","recipientCredential":"<device credential>","sealedSecret":"v2.x25519-hkdf-sha256-aes-256-gcm.…"}
 ```
 
 Read the caller's own entry of the stored generation with:
