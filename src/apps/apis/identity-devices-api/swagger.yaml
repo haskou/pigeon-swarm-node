@@ -209,6 +209,14 @@ paths:
         pairingExpiration, pairingId, previousRevision, revision,
         targetCredential, targetCredentialCommitment. Each compromisedCredentials
         entry writes compromisedSince before credential.
+
+        A device retiring itself (revocation with authorCredential equal to
+        targetCredential, without compromisedSince or compromisedCredentials)
+        may add sealedSecrets to hand over the next sealed secret generation to
+        the remaining devices. The node takes the transition revision as
+        authorizationRevision and authorCredential as publisherCredential for
+        the entry signature preimage, and validates the hand-over before the
+        transition is applied. The body limit is 1 MB.
       requestBody:
         required: true
         content:
@@ -221,11 +229,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DeviceAuthorization'
+                $ref: '#/components/schemas/DeviceAuthorizationTransitionResult'
         '400':
-          description: Malformed transition.
+          description: Malformed transition, or sealedSecrets on a transition that does not retire its author (code 400030).
         '409':
-          description: Expired, replayed, causally stale or unauthorized transition.
+          description: Expired, replayed, causally stale or unauthorized transition, or a hand-over that is not sealed to exactly the remaining devices, not signed by the retiring device, or not newer than the stored generation.
         '429':
           description: Per-identity (20 per minute) or per-node (300 per minute) transition rate limit exceeded (code 429030).
 components:
@@ -329,6 +337,8 @@ components:
         revision:
           type: integer
           minimum: 1
+        sealedSecrets:
+          $ref: '#/components/schemas/DeviceSealedSecretHandover'
         signature:
           type: string
           description: Signature made by an authorized device or the recovery authority over the transition and target proof of possession.
@@ -388,6 +398,43 @@ components:
         revision:
           type: integer
           minimum: 0
+    DeviceAuthorizationTransitionResult:
+      allOf:
+        - $ref: '#/components/schemas/DeviceAuthorization'
+        - type: object
+          properties:
+            sealedSecrets:
+              type: object
+              description: Present only when the handed-over generation was stored. Absent when a concurrent transition or publish won the race; the retirement is applied either way.
+              required:
+                - authorizationRevision
+                - generation
+              properties:
+                authorizationRevision:
+                  type: integer
+                  minimum: 1
+                generation:
+                  type: integer
+                  minimum: 1
+    DeviceSealedSecretHandover:
+      type: object
+      additionalProperties: false
+      description: Self-retirement only. The next sealed secret generation for the devices that remain after the retirement.
+      required:
+        - generation
+        - entries
+      properties:
+        generation:
+          type: integer
+          minimum: 1
+          description: Must be strictly greater than the stored generation.
+        entries:
+          type: array
+          minItems: 1
+          maxItems: 128
+          description: Exactly one entry per credential that remains authorized after the retirement, each signed by the retiring device.
+          items:
+            $ref: '#/components/schemas/DeviceSealedSecretEntry'
     DeviceSealedSecretPublication:
       type: object
       required:

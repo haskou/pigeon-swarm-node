@@ -42,3 +42,39 @@ Feature: Device sealed secret route
     Given I sign the current sealed secret delivery request
     When I GET the current sealed secret delivery
     Then response code is equal to 404
+
+  Scenario: Hand over the sealed root when a device retires itself
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "sealed-secret-network"
+    And I set a client-signed identity body with name "sealed handover" and handle "sealed-handover"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I set a signed device enrollment transition body
+    When I POST to "/identity-devices/transitions"
+    Then response code is equal to 200
+    Given I set a signed self-retirement transition body for the enrolled device
+    And I attach sealed secrets for the remaining devices with generation 2
+    When I POST to "/identity-devices/transitions"
+    Then response code is equal to 200
+    And response contains a valid resource with the following fields
+      | revision                            | 2 |
+      | sealedSecrets.authorizationRevision | 2 |
+      | sealedSecrets.generation            | 2 |
+    Given I sign the current sealed secret delivery request
+    When I GET the current sealed secret delivery
+    Then response code is equal to 200
+    And response contains a valid resource with the following fields
+      | authorizationRevision | 2 |
+      | generation            | 2 |
+
+  Scenario: Reject sealed secrets on a transition that does not retire its author
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "sealed-secret-network"
+    And I set a client-signed identity body with name "sealed enrollment" and handle "sealed-enrollment"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I set a signed device enrollment transition body
+    And I attach sealed secrets for the remaining devices with generation 2
+    When I POST to "/identity-devices/transitions"
+    Then response code is equal to 400
+    And the genesis device authorization checkpoint exists

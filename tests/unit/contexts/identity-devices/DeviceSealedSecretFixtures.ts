@@ -8,6 +8,7 @@ import {
   DeviceSealedSecretEntryPrimitives,
 } from '@app/contexts/identity-devices/domain/DeviceSealedSecretBundle';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
+import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { PairingAuthorization } from '@app/contexts/identity-devices/domain/value-objects/PairingAuthorization';
@@ -122,4 +123,24 @@ export function bundleOf(
     publisherCredential: credentialOf(input.publisher),
     ...input,
   });
+}
+
+export function retirementOf(input: {
+  author: KeyPair;
+  compromisedSince?: number;
+  identityId: string;
+  previousRevision: number;
+  target: KeyPair;
+}): DeviceAuthorizationTransition {
+  return DeviceAuthorizationTransition.revocation(
+    new IdentityId(input.identityId),
+    DeviceAuthorizationOperationId.generate(),
+    new DeviceAuthorizationRevision(input.previousRevision),
+    DeviceCredential.fromString(input.author.toPrimitives().publicKey),
+    DeviceCredential.fromString(input.target.toPrimitives().publicKey),
+    DeviceAuthorizationEpoch.genesis(),
+    input.compromisedSince === undefined
+      ? undefined
+      : new DeviceAuthorizationRevision(input.compromisedSince),
+  );
 }

@@ -4,6 +4,7 @@ import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { UniqueObjectArray } from '@haskou/value-objects';
 
 import { DeviceAuthorization } from './DeviceAuthorization';
+import { DeviceAuthorizationTransition } from './DeviceAuthorizationTransition';
 import { DeviceSealedSecretEntry } from './DeviceSealedSecretEntry';
 import { DeviceSealedSecretGenerationStaleError } from './errors/DeviceSealedSecretGenerationStaleError';
 import { DeviceSealedSecretNotFoundError } from './errors/DeviceSealedSecretNotFoundError';
@@ -173,7 +174,7 @@ export class DeviceSealedSecretBundle {
     }
   }
 
-  public assertPublishableBy(authorization: DeviceAuthorization): void {
+  private assertBuiltFor(authorization: DeviceAuthorization): void {
     if (!this.identityId.isEqual(authorization.getIdentityId())) {
       throw new InvalidDeviceSealedSecretBundleError(
         'bundle is addressed to another identity',
@@ -183,20 +184,10 @@ export class DeviceSealedSecretBundle {
     if (!authorization.getRevision().isEqual(this.authorizationRevision)) {
       throw new DeviceSealedSecretRevisionMismatchError();
     }
+  }
 
-    if (!authorization.isAuthorized(this.publisherCredential)) {
-      throw new DeviceSealedSecretPublisherNotAuthorizedError();
-    }
-
-    const authorized = UniqueObjectArray.fromArray(
-      authorization.getCredentials(),
-    );
-    const recipients = this.entries.map((entry) => entry.recipientCredential);
-
-    if (
-      authorized.length !== recipients.length ||
-      recipients.some((recipient) => !authorized.includes(recipient))
-    ) {
+  private assertSealedFor(authorization: DeviceAuthorization): void {
+    if (!this.hasRecipients(authorization)) {
       throw new DeviceSealedSecretRecipientsMismatchError();
     }
 
@@ -205,6 +196,73 @@ export class DeviceSealedSecretBundle {
         throw new InvalidDeviceSealedSecretSignatureError();
       }
     }
+  }
+
+  private hasRecipients(authorization: DeviceAuthorization): boolean {
+    const authorized = UniqueObjectArray.fromArray(
+      authorization.getCredentials(),
+    );
+    const recipients = this.entries.map((entry) => entry.recipientCredential);
+
+    return (
+      authorized.length === recipients.length &&
+      recipients.every((recipient) => authorized.includes(recipient))
+    );
+  }
+
+  private isRetirementOfPublisher(
+    retirement: DeviceAuthorizationTransition,
+  ): boolean {
+    return (
+      retirement.isRevocation() &&
+      retirement.getIdentityId().isEqual(this.identityId) &&
+      retirement.getCompromisedSince() === undefined &&
+      retirement.getCompromisedCredentials().length === 0 &&
+      retirement.getAuthorCredential().isEqual(this.publisherCredential) &&
+      retirement.getTargetCredential().isEqual(this.publisherCredential)
+    );
+  }
+
+  public assertPublishableBy(authorization: DeviceAuthorization): void {
+    this.assertBuiltFor(authorization);
+
+    if (!authorization.isAuthorized(this.publisherCredential)) {
+      throw new DeviceSealedSecretPublisherNotAuthorizedError();
+    }
+
+    this.assertSealedFor(authorization);
+  }
+
+  /**
+   * A hand-over is published by a device that retires itself: it seals a fresh
+   * generation to the devices that remain once its own revocation applies.
+   */
+  public assertHandedOverBy(
+    retirement: DeviceAuthorizationTransition,
+    authorization: DeviceAuthorization,
+  ): void {
+    if (!this.isRetirementOfPublisher(retirement)) {
+      throw new InvalidDeviceSealedSecretBundleError(
+        'only a device retiring itself hands over sealed secrets',
+      );
+    }
+
+    if (!authorization.isAuthorized(this.publisherCredential)) {
+      throw new DeviceSealedSecretPublisherNotAuthorizedError();
+    }
+
+    const remaining = authorization.revoke(this.publisherCredential);
+
+    this.assertBuiltFor(remaining);
+    this.assertSealedFor(remaining);
+  }
+
+  public isAddressedTo(authorization: DeviceAuthorization): boolean {
+    return (
+      this.identityId.isEqual(authorization.getIdentityId()) &&
+      authorization.getRevision().isEqual(this.authorizationRevision) &&
+      this.hasRecipients(authorization)
+    );
   }
 
   public assertSupersedes(stored: DeviceSealedSecretBundle | undefined): void {

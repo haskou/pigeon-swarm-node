@@ -170,16 +170,55 @@ recipientCredential, sealedSecret, signature }`.
 The response never includes other devices' entries, the authorized-device
 list, the head commitments, or any decrypted material.
 
+### Hand-over at retirement (`POST /identity-devices/transitions`)
+
+A device that forgets itself cannot rely on a remaining device being online to
+publish the next generation, and once its own revocation lands it can no
+longer `PUT`. So a self-retirement may carry the next generation:
+`sealedSecrets: { generation, entries }` on the transition body. The retiring
+device mints the fresh payload in memory and seals it only to the devices that
+remain, so the revocation and the new generation land together.
+
+- Allowed only on a revocation whose author is its target, without
+  `compromisedSince` or `compromisedCredentials`. Anything else is `400`
+  (`InvalidDeviceSealedSecretBundleError`). A compromise revocation is signed by
+  another device, which publishes with `PUT` instead.
+- The bundle's `authorizationRevision` is the transition `revision` and its
+  `publisherCredential` is the transition `authorCredential`; entries are
+  signed over the same preimage. A recipient that checks publisher membership
+  checks it at `authorizationRevision - 1`, the last revision at which the
+  publisher was authorized.
+- Before applying, the node checks that the publisher is authorized at the
+  head, that the retirement leaves at least one device, that recipients are
+  exactly the credentials remaining after it, that every signature verifies,
+  and that the generation is newer than the stored one. Any failure applies
+  nothing.
+- After applying, the bundle is stored only when the applied head is exactly
+  the one it was sealed for. A concurrent transition or publish that wins the
+  race leaves the retirement applied without the hand-over; the response then
+  omits `sealedSecrets`, and the remaining devices rotate on their next unlock.
+
+Letting a revoked device `PUT` afterwards was rejected: it would weaken the
+invariant that a revoked credential gets `401` everywhere. The hand-over gives a
+stolen authorized key no new power, since that key could already `PUT` a
+generation of its choice before being revoked.
+
 ## Residual races and staleness
 
 - A transition can land between the head read in step 1 and the store in
   step 7. A revoked device is still refused on `GET` by the head check, so
   this is safe. A device enrolled in the gap gets `404` until republish.
-- After a revocation, remaining devices keep reading the previous generation.
-  That is intentional and is what makes the change zero-friction. The revoked
-  device was already a recipient of that generation and holds its secrets. The
-  revocation fix comes from the new generation, which the owner must publish.
-  The node cannot force that.
+- After a revocation without a hand-over, remaining devices keep reading the
+  previous generation. That is intentional and is what makes the change
+  zero-friction. The revoked device was already a recipient of that
+  generation and holds its secrets. The revocation fix comes from the new
+  generation, which the owner must publish. The node cannot force that. A
+  device that forgets itself avoids the gap by handing over the next
+  generation with its retirement.
+- A retiring device that hands over a generation knows it, like every
+  publisher. The hand-over protects against copies of the device's storage
+  and against later compromise of an honest device, not against a device that
+  was already dishonest when it retired.
 
 ## What a compromised device can still do
 
@@ -245,5 +284,8 @@ be rotated in place.
    has seen. It opens the sealed payload with `KeyPair.decrypt`.
 4. After revocation, the owner publishes the next generation, then runs the
    mailbox readers procedure (`opaque-mailboxes.md`), and rotates the keychain
-   key and re-encrypts keychain content.
+   key and re-encrypts keychain content. A device that forgets itself instead
+   hands over the next generation on its own retirement, sealed to the
+   remaining devices, and treats it as delivered only when the response carries
+   `sealedSecrets`.
 5. Never log the sealed payload, the decrypted payload, topics or addresses.

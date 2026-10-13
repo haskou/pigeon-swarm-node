@@ -1,14 +1,11 @@
 import DeviceSealedSecretPublisher from '@app/contexts/identity-devices/application/publish/DeviceSealedSecretPublisher';
 import { PublishDeviceSealedSecretBundleMessage } from '@app/contexts/identity-devices/application/publish/messages/PublishDeviceSealedSecretBundleMessage';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
-import { DeviceSealedSecretBundle } from '@app/contexts/identity-devices/domain/DeviceSealedSecretBundle';
 import { DeviceAuthorizationNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceAuthorizationNotFoundError';
-import { DeviceSealedSecretNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretNotFoundError';
 import { DeviceSealedSecretGenerationStaleError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretGenerationStaleError';
 import { DeviceSealedSecretRevisionMismatchError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretRevisionMismatchError';
 import { InvalidDeviceSealedSecretBundleError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceSealedSecretBundleError';
 import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
-import { DeviceSealedSecretRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
@@ -19,32 +16,7 @@ import {
   sealedEntry,
   singleDeviceFixture,
 } from '../../DeviceSealedSecretFixtures';
-
-class InMemoryDeviceSealedSecretRepository extends DeviceSealedSecretRepository {
-  public readonly stored = new Map<string, DeviceSealedSecretBundle>();
-
-  public async has(identityId: IdentityId): Promise<boolean> {
-    return this.stored.has(identityId.valueOf());
-  }
-
-  public async require(
-    identityId: IdentityId,
-  ): Promise<DeviceSealedSecretBundle> {
-    const bundle = this.stored.get(identityId.valueOf());
-
-    if (!bundle) {
-      throw new DeviceSealedSecretNotFoundError();
-    }
-
-    return bundle;
-  }
-
-  public async replaceIfNewer(bundle: DeviceSealedSecretBundle): Promise<void> {
-    const key = bundle.getIdentityId().valueOf();
-    bundle.assertSupersedes(this.stored.get(key));
-    this.stored.set(key, bundle);
-  }
-}
+import { InMemoryDeviceSealedSecretRepository } from '../../InMemoryDeviceSealedSecretRepository';
 
 describe(DeviceSealedSecretPublisher.name, () => {
   let sealedSecrets: InMemoryDeviceSealedSecretRepository;
