@@ -13,10 +13,10 @@ import { mock } from 'jest-mock-extended';
 import {
   bundleOf,
   enrolledDeviceFixture,
-  InMemoryDeviceSealedSecretRepository,
   sealedEntry,
   singleDeviceFixture,
 } from '../../DeviceSealedSecretFixtures';
+import { InMemoryDeviceSealedSecretRepository } from '../../InMemoryDeviceSealedSecretRepository';
 
 describe(DeviceSealedSecretPublisher.name, () => {
   let sealedSecrets: InMemoryDeviceSealedSecretRepository;

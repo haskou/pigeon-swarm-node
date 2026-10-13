@@ -1911,15 +1911,19 @@ export default class Definitions {
       identityId: string;
       revision: number;
     };
+    const publisherCredential = DeviceCredential.fromString(
+      transition.authorCredential,
+    );
     const publisher = [owner, this.identityDeviceTargetKeyPair].find(
       (candidate) =>
         candidate !== undefined &&
-        new IdentityId(candidate.toPrimitives().publicKey).valueOf() ===
-          transition.authorCredential,
+        publisherCredential.isEqual(
+          DeviceCredential.fromString(candidate.toPrimitives().publicKey),
+        ),
     ) as KeyPair;
-    const recipientCredential = new IdentityId(
+    const recipientCredential = DeviceCredential.fromString(
       owner.toPrimitives().publicKey,
-    ).valueOf();
+    ).toWire();
     const sealedSecret = 'c2VhbGVk';
 
     this.body = JSON.stringify({
@@ -1935,7 +1939,7 @@ export default class Definitions {
                   authorizationRevision: transition.revision,
                   generation,
                   identityId: transition.identityId,
-                  publisherCredential: transition.authorCredential,
+                  publisherCredential: publisherCredential.toWire(),
                   recipientCredential,
                   sealedSecret,
                 }),

@@ -2,7 +2,6 @@ import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/
 import DeviceSealedSecretHandover from '@app/contexts/identity-devices/application/hand-over/DeviceSealedSecretHandover';
 import { HandOverDeviceSealedSecretsMessage } from '@app/contexts/identity-devices/application/hand-over/messages/HandOverDeviceSealedSecretsMessage';
 import DeviceAuthorizationEventPublisher from '@app/contexts/identity-devices/application/publish/DeviceAuthorizationEventPublisher';
-import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceSealedSecretBundle } from '@app/contexts/identity-devices/domain/DeviceSealedSecretBundle';
 import { DeviceSealedSecretGenerationStaleError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretGenerationStaleError';
 import { DeviceSealedSecretNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretNotFoundError';
@@ -16,10 +15,10 @@ import {
   bundleOf,
   EnrolledDeviceFixture,
   enrolledDeviceFixture,
-  InMemoryDeviceSealedSecretRepository,
   retirementOf,
   sealedEntry,
 } from '../../DeviceSealedSecretFixtures';
+import { InMemoryDeviceSealedSecretRepository } from '../../InMemoryDeviceSealedSecretRepository';
 
 describe(DeviceSealedSecretHandover.name, () => {
   let authorizations: MockProxy<DeviceAuthorizationRepository>;
@@ -37,14 +36,6 @@ describe(DeviceSealedSecretHandover.name, () => {
       eventPublisher,
     );
   });
-
-  function retiredAuthorization(
-    fixture: EnrolledDeviceFixture,
-  ): DeviceAuthorization {
-    return fixture.authorization.revoke(
-      DeviceCredential.fromString(fixture.candidate.toPrimitives().publicKey),
-    );
-  }
 
   function messageFor(
     fixture: EnrolledDeviceFixture,
@@ -99,7 +90,9 @@ describe(DeviceSealedSecretHandover.name, () => {
 
   it('applies the retirement and replaces the stored generation with the hand-over', async () => {
     const fixture = await enrolledDeviceFixture();
-    const retired = retiredAuthorization(fixture);
+    const retired = fixture.authorization.revoke(
+      DeviceCredential.fromString(fixture.candidate.toPrimitives().publicKey),
+    );
     authorizations.require.mockResolvedValue(fixture.authorization);
     authorizations.compareAndApply.mockResolvedValue(retired);
     await sealedSecrets.replaceIfNewer(storedBundle(fixture, 1));
@@ -160,11 +153,15 @@ describe(DeviceSealedSecretHandover.name, () => {
 
   it('keeps the retirement but stores nothing when a concurrent transition changed the result', async () => {
     const fixture = await enrolledDeviceFixture();
-    const merged = retiredAuthorization(fixture).enroll(
-      DeviceCredential.fromString(
-        (await KeyPair.generate()).toPrimitives().publicKey,
-      ),
-    );
+    const merged = fixture.authorization
+      .revoke(
+        DeviceCredential.fromString(fixture.candidate.toPrimitives().publicKey),
+      )
+      .enroll(
+        DeviceCredential.fromString(
+          (await KeyPair.generate()).toPrimitives().publicKey,
+        ),
+      );
     authorizations.require.mockResolvedValue(fixture.authorization);
     authorizations.compareAndApply.mockResolvedValue(merged);
 
