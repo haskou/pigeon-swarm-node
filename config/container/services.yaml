@@ -1261,8 +1261,7 @@ services:
     @contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicationRepository
   contexts/content-replication/domain/repositories/ContentReplicationStatusSummaryRepository: >-
     @contexts/content-replication/infrastructure/local-db/LocalContentReplicationStatusSummaryRepository
-  contexts/content-replication/domain/repositories/LegacyPrivateUploadRepository:
-    >-
+  contexts/content-replication/domain/repositories/LegacyPrivateUploadRepository: >-
     @contexts/content-replication/infrastructure/orbitdb/OrbitDBLegacyPrivateUploadRepository
   contexts/content-replication/infrastructure/ipfs/IpfsContentStorage:
     class: /contexts/content-replication/infrastructure/ipfs/IpfsContentStorage
