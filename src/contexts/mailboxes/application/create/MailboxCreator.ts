@@ -40,31 +40,26 @@ export default class MailboxCreator {
    * follows how full the node is, and a short proof is told what it needs.
    */
   public async create(message: MailboxCreateMessage): Promise<boolean> {
-    const mailboxId = message.mailboxId.valueOf();
-    const postTokenHash = message.postTokenHash.valueOf();
-    const readTokenHash = message.readTokenHash.valueOf();
-    const creationNonce = message.creationNonce.valueOf();
-
     const requiredBits = MailboxCreationDifficulty.bitsFor(
       await this.repository.count(),
       this.policy.maxMailboxes(),
     );
 
     const proof = new MailboxCreationProof(
-      mailboxId,
-      postTokenHash,
-      readTokenHash,
+      message.mailboxId.valueOf(),
+      message.postTokenHash.valueOf(),
+      message.readTokenHash.valueOf(),
     );
 
-    if (!proof.isValid(creationNonce, requiredBits)) {
+    if (!proof.isValid(message.creationNonce.valueOf(), requiredBits)) {
       throw new MailboxCreationProofInvalidError(requiredBits);
     }
 
     return this.coordinator.run(async (): Promise<boolean> => {
-      if (await this.repository.hasById(mailboxId)) {
-        const existing = await this.repository.requireById(mailboxId);
+      if (await this.repository.hasById(message.mailboxId)) {
+        const existing = await this.repository.requireById(message.mailboxId);
 
-        existing.requireHashes(postTokenHash, readTokenHash);
+        existing.requireHashes(message.postTokenHash, message.readTokenHash);
 
         return false;
       }
@@ -83,10 +78,10 @@ export default class MailboxCreator {
         Mailbox.create({
           appendTokens: this.policy.maxAppendsPerMinute(),
           firstCursor,
-          id: mailboxId,
+          id: message.mailboxId,
           now,
-          postTokenHash,
-          readTokenHash,
+          postTokenHash: message.postTokenHash,
+          readTokenHash: message.readTokenHash,
         }),
       );
 

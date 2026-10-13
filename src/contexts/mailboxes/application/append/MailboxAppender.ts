@@ -22,26 +22,25 @@ export default class MailboxAppender {
   public append(
     message: MailboxAppendMessage,
   ): Promise<{ created: boolean; cursor: number }> {
-    const mailboxId = message.mailboxId.valueOf();
-    const postToken = message.postToken.valueOf();
-    const envelopeId = message.envelopeId.valueOf();
     const body = message.body.valueOf();
 
     return this.coordinator.run(async () => {
-      const mailbox = await this.repository.requireById(mailboxId);
+      const mailbox = await this.repository.requireById(message.mailboxId);
 
-      if (!mailbox.acceptsPost(postToken)) {
+      if (!mailbox.acceptsPost(message.postToken)) {
         throw new MailboxNotFoundError();
       }
 
       const size = this.policy.decodedBodySize(body);
 
-      if (await this.repository.hasEnvelope(mailboxId, envelopeId)) {
+      if (
+        await this.repository.hasEnvelope(message.mailboxId, message.envelopeId)
+      ) {
         return {
           created: false,
           cursor: await this.repository.requireEnvelopeCursor(
-            mailboxId,
-            envelopeId,
+            message.mailboxId,
+            message.envelopeId,
           ),
         };
       }
@@ -54,11 +53,11 @@ export default class MailboxAppender {
       await this.repository.commitAppend(mailbox, {
         body,
         cursor,
-        envelopeId,
+        envelopeId: message.envelopeId.valueOf(),
         size,
         storedAt: now.toMilliseconds(),
       });
-      this.notifier.envelopeAppended(mailboxId, cursor);
+      this.notifier.envelopeAppended(message.mailboxId.valueOf(), cursor);
 
       return { created: true, cursor };
     });

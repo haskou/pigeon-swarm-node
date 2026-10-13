@@ -15,13 +15,10 @@ export default class MailboxAcknowledger {
 
   /** Records this reader's progress, then deletes what all readers passed. */
   public acknowledge(message: MailboxAcknowledgeMessage): Promise<void> {
-    const mailboxId = message.mailboxId.valueOf();
-    const readToken = message.readToken.valueOf();
-
     return this.coordinator.run(async (): Promise<void> => {
-      const mailbox = await this.repository.requireById(mailboxId);
+      const mailbox = await this.repository.requireById(message.mailboxId);
 
-      if (!mailbox.acknowledge(readToken, message.upTo)) {
+      if (!mailbox.acknowledge(message.readToken, message.upTo)) {
         throw new MailboxNotFoundError();
       }
 

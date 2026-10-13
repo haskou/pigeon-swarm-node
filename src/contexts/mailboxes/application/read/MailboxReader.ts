@@ -19,13 +19,10 @@ export default class MailboxReader {
   ) {}
 
   public read(message: MailboxReadMessage): Promise<MailboxPage> {
-    const mailboxId = message.mailboxId.valueOf();
-    const readToken = message.readToken.valueOf();
-
     return this.coordinator.run(async (): Promise<MailboxPage> => {
-      const mailbox = await this.repository.requireById(mailboxId);
+      const mailbox = await this.repository.requireById(message.mailboxId);
 
-      if (!mailbox.acceptsRead(readToken)) {
+      if (!mailbox.acceptsRead(message.readToken)) {
         throw new MailboxNotFoundError();
       }
 
@@ -34,7 +31,7 @@ export default class MailboxReader {
         MailboxPolicy.MAX_PAGE,
       );
       const page = await this.repository.listEnvelopes(
-        mailboxId,
+        message.mailboxId,
         message.after,
         bounded + 1,
       );

@@ -1,4 +1,5 @@
 import { PrivateBlobNotFoundError } from '@app/contexts/private-blobs/domain/errors/PrivateBlobNotFoundError';
+import { PrivateBlobId } from '@app/contexts/private-blobs/domain/value-objects/PrivateBlobId';
 import LocalPrivateBlobRepository from '@app/contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { promises as fs } from 'fs';
@@ -32,10 +33,12 @@ describe('LocalPrivateBlobRepository', () => {
   });
 
   it('reports an unknown blob as absent and rejects requiring it', async () => {
-    await expect(repository.hasById('missing')).resolves.toBe(false);
-    await expect(repository.requireById('missing')).rejects.toBeInstanceOf(
-      PrivateBlobNotFoundError,
-    );
+    await expect(
+      repository.hasById(new PrivateBlobId('missing')),
+    ).resolves.toBe(false);
+    await expect(
+      repository.requireById(new PrivateBlobId('missing')),
+    ).rejects.toBeInstanceOf(PrivateBlobNotFoundError);
   });
 
   it('rejects a malformed stored blob', async () => {
@@ -44,9 +47,11 @@ describe('LocalPrivateBlobRepository', () => {
       size: 'not a number',
     });
 
-    await expect(repository.hasById('broken')).resolves.toBe(true);
-    await expect(repository.requireById('broken')).rejects.toThrow(
-      'Stored private blob is malformed.',
+    await expect(repository.hasById(new PrivateBlobId('broken'))).resolves.toBe(
+      true,
     );
+    await expect(
+      repository.requireById(new PrivateBlobId('broken')),
+    ).rejects.toThrow('Stored private blob is malformed.');
   });
 });

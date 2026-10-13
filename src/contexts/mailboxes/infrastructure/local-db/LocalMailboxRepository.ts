@@ -8,6 +8,8 @@ import { Mailbox } from '../../domain/Mailbox';
 import { MailboxEnvelope } from '../../domain/MailboxEnvelope';
 import { MailboxPrimitivesShape } from '../../domain/MailboxPrimitivesShape';
 import MailboxRepository from '../../domain/repositories/MailboxRepository';
+import { MailboxEnvelopeId } from '../../domain/value-objects/MailboxEnvelopeId';
+import { MailboxId } from '../../domain/value-objects/MailboxId';
 
 /**
  * Embedded local database only: never OrbitDB, IPFS or pubsub. Envelopes and
@@ -24,22 +26,22 @@ export default class LocalMailboxRepository extends MailboxRepository {
     super();
   }
 
-  private dedupeNamespace(mailboxId: string): string {
-    return `mailbox_dedupe:${mailboxId}`;
+  private dedupeNamespace(mailboxId: MailboxId): string {
+    return `mailbox_dedupe:${mailboxId.valueOf()}`;
   }
 
   private envelopeId(cursor: number): string {
     return String(cursor).padStart(12, '0');
   }
 
-  private envelopeNamespace(mailboxId: string): string {
-    return `mailbox_envelopes:${mailboxId}`;
+  private envelopeNamespace(mailboxId: MailboxId): string {
+    return `mailbox_envelopes:${mailboxId.valueOf()}`;
   }
 
   private mailboxPut(mailbox: Mailbox): EmbeddedLocalDatabaseOperation {
     return {
       document: { ...mailbox.toPrimitives() },
-      id: mailbox.getId(),
+      id: mailbox.getId().valueOf(),
       namespace: LocalMailboxRepository.MAILBOXES,
       type: 'put',
     };
@@ -148,22 +150,22 @@ export default class LocalMailboxRepository extends MailboxRepository {
     ]);
   }
 
-  public async hasById(id: string): Promise<boolean> {
+  public async hasById(id: MailboxId): Promise<boolean> {
     const document = await this.database.findOne(
       LocalMailboxRepository.MAILBOXES,
-      id,
+      id.valueOf(),
     );
 
     return document !== undefined;
   }
 
   public async hasEnvelope(
-    mailboxId: string,
-    envelopeId: string,
+    mailboxId: MailboxId,
+    envelopeId: MailboxEnvelopeId,
   ): Promise<boolean> {
     const document = await this.database.findOne(
       this.dedupeNamespace(mailboxId),
-      envelopeId,
+      envelopeId.valueOf(),
     );
 
     return document !== undefined;
@@ -192,7 +194,7 @@ export default class LocalMailboxRepository extends MailboxRepository {
   }
 
   public async listEnvelopes(
-    mailboxId: string,
+    mailboxId: MailboxId,
     after: number,
     limit: number,
   ): Promise<MailboxEnvelope[]> {
@@ -206,10 +208,10 @@ export default class LocalMailboxRepository extends MailboxRepository {
       .slice(0, limit);
   }
 
-  public async remove(mailboxId: string): Promise<void> {
+  public async remove(mailboxId: MailboxId): Promise<void> {
     const existing = await this.database.findOne(
       LocalMailboxRepository.MAILBOXES,
-      mailboxId,
+      mailboxId.valueOf(),
     );
     const count = await this.readCount();
     const retired = await this.highestRetiredCursor();
@@ -222,7 +224,7 @@ export default class LocalMailboxRepository extends MailboxRepository {
 
     await this.database.commit([
       {
-        id: mailboxId,
+        id: mailboxId.valueOf(),
         namespace: LocalMailboxRepository.MAILBOXES,
         type: 'del',
       },
@@ -253,10 +255,10 @@ export default class LocalMailboxRepository extends MailboxRepository {
     ]);
   }
 
-  public async requireById(id: string): Promise<Mailbox> {
+  public async requireById(id: MailboxId): Promise<Mailbox> {
     const document = await this.database.findOne(
       LocalMailboxRepository.MAILBOXES,
-      id,
+      id.valueOf(),
     );
 
     if (!document) {
@@ -267,12 +269,12 @@ export default class LocalMailboxRepository extends MailboxRepository {
   }
 
   public async requireEnvelopeCursor(
-    mailboxId: string,
-    envelopeId: string,
+    mailboxId: MailboxId,
+    envelopeId: MailboxEnvelopeId,
   ): Promise<number> {
     const document = await this.database.findOne(
       this.dedupeNamespace(mailboxId),
-      envelopeId,
+      envelopeId.valueOf(),
     );
 
     if (typeof document?.cursor !== 'number') {

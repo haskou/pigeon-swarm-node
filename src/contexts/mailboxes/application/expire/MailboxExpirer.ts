@@ -18,7 +18,7 @@ export default class MailboxExpirer {
   private async expireOne(mailbox: Mailbox, now: Timestamp): Promise<void> {
     if (mailbox.isExpired(now, this.policy)) {
       await this.repository.remove(mailbox.getId());
-      this.notifier.mailboxRemoved(mailbox.getId());
+      this.notifier.mailboxRemoved(mailbox.getId().valueOf());
 
       return;
     }

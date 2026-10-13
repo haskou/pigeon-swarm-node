@@ -12,19 +12,16 @@ export default class MailboxRemover {
   ) {}
 
   public async remove(message: MailboxRemoveMessage): Promise<void> {
-    const mailboxId = message.mailboxId.valueOf();
-    const readToken = message.readToken.valueOf();
-
     await this.coordinator.run(async (): Promise<void> => {
-      const mailbox = await this.repository.requireById(mailboxId);
+      const mailbox = await this.repository.requireById(message.mailboxId);
 
-      if (!mailbox.acceptsRead(readToken)) {
+      if (!mailbox.acceptsRead(message.readToken)) {
         throw new MailboxNotFoundError();
       }
 
-      await this.repository.remove(mailboxId);
+      await this.repository.remove(message.mailboxId);
     });
 
-    this.notifier.mailboxRemoved(mailboxId);
+    this.notifier.mailboxRemoved(message.mailboxId.valueOf());
   }
 }

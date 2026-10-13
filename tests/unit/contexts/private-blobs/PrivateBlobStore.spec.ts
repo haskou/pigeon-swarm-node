@@ -12,6 +12,7 @@ import { PrivateBlob } from '@app/contexts/private-blobs/domain/PrivateBlob';
 import PrivateBlobPolicy from '@app/contexts/private-blobs/domain/PrivateBlobPolicy';
 import PrivateBlobRepository from '@app/contexts/private-blobs/domain/repositories/PrivateBlobRepository';
 import PrivateBlobOwnerKeyDeriver from '@app/contexts/private-blobs/domain/services/PrivateBlobOwnerKeyDeriver';
+import { PrivateBlobId } from '@app/contexts/private-blobs/domain/value-objects/PrivateBlobId';
 import { PrivateBlobLimitsFromEnvironment } from '@app/contexts/private-blobs/infrastructure/environment/PrivateBlobLimitsFromEnvironment';
 import FilePrivateBlobBytesStore from '@app/contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -32,16 +33,16 @@ import { Readable } from 'stream';
 class MemoryRepository extends PrivateBlobRepository {
   public readonly blobs = new Map<string, PrivateBlob>();
 
-  public async delete(id: string): Promise<void> {
-    this.blobs.delete(id);
+  public async delete(id: PrivateBlobId): Promise<void> {
+    this.blobs.delete(id.valueOf());
   }
 
-  public async hasById(id: string): Promise<boolean> {
-    return this.blobs.has(id);
+  public async hasById(id: PrivateBlobId): Promise<boolean> {
+    return this.blobs.has(id.valueOf());
   }
 
-  public async requireById(id: string): Promise<PrivateBlob> {
-    const blob = this.blobs.get(id);
+  public async requireById(id: PrivateBlobId): Promise<PrivateBlob> {
+    const blob = this.blobs.get(id.valueOf());
 
     if (!blob) {
       throw new PrivateBlobNotFoundError();
@@ -57,8 +58,8 @@ class MemoryRepository extends PrivateBlobRepository {
   public async findStoredRetainedBelow(
     retentionMs: number,
   ): Promise<PrivateBlob[]> {
-    return [...this.blobs.values()].filter(
-      (blob) => blob.isStored() && blob.getRetentionMs() < retentionMs,
+    return [...this.blobs.values()].filter((blob) =>
+      blob.isStoredWithRetentionBelow(retentionMs),
     );
   }
 
@@ -70,13 +71,13 @@ class MemoryRepository extends PrivateBlobRepository {
       .filter(
         (blob) =>
           !blob.isExpired(now) &&
-          (ownerKey === undefined || blob.getOwnerKey() === ownerKey),
+          (ownerKey === undefined || blob.isOwnedBy(ownerKey)),
       )
-      .reduce((sum, blob) => sum + blob.getSize(), 0);
+      .reduce((sum, blob) => sum + blob.getSize().valueOf(), 0);
   }
 
   public async save(blob: PrivateBlob): Promise<void> {
-    this.blobs.set(blob.getId(), blob);
+    this.blobs.set(blob.getId().valueOf(), blob);
   }
 }
 
@@ -391,13 +392,15 @@ describe('private blob store', () => {
     const realDelete = store.delete.bind(store);
     let broken = true;
 
-    jest.spyOn(store, 'delete').mockImplementation(async (id: string) => {
-      if (broken && id === first.blobId) {
-        throw new Error('EACCES');
-      }
+    jest
+      .spyOn(store, 'delete')
+      .mockImplementation(async (id: PrivateBlobId) => {
+        if (broken && id.valueOf() === first.blobId) {
+          throw new Error('EACCES');
+        }
 
-      return realDelete(id);
-    });
+        return realDelete(id);
+      });
 
     const expirer = new PrivateBlobExpirer(
       repository,
@@ -504,7 +507,7 @@ describe('private blob store', () => {
         new PrivateBlobUploadMessage(blobId, uploadToken, bytes('abc')),
       );
       expect(
-        repository.blobs.get(blobId)?.getExpiresAt(),
+        repository.blobs.get(blobId)?.getExpiresAt().toMilliseconds(),
       ).toBeGreaterThanOrEqual(now + mailboxRetentionMs);
 
       const expirer = new PrivateBlobExpirer(
@@ -555,9 +558,9 @@ describe('private blob store', () => {
       );
 
       expect(await expirer.expire(new Timestamp(now + 2 * dayMs))).toBe(0);
-      expect(repository.blobs.get(blobId)?.getExpiresAt()).toBe(
-        now + pigeonEnvironment().MAILBOX_RETENTION_MS,
-      );
+      expect(
+        repository.blobs.get(blobId)?.getExpiresAt().toMilliseconds(),
+      ).toBe(now + pigeonEnvironment().MAILBOX_RETENTION_MS);
       expect(
         await collect(
           (

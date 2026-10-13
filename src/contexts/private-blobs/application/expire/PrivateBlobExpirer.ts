@@ -3,6 +3,7 @@ import { Timestamp } from '@haskou/value-objects';
 import PrivateBlobPolicy from '../../domain/PrivateBlobPolicy';
 import PrivateBlobBytesStore from '../../domain/repositories/PrivateBlobBytesStore';
 import PrivateBlobRepository from '../../domain/repositories/PrivateBlobRepository';
+import { PrivateBlobId } from '../../domain/value-objects/PrivateBlobId';
 
 /** Retention, abandoned-upload cleanup and removal of orphaned bytes. */
 export default class PrivateBlobExpirer {
@@ -12,8 +13,8 @@ export default class PrivateBlobExpirer {
     private readonly policy: PrivateBlobPolicy,
   ) {}
 
-  private async findOrphanIds(): Promise<string[]> {
-    const orphans: string[] = [];
+  private async findOrphanIds(): Promise<PrivateBlobId[]> {
+    const orphans: PrivateBlobId[] = [];
 
     for (const id of await this.bytes.listIds()) {
       if (!(await this.repository.hasById(id))) {
