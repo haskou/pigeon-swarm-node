@@ -5,6 +5,7 @@ import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/do
 import { DeviceCompromiseCaps } from '@app/contexts/identity-devices/domain/DeviceCompromiseCaps';
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
+import Kernel from '@haskou/ddd-kernel';
 import { assert } from '@haskou/value-objects';
 import { isDeepStrictEqual } from 'node:util';
 
@@ -29,20 +30,44 @@ export default class OrbitDBDeviceAuthorizationReplayer {
     history: OrbitDBDeviceAuthorizationTransitionRecord[],
   ): RecordCandidate[] {
     const candidates: RecordCandidate[] = [];
+    let rejected = 0;
 
     for (const record of history) {
-      const transition = this.parsedTransitionOf(record);
+      const outcome = this.outcomeOf(record);
 
-      if (transition) {
-        candidates.push({
-          encoding: this.canonicalizer.serialize(record),
-          payload: record,
-          transition,
-        });
+      if (outcome.kind === 'candidate') {
+        candidates.push(outcome.candidate);
+      } else {
+        rejected += 1;
       }
     }
 
+    if (rejected > 0) {
+      Kernel.logger.warn?.(
+        `OrbitDB device authorization replay rejected records: count=${rejected}`,
+      );
+    }
+
     return candidates;
+  }
+
+  private outcomeOf(
+    record: OrbitDBDeviceAuthorizationTransitionRecord,
+  ): { candidate: RecordCandidate; kind: 'candidate' } | { kind: 'rejected' } {
+    const transition = this.parsedTransitionOf(record);
+
+    if (!transition) {
+      return { kind: 'rejected' };
+    }
+
+    return {
+      candidate: {
+        encoding: this.canonicalizer.serialize(record),
+        payload: record,
+        transition,
+      },
+      kind: 'candidate',
+    };
   }
 
   private parsedTransitionOf(
