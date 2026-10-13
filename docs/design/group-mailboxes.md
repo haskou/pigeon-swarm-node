@@ -63,15 +63,17 @@ Non-goals (stated so nobody claims them):
 | Term | Meaning |
 | --- | --- |
 | member | identity `Y` in group `G`, present in the MLS tree through its device leaves (D19) |
-| slot `s_Y` | 32 random bytes chosen by `Y` when it joins. Carried in `Y`'s MLS leaf extension, so current members learn it and no one else does. Not derived from any identity |
+| slot `s_Y` | 32 bytes derived from `gen_k` and `Y`'s identity id (D2). Every member of generation `k` can compute it from the roster; no one without `gen_k` can |
 | generation `k` | a 32-byte secret `gen_k`. It changes on every removal commit (D3) |
 | inbox `I(Y,k)` | `Y`'s mailbox for generation `k` |
 
 ### Derivation
 
 ```text
-gen_0          = MLS-Exporter(epoch at group creation, "pigeon/group-mailbox/gen/v1", 32)
-gen_{k+1}      = MLS-Exporter(epoch of removal commit k+1, "pigeon/group-mailbox/gen/v1", 32)
+gen_0          = MLS-Exporter(epoch at group creation, "pigeon/group-mailbox/gen/v1", "", 32)
+gen_{k+1}      = MLS-Exporter(epoch after removal commit k+1, "pigeon/group-mailbox/gen/v1", "", 32)
+
+s_Y           = HKDF(gen_k, "pigeon/group-mailbox/slot/v1" || utf8(identityId_Y)) // 32 bytes
 
 mailboxId(Y,k) = HKDF(gen_k, "pigeon/group-mailbox/id/v1",       s_Y)           // 32 bytes
 postToken(Y,k) = HKDF(gen_k, "pigeon/group-mailbox/post/v1",     s_Y)           // append capability
@@ -79,12 +81,16 @@ envelopeKey(Y,k) = HKDF(gen_k, "pigeon/group-mailbox/envelope/v1", s_Y)         
 readToken(Y,k) = HKDF(rootKey_Y, "pigeon/mailbox/read/v1" || mailboxId(Y,k))    // owner only
 ```
 
-- The MLS exporter is RFC 9420 section 8.5. `[INFERENCE]` The UI MLS library's exporter
-  API has not been checked.
-- `mailboxId`, `postToken` and `envelopeKey` depend on `gen_k` and the random slot. They
-  never depend on an identity or a group id. A server or outsider cannot link an
-  inbox to an identity or a group. Any member can compute every inbox id and post
-  token of the generation, because every member knows every slot.
+- The MLS exporter is RFC 9420 section 8.5, with an empty context. The UI uses the
+  `ts-mls` exporter through `MlsGroup.exportSecret`. HKDF is SHA-256 with an empty
+  salt; `info` is the label followed by the slot or the identity id.
+- A removal is any commit that blanks or replaces a leaf: member removed, member left,
+  device removed. Adds and updates keep `gen_k`.
+- `mailboxId`, `postToken` and `envelopeKey` depend on `gen_k` and the slot. Without
+  `gen_k` they cannot be computed from an identity or a group id, so a server or
+  outsider cannot link an inbox to an identity or a group. Any member can compute
+  every inbox id and post token of the generation, because every member can derive
+  every slot.
 - `readToken` derives from the owner's root key, as in 1:1 (`opaque-mailboxes.md` L66).
   No member other than the owner can read, ack or delete an inbox.
 - The post token is per member inbox, because the slot scopes it. This matches the UI
@@ -95,27 +101,36 @@ readToken(Y,k) = HKDF(rootKey_Y, "pigeon/mailbox/read/v1" || mailboxId(Y,k))    
 - The server stores `SHA-256(postToken)` and `SHA-256(readToken)`, as today
   (`opaque-mailboxes.md` L64-65).
 
-### Why not identity-derived ids
+### Why the slot is derived
 
-If `mailboxId` were a function of the identity id, anyone holding the identity records
-the node already keeps (the signed identity payload and the legacy roster) could
-compute and link the inbox. The random slot removes that link.
+If `mailboxId` were a function of the identity id alone, anyone holding the identity
+records the node already keeps (the signed identity payload and the legacy roster)
+could compute and link the inbox. The slot mixes in `gen_k`, which only members of the
+generation hold, so the node and outsiders still cannot link an inbox to an identity.
+A random slot carried in an MLS leaf extension was considered and dropped: it needs a
+custom leaf extension, and a derived slot gives the same unlinkability.
+
+A slot is per identity, not per device. All devices of `Y` read the same inbox (D1).
 
 ## Membership
 
 ### Create and join (add)
 
-1. The creator makes the MLS group, `gen_0`, its own slot, and inbox `I(creator,0)`.
-   The inbox is created with a PUT and creation proof of work (see Costs).
-2. Each invitee is added by an MLS Add in a commit. The Welcome is sealed to the
-   invitee's key package. It travels in the legacy `group_conversation_invitation`
-   notification together with `gen_k` (D8).
-3. The joiner reads `gen_k` and the slots from the Welcome, then creates
+1. The creator makes the MLS group, `gen_0`, and inbox `I(creator,0)`. The inbox is
+   created with a PUT and creation proof of work (see Costs).
+2. The inviter asks the invitee for a key package and gets it back as encrypted
+   control records over their existing 1:1 mailbox (see Control traffic).
+3. Each invitee is added by an MLS Add in a commit. The inviter sends the joiner
+   `{welcome, k, gen_k}` as an encrypted control record over the same 1:1 mailbox
+   (D8). The joiner cannot export `gen_k` itself, because it did not hold the epoch it
+   came from. It rejects a `k` newer than the Welcome epoch, and each Welcome opens
+   once per device.
+4. The joiner derives the slots from `gen_k` and the roster, then creates
    `I(joiner,k)`.
-4. Existing members do not rotate on add (D4). Each member posts to the joiner's
+5. Existing members do not rotate on add (D4). Each member posts to the joiner's
    inbox once it knows the id, from the commit. Until the joiner creates its inbox the
    node returns 404, and the sender keeps the message in its durable queue (D9).
-5. The joiner gets no history from before the join.
+6. The joiner gets no history from before the join.
 
 ### Remove and leave
 
@@ -124,7 +139,9 @@ Removal of Carol at generation `k`:
 1. The committer (Alice) commits a Remove for Carol. The group moves to epoch `e'`,
    and Alice derives `gen_{k+1}` from `e'`.
 2. The commit is appended to `I(Y,k)` for every remaining member `Y`, not to Carol.
-   Alice's own inbox receives it too, for her other devices.
+   Alice's own inbox receives it too, for her other devices. A commit that MLS does
+   not accept is rejected, including a commit for an epoch the member already left
+   whose sender data does not open under that retained epoch.
 3. Each remaining member, after applying the commit, derives `gen_{k+1}`, creates
    `I(Y,k+1)`, and switches its sends to generation `k+1`.
 4. Each remaining member keeps reading `I(Y,k)` for a drain window `D` of 24 hours
@@ -149,11 +166,25 @@ is device-bound `[INFERENCE]`.
 
 ### Commit ordering
 
-Two removals raced by two members produce two commits for one epoch. MLS admits one,
-and the other must rebase onto the new epoch. Ordering uses the roster: each roster
-op for add or remove carries the epoch it applies to, and members apply only the next
-epoch (D7). `[INFERENCE]` Current legacy roster ops carry no epoch field. The format
-must change, and that change is part of the legacy roster work, not new node storage.
+Two removals raced by two members produce two commits for one epoch. The UI MLS
+wrapper (`MlsGroup`, shared with communities) admits the commit with the lowest id,
+`SHA-256` of the commit bytes, and keeps the previous epoch state to switch when a
+lower one arrives later. The generation log then rewinds to that epoch and recomputes
+`gen_{k+1}`. The roster op carries no epoch and is not used for ordering (D7).
+
+### Control traffic
+
+No control message travels in clear and none uses a new node route.
+
+| Record | Path | Protection |
+| --- | --- | --- |
+| Key package request and response | 1:1 mailbox between inviter and invitee | 1:1 envelope encryption |
+| Welcome `{welcome, k, gen_k}` | 1:1 mailbox between inviter and joiner | 1:1 envelope encryption; the Welcome is also sealed to the key package |
+| Commit (add, remove, update) | `I(Y,k)` of every member, in the delivery generation | D5 per-copy AEAD around the MLS bytes |
+| Application message | `I(Y,k)` of every member, in the current generation | D5 per-copy AEAD around one MLS ciphertext |
+
+A removal commit is delivered in generation `k`: the remaining members learn
+`gen_{k+1}` only by applying it.
 
 ### Offline members
 
@@ -274,11 +305,11 @@ N = group members including the sender. Values are from code unless marked.
 | Item | Why it stays | Node sees in clear |
 | --- | --- | --- |
 | Identity publication with `mailboxHome` | discovery of home nodes; parsed as the `IdentityMailboxHome` value object (`src/contexts/identities/domain/value-objects/IdentityMailboxHome.ts`: http or https URL, at most 255 characters) | identity id, home node |
-| Roster ops `member_added`, `member_removed` | commit ordering (D7) and the roster itself (D15) | group id, member identity ids, timing |
-| Invitation notifications `group_conversation_invitation` | carries the Welcome and `gen_k` (D8) | recipient identity, conversation id, type |
+| Roster ops `member_added`, `member_removed` | the roster itself (D15); members check MLS leaves against it | group id, member identity ids, timing |
+| Invitation notifications `group_conversation_invitation` | tells the invitee a conversation exists; carries no Welcome and no `gen_k` (D8) | recipient identity, conversation id, type |
 | Private blobs (#290) | large attachments; retention `max(PRIVATE_BLOB_RETENTION_MS, MAILBOX_RETENTION_MS)` (`own-copy-and-history-backfill.md` L56, #446) | blob ids |
 | Own copy and pairing export | own devices and history | per own-copy document |
-| MLS key packages | existing path; location not checked here `[INFERENCE]` | key package |
+| MLS key packages | not stored on the node for group conversations; exchanged as control records over the 1:1 mailbox | nothing beyond the 1:1 mailbox metadata |
 
 Discovery: a sender reads each member's `mailboxHome` from its signed identity payload.
 It derives inbox ids from `gen_k` and the slots. No group directory is needed. A member
@@ -312,13 +343,13 @@ is the reason the no-plaintext-participant-list goal is not met for groups.
 | # | Decision | Recommended default | Alternative and reason against |
 | --- | --- | --- | --- |
 | D1 | Routing unit | one inbox per (member identity, generation); devices are readers | per device: N x devices appends and PUTs |
-| D2 | Inbox id and post token | HKDF over `gen_k` and random slot `s_Y`; read token root-derived per owner | identity-derived id: linkable from identity records the node already keeps |
+| D2 | Inbox id and post token | HKDF over `gen_k` and the slot `s_Y = HKDF(gen_k, label ‖ identityId)`; read token root-derived per owner | identity-only id: linkable from identity records the node already keeps; random slot in a leaf extension: needs a custom MLS extension for the same unlinkability |
 | D3 | When the generation advances | every removal commit: member removed, member left, device removed | rotate on add too: N - 1 PUTs per add with no secrecy gain; per-sender writer sets: node writer registry, N x N registrations |
 | D4 | Add | no rotation on add; joiner gets `gen_k` in its Welcome | rotate on add: see D3 |
 | D5 | Envelope payload | MLS bytes unchanged inside a per-copy AEAD with random nonce, AAD `mailboxId` | option B, no outer layer: `group_id` and `epoch` readable in clear, copies linkable by prefix. Needs Main sign-off |
 | D6 | Commit path | commits fan out through inboxes, like messages | node commit log: reveals group timing and needs a new table |
-| D7 | Commit ordering | roster op carries the epoch it applies to; members apply only the next epoch | node commit log or delivery service: a new store. Needs roster op format change `[INFERENCE]` |
-| D8 | Invitation | legacy `group_conversation_invitation` carrying Welcome and `gen_k` | welcome inbox per identity: later; the node still sees the recipient identity |
+| D7 | Commit ordering | lowest commit id per epoch, as in the community MLS path; the client keeps the previous epoch to switch | roster op carrying the epoch: needs a roster format change; node commit log: a new store |
+| D8 | Invitation | key package exchange and `{welcome, k, gen_k}` as encrypted control records over the inviter's 1:1 mailbox | inside the legacy `group_conversation_invitation` notification: puts the Welcome and `gen_k` on the replicated path |
 | D9 | Sender delivery | durable outbound queue; backoff on 404, 409, 429; re-encrypt under the current epoch if the generation changed; expire after 14 days and report failure | silent drop, as 1:1 does on 404 (`own-copy-and-history-backfill.md` L23): rejected |
 | D10 | Past epoch secrets | keep them for the drain window `D` | drop them: loses messages posted before a commit |
 | D11 | Old inbox deletion | owner DELETEs `I(Y,k)` 24 hours after applying the commit; 14-day idle expiry is the backstop | immediate delete: loses in-flight messages |
@@ -336,14 +367,17 @@ is the reason the no-plaintext-participant-list goal is not met for groups.
 
 Not part of this PR.
 
-1. Group MLS in UI (#174): leaves carry the slot extension; the generation is derived
-   from the exporter; the Welcome carries `gen_k`. This is the prerequisite.
-2. UI: a derivation module for `mailboxId`, `postToken`, `envelopeKey` and `readToken`,
-   with test vectors for each HKDF label.
-3. UI: send and receive for group conversations through the mailbox path; durable
-   outbound queue (D9); past epoch secrets (D10); MLS sender check on every record.
-4. Node: no new endpoint expected `[INFERENCE]`. Check during implementation that the
-   existing create, append, read, ack and readers routes cover the flow.
+1. Group MLS in UI (#174): one MLS group per conversation; `gen_k` from the exporter
+   after each removal; the slot derived from `gen_k` and the identity id.
+2. UI: a derivation module for the slot, `mailboxId`, `postToken`, `envelopeKey` and
+   `readToken`, with test vectors for each HKDF label.
+3. UI: control traffic as encrypted records (see Control traffic); send and receive
+   for group conversations through the mailbox path; durable outbound queue (D9);
+   past epoch secrets (D10); MLS sender check on every record.
+4. Node: no new endpoint. The existing routes cover the flow: `PUT /mailboxes/{id}`,
+   `POST /mailboxes/{id}/envelopes`, `GET /mailboxes/{id}/envelopes`,
+   `POST /mailboxes/{id}/ack`, the reader routes, and `DELETE /mailboxes/{id}` for
+   D11.
 5. Staging: N = 256, the 120-per-minute ceiling, offline-member fill, inbox counts per
    node (D20).
 6. Cutover (D14): one release for every group. Remove the replicated group message
@@ -353,11 +387,12 @@ Not part of this PR.
 
 - This PR changes one file: `docs/design/group-mailboxes.md`. No code or tests changed.
   CI is the gate.
-- Checked by reading the sources listed under References.
-- Not verified: MLS exporter and leaf extension support in the UI library; the RFC 9420
-  header claim behind D5; proof-of-work timing at 16 and 20 bits; capacity at N = 256
-  and inbox counts (D20); cross-node group delivery; the roster op epoch field (D7);
-  where MLS key packages live.
+- Checked by reading the sources listed under References and the mailbox routes in
+  `src/apps/apis/mailboxes-api/routes/`.
+- Checked in the UI (haskou/pigeon-swarm-ui#174): the `ts-mls` exporter and the slot
+  derivation, with test vectors.
+- Not verified: the RFC 9420 header claim behind D5; proof-of-work timing at 16 and 20
+  bits; capacity at N = 256 and inbox counts (D20); cross-node group delivery.
 
 ## References
 
