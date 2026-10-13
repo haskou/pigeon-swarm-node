@@ -31,7 +31,7 @@ export default class OrbitDBDeviceAuthorizationDocumentValidator {
         return false;
       }
 
-      const document = value as unknown as OrbitDBDeviceAuthorizationDocument;
+      const document = value;
 
       if (document.overflow) {
         return this.isOverflowDocument(document);

@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 
+import { OrbitDBDeviceAuthorizationDocument } from './documents/OrbitDBDeviceAuthorizationDocument';
 import { OrbitDBDeviceAuthorizationReplay } from './documents/OrbitDBDeviceAuthorizationReplay';
 import { OrbitDBDeviceAuthorizationSource } from './documents/OrbitDBDeviceAuthorizationSource';
 
@@ -226,7 +227,9 @@ export default class OrbitDBDeviceAuthorizationDocumentShape {
     );
   }
 
-  public hasDocumentShape(value: Record<string, unknown>): boolean {
+  public hasDocumentShape(
+    value: Record<string, unknown>,
+  ): value is OrbitDBDeviceAuthorizationDocument {
     const checkpoint = value.checkpoint;
     const overflow = value.overflow;
 

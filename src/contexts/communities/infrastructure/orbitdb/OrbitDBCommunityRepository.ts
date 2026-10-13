@@ -8,7 +8,6 @@ import { Community } from '../../domain/Community';
 import { CommunityNotFoundError } from '../../domain/errors/CommunityNotFoundError';
 import { CommunityOperation } from '../../domain/operations/CommunityOperation';
 import { CommunityOperationLimits } from '../../domain/operations/CommunityOperationLimits';
-import { CommunityOperationPrimitives } from '../../domain/operations/CommunityOperationPrimitives';
 import { CommunityState } from '../../domain/operations/CommunityState';
 import { CommunityStateFold } from '../../domain/operations/CommunityStateFold';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
@@ -100,9 +99,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     return records.flatMap((record) => {
       try {
         const operation = CommunityOperation.fromPrimitives(
-          PublicMutationRecord.payloadOf(
-            record,
-          ) as unknown as CommunityOperationPrimitives,
+          PublicMutationRecord.payloadOf(record),
         );
 
         return operation.getCommunityId().valueOf() === communityId
