@@ -177,6 +177,7 @@ describe('PeersViewModel', () => {
             changedAt: 1780000000000,
             networks: [
               {
+                communityState: { peers: [], state: 'unknown' },
                 connectedPeerIds: ['12D3KooWConnectedPeer'],
                 convergedStoreCount: 0,
                 id: publicNetworkId,
@@ -207,6 +208,7 @@ describe('PeersViewModel', () => {
         changedAt: 1780000000000,
         networks: [
           {
+            communityState: { peers: [], state: 'unknown' },
             connectedPeerIds: ['12D3KooWConnectedPeer'],
             convergedStoreCount: 0,
             id: publicNetworkId,

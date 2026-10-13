@@ -6,6 +6,7 @@ import { MessageReadProofVerifyMessage } from '@app/contexts/conversations/appli
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { MessageReadProof } from '@app/contexts/conversations/domain/value-objects/MessageReadProof';
 import { MailboxCapability } from '@app/contexts/mailboxes/domain/MailboxCapability';
+import { NodeCommunityStateWasAnnounced } from '@app/contexts/nodes/domain/events/NodeCommunityStateWasAnnounced';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Kernel from '@haskou/ddd-kernel';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
@@ -897,7 +898,10 @@ export class WebSocketEventHub {
 
   public publish(events: DomainEvent[]): void {
     for (const event of events) {
-      if (this.isCallSignalAcknowledgementEvent(event)) {
+      if (
+        this.isCallSignalAcknowledgementEvent(event) ||
+        event.eventName() === NodeCommunityStateWasAnnounced.EVENT_NAME
+      ) {
         continue;
       }
 

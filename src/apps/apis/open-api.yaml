@@ -82,14 +82,16 @@ paths:
         `{ "type": "connection_ack", "identityId": "<normalizedIdentityId>" }`
 
         The server then sends the current network synchronization snapshot and
-        publishes a new one whenever libp2p connectivity or OrbitDB store
-        membership changes:
+        publishes a new one whenever libp2p connectivity, OrbitDB store
+        membership or the compared community state changes:
 
         `{ "type": "network_synchronization_status", "status": { "changedAt": 1770000000000, "networks": [] } }`
 
         `converged` describes all stores against peers currently known to this
-        node. It is not a global percentage because future and disconnected
-        peers cannot be known in an eventually consistent network.
+        node, and requires every one of them to hold the same community state
+        (`communityState`); store participation alone is not content equality.
+        It is not a global percentage because future and disconnected peers
+        cannot be known in an eventually consistent network.
 
         Clients may send `{ "type": "identity_heartbeat" }` over the open
         socket. The reference client (`pigeon-swarm-ui`) sends one every 10 seconds.

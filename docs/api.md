@@ -244,7 +244,8 @@ Connection acknowledgement:
 
 The server immediately follows the acknowledgement with the current live
 network synchronization snapshot. It publishes the same message again whenever
-libp2p connectivity or OrbitDB store membership changes:
+libp2p connectivity, OrbitDB store membership or the compared community state
+changes:
 
 ```json
 {
@@ -258,9 +259,10 @@ libp2p connectivity or OrbitDB store membership changes:
 
 The status is runtime telemetry and is not persisted. `converged` means that
 every OrbitDB store has completed its head exchange with every replication peer
-currently known to this node. It cannot represent a global percentage: peers
-that are offline, disconnected, or have not yet been discovered are unknowable
-in an eventually consistent network.
+currently known to this node, and that every one of those peers announced the
+same community state (see [Get active peers](#get-active-peers)). It cannot
+represent a global percentage: peers that are offline, disconnected, or have
+not yet been discovered are unknowable in an eventually consistent network.
 
 The acknowledged `identityId` is normalized without PEM headers, footers or
 newlines. WebSocket routing uses that same normalized value for byte-for-byte
@@ -406,6 +408,9 @@ Implemented:
 - deliver call signals only to `recipientIdentityId`
 - deliver node-wide events, such as heartbeat/peer updates, to all
   authenticated WebSocket clients on the local node
+- never deliver `nodes.v1.community_state.was_announced`; it is a node-to-node
+  digest exchange whose only client-visible result is the `communityState` of
+  `networkSynchronization`
 - drop non-node events that do not carry enough identity information to route
   them safely
 
@@ -1373,6 +1378,15 @@ Response:
     "changedAt": 1773848829055,
     "networks": [
       {
+        "communityState": {
+          "peers": [
+            {
+              "peerId": "<libp2pPeerId>",
+              "state": "converged"
+            }
+          ],
+          "state": "converged"
+        },
         "connectedPeerIds": ["<libp2pPeerId>"],
         "convergedStoreCount": 16,
         "id": "<networkId>",
@@ -1429,9 +1443,28 @@ For private networks, a newly connected transport peer keeps the state at
 `syncing` until it has joined every store. The three states are:
 
 - `waiting_for_peers`: no replication peer is currently known
-- `syncing`: at least one currently known peer has not joined every store
+- `syncing`: at least one currently known peer has not joined every store, or
+  the community state is not yet `converged`
 - `converged`: every store has completed its head exchange with all currently
-  known replication peers
+  known replication peers, and every one of them reports the same community
+  state as this node
+
+Joining stores only proves participation, not equal content. `communityState`
+compares content: every 10 seconds each node announces, per network, a hash of
+the frontier of every community it holds, and compares the announcements of its
+peers with its own. `communityState.state` is:
+
+- `unknown`: this node has not hashed its own state yet, no peer is known, or a
+  peer has not announced in the last 35 seconds (for example a node on an older
+  version)
+- `diverged`: at least one peer holds different community state
+- `converged`: every known peer announced the same community state
+
+`communityState.peers` lists the same state per known peer. The hash, community
+ids and community counts are never exposed. Peer ids in announcements are
+claimed by the sender, so treat the field as a diagnostic, not as proof.
+Changes are pushed to WebSocket clients with the rest of `networkSynchronization`
+within one announcement interval.
 
 Implemented:
 

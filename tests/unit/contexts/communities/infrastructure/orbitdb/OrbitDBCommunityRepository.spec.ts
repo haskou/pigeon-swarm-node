@@ -109,6 +109,27 @@ describe('OrbitDBCommunityRepository', () => {
     await expect(repository.findByMember(owner)).resolves.toEqual([]);
   });
 
+  it('reports the frontier of every community of one network', async () => {
+    const created = genesis();
+    const joined = join([created], alice);
+
+    await save(created);
+    await save(joined);
+    await flushBackgroundTasks();
+
+    const frontiers = await repository.findFrontiersByNetwork(networkId);
+
+    expect(
+      frontiers.map(({ communityId: id, frontier }) => [
+        id.valueOf(),
+        frontier,
+      ]),
+    ).toEqual([[communityId.valueOf(), [joined.getHash()]]]);
+    await expect(
+      repository.findFrontiersByNetwork('another-network'),
+    ).resolves.toEqual([]);
+  });
+
   it('stores one record per operation however many times it is saved', async () => {
     const created = genesis();
 

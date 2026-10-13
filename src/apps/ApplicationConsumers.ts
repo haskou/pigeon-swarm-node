@@ -18,6 +18,7 @@ import ProvisionDeviceAuthorizationWhenIdentityCreated from '@app/apps/consumers
 import ProvisionDeviceAuthorizationWhenIdentityUpdated from '@app/apps/consumers/pubsub/identity-devices/ProvisionDeviceAuthorizationWhenIdentityUpdated';
 import RegisterKeychainWhenPublished from '@app/apps/consumers/pubsub/keychains/RegisterKeychainWhenPublished';
 import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains/SynchronizeKeychainWhenUpdated';
+import RecordPeerCommunityStateWhenAnnounced from '@app/apps/consumers/pubsub/nodes/RecordPeerCommunityStateWhenAnnounced';
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
 import RegisterIdentityPresenceWhenUpdated from '@app/apps/consumers/pubsub/presence/RegisterIdentityPresenceWhenUpdated';
 import ClearPushNotificationWhenConversationMessagesRead from '@app/apps/consumers/pubsub/push/ClearPushNotificationWhenConversationMessagesRead';
@@ -46,6 +47,7 @@ export const applicationConsumers: ApplicationServiceClass<Consumer>[] = [
   RegisterMessageReactionWhenRemoved,
   MarkMessagesReadWhenAnnounced,
   RegisterNodePeerWhenHeartbeatReceived,
+  RecordPeerCommunityStateWhenAnnounced,
   RegisterCommunityChannelMessageWhenAnnounced,
   DeleteCommunityChannelMessageWhenAnnounced,
   RegisterCommunityChannelMessageEditionWhenAnnounced,

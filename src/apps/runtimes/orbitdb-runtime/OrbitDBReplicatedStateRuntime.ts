@@ -38,6 +38,7 @@ export default class OrbitDBReplicatedStateRuntime {
       getConnectedPeerIds: () => network.getPeers(),
       id: network.getId(),
       isPrivate: network.isPrivate(),
+      localPeerId,
       name: network.getName(),
       onPeerConnected: (listener) => network.onPeerConnected(listener),
       onPeerDisconnected: (listener) => network.onPeerDisconnected(listener),

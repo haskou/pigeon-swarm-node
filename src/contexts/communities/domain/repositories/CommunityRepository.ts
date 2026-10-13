@@ -25,6 +25,14 @@ export default abstract class CommunityRepository {
   public abstract findByMember(identityId: IdentityId): Promise<Community[]>;
   /** The operations nobody built on yet: the parents of the next operation. */
   public abstract findFrontier(id: CommunityId): Promise<string[]>;
+  /**
+   * The frontier of every community of one network held on this node, deleted
+   * ones included: equal results on two nodes mean equal community state.
+   */
+  public abstract findFrontiersByNetwork(
+    networkId: string,
+  ): Promise<Array<{ communityId: CommunityId; frontier: string[] }>>;
+
   /** Appends an operation the client already signed. */
   public abstract save(
     operation: CommunityOperation,

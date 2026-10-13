@@ -2,6 +2,7 @@ import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MailboxCapability } from '@app/contexts/mailboxes/domain/MailboxCapability';
+import { NodeCommunityStateWasAnnounced } from '@app/contexts/nodes/domain/events/NodeCommunityStateWasAnnounced';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import WebSocketClientMessageHandler from '@app/shared/infrastructure/websocket/WebSocketClientMessageHandler';
@@ -400,6 +401,23 @@ describe('WebSocketEventHub', () => {
         type: 'domain_event',
       }),
     );
+  });
+
+  it('never sends node community state announcements to websocket clients', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+    const announcement = new NodeCommunityStateWasAnnounced('peer-id', {
+      digest: 'A'.repeat(43),
+      networkId: 'network-id',
+    });
+
+    hub.register(identityId, client);
+    jest.clearAllMocks();
+    hub.publish([announcement]);
+    hub.publishFromNetwork([announcement]);
+
+    expect(client.send).not.toHaveBeenCalled();
   });
 
   it('sends addressed events only to matching websocket clients', async () => {

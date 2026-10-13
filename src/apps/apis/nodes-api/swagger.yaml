@@ -463,9 +463,46 @@ components:
         - converged
         - syncing
         - waiting_for_peers
+    NetworkCommunityState:
+      type: string
+      description: >-
+        Content comparison against peers. `converged` means the same community
+        state as this node, `diverged` different state, and `unknown` no fresh
+        announcement or no local state yet.
+      enum:
+        - converged
+        - diverged
+        - unknown
+    NetworkCommunityStatePeerResource:
+      type: object
+      required:
+        - peerId
+        - state
+      properties:
+        peerId:
+          type: string
+          description: Peer id claimed by the announcing node. Diagnostic only.
+        state:
+          $ref: '#/components/schemas/NetworkCommunityState'
+    NetworkCommunityStateResource:
+      type: object
+      description: >-
+        Per-network comparison of community state with every known peer. The
+        compared hash, community ids and community counts are never exposed.
+      required:
+        - peers
+        - state
+      properties:
+        peers:
+          type: array
+          items:
+            $ref: '#/components/schemas/NetworkCommunityStatePeerResource'
+        state:
+          $ref: '#/components/schemas/NetworkCommunityState'
     NetworkSynchronizationNetworkResource:
       type: object
       required:
+        - communityState
         - connectedPeerIds
         - convergedStoreCount
         - id
@@ -476,6 +513,8 @@ components:
         - totalStoreCount
         - type
       properties:
+        communityState:
+          $ref: '#/components/schemas/NetworkCommunityStateResource'
         connectedPeerIds:
           type: array
           description: Peers currently connected through libp2p transport.
@@ -493,7 +532,11 @@ components:
           items:
             type: string
         state:
-          $ref: '#/components/schemas/NetworkSynchronizationState'
+          description: >-
+            `converged` only when every store joined all known replication
+            peers and `communityState.state` is `converged`.
+          allOf:
+            - $ref: '#/components/schemas/NetworkSynchronizationState'
         stores:
           type: array
           items:
