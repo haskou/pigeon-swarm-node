@@ -7,8 +7,11 @@ import {
   DeviceSealedSecretBundlePrimitives,
   DeviceSealedSecretEntryPrimitives,
 } from '@app/contexts/identity-devices/domain/DeviceSealedSecretBundle';
+import { DeviceSealedSecretNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretNotFoundError';
+import { DeviceSealedSecretRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
 import { DeviceAuthorizationOperationId } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperationId';
+import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { PairingAuthorization } from '@app/contexts/identity-devices/domain/value-objects/PairingAuthorization';
 import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
@@ -122,4 +125,54 @@ export function bundleOf(
     publisherCredential: credentialOf(input.publisher),
     ...input,
   });
+}
+
+export class InMemoryDeviceSealedSecretRepository extends DeviceSealedSecretRepository {
+  public readonly stored = new Map<string, DeviceSealedSecretBundle>();
+
+  public async has(identityId: IdentityId): Promise<boolean> {
+    return this.stored.has(identityId.valueOf());
+  }
+
+  public async require(
+    identityId: IdentityId,
+  ): Promise<DeviceSealedSecretBundle> {
+    const bundle = this.stored.get(identityId.valueOf());
+
+    if (!bundle) {
+      throw new DeviceSealedSecretNotFoundError();
+    }
+
+    return bundle;
+  }
+
+  public async replaceIfNewer(bundle: DeviceSealedSecretBundle): Promise<void> {
+    const key = bundle.getIdentityId().valueOf();
+    bundle.assertSupersedes(this.stored.get(key));
+    this.stored.set(key, bundle);
+  }
+}
+
+export interface RetirementInput {
+  author: KeyPair;
+  compromisedSince?: number;
+  identityId: string;
+  previousRevision: number;
+  target: KeyPair;
+}
+
+export function retirementOf(
+  input: RetirementInput,
+): DeviceAuthorizationTransition {
+  return DeviceAuthorizationTransition.revocation(
+    new IdentityId(input.identityId),
+    DeviceAuthorizationOperationId.generate(),
+    new DeviceAuthorizationRevision(input.previousRevision),
+    DeviceCredential.fromString(input.author.toPrimitives().publicKey),
+    DeviceCredential.fromString(input.target.toPrimitives().publicKey),
+    DeviceAuthorizationEpoch.genesis(),
+    input.compromisedSince === undefined
+      ? undefined
+      : new DeviceAuthorizationRevision(input.compromisedSince),
+  );
 }

@@ -24,6 +24,7 @@ import { MessageType } from '@app/contexts/conversations/domain/value-objects/Me
 import IdentityAdmissionLoadRepository from '@app/contexts/identities/domain/repositories/IdentityAdmissionLoadRepository';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
+import { DeviceSealedSecretBundle } from '@app/contexts/identity-devices/domain/DeviceSealedSecretBundle';
 import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
 import { DeviceAuthorizationOperationId } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
@@ -1872,6 +1873,79 @@ export default class Definitions {
     this.body = JSON.stringify(
       proven.authorize(owner.sign(proven.getSigningPayload())).toPrimitives(),
     );
+  }
+
+  @given(
+    'I set a signed self-retirement transition body for the enrolled device',
+  )
+  public iSetASignedSelfRetirementTransitionBodyForTheEnrolledDevice(): void {
+    const identityId = this.ownerIdentityId as IdentityId;
+    const target = this.identityDeviceTargetKeyPair as KeyPair;
+    const credential = DeviceCredential.fromString(
+      target.toPrimitives().publicKey,
+    );
+    const unsigned = DeviceAuthorizationTransition.revocation(
+      identityId,
+      DeviceAuthorizationOperationId.generate(),
+      new DeviceAuthorizationRevision(1),
+      credential,
+      credential,
+    );
+
+    this.body = JSON.stringify(
+      unsigned
+        .authorize(target.sign(unsigned.getSigningPayload()))
+        .toPrimitives(),
+    );
+  }
+
+  @given(
+    'I attach sealed secrets for the remaining devices with generation {int}',
+  )
+  public async iAttachSealedSecretsForTheRemainingDevicesWithGeneration(
+    generation: number,
+  ): Promise<void> {
+    const owner = await this.ensureIdentityDeviceOwnerKeyPair();
+    const transition = JSON.parse(this.body as string) as {
+      authorCredential: string;
+      identityId: string;
+      revision: number;
+    };
+    const publisher = [owner, this.identityDeviceTargetKeyPair].find(
+      (candidate) =>
+        candidate !== undefined &&
+        new IdentityId(candidate.toPrimitives().publicKey).valueOf() ===
+          transition.authorCredential,
+    ) as KeyPair;
+    const recipientCredential = new IdentityId(
+      owner.toPrimitives().publicKey,
+    ).valueOf();
+    const sealedSecret = 'c2VhbGVk';
+
+    this.body = JSON.stringify({
+      ...transition,
+      sealedSecrets: {
+        entries: [
+          {
+            recipientCredential,
+            sealedSecret,
+            signature: publisher
+              .sign(
+                DeviceSealedSecretBundle.signingPayload({
+                  authorizationRevision: transition.revision,
+                  generation,
+                  identityId: transition.identityId,
+                  publisherCredential: transition.authorCredential,
+                  recipientCredential,
+                  sealedSecret,
+                }),
+              )
+              .valueOf(),
+          },
+        ],
+        generation,
+      },
+    });
   }
 
   @given('I sign the current device authorization checkpoint request')
