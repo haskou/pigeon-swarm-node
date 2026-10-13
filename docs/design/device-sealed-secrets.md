@@ -67,18 +67,23 @@ recommends node-local storage, matching the mailbox trust model.
 
 ## Signed entries
 
-Each entry is signed by the publishing device over this preimage, serialized
-with `JSON.stringify` in exactly this key order:
+Each entry is signed by the publishing device over this preimage. It is
+serialized with `JSON.stringify`, keys in exactly this (alphabetical) order, as
+`DeviceSealedSecretBundle.signingPayload` builds it:
 
 ```
-{"purpose":"pigeon:device-sealed-secret:v1",
- "identityId":<identityId>,
+{"authorizationRevision":<authorizationRevision>,
  "generation":<generation>,
- "authorizationRevision":<authorizationRevision>,
+ "identityId":<identityId>,
  "publisherCredential":<publisher credential>,
+ "purpose":"pigeon:device-sealed-secret:v1",
  "recipientCredential":<recipient credential>,
  "sealedSecret":<sealedSecret>}
 ```
+
+Every credential and the identity id is the body-only base64 form: the
+`IdentityId` value without its PEM header and footer and without whitespace.
+The node verifies against that form, and stores and returns entries in it.
 
 The signature lets a recipient verify that the owner's authorized device
 produced the entry, without trusting the node. It also binds the entry to
