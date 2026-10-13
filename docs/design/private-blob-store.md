@@ -64,7 +64,7 @@ The stored blob is the ciphertext: the frame plus a 16-byte GCM tag per 8 MiB ch
 
 ## Availability across nodes (design, not implemented)
 
-Status: design only. It adds no endpoint, flag or node-to-node protocol, and needs no node code change. The work is in the client. Envelope availability (`opaque-mailboxes.md`, "Availability replication") is a separate prerequisite that is not implemented.
+Status: design only. It adds no endpoint, flag or node-to-node protocol, and needs no node code change. The work is in the client. Envelope availability (`opaque-mailboxes.md`, "Availability replication") is a separate prerequisite: its node side is in place, the client side is not implemented.
 
 ### Model
 
@@ -137,6 +137,6 @@ Upload cuts the ciphertext every 8 MiB of stored bytes. Each stored chunk is up 
 
 - Client fan-out, origin-bearing references and replica fallback, as above (UI).
 - Part alignment for new uploads (D4).
-- Mailbox availability replication (`opaque-mailboxes.md`). A blob is useful only with the envelope that carries its descriptor. If the recipient's mailbox node is lost, the message is lost even when its blobs survive.
+- Mailbox availability replication on the client (`opaque-mailboxes.md`). A blob is useful only with the envelope that carries its descriptor. If the recipient's mailbox node is lost, the message is lost even when its blobs survive. The node side needs no change and is covered by a two-node test.
 - Optional node work: anonymous reservation, using creation proof-of-work as mailboxes do. It removes identity disclosure to replica nodes and is the prerequisite for recipient-side replicas.
 - Unchanged by this design: IPFS CID migration, and server-side size bucketing (advisory only).

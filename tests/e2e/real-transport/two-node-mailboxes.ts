@@ -170,6 +170,66 @@ async function waitForPeers(node: NodeRuntime): Promise<void> {
   }, `${node.name} to connect to its peer on the private network`);
 }
 
+/**
+ * Availability replication is client-driven (docs/design/opaque-mailboxes.md):
+ * the recipient creates the same mailbox on every server it chose, the sender
+ * appends the same envelope to each, and the recipient reads from all and
+ * deduplicates by envelopeId. The nodes never talk to each other about it.
+ */
+async function verifyAvailabilityReplication(
+  nodeA: NodeRuntime,
+  nodeB: NodeRuntime,
+): Promise<void> {
+  const mailbox = newMailbox();
+
+  assert.equal(await putMailbox(nodeA, mailbox, true), 201);
+  assert.equal(await putMailbox(nodeB, mailbox, true), 201);
+
+  // The sender appends the same envelope to both servers. Each keeps its own
+  // cursor, and a retried append on either one stores nothing new.
+  const replicated = newEnvelope();
+  const cursorOnA = await postEnvelope(nodeA, mailbox, replicated, 201);
+  const cursorOnB = await postEnvelope(nodeB, mailbox, replicated, 201);
+
+  assert.equal(await postEnvelope(nodeB, mailbox, replicated, 200), cursorOnB);
+
+  // An append that reached only node A is not propagated to node B.
+  const onlyOnA = newEnvelope();
+
+  await postEnvelope(nodeA, mailbox, onlyOnA, 201);
+  assert.deepEqual(await readPage(nodeB, mailbox, 0), {
+    envelopes: [{ ...replicated, cursor: cursorOnB }],
+    hasMore: false,
+  });
+
+  // Reading from both and deduplicating by envelopeId yields each envelope once.
+  const fromA = (await readPage(nodeA, mailbox, 0)).envelopes;
+  const fromB = (await readPage(nodeB, mailbox, 0)).envelopes;
+  const envelopeIds = new Set(
+    [...fromA, ...fromB].map((envelope) => envelope.envelopeId),
+  );
+
+  assert.deepEqual(
+    [...envelopeIds].sort(),
+    [replicated.envelopeId, onlyOnA.envelopeId].sort(),
+  );
+
+  // Acknowledging on node A leaves node B's copy in place.
+  await acknowledge(nodeA, mailbox, cursorOnA);
+  assert.deepEqual(
+    (await readPage(nodeB, mailbox, 0)).envelopes.map(
+      (envelope) => envelope.envelopeId,
+    ),
+    [replicated.envelopeId],
+  );
+
+  // With node A gone, node B still delivers the replicated envelope.
+  await stopNode(nodeA);
+  assert.deepEqual(await readPage(nodeB, mailbox, 0), {
+    envelopes: [{ ...replicated, cursor: cursorOnB }],
+    hasMore: false,
+  });
+}
 async function verify(nodeA: NodeRuntime, nodeB: NodeRuntime): Promise<void> {
   const mailbox = newMailbox();
 
@@ -241,6 +301,9 @@ async function verify(nodeA: NodeRuntime, nodeB: NodeRuntime): Promise<void> {
     404,
     'node B must not know a mailbox created only on node A',
   );
+
+  // Last: it stops node A.
+  await verifyAvailabilityReplication(nodeA, nodeB);
 }
 
 async function main(): Promise<void> {
