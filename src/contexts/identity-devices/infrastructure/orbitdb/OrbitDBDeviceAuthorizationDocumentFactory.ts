@@ -1,5 +1,7 @@
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
+import { DeviceAuthorizationOverflowBound } from '@app/contexts/identity-devices/domain/DeviceAuthorizationOverflowBound';
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
+import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { assert } from '@haskou/value-objects';
@@ -15,37 +17,12 @@ import OrbitDBDeviceAuthorizationSources from './OrbitDBDeviceAuthorizationSourc
 
 export default class OrbitDBDeviceAuthorizationDocumentFactory {
   public constructor(
+    private readonly policy: DeviceAuthorizationPolicy,
     private readonly canonicalizer: OrbitDBDeviceAuthorizationCanonicalizer,
     private readonly replayer: OrbitDBDeviceAuthorizationReplayer,
     private readonly sources: OrbitDBDeviceAuthorizationSources,
     private readonly shape: OrbitDBDeviceAuthorizationDocumentShape,
   ) {}
-
-  private minimalOverflowSources(
-    genesis: DeviceAuthorization,
-    sources: OrbitDBDeviceAuthorizationSource[],
-  ): OrbitDBDeviceAuthorizationSource[] {
-    const hasBoundedHistory = this.shape.hasBoundedHistoryShape(
-      this.replayer.replaySources(genesis, sources).replay.history,
-    );
-
-    for (let length = 1; length <= sources.length; length += 1) {
-      const candidate = sources.slice(0, length);
-
-      if (
-        hasBoundedHistory
-          ? !this.shape.hasBoundedSourcesShape(candidate)
-          : !this.shape.hasBoundedProjection(
-              this.replayer.replaySources(genesis, candidate).replay,
-              candidate,
-            )
-      ) {
-        return candidate;
-      }
-    }
-
-    assert(false, new InvalidDeviceAuthorizationTransitionError());
-  }
 
   public documentId(identityId: IdentityId): string {
     return `device-authorization:${identityId.valueOf()}`;
@@ -110,36 +87,45 @@ export default class OrbitDBDeviceAuthorizationDocumentFactory {
     };
   }
 
+  /**
+   * The overflow bound measured over sources replayed from the genesis: the
+   * replayed history, the sources, and the projection must each fit one
+   * document.
+   */
+  public overflowBound(
+    genesis: DeviceAuthorization,
+  ): DeviceAuthorizationOverflowBound<OrbitDBDeviceAuthorizationSource> {
+    return {
+      fitsProjection: (sources) =>
+        this.shape.hasBoundedProjection(
+          this.replayer.replaySources(genesis, sources).replay,
+          sources,
+        ),
+      fitsReplayedHistory: (sources) =>
+        this.shape.hasBoundedHistoryShape(
+          this.replayer.replaySources(genesis, sources).replay.history,
+        ),
+      fitsSources: (sources) => this.shape.hasBoundedSourcesShape(sources),
+    };
+  }
+
   public frontierFromSources(
     genesis: DeviceAuthorization,
     sources: OrbitDBDeviceAuthorizationSource[],
   ): OrbitDBDeviceAuthorizationDocument {
-    const ordered = sources
-      .map((source) => ({
-        replay: this.replayer.sourceReplay(genesis, source),
-        source,
-      }))
-      .sort(
-        (left, right) =>
-          right.replay.authorization.getRevision().valueOf() -
-            left.replay.authorization.getRevision().valueOf() ||
-          this.canonicalizer
-            .serialize(left.source)
-            .localeCompare(this.canonicalizer.serialize(right.source)),
-      );
-    const [frontier] = ordered;
-
-    assert(
-      frontier !== undefined,
-      new InvalidDeviceAuthorizationTransitionError(),
+    const frontier = this.policy.preferFrontier(
+      sources.map((source) => ({
+        encoding: this.canonicalizer.serialize(source),
+        payload: source,
+        revision: this.replayer
+          .sourceReplay(genesis, source)
+          .authorization.getRevision(),
+      })),
     );
 
-    return this.toDocument(
-      genesis,
-      frontier.source.history,
-      frontier.source.checkpoint,
-      [frontier.source],
-    );
+    return this.toDocument(genesis, frontier.history, frontier.checkpoint, [
+      frontier,
+    ]);
   }
 
   public overflowDocument(
@@ -147,10 +133,13 @@ export default class OrbitDBDeviceAuthorizationDocumentFactory {
     sources: OrbitDBDeviceAuthorizationSource[],
     frontier: OrbitDBDeviceAuthorizationDocument,
   ): OrbitDBDeviceAuthorizationDocument {
-    const witness = this.minimalOverflowSources(genesis, sources);
-    const replay = this.replayer.replaySources(genesis, witness).replay;
-    const authorization = replay.authorization.requireRecoveryAt(
-      this.overflowRevision(replay, frontier),
+    const witness = this.policy.minimalOverflowWitness(
+      sources,
+      this.overflowBound(genesis),
+    );
+    const authorization = this.policy.suspendAtOverflow(
+      this.replayer.replaySources(genesis, witness).replay.authorization,
+      new DeviceAuthorizationRevision(frontier.authorization.revision),
     );
 
     return {
@@ -166,20 +155,5 @@ export default class OrbitDBDeviceAuthorizationDocumentFactory {
       },
       sources: [],
     };
-  }
-
-  public overflowRevision(
-    replay: OrbitDBDeviceAuthorizationReplay,
-    frontier: OrbitDBDeviceAuthorizationDocument,
-  ): DeviceAuthorizationRevision {
-    const replayRevision = replay.authorization.getRevision();
-    const frontierRevision = new DeviceAuthorizationRevision(
-      frontier.authorization.revision,
-    );
-    const latestRevision = replayRevision.isGreaterThan(frontierRevision)
-      ? replayRevision
-      : frontierRevision;
-
-    return latestRevision.next();
   }
 }

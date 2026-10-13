@@ -49,28 +49,6 @@ export default class OrbitDBDeviceAuthorizationTransitionProjector {
       .isCarriedBy(transition);
   }
 
-  public hasReplay(
-    document: OrbitDBDeviceAuthorizationDocument,
-    transition: DeviceAuthorizationTransition,
-  ): boolean {
-    const operationId = transition.getOperationId().valueOf();
-    const pairingId = transition.isEnrollment()
-      ? transition.requirePairingId().valueOf()
-      : undefined;
-    const checkpoint = this.sources.effectiveCheckpoint(document);
-
-    return Boolean(
-      this.sources
-        .effectiveHistory(document)
-        .some(
-          (record) =>
-            record.transition.operationId === operationId ||
-            (pairingId !== undefined &&
-              record.transition.pairingId === pairingId),
-        ) || checkpoint?.transition.transition.operationId === operationId,
-    );
-  }
-
   public authorizationAfter(
     stored: OrbitDBDeviceAuthorizationDocument,
     genesis: DeviceAuthorization,

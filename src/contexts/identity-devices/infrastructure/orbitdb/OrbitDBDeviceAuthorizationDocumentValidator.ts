@@ -1,4 +1,5 @@
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
+import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
@@ -17,6 +18,7 @@ export default class OrbitDBDeviceAuthorizationDocumentValidator {
   private readonly documentValidationCache = new Map<string, boolean>();
 
   public constructor(
+    private readonly policy: DeviceAuthorizationPolicy,
     private readonly canonicalizer: OrbitDBDeviceAuthorizationCanonicalizer,
     private readonly factory: OrbitDBDeviceAuthorizationDocumentFactory,
     private readonly genesisMatcher: OrbitDBDeviceAuthorizationGenesisMatcher,
@@ -137,12 +139,10 @@ export default class OrbitDBDeviceAuthorizationDocumentValidator {
     }
 
     const genesis = DeviceAuthorization.fromPrimitives(document.genesis);
-    const replay = this.replayer.replaySources(
-      genesis,
-      overflow.sources,
-    ).replay;
-    const authorization = replay.authorization.requireRecoveryAt(
-      this.factory.overflowRevision(replay, overflow.frontier),
+    const authorization = this.policy.suspendAtOverflow(
+      this.replayer.replaySources(genesis, overflow.sources).replay
+        .authorization,
+      new DeviceAuthorizationRevision(overflow.frontier.authorization.revision),
     );
 
     return (
@@ -206,51 +206,30 @@ export default class OrbitDBDeviceAuthorizationDocumentValidator {
     );
   }
 
+  /**
+   * The witness sources must be canonical, valid and within the overflow
+   * storage bound; whether they witness an overflow is the domain rule.
+   */
   private isMinimalOverflowSources(
     genesis: DeviceAuthorization,
     sources: OrbitDBDeviceAuthorizationSource[],
   ): boolean {
-    const replay = this.replayer.replaySources(genesis, sources).replay;
-    const hasBoundedHistory = this.shape.hasBoundedHistoryShape(replay.history);
-    const hasBoundedSources = this.shape.hasBoundedSourcesShape(sources);
-
-    if (
-      sources.length === 0 ||
-      (hasBoundedHistory && hasBoundedSources) ||
-      !this.shape.hasBoundedOverflowSourcesShape(sources) ||
-      !isDeepStrictEqual(sources, this.sources.canonicalSources(sources)) ||
-      !isDeepStrictEqual(
+    return (
+      this.shape.hasBoundedOverflowSourcesShape(sources) &&
+      isDeepStrictEqual(sources, this.sources.canonicalSources(sources)) &&
+      isDeepStrictEqual(
         sources,
         this.replayer.sourcesAtPreferredCheckpoint(genesis, sources),
-      ) ||
-      !sources.every(
+      ) &&
+      sources.every(
         (source) =>
           this.shape.hasSourceShape(source) &&
           this.isValidSource(genesis, source),
+      ) &&
+      this.policy.isMinimalOverflowWitness(
+        sources,
+        this.factory.overflowBound(genesis),
       )
-    ) {
-      return false;
-    }
-
-    return this.hasBoundedOverflowPrefix(
-      genesis,
-      sources.slice(0, -1),
-      hasBoundedHistory,
-    );
-  }
-
-  private hasBoundedOverflowPrefix(
-    genesis: DeviceAuthorization,
-    sources: OrbitDBDeviceAuthorizationSource[],
-    completeHistoryIsBounded: boolean,
-  ): boolean {
-    if (completeHistoryIsBounded) {
-      return this.shape.hasBoundedSourcesShape(sources);
-    }
-
-    return this.shape.hasBoundedProjection(
-      this.replayer.replaySources(genesis, sources).replay,
-      sources,
     );
   }
 

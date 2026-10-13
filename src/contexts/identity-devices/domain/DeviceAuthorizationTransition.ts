@@ -35,6 +35,15 @@ export class DeviceAuthorizationTransition {
       : new DeviceAuthorizationRevision(value);
   }
 
+  private static compromisedCredentialsOrUndefined(
+    entries: DeviceAuthorizationTransitionPrimitives['compromisedCredentials'],
+  ): DeviceCompromisedCredential[] | undefined {
+    return entries?.map((entry) => ({
+      compromisedSince: new DeviceAuthorizationRevision(entry.compromisedSince),
+      credential: DeviceCredential.fromString(entry.credential),
+    }));
+  }
+
   public static enrollment(
     identityId: IdentityId,
     operationId: DeviceAuthorizationOperationId,
@@ -64,9 +73,10 @@ export class DeviceAuthorizationTransition {
       authorCredential: primitives.authorCredential
         ? DeviceCredential.fromString(primitives.authorCredential)
         : undefined,
-      compromisedCredentials: compromisedCredentialsOrUndefined(
-        primitives.compromisedCredentials,
-      ),
+      compromisedCredentials:
+        DeviceAuthorizationTransition.compromisedCredentialsOrUndefined(
+          primitives.compromisedCredentials,
+        ),
       compromisedSince: DeviceAuthorizationTransition.revisionOrUndefined(
         primitives.compromisedSince,
       ),
@@ -219,7 +229,12 @@ export class DeviceAuthorizationTransition {
       : this.state.proofOfPossession !== undefined;
   }
 
-  private getUnsignedPrimitives(): object {
+  /**
+   * The signed preimage: the protocol bytes both signatures commit to. Its
+   * key order is part of the wire format, so it is kept apart from
+   * `toPrimitives` even where the fields coincide.
+   */
+  private getSignedPreimage(): object {
     return {
       authorCredential: this.state.authorCredential?.valueOf(),
       authorizedAt: this.state.pairing?.getAuthorizedAt().valueOf(),
@@ -404,12 +419,25 @@ export class DeviceAuthorizationTransition {
     );
   }
 
+  /**
+   * Whether this transition replays another: it records the same operation,
+   * or redeems the same pairing. A replayed transition is never accepted.
+   */
+  public replays(other: DeviceAuthorizationTransition): boolean {
+    return (
+      this.state.operationId.isEqual(other.state.operationId) ||
+      (this.state.pairing !== undefined &&
+        other.state.pairing !== undefined &&
+        this.state.pairing.getId().isEqual(other.state.pairing.getId()))
+    );
+  }
+
   public getSigningPayload(): DeviceAuthorizationPayload {
     return new DeviceAuthorizationPayload(
       JSON.stringify({
         domain: DeviceAuthorizationTransition.SIGNATURE_DOMAIN,
         proofOfPossession: this.state.proofOfPossession?.valueOf(),
-        transition: this.getUnsignedPrimitives(),
+        transition: this.getSignedPreimage(),
       }),
     );
   }
@@ -418,7 +446,7 @@ export class DeviceAuthorizationTransition {
     return new DeviceAuthorizationPayload(
       JSON.stringify({
         domain: DeviceAuthorizationTransition.PROOF_DOMAIN,
-        transition: this.getUnsignedPrimitives(),
+        transition: this.getSignedPreimage(),
       }),
     );
   }
@@ -449,17 +477,4 @@ export class DeviceAuthorizationTransition {
         this.getTargetCredentialCommitment().valueOf(),
     };
   }
-}
-
-function compromisedCredentialsOrUndefined(
-  entries: { compromisedSince: number; credential: string }[] | undefined,
-): DeviceCompromisedCredential[] | undefined {
-  if (entries === undefined) {
-    return undefined;
-  }
-
-  return entries.map((entry) => ({
-    compromisedSince: new DeviceAuthorizationRevision(entry.compromisedSince),
-    credential: DeviceCredential.fromString(entry.credential),
-  }));
 }

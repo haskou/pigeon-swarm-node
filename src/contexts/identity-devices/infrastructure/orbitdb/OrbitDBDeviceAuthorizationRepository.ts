@@ -60,7 +60,10 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   ) {
     super();
     const canonicalizer = new OrbitDBDeviceAuthorizationCanonicalizer();
-    const sources = new OrbitDBDeviceAuthorizationSources(canonicalizer);
+    const sources = new OrbitDBDeviceAuthorizationSources(
+      policy,
+      canonicalizer,
+    );
     const replayer = new OrbitDBDeviceAuthorizationReplayer(
       policy,
       canonicalizer,
@@ -76,12 +79,14 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     this.genesisMatcher = new OrbitDBDeviceAuthorizationGenesisMatcher();
     this.shape = new OrbitDBDeviceAuthorizationDocumentShape();
     this.factory = new OrbitDBDeviceAuthorizationDocumentFactory(
+      policy,
       canonicalizer,
       replayer,
       sources,
       this.shape,
     );
     this.validator = new OrbitDBDeviceAuthorizationDocumentValidator(
+      policy,
       canonicalizer,
       this.factory,
       this.genesisMatcher,
@@ -218,9 +223,9 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
           ? candidate
           : await this.save(this.factory.toDocument(trustedGenesis, []));
 
-      assert(
-        !this.projector.hasReplay(stored, transition),
-        new InvalidDeviceAuthorizationTransitionError(),
+      this.policy.verifyNotReplayed(
+        transition,
+        this.replayer.recordedTransitions(stored),
       );
       this.policy.verifyFirstAcceptance(transition, new Timestamp(Date.now()));
 

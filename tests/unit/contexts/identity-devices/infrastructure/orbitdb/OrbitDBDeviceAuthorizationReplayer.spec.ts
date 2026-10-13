@@ -24,10 +24,11 @@ describe(OrbitDBDeviceAuthorizationReplayer.name, () => {
 
   const now = new Timestamp(1_800_000_000_000);
   const canonicalizer = new OrbitDBDeviceAuthorizationCanonicalizer();
+  const policy = new DeviceAuthorizationPolicy();
   const replayer = new OrbitDBDeviceAuthorizationReplayer(
-    new DeviceAuthorizationPolicy(),
+    policy,
     canonicalizer,
-    new OrbitDBDeviceAuthorizationSources(canonicalizer),
+    new OrbitDBDeviceAuthorizationSources(policy, canonicalizer),
   );
 
   async function fixture(): Promise<{
