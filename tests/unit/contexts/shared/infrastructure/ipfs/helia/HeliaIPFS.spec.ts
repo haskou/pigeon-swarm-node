@@ -5,7 +5,6 @@ import {
   HeliaInstance,
 } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
 import { HeliaIPFS } from '@app/contexts/shared/infrastructure/ipfs/helia/HeliaIPFS';
-import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
 
 describe('HeliaIPFS', () => {
@@ -173,41 +172,5 @@ describe('HeliaIPFS', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(heliaRouting.findProviders).not.toHaveBeenCalled();
-  });
-
-  it('stops re-announcing a provider record without unpinning or removing its bytes', async () => {
-    const parsedCid = {};
-    const dht = { cancelReprovide: jest.fn().mockResolvedValue(undefined) };
-    const heliaCore = {
-      libp2p: {
-        addEventListener: jest.fn(),
-        services: { dht },
-      },
-    } as unknown as HeliaInstance;
-    const ipfs = new (class extends HeliaIPFS {})(heliaCore, {
-      storageLocation: 'memory',
-    });
-
-    jest
-      .spyOn(heliaRuntimeAdapter, 'parseCid')
-      .mockResolvedValue(parsedCid as never);
-
-    await ipfs.stopProvidingContent(new IPFSId('bafkreiacontent'));
-
-    expect(dht.cancelReprovide).toHaveBeenCalledWith(parsedCid);
-  });
-
-  it('does nothing on a network without a DHT', async () => {
-    const heliaCore = {
-      libp2p: { addEventListener: jest.fn(), services: {} },
-    } as unknown as HeliaInstance;
-    const ipfs = new (class extends HeliaIPFS {})(heliaCore, {
-      storageLocation: 'memory',
-    });
-    jest.spyOn(heliaRuntimeAdapter, 'parseCid').mockResolvedValue({} as never);
-
-    await expect(
-      ipfs.stopProvidingContent(new IPFSId('bafkreiacontent')),
-    ).resolves.toBeUndefined();
   });
 });

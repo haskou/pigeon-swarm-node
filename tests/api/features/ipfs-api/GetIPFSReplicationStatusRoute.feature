@@ -52,12 +52,12 @@ Feature: Get IPFS replication status route
     When I PUT the signed content replication registration
     Then response code is equal to 204
 
-  Scenario: Reject a replication registration for legacy private content
+  Scenario: Reject a replication registration with the private-upload context
     Given the local node has no owner and no networks
     And I sign the current node owner request
     When I PUT "/node/owner/"
     Then response code is equal to 200
-    And I register a test IPFS network "api-replication-legacy-private-network"
+    And I register a test IPFS network "api-replication-private-context-network"
     And I set raw IPFS content with content type "application/octet-stream" and text "hello"
     And I sign the current public IPFS content request
     When I POST to "/ipfs/public"

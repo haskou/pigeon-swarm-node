@@ -1139,27 +1139,6 @@ export abstract class HeliaIPFS implements IPFSConnection {
     await this.publishContentProvider(parsedCid, cid, signal);
   }
 
-  public async stopProvidingContent(cid: IPFSId): Promise<void> {
-    const services = this.heliaCore.libp2p.services as unknown as {
-      dht?: { cancelReprovide(cid: ParsedCidLike): Promise<void> };
-    };
-    const dht = services.dht;
-
-    if (!dht) {
-      return;
-    }
-
-    const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
-      cid.valueOf(),
-    );
-
-    await this.enqueueProviderPublication(async () => {
-      this.pendingContentProviderCids.delete(cid.valueOf());
-      this.automaticProviderPublicationAttempts.delete(cid.valueOf());
-      await dht.cancelReprovide(parsedCid);
-    });
-  }
-
   public async putRecord(
     key: string,
     value: string,

@@ -1500,8 +1500,8 @@ WebP, AVIF, MP4, WebM, MP3, OGG, WAV). Anything else is served as
 `application/octet-stream` with `Content-Disposition: attachment`. Neither a
 content type nor a filename is replicated, so a remote peer cannot choose them.
 If the CID points to existing JSON content, the endpoint still returns that JSON
-document, because identities, keychains and legacy encrypted uploads are stored
-as JSON. Reading a CID may populate Helia's local block cache, but it does not
+document, because identities and keychains are stored as JSON. Reading a CID
+may populate Helia's local block cache, but it does not
 pin the content or advertise this node as a provider.
 
 Unknown CIDs return `404` with body `{ "error": "CID not found in any network" }`.
@@ -1525,12 +1525,11 @@ Requires signed request headers. Call it only after the identity is published
 ```
 
 `context` must be `ipfs_public_upload`, the context for content from
-`POST /ipfs/public`. `ipfs_private_upload` is rejected with `400`: private
-content is never published to IPFS. The replicated gate applies the same rule
-to records written by any
-peer: a legacy `ipfs_private_upload` record is never listed and never provided
-by this node, whichever node wrote it. `sizeBytes` is 1..52428800. Response:
-`204`.
+`POST /ipfs/public`. Any other context, including `ipfs_private_upload`, is
+rejected with `400`: private content is never published to IPFS. The replicated
+gate applies the same rule to records written by any peer: a record with any
+other context is never listed and never provided by this node, whichever node
+wrote it. `sizeBytes` is 1..52428800. Response: `204`.
 
 The replicated record is stored in the gated `contentReplication` collection:
 

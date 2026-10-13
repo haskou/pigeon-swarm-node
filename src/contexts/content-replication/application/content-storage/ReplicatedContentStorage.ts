@@ -24,12 +24,6 @@ export default abstract class ReplicatedContentStorage {
     networkId: NetworkId,
   ): Promise<void>;
 
-  /** Stops announcing this node's provider record; the bytes stay pinned. */
-  public abstract stopProvidingInNetwork(
-    contentId: ContentId,
-    networkId: NetworkId,
-  ): Promise<void>;
-
   public abstract isRawContent(contentId: ContentId): Promise<boolean>;
 
   public abstract publishBytesToNetworks(

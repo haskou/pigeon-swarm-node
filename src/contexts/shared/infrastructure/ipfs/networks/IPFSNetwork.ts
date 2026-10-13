@@ -81,10 +81,6 @@ export class IPFSNetwork {
     return this.connection.provideContent(cid, signal);
   }
 
-  public async stopProvidingContent(cid: IPFSId): Promise<void> {
-    return this.connection.stopProvidingContent(cid);
-  }
-
   public async addBytes(
     bytes: Uint8Array,
     signal?: AbortSignal,

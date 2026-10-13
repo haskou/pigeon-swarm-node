@@ -151,7 +151,7 @@ describe('ContentReplicationMutationPolicy', () => {
       );
     });
 
-    it('refuses a legacy private-upload registration: private content is never replicated', async () => {
+    it('refuses a private-upload registration: private content is never replicated', async () => {
       await expect(admit({ context: 'ipfs_private_upload' })).rejects.toThrow(
         InvalidPublicMutationError,
       );
