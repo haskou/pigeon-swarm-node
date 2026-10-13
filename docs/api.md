@@ -3791,6 +3791,10 @@ target.id, createdAt])` (UTF-8). `createdAt` is the same value as
 `moderationLog.createdAt`. The node records exactly the action, target and
 details it computes from the request, and the entry is only admitted when they
 match what was signed and the actor holds the permission for the action.
+Byte-exact entries (id preimage, payload, digest, signing content and
+signature) are in
+[`tests/fixtures/community-moderation-log-vectors.json`](../tests/fixtures/community-moderation-log-vectors.json),
+checked by the `CommunityModerationLogVectors` unit spec.
 
 | Route                                                  | action                                                         | target                          | details                                                                                                                                                                     |
 | ------------------------------------------------------ | -------------------------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

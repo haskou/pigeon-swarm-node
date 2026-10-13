@@ -1,0 +1,282 @@
+{
+  "algorithms": {
+    "canonicalization": "RFC 8785 JSON Canonicalization Scheme (npm package canonicalize)",
+    "deviceCredential": "mutation.author.deviceCredential is the base64 SPKI public key of the signing device, here the identity key acting as its first device",
+    "id": "first 24 hex chars of sha256(utf8(JSON.stringify([communityId, actorIdentityId, action, targetType, targetId, createdAt])))",
+    "payload": "{action, actorIdentityId, communityId, createdAt, details, id, scopeType: \"community_moderation_log\", target: {id, type}}; details drop undefined values",
+    "payloadDigest": "base64url(sha256(utf8(canonicalize(payload))))",
+    "predecessor": "moderation log entries are immutable: always the first record of their id, so null with sequence 0",
+    "signature": "ed25519 over utf8(signingContent), standard base64 with padding (88 characters)",
+    "signingContent": "\"pigeon:public-mutation:v2\\n\" + canonicalize(mutationBody), mutationBody being the mutation without its signature; the community frontier is mandatory"
+  },
+  "cases": [
+    {
+      "derived": {
+        "body": {
+          "createdAt": 1767225300000,
+          "mutation": {
+            "author": {
+              "authorizationRevision": 0,
+              "deviceCredential": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=",
+              "identityId": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY="
+            },
+            "frontier": [
+              "RoaVUzHt4daRi2owbCQc9EIdMx6Zt5rmY84nf-r_32M",
+              "nCtFRSc-pqjGa02RuoHNQzITIaUbA5ZOrjJNsQQLt50"
+            ],
+            "kind": "put",
+            "operationId": "vector-moderation-log-0001",
+            "payloadDigest": "txYVyDNPXKiNbrjpiXXuzl4q3OBYboumtmPp1oAtF_0",
+            "predecessor": null,
+            "recordId": "608738804e4271556af0e5f3",
+            "sequence": 0,
+            "store": "moderationLogs",
+            "version": 2,
+            "signature": "k7HWXzwCx4fpkxeDz0seBvW2BTgYCYbFgJ4vbkUAW21L0h5uYm9V7a1MZI6JlFaegzNkvSV7KXjQDjgzad8kBQ=="
+          }
+        },
+        "id": "608738804e4271556af0e5f3",
+        "idPreimage": "[\"889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c\",\"MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=\",\"member_banned\",\"member\",\"MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=\",1767225300000]",
+        "mutationBody": {
+          "author": {
+            "authorizationRevision": 0,
+            "deviceCredential": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=",
+            "identityId": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY="
+          },
+          "frontier": [
+            "RoaVUzHt4daRi2owbCQc9EIdMx6Zt5rmY84nf-r_32M",
+            "nCtFRSc-pqjGa02RuoHNQzITIaUbA5ZOrjJNsQQLt50"
+          ],
+          "kind": "put",
+          "operationId": "vector-moderation-log-0001",
+          "payloadDigest": "txYVyDNPXKiNbrjpiXXuzl4q3OBYboumtmPp1oAtF_0",
+          "predecessor": null,
+          "recordId": "608738804e4271556af0e5f3",
+          "sequence": 0,
+          "store": "moderationLogs",
+          "version": 2
+        },
+        "payload": {
+          "action": "member_banned",
+          "actorIdentityId": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=",
+          "communityId": "889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c",
+          "createdAt": 1767225300000,
+          "details": {
+            "reason": "spam"
+          },
+          "id": "608738804e4271556af0e5f3",
+          "scopeType": "community_moderation_log",
+          "target": {
+            "id": "MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=",
+            "type": "member"
+          }
+        },
+        "payloadCanonical": "{\"action\":\"member_banned\",\"actorIdentityId\":\"MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=\",\"communityId\":\"889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c\",\"createdAt\":1767225300000,\"details\":{\"reason\":\"spam\"},\"id\":\"608738804e4271556af0e5f3\",\"scopeType\":\"community_moderation_log\",\"target\":{\"id\":\"MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=\",\"type\":\"member\"}}",
+        "payloadDigest": "txYVyDNPXKiNbrjpiXXuzl4q3OBYboumtmPp1oAtF_0",
+        "signature": "k7HWXzwCx4fpkxeDz0seBvW2BTgYCYbFgJ4vbkUAW21L0h5uYm9V7a1MZI6JlFaegzNkvSV7KXjQDjgzad8kBQ==",
+        "signingContent": "pigeon:public-mutation:v2\n{\"author\":{\"authorizationRevision\":0,\"deviceCredential\":\"MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=\",\"identityId\":\"MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=\"},\"frontier\":[\"RoaVUzHt4daRi2owbCQc9EIdMx6Zt5rmY84nf-r_32M\",\"nCtFRSc-pqjGa02RuoHNQzITIaUbA5ZOrjJNsQQLt50\"],\"kind\":\"put\",\"operationId\":\"vector-moderation-log-0001\",\"payloadDigest\":\"txYVyDNPXKiNbrjpiXXuzl4q3OBYboumtmPp1oAtF_0\",\"predecessor\":null,\"recordId\":\"608738804e4271556af0e5f3\",\"sequence\":0,\"store\":\"moderationLogs\",\"version\":2}"
+      },
+      "input": {
+        "action": "member_banned",
+        "communityId": "889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c",
+        "createdAt": 1767225300000,
+        "details": {
+          "reason": "spam"
+        },
+        "frontier": [
+          "RoaVUzHt4daRi2owbCQc9EIdMx6Zt5rmY84nf-r_32M",
+          "nCtFRSc-pqjGa02RuoHNQzITIaUbA5ZOrjJNsQQLt50"
+        ],
+        "operationId": "vector-moderation-log-0001",
+        "target": {
+          "id": "MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=",
+          "type": "member"
+        },
+        "signer": "moderator"
+      },
+      "name": "member_banned"
+    },
+    {
+      "derived": {
+        "body": {
+          "createdAt": 1767225300001,
+          "mutation": {
+            "author": {
+              "authorizationRevision": 0,
+              "deviceCredential": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=",
+              "identityId": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY="
+            },
+            "frontier": [
+              "RoaVUzHt4daRi2owbCQc9EIdMx6Zt5rmY84nf-r_32M",
+              "nCtFRSc-pqjGa02RuoHNQzITIaUbA5ZOrjJNsQQLt50"
+            ],
+            "kind": "put",
+            "operationId": "vector-moderation-log-0002",
+            "payloadDigest": "MHc6n7RhLRGKopt0Em2lrymsliaxS3NjdUqbRqLXwLs",
+            "predecessor": null,
+            "recordId": "306f849f2f1b55c78479fc0c",
+            "sequence": 0,
+            "store": "moderationLogs",
+            "version": 2,
+            "signature": "TNIN/UbY+pL+3PPF+acZIlvDCH25Gh8RaqqWojqaS9Ut4denz7fOk7d9vXYI+0QDONhGY4nA3u/IcvILy8OcAg=="
+          }
+        },
+        "id": "306f849f2f1b55c78479fc0c",
+        "idPreimage": "[\"889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c\",\"MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=\",\"role_updated\",\"role\",\"role-vector-0001\",1767225300001]",
+        "mutationBody": {
+          "author": {
+            "authorizationRevision": 0,
+            "deviceCredential": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=",
+            "identityId": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY="
+          },
+          "frontier": [
+            "RoaVUzHt4daRi2owbCQc9EIdMx6Zt5rmY84nf-r_32M",
+            "nCtFRSc-pqjGa02RuoHNQzITIaUbA5ZOrjJNsQQLt50"
+          ],
+          "kind": "put",
+          "operationId": "vector-moderation-log-0002",
+          "payloadDigest": "MHc6n7RhLRGKopt0Em2lrymsliaxS3NjdUqbRqLXwLs",
+          "predecessor": null,
+          "recordId": "306f849f2f1b55c78479fc0c",
+          "sequence": 0,
+          "store": "moderationLogs",
+          "version": 2
+        },
+        "payload": {
+          "action": "role_updated",
+          "actorIdentityId": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=",
+          "communityId": "889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c",
+          "createdAt": 1767225300001,
+          "details": {
+            "name": "Modérateurs 🛡️",
+            "permissions": ["ban_members", "manage_messages"],
+            "previous": {
+              "name": "Mods"
+            }
+          },
+          "id": "306f849f2f1b55c78479fc0c",
+          "scopeType": "community_moderation_log",
+          "target": {
+            "id": "role-vector-0001",
+            "type": "role"
+          }
+        },
+        "payloadCanonical": "{\"action\":\"role_updated\",\"actorIdentityId\":\"MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=\",\"communityId\":\"889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c\",\"createdAt\":1767225300001,\"details\":{\"name\":\"Modérateurs 🛡️\",\"permissions\":[\"ban_members\",\"manage_messages\"],\"previous\":{\"name\":\"Mods\"}},\"id\":\"306f849f2f1b55c78479fc0c\",\"scopeType\":\"community_moderation_log\",\"target\":{\"id\":\"role-vector-0001\",\"type\":\"role\"}}",
+        "payloadDigest": "MHc6n7RhLRGKopt0Em2lrymsliaxS3NjdUqbRqLXwLs",
+        "signature": "TNIN/UbY+pL+3PPF+acZIlvDCH25Gh8RaqqWojqaS9Ut4denz7fOk7d9vXYI+0QDONhGY4nA3u/IcvILy8OcAg==",
+        "signingContent": "pigeon:public-mutation:v2\n{\"author\":{\"authorizationRevision\":0,\"deviceCredential\":\"MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=\",\"identityId\":\"MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=\"},\"frontier\":[\"RoaVUzHt4daRi2owbCQc9EIdMx6Zt5rmY84nf-r_32M\",\"nCtFRSc-pqjGa02RuoHNQzITIaUbA5ZOrjJNsQQLt50\"],\"kind\":\"put\",\"operationId\":\"vector-moderation-log-0002\",\"payloadDigest\":\"MHc6n7RhLRGKopt0Em2lrymsliaxS3NjdUqbRqLXwLs\",\"predecessor\":null,\"recordId\":\"306f849f2f1b55c78479fc0c\",\"sequence\":0,\"store\":\"moderationLogs\",\"version\":2}"
+      },
+      "input": {
+        "action": "role_updated",
+        "communityId": "889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c",
+        "createdAt": 1767225300001,
+        "details": {
+          "name": "Modérateurs 🛡️",
+          "permissions": ["ban_members", "manage_messages"],
+          "previous": {
+            "name": "Mods"
+          }
+        },
+        "frontier": [
+          "RoaVUzHt4daRi2owbCQc9EIdMx6Zt5rmY84nf-r_32M",
+          "nCtFRSc-pqjGa02RuoHNQzITIaUbA5ZOrjJNsQQLt50"
+        ],
+        "operationId": "vector-moderation-log-0002",
+        "target": {
+          "id": "role-vector-0001",
+          "type": "role"
+        },
+        "signer": "moderator"
+      },
+      "name": "role_updated_nested_unicode_details"
+    },
+    {
+      "derived": {
+        "body": {
+          "createdAt": 1767225300002,
+          "mutation": {
+            "author": {
+              "authorizationRevision": 0,
+              "deviceCredential": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=",
+              "identityId": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY="
+            },
+            "frontier": ["RoaVUzHt4daRi2owbCQc9EIdMx6Zt5rmY84nf-r_32M"],
+            "kind": "put",
+            "operationId": "vector-moderation-log-0003",
+            "payloadDigest": "piKangjCbJQwkSQvlQAx3xkZn82nT_i3YwaESJ46QWQ",
+            "predecessor": null,
+            "recordId": "db211bc0c3bc1c27ee228239",
+            "sequence": 0,
+            "store": "moderationLogs",
+            "version": 2,
+            "signature": "zkKcxBZAWMJDHou7Wo4LkmEVJXtjz6tDYKGDU/EY7Mo5VuDCoBOLLG1X6SwhvB6WeDo4MpVUT/qwkm0NIaWUBg=="
+          }
+        },
+        "id": "db211bc0c3bc1c27ee228239",
+        "idPreimage": "[\"889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c\",\"MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=\",\"channel_created\",\"channel\",\"channel-vector-0001\",1767225300002]",
+        "mutationBody": {
+          "author": {
+            "authorizationRevision": 0,
+            "deviceCredential": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=",
+            "identityId": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY="
+          },
+          "frontier": ["RoaVUzHt4daRi2owbCQc9EIdMx6Zt5rmY84nf-r_32M"],
+          "kind": "put",
+          "operationId": "vector-moderation-log-0003",
+          "payloadDigest": "piKangjCbJQwkSQvlQAx3xkZn82nT_i3YwaESJ46QWQ",
+          "predecessor": null,
+          "recordId": "db211bc0c3bc1c27ee228239",
+          "sequence": 0,
+          "store": "moderationLogs",
+          "version": 2
+        },
+        "payload": {
+          "action": "channel_created",
+          "actorIdentityId": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=",
+          "communityId": "889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c",
+          "createdAt": 1767225300002,
+          "details": {},
+          "id": "db211bc0c3bc1c27ee228239",
+          "scopeType": "community_moderation_log",
+          "target": {
+            "id": "channel-vector-0001",
+            "type": "channel"
+          }
+        },
+        "payloadCanonical": "{\"action\":\"channel_created\",\"actorIdentityId\":\"MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=\",\"communityId\":\"889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c\",\"createdAt\":1767225300002,\"details\":{},\"id\":\"db211bc0c3bc1c27ee228239\",\"scopeType\":\"community_moderation_log\",\"target\":{\"id\":\"channel-vector-0001\",\"type\":\"channel\"}}",
+        "payloadDigest": "piKangjCbJQwkSQvlQAx3xkZn82nT_i3YwaESJ46QWQ",
+        "signature": "zkKcxBZAWMJDHou7Wo4LkmEVJXtjz6tDYKGDU/EY7Mo5VuDCoBOLLG1X6SwhvB6WeDo4MpVUT/qwkm0NIaWUBg==",
+        "signingContent": "pigeon:public-mutation:v2\n{\"author\":{\"authorizationRevision\":0,\"deviceCredential\":\"MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=\",\"identityId\":\"MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=\"},\"frontier\":[\"RoaVUzHt4daRi2owbCQc9EIdMx6Zt5rmY84nf-r_32M\"],\"kind\":\"put\",\"operationId\":\"vector-moderation-log-0003\",\"payloadDigest\":\"piKangjCbJQwkSQvlQAx3xkZn82nT_i3YwaESJ46QWQ\",\"predecessor\":null,\"recordId\":\"db211bc0c3bc1c27ee228239\",\"sequence\":0,\"store\":\"moderationLogs\",\"version\":2}"
+      },
+      "input": {
+        "action": "channel_created",
+        "communityId": "889GQafC5pdbxr4OHMPefsLah2wqtHLlYLx3wQtWK7c",
+        "createdAt": 1767225300002,
+        "details": {},
+        "frontier": ["RoaVUzHt4daRi2owbCQc9EIdMx6Zt5rmY84nf-r_32M"],
+        "operationId": "vector-moderation-log-0003",
+        "target": {
+          "id": "channel-vector-0001",
+          "type": "channel"
+        },
+        "signer": "moderator"
+      },
+      "name": "channel_created_empty_details"
+    }
+  ],
+  "description": "Signed community moderation log entries (store moderationLogs) that the UI signs and the node verifies. Keys derive from sha256(\"pigeon-vector:<name>\") as an Ed25519 seed. Regenerate only with a protocol version bump.",
+  "keys": {
+    "member": {
+      "identityId": "MCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=",
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEILDZV/VJ156PVuezQ2VLU9Vy3Xf6oTEIZ5RjTJGhzYZ5\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAIqEp34Xt46gS5nDBcFiWTvXd/hfiakKa1daH3T/V9yI=\n-----END PUBLIC KEY-----\n",
+      "seedHex": "b0d957f549d79e8f56e7b343654b53d572dd77faa131086794634c91a1cd8679"
+    },
+    "moderator": {
+      "identityId": "MCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=",
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEILBg8En1eXyqX+BJsO/JBYMxydF4Fl8QcN7ng/Ii5XPM\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAIslXLgpzT1b8jL27EQyTxHxTjss9FVRZoUDuSJGxgEY=\n-----END PUBLIC KEY-----\n",
+      "seedHex": "b060f049f5797caa5fe049b0efc9058331c9d178165f1070dee783f222e573cc"
+    }
+  }
+}

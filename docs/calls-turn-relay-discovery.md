@@ -124,17 +124,17 @@ corresponding issues can be closed.
 
 ## Components
 
-| Component | Responsibility |
-| --- | --- |
-| coturn | Terminates TURN/STUN and relays WebRTC media. Runs outside the backend. |
-| `CallRelayRuntime` | Starts v1 discovery on public networks and v2 discovery and credential serving on private networks; republishes local records. |
-| `CallRelayRecordSigner` | Signs and verifies call relay records with the shared libp2p peer key. |
-| `CallRelayRecordDiscovery` | Subscribes to the call relay pubsub topic and publishes records. |
-| `CallRelayRecordRegistry` | Keeps active discovered relay records in local memory. |
-| `CallIceServerConfig` | Builds the local or v1 pool HTTP ICE configuration. |
-| `FederatedCallRelayCredentials` | Selects connected private v2 relays and fetches, validates and caches owner-issued credentials. |
-| `CallRelayCredentialIssuer` | Issues ten-minute v2 credentials using the owner secret and enforces request quotas. |
-| `GET /calls/ice-servers` | Authenticated frontend contract for WebRTC ICE configuration. |
+| Component                       | Responsibility                                                                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| coturn                          | Terminates TURN/STUN and relays WebRTC media. Runs outside the backend.                                                        |
+| `CallRelayRuntime`              | Starts v1 discovery on public networks and v2 discovery and credential serving on private networks; republishes local records. |
+| `CallRelayRecordSigner`         | Signs and verifies call relay records with the shared libp2p peer key.                                                         |
+| `CallRelayRecordDiscovery`      | Subscribes to the call relay pubsub topic and publishes records.                                                               |
+| `CallRelayRecordRegistry`       | Keeps active discovered relay records in local memory.                                                                         |
+| `CallIceServerConfig`           | Builds the local or v1 pool HTTP ICE configuration.                                                                            |
+| `FederatedCallRelayCredentials` | Selects connected private v2 relays and fetches, validates and caches owner-issued credentials.                                |
+| `CallRelayCredentialIssuer`     | Issues ten-minute v2 credentials using the owner secret and enforces request quotas.                                           |
+| `GET /calls/ice-servers`        | Authenticated frontend contract for WebRTC ICE configuration.                                                                  |
 
 ## Discovery Flow
 
@@ -206,15 +206,11 @@ V1 (public pool) shape:
 V2 uses the same fields with `"version": 2` and `"poolSignature": ""`. It is
 published and accepted only on private networks. No pool-wide secret is needed.
 
-The canonical signed payload contains:
-
-- `version`
-- `role`
-- `peerId`
-- `publicKey`
-- sorted `urls`
-- `issuedAt`
-- `expiresAt`
+The canonical signed payload is `JSON.stringify` of exactly these keys, in this
+order: `expiresAt`, `issuedAt`, `peerId`, `publicKey`, `role`, `urls` (sorted
+by UTF-16 code units), `version`. The record itself carries `urls` in
+announcement order. `publicKey` is the base64url libp2p public key protobuf and
+`signature` is the base64url Ed25519 signature of the UTF-8 canonical payload.
 
 For v1, `poolSignature` is `base64url(hmac-sha256(canonicalPayload,
 CALLS_TURN_SHARED_SECRET))`. It proves that the publishing node knows the TURN
@@ -223,6 +219,12 @@ pool secret before its URLs are returned with local coturn credentials.
 `signature` proves that the libp2p peer that owns `peerId` announced the record.
 It does not prove that the TURN service is reachable; WebRTC ICE still does the
 final connectivity check.
+
+Byte-exact v1 and v2 records (canonical payload, pool signature, signature and
+the fixed relay key) are in
+[`tests/fixtures/call-relay-record-vectors.json`](../tests/fixtures/call-relay-record-vectors.json),
+checked by the `CallRelayRecordVectors` unit spec. Only nodes sign and verify
+these records, so the frontend does not mirror the fixture.
 
 ## Validation
 
@@ -383,16 +385,16 @@ over TCP and TURN media over UDP.
 
 ## Configuration
 
-| Variable | Purpose |
-| --- | --- |
-| `CALLS_TURN_SHARED_SECRET` | Local coturn REST secret. Required for local issuance and publication; missing or known public values disable those operations with a warning. Not required to fetch credentials from another v2 owner. |
-| `CALLS_TURN_URLS` | Explicit local TURN URLs to advertise and return. Comma-separated. |
-| `CALLS_TURN_TRANSPORTS` | Transports used when deriving URLs. Defaults to `udp,tcp`. |
-| `CALLS_TURN_RECORD_TTL_MS` | Signed record lifetime. Defaults to 10 minutes. |
-| `CALLS_TURN_PUBLICATION_INTERVAL_MS` | Republish interval. Defaults to half the TTL. |
-| `CALLS_TURN_DISCOVERY_ENABLED` | Set to `false` to disable pubsub discovery. |
-| `CALLS_TURN_CREDENTIAL_TTL_SECONDS` | Local/v1 credential lifetime, default 3600 seconds. V2 owner credentials always last ten minutes. |
-| `CALLS_ICE_TRANSPORT_POLICY` | Defaults to `all`, allowing direct ICE candidates when an advertised TURN service is unreachable. Configure `relay` explicitly only after verifying coturn reachability from every supported client network. |
+| Variable                             | Purpose                                                                                                                                                                                                      |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `CALLS_TURN_SHARED_SECRET`           | Local coturn REST secret. Required for local issuance and publication; missing or known public values disable those operations with a warning. Not required to fetch credentials from another v2 owner.      |
+| `CALLS_TURN_URLS`                    | Explicit local TURN URLs to advertise and return. Comma-separated.                                                                                                                                           |
+| `CALLS_TURN_TRANSPORTS`              | Transports used when deriving URLs. Defaults to `udp,tcp`.                                                                                                                                                   |
+| `CALLS_TURN_RECORD_TTL_MS`           | Signed record lifetime. Defaults to 10 minutes.                                                                                                                                                              |
+| `CALLS_TURN_PUBLICATION_INTERVAL_MS` | Republish interval. Defaults to half the TTL.                                                                                                                                                                |
+| `CALLS_TURN_DISCOVERY_ENABLED`       | Set to `false` to disable pubsub discovery.                                                                                                                                                                  |
+| `CALLS_TURN_CREDENTIAL_TTL_SECONDS`  | Local/v1 credential lifetime, default 3600 seconds. V2 owner credentials always last ten minutes.                                                                                                            |
+| `CALLS_ICE_TRANSPORT_POLICY`         | Defaults to `all`, allowing direct ICE candidates when an advertised TURN service is unreachable. Configure `relay` explicitly only after verifying coturn reachability from every supported client network. |
 
 When explicit `CALLS_TURN_URLS` are not enough, local TURN URLs are derived from
 `relayConfiguration.publicHost` and `relayConfiguration.callsRelay.port` in
@@ -438,16 +440,16 @@ records.
 
 ## Failure Modes
 
-| Failure | Result |
-| --- | --- |
-| Discovery pubsub unavailable | Local configured TURN remains available. Remote discovery is delayed on the affected public v1 or private v2 network. |
-| Required version proof or peer signature invalid | Record is ignored: v1 needs a matching pool HMAC; v2 needs private-network reception and an empty pool signature. |
-| Record expired | Record is filtered out and not returned to frontend. |
-| coturn process down but record still active | Frontend receives the URL. With the default `all` policy, WebRTC rejects the failed TURN candidate and can still select a direct candidate; an explicit `relay` policy makes the call fail. |
-| Different secrets in a v1 pool | Records fail pool verification or credentials fail coturn authentication. V1 issuers and selected servers must agree. Independent v2 owners intentionally use different secrets. |
-| V2 credential stream fails or owner is no longer eligible | That owner is omitted from the response; stale cached credentials are not returned for an ineligible peer. |
-| Local secret is missing or uses the known public value | Local issuance and publication are disabled. Fetching from eligible v2 owners remains possible. Configure a private local secret to advertise a local coturn. |
-| Frontend caches ICE servers too long | TURN credentials can expire before or during call setup. Request fresh ICE servers for each new call. |
+| Failure                                                   | Result                                                                                                                                                                                      |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Discovery pubsub unavailable                              | Local configured TURN remains available. Remote discovery is delayed on the affected public v1 or private v2 network.                                                                       |
+| Required version proof or peer signature invalid          | Record is ignored: v1 needs a matching pool HMAC; v2 needs private-network reception and an empty pool signature.                                                                           |
+| Record expired                                            | Record is filtered out and not returned to frontend.                                                                                                                                        |
+| coturn process down but record still active               | Frontend receives the URL. With the default `all` policy, WebRTC rejects the failed TURN candidate and can still select a direct candidate; an explicit `relay` policy makes the call fail. |
+| Different secrets in a v1 pool                            | Records fail pool verification or credentials fail coturn authentication. V1 issuers and selected servers must agree. Independent v2 owners intentionally use different secrets.            |
+| V2 credential stream fails or owner is no longer eligible | That owner is omitted from the response; stale cached credentials are not returned for an ineligible peer.                                                                                  |
+| Local secret is missing or uses the known public value    | Local issuance and publication are disabled. Fetching from eligible v2 owners remains possible. Configure a private local secret to advertise a local coturn.                               |
+| Frontend caches ICE servers too long                      | TURN credentials can expire before or during call setup. Request fresh ICE servers for each new call.                                                                                       |
 
 ## Security Notes
 
