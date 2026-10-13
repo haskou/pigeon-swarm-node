@@ -1842,6 +1842,11 @@ material. They never contain encrypted private keys, protected root-key
 envelopes, password KDF parameters, device unlock secrets or recovery secrets.
 Identity payloads containing those fields are rejected.
 
+The identity self-signature preimage (`IdentitySignatureDomainService`) and its
+signature are pinned byte for byte in
+[`tests/fixtures/identity-signature-vectors.json`](../tests/fixtures/identity-signature-vectors.json),
+checked by the `IdentitySignatureVectors` unit spec.
+
 ### Get identity
 
 ```http

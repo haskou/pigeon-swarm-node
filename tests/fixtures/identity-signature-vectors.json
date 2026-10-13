@@ -1,0 +1,249 @@
+{
+  "algorithms": {
+    "deviceCredentialCommitment": "SHA-256 hex of the PEM string of deviceCredential (DeviceCredentialCommitment.fromCredential).",
+    "keyDerivation": "Ed25519 seed = sha256(utf8(\"pigeon-vector:identity-signature:<role>\")) hex; PKCS#8 private key = 302e020100300506032b657004220420 || seed.",
+    "signature": "Ed25519 over utf8(signingPayload), standard base64 with padding (88 characters). Ed25519 is deterministic, so the signature is byte-exact.",
+    "signingPayload": "JSON.stringify of IdentitySignaturePayload.toPrimitives(): keys admissionNonce, authorizationRevision, deviceCredential, deviceCredentialCommitment, id, mailboxHome, networks, previousIdentityExternalIdentifier, profile, recoveryAuthority, timestamp, version (alphabetical). Absent optional fields are omitted. profile keys are banner, biography, handle, name, picture."
+  },
+  "cases": [
+    {
+      "derived": {
+        "signature": "5aZT/xMwg3mdeqLVyZJtj3WOd1GKCqvgbzqAk232PGScLkCTozX2U6lZQsIJbJj+r1y1FiihY+6RReTLD3ieBw==",
+        "signingPayload": "{\"authorizationRevision\":0,\"deviceCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=\\n-----END PUBLIC KEY-----\\n\",\"deviceCredentialCommitment\":\"e1767da7510f50cdc4980db05d494b98cfc916533afc44bb6b0f5534b5c8280f\",\"id\":\"MCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=\",\"networks\":[\"550e8400-e29b-41d4-a716-446655440000\"],\"profile\":{\"name\":\"Ada\"},\"recoveryAuthority\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=\\n-----END PUBLIC KEY-----\\n\",\"timestamp\":1778536870557,\"version\":1}"
+      },
+      "input": {
+        "authorizationRevision": 0,
+        "deviceCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=\n-----END PUBLIC KEY-----\n",
+        "deviceCredentialCommitment": "e1767da7510f50cdc4980db05d494b98cfc916533afc44bb6b0f5534b5c8280f",
+        "id": "MCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=",
+        "networks": ["550e8400-e29b-41d4-a716-446655440000"],
+        "profile": {
+          "name": "Ada"
+        },
+        "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=\n-----END PUBLIC KEY-----\n",
+        "timestamp": 1778536870557,
+        "version": 1
+      },
+      "name": "genesis identity without optional fields",
+      "signer": "identity"
+    },
+    {
+      "derived": {
+        "signature": "xZj+HBTJlcDIADOMA9O6895HWuD5SrYL5sokHVtmKZF/xck2oORhpqRq8QqNI9rH5i4+nSOcQXi3XeRp7X/aDQ==",
+        "signingPayload": "{\"admissionNonce\":\"a1b2c3\",\"authorizationRevision\":3,\"deviceCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=\\n-----END PUBLIC KEY-----\\n\",\"deviceCredentialCommitment\":\"e1767da7510f50cdc4980db05d494b98cfc916533afc44bb6b0f5534b5c8280f\",\"id\":\"MCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=\",\"mailboxHome\":\"https://mailbox.example.test\",\"networks\":[\"550e8400-e29b-41d4-a716-446655440000\",\"6ba7b810-9dad-11d1-80b4-00c04fd430c8\"],\"previousIdentityExternalIdentifier\":\"bafybeigdyrztprevidentity\",\"profile\":{\"banner\":\"bafkreibannerimage\",\"biography\":\"Analytical engine notes\",\"handle\":\"ada.lovelace\",\"name\":\"Ada\",\"picture\":\"bafkreipictureimage\"},\"recoveryAuthority\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=\\n-----END PUBLIC KEY-----\\n\",\"timestamp\":1778536870557,\"version\":2}"
+      },
+      "input": {
+        "admissionNonce": "a1b2c3",
+        "authorizationRevision": 3,
+        "deviceCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=\n-----END PUBLIC KEY-----\n",
+        "deviceCredentialCommitment": "e1767da7510f50cdc4980db05d494b98cfc916533afc44bb6b0f5534b5c8280f",
+        "id": "MCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=",
+        "mailboxHome": "https://mailbox.example.test",
+        "networks": [
+          "550e8400-e29b-41d4-a716-446655440000",
+          "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+        ],
+        "previousIdentityExternalIdentifier": "bafybeigdyrztprevidentity",
+        "profile": {
+          "banner": "bafkreibannerimage",
+          "biography": "Analytical engine notes",
+          "handle": "ada.lovelace",
+          "name": "Ada",
+          "picture": "bafkreipictureimage"
+        },
+        "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=\n-----END PUBLIC KEY-----\n",
+        "timestamp": 1778536870557,
+        "version": 2
+      },
+      "name": "identity with profile, mailbox home, admission nonce and previous identity",
+      "signer": "identity"
+    }
+  ],
+  "description": "Fixed, byte-exact vectors for the identity self-signature preimage (IdentitySignatureDomainService.getCanonicalSigningContent) and the Identity signature verification. Every derived value is computed from the keys and inputs only; tests/unit/contexts/identities/domain/IdentitySignatureVectors.spec.ts recomputes them with the real domain code, so any drift in key order, field set, credential form or signature scheme fails. The UI pins the same signingPayload bytes and signature.",
+  "identities": {
+    "accepted": [
+      {
+        "name": "genesis identity signed by its identity key",
+        "primitives": {
+          "authorizationRevision": 0,
+          "deviceCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=\n-----END PUBLIC KEY-----\n",
+          "deviceCredentialCommitment": "e1767da7510f50cdc4980db05d494b98cfc916533afc44bb6b0f5534b5c8280f",
+          "id": "MCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=",
+          "networks": ["550e8400-e29b-41d4-a716-446655440000"],
+          "profile": {
+            "name": "Ada"
+          },
+          "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=\n-----END PUBLIC KEY-----\n",
+          "timestamp": 1778536870557,
+          "version": 1,
+          "signature": "5aZT/xMwg3mdeqLVyZJtj3WOd1GKCqvgbzqAk232PGScLkCTozX2U6lZQsIJbJj+r1y1FiihY+6RReTLD3ieBw=="
+        }
+      },
+      {
+        "name": "full identity signed by its identity key",
+        "primitives": {
+          "admissionNonce": "a1b2c3",
+          "authorizationRevision": 3,
+          "deviceCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=\n-----END PUBLIC KEY-----\n",
+          "deviceCredentialCommitment": "e1767da7510f50cdc4980db05d494b98cfc916533afc44bb6b0f5534b5c8280f",
+          "id": "MCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=",
+          "mailboxHome": "https://mailbox.example.test",
+          "networks": [
+            "550e8400-e29b-41d4-a716-446655440000",
+            "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+          ],
+          "previousIdentityExternalIdentifier": "bafybeigdyrztprevidentity",
+          "profile": {
+            "banner": "bafkreibannerimage",
+            "biography": "Analytical engine notes",
+            "handle": "ada.lovelace",
+            "name": "Ada",
+            "picture": "bafkreipictureimage"
+          },
+          "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=\n-----END PUBLIC KEY-----\n",
+          "timestamp": 1778536870557,
+          "version": 2,
+          "signature": "xZj+HBTJlcDIADOMA9O6895HWuD5SrYL5sokHVtmKZF/xck2oORhpqRq8QqNI9rH5i4+nSOcQXi3XeRp7X/aDQ=="
+        }
+      }
+    ],
+    "rejected": [
+      {
+        "name": "signed by the device credential instead of the identity key",
+        "primitives": {
+          "admissionNonce": "a1b2c3",
+          "authorizationRevision": 3,
+          "deviceCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=\n-----END PUBLIC KEY-----\n",
+          "deviceCredentialCommitment": "e1767da7510f50cdc4980db05d494b98cfc916533afc44bb6b0f5534b5c8280f",
+          "id": "MCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=",
+          "mailboxHome": "https://mailbox.example.test",
+          "networks": [
+            "550e8400-e29b-41d4-a716-446655440000",
+            "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+          ],
+          "previousIdentityExternalIdentifier": "bafybeigdyrztprevidentity",
+          "profile": {
+            "banner": "bafkreibannerimage",
+            "biography": "Analytical engine notes",
+            "handle": "ada.lovelace",
+            "name": "Ada",
+            "picture": "bafkreipictureimage"
+          },
+          "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=\n-----END PUBLIC KEY-----\n",
+          "timestamp": 1778536870557,
+          "version": 2,
+          "signature": "rVKpN/c7J0bLRqxlnkJaFkW5xuF1umuRHIqTEMAonBdOy2n2fGkJlw3OA9ajnCnvoQHBKjxhXb/a7dnXFlDUCg=="
+        },
+        "signedPayload": "{\"admissionNonce\":\"a1b2c3\",\"authorizationRevision\":3,\"deviceCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=\\n-----END PUBLIC KEY-----\\n\",\"deviceCredentialCommitment\":\"e1767da7510f50cdc4980db05d494b98cfc916533afc44bb6b0f5534b5c8280f\",\"id\":\"MCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=\",\"mailboxHome\":\"https://mailbox.example.test\",\"networks\":[\"550e8400-e29b-41d4-a716-446655440000\",\"6ba7b810-9dad-11d1-80b4-00c04fd430c8\"],\"previousIdentityExternalIdentifier\":\"bafybeigdyrztprevidentity\",\"profile\":{\"banner\":\"bafkreibannerimage\",\"biography\":\"Analytical engine notes\",\"handle\":\"ada.lovelace\",\"name\":\"Ada\",\"picture\":\"bafkreipictureimage\"},\"recoveryAuthority\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=\\n-----END PUBLIC KEY-----\\n\",\"timestamp\":1778536870557,\"version\":2}",
+        "signer": "device"
+      },
+      {
+        "name": "signed over the preimage with keys in reverse order",
+        "primitives": {
+          "admissionNonce": "a1b2c3",
+          "authorizationRevision": 3,
+          "deviceCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=\n-----END PUBLIC KEY-----\n",
+          "deviceCredentialCommitment": "e1767da7510f50cdc4980db05d494b98cfc916533afc44bb6b0f5534b5c8280f",
+          "id": "MCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=",
+          "mailboxHome": "https://mailbox.example.test",
+          "networks": [
+            "550e8400-e29b-41d4-a716-446655440000",
+            "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+          ],
+          "previousIdentityExternalIdentifier": "bafybeigdyrztprevidentity",
+          "profile": {
+            "banner": "bafkreibannerimage",
+            "biography": "Analytical engine notes",
+            "handle": "ada.lovelace",
+            "name": "Ada",
+            "picture": "bafkreipictureimage"
+          },
+          "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=\n-----END PUBLIC KEY-----\n",
+          "timestamp": 1778536870557,
+          "version": 2,
+          "signature": "YmPwjbKFqXgakL0pLi8l94yn+gMMQhugX4Yb7Ml7MysmtWiXT0AkXlUIgdYeVYkBsVce6FIX0hwbbcyIPaCXBg=="
+        },
+        "signedPayload": "{\"version\":2,\"timestamp\":1778536870557,\"recoveryAuthority\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=\\n-----END PUBLIC KEY-----\\n\",\"profile\":{\"banner\":\"bafkreibannerimage\",\"biography\":\"Analytical engine notes\",\"handle\":\"ada.lovelace\",\"name\":\"Ada\",\"picture\":\"bafkreipictureimage\"},\"previousIdentityExternalIdentifier\":\"bafybeigdyrztprevidentity\",\"networks\":[\"550e8400-e29b-41d4-a716-446655440000\",\"6ba7b810-9dad-11d1-80b4-00c04fd430c8\"],\"mailboxHome\":\"https://mailbox.example.test\",\"id\":\"MCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=\",\"deviceCredentialCommitment\":\"e1767da7510f50cdc4980db05d494b98cfc916533afc44bb6b0f5534b5c8280f\",\"deviceCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=\\n-----END PUBLIC KEY-----\\n\",\"authorizationRevision\":3,\"admissionNonce\":\"a1b2c3\"}",
+        "signer": "identity"
+      },
+      {
+        "name": "signed over the preimage without the admission nonce",
+        "primitives": {
+          "admissionNonce": "a1b2c3",
+          "authorizationRevision": 3,
+          "deviceCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=\n-----END PUBLIC KEY-----\n",
+          "deviceCredentialCommitment": "e1767da7510f50cdc4980db05d494b98cfc916533afc44bb6b0f5534b5c8280f",
+          "id": "MCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=",
+          "mailboxHome": "https://mailbox.example.test",
+          "networks": [
+            "550e8400-e29b-41d4-a716-446655440000",
+            "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+          ],
+          "previousIdentityExternalIdentifier": "bafybeigdyrztprevidentity",
+          "profile": {
+            "banner": "bafkreibannerimage",
+            "biography": "Analytical engine notes",
+            "handle": "ada.lovelace",
+            "name": "Ada",
+            "picture": "bafkreipictureimage"
+          },
+          "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=\n-----END PUBLIC KEY-----\n",
+          "timestamp": 1778536870557,
+          "version": 2,
+          "signature": "7dyEkZG7xixg9VVoMRfwmvX6YfqU0Ws6k7Pd0mQ/X8trHDQCuDb+630vnV+xth+HmiakHeLCPuo6L++r+cIHBQ=="
+        },
+        "signedPayload": "{\"authorizationRevision\":3,\"deviceCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=\\n-----END PUBLIC KEY-----\\n\",\"deviceCredentialCommitment\":\"e1767da7510f50cdc4980db05d494b98cfc916533afc44bb6b0f5534b5c8280f\",\"id\":\"MCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=\",\"mailboxHome\":\"https://mailbox.example.test\",\"networks\":[\"550e8400-e29b-41d4-a716-446655440000\",\"6ba7b810-9dad-11d1-80b4-00c04fd430c8\"],\"previousIdentityExternalIdentifier\":\"bafybeigdyrztprevidentity\",\"profile\":{\"banner\":\"bafkreibannerimage\",\"biography\":\"Analytical engine notes\",\"handle\":\"ada.lovelace\",\"name\":\"Ada\",\"picture\":\"bafkreipictureimage\"},\"recoveryAuthority\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=\\n-----END PUBLIC KEY-----\\n\",\"timestamp\":1778536870557,\"version\":2}",
+        "signer": "identity"
+      },
+      {
+        "name": "profile name changed after signing",
+        "primitives": {
+          "admissionNonce": "a1b2c3",
+          "authorizationRevision": 3,
+          "deviceCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=\n-----END PUBLIC KEY-----\n",
+          "deviceCredentialCommitment": "e1767da7510f50cdc4980db05d494b98cfc916533afc44bb6b0f5534b5c8280f",
+          "id": "MCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=",
+          "mailboxHome": "https://mailbox.example.test",
+          "networks": [
+            "550e8400-e29b-41d4-a716-446655440000",
+            "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+          ],
+          "previousIdentityExternalIdentifier": "bafybeigdyrztprevidentity",
+          "profile": {
+            "banner": "bafkreibannerimage",
+            "biography": "Analytical engine notes",
+            "handle": "ada.lovelace",
+            "name": "Grace",
+            "picture": "bafkreipictureimage"
+          },
+          "recoveryAuthority": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=\n-----END PUBLIC KEY-----\n",
+          "timestamp": 1778536870557,
+          "version": 2,
+          "signature": "xZj+HBTJlcDIADOMA9O6895HWuD5SrYL5sokHVtmKZF/xck2oORhpqRq8QqNI9rH5i4+nSOcQXi3XeRp7X/aDQ=="
+        },
+        "signedPayload": "{\"admissionNonce\":\"a1b2c3\",\"authorizationRevision\":3,\"deviceCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=\\n-----END PUBLIC KEY-----\\n\",\"deviceCredentialCommitment\":\"e1767da7510f50cdc4980db05d494b98cfc916533afc44bb6b0f5534b5c8280f\",\"id\":\"MCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=\",\"mailboxHome\":\"https://mailbox.example.test\",\"networks\":[\"550e8400-e29b-41d4-a716-446655440000\",\"6ba7b810-9dad-11d1-80b4-00c04fd430c8\"],\"previousIdentityExternalIdentifier\":\"bafybeigdyrztprevidentity\",\"profile\":{\"banner\":\"bafkreibannerimage\",\"biography\":\"Analytical engine notes\",\"handle\":\"ada.lovelace\",\"name\":\"Ada\",\"picture\":\"bafkreipictureimage\"},\"recoveryAuthority\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=\\n-----END PUBLIC KEY-----\\n\",\"timestamp\":1778536870557,\"version\":2}",
+        "signer": "identity"
+      }
+    ]
+  },
+  "keys": {
+    "device": {
+      "identityId": "MCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=",
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIAopuBWAq3pUImZvXDpEMknlgdGDjEm5t+zLwTBj+ekJ\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAA/wgW5GzeJmnvGBt2yZCsEOcMr6Q8fMmtwk4an4oUe4=\n-----END PUBLIC KEY-----\n",
+      "seedHex": "0a29b81580ab7a5422666f5c3a443249e581d1838c49b9b7eccbc13063f9e909"
+    },
+    "identity": {
+      "identityId": "MCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=",
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEICO46iiC7U+m1oZViDVyX1/83xwQkI9RdzluM1QLDl3Q\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAIPGUw0ob1Oa1Yp9GtcpimiT7Hhvi6t/Y6HCCPGt8v5c=\n-----END PUBLIC KEY-----\n",
+      "seedHex": "23b8ea2882ed4fa6d686558835725f5ffcdf1c10908f5177396e33540b0e5dd0"
+    },
+    "recovery": {
+      "identityId": "MCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=",
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIDl4HSeXIC9IlElymczOW3/WS5hALWnIymR7B8/uJZfW\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAtgVgChcCTHTyEiL+0NXHrttPXFSLoSVKd5AqPDz2IJ4=\n-----END PUBLIC KEY-----\n",
+      "seedHex": "39781d2797202f4894497299ccce5b7fd64b98402d69c8ca647b07cfee2597d6"
+    }
+  }
+}
