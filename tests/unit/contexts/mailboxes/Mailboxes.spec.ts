@@ -1078,4 +1078,42 @@ describe('mailboxes', () => {
       'Stored mailbox is malformed.',
     );
   });
+
+  it.each([
+    ['without the append bucket fields', {}],
+    ['with a NaN append bucket', { appendRefilledAt: NaN, appendTokens: NaN }],
+  ])(
+    'refuses appends to a stored mailbox %s instead of skipping the rate limit',
+    async (_case, bucket) => {
+      const unbucketed = 'u'.repeat(43);
+      await database.save('mailboxes', unbucketed, {
+        bytes: 0,
+        createdAt: Date.now(),
+        envelopeCount: 0,
+        id: unbucketed,
+        lastReadAt: Date.now(),
+        nextCursor: 1,
+        postTokenHash: POST_HASH,
+        readers: [{ ackedCursor: 0, readTokenHash: READ_HASH }],
+        ...bucket,
+      });
+
+      await expect(
+        appender.append(
+          new MailboxAppendMessage(
+            unbucketed,
+            POST,
+            'a'.repeat(22),
+            body(1024),
+          ),
+        ),
+      ).rejects.toThrow('Stored mailbox is malformed.');
+      await expect(
+        repository.hasEnvelope(
+          new MailboxId(unbucketed),
+          new MailboxEnvelopeId('a'.repeat(22)),
+        ),
+      ).resolves.toBe(false);
+    },
+  );
 });
