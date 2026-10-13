@@ -21,6 +21,7 @@ import { OrbitDBRecordReadmission } from './OrbitDBRecordReadmission';
 import { OrbitDBReplicatedDocumentStoreName } from './OrbitDBReplicatedDocumentStoreName';
 import OrbitDBReplicatedHeadCache from './OrbitDBReplicatedHeadCache';
 import OrbitDBReplicatedHeadKeyDeriver from './OrbitDBReplicatedHeadKeyDeriver';
+import { isOrbitDBTransientBlockError } from './OrbitDBTransientBlockError';
 import ReplicatedStateNotReadyError from './ReplicatedStateNotReadyError';
 
 type PersistedHeadCacheHydration = {
@@ -126,6 +127,13 @@ export default class OrbitDBReplicatedStateRegistry {
   private readonly documentUpdateListenerStores = new Map<
     OrbitDBReplicatedDocumentStoreName,
     WeakSet<OrbitDBDatabase>
+  >();
+
+  private readonly headCacheListenerStores = new WeakSet<OrbitDBDatabase>();
+
+  private readonly pendingSubscriberBootstraps = new WeakMap<
+    OrbitDBDatabase,
+    Array<() => Promise<void>>
   >();
 
   private readonly reconciledStoreHeadSignatures = new WeakMap<
@@ -664,12 +672,16 @@ export default class OrbitDBReplicatedStateRegistry {
     store.events?.on?.('update', (entry) => {
       const history = this.documentHistory(storeName, store);
 
+      this.retryPendingSubscriberBootstraps(storeName, store);
+
       if (history) this.refreshDocumentHistory(history);
       else
         void this.notifyDocumentUpdated(storeName, store, entry.payload?.value);
     });
     store.events?.on?.('join', (_peerId, heads) => {
       const history = this.documentHistory(storeName, store);
+
+      this.retryPendingSubscriberBootstraps(storeName, store);
 
       if (history) this.refreshDocumentHistory(history);
       else this.reconcileDocumentProjection(storeName, store, heads);
@@ -687,6 +699,54 @@ export default class OrbitDBReplicatedStateRegistry {
       if (store) {
         this.registerDocumentUpdateListener(storeName, store);
       }
+    }
+  }
+
+  /**
+   * Bootstraps a new subscriber. A block the store cannot load in time (a
+   * restarted node missing blocks only its peers serve) defers the bootstrap
+   * to the store's next head update instead of failing the subscription.
+   */
+  private async bootstrapSubscriber(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    store: OrbitDBDatabase,
+    bootstrap: () => Promise<void>,
+  ): Promise<void> {
+    try {
+      await bootstrap();
+    } catch (error: unknown) {
+      if (!isOrbitDBTransientBlockError(error)) throw error;
+
+      const pending = this.pendingSubscriberBootstraps.get(store) ?? [];
+
+      pending.push(bootstrap);
+      this.pendingSubscriberBootstraps.set(store, pending);
+      Kernel.logger.warn?.(
+        `OrbitDB document subscriber bootstrap deferred: store=${storeName}` +
+          ` error=${String(error)}` +
+          ' recovery=retry-on-store-head-update',
+      );
+    }
+  }
+
+  private retryPendingSubscriberBootstraps(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    store: OrbitDBDatabase,
+  ): void {
+    const pending = this.pendingSubscriberBootstraps.get(store);
+
+    if (!pending) return;
+
+    this.pendingSubscriberBootstraps.delete(store);
+    for (const bootstrap of pending) {
+      void this.bootstrapSubscriber(storeName, store, bootstrap).catch(
+        (error: unknown) => {
+          Kernel.logger.warn?.(
+            `OrbitDB document subscriber bootstrap failed: store=${storeName}` +
+              ` error=${String(error)}`,
+          );
+        },
+      );
     }
   }
 
@@ -1923,6 +1983,9 @@ export default class OrbitDBReplicatedStateRegistry {
     networkId: string,
     stores: OrbitDBPrivateNetworkStores,
   ): void {
+    if (this.headCacheListenerStores.has(stores.heads)) return;
+
+    this.headCacheListenerStores.add(stores.heads);
     stores.heads.events?.on?.('update', (entry) => {
       void this.cacheHeadUpdate(networkId, entry);
     });
@@ -2098,11 +2161,13 @@ export default class OrbitDBReplicatedStateRegistry {
 
       this.registerDocumentUpdateListener(storeName, store);
 
-      await this.bootstrapSubscribedDocumentListener(
-        storeName,
-        store,
-        listener,
-        options.historyObserver,
+      await this.bootstrapSubscriber(storeName, store, () =>
+        this.bootstrapSubscribedDocumentListener(
+          storeName,
+          store,
+          listener,
+          options.historyObserver,
+        ),
       );
     }
   }

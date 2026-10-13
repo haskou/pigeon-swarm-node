@@ -25,6 +25,18 @@ OrbitDB write path. Projection hydration yields to the Node.js event loop after
 each bounded batch; it does not rescan documents on HTTP reads or write repaired
 heads back into OrbitDB.
 
+A restarted node can miss blocks that only its peers serve, and OrbitDB gives up
+on a block after 30 seconds. Such a block timeout (`TimeoutError`,
+`LoadBlockFailedError`, `Failed to load block`, `Want was aborted`) while a
+private network registers its replicated state, or while a projection subscribes
+to a document store, does not abort startup. The node logs a warning, still
+starts synchronizing the network, and recovers through the head exchange: the
+first peer `join` reconciles the head cache and the document projections again,
+and a deferred subscriber is bootstrapped again on the store's next `update` or
+`join`. Any other registration or subscription error still fails startup.
+`yarn test:e2e:real-transport:restart-missing-block` proves the subscriber path
+with two real private nodes.
+
 ## Private relay records
 
 Private relay records use two gossipsub topics derived from the private network

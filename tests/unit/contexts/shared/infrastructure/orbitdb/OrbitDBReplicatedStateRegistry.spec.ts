@@ -414,10 +414,10 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       next: ['first'],
       payload: { value: { id: 'call', updatedAt: 2 } },
     };
-    const getAncestor = jest.fn(async () => ancestor);
+    const getAncestor = jest.fn(() => Promise.resolve(ancestor));
     calls.log = {
       get: getAncestor,
-      heads: jest.fn(async () => [head]),
+      heads: jest.fn(() => Promise.resolve([head])),
     };
     await registry.register('network-1', stores);
     await registry.onDocumentUpdated('calls', () => undefined, {
@@ -426,7 +426,10 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     const late: unknown[] = [];
 
     getAncestor.mockRejectedValueOnce(
-      new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+      new DOMException(
+        'The operation was aborted due to timeout',
+        'TimeoutError',
+      ),
     );
     await registry.onDocumentUpdated(
       'calls',

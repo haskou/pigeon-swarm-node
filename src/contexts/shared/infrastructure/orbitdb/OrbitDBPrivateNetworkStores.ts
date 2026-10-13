@@ -9,6 +9,7 @@ import { OrbitDBPrivateNetworkStoreAddresses } from './OrbitDBPrivateNetworkStor
 import { OrbitDBPrivateNetworkStoreName } from './OrbitDBPrivateNetworkStoreName';
 import { OrbitDBPrivateNetworkStoreSet } from './OrbitDBPrivateNetworkStoreSet';
 import { orbitDBRuntimeAdapter } from './OrbitDBRuntimeAdapter';
+import { isOrbitDBTransientBlockError } from './OrbitDBTransientBlockError';
 
 export class OrbitDBPrivateNetworkStores {
   private static readonly SYNCHRONIZATION_START_BATCH_SIZE = 2;
@@ -86,18 +87,6 @@ export class OrbitDBPrivateNetworkStores {
     return `${networkId}:${store}:${message}`;
   }
 
-  private static isTransientSyncError(error: unknown): boolean {
-    const message = String(error);
-
-    return (
-      message.includes('LoadBlockFailedError') ||
-      message.includes('Failed to load block') ||
-      message.includes('Want was aborted') ||
-      message.includes('TimeoutError') ||
-      message.includes('operation was aborted due to timeout')
-    );
-  }
-
   private static registerSyncErrorLogger(
     networkId: string,
     store: string,
@@ -111,12 +100,12 @@ export class OrbitDBPrivateNetworkStores {
       }
 
       this.syncErrorWarningKeys.add(warningKey);
-      const level = this.isTransientSyncError(error) ? 'debug' : 'warn';
+      const transient = isOrbitDBTransientBlockError(error);
 
-      Kernel.logger[level]?.(
+      Kernel.logger[transient ? 'debug' : 'warn']?.(
         `OrbitDB private network store sync error handled: networkId=${networkId}` +
           ` store=${store}` +
-          ` transient=${this.isTransientSyncError(error)}` +
+          ` transient=${transient}` +
           ` error=${String(error)}`,
       );
     });

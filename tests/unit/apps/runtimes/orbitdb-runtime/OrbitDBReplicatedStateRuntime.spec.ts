@@ -216,7 +216,10 @@ describe('OrbitDBReplicatedStateRuntime', () => {
 
     jest.spyOn(OrbitDBPrivateNetworkStores, 'open').mockResolvedValue(stores);
     replicatedStateRegistry.register.mockRejectedValue(
-      new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+      new DOMException(
+        'The operation was aborted due to timeout',
+        'TimeoutError',
+      ),
     );
 
     await expect(runtime.run()).resolves.toBeUndefined();

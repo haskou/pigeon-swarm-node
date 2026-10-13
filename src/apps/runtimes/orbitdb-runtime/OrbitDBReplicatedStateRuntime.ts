@@ -3,6 +3,7 @@ import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/I
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { isOrbitDBTransientBlockError } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBTransientBlockError';
 import Kernel from '@haskou/ddd-kernel';
 
 import { RegisteredOrbitDBNetwork } from './RegisteredOrbitDBNetwork';
@@ -19,6 +20,33 @@ export default class OrbitDBReplicatedStateRuntime {
     private readonly synchronizationMonitor: NodeNetworkSynchronizationMonitor,
   ) {}
 
+  /**
+   * A restarted node may need blocks only its peers serve while it registers
+   * its replicated state. Such a block timeout must not abort startup: the
+   * network still starts synchronizing, and the head exchange with the first
+   * peer reconciles the head cache and the document projections again.
+   */
+  private async registerReplicatedState(
+    networkId: string,
+    stores: OrbitDBPrivateNetworkStores,
+  ): Promise<void> {
+    try {
+      await this.registry.register(networkId, stores);
+    } catch (error: unknown) {
+      if (!isOrbitDBTransientBlockError(error)) {
+        this.registeredNetworks.delete(networkId);
+        await this.registry.unregister(networkId);
+        throw error;
+      }
+
+      Kernel.logger.warn(
+        `OrbitDB replicated state registration degraded: networkId=${networkId}` +
+          ` error=${String(error)}` +
+          ' recovery=reconcile-on-peer-head-exchange',
+      );
+    }
+  }
+
   private async registerNetwork(network: IPFSNetwork): Promise<void> {
     const networkId = network.getId();
 
@@ -33,7 +61,7 @@ export default class OrbitDBReplicatedStateRuntime {
       localPeerId,
       stores,
     });
-    await this.registry.register(networkId, stores);
+    await this.registerReplicatedState(networkId, stores);
     this.synchronizationMonitor.observe({
       getConnectedPeerIds: () => network.getPeers(),
       id: network.getId(),
