@@ -1968,6 +1968,61 @@ export default class Definitions {
 
   @given('I sign the current device authorization checkpoint request')
   public async iSignTheCurrentDeviceAuthorizationCheckpointRequest(): Promise<void> {
+    await this.signDeviceAuthorizationCheckpointRequest(
+      await this.ensureIdentityDeviceOwnerKeyPair(),
+    );
+  }
+
+  @given(
+    'the enrolled device signs the current device authorization checkpoint request',
+  )
+  public async theEnrolledDeviceSignsTheCurrentDeviceAuthorizationCheckpointRequest(): Promise<void> {
+    await this.signDeviceAuthorizationCheckpointRequest(
+      this.identityDeviceTargetKeyPair as KeyPair,
+    );
+  }
+
+  @given(
+    'I set a self-retirement transition body for the enrolled device signed by another key',
+  )
+  public async iSetASelfRetirementTransitionBodySignedByAnotherKey(): Promise<void> {
+    const target = this.identityDeviceTargetKeyPair as KeyPair;
+    const credential = DeviceCredential.fromString(
+      target.toPrimitives().publicKey,
+    );
+    const unsigned = DeviceAuthorizationTransition.revocation(
+      this.ownerIdentityId as IdentityId,
+      DeviceAuthorizationOperationId.generate(),
+      new DeviceAuthorizationRevision(1),
+      credential,
+      credential,
+    );
+    const forger = await KeyPair.generate();
+
+    this.body = JSON.stringify(
+      unsigned
+        .authorize(forger.sign(unsigned.getSigningPayload()))
+        .toPrimitives(),
+    );
+  }
+
+  @given('I set the raw JSON body {string}')
+  public iSetTheRawJsonBody(body: string): void {
+    this.binaryBody = Buffer.from(body);
+    this.headers['content-type'] = 'application/json';
+  }
+
+  @given('I set a JSON body of {int} megabytes')
+  public iSetAJsonBodyOfMegabytes(megabytes: number): void {
+    this.binaryBody = Buffer.from(
+      JSON.stringify({ padding: 'a'.repeat(megabytes * 1024 * 1024) }),
+    );
+    this.headers['content-type'] = 'application/json';
+  }
+
+  private async signDeviceAuthorizationCheckpointRequest(
+    device: KeyPair,
+  ): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;
     this.body = undefined;
     const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}`;
@@ -1979,7 +2034,6 @@ export default class Definitions {
       timestamp,
       this.getCurrentRequestBody(),
     );
-    const device = await this.ensureIdentityDeviceOwnerKeyPair();
     this.headers['x-device-credential'] = new IdentityId(
       device.toPrimitives().publicKey,
     ).valueOf();

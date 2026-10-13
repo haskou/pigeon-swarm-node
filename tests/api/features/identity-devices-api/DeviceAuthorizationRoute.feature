@@ -30,6 +30,45 @@ Feature: Device authorization route
     When I POST to "/identity-devices/transitions"
     Then response code is equal to 400
 
+  Scenario: Refuse a request signed by a revoked device
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "revoked device owner" and handle "revoked-device"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I set a signed device enrollment transition body
+    When I POST to "/identity-devices/transitions"
+    Then response code is equal to 200
+    Given the enrolled device signs the current device authorization checkpoint request
+    When I GET the current device authorization checkpoint
+    Then response code is equal to 200
+    Given I set a signed self-retirement transition body for the enrolled device
+    When I POST to "/identity-devices/transitions"
+    Then response code is equal to 200
+    Given the enrolled device signs the current device authorization checkpoint request
+    When I GET the current device authorization checkpoint
+    Then response code is equal to 401
+    And response body should contain "401020"
+
+  Scenario: A revocation without a valid signature changes nothing
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "forged revoke owner" and handle "forged-revoke"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I set a signed device enrollment transition body
+    When I POST to "/identity-devices/transitions"
+    Then response code is equal to 200
+    Given I set a self-retirement transition body for the enrolled device signed by another key
+    When I POST to "/identity-devices/transitions"
+    Then response code is equal to 409
+    And response body should contain "InvalidDeviceAuthorizationTransitionError"
+    Given the enrolled device signs the current device authorization checkpoint request
+    When I GET the current device authorization checkpoint
+    Then response code is equal to 200
+    And response contains a valid resource with the following fields
+      | revision | 1 |
+
   Scenario: Read the authenticated identity authorization checkpoint
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
