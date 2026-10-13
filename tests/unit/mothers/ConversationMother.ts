@@ -78,7 +78,9 @@ export class ConversationMother {
       ),
       this.networkId,
       new GroupConversationName('Mother group'),
-      [this.author, this.recipient],
+      [this.author, this.recipient].sort((left, right) =>
+        left.valueOf() < right.valueOf() ? -1 : 1,
+      ),
       [],
       this.author,
     );
