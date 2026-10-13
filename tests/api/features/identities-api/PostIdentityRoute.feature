@@ -151,6 +151,28 @@ Feature: Post identity route
     Then response code is equal to 429
     And response body should contain "429042"
 
+  Scenario: Ask for a harder admission proof while a network is busy on this node
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174996" and name "busy-admission-network"
+    And this node recently accepted 60 identity admissions into the current network
+    And identity admission proofs are mined at exactly 16 bits
+    And I set a client-signed identity body with name "busy floor" and handle "busy-floor"
+    When I POST to "/identities/"
+    Then response code is equal to 400
+    And response data should match partially
+      """
+      { "code": "BadRequestError", "requiredDifficultyBits": 17 }
+      """
+
+  Scenario: Admit a proof that meets the raised difficulty while a network is busy
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174995" and name "busy-proven-network"
+    And this node recently accepted 60 identity admissions into the current network
+    And identity admission proofs are mined at exactly 17 bits
+    And I set a client-signed identity body with name "busy proven" and handle "busy-proven"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+
   Scenario: Reject identity updates above the per-source rate limit
     Given I am an anonymous user
     And identity admissions are limited to 1 per source per minute

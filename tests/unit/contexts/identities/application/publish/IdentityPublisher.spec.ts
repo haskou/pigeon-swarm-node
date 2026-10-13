@@ -1,14 +1,24 @@
 import DeviceAuthorizationProvisioner from '@app/contexts/identity-devices/application/provision/DeviceAuthorizationProvisioner';
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
 import { IdentityPublishMessage } from '@app/contexts/identities/application/publish/messages/IdentityPublishMessage';
+import { InsufficientIdentityAdmissionProofError } from '@app/contexts/identities/domain/errors/InsufficientIdentityAdmissionProofError';
+import { Identity } from '@app/contexts/identities/domain/Identity';
+import IdentityAdmissionLoadRepository from '@app/contexts/identities/domain/repositories/IdentityAdmissionLoadRepository';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import IdentityCandidateValidationDomainService from '@app/contexts/identities/domain/services/IdentityCandidateValidationDomainService';
 import IdentitySaverService from '@app/contexts/identities/domain/services/IdentitySaverService';
+import { IdentityAdmissionDifficulty } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionDifficulty';
+import { IdentityAdmissionProof } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionProof';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityMother } from '../../../../mothers/IdentityMother';
+
+const NETWORK = '550e8400-e29b-41d4-a716-446655440000';
+const ADDED_NETWORK = '550e8400-e29b-41d4-a716-446655440001';
+const BUSY = IdentityAdmissionDifficulty.FREE_ADMISSIONS_PER_WINDOW;
 
 describe('IdentityPublisher', () => {
   let saver: MockProxy<IdentitySaverService>;
@@ -16,7 +26,37 @@ describe('IdentityPublisher', () => {
   let validator: MockProxy<IdentityCandidateValidationDomainService>;
   let eventPublisher: MockProxy<DomainEventPublisher>;
   let provisioner: MockProxy<DeviceAuthorizationProvisioner>;
+  let admissionLoad: MockProxy<IdentityAdmissionLoadRepository>;
   let publisher: IdentityPublisher;
+
+  /** Nonce that meets exactly `bits` leading zero bits and not one more. */
+  function nonceWithExactly(
+    mother: IdentityMother,
+    networks: string[],
+    bits: number,
+  ): string {
+    const proof = new IdentityAdmissionProof(mother.id.valueOf(), networks);
+
+    return proof.mine(
+      (nonce) => proof.isValid(nonce, bits) && !proof.isValid(nonce, bits + 1),
+    );
+  }
+
+  async function genesisProvenAt(bits: number): Promise<Identity> {
+    const mother = new IdentityMother();
+
+    return mother.buildNext({
+      admissionNonce: nonceWithExactly(mother, [NETWORK], bits),
+      previousIdentityExternalIdentifier: undefined,
+      version: 1,
+    });
+  }
+
+  function loadPerNetwork(load: Record<string, number>): void {
+    admissionLoad.countRecent.mockImplementation(
+      async (networkId: NetworkId) => load[networkId.valueOf()] ?? 0,
+    );
+  }
 
   beforeEach(() => {
     saver = mock<IdentitySaverService>();
@@ -24,17 +64,20 @@ describe('IdentityPublisher', () => {
     validator = mock<IdentityCandidateValidationDomainService>();
     eventPublisher = mock<DomainEventPublisher>();
     provisioner = mock<DeviceAuthorizationProvisioner>();
+    admissionLoad = mock<IdentityAdmissionLoadRepository>();
     publisher = new IdentityPublisher(
       saver,
       repository,
       validator,
       eventPublisher,
       provisioner,
+      admissionLoad,
     );
     validator.isValidChainFor.mockResolvedValue(true);
     const externalIdentifier = new IdentityExternalIdentifier('bafkidentity');
     saver.calculateExternalIdentifier.mockResolvedValue(externalIdentifier);
     saver.save.mockResolvedValue(externalIdentifier);
+    loadPerNetwork({});
   });
 
   it('does not publish an identity when device authorization provisioning fails', async () => {
@@ -107,5 +150,126 @@ describe('IdentityPublisher', () => {
     expect(repository.requireByExternalIdentifier).toHaveBeenCalledWith(
       previous,
     );
+  });
+
+  describe('admission difficulty', () => {
+    it('asks only the protocol floor while the network is quiet on this node', async () => {
+      const identity = await genesisProvenAt(16);
+      loadPerNetwork({ [NETWORK]: BUSY - 1 });
+
+      await publisher.publish(
+        new IdentityPublishMessage(identity.toPrimitives()),
+      );
+
+      expect(saver.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses a new admission whose proof misses the raised difficulty', async () => {
+      const identity = await genesisProvenAt(16);
+      loadPerNetwork({ [NETWORK]: BUSY });
+
+      const publication = publisher.publish(
+        new IdentityPublishMessage(identity.toPrimitives()),
+      );
+
+      await expect(publication).rejects.toBeInstanceOf(
+        InsufficientIdentityAdmissionProofError,
+      );
+      await expect(publication).rejects.toMatchObject({
+        requiredDifficultyBits: 17,
+      });
+      expect(provisioner.provision).not.toHaveBeenCalled();
+      expect(saver.save).not.toHaveBeenCalled();
+      expect(admissionLoad.record).not.toHaveBeenCalled();
+    });
+
+    it('admits a proof that meets the raised difficulty', async () => {
+      const identity = await genesisProvenAt(17);
+      loadPerNetwork({ [NETWORK]: BUSY });
+
+      await publisher.publish(
+        new IdentityPublishMessage(identity.toPrimitives()),
+      );
+
+      expect(saver.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('charges the admitted networks only after the identity is saved', async () => {
+      const identity = await genesisProvenAt(16);
+
+      await publisher.publish(
+        new IdentityPublishMessage(identity.toPrimitives()),
+      );
+
+      expect(admissionLoad.record).toHaveBeenCalledWith([
+        new NetworkId(NETWORK),
+      ]);
+      expect(admissionLoad.record.mock.invocationCallOrder[0]).toBeGreaterThan(
+        saver.save.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('does not charge an admission that fails to save', async () => {
+      const identity = await genesisProvenAt(16);
+      saver.save.mockRejectedValue(new Error('routing publication failed'));
+
+      await expect(
+        publisher.publish(new IdentityPublishMessage(identity.toPrimitives())),
+      ).rejects.toThrow('routing publication failed');
+      expect(admissionLoad.record).not.toHaveBeenCalled();
+    });
+
+    it('does not raise the bar for an update that keeps its networks', async () => {
+      const mother = new IdentityMother();
+      const previous = mother.build();
+      const update = await mother.buildNext();
+      repository.requireByExternalIdentifier.mockResolvedValue(previous);
+      loadPerNetwork({ [NETWORK]: BUSY * 64 });
+
+      await publisher.publish(
+        new IdentityPublishMessage(update.toPrimitives()),
+      );
+
+      expect(saver.save).toHaveBeenCalledTimes(1);
+      expect(admissionLoad.countRecent).not.toHaveBeenCalled();
+      expect(admissionLoad.record).not.toHaveBeenCalled();
+    });
+
+    it('prices an update by the networks it adds', async () => {
+      const mother = new IdentityMother();
+      const previous = mother.build();
+      const networks = [NETWORK, ADDED_NETWORK];
+      const update = await mother.buildNext({
+        admissionNonce: nonceWithExactly(mother, networks, 16),
+        networks,
+      });
+      repository.requireByExternalIdentifier.mockResolvedValue(previous);
+      loadPerNetwork({ [ADDED_NETWORK]: BUSY * 2 });
+
+      await expect(
+        publisher.publish(new IdentityPublishMessage(update.toPrimitives())),
+      ).rejects.toMatchObject({ requiredDifficultyBits: 18 });
+      expect(admissionLoad.countRecent).toHaveBeenCalledTimes(1);
+      expect(admissionLoad.countRecent).toHaveBeenCalledWith(
+        new NetworkId(ADDED_NETWORK),
+      );
+    });
+
+    it('charges an update only for the networks it adds', async () => {
+      const mother = new IdentityMother();
+      const previous = mother.build();
+      const update = await mother.buildNext({
+        networks: [NETWORK, ADDED_NETWORK],
+      });
+      repository.requireByExternalIdentifier.mockResolvedValue(previous);
+
+      await publisher.publish(
+        new IdentityPublishMessage(update.toPrimitives()),
+      );
+
+      expect(admissionLoad.record).toHaveBeenCalledWith([
+        new NetworkId(ADDED_NETWORK),
+      ]);
+    });
   });
 });
