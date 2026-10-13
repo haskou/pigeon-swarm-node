@@ -3,6 +3,7 @@ import { PublishDeviceSealedSecretBundleMessage } from '@app/contexts/identity-d
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceSealedSecretBundle } from '@app/contexts/identity-devices/domain/DeviceSealedSecretBundle';
 import { DeviceAuthorizationNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceAuthorizationNotFoundError';
+import { DeviceSealedSecretNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretNotFoundError';
 import { DeviceSealedSecretGenerationStaleError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretGenerationStaleError';
 import { DeviceSealedSecretRevisionMismatchError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretRevisionMismatchError';
 import { InvalidDeviceSealedSecretBundleError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceSealedSecretBundleError';
@@ -10,6 +11,7 @@ import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/do
 import { DeviceSealedSecretRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { mock } from 'jest-mock-extended';
 
 import {
   bundleOf,
@@ -21,10 +23,20 @@ import {
 class InMemoryDeviceSealedSecretRepository extends DeviceSealedSecretRepository {
   public readonly stored = new Map<string, DeviceSealedSecretBundle>();
 
-  public async find(
+  public async has(identityId: IdentityId): Promise<boolean> {
+    return this.stored.has(identityId.valueOf());
+  }
+
+  public async require(
     identityId: IdentityId,
-  ): Promise<DeviceSealedSecretBundle | undefined> {
-    return this.stored.get(identityId.valueOf());
+  ): Promise<DeviceSealedSecretBundle> {
+    const bundle = this.stored.get(identityId.valueOf());
+
+    if (!bundle) {
+      throw new DeviceSealedSecretNotFoundError();
+    }
+
+    return bundle;
   }
 
   public async replaceIfNewer(bundle: DeviceSealedSecretBundle): Promise<void> {
@@ -44,9 +56,15 @@ describe(DeviceSealedSecretPublisher.name, () => {
   function publisherFor(
     authorization: DeviceAuthorization | undefined,
   ): DeviceSealedSecretPublisher {
-    const authorizations = {
-      find: jest.fn().mockResolvedValue(authorization),
-    } as unknown as DeviceAuthorizationRepository;
+    const authorizations = mock<DeviceAuthorizationRepository>();
+
+    if (authorization) {
+      authorizations.require.mockResolvedValue(authorization);
+    } else {
+      authorizations.require.mockRejectedValue(
+        new DeviceAuthorizationNotFoundError(),
+      );
+    }
 
     return new DeviceSealedSecretPublisher(authorizations, sealedSecrets);
   }
@@ -71,9 +89,9 @@ describe(DeviceSealedSecretPublisher.name, () => {
       new PublishDeviceSealedSecretBundleMessage(bundle.toPrimitives()),
     );
 
-    const stored = await sealedSecrets.find(new IdentityId(identityId));
-    expect(stored?.getGeneration().valueOf()).toBe(1);
-    expect(stored?.getAuthorizationRevision().valueOf()).toBe(0);
+    const stored = await sealedSecrets.require(new IdentityId(identityId));
+    expect(stored.getGeneration().valueOf()).toBe(1);
+    expect(stored.getAuthorizationRevision().valueOf()).toBe(0);
   });
 
   it('replaces the stored generation with a strictly newer one', async () => {
@@ -108,8 +126,8 @@ describe(DeviceSealedSecretPublisher.name, () => {
       ),
     );
 
-    const stored = await sealedSecrets.find(new IdentityId(identityId));
-    expect(stored?.getGeneration().valueOf()).toBe(2);
+    const stored = await sealedSecrets.require(new IdentityId(identityId));
+    expect(stored.getGeneration().valueOf()).toBe(2);
   });
 
   it('rejects a generation that does not advance the stored one and keeps the stored bundle', async () => {
@@ -153,8 +171,8 @@ describe(DeviceSealedSecretPublisher.name, () => {
       ),
     ).rejects.toThrow(DeviceSealedSecretGenerationStaleError);
 
-    const stored = await sealedSecrets.find(new IdentityId(identityId));
-    expect(stored?.toPrimitives()).toEqual(first.toPrimitives());
+    const stored = await sealedSecrets.require(new IdentityId(identityId));
+    expect(stored.toPrimitives()).toEqual(first.toPrimitives());
   });
 
   it('rejects a bundle built for a superseded authorization revision and stores nothing', async () => {

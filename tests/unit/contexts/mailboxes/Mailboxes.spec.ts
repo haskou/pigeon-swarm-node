@@ -22,6 +22,7 @@ import MailboxSettler from '@app/contexts/mailboxes/application/settle/MailboxSe
 import { MailboxAppendRateLimitedError } from '@app/contexts/mailboxes/domain/errors/MailboxAppendRateLimitedError';
 import { MailboxConflictError } from '@app/contexts/mailboxes/domain/errors/MailboxConflictError';
 import { MailboxCreationProofInvalidError } from '@app/contexts/mailboxes/domain/errors/MailboxCreationProofInvalidError';
+import { MailboxEnvelopeNotFoundError } from '@app/contexts/mailboxes/domain/errors/MailboxEnvelopeNotFoundError';
 import { MailboxEnvelopeInvalidError } from '@app/contexts/mailboxes/domain/errors/MailboxEnvelopeInvalidError';
 import { MailboxFullError } from '@app/contexts/mailboxes/domain/errors/MailboxFullError';
 import { MailboxLastReaderError } from '@app/contexts/mailboxes/domain/errors/MailboxLastReaderError';
@@ -210,19 +211,6 @@ describe('mailboxes', () => {
     await remover.remove(new MailboxRemoveMessage(MAILBOX, READ));
     await database.close();
     wire();
-
-    const find = jest.spyOn(database, 'find');
-
-    await expect(repository.count()).resolves.toBe(2);
-    expect(find).not.toHaveBeenCalled();
-    find.mockRestore();
-  });
-
-  it('backfills the counter for a database written before it existed', async () => {
-    await createMailbox('n'.repeat(43), sha(POST), sha(READ));
-    await database.delete('mailbox_counters', 'mailboxes');
-
-    await expect(repository.count()).resolves.toBe(2);
 
     const find = jest.spyOn(database, 'find');
 
@@ -645,7 +633,7 @@ describe('mailboxes', () => {
         new MailboxCreateMessage(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
       ),
     ).resolves.toBe(true);
-    await expect(repository.findById(MAILBOX)).resolves.toBeUndefined();
+    await expect(repository.hasById(MAILBOX)).resolves.toBe(false);
     await expect(repository.count()).resolves.toBe(1);
     clock.mockRestore();
   });
@@ -665,7 +653,7 @@ describe('mailboxes', () => {
         new MailboxCreateMessage(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
       ),
     ).rejects.toBeInstanceOf(MailboxLimitReachedError);
-    await expect(repository.findById(MAILBOX)).resolves.toBeDefined();
+    await expect(repository.hasById(MAILBOX)).resolves.toBe(true);
     clock.mockRestore();
   });
 
@@ -698,8 +686,8 @@ describe('mailboxes', () => {
         new MailboxCreateMessage(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
       ),
     ).resolves.toBe(true);
-    await expect(repository.findById(MAILBOX)).resolves.toBeUndefined();
-    await expect(repository.findById(SECOND)).resolves.toBeDefined();
+    await expect(repository.hasById(MAILBOX)).resolves.toBe(false);
+    await expect(repository.hasById(SECOND)).resolves.toBe(true);
     clock.mockRestore();
   });
 
@@ -720,8 +708,8 @@ describe('mailboxes', () => {
       ),
     ).rejects.toBeInstanceOf(MailboxLimitReachedError);
     await expect(repository.count()).resolves.toBe(3);
-    await expect(repository.findById(MAILBOX)).resolves.toBeDefined();
-    await expect(repository.findById(SECOND)).resolves.toBeDefined();
+    await expect(repository.hasById(MAILBOX)).resolves.toBe(true);
+    await expect(repository.hasById(SECOND)).resolves.toBe(true);
     clock.mockRestore();
   });
 
@@ -1024,7 +1012,22 @@ describe('mailboxes', () => {
     clock.mockRestore();
   });
 
-  it('reads a document written with one read hash as a single reader', async () => {
+  it('requireById rejects an unknown mailbox with MailboxNotFoundError', async () => {
+    await expect(repository.requireById(FRESH)).rejects.toBeInstanceOf(
+      MailboxNotFoundError,
+    );
+  });
+
+  it('requireEnvelopeCursor rejects an unknown envelope with MailboxEnvelopeNotFoundError', async () => {
+    await expect(repository.hasEnvelope(MAILBOX, 'a'.repeat(22))).resolves.toBe(
+      false,
+    );
+    await expect(
+      repository.requireEnvelopeCursor(MAILBOX, 'a'.repeat(22)),
+    ).rejects.toBeInstanceOf(MailboxEnvelopeNotFoundError);
+  });
+
+  it('rejects a stored document in the legacy single read hash shape as malformed', async () => {
     const legacy = 'l'.repeat(43);
     await database.save('mailboxes', legacy, {
       appendRefilledAt: Date.now(),
@@ -1039,14 +1042,28 @@ describe('mailboxes', () => {
       readTokenHash: READ_HASH,
     });
 
-    await expect(
-      lister.list(new MailboxReaderListMessage(legacy, READ)),
-    ).resolves.toEqual({
-      maxReaders: MAX_DEVICE_CREDENTIALS + 1,
-      readers: [{ ackedCursor: 0, readTokenHash: READ_HASH }],
+    await expect(repository.hasById(legacy)).resolves.toBe(true);
+    await expect(repository.requireById(legacy)).rejects.toThrow(
+      'Stored mailbox is malformed.',
+    );
+  });
+
+  it('rejects a stored mailbox missing its readers as malformed', async () => {
+    const broken = 'b'.repeat(43);
+    await database.save('mailboxes', broken, {
+      appendRefilledAt: Date.now(),
+      appendTokens: 120,
+      bytes: 0,
+      createdAt: Date.now(),
+      envelopeCount: 0,
+      id: broken,
+      lastReadAt: Date.now(),
+      nextCursor: 1,
+      postTokenHash: sha(POST),
     });
-    await expect(
-      adder.add(new MailboxReaderAddMessage(legacy, READ, OTHER_READ_HASH)),
-    ).resolves.toBe(true);
+
+    await expect(repository.requireById(broken)).rejects.toThrow(
+      'Stored mailbox is malformed.',
+    );
   });
 });

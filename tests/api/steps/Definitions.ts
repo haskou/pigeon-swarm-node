@@ -2038,9 +2038,9 @@ export default class Definitions {
     const identityId = this.ownerIdentityId as IdentityId;
     const authorization = await Kernel.di
       .getService<DeviceAuthorizationRepository>(DeviceAuthorizationRepository)
-      .find(identityId);
+      .require(identityId);
 
-    expect(authorization?.getRevision().valueOf()).to.equal(0);
+    expect(authorization.getRevision().valueOf()).to.equal(0);
   }
 
   @then('response is the current device list')

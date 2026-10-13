@@ -187,7 +187,8 @@ describe('WebSocketClientMessageHandler', () => {
     const mailbox = mock<Mailbox>({
       acceptsRead: jest.fn().mockReturnValue(true),
     });
-    mailboxRepository.findById.mockResolvedValue(mailbox);
+    mailboxRepository.hasById.mockResolvedValue(true);
+    mailboxRepository.requireById.mockResolvedValue(mailbox);
 
     await expect(
       handler.canReadMailbox('m'.repeat(43), 'r'.repeat(32)),
@@ -196,7 +197,8 @@ describe('WebSocketClientMessageHandler', () => {
   });
 
   it('rejects a read capability that does not match the mailbox', async () => {
-    mailboxRepository.findById.mockResolvedValue(
+    mailboxRepository.hasById.mockResolvedValue(true);
+    mailboxRepository.requireById.mockResolvedValue(
       mock<Mailbox>({ acceptsRead: jest.fn().mockReturnValue(false) }),
     );
 
@@ -206,10 +208,11 @@ describe('WebSocketClientMessageHandler', () => {
   });
 
   it('rejects read capabilities for unknown mailboxes', async () => {
-    mailboxRepository.findById.mockResolvedValue(undefined);
+    mailboxRepository.hasById.mockResolvedValue(false);
 
     await expect(
       handler.canReadMailbox('m'.repeat(43), 'r'.repeat(32)),
     ).resolves.toBe(false);
+    expect(mailboxRepository.requireById).not.toHaveBeenCalled();
   });
 });

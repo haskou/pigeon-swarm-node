@@ -7,9 +7,11 @@ import { PrivateBlobReserveMessage } from '@app/contexts/private-blobs/applicati
 import PrivateBlobReserver from '@app/contexts/private-blobs/application/reserve/PrivateBlobReserver';
 import { PrivateBlobUploadMessage } from '@app/contexts/private-blobs/application/upload/messages/PrivateBlobUploadMessage';
 import PrivateBlobUploader from '@app/contexts/private-blobs/application/upload/PrivateBlobUploader';
+import { PrivateBlobNotFoundError } from '@app/contexts/private-blobs/domain/errors/PrivateBlobNotFoundError';
 import { PrivateBlob } from '@app/contexts/private-blobs/domain/PrivateBlob';
 import PrivateBlobPolicy from '@app/contexts/private-blobs/domain/PrivateBlobPolicy';
 import PrivateBlobRepository from '@app/contexts/private-blobs/domain/repositories/PrivateBlobRepository';
+import PrivateBlobOwnerKeyDeriver from '@app/contexts/private-blobs/domain/services/PrivateBlobOwnerKeyDeriver';
 import { PrivateBlobLimitsFromEnvironment } from '@app/contexts/private-blobs/infrastructure/environment/PrivateBlobLimitsFromEnvironment';
 import FilePrivateBlobBytesStore from '@app/contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -34,8 +36,18 @@ class MemoryRepository extends PrivateBlobRepository {
     this.blobs.delete(id);
   }
 
-  public async findById(id: string): Promise<PrivateBlob | undefined> {
-    return this.blobs.get(id);
+  public async hasById(id: string): Promise<boolean> {
+    return this.blobs.has(id);
+  }
+
+  public async requireById(id: string): Promise<PrivateBlob> {
+    const blob = this.blobs.get(id);
+
+    if (!blob) {
+      throw new PrivateBlobNotFoundError();
+    }
+
+    return blob;
   }
 
   public async findExpired(now: Timestamp): Promise<PrivateBlob[]> {
@@ -48,10 +60,6 @@ class MemoryRepository extends PrivateBlobRepository {
     return [...this.blobs.values()].filter(
       (blob) => blob.isStored() && blob.getRetentionMs() < retentionMs,
     );
-  }
-
-  public async ownerKeyFor(identityId: string): Promise<string> {
-    return `owner:${Buffer.from(identityId).toString('hex')}`;
   }
 
   public async reservedBytes(
@@ -69,6 +77,12 @@ class MemoryRepository extends PrivateBlobRepository {
 
   public async save(blob: PrivateBlob): Promise<void> {
     this.blobs.set(blob.getId(), blob);
+  }
+}
+
+class HexOwnerKeyDeriver extends PrivateBlobOwnerKeyDeriver {
+  public async derive(identityId: string): Promise<string> {
+    return `owner:${Buffer.from(identityId).toString('hex')}`;
   }
 }
 
@@ -114,7 +128,11 @@ describe('private blob store', () => {
       PrivateBlobLimitsFromEnvironment.load(),
     );
 
-    reserver = new PrivateBlobReserver(repository, policy);
+    reserver = new PrivateBlobReserver(
+      repository,
+      policy,
+      new HexOwnerKeyDeriver(),
+    );
     uploader = new PrivateBlobUploader(repository, store);
     reader = new PrivateBlobReader(repository, store);
   });

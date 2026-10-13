@@ -7,6 +7,7 @@ import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/I
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
+import { DeviceAuthorizationNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceAuthorizationNotFoundError';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
 import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperationId';
@@ -270,12 +271,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         DeviceAuthorizationRevision.initial().next(),
       ),
     );
-    const found = await repository.find(identityId);
+    const found = await repository.require(identityId);
 
     expect(
       applied.pullDomainEvents().map((event) => event.eventName()),
     ).toEqual(['identity_devices.v1.device_authorization.credential_enrolled']);
-    expect(found?.pullDomainEvents()).toEqual([]);
+    expect(found.pullDomainEvents()).toEqual([]);
   });
 
   it('replicates authorization state only through registered private networks', async () => {
@@ -338,11 +339,11 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
     await provisionAuthorization(repository, authorization);
     const applied = await repository.compareAndApply(transition);
-    const found = await repository.find(identityId);
+    const found = await repository.require(identityId);
 
     expect(applied.getRevision().valueOf()).toBe(1);
-    expect(found?.getRevision().valueOf()).toBe(1);
-    expect(found?.getCredentials()).toHaveLength(2);
+    expect(found.getRevision().valueOf()).toBe(1);
+    expect(found.getCredentials()).toHaveLength(2);
     await expect(repository.compareAndApply(transition)).rejects.toThrow();
     expect(registry.putDocument).not.toHaveBeenCalled();
     expect(registry.putHead).not.toHaveBeenCalled();
@@ -555,7 +556,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         ),
       );
 
-      const timeline = await repository.findTimeline(identityId);
+      const timeline = await repository.requireTimeline(identityId);
 
       expect(timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(0))).toBe(
         false,
@@ -620,7 +621,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         ),
       );
 
-      const timeline = await first.repository.findTimeline(identityId);
+      const timeline = await first.repository.requireTimeline(identityId);
 
       expect(timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(1))).toBe(
         true,
@@ -707,7 +708,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         const reader = repositoryFixture();
         await provisionAuthorization(reader.repository, genesis);
         reader.setHead(merged);
-        const timeline = await reader.repository.findTimeline(identityId);
+        const timeline = await reader.repository.requireTimeline(identityId);
 
         expect(
           timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(1)),
@@ -859,13 +860,13 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
             ),
           ),
         );
-        const timeline = await reader.repository.findTimeline(identityId);
+        const timeline = await reader.repository.requireTimeline(identityId);
 
         expect(
-          timeline?.isAuthorizedAt(credentialOf(uncappedTarget), revisionOf(5)),
+          timeline.isAuthorizedAt(credentialOf(uncappedTarget), revisionOf(5)),
         ).toBe(true);
         expect(
-          timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(5)),
+          timeline.isAuthorizedAt(credentialOf(phone), revisionOf(5)),
         ).toBe(false);
       }
     });
@@ -917,7 +918,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       const { repository } = repositoryFixture();
       await provisionAuthorization(repository, genesis);
 
-      const timeline = await repository.findTimeline(identityId);
+      const timeline = await repository.requireTimeline(identityId);
 
       expect(timeline?.isAuthorizedAt(credentialOf(owner), revisionOf(0))).toBe(
         true,
@@ -974,8 +975,8 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         first.database,
       );
 
-      const before = await first.repository.findTimeline(identityId);
-      const after = await restarted.findTimeline(identityId);
+      const before = await first.repository.requireTimeline(identityId);
+      const after = await restarted.requireTimeline(identityId);
 
       for (const key of [owner, phone, laptop]) {
         for (const revision of [0, 1, 2, 3, 4]) {
@@ -1024,7 +1025,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         proven.authorizeRecovery(recovery.sign(proven.getSigningPayload())),
       );
 
-      const timeline = await repository.findTimeline(identityId);
+      const timeline = await repository.requireTimeline(identityId);
 
       expect(
         timeline?.isAuthorizedAt(credentialOf(recovered), revisionOf(2)),
@@ -1097,7 +1098,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         ),
       );
 
-      const timeline = await repository.findTimeline(identityId);
+      const timeline = await repository.requireTimeline(identityId);
 
       expect(timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(4))).toBe(
         false,
@@ -1181,8 +1182,8 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       );
 
       const timelines = [
-        await restarted.findTimeline(identityId),
-        await replica.repository.findTimeline(identityId),
+        await restarted.requireTimeline(identityId),
+        await replica.repository.requireTimeline(identityId),
       ];
 
       for (const timeline of timelines) {
@@ -1540,7 +1541,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         ),
       );
 
-      const timeline = await aggregate.repository.findTimeline(identityId);
+      const timeline = await aggregate.repository.requireTimeline(identityId);
       const checkedRevision = new DeviceAuthorizationRevision(
         overflowRevision.valueOf() + 2,
       );
@@ -2746,7 +2747,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
     for (let index = 0; index < 12; index += 1) {
       const suffix = String(index + 1).padStart(12, '0');
-      const current = await repository.find(identityId);
+      const current = await repository.require(identityId);
 
       expect(current).toBeDefined();
       await repository.compareAndApply(
@@ -2759,7 +2760,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
           current?.getRevision(),
         ),
       );
-      const enrolled = await repository.find(identityId);
+      const enrolled = await repository.require(identityId);
 
       expect(enrolled).toBeDefined();
       await repository.compareAndApply(
@@ -3039,6 +3040,20 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     parser.mockRestore();
   });
 
+  it('reports an unknown identity as absent and rejects requiring it', async () => {
+    const { identityId } = await fixture();
+    const { identityRepository, repository } = repositoryFixture();
+    identityRepository.findFreshCandidateReferencesById.mockResolvedValue([]);
+
+    await expect(repository.has(identityId)).resolves.toBe(false);
+    await expect(repository.require(identityId)).rejects.toThrow(
+      DeviceAuthorizationNotFoundError,
+    );
+    await expect(repository.requireTimeline(identityId)).rejects.toThrow(
+      DeviceAuthorizationNotFoundError,
+    );
+  });
+
   it('restores the signed identity genesis after an untrusted restart head', async () => {
     const { genesis, identityId } = await fixture();
     const attackerRecovery = await KeyPair.generate();
@@ -3062,9 +3077,9 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       kind: 'device_authorization',
     });
 
-    const restored = await repository.find(identityId);
+    const restored = await repository.require(identityId);
 
-    expect(restored?.toPrimitives()).toEqual(genesis.toPrimitives());
+    expect(restored.toPrimitives()).toEqual(genesis.toPrimitives());
   });
 
   it('does not adopt a replicated head with an attacker genesis for an identity it has not verified', async () => {
@@ -3086,7 +3101,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     victim.identityRepository.findFreshCandidateReferencesById.mockResolvedValue(
       [new IdentityCandidate(genesisExternalIdentifier, identityOf(genesis))],
     );
-    await victim.repository.find(identityId);
+    await victim.repository.require(identityId);
 
     expect(victim.getMerger()?.(undefined, forgedHead)).toBeUndefined();
     expect(
@@ -3127,12 +3142,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       [new IdentityCandidate(genesisExternalIdentifier, identityOf(genesis))],
     );
 
-    const restored = await restarted.repository.find(identityId);
+    const restored = await restarted.repository.require(identityId);
 
     expect(restarted.registry.rehydrateHead).toHaveBeenCalledWith(
       `device-authorization:${identityId.valueOf()}`,
     );
-    expect(restored?.getRevision().valueOf()).toBe(1);
+    expect(restored.getRevision().valueOf()).toBe(1);
     expect(restarted.registry.putHead).not.toHaveBeenCalled();
   });
 
@@ -3145,16 +3160,17 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       previous: genesisExternalIdentifier,
       version: 2,
     });
-    identityRepository.findByExternalIdentifier.mockResolvedValue(
+    identityRepository.hasByExternalIdentifier.mockResolvedValue(true);
+    identityRepository.requireByExternalIdentifier.mockResolvedValue(
       identityOf(genesis),
     );
     identityRepository.findFreshCandidateReferencesById.mockResolvedValue([
       new IdentityCandidate(new IdentityExternalIdentifier('bafy-v2'), latest),
     ]);
 
-    const found = await repository.find(identityId);
+    const found = await repository.require(identityId);
 
-    expect(found?.getNetworkIds()).toEqual(genesis.getNetworkIds());
+    expect(found.getNetworkIds()).toEqual(genesis.getNetworkIds());
   });
 
   it('returns a concurrently merged checkpoint when repairing an untrusted head', async () => {
@@ -3178,11 +3194,11 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       return Promise.resolve();
     });
 
-    const restored = await repository.find(identityId);
+    const restored = await repository.require(identityId);
 
-    expect(restored?.getRevision().valueOf()).toBe(1);
+    expect(restored.getRevision().valueOf()).toBe(1);
     expect(
-      restored?.isAuthorized(
+      restored.isAuthorized(
         DeviceCredential.fromString(target.toPrimitives().publicKey),
       ),
     ).toBe(true);
@@ -3241,17 +3257,17 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       authorization?: { revision?: number };
     };
 
-    const authorization = await repository.find(identityId);
+    const authorization = await repository.require(identityId);
 
     expect(merged.authorization?.revision).toBe(2);
-    expect(authorization?.getRevision().valueOf()).toBe(2);
+    expect(authorization.getRevision().valueOf()).toBe(2);
     expect(
-      authorization?.isAuthorized(
+      authorization.isAuthorized(
         DeviceCredential.fromString(owner.toPrimitives().publicKey),
       ),
     ).toBe(false);
     expect(
-      authorization?.isAuthorized(
+      authorization.isAuthorized(
         DeviceCredential.fromString(target.toPrimitives().publicKey),
       ),
     ).toBe(true);
@@ -3293,7 +3309,8 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       previous: genesisExternalIdentifier,
       version: 2,
     });
-    identityRepository.findByExternalIdentifier.mockResolvedValue(
+    identityRepository.hasByExternalIdentifier.mockResolvedValue(true);
+    identityRepository.requireByExternalIdentifier.mockResolvedValue(
       identityOf(genesis),
     );
     identityRepository.findFreshCandidateReferencesById.mockResolvedValue([

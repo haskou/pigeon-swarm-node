@@ -3,6 +3,7 @@ import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infras
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
+import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PrivateAuthorizationReceiptNotFoundError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationReceiptNotFoundError';
 import { PrivateAuthorizationScopeNotFoundError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationScopeNotFoundError';
 import { PrivateAuthorizationRevision } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationRevision';
@@ -347,13 +348,10 @@ describe('LocalPrivateAuthorizationRepository', () => {
     });
 
     await guard.runWhilePublic(new CommunityId('scope'), () => {
-      guard.runInBackgroundWhilePublic(
-        new CommunityId('scope'),
-        async () => {
-          backgroundStarted();
-          await release;
-        },
-      );
+      guard.runInBackgroundWhilePublic(new CommunityId('scope'), async () => {
+        backgroundStarted();
+        await release;
+      });
 
       return Promise.resolve();
     });
@@ -370,5 +368,19 @@ describe('LocalPrivateAuthorizationRepository', () => {
     releaseBackground();
     await pin;
     expect(pinned).toBe(true);
+  });
+
+  it('rejects a malformed stored scope', async () => {
+    const repository = new LocalPrivateAuthorizationRepository(
+      database,
+      coordinator,
+    );
+    await database.save(PrivateAuthorizationLocalNamespaces.scopes, 'scope', {
+      checkpoint: 'not a checkpoint',
+    });
+
+    await expect(repository.requireScope('scope')).rejects.toThrow(
+      InvalidPrivateAuthorizationError,
+    );
   });
 });

@@ -477,9 +477,10 @@ async function main(): Promise<void> {
   await startSynchronization();
   await verifyExchange();
   await until('the partitioned replica reaches the head', async () => {
-    const authorization = await second.repository!.find(identityId);
+    if (!(await second.repository!.has(identityId))) return false;
+    const authorization = await second.repository!.require(identityId);
 
-    return authorization?.toPrimitives().revision === 6;
+    return authorization.toPrimitives().revision === 6;
   });
 
   stage = 'revocation then late delivery';
@@ -535,9 +536,10 @@ async function main(): Promise<void> {
     ),
   );
   await until('second reaches the recovery checkpoint', async () => {
-    const authorization = await second.repository!.find(identityId);
+    if (!(await second.repository!.has(identityId))) return false;
+    const authorization = await second.repository!.require(identityId);
 
-    return authorization?.toPrimitives().revision === 7;
+    return authorization.toPrimitives().revision === 7;
   });
   const afterRecovery: Array<[string, KeyPair, number, boolean]> = [
     ['recovered device at its checkpoint', recovered, 7, true],
@@ -575,9 +577,10 @@ async function main(): Promise<void> {
     Object.values(third.stores!).every((store) => (store.peers?.size ?? 0) > 0),
   );
   await until('third reaches the recovery checkpoint', async () => {
-    const authorization = await third.repository!.find(identityId);
+    if (!(await third.repository!.has(identityId))) return false;
+    const authorization = await third.repository!.require(identityId);
 
-    return authorization?.toPrimitives().revision === 7;
+    return authorization.toPrimitives().revision === 7;
   });
   await expectVerdicts('fresh replica', third, identityId, afterRecovery);
 
