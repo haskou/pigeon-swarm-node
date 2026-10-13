@@ -1,9 +1,11 @@
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import NodeNetworkSynchronizationMonitor from '@app/contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
+import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import Kernel from '@haskou/ddd-kernel';
+import { mock } from 'jest-mock-extended';
 
 type FakeStore = {
   all: jest.Mock;
@@ -48,6 +50,26 @@ function fakeSynchronizationMonitor(): NodeNetworkSynchronizationMonitor {
     read: jest.fn(),
     remove: jest.fn(),
   } as unknown as NodeNetworkSynchronizationMonitor;
+}
+
+function restartedPrivateNetwork(): IPFSNetwork {
+  const network = mock<IPFSNetwork>();
+
+  network.getId.mockReturnValue('network-1');
+  network.getName.mockReturnValue('Private network');
+  network.getPeerId.mockReturnValue('peer-1');
+  network.getPeers.mockReturnValue([]);
+  network.isPrivate.mockReturnValue(true);
+
+  return network;
+}
+
+function networkRegistryWith(network: IPFSNetwork): IPFSNetworkRegistry {
+  const networkRegistry = mock<IPFSNetworkRegistry>();
+
+  networkRegistry.getAll.mockReturnValue([network]);
+
+  return networkRegistry;
 }
 
 describe('OrbitDBReplicatedStateRuntime', () => {
@@ -180,5 +202,57 @@ describe('OrbitDBReplicatedStateRuntime', () => {
       expect((store as unknown as FakeStore).events.on).not.toHaveBeenCalled();
       expect((store as unknown as FakeStore).all).not.toHaveBeenCalled();
     }
+  });
+
+  it('keeps starting a restarted network when its replicated state cannot load a block in time', async () => {
+    const stores = fakeStores();
+    const replicatedStateRegistry = mock<OrbitDBReplicatedStateRegistry>();
+    const synchronizationMonitor = mock<NodeNetworkSynchronizationMonitor>();
+    const runtime = new OrbitDBReplicatedStateRuntime(
+      networkRegistryWith(restartedPrivateNetwork()),
+      replicatedStateRegistry,
+      synchronizationMonitor,
+    );
+
+    jest.spyOn(OrbitDBPrivateNetworkStores, 'open').mockResolvedValue(stores);
+    replicatedStateRegistry.register.mockRejectedValue(
+      new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+    );
+
+    await expect(runtime.run()).resolves.toBeUndefined();
+
+    expect(synchronizationMonitor.observe).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'network-1', localPeerId: 'peer-1' }),
+    );
+    expect(stores.startSynchronization).toHaveBeenCalledTimes(1);
+    expect(replicatedStateRegistry.unregister).not.toHaveBeenCalled();
+    expect(Kernel.logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'OrbitDB replicated state registration degraded: networkId=network-1',
+      ),
+    );
+  });
+
+  it('fails startup and releases the stores when registration fails for a non-transient reason', async () => {
+    const stores = fakeStores();
+    const replicatedStateRegistry = mock<OrbitDBReplicatedStateRegistry>();
+    const synchronizationMonitor = mock<NodeNetworkSynchronizationMonitor>();
+    const runtime = new OrbitDBReplicatedStateRuntime(
+      networkRegistryWith(restartedPrivateNetwork()),
+      replicatedStateRegistry,
+      synchronizationMonitor,
+    );
+    const failure = new Error('OrbitDB document history is incomplete');
+
+    jest.spyOn(OrbitDBPrivateNetworkStores, 'open').mockResolvedValue(stores);
+    replicatedStateRegistry.register.mockRejectedValue(failure);
+
+    await expect(runtime.run()).rejects.toBe(failure);
+
+    expect(replicatedStateRegistry.unregister).toHaveBeenCalledWith(
+      'network-1',
+    );
+    expect(synchronizationMonitor.observe).not.toHaveBeenCalled();
+    expect(stores.startSynchronization).not.toHaveBeenCalled();
   });
 });

@@ -401,6 +401,80 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     registry.clear();
   });
 
+  it('retries a history subscriber on the next store update after its replay could not load a block in time', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { calls, stores } = createStores();
+    const ancestor: OrbitDBEntry = {
+      hash: 'first',
+      next: [],
+      payload: { value: { id: 'call', updatedAt: 1 } },
+    };
+    const head: OrbitDBEntry = {
+      hash: 'second',
+      next: ['first'],
+      payload: { value: { id: 'call', updatedAt: 2 } },
+    };
+    const getAncestor = jest.fn(async () => ancestor);
+    calls.log = {
+      get: getAncestor,
+      heads: jest.fn(async () => [head]),
+    };
+    await registry.register('network-1', stores);
+    await registry.onDocumentUpdated('calls', () => undefined, {
+      includeHistory: true,
+    });
+    const late: unknown[] = [];
+
+    getAncestor.mockRejectedValueOnce(
+      new DOMException('The operation was aborted due to timeout', 'TimeoutError'),
+    );
+    await registry.onDocumentUpdated(
+      'calls',
+      (document) => {
+        late.push(document.updatedAt);
+      },
+      { includeHistory: true },
+    );
+    const beforeRetry = [...late];
+
+    calls.emitUpdate({ payload: { value: head.payload?.value } });
+    await flushPromises();
+
+    expect(beforeRetry).toEqual([]);
+    expect(late).toEqual([1, 2]);
+    registry.clear();
+  });
+
+  it('fails a subscription whose bootstrap fails for a non-transient reason', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { calls, stores } = createStores();
+    const failure = new Error('replicated call projection rejected');
+
+    await registry.register('network-1', stores);
+    calls.all.mockRejectedValueOnce(failure);
+
+    await expect(
+      registry.onDocumentUpdated('calls', () => undefined),
+    ).rejects.toBe(failure);
+    registry.clear();
+  });
+
+  it('subscribes to replicated head updates once when the same stores register again', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { heads, stores } = createStores();
+
+    await registry.register('network-1', stores);
+    await registry.register('network-1', stores);
+
+    expect(
+      heads.events.on.mock.calls.filter(([event]) => event === 'update'),
+    ).toHaveLength(1);
+    expect(
+      heads.events.on.mock.calls.filter(([event]) => event === 'join'),
+    ).toHaveLength(1);
+    registry.clear();
+  });
+
   it('waits for asynchronous call history projection before completing subscription', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const { calls, stores } = createStores();
