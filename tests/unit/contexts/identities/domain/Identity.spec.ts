@@ -9,8 +9,10 @@ import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects
 import { InvalidProfileBannerError } from '@app/contexts/identities/domain/errors/InvalidProfileBannerError';
 import { InvalidProfileImageError } from '@app/contexts/identities/domain/errors/InvalidProfileImageError';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
+import { IdentityAdmissionDifficulty } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionDifficulty';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 
 import { IdentityMother } from '../../../mothers/IdentityMother';
 import { SignedIdentityMother } from '../../../mothers/SignedIdentityMother';
@@ -51,6 +53,31 @@ describe(Identity.name, () => {
     expect(Identity.fromPrimitives(primitives).toPrimitives()).toEqual(
       primitives,
     );
+  });
+
+  describe('admission freshness', () => {
+    const HORIZON = IdentityAdmissionDifficulty.FRESHNESS_HORIZON_MS;
+
+    it('is fresh while the node clock is within the horizon of the signed time', () => {
+      const identity = mother.build();
+      const signedAt = mother.timestamp.valueOf();
+
+      for (const now of [signedAt - HORIZON, signedAt, signedAt + HORIZON]) {
+        expect(identity.isFreshAdmissionAt(new Timestamp(now))).toBe(true);
+      }
+    });
+
+    it('is stale once backdated or future-dated beyond the horizon', () => {
+      const identity = mother.build();
+      const signedAt = mother.timestamp.valueOf();
+
+      expect(
+        identity.isFreshAdmissionAt(new Timestamp(signedAt + HORIZON + 1)),
+      ).toBe(false);
+      expect(
+        identity.isFreshAdmissionAt(new Timestamp(signedAt - HORIZON - 1)),
+      ).toBe(false);
+    });
   });
 
   it.each([

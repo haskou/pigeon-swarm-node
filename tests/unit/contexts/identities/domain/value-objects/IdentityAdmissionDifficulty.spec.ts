@@ -44,6 +44,12 @@ describe('IdentityAdmissionDifficulty', () => {
     expect(IdentityAdmissionDifficulty.MAX_BITS).toBe(20);
   });
 
+  it('exposes the cap as a requirement', () => {
+    expect(IdentityAdmissionDifficulty.max().valueOf()).toBe(
+      IdentityAdmissionDifficulty.MAX_BITS,
+    );
+  });
+
   it('never decreases as load grows', () => {
     let previous = IdentityAdmissionDifficulty.floor();
 
