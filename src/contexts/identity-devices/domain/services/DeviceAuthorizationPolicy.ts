@@ -8,16 +8,11 @@ import { DeviceAuthorizationTransition } from '../DeviceAuthorizationTransition'
 import { DeviceCompromiseCaps } from '../DeviceCompromiseCaps';
 import { InvalidDeviceAuthorizationTransitionError } from '../errors/InvalidDeviceAuthorizationTransitionError';
 import { DeviceAuthorizationEpoch } from '../value-objects/DeviceAuthorizationEpoch';
-import { DeviceAuthorizationRevision } from '../value-objects/DeviceAuthorizationRevision';
+import { RevisionGroup } from './RevisionGroup';
 
 interface Admitted<T> {
   authorization: DeviceAuthorization;
   candidate: DeviceAuthorizationCandidate<T>;
-}
-
-interface RevisionGroup<T> {
-  revision: DeviceAuthorizationRevision;
-  candidates: DeviceAuthorizationCandidate<T>[];
 }
 
 export default class DeviceAuthorizationPolicy {

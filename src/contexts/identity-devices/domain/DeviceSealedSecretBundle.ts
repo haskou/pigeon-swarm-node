@@ -4,6 +4,7 @@ import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { UniqueObjectArray } from '@haskou/value-objects';
 
 import { DeviceAuthorization } from './DeviceAuthorization';
+import { DeviceSealedSecretEntry } from './DeviceSealedSecretEntry';
 import { DeviceSealedSecretGenerationStaleError } from './errors/DeviceSealedSecretGenerationStaleError';
 import { DeviceSealedSecretNotFoundError } from './errors/DeviceSealedSecretNotFoundError';
 import { DeviceSealedSecretPublisherNotAuthorizedError } from './errors/DeviceSealedSecretPublisherNotAuthorizedError';
@@ -44,12 +45,6 @@ export interface DeviceSealedSecretSigningInput {
   sealedSecret: string;
 }
 
-interface DeviceSealedSecretEntry {
-  recipientCredential: DeviceCredential;
-  sealedSecret: string;
-  signature: string;
-}
-
 const SIGNING_PURPOSE = 'pigeon:device-sealed-secret:v1';
 const MAX_ENTRIES = 128;
 const SEALED_SECRET_PATTERN = /^[A-Za-z0-9+/=.-]+$/;
@@ -60,11 +55,6 @@ function parseOrReject<T>(reason: string, parse: () => T): T {
   } catch {
     throw new InvalidDeviceSealedSecretBundleError(reason);
   }
-}
-
-/** Wire form of a credential: the identity-id body without PEM headers. */
-function toWire(credential: DeviceCredential): string {
-  return new IdentityId(credential.valueOf()).valueOf();
 }
 
 export class DeviceSealedSecretBundle {
@@ -94,10 +84,7 @@ export class DeviceSealedSecretBundle {
     const entries = primitives.entries.map((entry) => {
       const recipientCredential = parseOrReject(
         'recipient credential is malformed',
-        () =>
-          DeviceCredential.fromIdentityId(
-            new IdentityId(entry.recipientCredential),
-          ),
+        () => DeviceCredential.fromWire(entry.recipientCredential),
       );
 
       if (
@@ -140,9 +127,7 @@ export class DeviceSealedSecretBundle {
         () => new IdentityId(primitives.identityId),
       ),
       parseOrReject('publisher credential is malformed', () =>
-        DeviceCredential.fromIdentityId(
-          new IdentityId(primitives.publisherCredential),
-        ),
+        DeviceCredential.fromWire(primitives.publisherCredential),
       ),
       authorizationRevision,
       generation,
@@ -177,8 +162,8 @@ export class DeviceSealedSecretBundle {
           authorizationRevision: this.authorizationRevision.valueOf(),
           generation: this.generation.valueOf(),
           identityId: this.identityId.valueOf(),
-          publisherCredential: toWire(this.publisherCredential),
-          recipientCredential: toWire(entry.recipientCredential),
+          publisherCredential: this.publisherCredential.toWire(),
+          recipientCredential: entry.recipientCredential.toWire(),
           sealedSecret: entry.sealedSecret,
         }),
         new Signature(entry.signature),
@@ -243,8 +228,8 @@ export class DeviceSealedSecretBundle {
       authorizationRevision: this.authorizationRevision.valueOf(),
       generation: this.generation.valueOf(),
       identityId: this.identityId.valueOf(),
-      publisherCredential: toWire(this.publisherCredential),
-      recipientCredential: toWire(entry.recipientCredential),
+      publisherCredential: this.publisherCredential.toWire(),
+      recipientCredential: entry.recipientCredential.toWire(),
       sealedSecret: entry.sealedSecret,
       signature: entry.signature,
     };
@@ -266,13 +251,13 @@ export class DeviceSealedSecretBundle {
     return {
       authorizationRevision: this.authorizationRevision.valueOf(),
       entries: this.entries.map((entry) => ({
-        recipientCredential: toWire(entry.recipientCredential),
+        recipientCredential: entry.recipientCredential.toWire(),
         sealedSecret: entry.sealedSecret,
         signature: entry.signature,
       })),
       generation: this.generation.valueOf(),
       identityId: this.identityId.valueOf(),
-      publisherCredential: toWire(this.publisherCredential),
+      publisherCredential: this.publisherCredential.toWire(),
     };
   }
 }

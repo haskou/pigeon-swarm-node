@@ -1,6 +1,5 @@
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { assert } from '@haskou/value-objects';
 import { Request } from 'express';
@@ -17,7 +16,7 @@ export class DeviceAuthorizationRequestAuthenticator {
     signatureValue: string | undefined,
     payload: string,
     authorization: DeviceAuthorization,
-  ): IdentityId {
+  ): DeviceCredential {
     assert(
       credentialValue !== undefined &&
         credentialValue.length > 0 &&
@@ -25,9 +24,7 @@ export class DeviceAuthorizationRequestAuthenticator {
         signatureValue.length > 0,
       new InvalidSignedRequestError(),
     );
-    const credential = DeviceCredential.fromIdentityId(
-      new IdentityId(credentialValue),
-    );
+    const credential = DeviceCredential.fromWire(credentialValue);
     const hasValidSignature = credential.isValidSignature(
       payload,
       new Signature(signatureValue),
@@ -37,7 +34,7 @@ export class DeviceAuthorizationRequestAuthenticator {
       new InvalidSignedRequestError(),
     );
 
-    return new IdentityId(credentialValue);
+    return credential;
   }
 
   public authenticate(
@@ -92,7 +89,7 @@ export class DeviceAuthorizationRequestAuthenticator {
   public authenticateCurrentDevice(
     request: Request,
     authorization: DeviceAuthorization,
-  ): IdentityId {
+  ): DeviceCredential {
     try {
       assert(
         request.header('x-recovery-signature') === undefined,
