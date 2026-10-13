@@ -318,20 +318,20 @@ async function main(): Promise<void> {
     'gated node lists no forged record',
   );
 
-  stage = 'a signed legacy private-upload registration is refused';
-  const legacy: Record<string, unknown> = {
+  stage = 'a signed private-upload registration is refused';
+  const privateUpload: Record<string, unknown> = {
     ...ownerPayload(cidOf(5)),
     context: 'ipfs_private_upload',
   };
 
-  await raw(legacy, sign(owner, legacy as never));
-  await until('control received the legacy registration', async () =>
-    (await rawIds(control)).includes(legacy.id as string),
+  await raw(privateUpload, sign(owner, privateUpload as never));
+  await until('control received the private-upload registration', async () =>
+    (await rawIds(control)).includes(privateUpload.id as string),
   );
   await pause(3000);
   assert.ok(
     !(await listed(honest)).includes(cidOf(5)),
-    'gated node never lists a legacy private registration',
+    'gated node never lists a private-upload registration',
   );
 
   stage = 'a signed registration is admitted';
