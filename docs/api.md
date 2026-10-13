@@ -4426,7 +4426,8 @@ base64, at most 262144 characters. `commit` and `welcome` require `epoch`;
 record id is content-bound: `base64url(sha256(canonicalize({epoch, groupId,
 kind, payload, recipientIdentityId})))`, and the signed `mutation` targets store
 `mlsRecords`.
-Publishing the same record twice is a no-op.
+Publishing the same record twice is a no-op. An empty `recipientIdentityId` is
+omitted from the record id like an absent one.
 
 Byte-exact vectors (canonical JSON, record id and proof record id) are in
 [`tests/fixtures/mls-record-id-vectors.json`](../tests/fixtures/mls-record-id-vectors.json),
