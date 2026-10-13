@@ -1,11 +1,11 @@
 import { Timestamp } from '@haskou/value-objects';
-import { Readable } from 'stream';
 
-import { PrivateBlobNotFoundError } from '../domain/errors/PrivateBlobNotFoundError';
-import { PrivateBlobUploadClosedError } from '../domain/errors/PrivateBlobUploadClosedError';
-import { PrivateBlobUploadInProgressError } from '../domain/errors/PrivateBlobUploadInProgressError';
-import PrivateBlobBytesStore from '../domain/repositories/PrivateBlobBytesStore';
-import PrivateBlobRepository from '../domain/repositories/PrivateBlobRepository';
+import { PrivateBlobNotFoundError } from '../../domain/errors/PrivateBlobNotFoundError';
+import { PrivateBlobUploadClosedError } from '../../domain/errors/PrivateBlobUploadClosedError';
+import { PrivateBlobUploadInProgressError } from '../../domain/errors/PrivateBlobUploadInProgressError';
+import PrivateBlobBytesStore from '../../domain/repositories/PrivateBlobBytesStore';
+import PrivateBlobRepository from '../../domain/repositories/PrivateBlobRepository';
+import { PrivateBlobUploadMessage } from './messages/PrivateBlobUploadMessage';
 
 export default class PrivateBlobUploader {
   private readonly inProgress = new Set<string>();
@@ -15,17 +15,14 @@ export default class PrivateBlobUploader {
     private readonly bytes: PrivateBlobBytesStore,
   ) {}
 
-  public async upload(
-    blobId: string,
-    uploadToken: string,
-    source: Readable,
-  ): Promise<void> {
+  public async upload(message: PrivateBlobUploadMessage): Promise<void> {
+    const blobId = message.blobId.valueOf();
     const blob = await this.repository.findById(blobId);
 
     if (
       !blob ||
       blob.isExpired(Timestamp.now()) ||
-      !blob.acceptsUpload(uploadToken)
+      !blob.acceptsUpload(message.uploadToken.valueOf())
     ) {
       throw new PrivateBlobNotFoundError();
     }
@@ -41,7 +38,7 @@ export default class PrivateBlobUploader {
     this.inProgress.add(blobId);
 
     try {
-      await this.bytes.write(blobId, source, blob.getSize());
+      await this.bytes.write(blobId, message.source, blob.getSize());
       blob.markStored(Timestamp.now());
       await this.repository.save(blob);
     } finally {

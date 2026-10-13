@@ -1,8 +1,9 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import { PrivateBlob } from '../domain/PrivateBlob';
-import PrivateBlobPolicy from '../domain/PrivateBlobPolicy';
-import PrivateBlobRepository from '../domain/repositories/PrivateBlobRepository';
+import { PrivateBlob } from '../../domain/PrivateBlob';
+import PrivateBlobPolicy from '../../domain/PrivateBlobPolicy';
+import PrivateBlobRepository from '../../domain/repositories/PrivateBlobRepository';
+import { PrivateBlobReserveMessage } from './messages/PrivateBlobReserveMessage';
 
 export interface PrivateBlobReservation {
   blobId: string;
@@ -20,25 +21,26 @@ export default class PrivateBlobReserver {
   ) {}
 
   private async reserveNow(
-    ownerIdentityId: string,
-    size: number,
+    message: PrivateBlobReserveMessage,
   ): Promise<PrivateBlobReservation> {
-    this.policy.assertSizeAllowed(size);
+    this.policy.assertSizeAllowed(message.size);
 
     const now = Timestamp.now();
-    const ownerKey = await this.repository.ownerKeyFor(ownerIdentityId);
+    const ownerKey = await this.repository.ownerKeyFor(
+      message.ownerIdentityId.valueOf(),
+    );
     const [total, owned] = await Promise.all([
       this.repository.reservedBytes(now),
       this.repository.reservedBytes(now, ownerKey),
     ]);
 
-    this.policy.assertQuotaAllowed(size, total, owned);
+    this.policy.assertQuotaAllowed(message.size, total, owned);
 
     const { blob, downloadToken, uploadToken } = PrivateBlob.reserve({
       now,
       ownerKey,
       retentionMs: this.policy.retentionMs(),
-      size,
+      size: message.size,
       uploadWindowMs: this.policy.uploadWindowMs(),
     });
 
@@ -54,11 +56,10 @@ export default class PrivateBlobReserver {
 
   /** Serialized so concurrent reservations cannot overshoot a quota. */
   public reserve(
-    ownerIdentityId: string,
-    size: number,
+    message: PrivateBlobReserveMessage,
   ): Promise<PrivateBlobReservation> {
     const result = this.queue.then((): Promise<PrivateBlobReservation> =>
-      this.reserveNow(ownerIdentityId, size),
+      this.reserveNow(message),
     );
 
     this.queue = result.catch((): void => undefined);

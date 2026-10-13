@@ -34,12 +34,7 @@ export class PostMailboxEnvelopeRoute extends MailboxRouteSupport {
 
     try {
       const result = await this.appender.append(
-        new MailboxAppendMessage(
-          id,
-          token,
-          body.envelopeId,
-          body.body,
-        ),
+        new MailboxAppendMessage(id, token, body.envelopeId, body.body),
       );
 
       return response

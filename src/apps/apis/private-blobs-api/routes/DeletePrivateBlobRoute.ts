@@ -1,5 +1,5 @@
-import PrivateBlobRemover from '@app/contexts/private-blobs/application/remove/PrivateBlobRemover';
 import { PrivateBlobRemoveMessage } from '@app/contexts/private-blobs/application/remove/messages/PrivateBlobRemoveMessage';
+import PrivateBlobRemover from '@app/contexts/private-blobs/application/remove/PrivateBlobRemover';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';

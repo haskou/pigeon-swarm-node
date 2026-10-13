@@ -1,5 +1,5 @@
-import PrivateBlobUploader from '@app/contexts/private-blobs/application/upload/PrivateBlobUploader';
 import { PrivateBlobUploadMessage } from '@app/contexts/private-blobs/application/upload/messages/PrivateBlobUploadMessage';
+import PrivateBlobUploader from '@app/contexts/private-blobs/application/upload/PrivateBlobUploader';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { JsonController, Param, Put, Req, Res } from 'routing-controllers';

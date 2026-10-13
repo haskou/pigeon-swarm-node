@@ -1,6 +1,7 @@
-import { PrivateBlobNotFoundError } from '../domain/errors/PrivateBlobNotFoundError';
-import PrivateBlobBytesStore from '../domain/repositories/PrivateBlobBytesStore';
-import PrivateBlobRepository from '../domain/repositories/PrivateBlobRepository';
+import { PrivateBlobNotFoundError } from '../../domain/errors/PrivateBlobNotFoundError';
+import PrivateBlobBytesStore from '../../domain/repositories/PrivateBlobBytesStore';
+import PrivateBlobRepository from '../../domain/repositories/PrivateBlobRepository';
+import { PrivateBlobRemoveMessage } from './messages/PrivateBlobRemoveMessage';
 
 export default class PrivateBlobRemover {
   constructor(
@@ -9,10 +10,11 @@ export default class PrivateBlobRemover {
   ) {}
 
   /** Bytes go first: a crash leaves a record that expiry cleans, never an orphan file. */
-  public async remove(blobId: string, uploadToken: string): Promise<void> {
+  public async remove(message: PrivateBlobRemoveMessage): Promise<void> {
+    const blobId = message.blobId.valueOf();
     const blob = await this.repository.findById(blobId);
 
-    if (!blob || !blob.acceptsUpload(uploadToken)) {
+    if (!blob || !blob.acceptsUpload(message.uploadToken.valueOf())) {
       throw new PrivateBlobNotFoundError();
     }
 

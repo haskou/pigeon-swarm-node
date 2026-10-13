@@ -1,6 +1,6 @@
+import { PrivateBlobRangeRequest } from '@app/contexts/private-blobs/domain/PrivateBlobRangeRequest';
 import { PrivateBlobDownloadToken } from '@app/contexts/private-blobs/domain/value-objects/PrivateBlobDownloadToken';
 import { PrivateBlobId } from '@app/contexts/private-blobs/domain/value-objects/PrivateBlobId';
-import { PrivateBlobRangeRequest } from '@app/contexts/private-blobs/domain/PrivateBlobRangeRequest';
 
 export class PrivateBlobReadMessage {
   public readonly blobId: PrivateBlobId;

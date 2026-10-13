@@ -1,5 +1,5 @@
-import PrivateBlobReader from '@app/contexts/private-blobs/application/read/PrivateBlobReader';
 import { PrivateBlobReadMessage } from '@app/contexts/private-blobs/application/read/messages/PrivateBlobReadMessage';
+import PrivateBlobReader from '@app/contexts/private-blobs/application/read/PrivateBlobReader';
 import { PrivateBlobRangeOutOfBoundsError } from '@app/contexts/private-blobs/domain/errors/PrivateBlobRangeOutOfBoundsError';
 import { Request, Response } from 'express';
 import { Get, JsonController, Param, Req, Res } from 'routing-controllers';

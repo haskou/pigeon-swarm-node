@@ -4,8 +4,8 @@ export class PrivateBlobReserveMessage {
   public readonly ownerIdentityId: IdentityId;
   public readonly size: number;
 
-  constructor(ownerIdentityId: string, size: number) {
-    this.ownerIdentityId = new IdentityId(ownerIdentityId);
+  constructor(ownerIdentityId: IdentityId, size: number) {
+    this.ownerIdentityId = ownerIdentityId;
     this.size = size;
   }
 }
