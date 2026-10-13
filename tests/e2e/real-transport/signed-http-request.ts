@@ -255,7 +255,7 @@ async function exercise(node: NodeRuntime): Promise<void> {
       identity: key,
       recovery: generateEd25519(),
     },
-    'signed-request-vector',
+    'signed-vector',
   );
 
   const [jsonVector, getVector, binaryVector] = vectors.cases;
