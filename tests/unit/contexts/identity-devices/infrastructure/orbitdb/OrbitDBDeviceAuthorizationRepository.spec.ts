@@ -718,6 +718,132 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       }
     });
 
+    it('keeps the compromise cap when a concurrent recovery that carries none wins the checkpoint', async () => {
+      const { genesis, identityId, owner, recovery } = await fixture();
+      const phone = await KeyPair.generate();
+      const laptop = await KeyPair.generate();
+      const keyOf = (key: KeyPair): string => key.toPrimitives().publicKey;
+      const [first, second] = [
+        await KeyPair.generate(),
+        await KeyPair.generate(),
+      ];
+      // The merge keeps the checkpoint whose serialized record sorts first,
+      // which starts with the recovered credential: the recovery without the
+      // cap must sort first so it wins the checkpoint.
+      const [uncappedTarget, cappedTarget] =
+        keyOf(first).localeCompare(keyOf(second)) < 0
+          ? [first, second]
+          : [second, first];
+      const base = repositoryFixture();
+      await provisionAuthorization(base.repository, genesis);
+      await base.repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000001',
+          '10000000-0000-4000-8000-000000000001',
+        ),
+      );
+      await base.repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          laptop,
+          '00000000-0000-4000-8000-000000000002',
+          '10000000-0000-4000-8000-000000000002',
+          revisionOf(1),
+        ),
+      );
+      const baseHead = base.getHead() as Record<string, unknown>;
+      const retired = repositoryFixture();
+      const compromised = repositoryFixture();
+      for (const branch of [retired, compromised]) {
+        await provisionAuthorization(branch.repository, genesis);
+        branch.setHead(baseHead);
+      }
+      await retired.repository.compareAndApply(
+        revocation(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000003',
+          revisionOf(2),
+        ),
+      );
+      await retired.repository.compareAndApply(
+        recoveryOf(
+          identityId,
+          recovery,
+          uncappedTarget,
+          '00000000-0000-4000-8000-000000000005',
+          revisionOf(3),
+        ),
+      );
+      await compromised.repository.compareAndApply(
+        revocation(
+          identityId,
+          laptop,
+          phone,
+          '00000000-0000-4000-8000-000000000004',
+          revisionOf(2),
+          DeviceAuthorizationEpoch.genesis(),
+          revisionOf(2),
+        ),
+      );
+      await compromised.repository.compareAndApply(
+        recoveryOf(
+          identityId,
+          recovery,
+          cappedTarget,
+          '00000000-0000-4000-8000-000000000006',
+          revisionOf(3),
+          [
+            {
+              compromisedSince: revisionOf(2),
+              credential: credentialOf(phone),
+            },
+          ],
+        ),
+      );
+
+      for (const [left, right] of [
+        [retired, compromised],
+        [compromised, retired],
+      ]) {
+        const merged = left.getMerger()?.(
+          left.getHead(),
+          right.getHead() ?? {},
+        ) as Record<string, unknown>;
+        const reader = repositoryFixture();
+        await provisionAuthorization(reader.repository, genesis);
+        reader.setHead(merged);
+        await reader.repository.compareAndApply(
+          await enrollment(
+            identityId,
+            uncappedTarget,
+            phone,
+            '00000000-0000-4000-8000-000000000007',
+            '10000000-0000-4000-8000-000000000007',
+            revisionOf(4),
+            DeviceAuthorizationEpoch.fromRecovery(
+              new DeviceAuthorizationOperationId(
+                '00000000-0000-4000-8000-000000000005',
+              ),
+            ),
+          ),
+        );
+        const timeline = await reader.repository.findTimeline(identityId);
+
+        expect(
+          timeline?.isAuthorizedAt(credentialOf(uncappedTarget), revisionOf(5)),
+        ).toBe(true);
+        expect(
+          timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(5)),
+        ).toBe(false);
+      }
+    });
+
     it('rejects a compromise revision beyond the revocation it is signed in', () => {
       expect(() =>
         DeviceAuthorizationTransition.revocation(
@@ -901,7 +1027,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
           recovered,
           '00000000-0000-4000-8000-000000000003',
           revisionOf(2),
-          [{ compromisedSince: revisionOf(1), credential: credentialOf(phone) }],
+          [
+            {
+              compromisedSince: revisionOf(1),
+              credential: credentialOf(phone),
+            },
+          ],
         ),
       );
       await repository.compareAndApply(
@@ -963,7 +1094,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
           recovered,
           '00000000-0000-4000-8000-000000000003',
           revisionOf(2),
-          [{ compromisedSince: revisionOf(1), credential: credentialOf(phone) }],
+          [
+            {
+              compromisedSince: revisionOf(1),
+              credential: credentialOf(phone),
+            },
+          ],
         ),
       );
       await first.repository.compareAndApply(
@@ -1004,9 +1140,9 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       ];
 
       for (const timeline of timelines) {
-        expect(timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(4))).toBe(
-          false,
-        );
+        expect(
+          timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(4)),
+        ).toBe(false);
         expect(
           timeline?.isAuthorizedAt(credentialOf(recovered), revisionOf(4)),
         ).toBe(true);
@@ -1077,7 +1213,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
             recovered,
             '00000000-0000-4000-8000-000000000002',
             revisionOf(1),
-            [{ compromisedSince: revisionOf(1), credential: credentialOf(phone) }],
+            [
+              {
+                compromisedSince: revisionOf(1),
+                credential: credentialOf(phone),
+              },
+            ],
           ),
         ),
       ).rejects.toThrow();
@@ -1117,7 +1258,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
           recovered,
           '00000000-0000-4000-8000-000000000003',
           revisionOf(2),
-          [{ compromisedSince: revisionOf(1), credential: credentialOf(phone) }],
+          [
+            {
+              compromisedSince: revisionOf(1),
+              credential: credentialOf(phone),
+            },
+          ],
         ),
       );
       const trusted = getHead() as {
@@ -1131,7 +1277,9 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         revisionOf(3),
         credentialOf(recovered),
         DeviceAuthorizationEpoch.fromRecovery(
-          new DeviceAuthorizationOperationId('00000000-0000-4000-8000-000000000003'),
+          new DeviceAuthorizationOperationId(
+            '00000000-0000-4000-8000-000000000003',
+          ),
         ),
       );
       const successorRecovery = recoveryOf(
@@ -1142,13 +1290,17 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         revisionOf(3),
         undefined,
         DeviceAuthorizationEpoch.fromRecovery(
-          new DeviceAuthorizationOperationId('00000000-0000-4000-8000-000000000003'),
+          new DeviceAuthorizationOperationId(
+            '00000000-0000-4000-8000-000000000003',
+          ),
         ),
       );
       const candidateAuthorization = recoveredAuthorization.recoverAt(
         successorRecovery.getRevision(),
         successorRecovery.getTargetCredential(),
-        DeviceAuthorizationEpoch.fromRecovery(successorRecovery.getOperationId()),
+        DeviceAuthorizationEpoch.fromRecovery(
+          successorRecovery.getOperationId(),
+        ),
       );
       const checkpoint = {
         authorization: candidateAuthorization.toPrimitives(),
