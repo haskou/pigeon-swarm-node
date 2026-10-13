@@ -62,11 +62,6 @@ function parseOrReject<T>(reason: string, parse: () => T): T {
   }
 }
 
-/** Wire form of a credential: the identity-id body without PEM headers. */
-function toWire(credential: DeviceCredential): string {
-  return new IdentityId(credential.valueOf()).valueOf();
-}
-
 export class DeviceSealedSecretBundle {
   public static readonly MAX_SEALED_SECRET_LENGTH = 4096;
 
@@ -94,10 +89,7 @@ export class DeviceSealedSecretBundle {
     const entries = primitives.entries.map((entry) => {
       const recipientCredential = parseOrReject(
         'recipient credential is malformed',
-        () =>
-          DeviceCredential.fromIdentityId(
-            new IdentityId(entry.recipientCredential),
-          ),
+        () => DeviceCredential.fromWire(entry.recipientCredential),
       );
 
       if (
@@ -140,9 +132,7 @@ export class DeviceSealedSecretBundle {
         () => new IdentityId(primitives.identityId),
       ),
       parseOrReject('publisher credential is malformed', () =>
-        DeviceCredential.fromIdentityId(
-          new IdentityId(primitives.publisherCredential),
-        ),
+        DeviceCredential.fromWire(primitives.publisherCredential),
       ),
       authorizationRevision,
       generation,
@@ -177,8 +167,8 @@ export class DeviceSealedSecretBundle {
           authorizationRevision: this.authorizationRevision.valueOf(),
           generation: this.generation.valueOf(),
           identityId: this.identityId.valueOf(),
-          publisherCredential: toWire(this.publisherCredential),
-          recipientCredential: toWire(entry.recipientCredential),
+          publisherCredential: this.publisherCredential.toWire(),
+          recipientCredential: entry.recipientCredential.toWire(),
           sealedSecret: entry.sealedSecret,
         }),
         new Signature(entry.signature),
@@ -243,8 +233,8 @@ export class DeviceSealedSecretBundle {
       authorizationRevision: this.authorizationRevision.valueOf(),
       generation: this.generation.valueOf(),
       identityId: this.identityId.valueOf(),
-      publisherCredential: toWire(this.publisherCredential),
-      recipientCredential: toWire(entry.recipientCredential),
+      publisherCredential: this.publisherCredential.toWire(),
+      recipientCredential: entry.recipientCredential.toWire(),
       sealedSecret: entry.sealedSecret,
       signature: entry.signature,
     };
@@ -266,13 +256,13 @@ export class DeviceSealedSecretBundle {
     return {
       authorizationRevision: this.authorizationRevision.valueOf(),
       entries: this.entries.map((entry) => ({
-        recipientCredential: toWire(entry.recipientCredential),
+        recipientCredential: entry.recipientCredential.toWire(),
         sealedSecret: entry.sealedSecret,
         signature: entry.signature,
       })),
       generation: this.generation.valueOf(),
       identityId: this.identityId.valueOf(),
-      publisherCredential: toWire(this.publisherCredential),
+      publisherCredential: this.publisherCredential.toWire(),
     };
   }
 }

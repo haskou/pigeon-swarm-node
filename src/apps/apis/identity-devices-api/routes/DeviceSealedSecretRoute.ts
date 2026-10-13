@@ -1,6 +1,5 @@
 import { InvalidSignedRequestError } from '@app/apps/apis/shared/errors/InvalidSignedRequestError';
 import { signedRequestReplayGuard } from '@app/apps/apis/shared/SignedRequestReplayGuard';
-import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import DeviceAuthorizationFinder from '@app/contexts/identity-devices/application/find/DeviceAuthorizationFinder';
 import DeviceSealedSecretFinder from '@app/contexts/identity-devices/application/find/DeviceSealedSecretFinder';
 import { DeviceAuthorizationFindMessage } from '@app/contexts/identity-devices/application/find/messages/DeviceAuthorizationFindMessage';
@@ -115,10 +114,7 @@ export class DeviceSealedSecretRoute extends Route {
 
     try {
       const delivery = await this.finder.find(
-        new DeviceSealedSecretFindMessage(
-          target,
-          DeviceCredential.fromIdentityId(recipientCredential),
-        ),
+        new DeviceSealedSecretFindMessage(target, recipientCredential),
       );
 
       return response.status(HttpRouteStatusEnum.OK).send(delivery);

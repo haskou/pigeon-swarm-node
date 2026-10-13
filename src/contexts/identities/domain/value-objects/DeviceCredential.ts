@@ -9,6 +9,11 @@ export class DeviceCredential extends PublicKey {
     return new DeviceCredential(identityId.toString());
   }
 
+  /** Parses the wire form: the identity-id body without PEM headers. */
+  public static fromWire(value: string): DeviceCredential {
+    return DeviceCredential.fromIdentityId(new IdentityId(value));
+  }
+
   public static fromString(
     value: string | StringValueObject,
   ): DeviceCredential {
@@ -17,6 +22,11 @@ export class DeviceCredential extends PublicKey {
 
   public getCommitment(): DeviceCredentialCommitment {
     return DeviceCredentialCommitment.fromCredential(this);
+  }
+
+  /** Wire form: the identity-id body without PEM headers. */
+  public toWire(): string {
+    return new IdentityId(this.valueOf()).valueOf();
   }
 
   /** Code-unit order: the strict ascending check on compromised credentials. */
