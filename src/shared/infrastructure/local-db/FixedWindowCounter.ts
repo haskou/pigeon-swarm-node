@@ -27,6 +27,19 @@ export default class FixedWindowCounter {
     return live?.count ?? 0;
   }
 
+  /** Deletes every window in `namespace` that has already closed. */
+  public static async deleteExpired(
+    database: EmbeddedLocalDatabase,
+    namespace: string,
+  ): Promise<void> {
+    const now = Date.now();
+
+    await database.deleteMany(
+      namespace,
+      (window) => typeof window.resetAt !== 'number' || window.resetAt <= now,
+    );
+  }
+
   /** Records one event for `key` and returns the count in the live window, including this event. */
   public static async increment(
     database: EmbeddedLocalDatabase,

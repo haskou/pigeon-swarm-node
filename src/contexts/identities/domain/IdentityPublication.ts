@@ -2,6 +2,7 @@ import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { Profile } from './Profile';
+import { IdentityAdmissionDifficulty } from './value-objects/IdentityAdmissionDifficulty';
 import { IdentityExternalIdentifier } from './value-objects/IdentityExternalIdentifier';
 import { IdentityMailboxHome } from './value-objects/IdentityMailboxHome';
 import { IdentityVersion } from './value-objects/IdentityVersion';
@@ -46,6 +47,10 @@ export class IdentityPublication {
 
   public getAdmissionNonce(): string | undefined {
     return this.admissionNonce;
+  }
+
+  public isFreshAdmissionAt(now: Timestamp): boolean {
+    return IdentityAdmissionDifficulty.isFreshAdmission(this.timestamp, now);
   }
 
   public hasHandle(handle: ProfileHandle): boolean {

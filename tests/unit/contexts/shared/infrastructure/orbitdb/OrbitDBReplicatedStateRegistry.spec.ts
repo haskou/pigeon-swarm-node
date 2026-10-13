@@ -449,6 +449,15 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     });
   });
 
+  it('tells which networks it replicates state for', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+
+    await registry.register('network-1', createStores().stores);
+
+    expect(registry.hostsNetwork('network-1')).toBe(true);
+    expect(registry.hostsNetwork('network-2')).toBe(false);
+  });
+
   it('routes documents to the matching network only', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();

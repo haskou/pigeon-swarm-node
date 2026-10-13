@@ -1,16 +1,18 @@
 import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
 import { InvalidIdentitySignatureError } from '@app/contexts/identities/domain/errors/InvalidIdentitySignatureError';
+import { InvalidProfileBannerError } from '@app/contexts/identities/domain/errors/InvalidProfileBannerError';
+import { InvalidProfileImageError } from '@app/contexts/identities/domain/errors/InvalidProfileImageError';
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
 import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
-import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
-import { InvalidProfileBannerError } from '@app/contexts/identities/domain/errors/InvalidProfileBannerError';
-import { InvalidProfileImageError } from '@app/contexts/identities/domain/errors/InvalidProfileImageError';
+import { IdentityAdmissionDifficulty } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionDifficulty';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
+import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 
 import { IdentityMother } from '../../../mothers/IdentityMother';
 import { SignedIdentityMother } from '../../../mothers/SignedIdentityMother';
@@ -51,6 +53,31 @@ describe(Identity.name, () => {
     expect(Identity.fromPrimitives(primitives).toPrimitives()).toEqual(
       primitives,
     );
+  });
+
+  describe('admission freshness', () => {
+    const HORIZON = IdentityAdmissionDifficulty.FRESHNESS_HORIZON_MS;
+
+    it('is fresh while the node clock is within the horizon of the signed time', () => {
+      const identity = mother.build();
+      const signedAt = mother.timestamp.valueOf();
+
+      for (const now of [signedAt - HORIZON, signedAt, signedAt + HORIZON]) {
+        expect(identity.isFreshAdmissionAt(new Timestamp(now))).toBe(true);
+      }
+    });
+
+    it('is stale once backdated or future-dated beyond the horizon', () => {
+      const identity = mother.build();
+      const signedAt = mother.timestamp.valueOf();
+
+      expect(
+        identity.isFreshAdmissionAt(new Timestamp(signedAt + HORIZON + 1)),
+      ).toBe(false);
+      expect(
+        identity.isFreshAdmissionAt(new Timestamp(signedAt - HORIZON - 1)),
+      ).toBe(false);
+    });
   });
 
   it.each([

@@ -1,15 +1,17 @@
-import DeviceAuthorizationProvisioner from '@app/contexts/identity-devices/application/provision/DeviceAuthorizationProvisioner';
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
 import { IdentityPublishMessage } from '@app/contexts/identities/application/publish/messages/IdentityPublishMessage';
 import { InsufficientIdentityAdmissionProofError } from '@app/contexts/identities/domain/errors/InsufficientIdentityAdmissionProofError';
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import IdentityAdmissionLoadRepository from '@app/contexts/identities/domain/repositories/IdentityAdmissionLoadRepository';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import IdentityAdmissionPricingDomainService from '@app/contexts/identities/domain/services/IdentityAdmissionPricingDomainService';
 import IdentityCandidateValidationDomainService from '@app/contexts/identities/domain/services/IdentityCandidateValidationDomainService';
 import IdentitySaverService from '@app/contexts/identities/domain/services/IdentitySaverService';
 import { IdentityAdmissionDifficulty } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionDifficulty';
 import { IdentityAdmissionProof } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionProof';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
+import DeviceAuthorizationProvisioner from '@app/contexts/identity-devices/application/provision/DeviceAuthorizationProvisioner';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -19,6 +21,8 @@ import { IdentityMother } from '../../../../mothers/IdentityMother';
 const NETWORK = '550e8400-e29b-41d4-a716-446655440000';
 const ADDED_NETWORK = '550e8400-e29b-41d4-a716-446655440001';
 const BUSY = IdentityAdmissionDifficulty.FREE_ADMISSIONS_PER_WINDOW;
+const HORIZON = IdentityAdmissionDifficulty.FRESHNESS_HORIZON_MS;
+const PUBLISHED = new IdentityExternalIdentifier('bafkidentity');
 
 describe('IdentityPublisher', () => {
   let saver: MockProxy<IdentitySaverService>;
@@ -59,6 +63,9 @@ describe('IdentityPublisher', () => {
   }
 
   beforeEach(() => {
+    jest
+      .spyOn(Date, 'now')
+      .mockReturnValue(new IdentityMother().timestamp.valueOf());
     saver = mock<IdentitySaverService>();
     repository = mock<IdentityRepository>();
     validator = mock<IdentityCandidateValidationDomainService>();
@@ -71,13 +78,16 @@ describe('IdentityPublisher', () => {
       validator,
       eventPublisher,
       provisioner,
-      admissionLoad,
+      new IdentityAdmissionPricingDomainService(admissionLoad),
     );
     validator.isValidChainFor.mockResolvedValue(true);
-    const externalIdentifier = new IdentityExternalIdentifier('bafkidentity');
-    saver.calculateExternalIdentifier.mockResolvedValue(externalIdentifier);
-    saver.save.mockResolvedValue(externalIdentifier);
+    saver.calculateExternalIdentifier.mockResolvedValue(PUBLISHED);
+    saver.save.mockResolvedValue(PUBLISHED);
     loadPerNetwork({});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('does not publish an identity when device authorization provisioning fails', async () => {
@@ -201,9 +211,10 @@ describe('IdentityPublisher', () => {
         new IdentityPublishMessage(identity.toPrimitives()),
       );
 
-      expect(admissionLoad.record).toHaveBeenCalledWith([
-        new NetworkId(NETWORK),
-      ]);
+      expect(admissionLoad.record).toHaveBeenCalledWith(
+        new IdentityId(identity.toPrimitives().id),
+        [new NetworkId(NETWORK)],
+      );
       expect(admissionLoad.record.mock.invocationCallOrder[0]).toBeGreaterThan(
         saver.save.mock.invocationCallOrder[0],
       );
@@ -267,9 +278,59 @@ describe('IdentityPublisher', () => {
         new IdentityPublishMessage(update.toPrimitives()),
       );
 
-      expect(admissionLoad.record).toHaveBeenCalledWith([
+      expect(admissionLoad.record).toHaveBeenCalledWith(mother.id, [
         new NetworkId(ADDED_NETWORK),
       ]);
+    });
+
+    it('prices a backdated admission at the cap so it cannot dodge observation', async () => {
+      const mother = new IdentityMother();
+      const identity = await mother.buildNext({
+        admissionNonce: nonceWithExactly(mother, [NETWORK], 16),
+        previousIdentityExternalIdentifier: undefined,
+        timestamp: Date.now() - HORIZON - 1,
+        version: 1,
+      });
+
+      await expect(
+        publisher.publish(new IdentityPublishMessage(identity.toPrimitives())),
+      ).rejects.toMatchObject({
+        requiredDifficultyBits: IdentityAdmissionDifficulty.MAX_BITS,
+      });
+      expect(admissionLoad.countRecent).not.toHaveBeenCalled();
+      expect(saver.save).not.toHaveBeenCalled();
+    });
+
+    it('prices a future-dated admission at the cap', async () => {
+      const mother = new IdentityMother();
+      const identity = await mother.buildNext({
+        admissionNonce: nonceWithExactly(mother, [NETWORK], 16),
+        previousIdentityExternalIdentifier: undefined,
+        timestamp: Date.now() + HORIZON + 1,
+        version: 1,
+      });
+
+      await expect(
+        publisher.publish(new IdentityPublishMessage(identity.toPrimitives())),
+      ).rejects.toMatchObject({
+        requiredDifficultyBits: IdentityAdmissionDifficulty.MAX_BITS,
+      });
+    });
+
+    it('keeps the floor for a backdated update that enters no network', async () => {
+      const mother = new IdentityMother();
+      const previous = mother.build();
+      const update = await mother.buildNext({
+        timestamp: Date.now() - HORIZON - 1,
+      });
+      repository.requireByExternalIdentifier.mockResolvedValue(previous);
+
+      await publisher.publish(
+        new IdentityPublishMessage(update.toPrimitives()),
+      );
+
+      expect(saver.save).toHaveBeenCalledTimes(1);
+      expect(admissionLoad.record).not.toHaveBeenCalled();
     });
   });
 });

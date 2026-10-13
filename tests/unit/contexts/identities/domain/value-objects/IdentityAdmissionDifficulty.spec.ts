@@ -20,9 +20,9 @@ describe('IdentityAdmissionDifficulty', () => {
   });
 
   it('adds one bit per doubling of recent admissions beyond the free allowance', () => {
-    expect(IdentityAdmissionDifficulty.forRecentAdmissions(FREE).valueOf()).toBe(
-      17,
-    );
+    expect(
+      IdentityAdmissionDifficulty.forRecentAdmissions(FREE).valueOf(),
+    ).toBe(17);
     expect(
       IdentityAdmissionDifficulty.forRecentAdmissions(FREE * 2 - 1).valueOf(),
     ).toBe(17);
@@ -44,11 +44,30 @@ describe('IdentityAdmissionDifficulty', () => {
     expect(IdentityAdmissionDifficulty.MAX_BITS).toBe(20);
   });
 
+  it('exposes the cap as a requirement', () => {
+    expect(IdentityAdmissionDifficulty.max().valueOf()).toBe(
+      IdentityAdmissionDifficulty.MAX_BITS,
+    );
+  });
+
+  it('saturates at the first load that asks the cap', () => {
+    const saturating =
+      IdentityAdmissionDifficulty.SATURATING_ADMISSIONS_PER_WINDOW;
+
+    expect(
+      IdentityAdmissionDifficulty.forRecentAdmissions(saturating).valueOf(),
+    ).toBe(IdentityAdmissionDifficulty.MAX_BITS);
+    expect(
+      IdentityAdmissionDifficulty.forRecentAdmissions(saturating - 1).valueOf(),
+    ).toBeLessThan(IdentityAdmissionDifficulty.MAX_BITS);
+  });
+
   it('never decreases as load grows', () => {
     let previous = IdentityAdmissionDifficulty.floor();
 
     for (let recent = 0; recent <= FREE * 16; recent += 1) {
-      const difficulty = IdentityAdmissionDifficulty.forRecentAdmissions(recent);
+      const difficulty =
+        IdentityAdmissionDifficulty.forRecentAdmissions(recent);
 
       expect(difficulty.isGreaterOrEqualThan(previous)).toBe(true);
       previous = difficulty;

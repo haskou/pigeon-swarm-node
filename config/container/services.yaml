@@ -407,6 +407,12 @@ services:
       /apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime
     arguments:
       - '@contexts/calls/infrastructure/orbitdb/OrbitDBCallProjection'
+  apps/runtimes/orbitdb-identity-admission-observation-runtime/OrbitDBIdentityAdmissionObservationRuntime:
+    class: >-
+      /apps/runtimes/orbitdb-identity-admission-observation-runtime/OrbitDBIdentityAdmissionObservationRuntime
+    arguments:
+      - >-
+        @contexts/identities/infrastructure/orbitdb/OrbitDBIdentityAdmissionObservationProjection
   apps/runtimes/orbitdb-identity-metadata-projection-runtime/OrbitDBIdentityMetadataProjectionRuntime:
     class: >-
       /apps/runtimes/orbitdb-identity-metadata-projection-runtime/OrbitDBIdentityMetadataProjectionRuntime
@@ -1516,6 +1522,12 @@ services:
     class: /contexts/identities/application/find-networks/IdentityNetworksFinder
     arguments:
       - '@contexts/identities/domain/repositories/IdentityNetworkRepository'
+  contexts/identities/application/observe-admission/IdentityAdmissionObserver:
+    class: >-
+      /contexts/identities/application/observe-admission/IdentityAdmissionObserver
+    arguments:
+      - >-
+        @contexts/identities/domain/services/IdentityAdmissionPricingDomainService
   contexts/identities/application/publish/IdentityPublisher:
     class: /contexts/identities/application/publish/IdentityPublisher
     arguments:
@@ -1526,7 +1538,8 @@ services:
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
       - >-
         @contexts/identity-devices/application/provision/DeviceAuthorizationProvisioner
-      - '@contexts/identities/domain/repositories/IdentityAdmissionLoadRepository'
+      - >-
+        @contexts/identities/domain/services/IdentityAdmissionPricingDomainService
   contexts/identities/application/register-candidate/IdentityCandidateRegistrar:
     class: >-
       /contexts/identities/application/register-candidate/IdentityCandidateRegistrar
@@ -1537,6 +1550,10 @@ services:
   contexts/identities/domain/repositories/IdentityNetworkRepository: >-
     @contexts/identities/infrastructure/metadata/MetadataIdentityNetworkRepository
   contexts/identities/domain/repositories/IdentityRepository: '@contexts/identities/infrastructure/ipfs/IpfsIdentityRepository'
+  contexts/identities/domain/services/IdentityAdmissionPricingDomainService:
+    class: /contexts/identities/domain/services/IdentityAdmissionPricingDomainService
+    arguments:
+      - '@contexts/identities/domain/repositories/IdentityAdmissionLoadRepository'
   contexts/identities/domain/services/IdentityCandidateValidationDomainService:
     class: >-
       /contexts/identities/domain/services/IdentityCandidateValidationDomainService
@@ -1589,6 +1606,14 @@ services:
     arguments:
       - '@contexts/identities/infrastructure/metadata/IdentityMetadataIndex'
     parent: contexts/identities/domain/repositories/IdentityNetworkRepository
+  contexts/identities/infrastructure/orbitdb/OrbitDBIdentityAdmissionObservationProjection:
+    class: >-
+      /contexts/identities/infrastructure/orbitdb/OrbitDBIdentityAdmissionObservationProjection
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex'
+      - >-
+        @contexts/identities/application/observe-admission/IdentityAdmissionObserver
   contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex:
     class: /contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex
     arguments:

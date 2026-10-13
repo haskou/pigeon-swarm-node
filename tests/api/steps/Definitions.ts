@@ -100,6 +100,7 @@ type StickerPackDocument = Record<string, unknown> & {
 @binding()
 export default class Definitions {
   private admissionProofBits: number | undefined;
+  private identitySignedOffsetMs = 0;
   private binaryBody: Buffer | undefined;
   private readonly notificationSettingsSequences = new Map<string, number>();
   private readonly communityRecordSequences = new Map<string, number>();
@@ -263,7 +264,7 @@ export default class Definitions {
       previousIdentityExternalIdentifier,
       profile,
       recoveryAuthority: recoveryKeyPair.toPrimitives().publicKey,
-      timestamp: 1773848829055 + version,
+      timestamp: Date.now() + this.identitySignedOffsetMs + version,
       version,
     };
     const signature = keyPair.sign(JSON.stringify(signaturePayload)).valueOf();
@@ -1427,6 +1428,7 @@ export default class Definitions {
     this.callProofs.clear();
     this.callJoined.clear();
     this.admissionProofBits = undefined;
+    this.identitySignedOffsetMs = 0;
     this.communityChannelId = undefined;
     this.communityChannelMessageId = undefined;
     this.communityThreadRootMessageId = undefined;
@@ -1833,8 +1835,20 @@ export default class Definitions {
     );
 
     for (let admission = 0; admission < admissions; admission += 1) {
-      await load.record([network]);
+      await load.record(
+        new IdentityId(
+          generateKeyPairSync('ed25519')
+            .publicKey.export({ format: 'pem', type: 'spki' })
+            .toString(),
+        ),
+        [network],
+      );
     }
+  }
+
+  @given('identity bodies are signed {int} minutes ago')
+  public identityBodiesAreSignedMinutesAgo(minutes: number): void {
+    this.identitySignedOffsetMs = -minutes * 60_000;
   }
 
   @given(

@@ -2015,25 +2015,30 @@ checked by the `IdentityAdmissionProofVectors` unit spec.
 
 Through `POST /identities` and `PUT /identities/{identityId}`, a node may ask
 more than 16 bits for the networks an identity enters (all of them for a new
-identity, only the added ones for an update) while they are busy on that node.
-Up to 60 admissions per network per minute on the node the floor applies; after
-that the node adds one bit per doubling, up to 20 bits (60: 17, 120: 18,
-240: 19, 480: 20). A shorter proof is refused with `400` and the bits it needs:
+identity, only the added ones for an update) while they are busy. Up to 60
+admissions per network per minute the floor applies; after that the node adds
+one bit per doubling, up to 20 bits (60: 17, 120: 18, 240: 19, 480: 20). The
+node counts the admissions it accepted plus the fresh ones it saw replicate in
+from other nodes, so the price follows the whole network. An identity whose
+`timestamp` is more than 10 minutes away from the node's clock is asked the
+20-bit maximum for the networks it enters. A shorter proof is refused with
+`400` and the bits it needs:
 
 ```json
 {
   "code": "BadRequestError",
   "errors": [],
   "httpStatus": 400,
-  "message": "Identity admission needs an admissionNonce with 17 leading zero bits while the network is busy on this node.",
+  "message": "Identity admission needs an admissionNonce with 17 leading zero bits on this node now: the network is busy or the identity timestamp is outside the freshness horizon.",
   "requiredDifficultyBits": 17
 }
 ```
 
 Mine a new nonce with at least `requiredDifficultyBits` leading zero bits, sign
-again and retry. Updates that keep their networks are never asked for more.
-Only accepted publications count towards the load. Replicated records are still
-valid at 16 bits.
+again and retry; sign with the current time to stay at the lowest price.
+Updates that keep their networks are never asked for more. Only accepted
+publications, and replicated ones that were fresh and paid what this node asks,
+count towards the load. Replicated records are still valid at 16 bits.
 
 Undefined optional properties are omitted before signing. Handles must already
 be normalized. Current requests reject `encryptedKeyPair`,

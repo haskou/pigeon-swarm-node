@@ -173,6 +173,19 @@ Feature: Post identity route
     When I POST to "/identities/"
     Then response code is equal to 200
 
+  Scenario: Price an admission signed outside the freshness horizon at the cap
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174994" and name "stale-admission-network"
+    And identity admission proofs are mined at exactly 16 bits
+    And identity bodies are signed 11 minutes ago
+    And I set a client-signed identity body with name "stale admission" and handle "stale-admission"
+    When I POST to "/identities/"
+    Then response code is equal to 400
+    And response data should match partially
+      """
+      { "code": "BadRequestError", "requiredDifficultyBits": 20 }
+      """
+
   Scenario: Reject identity updates above the per-source rate limit
     Given I am an anonymous user
     And identity admissions are limited to 1 per source per minute
