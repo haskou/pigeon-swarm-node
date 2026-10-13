@@ -1520,7 +1520,10 @@ Requires signed request headers. Call it only after the identity is published
 
 `context` must be `ipfs_public_upload`, the context for content from
 `POST /ipfs/public`. `ipfs_private_upload` is rejected with `400`: private
-content is never published to IPFS. `sizeBytes` is 1..52428800. Response:
+content is never published to IPFS. The replicated gate applies the same rule
+to records written by any
+peer: a legacy `ipfs_private_upload` record is never listed and never provided
+by this node, whichever node wrote it. `sizeBytes` is 1..52428800. Response:
 `204`.
 
 The replicated record is stored in the gated `contentReplication` collection:

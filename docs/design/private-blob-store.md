@@ -52,7 +52,12 @@ The stored blob is the ciphertext: the frame plus a 16-byte GCM tag per 8 MiB ch
 - **Availability is one node.** A blob exists only on the node that received it and only until retention ends. Nodes never replicate to each other. Client-chosen replicas are designed in "Availability across nodes" below and are not implemented.
 - **Signer identity.** The signed reservation carries the signer's identity public key in clear, because the identity id is the PEM key the signature is checked against. The owner HMAC protects storage, not the request. Every node that receives a reservation learns the signer's identity and the blob size.
 - **Backups.** A complete backup needs both halves captured at the same moment: the bytes under `PRIVATE_BLOB_STORAGE_PATH` and the local database at `PIGEON_LOCAL_DB_PATH` (default `./local_storage`), which holds the `private_blobs` records and the `owner-key-salt` in `private_blob_meta`. Stop the node, or copy both from one filesystem snapshot. A bytes-only backup restores no records, so the next sweep deletes its files. A restored record keeps its original `expiresAt`; the sweep only raises it to the current retention floor. Capabilities are stored only as SHA-256 hashes, so a backup cannot download a blob on its own. Treat backups as sensitive: they contain the owner-key salt.
-- **Migration.** Attachments already published as IPFS CIDs stay distributed; this store cannot delete them. No automatic migration exists.
+- **Migration.** Attachments already published as IPFS CIDs stay distributed;
+  this store cannot delete them. No automatic migration exists. A node stops
+  replicating legacy `ipfs_private_upload` registrations: it never lists or
+  provides them. Its local bytes are kept and nothing on this node is deleted.
+  Copies held by other nodes and provider records already published to the DHT
+  are not withdrawn by this node.
 - **Client.** The UI uses this API for private attachments. Attachments uploaded before size padding existed are stored and served the same way.
 - Metadata visible to the node operator: blob size, upload time, and request timing/IP at the HTTP layer.
 
