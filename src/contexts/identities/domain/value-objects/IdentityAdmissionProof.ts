@@ -29,8 +29,10 @@ export class IdentityAdmissionProof {
     nonce: string | undefined,
     difficultyBits: number = IdentityAdmissionProof.DIFFICULTY_BITS,
   ): boolean {
-    return (
-      typeof nonce === 'string' && this.work.isValid(nonce, difficultyBits)
-    );
+    if (typeof nonce !== 'string') {
+      return false;
+    }
+
+    return this.work.isValid(nonce, difficultyBits);
   }
 }
