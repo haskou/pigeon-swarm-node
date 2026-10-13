@@ -13,6 +13,7 @@ import {
 } from 'class-validator';
 
 import { DeviceCompromisedCredentialBody } from './DeviceCompromisedCredentialBody';
+import { DeviceSealedSecretHandoverBody } from './DeviceSealedSecretHandoverBody';
 
 export class PostDeviceAuthorizationTransitionBody {
   @IsOptional()
@@ -66,6 +67,11 @@ export class PostDeviceAuthorizationTransitionBody {
   @IsInt()
   @Min(1)
   public readonly revision: number;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DeviceSealedSecretHandoverBody)
+  public readonly sealedSecrets?: DeviceSealedSecretHandoverBody;
 
   @IsString()
   public readonly signature: string;

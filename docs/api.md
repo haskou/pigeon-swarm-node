@@ -5996,6 +5996,13 @@ invalidate it. The author must refuse to create that final signature after the
 pairing deadline. The endpoint never returns local vault envelopes or secret
 recovery material.
 
+A device retiring itself (a revocation whose `authorCredential` equals its
+`targetCredential`, without `compromisedSince` or `compromisedCredentials`) may
+add `sealedSecrets` to hand over a fresh sealed secret generation to the devices
+that remain; see [Hand-over at retirement](#hand-over-at-retirement). The body
+limit is 1 MB. On any other transition the field returns `400` with code
+`400030` and nothing is applied.
+
 ### Device sealed secrets
 
 Each new generation carries one sealed payload per authorized device (for
@@ -6109,6 +6116,57 @@ the vector signature from `GET`. The fixture's rejected bundles and a flipped
 signature byte get `409` with code `InvalidDeviceSealedSecretSignatureError`,
 and a republished generation gets `DeviceSealedSecretGenerationStaleError`.
 Sealed secrets are node-local, so there is no second-node assertion.
+
+#### Hand-over at retirement
+
+A remaining device need not be online when another device forgets itself. The
+retiring device therefore publishes the next generation together with its own
+revocation, on `POST /identity-devices/transitions`:
+
+```json
+{
+  "...": "the signed self-revocation transition fields",
+  "sealedSecrets": {
+    "generation": 4,
+    "entries": [
+      {
+        "recipientCredential": "<remaining device credential>",
+        "sealedSecret": "v2.x25519-hkdf-sha256-aes-256-gcm.…",
+        "signature": "<base64 retiring device signature over the preimage>"
+      }
+    ]
+  }
+}
+```
+
+`generation` and `entries` follow the same limits as `PUT`. The hand-over has no
+`authorizationRevision` or publisher of its own: the node takes the
+transition's `revision` and `authorCredential`, and each entry signature covers
+the same preimage with those values. The publisher is therefore the credential
+revoked at `authorizationRevision`; a client that checks the publisher's
+membership checks it at `authorizationRevision - 1`.
+
+Before anything is applied the node checks, in order:
+
+1. The transition retires its author and the author is the publisher: `400`.
+2. The publisher is authorized at the head: `409`.
+3. The retirement leaves at least one device: `409`.
+4. `recipientCredential` values are exactly the credentials that remain after
+   the retirement, at the transition's `revision`: `409`.
+5. Every entry signature verifies under the retiring credential: `409`.
+6. `generation` is strictly greater than the stored generation: `409`.
+
+The transition is then applied as usual. When the applied head is exactly the
+one the hand-over was sealed for, the generation replaces the stored one and the
+response adds `"sealedSecrets": { "authorizationRevision", "generation" }`.
+When a concurrent transition or publish wins the race, the retirement still
+applies but the field is absent: the client must not treat the new secret as
+delivered, and the remaining devices rotate on their next unlock as before.
+
+A retiring device that hands over a generation can still decrypt it until it
+discards it, exactly as with any secret it already held; the hand-over only
+guarantees that the old generation and the retired device's own entry stop
+being served the moment the retirement applies.
 
 ## Planned API
 

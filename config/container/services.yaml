@@ -1619,6 +1619,16 @@ services:
     arguments:
       - >-
         @contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository
+  contexts/identity-devices/application/hand-over/DeviceSealedSecretHandover:
+    class: >-
+      /contexts/identity-devices/application/hand-over/DeviceSealedSecretHandover
+    arguments:
+      - >-
+        @contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository
+      - >-
+        @contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository
+      - >-
+        @contexts/identity-devices/application/publish/DeviceAuthorizationEventPublisher
   contexts/identity-devices/application/provision/DeviceAuthorizationProvisioner:
     class: >-
       /contexts/identity-devices/application/provision/DeviceAuthorizationProvisioner
