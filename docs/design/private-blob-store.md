@@ -52,14 +52,8 @@ The stored blob is the ciphertext: the frame plus a 16-byte GCM tag per 8 MiB ch
 - **Availability is one node.** A blob exists only on the node that received it and only until retention ends. Nodes never replicate to each other. Client-chosen replicas are designed in "Availability across nodes" below and are not implemented.
 - **Signer identity.** The signed reservation carries the signer's identity public key in clear, because the identity id is the PEM key the signature is checked against. The owner HMAC protects storage, not the request. Every node that receives a reservation learns the signer's identity and the blob size.
 - **Backups.** A complete backup needs both halves captured at the same moment: the bytes under `PRIVATE_BLOB_STORAGE_PATH` and the local database at `PIGEON_LOCAL_DB_PATH` (default `./local_storage`), which holds the `private_blobs` records and the `owner-key-salt` in `private_blob_meta`. Stop the node, or copy both from one filesystem snapshot. A bytes-only backup restores no records, so the next sweep deletes its files. A restored record keeps its original `expiresAt`; the sweep only raises it to the current retention floor. Capabilities are stored only as SHA-256 hashes, so a backup cannot download a blob on its own. Treat backups as sensitive: they contain the owner-key salt.
-- **Migration.** Attachments already published as IPFS CIDs stay distributed;
-  this store cannot delete them. No automatic migration exists. A node stops
-  providing legacy `ipfs_private_upload` registrations: it never admits them to
-  replication, and it stops re-announcing the provider records it published for
-  them. Its local bytes are kept and nothing on this node is deleted. Copies held
-  by other nodes, and provider records already published to the DHT, are not
-  withdrawn by this node. Those records age out on the DHT's own expiry.
-- **Client.** The UI uses this API for private attachments. Attachments uploaded before size padding existed are stored and served the same way.
+- **No IPFS path.** Private attachments are stored only in this store. Content replication refuses the `ipfs_private_upload` context, so a node never admits, replicates or announces private attachment bytes on IPFS or the DHT.
+- **Client.** The UI uses this API for private attachments.
 - Metadata visible to the node operator: blob size, upload time, and request timing/IP at the HTTP layer.
 
 ## Availability across nodes (design, not implemented)
@@ -97,7 +91,7 @@ PrivateBlobReference = {
 }
 ```
 
-References without `origin` are legacy. They read from the session node, as today.
+A reference without `origin` is a single-node reference: it reads from the session node.
 
 **Origin rule** (every `origin`, primary and alternates): the canonical string `MailboxHomeBase` accepts. That means `https` (or loopback `http` for development), no credentials, query or fragment, no `//` or trailing slash in the path, at most 255 characters, and no private or link-local host. An entry that fails the rule is dropped and never fetched.
 
@@ -112,9 +106,9 @@ References without `origin` are legacy. They read from the session node, as toda
 
 **Read**
 
-1. For each part in `index` order, candidates are the primary, then the alternates. A legacy part has only the session node.
+1. For each part in `index` order, candidates are the primary, then the alternates. A single-node part has only the session node.
 2. Try candidates in order: `GET {origin}/private-blobs/{blobId}` with `Authorization: Bearer {downloadToken}` and `redirect: 'error'`. Accept only `200` whose body is exactly `size` bytes. A `404`, any other status, a network error, a timeout or a short body moves to the next candidate.
-3. Aligned parts are checked one at a time with their own GCM tag, so a bad replica is replaced for that part only. Legacy parts decrypt as one assembled buffer. If that fails, fetch every part again with the candidate order rotated by one, at most once per replica, then report the attachment unavailable.
+3. Aligned parts are checked one at a time with their own GCM tag, so a bad replica is replaced for that part only. Unaligned parts decrypt as one assembled buffer. If that fails, fetch every part again with the candidate order rotated by one, at most once per replica, then report the attachment unavailable.
 4. Cache decrypted content by `blobId`, never by origin.
 
 **Part alignment**
@@ -139,4 +133,4 @@ Upload cuts the ciphertext every 8 MiB of stored bytes. Each stored chunk is up 
 - Part alignment for new uploads (D4).
 - Mailbox availability replication on the client (`opaque-mailboxes.md`). A blob is useful only with the envelope that carries its descriptor. If the recipient's mailbox node is lost, the message is lost even when its blobs survive. The node side needs no change and is covered by a two-node test.
 - Optional node work: anonymous reservation, using creation proof-of-work as mailboxes do. It removes identity disclosure to replica nodes and is the prerequisite for recipient-side replicas.
-- Unchanged by this design: IPFS CID migration, and server-side size bucketing (advisory only).
+- Unchanged by this design: server-side size bucketing (advisory only).

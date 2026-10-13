@@ -51,6 +51,10 @@ jobs:
         run: yarn lint
         timeout-minutes: 5
 
+      - name: Validate OpenAPI YAML
+        run: yarn lint:openapi
+        timeout-minutes: 5
+
       - name: Typecheck
         run: yarn typecheck
         timeout-minutes: 5

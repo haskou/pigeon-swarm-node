@@ -250,18 +250,17 @@ Network-level protection (Tor, mixnets, relays) is out of scope.
 - #291: presence, signalling and receipts must also stop using identity-addressed
   fan-out; ephemeral state stays in memory and never enters mailboxes.
 
-## Implementation plan
+## Implementation status
 
 1. Domain and storage: `Mailbox` aggregate, capability hashing, quotas, expiry
-   scheduler, local database repository, with unit tests for every limit and for
-   crash atomicity.
-2. HTTP API and OpenAPI/Swagger/`docs/api.md`; WebSocket `mailbox_envelope` hint (done).
-3. Real-transport test proving mailbox records and envelopes never reach DHT,
-   public IPFS or pubsub, and that an offline recipient receives pending
+   scheduler and local database repository, with unit tests for every limit and
+   for crash atomicity.
+2. HTTP API, OpenAPI/Swagger, `docs/api.md` and the WebSocket
+   `mailbox_envelope` hint.
+3. Real-transport tests proving mailbox records and envelopes never reach the
+   DHT, public IPFS or pubsub, and that an offline recipient receives pending
    envelopes after reconnect.
-4. UI: key schedule, send/receive and cursor recovery (done in pigeon-swarm-ui #252 and #257). Open: rotation; direct-message wiring (#258); removal of the OrbitDB conversation path for protected scopes.
-5. Wrapper: end-to-end two-node proof, then retire the replicated conversation
-   collections.
-
-Each step is a separate PR. #289 stays open until the acceptance criteria have
-direct test evidence.
+4. UI key schedule, send/receive and cursor recovery (pigeon-swarm-ui #252 and
+   #257). Mailbox rotation is not implemented.
+5. One-to-one messages travel only through mailboxes: the replicated
+   conversation routes reject one-to-one messages and read markers.
