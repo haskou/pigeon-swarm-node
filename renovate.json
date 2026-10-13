@@ -55,6 +55,48 @@
       "matchUpdateTypes": [
         "major"
       ]
+    },
+    {
+      "allowedVersions": "<7.0.0",
+      "description": "Blocked: TypeScript 7 native compiler breaks ts-node, ts-jest and typescript-eslint (fileExists/LineFeed of undefined). Lift when the toolchain supports it.",
+      "matchPackageNames": [
+        "typescript"
+      ]
+    },
+    {
+      "allowedVersions": "<2.0.0",
+      "description": "Blocked: @helia/libp2p 2 requires helia 8 service factories (createService is not a function at runtime).",
+      "matchPackageNames": [
+        "@helia/libp2p"
+      ]
+    },
+    {
+      "allowedVersions": "<3.3.0",
+      "description": "Blocked: @libp2p/interface 3.3 is type-incompatible with the pinned @libp2p/utils stream classes (TS2420/TS2344).",
+      "matchPackageNames": [
+        "@libp2p/interface"
+      ]
+    },
+    {
+      "allowedVersions": "<8.4.0",
+      "description": "Blocked: @haskou/value-objects 8.4 changes UUID static side; every UUID subclass fails TS2417. Needs a dedicated migration PR.",
+      "matchPackageNames": [
+        "@haskou/value-objects"
+      ]
+    },
+    {
+      "allowedVersions": "<0.2.2",
+      "description": "Blocked: @haskou/eslint-config 0.2.2 tightens member-ordering on protected fields; needs a dedicated lint cleanup PR.",
+      "matchPackageNames": [
+        "@haskou/eslint-config"
+      ]
+    },
+    {
+      "allowedVersions": "<13.3.0",
+      "description": "Blocked: @cucumber/cucumber 13.3 with cucumber-tsflow fails with Reflect.getMetadata is not a function.",
+      "matchPackageNames": [
+        "@cucumber/cucumber"
+      ]
     }
   ],
   "platformAutomerge": true,
