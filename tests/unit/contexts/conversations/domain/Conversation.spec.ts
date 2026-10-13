@@ -1,11 +1,14 @@
+import { MessageMetadata } from '@app/contexts/conversations/domain/entities/messages/MessageMetadata';
 import { MessageSent } from '@app/contexts/conversations/domain/entities/messages/MessageSent';
 import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
 import { MessageTargetAlreadyDeletedError } from '@app/contexts/conversations/domain/errors/MessageTargetAlreadyDeletedError';
 import { MessageTargetAuthorMismatchError } from '@app/contexts/conversations/domain/errors/MessageTargetAuthorMismatchError';
 import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageTargetNotFoundError';
+import { OneToOneConversationMessagesNotReplicatedError } from '@app/contexts/conversations/domain/errors/OneToOneConversationMessagesNotReplicatedError';
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
+import { GroupConversation } from '@app/contexts/conversations/domain/GroupConversation';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { MessageEditOptions } from '@app/contexts/conversations/domain/value-objects/MessageEditOptions';
@@ -14,6 +17,7 @@ import { MessageSendOptions } from '@app/contexts/conversations/domain/value-obj
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { Timestamp } from '@haskou/value-objects';
 
 import { ConversationMother } from '../../../mothers/ConversationMother';
 import { messageProof } from '../support/messageProof';
@@ -23,14 +27,14 @@ describe('Conversation', () => {
   let recipient: IdentityId;
   let outsider: IdentityId;
   let mother: ConversationMother;
-  let conversation: OneToOneConversation;
+  let conversation: GroupConversation;
 
   beforeEach(async () => {
     mother = await ConversationMother.create();
     author = mother.author;
     recipient = mother.recipient;
     outsider = await ConversationMother.generateIdentityId();
-    conversation = mother.build();
+    conversation = mother.buildGroup();
   });
 
   describe('sendMessage', () => {
@@ -58,8 +62,7 @@ describe('Conversation', () => {
       expect(events).toEqual([expect.any(ConversationMessageWasSentEvent)]);
       expect(events[0].attributes).toEqual({
         authorId: author.valueOf(),
-        conversationName: undefined,
-        conversationType: 'one-to-one',
+        conversationName: 'Mother group',
         message: message.toPrimitives(),
         messageId: message.getId().valueOf(),
         mutationProof: messageProof().toPrimitives(),
@@ -338,6 +341,85 @@ describe('Conversation', () => {
       expect(() =>
         conversation.deleteMessage(author, sent.getId(), messageProof()),
       ).toThrow(MessageTargetAlreadyDeletedError);
+    });
+  });
+
+  describe('one-to-one message log', () => {
+    let oneToOne: OneToOneConversation;
+
+    beforeEach(() => {
+      oneToOne = mother.build();
+    });
+
+    it.each<[string, (target: OneToOneConversation) => unknown]>([
+      [
+        'sendMessage',
+        (target) =>
+          target.sendMessage(
+            author,
+            new EncryptedMessagePayload('encrypted-payload'),
+            messageProof(),
+          ),
+      ],
+      [
+        'registerMessage',
+        (target) =>
+          target.registerMessage(
+            MessageSent.create(
+              new MessageMetadata(
+                MessageId.generate(),
+                target.getId(),
+                author,
+                [],
+                Timestamp.now(),
+              ),
+              new EncryptedMessagePayload('encrypted-payload'),
+            ),
+          ),
+      ],
+      [
+        'addPollMessage',
+        (target) => target.addPollMessage(author, PollId.generate()),
+      ],
+      [
+        'editMessage',
+        (target) =>
+          target.editMessage(
+            author,
+            MessageId.generate(),
+            new EncryptedMessagePayload('edited-payload'),
+            messageProof(),
+          ),
+      ],
+      [
+        'deleteMessage',
+        (target) =>
+          target.deleteMessage(author, MessageId.generate(), messageProof()),
+      ],
+      [
+        'pinMessage',
+        (target) => target.pinMessage(author, MessageId.generate()),
+      ],
+      [
+        'unpinMessage',
+        (target) => target.unpinMessage(author, MessageId.generate()),
+      ],
+    ])('should reject %s', (_operation, operation) => {
+      expect(() => operation(oneToOne)).toThrow(
+        OneToOneConversationMessagesNotReplicatedError,
+      );
+      expect(oneToOne.toPrimitives().messages).toEqual([]);
+      expect(oneToOne.pullDomainEvents()).toEqual([]);
+    });
+
+    it('should keep rejecting non participants as such', () => {
+      expect(() =>
+        oneToOne.sendMessage(
+          outsider,
+          new EncryptedMessagePayload('encrypted-payload'),
+          messageProof(),
+        ),
+      ).toThrow(ConversationParticipantNotFoundError);
     });
   });
 });

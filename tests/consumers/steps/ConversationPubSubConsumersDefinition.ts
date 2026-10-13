@@ -14,6 +14,7 @@ import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/d
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import PushNotificationDispatcher from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
@@ -30,8 +31,11 @@ import { PubSubConsumerTestContext } from './PubSubConsumerTestHelpers';
 
 @binding()
 export default class ConversationPubSubConsumersDefinition extends PubSubConsumerTestContext {
-  private readonly conversationId =
-    'one-to-one:75e1c7c2a058728e82a8bbb2bb2ed842c8fc6a8aa1f039efe0755d1a5d3461de';
+  private readonly conversationId = ConversationId.deriveGroup(
+    'network-1',
+    'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=',
+    'consumer-feature',
+  ).valueOf();
 
   private readonly messageId = '507f1f77bcf86cd799439011';
 
