@@ -1612,6 +1612,7 @@ Node-local queues of opaque ciphertext envelopes. Mailboxes are never written to
 | `DELETE /mailboxes/{mailboxId}` | `Bearer <readToken>` | Deletes the mailbox and its envelopes. `204`. Closes every realtime subscription to it. |
 
 - `mailboxId` is 32 bytes base64url; capabilities are sent only in `Authorization`, never the URL.
+- Creation proof preimage: `pigeon-mailbox-creation:v1:<mailboxId>:<postTokenHash>:<readTokenHash>:<creationNonce>` (1 to 64 character nonce). Byte-exact vectors (preimage, digest, leading zero bits, mined nonce) are in [`tests/fixtures/mailbox-creation-proof-vectors.json`](../tests/fixtures/mailbox-creation-proof-vectors.json), checked by the `MailboxCreationProofVectors` unit spec.
 - A wrong, swapped or missing capability, a malformed id and an unknown mailbox all return the same `404`.
 - Limits: `MAILBOX_MAX_ENVELOPES`, `MAILBOX_MAX_BYTES`, `MAILBOX_MAX_COUNT`, `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE` (in memory, per client address, `0` disables; IPv6 counts per /64, IPv4-mapped addresses as IPv4; the address is the socket address unless `API_TRUST_PROXY` is set; the window resets on restart and `MAILBOX_MAX_COUNT` still bounds creation; exceeding the rate returns `429` with code `429041`), `MAILBOX_APPEND_RATE_PER_MINUTE` (persisted per mailbox, default `120`, `0` disables).
 - Readers: `MAILBOX_MAX_READERS` (default `129`, at least `1`) bounds how many read capabilities one mailbox holds: the root reader plus one per device, so the default admits all 128 devices an identity may hold. Each reader keeps its own acknowledged cursor.
@@ -1957,6 +1958,9 @@ at most 64 characters, and must be mined again whenever the network set changes.
 Every node verifies it; identities without a valid proof are rejected and never
 admitted to the replicated store. The request `admissionNonce` is required in
 practice: without it the identity is refused.
+Byte-exact vectors (preimage, digest, leading zero bits, mined nonce) are in
+[`tests/fixtures/identity-admission-proof-vectors.json`](../tests/fixtures/identity-admission-proof-vectors.json),
+checked by the `IdentityAdmissionProofVectors` unit spec.
 
 Undefined optional properties are omitted before signing. Handles must already
 be normalized. Current requests reject `encryptedKeyPair`,
