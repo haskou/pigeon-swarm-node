@@ -12,6 +12,7 @@ package "conversations.domain" {
     -messages: Message[]
     -admins: ConversationAdmins
     -createdAt: Timestamp
+    -assertHasReplicatedMessageLog(): void
     +hasParticipant(identityId: IdentityId): boolean
     +record(message: Message): void
     +latestEvents(limit: number): Message[]
@@ -58,6 +59,7 @@ package "conversations.domain" {
   }
   class InvalidConversationOperationError
   class ConversationOperationLimitExceededError
+  class OneToOneConversationMessagesNotReplicatedError
 
   abstract class Message <<Entity>> {
     -metadata: MessageMetadata
@@ -174,6 +176,7 @@ MessageEdited --> MessageId
   ConversationOperation --> ConversationOperationAction
   ConversationRoster ..> InvalidConversationOperationError
   ConversationOperationLimits ..> ConversationOperationLimitExceededError
+  Conversation ..> OneToOneConversationMessagesNotReplicatedError
   Conversation ..> ConversationMessageWasSentEvent
   Conversation ..> ConversationMessageWasEditedEvent
   Conversation ..> ConversationMessageWasDeletedEvent

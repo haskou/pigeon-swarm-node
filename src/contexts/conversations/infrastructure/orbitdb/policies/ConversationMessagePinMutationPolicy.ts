@@ -63,7 +63,11 @@ export default class ConversationMessagePinMutationPolicy extends PublicMutation
         ),
     );
 
-    if (!conversation.hasParticipant(new IdentityId(authorIdentityId))) {
+    // One-to-one pins travel only through opaque mailboxes.
+    if (
+      !conversation.isGroup() ||
+      !conversation.hasParticipant(new IdentityId(authorIdentityId))
+    ) {
       throw new InvalidPublicMutationError();
     }
   }

@@ -3,6 +3,8 @@ import canonicalize from 'canonicalize';
 import { createHash } from 'crypto';
 
 export class ConversationId extends StringValueObject {
+  private static readonly GROUP_PREFIX = 'group:';
+
   public static deterministic(
     first: { valueOf(): string },
     second: { valueOf(): string },
@@ -33,6 +35,11 @@ export class ConversationId extends StringValueObject {
       .update(canonicalize({ creatorIdentityId, networkId, nonce }) as string)
       .digest('base64url');
 
-    return new ConversationId(`group:${hash}`);
+    return new ConversationId(`${ConversationId.GROUP_PREFIX}${hash}`);
+  }
+
+  /** Whether the id has the genesis-bound group form; every other id is a 1:1. */
+  public isGroup(): boolean {
+    return this.valueOf().startsWith(ConversationId.GROUP_PREFIX);
   }
 }

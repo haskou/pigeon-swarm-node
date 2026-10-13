@@ -4,6 +4,7 @@ import { assert } from '@haskou/value-objects';
 import { MessageReaction } from '../../domain/entities/messages/MessageReaction';
 import { ConversationParticipantNotFoundError } from '../../domain/errors/ConversationParticipantNotFoundError';
 import { MessageTargetNotFoundError } from '../../domain/errors/MessageTargetNotFoundError';
+import { OneToOneConversationMessagesNotReplicatedError } from '../../domain/errors/OneToOneConversationMessagesNotReplicatedError';
 import { ConversationMessageReactionWasAddedEvent } from '../../domain/events/ConversationMessageReactionWasAddedEvent';
 import ConversationRepository from '../../domain/repositories/ConversationRepository';
 import MessageReactionRepository from '../../domain/repositories/MessageReactionRepository';
@@ -26,6 +27,10 @@ export default class MessageReactionAdder {
     assert(
       conversation.hasParticipant(message.authorId),
       new ConversationParticipantNotFoundError(),
+    );
+    assert(
+      conversation.isGroup(),
+      new OneToOneConversationMessagesNotReplicatedError(),
     );
     assert(
       await this.conversationRepository.hasMessage(

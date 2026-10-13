@@ -248,7 +248,7 @@ describe('PublicMutationGate over pins', () => {
 
 describe('PublicMutationGate over conversation pins', () => {
   const author = 'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=';
-  const conversationId = 'one-to-one:c1';
+  const conversationId = 'group:c1';
   const id = `conversation:${conversationId}:m1`;
   const pin = {
     conversationId,
@@ -296,7 +296,10 @@ describe('PublicMutationGate over conversation pins', () => {
   beforeEach(() => {
     authorization.isAuthorized.mockResolvedValue(true);
     conversationRepository.requireMetadataAtFrontier.mockResolvedValue(
-      mock<Conversation>({ hasParticipant: jest.fn(() => true) }),
+      mock<Conversation>({
+        hasParticipant: jest.fn(() => true),
+        isGroup: jest.fn(() => true),
+      }),
     );
     gate = new PublicMutationGate(new PublicMutationVerifier(authorization), [
       new CommunityChannelMessagePinMutationPolicy(communityRepository),
@@ -310,7 +313,10 @@ describe('PublicMutationGate over conversation pins', () => {
 
   it('rejects a pin from someone who is not a participant', async () => {
     conversationRepository.requireMetadataAtFrontier.mockResolvedValue(
-      mock<Conversation>({ hasParticipant: jest.fn(() => false) }),
+      mock<Conversation>({
+        hasParticipant: jest.fn(() => false),
+        isGroup: jest.fn(() => true),
+      }),
     );
 
     await expect(gate.accepts('pins', await sign(pin))).resolves.toBe(false);
@@ -322,8 +328,8 @@ describe('PublicMutationGate over conversation pins', () => {
     await expect(
       gate.accepts('pins', {
         ...signed,
-        conversationId: 'one-to-one:c2',
-        id: 'conversation:one-to-one:c2:m1',
+        conversationId: 'group:c2',
+        id: 'conversation:group:c2:m1',
       }),
     ).resolves.toBe(false);
   });

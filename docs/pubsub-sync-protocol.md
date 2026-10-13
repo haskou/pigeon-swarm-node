@@ -133,6 +133,11 @@ ahead of the receiving node's clock (`MessageReadProof.MAX_FUTURE_SKEW_MS`).
 Late receipts from readers that were offline still apply inside that window.
 Push clearing sends `notifications_cleared` only to that verified reader.
 
+Read receipts and read-marker heads exist only for group conversations. A
+receipt for a one-to-one conversation is refused like an unproven one, and the
+head merger refuses a `read-marker:` head whose `conversationId` is not a
+`group:` id, so 1:1 read state travels only through opaque mailboxes.
+
 A receipt that marks an earlier message than the reader's stored marker is
 refused by the store, so the marker never moves back. Such a receipt is not
 forwarded to WebSocket clients either. Receipts for the stored marker's own
@@ -416,7 +421,7 @@ arrival order (`CommunityOperationLimits`):
 - An identity other than the founder (the genesis author, trusted by construction and the one that approves every member) signs at most 1000 operations per community (`MAX_OPERATIONS_PER_AUTHOR`).
   The ledger refuses an operation when its causal past already holds 1000 of its
   author's operations, and the fold skips every operation of an author ordered after
-  that author's 1000th (see *Community operation fold*). Operations of other branches
+  that author's 1000th (see _Community operation fold_). Operations of other branches
   that the author signed concurrently are invisible to admission, so the fold is the
   rule that decides; admission is only the cheap early refusal.
 
@@ -543,12 +548,16 @@ Signed public mutations (pins, reactions and the other governed collections):
 - Each `pins`/`reactions` document carries a `proof` (`PublicMutationProof`): version,
   `operationId`, `kind` (`put`|`delete`), `store`, `recordId`, `payloadDigest`,
   `predecessor`, `sequence`, `author { identityId, deviceCredential,
-  authorizationRevision }` and an
+authorizationRevision }` and an
   Ed25519 signature by the device. `payloadDigest` covers the document without
   `proof`, so ids, scope (community/channel/message) and author are bound.
 - Community and conversation reaction events carry the proof as `mutationProof`;
   consumers pass it to the repository, which re-verifies it. Conversation records
-  use `scopeType: "conversation"`; the author must be a participant of the roster folded from the signed `conversationOperations`.
+  use `scopeType: "conversation"`; the conversation must be a group and the author
+  a participant of the roster folded from the signed `conversationOperations`.
+  One-to-one conversations have no replicated messages, pins, reactions or read
+  markers: their records are rejected, and 1:1 message, edit, deletion and
+  reaction events are dropped without network fan-out.
   Policies are looked up by collection and `scopeType`, so a record whose scope
   type has no policy in a governed collection is rejected.
 - `notificationSettings` documents (public scopes only) are governed the same way
@@ -568,7 +577,7 @@ Signed public mutations (pins, reactions and the other governed collections):
 - `mlsRecords` documents are governed with scope type `community_mls`
   (record id `community:<community>:mls:<recordId>` where `recordId` is
   `base64url(sha256(canonicalize({epoch, groupId, kind, payload,
-  recipientIdentityId})))`, so a peer cannot claim an id for content it did not
+recipientIdentityId})))`, so a peer cannot claim an id for content it did not
   write). Records are immutable: a `removed` marker or a `delete` proof is
   rejected. The author must be a current member of the community, and for a
   channel group (`<community>:<channel>`) able to view the channel; a `welcome`
@@ -579,8 +588,8 @@ Signed public mutations (pins, reactions and the other governed collections):
   (record id `community:<community>:<channel>:<message>:<author>`; an edit is
   a higher-sequence put, a delete is a `delete` tombstone signed by the author
   or a moderator) and `conversation` (one immutable record per sent, edited,
-  deleted or poll event, id = message id). Node-authored system and call
-  messages are not part of this path.
+  deleted or poll event of a group conversation, id = message id). Node-authored
+  system and call messages are not part of this path.
 - `polls` documents are governed with three scope types: `poll` (author =
   `creatorIdentityId`, id = client-chosen poll id, immutable), `poll_vote`
   (author = voter, id `poll-vote:<pollId>:<voterIdentityId>`, replaced by a
@@ -599,9 +608,9 @@ Signed public mutations (pins, reactions and the other governed collections):
   (`sticker-pack:<id>`, `sticker-user-library:<identityId>`) are index wrappers
   checked on admission; flat unsigned heads are no longer read.
 - `moderationLogs` documents are governed with `scopeType:
-  "community_moderation_log"`: author = `actorIdentityId` (the moderator), id =
+"community_moderation_log"`: author = `actorIdentityId` (the moderator), id =
   first 24 hex of `sha256(JSON([communityId, actor, action, target.type,
-  target.id, createdAt]))`, immutable (tombstones are always rejected; the
+target.id, createdAt]))`, immutable (tombstones are always rejected; the
   unsigned per-community tombstones on community deletion are gone). Admission
   checks the derived id and that the actor holds the permission for the action
   in the current community (channels, roles, bans, kicks with manage members,
@@ -637,18 +646,18 @@ append to any store**. Replicated content is trusted only after a node-side
 admission policy accepts it. The audit lists the writer, the policy that
 protects the collection and what a malicious peer can still do.
 
-| Store | Writer | Policy | Status |
-| --- | --- | --- | --- |
-| `communityOperations` | `OrbitDBCommunityRepository` | `CommunityOperationGate`, see [Community signed operations](#community-signed-operations) | Signed (#316) |
-| `messages`, `mlsRecords`, `pins`, `reactions`, `requests`, `polls`, `stickerPacks`, `stickerUserLibraries`, `moderationLogs` | the community, conversation, poll, sticker and moderation repositories | `PublicMutationGate`, see [Other signed public mutations](#other-signed-public-mutations) | Signed |
-| `notificationSettings` | `OrbitDBNotificationScopeSettingsRepository` | `PublicMutationGate` (`notification_settings`, #349) | Signed |
-| `keychains` | `OrbitDBKeychainMetadataIndex` | `OrbitDBKeychainMutationGate`, see [Keychains](#keychains) | Self-authenticating (this change) |
-| `identities` (identity metadata) | `OrbitDBIdentityMetadataIndex` | identity-key signature plus canonical CID, see [Identities](#identities-and-device-authorization) | Self-authenticating (#361), see [design](design/identity-authentication.md) |
-| `identities` (device authorization) | `OrbitDBDeviceAuthorizationRepository` | history replayed from the pinned genesis, see [Identity device authorization convergence](#identity-device-authorization-convergence) | Replay-validated from a self-certified genesis (#361) |
-| `calls` | `OrbitDBCallRepository` | `CallStartMutationPolicy`, `CallParticipantMutationPolicy` and `CallEndMutationPolicy` through `PublicMutationGate` (#373) | Signed |
-| `contentReplication` | `OrbitDBContentReplicationRepository` | `ContentReplicationMutationPolicy` through `PublicMutationGate`; owner-signed per `(networkId, cid)`, 1 GiB and 10000 records per identity per network (#372) | Signed |
-| `notifications` | `OrbitDBNotificationRepository` | `NotificationInvitationMutationPolicy` and `NotificationStateMutationPolicy` through `PublicMutationGate`, plus `OrbitDBNotificationHeadMutationGate` for `notification:` heads (#371) | Signed |
-| `conversationOperations` | `OrbitDBConversationRepository` | `ConversationOperationMutationPolicy` through `PublicMutationGate`; roster folded from the signed operations (#370) | Signed |
+| Store                                                                                                                        | Writer                                                                 | Policy                                                                                                                                                                                 | Status                                                                      |
+| ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `communityOperations`                                                                                                        | `OrbitDBCommunityRepository`                                           | `CommunityOperationGate`, see [Community signed operations](#community-signed-operations)                                                                                              | Signed (#316)                                                               |
+| `messages`, `mlsRecords`, `pins`, `reactions`, `requests`, `polls`, `stickerPacks`, `stickerUserLibraries`, `moderationLogs` | the community, conversation, poll, sticker and moderation repositories | `PublicMutationGate`, see [Other signed public mutations](#other-signed-public-mutations)                                                                                              | Signed                                                                      |
+| `notificationSettings`                                                                                                       | `OrbitDBNotificationScopeSettingsRepository`                           | `PublicMutationGate` (`notification_settings`, #349)                                                                                                                                   | Signed                                                                      |
+| `keychains`                                                                                                                  | `OrbitDBKeychainMetadataIndex`                                         | `OrbitDBKeychainMutationGate`, see [Keychains](#keychains)                                                                                                                             | Self-authenticating (this change)                                           |
+| `identities` (identity metadata)                                                                                             | `OrbitDBIdentityMetadataIndex`                                         | identity-key signature plus canonical CID, see [Identities](#identities-and-device-authorization)                                                                                      | Self-authenticating (#361), see [design](design/identity-authentication.md) |
+| `identities` (device authorization)                                                                                          | `OrbitDBDeviceAuthorizationRepository`                                 | history replayed from the pinned genesis, see [Identity device authorization convergence](#identity-device-authorization-convergence)                                                  | Replay-validated from a self-certified genesis (#361)                       |
+| `calls`                                                                                                                      | `OrbitDBCallRepository`                                                | `CallStartMutationPolicy`, `CallParticipantMutationPolicy` and `CallEndMutationPolicy` through `PublicMutationGate` (#373)                                                             | Signed                                                                      |
+| `contentReplication`                                                                                                         | `OrbitDBContentReplicationRepository`                                  | `ContentReplicationMutationPolicy` through `PublicMutationGate`; owner-signed per `(networkId, cid)`, 1 GiB and 10000 records per identity per network (#372)                          | Signed                                                                      |
+| `notifications`                                                                                                              | `OrbitDBNotificationRepository`                                        | `NotificationInvitationMutationPolicy` and `NotificationStateMutationPolicy` through `PublicMutationGate`, plus `OrbitDBNotificationHeadMutationGate` for `notification:` heads (#371) | Signed                                                                      |
+| `conversationOperations`                                                                                                     | `OrbitDBConversationRepository`                                        | `ConversationOperationMutationPolicy` through `PublicMutationGate`; roster folded from the signed operations (#370)                                                                    | Signed                                                                      |
 
 #### Keychains
 
@@ -778,8 +787,7 @@ call state, stored in a local database and never replicated. The 30 records per
 minute per identity cap is enforced on the write path of the local node. The gate
 bounds what it keeps per author deterministically: the genuine invitations of one
 inviter (`NOTIFICATIONS_MAX_INVITATIONS_PER_IDENTITY`, default 10000) and the
-genuine states of one recipient (`NOTIFICATIONS_MAX_STATES_PER_IDENTITY`, default
-30000) sort by id and only the first ones that fit are admitted, whatever order
+genuine states of one recipient (`NOTIFICATIONS_MAX_STATES_PER_IDENTITY`, default 30000) sort by id and only the first ones that fit are admitted, whatever order
 they arrived in. A malicious replica can still publish up to the quota for each
 identity it controls.
 

@@ -3,6 +3,7 @@ import { ConversationMessagesAround } from '@app/contexts/conversations/domain/C
 import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageTargetNotFoundError';
+import { OneToOneConversationMessagesNotReplicatedError } from '@app/contexts/conversations/domain/errors/OneToOneConversationMessagesNotReplicatedError';
 import { GroupConversation } from '@app/contexts/conversations/domain/GroupConversation';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { ConversationOperation } from '@app/contexts/conversations/domain/operations/ConversationOperation';
@@ -409,12 +410,19 @@ export default class OrbitDBConversationRepository implements ConversationReposi
    * A read marker only moves forward. The candidate replaces the current
    * marker when it marks the same or a later message, so a replayed, delayed
    * or replicated older marker never rolls the reader back. Every replica
-   * applies this rule to the replicated head.
+   * applies this rule to the replicated head. A 1:1 marker is refused: 1:1
+   * read state travels only through opaque mailboxes.
    */
   private mergeReadMarkers(
     current: Record<string, unknown> | undefined,
     candidate: Record<string, unknown>,
   ): Record<string, unknown> {
+    const conversationId = this.stringValue(candidate, 'conversationId');
+
+    if (!conversationId || !new ConversationId(conversationId).isGroup()) {
+      throw new OneToOneConversationMessagesNotReplicatedError();
+    }
+
     if (!current) return candidate;
 
     const candidatePosition = this.readMarkerPosition(candidate);

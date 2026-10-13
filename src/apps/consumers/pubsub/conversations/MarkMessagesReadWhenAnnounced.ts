@@ -2,6 +2,7 @@ import { MessagesReadMarkMessage } from '@app/contexts/conversations/application
 import MessagesReadRegistrar from '@app/contexts/conversations/application/mark-messages-read/MessagesReadRegistrar';
 import { MessageReadProofVerifier } from '@app/contexts/conversations/application/verify-message-read-proof/MessageReadProofVerifier';
 import { MessageReadProofVerifyMessage } from '@app/contexts/conversations/application/verify-message-read-proof/messages/MessageReadProofVerifyMessage';
+import { OneToOneConversationMessagesNotReplicatedError } from '@app/contexts/conversations/domain/errors/OneToOneConversationMessagesNotReplicatedError';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import { MessageReadProof } from '@app/contexts/conversations/domain/value-objects/MessageReadProof';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
@@ -54,17 +55,29 @@ export default class MarkMessagesReadWhenAnnounced extends Consumer {
       return;
     }
 
-    const accepted = await this.registrar.register(
-      new MessagesReadMarkMessage(
-        conversationId,
-        readerIdentityId,
-        messageId,
-        verified.proof,
-      ),
-    );
+    let accepted: boolean;
 
-    // The store refused this marker as stale. Keep the receipt off the WebSocket
-    // fanout that runs after the handlers. Duplicates and unknown messages still fan out.
+    try {
+      accepted = await this.registrar.register(
+        new MessagesReadMarkMessage(
+          conversationId,
+          readerIdentityId,
+          messageId,
+          verified.proof,
+        ),
+      );
+    } catch (error) {
+      if (!(error instanceof OneToOneConversationMessagesNotReplicatedError)) {
+        throw error;
+      }
+
+      accepted = false;
+    }
+
+    // The store refused this marker as stale, or the conversation is one-to-one
+    // and its receipts travel only through mailboxes. Keep the receipt off the
+    // WebSocket fanout that runs after the handlers. Duplicates and unknown
+    // messages still fan out.
     if (!accepted) {
       networkFanoutSuppression.add(event);
     }

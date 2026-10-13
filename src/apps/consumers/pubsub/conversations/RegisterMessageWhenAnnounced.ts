@@ -2,11 +2,13 @@ import ConversationMessageRegistrar from '@app/contexts/conversations/applicatio
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
 import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
 import { MessageFactory } from '@app/contexts/conversations/domain/entities/messages/MessageFactory';
+import { OneToOneConversationMessagesNotReplicatedError } from '@app/contexts/conversations/domain/errors/OneToOneConversationMessagesNotReplicatedError';
 import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { StalePublicMutationError } from '@app/contexts/public-mutations/domain/errors/StalePublicMutationError';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
+import { networkFanoutSuppression } from '@app/shared/infrastructure/messageBus/NetworkFanoutSuppression';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { PrimitiveOf } from '@haskou/value-objects';
@@ -106,6 +108,12 @@ export default class RegisterMessageWhenAnnounced extends Consumer {
 
       await this.registerMessage(message, this.messageCandidateFrom(event));
     } catch (error) {
+      if (error instanceof OneToOneConversationMessagesNotReplicatedError) {
+        networkFanoutSuppression.add(event);
+
+        return;
+      }
+
       if (error instanceof InvalidPublicMutationError) return;
 
       if (error instanceof StalePublicMutationError) return;

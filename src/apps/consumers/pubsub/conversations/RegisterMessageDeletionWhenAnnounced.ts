@@ -1,10 +1,12 @@
 import ConversationMessageRegistrar from '@app/contexts/conversations/application/register-message/ConversationMessageRegistrar';
 import { RegisterConversationMessage } from '@app/contexts/conversations/application/register-message/messages/RegisterConversationMessage';
+import { OneToOneConversationMessagesNotReplicatedError } from '@app/contexts/conversations/domain/errors/OneToOneConversationMessagesNotReplicatedError';
 import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { StalePublicMutationError } from '@app/contexts/public-mutations/domain/errors/StalePublicMutationError';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
+import { networkFanoutSuppression } from '@app/shared/infrastructure/messageBus/NetworkFanoutSuppression';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
@@ -45,6 +47,12 @@ export default class RegisterMessageDeletionWhenAnnounced extends Consumer {
         ),
       );
     } catch (error) {
+      if (error instanceof OneToOneConversationMessagesNotReplicatedError) {
+        networkFanoutSuppression.add(event);
+
+        return;
+      }
+
       if (error instanceof InvalidPublicMutationError) return;
 
       if (error instanceof StalePublicMutationError) return;

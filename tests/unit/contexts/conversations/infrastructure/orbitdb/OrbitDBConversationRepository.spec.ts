@@ -344,7 +344,9 @@ describe('OrbitDBConversationRepository', () => {
         conversation.getId().valueOf(),
         mother.recipient.valueOf(),
       ),
-    ).toEqual(expect.objectContaining({ messageId: secondMessageId.valueOf() }));
+    ).toEqual(
+      expect.objectContaining({ messageId: secondMessageId.valueOf() }),
+    );
   });
 
   it('should not replace a newer read marker with an older replicated head', async () => {

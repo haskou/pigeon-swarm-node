@@ -1,4 +1,5 @@
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
+import { OneToOneConversationMessagesNotReplicatedError } from '@app/contexts/conversations/domain/errors/OneToOneConversationMessagesNotReplicatedError';
 import { StaleReadMarkerError } from '@app/contexts/conversations/domain/errors/StaleReadMarkerError';
 import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
@@ -19,6 +20,10 @@ export default class MessagesReadMarker {
 
     if (!conversation.hasParticipant(message.readerIdentityId)) {
       throw new ConversationNotFoundError(message.conversationId);
+    }
+
+    if (!conversation.isGroup()) {
+      throw new OneToOneConversationMessagesNotReplicatedError();
     }
 
     const accepted = await this.conversationRepository.markReadUntil(

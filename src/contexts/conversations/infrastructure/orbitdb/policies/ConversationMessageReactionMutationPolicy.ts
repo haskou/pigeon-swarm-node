@@ -68,7 +68,11 @@ export default class ConversationMessageReactionMutationPolicy extends PublicMut
         ),
     );
 
-    if (!conversation.hasParticipant(new IdentityId(authorIdentityId))) {
+    // One-to-one reactions travel only through opaque mailboxes.
+    if (
+      !conversation.isGroup() ||
+      !conversation.hasParticipant(new IdentityId(authorIdentityId))
+    ) {
       throw new InvalidPublicMutationError();
     }
   }

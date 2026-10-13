@@ -2201,6 +2201,26 @@ Standalone group conversations are different from future community channels:
 groups use explicit `participantIds`, while community channel access will be
 based on community membership/roles.
 
+### Conversation message log scope
+
+The replicated conversation message log (messages, edits, deletions, polls,
+reactions, pins, read markers, threads and the message timeline) exists only for
+group conversations. One-to-one conversations exchange messages only through
+opaque mailboxes. Every message route below answers a participant of a 1:1
+conversation with `409`; a non-participant still gets the participant error first:
+
+```json
+{
+  "code": "OneToOneConversationMessagesNotReplicatedError",
+  "message": "One-to-one conversation messages are not replicated"
+}
+```
+
+Nodes also refuse replicated 1:1 message, reaction, pin and read-marker records,
+and drop 1:1 message, edit, deletion, reaction and read events received over
+PubSub without fanning them out. A 1:1 keeps its signed genesis, its listing
+entry, its frontier and its calls.
+
 ### Get latest messages
 
 ```http
@@ -2211,7 +2231,7 @@ Response:
 
 ```json
 {
-  "conversationId": "one-to-one:<deterministic-id>",
+  "conversationId": "group:<id>",
   "messages": [
     {
       "id": "<messageId>",
@@ -2231,7 +2251,7 @@ Response:
     },
     {
       "id": "call-event:<callId>:ended:<identityId>",
-      "conversationId": "one-to-one:<deterministic-id>",
+      "conversationId": "group:<id>",
       "type": "call_event",
       "callId": "<callId>",
       "callEventType": "ended",
@@ -2267,7 +2287,7 @@ Implemented:
 - require signed request auth
 - return the latest messages ordered from oldest to newest in the page
 - include non-encrypted `call_event` system items for calls scoped to the
-  conversation, with `callEventType` equal to `ended`, `declined` or `missed`
+  group conversation, with `callEventType` equal to `ended`, `declined` or `missed`
 - include `poll` timeline items scoped to the group conversation. For group
   conversations, the poll `id` is also registered as a conversation message id,
   so it is valid in later `previousMessageIds`.
@@ -2284,7 +2304,7 @@ Response:
 ```json
 {
   "id": "<messageId>",
-  "conversationId": "one-to-one:<deterministic-id>",
+  "conversationId": "group:<id>",
   "authorIdentityId": "<identityId>",
   "type": "sent",
   "createdAt": 1773848829055,
@@ -2337,11 +2357,11 @@ Response:
 
 ```json
 {
-  "conversationId": "one-to-one:<deterministic-id>",
+  "conversationId": "group:<id>",
   "messages": [
     {
       "id": "<replyMessageId>",
-      "conversationId": "one-to-one:<deterministic-id>",
+      "conversationId": "group:<id>",
       "authorIdentityId": "<identityId>",
       "type": "sent",
       "createdAt": 1773848829055,
@@ -2479,8 +2499,9 @@ every node folds it):
 - `admin_promoted`: only by the creator; the target is a member, not the creator and
   not already an admin. `admin_demoted`: only by the creator; the target is an admin.
 - A 1:1 is immutable: it accepts its genesis and refuses every other operation.
-- Messages, pins, reactions and calls authorize against the folded roster (1:1 from
-  the signed genesis); a removed member loses access.
+- Group messages, pins, reactions and read markers, and the calls of both kinds,
+  authorize against the folded roster (1:1 from the signed genesis); a removed
+  member loses access.
 
 **Limits.** `args` is at most 4096 bytes of JSON, a group has at most 256 members and
 an identity other than the creator signs at most 1000 operations per conversation
@@ -2605,7 +2626,7 @@ List response:
 
 ```json
 {
-  "conversationId": "one-to-one:<deterministic-id>",
+  "conversationId": "group:<id>",
   "pins": [
     {
       "messageId": "<messageId>",
@@ -2613,7 +2634,7 @@ List response:
       "createdAt": 1773848829055,
       "message": {
         "id": "<messageId>",
-        "conversationId": "one-to-one:<deterministic-id>",
+        "conversationId": "group:<id>",
         "authorIdentityId": "<identityId>",
         "type": "sent",
         "createdAt": 1773848829055,
@@ -2629,10 +2650,10 @@ List response:
 Pin requests carry `{ "createdAt": <ms>, "mutation": SignedPublicMutation }`;
 unpin requests carry `{ "mutation": SignedPublicMutation }` with a `delete` proof.
 Conversation pins and reactions use the same proof rules as the community ones
-(see Community channel pins), with `scopeType: "conversation"`: the proof author
-must be a conversation participant, and missing, forged, copied-scope, stale or
-revoked-device proofs fail with 409. Replicated records without a valid proof are
-ignored by every node.
+(see Community channel pins), with `scopeType: "conversation"`: the conversation
+must be a group and the proof author one of its participants, and missing, forged,
+copied-scope, stale or revoked-device proofs fail with 409. Replicated records
+without a valid proof, or for a 1:1 conversation, are ignored by every node.
 
 Implemented:
 
@@ -2665,7 +2686,7 @@ Response:
 ```json
 {
   "id": "<messageId>",
-  "conversationId": "one-to-one:<deterministic-id>",
+  "conversationId": "group:<id>",
   "authorIdentityId": "<identityId>",
   "type": "sent",
   "createdAt": 1773848829055,
@@ -2678,7 +2699,8 @@ Response:
 
 Implemented:
 
-- enforce encrypted payloads for 1to1 conversations
+- require a client-encrypted payload; a 1:1 conversation is refused with `409`
+  (`OneToOneConversationMessagesNotReplicatedError`)
 - accept optional `previousMessageIds`; when omitted, the node uses an empty
   list. The signed record must carry exactly the array sent in the body
 - allow replies by sending `replyToMessageId` with the id of an existing,
@@ -2716,7 +2738,7 @@ Response:
 ```json
 {
   "id": "<editionMessageId>",
-  "conversationId": "one-to-one:<deterministic-id>",
+  "conversationId": "group:<id>",
   "authorIdentityId": "<identityId>",
   "type": "edited",
   "createdAt": 1773848829055,
@@ -2770,7 +2792,7 @@ closed:
 Optional fields are omitted when absent. `authorId` is the authenticated identity.
 `edited` and `deleted` default `previousMessageIds` to `[targetMessageId]`
 (the path `messageId`); `sent` defaults to `[]`. Nodes reject records whose
-author is not a conversation participant.
+conversation is not a group or whose author is not a conversation participant.
 
 ### Mark messages as read
 
@@ -2799,7 +2821,8 @@ Implemented:
 - require signed request auth
 - require the authenticated identity to be a conversation participant
 - update the OrbitDB replicated read marker for the authenticated identity up to
-  and including `messageId`
+  and including `messageId`; nodes refuse a replicated read marker whose
+  `conversationId` is not a group
 - reject a `messageId` older than the stored marker with `409` (`StaleReadMarkerError`); the stored marker stays and no event is published
 - publish `ConversationMessagesWereReadEvent` with `messageId`,
   `readerIdentityId`, `networkId`, `participantIds` and `readProof` (the reader's
@@ -2914,7 +2937,7 @@ Response:
 ```json
 {
   "id": "<deletionMessageId>",
-  "conversationId": "one-to-one:<deterministic-id>",
+  "conversationId": "group:<id>",
   "authorIdentityId": "<identityId>",
   "type": "deleted",
   "createdAt": 1773848829055,
