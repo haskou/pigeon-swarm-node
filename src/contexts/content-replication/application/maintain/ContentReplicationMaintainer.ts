@@ -1,5 +1,6 @@
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
+import LegacyPrivateUploadRepository from '../../domain/repositories/LegacyPrivateUploadRepository';
 import { ContentId } from '../../domain/value-objects/ContentId';
 import ReplicatedContentStorage from '../content-storage/ReplicatedContentStorage';
 import ContentReplicationStatusFinder from '../find-status/ContentReplicationStatusFinder';
@@ -11,13 +12,14 @@ import { ContentReplicationMaintenanceResult } from './ContentReplicationMainten
 
 /**
  * Fetches and advertises the signed registrations this node is responsible
- * for. It never releases a replica: no other node's statement can make this
- * node drop bytes.
+ * for, and stops advertising its own legacy private uploads. It never removes
+ * a replica's bytes: no other node's statement can make this node drop them.
  */
 export default class ContentReplicationMaintainer {
   constructor(
     private readonly finder: ContentReplicationStatusFinder,
     private readonly contentStorage: ReplicatedContentStorage,
+    private readonly legacyPrivateUploads: LegacyPrivateUploadRepository,
     private readonly summaryUpdater?: ContentReplicationStatusSummaryUpdater,
   ) {}
 
@@ -31,6 +33,41 @@ export default class ContentReplicationMaintainer {
 
     await this.contentStorage.findBytesInNetwork(cid, networkId, maxBytes);
     await this.contentStorage.provideInNetwork(cid, networkId);
+  }
+
+  private async withdrawLegacyPrivateUploads(
+    contents: ReplicatedContentStatus[],
+  ): Promise<number> {
+    const admitted = new Set(
+      contents.flatMap((content) =>
+        content.networks.map((network) =>
+          JSON.stringify([network.networkId, content.cid]),
+        ),
+      ),
+    );
+    let failed = 0;
+
+    for (const upload of await this.legacyPrivateUploads.findGenuine()) {
+      const key = JSON.stringify([
+        upload.networkId.valueOf(),
+        upload.cid.valueOf(),
+      ]);
+
+      if (admitted.has(key)) {
+        continue;
+      }
+
+      try {
+        await this.contentStorage.stopProvidingInNetwork(
+          upload.cid,
+          upload.networkId,
+        );
+      } catch {
+        failed++;
+      }
+    }
+
+    return failed;
   }
 
   private async updateSummary(): Promise<void> {
@@ -61,6 +98,9 @@ export default class ContentReplicationMaintainer {
       }
     }
 
+    result.failedReplicas += await this.withdrawLegacyPrivateUploads(
+      status.contents,
+    );
     await this.updateSummary();
 
     return result;

@@ -80,6 +80,16 @@ export default class IpfsContentStorage extends ReplicatedContentStorage {
     });
   }
 
+  public async stopProvidingInNetwork(
+    contentId: ContentId,
+    networkId: NetworkId,
+  ): Promise<void> {
+    await this.ipfs.stopProvidingContentFromNetwork(
+      this.toIpfsId(contentId),
+      networkId.valueOf(),
+    );
+  }
+
   public isRawContent(contentId: ContentId): Promise<boolean> {
     return this.ipfs.isRawCid(this.toIpfsId(contentId));
   }

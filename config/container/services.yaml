@@ -1212,6 +1212,8 @@ services:
       - >-
         @contexts/content-replication/application/content-storage/ReplicatedContentStorage
       - >-
+        @contexts/content-replication/domain/repositories/LegacyPrivateUploadRepository
+      - >-
         @contexts/content-replication/application/update-status-summary/ContentReplicationStatusSummaryUpdater
   contexts/content-replication/application/publish-content/ContentPublisher:
     class: /contexts/content-replication/application/publish-content/ContentPublisher
@@ -1259,6 +1261,9 @@ services:
     @contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicationRepository
   contexts/content-replication/domain/repositories/ContentReplicationStatusSummaryRepository: >-
     @contexts/content-replication/infrastructure/local-db/LocalContentReplicationStatusSummaryRepository
+  contexts/content-replication/domain/repositories/LegacyPrivateUploadRepository:
+    >-
+    @contexts/content-replication/infrastructure/orbitdb/OrbitDBLegacyPrivateUploadRepository
   contexts/content-replication/infrastructure/ipfs/IpfsContentStorage:
     class: /contexts/content-replication/infrastructure/ipfs/IpfsContentStorage
     arguments:
@@ -1281,6 +1286,15 @@ services:
         @contexts/content-replication/infrastructure/orbitdb/mappers/OrbitDBContentReplicationMapper
     parent: >-
       contexts/content-replication/domain/repositories/ContentReplicationRepository
+  contexts/content-replication/infrastructure/orbitdb/OrbitDBLegacyPrivateUploadRepository:
+    class: >-
+      /contexts/content-replication/infrastructure/orbitdb/OrbitDBLegacyPrivateUploadRepository
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - >-
+        @contexts/content-replication/infrastructure/orbitdb/policies/ContentReplicationMutationPolicy
+    parent: >-
+      contexts/content-replication/domain/repositories/LegacyPrivateUploadRepository
   contexts/content-replication/infrastructure/orbitdb/mappers/OrbitDBContentReplicationMapper:
     class: >-
       /contexts/content-replication/infrastructure/orbitdb/mappers/OrbitDBContentReplicationMapper
