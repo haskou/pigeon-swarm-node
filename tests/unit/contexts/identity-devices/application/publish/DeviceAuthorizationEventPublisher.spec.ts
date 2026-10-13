@@ -1,7 +1,7 @@
-import DeviceAuthorizationEventPublisher from '@app/contexts/identity-devices/application/publish/DeviceAuthorizationEventPublisher';
-import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
+import DeviceAuthorizationEventPublisher from '@app/contexts/identity-devices/application/publish/DeviceAuthorizationEventPublisher';
+import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { LocalDomainEventPublisher } from '@app/shared/infrastructure/messageBus/LocalDomainEventPublisher';

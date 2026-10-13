@@ -1,6 +1,7 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
+import { LocalDomainEventPublisher } from '@app/shared/infrastructure/messageBus/LocalDomainEventPublisher';
 import Kernel from '@haskou/ddd-kernel';
 import { PublisherHookPipeline } from '@haskou/ddd-kernel/adapters/pubsub';
 import { PublisherHook } from '@haskou/ddd-kernel/contracts/pubsub';
@@ -20,7 +21,11 @@ type LocalSubscriptionHandler = {
 };
 
 export default class MessageBus
-  implements DomainMessageBus, DomainEventConsumer, DomainEventPublisher
+  implements
+    DomainMessageBus,
+    DomainEventConsumer,
+    DomainEventPublisher,
+    LocalDomainEventPublisher
 {
   private static sourceEventContext = new Map<string, DomainEvent>();
   private static activeContextIds: string[] = [];
@@ -173,6 +178,19 @@ export default class MessageBus
     }
   }
 
+  private async runLocalHandler(
+    domainEvent: DomainEvent,
+    handler: (event: DomainEvent) => Promise<void>,
+  ): Promise<void> {
+    try {
+      await handler(domainEvent);
+    } catch (error: unknown) {
+      Kernel.logger.warn?.(
+        `Local domain event handler failed: error=${String(error)}`,
+      );
+    }
+  }
+
   public registerPublisherHooks(...hooks: PublisherHook[]): void {
     this.publisherHooks.register(...hooks);
   }
@@ -189,6 +207,19 @@ export default class MessageBus
     );
 
     return Promise.resolve();
+  }
+
+  public async publishLocally(domainEvents: DomainEvent[]): Promise<void> {
+    const enrichedEvents = this.enrichEventsWithContext(domainEvents);
+
+    for (const domainEvent of enrichedEvents) {
+      const handlers =
+        this.localSubscriptionHandlers.get(domainEvent.eventName()) || [];
+
+      for (const { handler } of handlers) {
+        await this.runLocalHandler(domainEvent, handler);
+      }
+    }
   }
 
   public async consume(

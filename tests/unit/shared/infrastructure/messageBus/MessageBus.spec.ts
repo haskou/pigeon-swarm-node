@@ -93,10 +93,7 @@ describe('MessageBus', () => {
     const websocketPublish = jest
       .spyOn(webSocketEventHub, 'publish')
       .mockImplementation();
-    const messageBus = new MessageBus(
-      memoryAdapter,
-      libp2pGossipsubAdapter,
-    );
+    const messageBus = new MessageBus(memoryAdapter, libp2pGossipsubAdapter);
     const handler = jest.fn().mockResolvedValue(undefined);
 
     await messageBus.consume(
@@ -117,10 +114,7 @@ describe('MessageBus', () => {
   it('should keep local dispatch from failing when a local handler rejects', async () => {
     process.env.TRANSPORT_DSN = 'in-memory://';
     const event = new TestDomainEvent('aggregate-id', {});
-    const messageBus = new MessageBus(
-      memoryAdapter,
-      libp2pGossipsubAdapter,
-    );
+    const messageBus = new MessageBus(memoryAdapter, libp2pGossipsubAdapter);
     const handler = jest.fn().mockRejectedValue(new Error('handler failed'));
 
     await messageBus.consume(

@@ -1590,6 +1590,8 @@ services:
     arguments:
       - >-
         @contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository
+      - >-
+        @contexts/identity-devices/application/publish/DeviceAuthorizationEventPublisher
   contexts/identity-devices/application/find/DeviceAuthorizationFinder:
     class: /contexts/identity-devices/application/find/DeviceAuthorizationFinder
     arguments:
@@ -1606,6 +1608,11 @@ services:
     arguments:
       - >-
         @contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository
+  contexts/identity-devices/application/publish/DeviceAuthorizationEventPublisher:
+    class: >-
+      /contexts/identity-devices/application/publish/DeviceAuthorizationEventPublisher
+    arguments:
+      - '@shared/infrastructure/messageBus/LocalDomainEventPublisher'
   contexts/identity-devices/application/publish/DeviceSealedSecretPublisher:
     class: /contexts/identity-devices/application/publish/DeviceSealedSecretPublisher
     arguments:
