@@ -169,7 +169,7 @@ export default class RegisterIdentityWhenPublishedDefinition {
       previousIdentityExternalIdentifier,
       profile,
       recoveryAuthority: recoveryKeyPair.toPrimitives().publicKey,
-      timestamp: 1773848829055,
+      timestamp: Date.now(),
       version: 1,
     };
 

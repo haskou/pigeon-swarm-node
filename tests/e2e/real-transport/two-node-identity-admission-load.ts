@@ -190,6 +190,14 @@ async function connect(): Promise<void> {
     assert.ok(store.sync, 'Real OrbitDB synchronization controls are required');
     await store.sync.start();
   }
+  // Writes gossiped before both stores see each other would only replicate with the next write.
+  await until('fixture stores exchange heads', () =>
+    nodes.every((replica) =>
+      Object.values(replica.stores!).every(
+        (store) => (store.peers?.size ?? 0) > 0,
+      ),
+    ),
+  );
 }
 
 /** A self-signed genesis admission into the network whose proof meets exactly `bits`. */
@@ -291,14 +299,7 @@ async function main(): Promise<void> {
   const pricing = new IdentityAdmissionPricingDomainService(load);
   const observer = new TrackingObserver(pricing);
 
-  await new OrbitDBIdentityAdmissionObservationProjection(
-    observing.registry!,
-    observing.index!,
-    observer,
-  ).start();
-  await connect();
-
-  // Mined up front so the whole flood replicates inside one counting window.
+  // Mined before connecting: mining starves the event loop, and the whole flood must replicate inside one counting window.
   stage = 'mining admissions';
   const now = Date.now();
   const stale = await admissions(
@@ -310,6 +311,14 @@ async function main(): Promise<void> {
   const underpaid = await admissions(10, now, FLOOR_BITS);
   const [paid] = await admissions(1, now, FLOOR_BITS + 1);
   const probe = await admission(now, FLOOR_BITS);
+
+  await new OrbitDBIdentityAdmissionObservationProjection(
+    observing.registry!,
+    observing.index!,
+    observer,
+  ).start();
+  stage = 'connecting';
+  await connect();
 
   stage = 'stale admissions replicate';
   await admit(admitting, stale);
