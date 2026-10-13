@@ -5,5 +5,5 @@ export function mineAdmissionNonce(
   identityId: string,
   networkIds: string[],
 ): string {
-  return IdentityAdmissionProof.mine(identityId, networkIds);
+  return new IdentityAdmissionProof(identityId, networkIds).mine();
 }

@@ -49,15 +49,13 @@ export default class MailboxCreator {
       this.policy.maxMailboxes(),
     );
 
-    if (
-      !MailboxCreationProof.isValid(
-        mailboxId,
-        postTokenHash,
-        readTokenHash,
-        creationNonce,
-        requiredBits,
-      )
-    ) {
+    const proof = new MailboxCreationProof(
+      mailboxId,
+      postTokenHash,
+      readTokenHash,
+    );
+
+    if (!proof.isValid(creationNonce, requiredBits)) {
       throw new MailboxCreationProofInvalidError(requiredBits);
     }
 

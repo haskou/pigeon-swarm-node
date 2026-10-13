@@ -54,20 +54,13 @@ describe('IpfsIdentityRepository', () => {
     );
     const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
     const previousIdentityExternalIdentifier: string | undefined = undefined;
-    let nonce = 0;
-
-    while (
-      !IdentityAdmissionProof.isValid(
-        identityId.valueOf(),
-        [networkId],
-        nonce.toString(),
-      )
-    ) {
-      nonce += 1;
-    }
+    const nonce = new IdentityAdmissionProof(
+      identityId.valueOf(),
+      [networkId],
+    ).mine();
 
     const signaturePayload = {
-      admissionNonce: nonce.toString(),
+      admissionNonce: nonce,
       authorizationRevision: 0,
       deviceCredential: deviceCredential.valueOf(),
       deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),

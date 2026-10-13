@@ -92,11 +92,12 @@ export class Identity extends AggregateRoot {
   }
 
   public hasValidAdmissionProof(): boolean {
-    return IdentityAdmissionProof.isValid(
+    const proof = new IdentityAdmissionProof(
       this.id.valueOf(),
       this.networks.toArray().map((networkId) => networkId.valueOf()),
-      this.publication.getAdmissionNonce(),
     );
+
+    return proof.isValid(this.publication.getAdmissionNonce());
   }
 
   public hasHandle(handle: ProfileHandle): boolean {

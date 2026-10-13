@@ -5623,12 +5623,11 @@ export default class Definitions {
     const readTokenHash = this.mailboxHash(mailbox.readToken);
 
     this.response = await this.restClient.put(`/mailboxes/${mailbox.id}`, {
-      creationNonce: MailboxCreationProof.mine(
+      creationNonce: new MailboxCreationProof(
         mailbox.id,
         postTokenHash,
         readTokenHash,
-        MailboxCreationDifficulty.MIN_BITS,
-      ),
+      ).mine(MailboxCreationDifficulty.MIN_BITS),
       postTokenHash,
       readTokenHash,
     });
@@ -5654,16 +5653,9 @@ export default class Definitions {
     const postTokenHash = this.mailboxHash(postToken);
     const readTokenHash = this.mailboxHash(readToken);
     let nonce = 0;
+    const proof = new MailboxCreationProof(id, postTokenHash, readTokenHash);
 
-    while (
-      MailboxCreationProof.isValid(
-        id,
-        postTokenHash,
-        readTokenHash,
-        String(nonce),
-        MailboxCreationDifficulty.MIN_BITS,
-      )
-    ) {
+    while (proof.isValid(String(nonce), MailboxCreationDifficulty.MIN_BITS)) {
       nonce += 1;
     }
 

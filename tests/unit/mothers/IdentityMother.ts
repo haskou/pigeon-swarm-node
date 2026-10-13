@@ -143,7 +143,7 @@ export class IdentityMother {
   }
 
   public mineAdmissionNonce(networks: string[]): string {
-    return IdentityAdmissionProof.mine(this.id.valueOf(), networks);
+    return new IdentityAdmissionProof(this.id.valueOf(), networks).mine();
   }
 
   public async buildNext(

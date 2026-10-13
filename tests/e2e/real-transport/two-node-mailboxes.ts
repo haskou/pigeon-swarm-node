@@ -70,12 +70,11 @@ async function putMailbox(
   const response = await fetch(`${node.baseUrl}/mailboxes/${mailbox.id}`, {
     body: JSON.stringify({
       creationNonce: withProof
-        ? MailboxCreationProof.mine(
+        ? new MailboxCreationProof(
             mailbox.id,
             mailbox.postTokenHash,
             mailbox.readTokenHash,
-            MailboxCreationDifficulty.MIN_BITS,
-          )
+          ).mine(MailboxCreationDifficulty.MIN_BITS)
         : undefined,
       postTokenHash: mailbox.postTokenHash,
       readTokenHash: mailbox.readTokenHash,
