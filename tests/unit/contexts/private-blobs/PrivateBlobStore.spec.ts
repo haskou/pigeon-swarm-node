@@ -1,13 +1,18 @@
-import PrivateBlobExpirer from '@app/contexts/private-blobs/application/PrivateBlobExpirer';
-import PrivateBlobReader from '@app/contexts/private-blobs/application/PrivateBlobReader';
-import PrivateBlobRemover from '@app/contexts/private-blobs/application/PrivateBlobRemover';
-import PrivateBlobReserver from '@app/contexts/private-blobs/application/PrivateBlobReserver';
-import PrivateBlobUploader from '@app/contexts/private-blobs/application/PrivateBlobUploader';
+import PrivateBlobExpirer from '@app/contexts/private-blobs/application/expire/PrivateBlobExpirer';
+import { PrivateBlobReadMessage } from '@app/contexts/private-blobs/application/read/messages/PrivateBlobReadMessage';
+import PrivateBlobReader from '@app/contexts/private-blobs/application/read/PrivateBlobReader';
+import { PrivateBlobRemoveMessage } from '@app/contexts/private-blobs/application/remove/messages/PrivateBlobRemoveMessage';
+import PrivateBlobRemover from '@app/contexts/private-blobs/application/remove/PrivateBlobRemover';
+import { PrivateBlobReserveMessage } from '@app/contexts/private-blobs/application/reserve/messages/PrivateBlobReserveMessage';
+import PrivateBlobReserver from '@app/contexts/private-blobs/application/reserve/PrivateBlobReserver';
+import { PrivateBlobUploadMessage } from '@app/contexts/private-blobs/application/upload/messages/PrivateBlobUploadMessage';
+import PrivateBlobUploader from '@app/contexts/private-blobs/application/upload/PrivateBlobUploader';
 import { PrivateBlob } from '@app/contexts/private-blobs/domain/PrivateBlob';
 import PrivateBlobPolicy from '@app/contexts/private-blobs/domain/PrivateBlobPolicy';
 import PrivateBlobRepository from '@app/contexts/private-blobs/domain/repositories/PrivateBlobRepository';
 import { PrivateBlobLimitsFromEnvironment } from '@app/contexts/private-blobs/infrastructure/environment/PrivateBlobLimitsFromEnvironment';
 import FilePrivateBlobBytesStore from '@app/contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { Timestamp } from '@haskou/value-objects';
 import { randomUUID } from 'crypto';
@@ -67,6 +72,16 @@ class MemoryRepository extends PrivateBlobRepository {
   }
 }
 
+const alice = new IdentityId(
+  'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
+);
+const bob = new IdentityId(
+  'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=',
+);
+const carol = new IdentityId(
+  'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=',
+);
+
 const bytes = (text: string): Readable => Readable.from([Buffer.from(text)]);
 
 const collect = async (stream: Readable): Promise<string> => {
@@ -116,119 +131,199 @@ describe('private blob store', () => {
 
   it('round-trips bytes and serves ranges with the right slice', async () => {
     const { blobId, downloadToken, uploadToken } = await reserver.reserve(
-      'alice',
-      10,
+      new PrivateBlobReserveMessage(alice, 10),
     );
 
-    await uploader.upload(blobId, uploadToken, bytes('0123456789'));
+    await uploader.upload(
+      new PrivateBlobUploadMessage(blobId, uploadToken, bytes('0123456789')),
+    );
 
     expect(
-      await collect((await reader.open(blobId, downloadToken)).stream),
+      await collect(
+        (
+          await reader.open(
+            new PrivateBlobReadMessage(blobId, downloadToken, undefined),
+          )
+        ).stream,
+      ),
     ).toBe('0123456789');
 
-    const ranged = await reader.open(blobId, downloadToken, {
-      first: 2,
-      kind: 'from',
-      last: 4,
-    });
+    const ranged = await reader.open(
+      new PrivateBlobReadMessage(blobId, downloadToken, {
+        first: 2,
+        kind: 'from',
+        last: 4,
+      }),
+    );
 
     expect(ranged.range).toEqual({ end: 4, start: 2 });
     expect(await collect(ranged.stream)).toBe('234');
     expect(
       await collect(
         (
-          await reader.open(blobId, downloadToken, {
-            kind: 'suffix',
-            length: 3,
-          })
+          await reader.open(
+            new PrivateBlobReadMessage(blobId, downloadToken, {
+              kind: 'suffix',
+              length: 3,
+            }),
+          )
         ).stream,
       ),
     ).toBe('789');
     await expect(
-      reader.open(blobId, downloadToken, { first: 10, kind: 'from' }),
+      reader.open(
+        new PrivateBlobReadMessage(blobId, downloadToken, {
+          first: 10,
+          kind: 'from',
+        }),
+      ),
     ).rejects.toMatchObject({ size: 10 });
     await expect(
-      reader.open(blobId, downloadToken, { kind: 'invalid' }),
+      reader.open(
+        new PrivateBlobReadMessage(blobId, downloadToken, {
+          kind: 'invalid',
+        }),
+      ),
     ).rejects.toMatchObject({ size: 10 });
   });
 
   it('does not disclose blobs to the wrong or missing capability', async () => {
     const { blobId, downloadToken, uploadToken } = await reserver.reserve(
-      'alice',
-      3,
+      new PrivateBlobReserveMessage(alice, 3),
     );
 
     await expect(
-      uploader.upload(blobId, downloadToken, bytes('abc')),
+      uploader.upload(
+        new PrivateBlobUploadMessage(blobId, downloadToken, bytes('abc')),
+      ),
     ).rejects.toThrow('not found');
-    await uploader.upload(blobId, uploadToken, bytes('abc'));
-    await expect(reader.open(blobId, uploadToken)).rejects.toThrow('not found');
-    await expect(reader.open(blobId, 'x'.repeat(43))).rejects.toThrow(
-      'not found',
+    await uploader.upload(
+      new PrivateBlobUploadMessage(blobId, uploadToken, bytes('abc')),
     );
-    await expect(reader.open('missing', downloadToken)).rejects.toThrow(
-      'not found',
-    );
+    await expect(
+      reader.open(new PrivateBlobReadMessage(blobId, uploadToken, undefined)),
+    ).rejects.toThrow('not found');
+    await expect(
+      reader.open(
+        new PrivateBlobReadMessage(blobId, 'x'.repeat(43), undefined),
+      ),
+    ).rejects.toThrow('not found');
+    await expect(
+      reader.open(
+        new PrivateBlobReadMessage('missing', downloadToken, undefined),
+      ),
+    ).rejects.toThrow('not found');
   });
 
   it('keeps nothing when the uploaded size differs from the reservation', async () => {
-    const short = await reserver.reserve('alice', 5);
-    const long = await reserver.reserve('alice', 5);
+    const short = await reserver.reserve(
+      new PrivateBlobReserveMessage(alice, 5),
+    );
+    const long = await reserver.reserve(
+      new PrivateBlobReserveMessage(alice, 5),
+    );
 
     await expect(
-      uploader.upload(short.blobId, short.uploadToken, bytes('abc')),
+      uploader.upload(
+        new PrivateBlobUploadMessage(
+          short.blobId,
+          short.uploadToken,
+          bytes('abc'),
+        ),
+      ),
     ).rejects.toThrow('do not match');
     await expect(
-      uploader.upload(long.blobId, long.uploadToken, bytes('abcdefgh')),
+      uploader.upload(
+        new PrivateBlobUploadMessage(
+          long.blobId,
+          long.uploadToken,
+          bytes('abcdefgh'),
+        ),
+      ),
     ).rejects.toThrow('do not match');
 
     expect(readdirSync(directory)).toEqual([]);
     await expect(
-      reader.open(short.blobId, short.downloadToken),
+      reader.open(
+        new PrivateBlobReadMessage(
+          short.blobId,
+          short.downloadToken,
+          undefined,
+        ),
+      ),
     ).rejects.toThrow('not found');
   });
 
   it('refuses a second upload and never serves a partial blob', async () => {
     const { blobId, downloadToken, uploadToken } = await reserver.reserve(
-      'alice',
-      3,
+      new PrivateBlobReserveMessage(alice, 3),
     );
 
-    await expect(reader.open(blobId, downloadToken)).rejects.toThrow(
-      'not found',
-    );
-    await uploader.upload(blobId, uploadToken, bytes('abc'));
     await expect(
-      uploader.upload(blobId, uploadToken, bytes('xyz')),
+      reader.open(new PrivateBlobReadMessage(blobId, downloadToken, undefined)),
+    ).rejects.toThrow('not found');
+    await uploader.upload(
+      new PrivateBlobUploadMessage(blobId, uploadToken, bytes('abc')),
+    );
+    await expect(
+      uploader.upload(
+        new PrivateBlobUploadMessage(blobId, uploadToken, bytes('xyz')),
+      ),
     ).rejects.toThrow('already complete');
     expect(
-      await collect((await reader.open(blobId, downloadToken)).stream),
+      await collect(
+        (
+          await reader.open(
+            new PrivateBlobReadMessage(blobId, downloadToken, undefined),
+          )
+        ).stream,
+      ),
     ).toBe('abc');
   });
 
   it('enforces size, per-owner and total quotas', async () => {
-    await expect(reserver.reserve('alice', 0)).rejects.toThrow('between 1');
-    await expect(reserver.reserve('alice', 81)).rejects.toThrow('between 1');
+    await expect(
+      reserver.reserve(new PrivateBlobReserveMessage(alice, 0)),
+    ).rejects.toThrow('between 1');
+    await expect(
+      reserver.reserve(new PrivateBlobReserveMessage(alice, 81)),
+    ).rejects.toThrow('between 1');
 
-    await reserver.reserve('alice', 80);
-    await expect(reserver.reserve('alice', 21)).rejects.toThrow('quota');
-    await reserver.reserve('bob', 70);
-    await expect(reserver.reserve('carol', 1)).rejects.toThrow('quota');
+    await reserver.reserve(new PrivateBlobReserveMessage(alice, 80));
+    await expect(
+      reserver.reserve(new PrivateBlobReserveMessage(alice, 21)),
+    ).rejects.toThrow('quota');
+    await reserver.reserve(new PrivateBlobReserveMessage(bob, 70));
+    await expect(
+      reserver.reserve(new PrivateBlobReserveMessage(carol, 1)),
+    ).rejects.toThrow('quota');
   });
 
   it('cannot overshoot a quota with concurrent reservations', async () => {
     const results = await Promise.allSettled(
-      Array.from({ length: 5 }, () => reserver.reserve('alice', 40)),
+      Array.from({ length: 5 }, () =>
+        reserver.reserve(new PrivateBlobReserveMessage(alice, 40)),
+      ),
     );
 
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(2);
   });
 
   it('expires abandoned reservations and stored blobs, freeing quota and bytes', async () => {
-    const abandoned = await reserver.reserve('alice', 80);
-    const stored = await reserver.reserve('bob', 5);
+    const abandoned = await reserver.reserve(
+      new PrivateBlobReserveMessage(alice, 80),
+    );
+    const stored = await reserver.reserve(
+      new PrivateBlobReserveMessage(bob, 5),
+    );
 
-    await uploader.upload(stored.blobId, stored.uploadToken, bytes('12345'));
+    await uploader.upload(
+      new PrivateBlobUploadMessage(
+        stored.blobId,
+        stored.uploadToken,
+        bytes('12345'),
+      ),
+    );
 
     const expirer = new PrivateBlobExpirer(
       repository,
@@ -242,16 +337,38 @@ describe('private blob store', () => {
     expect(repository.blobs.size).toBe(0);
     expect(readdirSync(directory)).toEqual([]);
     await expect(
-      uploader.upload(abandoned.blobId, abandoned.uploadToken, bytes('x')),
+      uploader.upload(
+        new PrivateBlobUploadMessage(
+          abandoned.blobId,
+          abandoned.uploadToken,
+          bytes('x'),
+        ),
+      ),
     ).rejects.toThrow('not found');
   });
 
   it('keeps sweeping when one blob cannot be deleted and retries it later', async () => {
-    const first = await reserver.reserve('alice', 5);
-    const second = await reserver.reserve('bob', 5);
+    const first = await reserver.reserve(
+      new PrivateBlobReserveMessage(alice, 5),
+    );
+    const second = await reserver.reserve(
+      new PrivateBlobReserveMessage(bob, 5),
+    );
 
-    await uploader.upload(first.blobId, first.uploadToken, bytes('12345'));
-    await uploader.upload(second.blobId, second.uploadToken, bytes('67890'));
+    await uploader.upload(
+      new PrivateBlobUploadMessage(
+        first.blobId,
+        first.uploadToken,
+        bytes('12345'),
+      ),
+    );
+    await uploader.upload(
+      new PrivateBlobUploadMessage(
+        second.blobId,
+        second.uploadToken,
+        bytes('67890'),
+      ),
+    );
 
     const realDelete = store.delete.bind(store);
     let broken = true;
@@ -282,11 +399,15 @@ describe('private blob store', () => {
   });
 
   it('sweeps bytes that no record owns and never touches unrelated files', async () => {
-    const kept = await reserver.reserve('alice', 3);
+    const kept = await reserver.reserve(
+      new PrivateBlobReserveMessage(alice, 3),
+    );
     const orphanBlob = randomUUID();
     const orphanPart = randomUUID();
 
-    await uploader.upload(kept.blobId, kept.uploadToken, bytes('abc'));
+    await uploader.upload(
+      new PrivateBlobUploadMessage(kept.blobId, kept.uploadToken, bytes('abc')),
+    );
     writeFileSync(path.join(directory, `${orphanBlob}.blob`), 'stale');
     writeFileSync(path.join(directory, `${orphanPart}.part`), 'stale');
     writeFileSync(path.join(directory, 'notes.txt'), 'not ours');
@@ -303,34 +424,42 @@ describe('private blob store', () => {
     );
     expect(
       await collect(
-        (await reader.open(kept.blobId, kept.downloadToken)).stream,
+        (
+          await reader.open(
+            new PrivateBlobReadMessage(
+              kept.blobId,
+              kept.downloadToken,
+              undefined,
+            ),
+          )
+        ).stream,
       ),
     ).toBe('abc');
   });
 
   it('only the uploader capability withdraws a blob and bytes go with it', async () => {
     const { blobId, downloadToken, uploadToken } = await reserver.reserve(
-      'alice',
-      3,
+      new PrivateBlobReserveMessage(alice, 3),
     );
     const remover = new PrivateBlobRemover(repository, store);
 
-    await uploader.upload(blobId, uploadToken, bytes('abc'));
-    await expect(remover.remove(blobId, downloadToken)).rejects.toThrow(
-      'not found',
+    await uploader.upload(
+      new PrivateBlobUploadMessage(blobId, uploadToken, bytes('abc')),
     );
-    await remover.remove(blobId, uploadToken);
+    await expect(
+      remover.remove(new PrivateBlobRemoveMessage(blobId, downloadToken)),
+    ).rejects.toThrow('not found');
+    await remover.remove(new PrivateBlobRemoveMessage(blobId, uploadToken));
 
     expect(existsSync(path.join(directory, `${blobId}.blob`))).toBe(false);
-    await expect(reader.open(blobId, downloadToken)).rejects.toThrow(
-      'not found',
-    );
+    await expect(
+      reader.open(new PrivateBlobReadMessage(blobId, downloadToken, undefined)),
+    ).rejects.toThrow('not found');
   });
 
   it('stores only an opaque record: hashed capabilities, no names or keys', async () => {
     const { blobId, downloadToken, uploadToken } = await reserver.reserve(
-      'alice',
-      3,
+      new PrivateBlobReserveMessage(alice, 3),
     );
     const serialized = JSON.stringify(
       repository.blobs.get(blobId)?.toPrimitives(),
@@ -338,7 +467,7 @@ describe('private blob store', () => {
 
     expect(serialized).not.toContain(downloadToken);
     expect(serialized).not.toContain(uploadToken);
-    expect(serialized).not.toContain('alice');
+    expect(serialized).not.toContain(alice.valueOf());
   });
 
   it('keeps a stored blob for at least the mailbox retention, whatever the blob setting', async () => {
@@ -350,11 +479,12 @@ describe('private blob store', () => {
 
     try {
       const { blobId, downloadToken, uploadToken } = await reserver.reserve(
-        'alice',
-        3,
+        new PrivateBlobReserveMessage(alice, 3),
       );
 
-      await uploader.upload(blobId, uploadToken, bytes('abc'));
+      await uploader.upload(
+        new PrivateBlobUploadMessage(blobId, uploadToken, bytes('abc')),
+      );
       expect(
         repository.blobs.get(blobId)?.getExpiresAt(),
       ).toBeGreaterThanOrEqual(now + mailboxRetentionMs);
@@ -370,7 +500,13 @@ describe('private blob store', () => {
         await expirer.expire(new Timestamp(now + mailboxRetentionMs - 1)),
       ).toBe(0);
       expect(
-        await collect((await reader.open(blobId, downloadToken)).stream),
+        await collect(
+          (
+            await reader.open(
+              new PrivateBlobReadMessage(blobId, downloadToken, undefined),
+            )
+          ).stream,
+        ),
       ).toBe('abc');
     } finally {
       clock.mockRestore();
@@ -385,11 +521,12 @@ describe('private blob store', () => {
 
     try {
       const { blobId, downloadToken, uploadToken } = await reserver.reserve(
-        'alice',
-        3,
+        new PrivateBlobReserveMessage(alice, 3),
       );
 
-      await uploader.upload(blobId, uploadToken, bytes('abc'));
+      await uploader.upload(
+        new PrivateBlobUploadMessage(blobId, uploadToken, bytes('abc')),
+      );
 
       // The setting is gone after the upgrade; the blob keeps its old record.
       delete process.env.PRIVATE_BLOB_RETENTION_MS;
@@ -404,7 +541,13 @@ describe('private blob store', () => {
         now + pigeonEnvironment().MAILBOX_RETENTION_MS,
       );
       expect(
-        await collect((await reader.open(blobId, downloadToken)).stream),
+        await collect(
+          (
+            await reader.open(
+              new PrivateBlobReadMessage(blobId, downloadToken, undefined),
+            )
+          ).stream,
+        ),
       ).toBe('abc');
     } finally {
       clock.mockRestore();

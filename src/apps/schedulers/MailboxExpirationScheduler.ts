@@ -1,4 +1,4 @@
-import MailboxExpirer from '@app/contexts/mailboxes/application/MailboxExpirer';
+import MailboxExpirer from '@app/contexts/mailboxes/application/expire/MailboxExpirer';
 import ReplicatedStateSchedulerErrorPolicy from '@app/shared/infrastructure/scheduler/ReplicatedStateSchedulerErrorPolicy';
 import Scheduler from '@haskou/ddd-kernel/scheduler';
 import { CronExpression } from '@haskou/ddd-kernel/scheduler';

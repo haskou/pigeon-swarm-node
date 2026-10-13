@@ -1,4 +1,5 @@
-import MailboxAcknowledger from '@app/contexts/mailboxes/application/MailboxAcknowledger';
+import MailboxAcknowledger from '@app/contexts/mailboxes/application/acknowledge/MailboxAcknowledger';
+import { MailboxAcknowledgeMessage } from '@app/contexts/mailboxes/application/acknowledge/messages/MailboxAcknowledgeMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import {
@@ -30,7 +31,9 @@ export class PostMailboxAckRoute extends MailboxRouteSupport {
     const token = this.bearerToken(request);
 
     try {
-      await this.acknowledger.acknowledge(id, token, body.upTo);
+      await this.acknowledger.acknowledge(
+        new MailboxAcknowledgeMessage(id, token, body.upTo),
+      );
 
       return response.status(HttpRouteStatusEnum.NO_CONTENT).send();
     } catch (error: unknown) {

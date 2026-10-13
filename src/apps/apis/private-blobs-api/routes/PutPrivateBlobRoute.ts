@@ -1,4 +1,5 @@
-import PrivateBlobUploader from '@app/contexts/private-blobs/application/PrivateBlobUploader';
+import { PrivateBlobUploadMessage } from '@app/contexts/private-blobs/application/upload/messages/PrivateBlobUploadMessage';
+import PrivateBlobUploader from '@app/contexts/private-blobs/application/upload/PrivateBlobUploader';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { JsonController, Param, Put, Req, Res } from 'routing-controllers';
@@ -18,7 +19,13 @@ export class PutPrivateBlobRoute extends PrivateBlobRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     try {
-      await this.uploader.upload(blobId, this.bearerToken(request), request);
+      await this.uploader.upload(
+        new PrivateBlobUploadMessage(
+          blobId,
+          this.bearerToken(request),
+          request,
+        ),
+      );
 
       return response.status(HttpRouteStatusEnum.NO_CONTENT).send();
     } catch (error: unknown) {

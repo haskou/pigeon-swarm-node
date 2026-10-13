@@ -1,4 +1,4 @@
-import PrivateBlobExpirer from '@app/contexts/private-blobs/application/PrivateBlobExpirer';
+import PrivateBlobExpirer from '@app/contexts/private-blobs/application/expire/PrivateBlobExpirer';
 import ReplicatedStateSchedulerErrorPolicy from '@app/shared/infrastructure/scheduler/ReplicatedStateSchedulerErrorPolicy';
 import Scheduler from '@haskou/ddd-kernel/scheduler';
 import { CronExpression } from '@haskou/ddd-kernel/scheduler';

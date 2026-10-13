@@ -1,16 +1,24 @@
 import { MAX_DEVICE_CREDENTIALS } from '@app/contexts/identity-devices/domain/DeviceCredentialLimits';
-import MailboxAcknowledger from '@app/contexts/mailboxes/application/MailboxAcknowledger';
-import MailboxAppender from '@app/contexts/mailboxes/application/MailboxAppender';
-import MailboxCoordinator from '@app/contexts/mailboxes/application/MailboxCoordinator';
-import MailboxCreator from '@app/contexts/mailboxes/application/MailboxCreator';
-import MailboxEnvelopeNotifier from '@app/contexts/mailboxes/application/MailboxEnvelopeNotifier';
-import MailboxExpirer from '@app/contexts/mailboxes/application/MailboxExpirer';
-import MailboxReader from '@app/contexts/mailboxes/application/MailboxReader';
-import MailboxReaderAdder from '@app/contexts/mailboxes/application/MailboxReaderAdder';
-import MailboxReaderLister from '@app/contexts/mailboxes/application/MailboxReaderLister';
-import MailboxReaderRevoker from '@app/contexts/mailboxes/application/MailboxReaderRevoker';
-import MailboxRemover from '@app/contexts/mailboxes/application/MailboxRemover';
-import MailboxSettler from '@app/contexts/mailboxes/application/MailboxSettler';
+import MailboxAcknowledger from '@app/contexts/mailboxes/application/acknowledge/MailboxAcknowledger';
+import { MailboxAcknowledgeMessage } from '@app/contexts/mailboxes/application/acknowledge/messages/MailboxAcknowledgeMessage';
+import MailboxReaderAdder from '@app/contexts/mailboxes/application/add-reader/MailboxReaderAdder';
+import { MailboxReaderAddMessage } from '@app/contexts/mailboxes/application/add-reader/messages/MailboxReaderAddMessage';
+import MailboxAppender from '@app/contexts/mailboxes/application/append/MailboxAppender';
+import { MailboxAppendMessage } from '@app/contexts/mailboxes/application/append/messages/MailboxAppendMessage';
+import MailboxCoordinator from '@app/contexts/mailboxes/application/coordinate/MailboxCoordinator';
+import MailboxCreator from '@app/contexts/mailboxes/application/create/MailboxCreator';
+import { MailboxCreateMessage } from '@app/contexts/mailboxes/application/create/messages/MailboxCreateMessage';
+import MailboxExpirer from '@app/contexts/mailboxes/application/expire/MailboxExpirer';
+import MailboxReaderLister from '@app/contexts/mailboxes/application/list-readers/MailboxReaderLister';
+import { MailboxReaderListMessage } from '@app/contexts/mailboxes/application/list-readers/messages/MailboxReaderListMessage';
+import MailboxEnvelopeNotifier from '@app/contexts/mailboxes/application/notify/MailboxEnvelopeNotifier';
+import MailboxReader from '@app/contexts/mailboxes/application/read/MailboxReader';
+import { MailboxReadMessage } from '@app/contexts/mailboxes/application/read/messages/MailboxReadMessage';
+import MailboxRemover from '@app/contexts/mailboxes/application/remove/MailboxRemover';
+import { MailboxRemoveMessage } from '@app/contexts/mailboxes/application/remove/messages/MailboxRemoveMessage';
+import MailboxReaderRevoker from '@app/contexts/mailboxes/application/revoke-reader/MailboxReaderRevoker';
+import { MailboxReaderRevokeMessage } from '@app/contexts/mailboxes/application/revoke-reader/messages/MailboxReaderRevokeMessage';
+import MailboxSettler from '@app/contexts/mailboxes/application/settle/MailboxSettler';
 import { MailboxAppendRateLimitedError } from '@app/contexts/mailboxes/domain/errors/MailboxAppendRateLimitedError';
 import { MailboxConflictError } from '@app/contexts/mailboxes/domain/errors/MailboxConflictError';
 import { MailboxCreationProofInvalidError } from '@app/contexts/mailboxes/domain/errors/MailboxCreationProofInvalidError';
@@ -137,19 +145,21 @@ describe('mailboxes', () => {
     difficultyBits = MailboxCreationDifficulty.MIN_BITS,
   ): Promise<boolean> =>
     creator.create(
-      id,
-      postHash,
-      readHash,
-      new MailboxCreationProof(id, postHash, readHash).mine(difficultyBits),
+      new MailboxCreateMessage(
+        id,
+        postHash,
+        readHash,
+        new MailboxCreationProof(id, postHash, readHash).mine(difficultyBits),
+      ),
     );
 
   const readCursors = async (
     mailboxId: string,
     readToken: string,
   ): Promise<number[]> =>
-    (await reader.read(mailboxId, readToken, 0, 10)).envelopes.map(
-      (envelope) => envelope.cursor,
-    );
+    (
+      await reader.read(new MailboxReadMessage(mailboxId, readToken, 0, 10))
+    ).envelopes.map((envelope) => envelope.cursor);
 
   beforeEach(async () => {
     for (const key of envKeys) {
@@ -188,14 +198,16 @@ describe('mailboxes', () => {
     wirePolicy();
 
     await expect(
-      creator.create(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+      creator.create(
+        new MailboxCreateMessage(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+      ),
     ).rejects.toBeInstanceOf(MailboxLimitReachedError);
   });
 
   it('counts in constant time and keeps the count across a restart', async () => {
     await createMailbox('n'.repeat(43), sha(POST), sha(READ));
     await createMailbox('o'.repeat(43), sha(POST), sha(READ));
-    await remover.remove(MAILBOX, READ);
+    await remover.remove(new MailboxRemoveMessage(MAILBOX, READ));
     await database.close();
     wire();
 
@@ -222,16 +234,29 @@ describe('mailboxes', () => {
   it('answers wrong capability, swapped capability and unknown mailbox identically', async () => {
     const outcomes = await Promise.all([
       appender
-        .append(MAILBOX, READ, 'a'.repeat(22), body(1024))
+        .append(
+          new MailboxAppendMessage(MAILBOX, READ, 'a'.repeat(22), body(1024)),
+        )
         .catch((e: unknown) => e as Error),
       appender
-        .append('x'.repeat(43), POST, 'a'.repeat(22), body(1024))
+        .append(
+          new MailboxAppendMessage(
+            'x'.repeat(43),
+            POST,
+            'a'.repeat(22),
+            body(1024),
+          ),
+        )
         .catch((e: unknown) => e as Error),
-      reader.read(MAILBOX, POST, 0, 10).catch((e: unknown) => e as Error),
+      reader
+        .read(new MailboxReadMessage(MAILBOX, POST, 0, 10))
+        .catch((e: unknown) => e as Error),
       acknowledger
-        .acknowledge(MAILBOX, POST, 1)
+        .acknowledge(new MailboxAcknowledgeMessage(MAILBOX, POST, 1))
         .catch((e: unknown) => e as Error),
-      remover.remove(MAILBOX, POST).catch((e: unknown) => e as Error),
+      remover
+        .remove(new MailboxRemoveMessage(MAILBOX, POST))
+        .catch((e: unknown) => e as Error),
     ]);
 
     for (const outcome of outcomes) {
@@ -242,32 +267,55 @@ describe('mailboxes', () => {
 
   it('accepts only bucket sizes and base64url', async () => {
     await expect(
-      appender.append(MAILBOX, POST, 'a'.repeat(22), body(1000)),
+      appender.append(
+        new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1000)),
+      ),
     ).rejects.toBeInstanceOf(MailboxEnvelopeInvalidError);
     await expect(
-      appender.append(MAILBOX, POST, 'a'.repeat(22), '!!!!'),
+      appender.append(
+        new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), '!!!!'),
+      ),
     ).rejects.toBeInstanceOf(MailboxEnvelopeInvalidError);
     await expect(
-      appender.append(MAILBOX, POST, 'a'.repeat(22), body(4096)),
+      appender.append(
+        new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(4096)),
+      ),
     ).resolves.toEqual({ created: true, cursor: 1 });
   });
 
   it('dedupes by envelopeId and returns the first cursor', async () => {
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
-    await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+    );
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'b'.repeat(22), body(1024)),
+    );
 
     await expect(
-      appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+      appender.append(
+        new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+      ),
     ).resolves.toEqual({ created: false, cursor: 1 });
-    expect((await reader.read(MAILBOX, READ, 0, 10)).envelopes).toHaveLength(2);
+    expect(
+      (await reader.read(new MailboxReadMessage(MAILBOX, READ, 0, 10)))
+        .envelopes,
+    ).toHaveLength(2);
   });
 
   it('notifies realtime listeners only for newly appended envelopes, in cursor order', async () => {
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
-    await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+    );
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+    );
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'b'.repeat(22), body(1024)),
+    );
     await expect(
-      appender.append(MAILBOX, POST, 'c'.repeat(22), '!!!!'),
+      appender.append(
+        new MailboxAppendMessage(MAILBOX, POST, 'c'.repeat(22), '!!!!'),
+      ),
     ).rejects.toBeInstanceOf(MailboxEnvelopeInvalidError);
 
     expect(notifier.envelopeAppended.mock.calls).toEqual([
@@ -279,14 +327,22 @@ describe('mailboxes', () => {
   it('refuses instead of dropping when the envelope or byte limit is reached', async () => {
     process.env.MAILBOX_MAX_ENVELOPES = '2';
     wirePolicy();
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
-    await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+    );
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'b'.repeat(22), body(1024)),
+    );
 
     await expect(
-      appender.append(MAILBOX, POST, 'c'.repeat(22), body(1024)),
+      appender.append(
+        new MailboxAppendMessage(MAILBOX, POST, 'c'.repeat(22), body(1024)),
+      ),
     ).rejects.toBeInstanceOf(MailboxFullError);
     expect(
-      (await reader.read(MAILBOX, READ, 0, 10)).envelopes.map((e) => e.cursor),
+      (
+        await reader.read(new MailboxReadMessage(MAILBOX, READ, 0, 10))
+      ).envelopes.map((e) => e.cursor),
     ).toEqual([1, 2]);
 
     process.env.MAILBOX_MAX_ENVELOPES = '100';
@@ -294,28 +350,36 @@ describe('mailboxes', () => {
     wirePolicy();
 
     await expect(
-      appender.append(MAILBOX, POST, 'c'.repeat(22), body(1024)),
+      appender.append(
+        new MailboxAppendMessage(MAILBOX, POST, 'c'.repeat(22), body(1024)),
+      ),
     ).rejects.toBeInstanceOf(MailboxFullError);
   });
 
   it('pages in cursor order past ten envelopes and survives restart', async () => {
     for (let i = 0; i < 12; i += 1) {
       await appender.append(
-        MAILBOX,
-        POST,
-        String(i).padStart(22, 'z'),
-        body(1024),
+        new MailboxAppendMessage(
+          MAILBOX,
+          POST,
+          String(i).padStart(22, 'z'),
+          body(1024),
+        ),
       );
     }
 
-    const first = await reader.read(MAILBOX, READ, 0, 5);
+    const first = await reader.read(
+      new MailboxReadMessage(MAILBOX, READ, 0, 5),
+    );
 
     expect(first.envelopes.map((e) => e.cursor)).toEqual([1, 2, 3, 4, 5]);
     expect(first.hasMore).toBe(true);
 
     await database.close();
     wire();
-    const rest = await reader.read(MAILBOX, READ, 5, 100);
+    const rest = await reader.read(
+      new MailboxReadMessage(MAILBOX, READ, 5, 100),
+    );
 
     expect(rest.envelopes.map((e) => e.cursor)).toEqual([
       6, 7, 8, 9, 10, 11, 12,
@@ -326,62 +390,93 @@ describe('mailboxes', () => {
   it('frees capacity on acknowledge and never reuses cursors', async () => {
     process.env.MAILBOX_MAX_ENVELOPES = '2';
     wirePolicy();
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
-    await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
-    await acknowledger.acknowledge(MAILBOX, READ, 1);
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+    );
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'b'.repeat(22), body(1024)),
+    );
+    await acknowledger.acknowledge(
+      new MailboxAcknowledgeMessage(MAILBOX, READ, 1),
+    );
 
     await expect(
-      appender.append(MAILBOX, POST, 'c'.repeat(22), body(1024)),
+      appender.append(
+        new MailboxAppendMessage(MAILBOX, POST, 'c'.repeat(22), body(1024)),
+      ),
     ).resolves.toEqual({ created: true, cursor: 3 });
     expect(
-      (await reader.read(MAILBOX, READ, 0, 10)).envelopes.map((e) => e.cursor),
+      (
+        await reader.read(new MailboxReadMessage(MAILBOX, READ, 0, 10))
+      ).envelopes.map((e) => e.cursor),
     ).toEqual([2, 3]);
   });
 
   it('deletes a mailbox and its envelopes', async () => {
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
-    await remover.remove(MAILBOX, READ);
-
-    await expect(reader.read(MAILBOX, READ, 0, 10)).rejects.toBeInstanceOf(
-      MailboxNotFoundError,
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
     );
+    await remover.remove(new MailboxRemoveMessage(MAILBOX, READ));
+
+    await expect(
+      reader.read(new MailboxReadMessage(MAILBOX, READ, 0, 10)),
+    ).rejects.toBeInstanceOf(MailboxNotFoundError);
     await createMailbox(MAILBOX, sha(POST), sha(READ));
-    expect((await reader.read(MAILBOX, READ, 0, 10)).envelopes).toEqual([]);
+    expect(
+      (await reader.read(new MailboxReadMessage(MAILBOX, READ, 0, 10)))
+        .envelopes,
+    ).toEqual([]);
   });
 
   it('tells realtime listeners when a mailbox is deleted', async () => {
-    await remover.remove(MAILBOX, READ);
+    await remover.remove(new MailboxRemoveMessage(MAILBOX, READ));
 
     expect(notifier.mailboxRemoved).toHaveBeenCalledWith(MAILBOX);
   });
 
   it('never reuses a cursor when a deleted mailbox is recreated under the same id', async () => {
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
-    await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
-    await remover.remove(MAILBOX, READ);
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+    );
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'b'.repeat(22), body(1024)),
+    );
+    await remover.remove(new MailboxRemoveMessage(MAILBOX, READ));
     await createMailbox(MAILBOX, sha(POST), sha(READ));
 
     // A client still holding cursor 2 from the old queue must receive the new envelope.
     await expect(
-      appender.append(MAILBOX, POST, 'c'.repeat(22), body(1024)),
+      appender.append(
+        new MailboxAppendMessage(MAILBOX, POST, 'c'.repeat(22), body(1024)),
+      ),
     ).resolves.toEqual({ created: true, cursor: 3 });
     expect(
-      (await reader.read(MAILBOX, READ, 2, 10)).envelopes.map((e) => e.cursor),
+      (
+        await reader.read(new MailboxReadMessage(MAILBOX, READ, 2, 10))
+      ).envelopes.map((e) => e.cursor),
     ).toEqual([3]);
   });
 
   it('keeps the retired cursor across eviction at capacity and a restart', async () => {
     process.env.MAILBOX_MAX_COUNT = '1';
     wirePolicy();
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
-    await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
-    await acknowledger.acknowledge(MAILBOX, READ, 2);
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+    );
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'b'.repeat(22), body(1024)),
+    );
+    await acknowledger.acknowledge(
+      new MailboxAcknowledgeMessage(MAILBOX, READ, 2),
+    );
     const clock = jest
       .spyOn(Date, 'now')
       .mockReturnValue(Date.now() + IDLE_MS + 1000);
 
     await expect(
-      creator.create(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+      creator.create(
+        new MailboxCreateMessage(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+      ),
     ).resolves.toBe(true);
     clock.mockRestore();
     await database.close();
@@ -391,7 +486,9 @@ describe('mailboxes', () => {
     await createMailbox(MAILBOX, sha(POST), sha(READ));
 
     await expect(
-      appender.append(MAILBOX, POST, 'c'.repeat(22), body(1024)),
+      appender.append(
+        new MailboxAppendMessage(MAILBOX, POST, 'c'.repeat(22), body(1024)),
+      ),
     ).resolves.toEqual({ created: true, cursor: 3 });
   });
 
@@ -403,18 +500,23 @@ describe('mailboxes', () => {
     const idle = 'i'.repeat(43);
 
     clock.mockReturnValue(t0);
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+    );
     await createMailbox(idle, sha(POST), sha(READ));
 
     clock.mockReturnValue(t0 + 800);
-    await reader.read(MAILBOX, READ, 0, 10);
+    await reader.read(new MailboxReadMessage(MAILBOX, READ, 0, 10));
     await expirer.expire(new Timestamp(t0 + 1200));
     clock.mockReturnValue(t0 + 1200);
 
-    expect((await reader.read(MAILBOX, READ, 0, 10)).envelopes).toEqual([]);
-    await expect(reader.read(idle, READ, 0, 10)).rejects.toBeInstanceOf(
-      MailboxNotFoundError,
-    );
+    expect(
+      (await reader.read(new MailboxReadMessage(MAILBOX, READ, 0, 10)))
+        .envelopes,
+    ).toEqual([]);
+    await expect(
+      reader.read(new MailboxReadMessage(idle, READ, 0, 10)),
+    ).rejects.toBeInstanceOf(MailboxNotFoundError);
     clock.mockRestore();
   });
 
@@ -435,18 +537,24 @@ describe('mailboxes', () => {
   });
 
   it('leaves the old state when a batch fails midway', async () => {
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+    );
     const failing = jest
       .spyOn(database, 'commit')
       .mockRejectedValueOnce(new Error('disk failure'));
 
     await expect(
-      appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024)),
+      appender.append(
+        new MailboxAppendMessage(MAILBOX, POST, 'b'.repeat(22), body(1024)),
+      ),
     ).rejects.toThrow('disk failure');
     failing.mockRestore();
 
     await expect(
-      appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024)),
+      appender.append(
+        new MailboxAppendMessage(MAILBOX, POST, 'b'.repeat(22), body(1024)),
+      ),
     ).resolves.toEqual({ created: true, cursor: 2 });
   });
 
@@ -459,14 +567,16 @@ describe('mailboxes', () => {
     ).mine(MailboxCreationDifficulty.MIN_BITS);
 
     await expect(
-      creator.create(other, sha(POST), sha(READ), ''),
+      creator.create(new MailboxCreateMessage(other, sha(POST), sha(READ), '')),
     ).rejects.toBeInstanceOf(MailboxCreationProofInvalidError);
     await expect(
-      creator.create(other, sha(POST), sha(READ), forMailbox),
+      creator.create(
+        new MailboxCreateMessage(other, sha(POST), sha(READ), forMailbox),
+      ),
     ).rejects.toBeInstanceOf(MailboxCreationProofInvalidError);
-    await expect(reader.read(other, READ, 0, 10)).rejects.toBeInstanceOf(
-      MailboxNotFoundError,
-    );
+    await expect(
+      reader.read(new MailboxReadMessage(other, READ, 0, 10)),
+    ).rejects.toBeInstanceOf(MailboxNotFoundError);
   });
 
   it('keeps the full-capacity fixture valid at the full difficulty', () => {
@@ -496,7 +606,7 @@ describe('mailboxes', () => {
     // Three of four slots are taken, so the next mailbox needs 18 bits.
     const weak = proofMeeting(FRESH, POST_HASH, READ_HASH, 16, 18);
     const refusal = await creator
-      .create(FRESH, POST_HASH, READ_HASH, weak)
+      .create(new MailboxCreateMessage(FRESH, POST_HASH, READ_HASH, weak))
       .catch((e: unknown) => e);
 
     expect(refusal).toBeInstanceOf(MailboxCreationProofInvalidError);
@@ -513,7 +623,7 @@ describe('mailboxes', () => {
     wirePolicy();
     const weak = proofMeeting(FRESH, POST_HASH, READ_HASH, 16, 20);
     const refusal = await creator
-      .create(FRESH, POST_HASH, READ_HASH, weak)
+      .create(new MailboxCreateMessage(FRESH, POST_HASH, READ_HASH, weak))
       .catch((e: unknown) => e);
 
     expect(refusal).toBeInstanceOf(MailboxCreationProofInvalidError);
@@ -531,7 +641,9 @@ describe('mailboxes', () => {
       .mockReturnValue(Date.now() + IDLE_MS + 1000);
 
     await expect(
-      creator.create(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+      creator.create(
+        new MailboxCreateMessage(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+      ),
     ).resolves.toBe(true);
     await expect(repository.findById(MAILBOX)).resolves.toBeUndefined();
     await expect(repository.count()).resolves.toBe(1);
@@ -541,13 +653,17 @@ describe('mailboxes', () => {
   it('never evicts a mailbox that still holds envelopes', async () => {
     process.env.MAILBOX_MAX_COUNT = '1';
     wirePolicy();
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+    );
     const clock = jest
       .spyOn(Date, 'now')
       .mockReturnValue(Date.now() + IDLE_MS + 1000);
 
     await expect(
-      creator.create(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+      creator.create(
+        new MailboxCreateMessage(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+      ),
     ).rejects.toBeInstanceOf(MailboxLimitReachedError);
     await expect(repository.findById(MAILBOX)).resolves.toBeDefined();
     clock.mockRestore();
@@ -558,11 +674,13 @@ describe('mailboxes', () => {
     wirePolicy();
     const t0 = Date.now();
     const clock = jest.spyOn(Date, 'now').mockReturnValue(t0 + DAY);
-    await reader.read(MAILBOX, READ, 0, 10);
+    await reader.read(new MailboxReadMessage(MAILBOX, READ, 0, 10));
     clock.mockReturnValue(t0 + DAY + IDLE_MS - 1000);
 
     await expect(
-      creator.create(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+      creator.create(
+        new MailboxCreateMessage(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+      ),
     ).rejects.toBeInstanceOf(MailboxLimitReachedError);
     clock.mockRestore();
   });
@@ -576,7 +694,9 @@ describe('mailboxes', () => {
     clock.mockReturnValue(t0 + IDLE_MS + 2000);
 
     await expect(
-      creator.create(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+      creator.create(
+        new MailboxCreateMessage(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+      ),
     ).resolves.toBe(true);
     await expect(repository.findById(MAILBOX)).resolves.toBeUndefined();
     await expect(repository.findById(SECOND)).resolves.toBeDefined();
@@ -589,13 +709,15 @@ describe('mailboxes', () => {
     await createMailbox(SECOND, POST_HASH, READ_HASH);
     await createMailbox(THIRD, POST_HASH, READ_HASH);
     clock.mockReturnValue(t0 + DAY);
-    await reader.read(THIRD, READ, 0, 10);
+    await reader.read(new MailboxReadMessage(THIRD, READ, 0, 10));
     process.env.MAILBOX_MAX_COUNT = '1';
     wirePolicy();
     clock.mockReturnValue(t0 + IDLE_MS + 2000);
 
     await expect(
-      creator.create(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+      creator.create(
+        new MailboxCreateMessage(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
+      ),
     ).rejects.toBeInstanceOf(MailboxLimitReachedError);
     await expect(repository.count()).resolves.toBe(3);
     await expect(repository.findById(MAILBOX)).resolves.toBeDefined();
@@ -610,17 +732,27 @@ describe('mailboxes', () => {
     const clock = jest.spyOn(Date, 'now').mockReturnValue(t0);
     await createMailbox(RATED, sha(POST), sha(READ));
 
-    await appender.append(RATED, POST, 'a'.repeat(22), body(1024));
-    await appender.append(RATED, POST, 'b'.repeat(22), body(1024));
-    await appender.append(RATED, POST, 'c'.repeat(22), body(1024));
+    await appender.append(
+      new MailboxAppendMessage(RATED, POST, 'a'.repeat(22), body(1024)),
+    );
+    await appender.append(
+      new MailboxAppendMessage(RATED, POST, 'b'.repeat(22), body(1024)),
+    );
+    await appender.append(
+      new MailboxAppendMessage(RATED, POST, 'c'.repeat(22), body(1024)),
+    );
     await expect(
-      appender.append(RATED, POST, 'd'.repeat(22), body(1024)),
+      appender.append(
+        new MailboxAppendMessage(RATED, POST, 'd'.repeat(22), body(1024)),
+      ),
     ).rejects.toBeInstanceOf(MailboxAppendRateLimitedError);
 
     // Three per minute: one token returns after twenty seconds.
     clock.mockReturnValue(t0 + 20_000);
     await expect(
-      appender.append(RATED, POST, 'd'.repeat(22), body(1024)),
+      appender.append(
+        new MailboxAppendMessage(RATED, POST, 'd'.repeat(22), body(1024)),
+      ),
     ).resolves.toEqual({ created: true, cursor: 4 });
     clock.mockRestore();
   });
@@ -629,13 +761,17 @@ describe('mailboxes', () => {
     process.env.MAILBOX_APPEND_RATE_PER_MINUTE = '1';
     wirePolicy();
     await createMailbox(RATED, sha(POST), sha(READ));
-    await appender.append(RATED, POST, 'a'.repeat(22), body(1024));
+    await appender.append(
+      new MailboxAppendMessage(RATED, POST, 'a'.repeat(22), body(1024)),
+    );
 
     await database.close();
     wire();
 
     await expect(
-      appender.append(RATED, POST, 'b'.repeat(22), body(1024)),
+      appender.append(
+        new MailboxAppendMessage(RATED, POST, 'b'.repeat(22), body(1024)),
+      ),
     ).rejects.toBeInstanceOf(MailboxAppendRateLimitedError);
   });
 
@@ -643,10 +779,14 @@ describe('mailboxes', () => {
     process.env.MAILBOX_APPEND_RATE_PER_MINUTE = '1';
     wirePolicy();
     await createMailbox(RATED, sha(POST), sha(READ));
-    await appender.append(RATED, POST, 'a'.repeat(22), body(1024));
+    await appender.append(
+      new MailboxAppendMessage(RATED, POST, 'a'.repeat(22), body(1024)),
+    );
 
     await expect(
-      appender.append(RATED, POST, 'a'.repeat(22), body(1024)),
+      appender.append(
+        new MailboxAppendMessage(RATED, POST, 'a'.repeat(22), body(1024)),
+      ),
     ).resolves.toEqual({ created: false, cursor: 1 });
   });
 
@@ -656,10 +796,14 @@ describe('mailboxes', () => {
     await createMailbox(RATED, sha(POST), sha(READ));
 
     for (const letter of ['a', 'b', 'c', 'd', 'e']) {
-      await appender.append(RATED, POST, letter.repeat(22), body(1024));
+      await appender.append(
+        new MailboxAppendMessage(RATED, POST, letter.repeat(22), body(1024)),
+      );
     }
 
-    expect((await reader.read(RATED, READ, 0, 10)).envelopes).toHaveLength(5);
+    expect(
+      (await reader.read(new MailboxReadMessage(RATED, READ, 0, 10))).envelopes,
+    ).toHaveLength(5);
   });
 
   it('lets a sender never add a reader', async () => {
@@ -667,26 +811,32 @@ describe('mailboxes', () => {
       createMailbox(MAILBOX, sha(POST), OTHER_READ_HASH),
     ).rejects.toBeInstanceOf(MailboxConflictError);
     await expect(
-      adder.add(MAILBOX, POST, OTHER_READ_HASH),
-    ).rejects.toBeInstanceOf(MailboxNotFoundError);
-    await expect(lister.list(MAILBOX, POST)).rejects.toBeInstanceOf(
-      MailboxNotFoundError,
-    );
-    await expect(
-      revoker.revoke(MAILBOX, POST, READ_HASH),
+      adder.add(new MailboxReaderAddMessage(MAILBOX, POST, OTHER_READ_HASH)),
     ).rejects.toBeInstanceOf(MailboxNotFoundError);
     await expect(
-      reader.read(MAILBOX, OTHER_READ, 0, 10),
+      lister.list(new MailboxReaderListMessage(MAILBOX, POST)),
+    ).rejects.toBeInstanceOf(MailboxNotFoundError);
+    await expect(
+      revoker.revoke(new MailboxReaderRevokeMessage(MAILBOX, POST, READ_HASH)),
+    ).rejects.toBeInstanceOf(MailboxNotFoundError);
+    await expect(
+      reader.read(new MailboxReadMessage(MAILBOX, OTHER_READ, 0, 10)),
     ).rejects.toBeInstanceOf(MailboxNotFoundError);
   });
 
   it('adds a reader idempotently, and the new reader gets the backlog', async () => {
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
-
-    await expect(adder.add(MAILBOX, READ, OTHER_READ_HASH)).resolves.toBe(true);
-    await expect(adder.add(MAILBOX, OTHER_READ, OTHER_READ_HASH)).resolves.toBe(
-      false,
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
     );
+
+    await expect(
+      adder.add(new MailboxReaderAddMessage(MAILBOX, READ, OTHER_READ_HASH)),
+    ).resolves.toBe(true);
+    await expect(
+      adder.add(
+        new MailboxReaderAddMessage(MAILBOX, OTHER_READ, OTHER_READ_HASH),
+      ),
+    ).resolves.toBe(false);
     await expect(
       createMailbox(MAILBOX, sha(POST), OTHER_READ_HASH),
     ).resolves.toBe(false);
@@ -694,22 +844,38 @@ describe('mailboxes', () => {
   });
 
   it('deletes an envelope only after every reader has acknowledged it', async () => {
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
-    await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
-    await adder.add(MAILBOX, READ, OTHER_READ_HASH);
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+    );
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'b'.repeat(22), body(1024)),
+    );
+    await adder.add(
+      new MailboxReaderAddMessage(MAILBOX, READ, OTHER_READ_HASH),
+    );
 
-    await acknowledger.acknowledge(MAILBOX, READ, 2);
+    await acknowledger.acknowledge(
+      new MailboxAcknowledgeMessage(MAILBOX, READ, 2),
+    );
     expect(await readCursors(MAILBOX, OTHER_READ)).toEqual([1, 2]);
 
-    await acknowledger.acknowledge(MAILBOX, OTHER_READ, 1);
+    await acknowledger.acknowledge(
+      new MailboxAcknowledgeMessage(MAILBOX, OTHER_READ, 1),
+    );
     expect(await readCursors(MAILBOX, READ)).toEqual([2]);
   });
 
   it('never acknowledges envelopes that do not exist yet', async () => {
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+    );
 
-    await acknowledger.acknowledge(MAILBOX, READ, 99);
-    await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
+    await acknowledger.acknowledge(
+      new MailboxAcknowledgeMessage(MAILBOX, READ, 99),
+    );
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'b'.repeat(22), body(1024)),
+    );
 
     expect(await readCursors(MAILBOX, READ)).toEqual([2]);
   });
@@ -717,14 +883,20 @@ describe('mailboxes', () => {
   it('caps readers at MAILBOX_MAX_READERS and frees a slot when one is revoked', async () => {
     process.env.MAILBOX_MAX_READERS = '2';
     wirePolicy();
-    await adder.add(MAILBOX, READ, OTHER_READ_HASH);
-
-    await expect(adder.add(MAILBOX, READ, sha(THIRD))).rejects.toBeInstanceOf(
-      MailboxReaderLimitReachedError,
+    await adder.add(
+      new MailboxReaderAddMessage(MAILBOX, READ, OTHER_READ_HASH),
     );
 
-    await revoker.revoke(MAILBOX, READ, OTHER_READ_HASH);
-    await expect(adder.add(MAILBOX, READ, sha(THIRD))).resolves.toBe(true);
+    await expect(
+      adder.add(new MailboxReaderAddMessage(MAILBOX, READ, sha(THIRD))),
+    ).rejects.toBeInstanceOf(MailboxReaderLimitReachedError);
+
+    await revoker.revoke(
+      new MailboxReaderRevokeMessage(MAILBOX, READ, OTHER_READ_HASH),
+    );
+    await expect(
+      adder.add(new MailboxReaderAddMessage(MAILBOX, READ, sha(THIRD))),
+    ).resolves.toBe(true);
   });
 
   it('admits a reader for each device an identity may hold, plus the root, by default', async () => {
@@ -733,20 +905,32 @@ describe('mailboxes', () => {
 
     for (let device = 1; device <= MAX_DEVICE_CREDENTIALS; device += 1) {
       await expect(
-        adder.add(MAILBOX, READ, sha(`device-${device}`)),
+        adder.add(
+          new MailboxReaderAddMessage(MAILBOX, READ, sha(`device-${device}`)),
+        ),
       ).resolves.toBe(true);
     }
 
-    const { readers } = await lister.list(MAILBOX, READ);
+    const { readers } = await lister.list(
+      new MailboxReaderListMessage(MAILBOX, READ),
+    );
     expect(readers).toHaveLength(MAX_DEVICE_CREDENTIALS + 1);
   });
 
   it('lists readers with their acknowledged cursors, for readers only', async () => {
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
-    await adder.add(MAILBOX, READ, OTHER_READ_HASH);
-    await acknowledger.acknowledge(MAILBOX, READ, 1);
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+    );
+    await adder.add(
+      new MailboxReaderAddMessage(MAILBOX, READ, OTHER_READ_HASH),
+    );
+    await acknowledger.acknowledge(
+      new MailboxAcknowledgeMessage(MAILBOX, READ, 1),
+    );
 
-    await expect(lister.list(MAILBOX, OTHER_READ)).resolves.toEqual({
+    await expect(
+      lister.list(new MailboxReaderListMessage(MAILBOX, OTHER_READ)),
+    ).resolves.toEqual({
       maxReaders: MAX_DEVICE_CREDENTIALS + 1,
       readers: [
         { ackedCursor: 1, readTokenHash: READ_HASH },
@@ -756,35 +940,51 @@ describe('mailboxes', () => {
   });
 
   it('revoking a silent reader deletes what the remaining readers acknowledged', async () => {
-    await adder.add(MAILBOX, READ, OTHER_READ_HASH);
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
-    await appender.append(MAILBOX, POST, 'b'.repeat(22), body(1024));
-    await acknowledger.acknowledge(MAILBOX, READ, 2);
+    await adder.add(
+      new MailboxReaderAddMessage(MAILBOX, READ, OTHER_READ_HASH),
+    );
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+    );
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'b'.repeat(22), body(1024)),
+    );
+    await acknowledger.acknowledge(
+      new MailboxAcknowledgeMessage(MAILBOX, READ, 2),
+    );
     expect(await readCursors(MAILBOX, READ)).toEqual([1, 2]);
 
-    await revoker.revoke(MAILBOX, READ, OTHER_READ_HASH);
+    await revoker.revoke(
+      new MailboxReaderRevokeMessage(MAILBOX, READ, OTHER_READ_HASH),
+    );
 
     expect(await readCursors(MAILBOX, READ)).toEqual([]);
     await expect(
-      reader.read(MAILBOX, OTHER_READ, 0, 10),
+      reader.read(new MailboxReadMessage(MAILBOX, OTHER_READ, 0, 10)),
     ).rejects.toBeInstanceOf(MailboxNotFoundError);
   });
 
   it('refuses to revoke the last reader or a reader that is not registered', async () => {
     await expect(
-      revoker.revoke(MAILBOX, READ, READ_HASH),
+      revoker.revoke(new MailboxReaderRevokeMessage(MAILBOX, READ, READ_HASH)),
     ).rejects.toBeInstanceOf(MailboxLastReaderError);
 
-    await adder.add(MAILBOX, READ, OTHER_READ_HASH);
+    await adder.add(
+      new MailboxReaderAddMessage(MAILBOX, READ, OTHER_READ_HASH),
+    );
     await expect(
-      revoker.revoke(MAILBOX, READ, sha(THIRD)),
+      revoker.revoke(new MailboxReaderRevokeMessage(MAILBOX, READ, sha(THIRD))),
     ).rejects.toBeInstanceOf(MailboxReaderNotFoundError);
   });
 
   it('tells realtime listeners which reader was revoked', async () => {
-    await adder.add(MAILBOX, READ, OTHER_READ_HASH);
+    await adder.add(
+      new MailboxReaderAddMessage(MAILBOX, READ, OTHER_READ_HASH),
+    );
 
-    await revoker.revoke(MAILBOX, READ, OTHER_READ_HASH);
+    await revoker.revoke(
+      new MailboxReaderRevokeMessage(MAILBOX, READ, OTHER_READ_HASH),
+    );
 
     expect(notifier.readerRevoked).toHaveBeenCalledWith(
       MAILBOX,
@@ -794,7 +994,7 @@ describe('mailboxes', () => {
 
   it('tells realtime listeners nothing about a refused revocation', async () => {
     await expect(
-      revoker.revoke(MAILBOX, READ, READ_HASH),
+      revoker.revoke(new MailboxReaderRevokeMessage(MAILBOX, READ, READ_HASH)),
     ).rejects.toBeInstanceOf(MailboxLastReaderError);
 
     expect(notifier.readerRevoked).not.toHaveBeenCalled();
@@ -806,10 +1006,16 @@ describe('mailboxes', () => {
     const start = Date.now();
     const clock = jest.spyOn(Date, 'now').mockReturnValue(start);
 
-    await adder.add(MAILBOX, READ, OTHER_READ_HASH);
-    await appender.append(MAILBOX, POST, 'a'.repeat(22), body(1024));
+    await adder.add(
+      new MailboxReaderAddMessage(MAILBOX, READ, OTHER_READ_HASH),
+    );
+    await appender.append(
+      new MailboxAppendMessage(MAILBOX, POST, 'a'.repeat(22), body(1024)),
+    );
     clock.mockReturnValue(start + 800);
-    await acknowledger.acknowledge(MAILBOX, READ, 1);
+    await acknowledger.acknowledge(
+      new MailboxAcknowledgeMessage(MAILBOX, READ, 1),
+    );
     expect(await readCursors(MAILBOX, READ)).toEqual([1]);
 
     clock.mockReturnValue(start + 1200);
@@ -833,10 +1039,14 @@ describe('mailboxes', () => {
       readTokenHash: READ_HASH,
     });
 
-    await expect(lister.list(legacy, READ)).resolves.toEqual({
+    await expect(
+      lister.list(new MailboxReaderListMessage(legacy, READ)),
+    ).resolves.toEqual({
       maxReaders: MAX_DEVICE_CREDENTIALS + 1,
       readers: [{ ackedCursor: 0, readTokenHash: READ_HASH }],
     });
-    await expect(adder.add(legacy, READ, OTHER_READ_HASH)).resolves.toBe(true);
+    await expect(
+      adder.add(new MailboxReaderAddMessage(legacy, READ, OTHER_READ_HASH)),
+    ).resolves.toBe(true);
   });
 });

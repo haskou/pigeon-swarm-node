@@ -447,7 +447,7 @@ services:
   apps/schedulers/MailboxExpirationScheduler:
     class: /apps/schedulers/MailboxExpirationScheduler
     arguments:
-      - '@contexts/mailboxes/application/MailboxExpirer'
+      - '@contexts/mailboxes/application/expire/MailboxExpirer'
   apps/schedulers/NodeHeartbeatScheduler:
     class: /apps/schedulers/NodeHeartbeatScheduler
     arguments:
@@ -455,7 +455,7 @@ services:
   apps/schedulers/PrivateBlobExpirationScheduler:
     class: /apps/schedulers/PrivateBlobExpirationScheduler
     arguments:
-      - '@contexts/private-blobs/application/PrivateBlobExpirer'
+      - '@contexts/private-blobs/application/expire/PrivateBlobExpirer'
   contexts/calls/application/acknowledge-signal/CallSignalAcknowledger:
     class: /contexts/calls/application/acknowledge-signal/CallSignalAcknowledger
     arguments:
@@ -1812,67 +1812,67 @@ services:
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - '@contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataIndex'
-  contexts/mailboxes/application/MailboxAcknowledger:
-    class: /contexts/mailboxes/application/MailboxAcknowledger
+  contexts/mailboxes/application/acknowledge/MailboxAcknowledger:
+    class: /contexts/mailboxes/application/acknowledge/MailboxAcknowledger
     arguments:
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
-      - '@contexts/mailboxes/application/MailboxCoordinator'
-      - '@contexts/mailboxes/application/MailboxSettler'
-  contexts/mailboxes/application/MailboxAppender:
-    class: /contexts/mailboxes/application/MailboxAppender
+      - '@contexts/mailboxes/application/coordinate/MailboxCoordinator'
+      - '@contexts/mailboxes/application/settle/MailboxSettler'
+  contexts/mailboxes/application/add-reader/MailboxReaderAdder:
+    class: /contexts/mailboxes/application/add-reader/MailboxReaderAdder
     arguments:
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
       - '@contexts/mailboxes/domain/MailboxPolicy'
-      - '@contexts/mailboxes/application/MailboxCoordinator'
-      - '@contexts/mailboxes/application/MailboxEnvelopeNotifier'
-  contexts/mailboxes/application/MailboxCoordinator:
-    class: /contexts/mailboxes/application/MailboxCoordinator
+      - '@contexts/mailboxes/application/coordinate/MailboxCoordinator'
+  contexts/mailboxes/application/append/MailboxAppender:
+    class: /contexts/mailboxes/application/append/MailboxAppender
+    arguments:
+      - '@contexts/mailboxes/domain/repositories/MailboxRepository'
+      - '@contexts/mailboxes/domain/MailboxPolicy'
+      - '@contexts/mailboxes/application/coordinate/MailboxCoordinator'
+      - '@contexts/mailboxes/application/notify/MailboxEnvelopeNotifier'
+  contexts/mailboxes/application/coordinate/MailboxCoordinator:
+    class: /contexts/mailboxes/application/coordinate/MailboxCoordinator
     arguments: []
-  contexts/mailboxes/application/MailboxCreator:
-    class: /contexts/mailboxes/application/MailboxCreator
+  contexts/mailboxes/application/create/MailboxCreator:
+    class: /contexts/mailboxes/application/create/MailboxCreator
     arguments:
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
       - '@contexts/mailboxes/domain/MailboxPolicy'
-      - '@contexts/mailboxes/application/MailboxCoordinator'
-  contexts/mailboxes/application/MailboxEnvelopeNotifier: '@contexts/mailboxes/infrastructure/realtime/WebSocketMailboxEnvelopeNotifier'
-  contexts/mailboxes/application/MailboxExpirer:
-    class: /contexts/mailboxes/application/MailboxExpirer
+      - '@contexts/mailboxes/application/coordinate/MailboxCoordinator'
+  contexts/mailboxes/application/expire/MailboxExpirer:
+    class: /contexts/mailboxes/application/expire/MailboxExpirer
     arguments:
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
       - '@contexts/mailboxes/domain/MailboxPolicy'
-      - '@contexts/mailboxes/application/MailboxCoordinator'
-      - '@contexts/mailboxes/application/MailboxEnvelopeNotifier'
-  contexts/mailboxes/application/MailboxReader:
-    class: /contexts/mailboxes/application/MailboxReader
-    arguments:
-      - '@contexts/mailboxes/domain/repositories/MailboxRepository'
-      - '@contexts/mailboxes/application/MailboxCoordinator'
-  contexts/mailboxes/application/MailboxReaderAdder:
-    class: /contexts/mailboxes/application/MailboxReaderAdder
+      - '@contexts/mailboxes/application/coordinate/MailboxCoordinator'
+      - '@contexts/mailboxes/application/notify/MailboxEnvelopeNotifier'
+  contexts/mailboxes/application/list-readers/MailboxReaderLister:
+    class: /contexts/mailboxes/application/list-readers/MailboxReaderLister
     arguments:
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
       - '@contexts/mailboxes/domain/MailboxPolicy'
-      - '@contexts/mailboxes/application/MailboxCoordinator'
-  contexts/mailboxes/application/MailboxReaderLister:
-    class: /contexts/mailboxes/application/MailboxReaderLister
+  contexts/mailboxes/application/notify/MailboxEnvelopeNotifier: '@contexts/mailboxes/infrastructure/realtime/WebSocketMailboxEnvelopeNotifier'
+  contexts/mailboxes/application/read/MailboxReader:
+    class: /contexts/mailboxes/application/read/MailboxReader
     arguments:
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
-      - '@contexts/mailboxes/domain/MailboxPolicy'
-  contexts/mailboxes/application/MailboxReaderRevoker:
-    class: /contexts/mailboxes/application/MailboxReaderRevoker
+      - '@contexts/mailboxes/application/coordinate/MailboxCoordinator'
+  contexts/mailboxes/application/remove/MailboxRemover:
+    class: /contexts/mailboxes/application/remove/MailboxRemover
     arguments:
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
-      - '@contexts/mailboxes/application/MailboxCoordinator'
-      - '@contexts/mailboxes/application/MailboxSettler'
-      - '@contexts/mailboxes/application/MailboxEnvelopeNotifier'
-  contexts/mailboxes/application/MailboxRemover:
-    class: /contexts/mailboxes/application/MailboxRemover
+      - '@contexts/mailboxes/application/coordinate/MailboxCoordinator'
+      - '@contexts/mailboxes/application/notify/MailboxEnvelopeNotifier'
+  contexts/mailboxes/application/revoke-reader/MailboxReaderRevoker:
+    class: /contexts/mailboxes/application/revoke-reader/MailboxReaderRevoker
     arguments:
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
-      - '@contexts/mailboxes/application/MailboxCoordinator'
-      - '@contexts/mailboxes/application/MailboxEnvelopeNotifier'
-  contexts/mailboxes/application/MailboxSettler:
-    class: /contexts/mailboxes/application/MailboxSettler
+      - '@contexts/mailboxes/application/coordinate/MailboxCoordinator'
+      - '@contexts/mailboxes/application/settle/MailboxSettler'
+      - '@contexts/mailboxes/application/notify/MailboxEnvelopeNotifier'
+  contexts/mailboxes/application/settle/MailboxSettler:
+    class: /contexts/mailboxes/application/settle/MailboxSettler
     arguments:
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
   contexts/mailboxes/domain/MailboxPolicy:
@@ -1889,7 +1889,7 @@ services:
     class: >-
       /contexts/mailboxes/infrastructure/realtime/WebSocketMailboxEnvelopeNotifier
     arguments: []
-    parent: contexts/mailboxes/application/MailboxEnvelopeNotifier
+    parent: contexts/mailboxes/application/notify/MailboxEnvelopeNotifier
   contexts/nodes/application/add-network/NodeNetworkAdder:
     class: /contexts/nodes/application/add-network/NodeNetworkAdder
     arguments:
@@ -2316,29 +2316,29 @@ services:
       - >-
         @contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator
     parent: contexts/private-authorization/application/PrivateOperationUnitOfWork
-  contexts/private-blobs/application/PrivateBlobExpirer:
-    class: /contexts/private-blobs/application/PrivateBlobExpirer
+  contexts/private-blobs/application/expire/PrivateBlobExpirer:
+    class: /contexts/private-blobs/application/expire/PrivateBlobExpirer
     arguments:
       - '@contexts/private-blobs/domain/repositories/PrivateBlobRepository'
       - '@contexts/private-blobs/domain/repositories/PrivateBlobBytesStore'
       - '@contexts/private-blobs/domain/PrivateBlobPolicy'
-  contexts/private-blobs/application/PrivateBlobReader:
-    class: /contexts/private-blobs/application/PrivateBlobReader
+  contexts/private-blobs/application/read/PrivateBlobReader:
+    class: /contexts/private-blobs/application/read/PrivateBlobReader
     arguments:
       - '@contexts/private-blobs/domain/repositories/PrivateBlobRepository'
       - '@contexts/private-blobs/domain/repositories/PrivateBlobBytesStore'
-  contexts/private-blobs/application/PrivateBlobRemover:
-    class: /contexts/private-blobs/application/PrivateBlobRemover
+  contexts/private-blobs/application/remove/PrivateBlobRemover:
+    class: /contexts/private-blobs/application/remove/PrivateBlobRemover
     arguments:
       - '@contexts/private-blobs/domain/repositories/PrivateBlobRepository'
       - '@contexts/private-blobs/domain/repositories/PrivateBlobBytesStore'
-  contexts/private-blobs/application/PrivateBlobReserver:
-    class: /contexts/private-blobs/application/PrivateBlobReserver
+  contexts/private-blobs/application/reserve/PrivateBlobReserver:
+    class: /contexts/private-blobs/application/reserve/PrivateBlobReserver
     arguments:
       - '@contexts/private-blobs/domain/repositories/PrivateBlobRepository'
       - '@contexts/private-blobs/domain/PrivateBlobPolicy'
-  contexts/private-blobs/application/PrivateBlobUploader:
-    class: /contexts/private-blobs/application/PrivateBlobUploader
+  contexts/private-blobs/application/upload/PrivateBlobUploader:
+    class: /contexts/private-blobs/application/upload/PrivateBlobUploader
     arguments:
       - '@contexts/private-blobs/domain/repositories/PrivateBlobRepository'
       - '@contexts/private-blobs/domain/repositories/PrivateBlobBytesStore'
