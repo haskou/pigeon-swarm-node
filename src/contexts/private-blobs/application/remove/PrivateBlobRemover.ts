@@ -12,9 +12,9 @@ export default class PrivateBlobRemover {
   /** Bytes go first: a crash leaves a record that expiry cleans, never an orphan file. */
   public async remove(message: PrivateBlobRemoveMessage): Promise<void> {
     const blobId = message.blobId.valueOf();
-    const blob = await this.repository.findById(blobId);
+    const blob = await this.repository.requireById(blobId);
 
-    if (!blob || !blob.acceptsUpload(message.uploadToken.valueOf())) {
+    if (!blob.acceptsUpload(message.uploadToken.valueOf())) {
       throw new PrivateBlobNotFoundError();
     }
 

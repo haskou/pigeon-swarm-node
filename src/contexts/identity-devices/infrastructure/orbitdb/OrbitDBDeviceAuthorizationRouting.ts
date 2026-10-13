@@ -129,14 +129,20 @@ export default class OrbitDBDeviceAuthorizationRouting {
       identityId,
       candidate.getIdentity(),
       async (externalIdentifier) => {
+        if (
+          !(await this.identityRepository.hasByExternalIdentifier(
+            externalIdentifier,
+          ))
+        ) {
+          return undefined;
+        }
+
         const previous =
-          await this.identityRepository.findByExternalIdentifier(
+          await this.identityRepository.requireByExternalIdentifier(
             externalIdentifier,
           );
 
-        if (previous) {
-          root = { externalIdentifier, identity: previous };
-        }
+        root = { externalIdentifier, identity: previous };
 
         return previous;
       },

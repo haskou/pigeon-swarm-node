@@ -12,14 +12,18 @@ export abstract class DeviceAuthorizationRepository {
     transition: DeviceAuthorizationTransition,
   ): Promise<DeviceAuthorization>;
 
-  public abstract find(
-    identityId: IdentityId,
-  ): Promise<DeviceAuthorization | undefined>;
+  public abstract has(identityId: IdentityId): Promise<boolean>;
 
-  /** Every replayable authorization state of the identity, not only its head. */
-  public abstract findTimeline(
+  /** Rejects with DeviceAuthorizationNotFoundError when none is provisioned. */
+  public abstract require(identityId: IdentityId): Promise<DeviceAuthorization>;
+
+  /**
+   * Every replayable authorization state of the identity, not only its head.
+   * Rejects with DeviceAuthorizationNotFoundError when none is provisioned.
+   */
+  public abstract requireTimeline(
     identityId: IdentityId,
-  ): Promise<DeviceAuthorizationTimeline | undefined>;
+  ): Promise<DeviceAuthorizationTimeline>;
 
   /** The caps in effect at the head. */
   public abstract findCompromisedSince(

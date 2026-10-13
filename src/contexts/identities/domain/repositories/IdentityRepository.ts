@@ -33,9 +33,14 @@ export default abstract class IdentityRepository {
 
   public abstract findByHandle(handle: ProfileHandle): Promise<Identity>;
 
-  public abstract findByExternalIdentifier(
+  public abstract hasByExternalIdentifier(
     externalIdentifier: IdentityExternalIdentifier,
-  ): Promise<Identity | undefined>;
+  ): Promise<boolean>;
+
+  /** Rejects with IdentityNotFoundError when the document cannot be read. */
+  public abstract requireByExternalIdentifier(
+    externalIdentifier: IdentityExternalIdentifier,
+  ): Promise<Identity>;
 
   public abstract findCandidatesById(id: IdentityId): Promise<Identity[]>;
 }

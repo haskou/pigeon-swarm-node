@@ -226,8 +226,12 @@ export default class WebSocketClientMessageHandler {
     mailboxId: string,
     readToken: string,
   ): Promise<boolean> {
-    const mailbox = await this.mailboxRepository.findById(mailboxId);
+    if (!(await this.mailboxRepository.hasById(mailboxId))) {
+      return false;
+    }
 
-    return mailbox?.acceptsRead(readToken) ?? false;
+    const mailbox = await this.mailboxRepository.requireById(mailboxId);
+
+    return mailbox.acceptsRead(readToken);
   }
 }

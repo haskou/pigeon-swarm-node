@@ -16,7 +16,7 @@ export default class PrivateBlobExpirer {
     const orphans: string[] = [];
 
     for (const id of await this.bytes.listIds()) {
-      if (!(await this.repository.findById(id))) {
+      if (!(await this.repository.hasById(id))) {
         orphans.push(id);
       }
     }

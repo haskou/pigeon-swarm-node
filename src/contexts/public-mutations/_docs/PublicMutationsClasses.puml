@@ -28,7 +28,8 @@ package "identity-devices/domain" {
     +isAuthorizedAt(credential, revision): boolean
   }
   interface DeviceAuthorizationRepository {
-    +findTimeline(identityId): Promise<DeviceAuthorizationTimeline>
+    +has(identityId): Promise<boolean>
+    +requireTimeline(identityId): Promise<DeviceAuthorizationTimeline>
   }
 }
 

@@ -28,8 +28,10 @@ export default class IdentityPublisher {
     const isValid = await this.validator.isValidChainFor(
       new IdentityId(primitives.id),
       identity,
-      (externalIdentifier) =>
-        this.repository.findByExternalIdentifier(externalIdentifier),
+      async (externalIdentifier) =>
+        (await this.repository.hasByExternalIdentifier(externalIdentifier))
+          ? this.repository.requireByExternalIdentifier(externalIdentifier)
+          : undefined,
     );
 
     if (!isValid) {

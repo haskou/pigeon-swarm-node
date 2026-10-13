@@ -16,9 +16,9 @@ export default class MailboxRemover {
     const readToken = message.readToken.valueOf();
 
     await this.coordinator.run(async (): Promise<void> => {
-      const mailbox = await this.repository.findById(mailboxId);
+      const mailbox = await this.repository.requireById(mailboxId);
 
-      if (!mailbox || !mailbox.acceptsRead(readToken)) {
+      if (!mailbox.acceptsRead(readToken)) {
         throw new MailboxNotFoundError();
       }
 

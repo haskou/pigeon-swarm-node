@@ -20,9 +20,9 @@ export default class MailboxReaderLister {
     const mailboxId = message.mailboxId.valueOf();
     const readToken = message.readToken.valueOf();
 
-    const mailbox = await this.repository.findById(mailboxId);
+    const mailbox = await this.repository.requireById(mailboxId);
 
-    if (!mailbox || !mailbox.acceptsRead(readToken)) {
+    if (!mailbox.acceptsRead(readToken)) {
       throw new MailboxNotFoundError();
     }
 

@@ -3,6 +3,7 @@ import { Timestamp } from '@haskou/value-objects';
 import { PrivateBlob } from '../../domain/PrivateBlob';
 import PrivateBlobPolicy from '../../domain/PrivateBlobPolicy';
 import PrivateBlobRepository from '../../domain/repositories/PrivateBlobRepository';
+import PrivateBlobOwnerKeyDeriver from '../../domain/services/PrivateBlobOwnerKeyDeriver';
 import { PrivateBlobReserveMessage } from './messages/PrivateBlobReserveMessage';
 
 export interface PrivateBlobReservation {
@@ -18,6 +19,7 @@ export default class PrivateBlobReserver {
   constructor(
     private readonly repository: PrivateBlobRepository,
     private readonly policy: PrivateBlobPolicy,
+    private readonly ownerKeys: PrivateBlobOwnerKeyDeriver,
   ) {}
 
   private async reserveNow(
@@ -26,7 +28,7 @@ export default class PrivateBlobReserver {
     this.policy.assertSizeAllowed(message.size);
 
     const now = Timestamp.now();
-    const ownerKey = await this.repository.ownerKeyFor(
+    const ownerKey = await this.ownerKeys.derive(
       message.ownerIdentityId.valueOf(),
     );
     const [total, owned] = await Promise.all([

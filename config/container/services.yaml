@@ -2337,6 +2337,7 @@ services:
     arguments:
       - '@contexts/private-blobs/domain/repositories/PrivateBlobRepository'
       - '@contexts/private-blobs/domain/PrivateBlobPolicy'
+      - '@contexts/private-blobs/domain/services/PrivateBlobOwnerKeyDeriver'
   contexts/private-blobs/application/upload/PrivateBlobUploader:
     class: /contexts/private-blobs/application/upload/PrivateBlobUploader
     arguments:
@@ -2348,11 +2349,19 @@ services:
       - '@contexts/private-blobs/domain/PrivateBlobLimits'
   contexts/private-blobs/domain/repositories/PrivateBlobBytesStore: '@contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore'
   contexts/private-blobs/domain/repositories/PrivateBlobRepository: '@contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository'
+  contexts/private-blobs/domain/services/PrivateBlobOwnerKeyDeriver: >-
+    @contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobOwnerKeyDeriver
   contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore:
     class: >-
       /contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore
     arguments: []
     parent: contexts/private-blobs/domain/repositories/PrivateBlobBytesStore
+  contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobOwnerKeyDeriver:
+    class: >-
+      /contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobOwnerKeyDeriver
+    arguments:
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+    parent: contexts/private-blobs/domain/services/PrivateBlobOwnerKeyDeriver
   contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository:
     class: /contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository
     arguments:

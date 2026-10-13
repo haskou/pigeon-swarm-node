@@ -18,12 +18,21 @@ export default abstract class MailboxRepository {
 
   public abstract create(mailbox: Mailbox): Promise<void>;
 
-  public abstract findById(id: string): Promise<Mailbox | undefined>;
+  public abstract hasById(id: string): Promise<boolean>;
 
-  public abstract findCursorByEnvelopeId(
+  /** Rejects with MailboxNotFoundError when the mailbox is absent. */
+  public abstract requireById(id: string): Promise<Mailbox>;
+
+  public abstract hasEnvelope(
     mailboxId: string,
     envelopeId: string,
-  ): Promise<number | undefined>;
+  ): Promise<boolean>;
+
+  /** Rejects with MailboxEnvelopeNotFoundError when the envelope is absent. */
+  public abstract requireEnvelopeCursor(
+    mailboxId: string,
+    envelopeId: string,
+  ): Promise<number>;
 
   /** Highest cursor any removed mailbox reached on this node; 0 when none. */
   public abstract highestRetiredCursor(): Promise<number>;

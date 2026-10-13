@@ -15,9 +15,8 @@ import { ShortLivedLookup } from './ShortLivedLookup';
  * trusted.
  */
 export default class DeviceAuthorizationPublicMutationAuthorization extends PublicMutationAuthorAuthorization {
-  private readonly lookups = new ShortLivedLookup<
-    DeviceAuthorizationTimeline | undefined
-  >();
+  private readonly lookups =
+    new ShortLivedLookup<DeviceAuthorizationTimeline>();
 
   constructor(private readonly repository: DeviceAuthorizationRepository) {
     super();
@@ -26,15 +25,16 @@ export default class DeviceAuthorizationPublicMutationAuthorization extends Publ
   public async isAuthorized(
     author: PublicMutationAuthorPrimitives,
   ): Promise<boolean> {
-    const timeline = await this.lookups.get(author.identityId, () =>
-      this.repository.findTimeline(new IdentityId(author.identityId)),
+    const identityId = new IdentityId(author.identityId);
+    const timeline = await this.lookups.get(author.identityId, async () =>
+      (await this.repository.has(identityId))
+        ? this.repository.requireTimeline(identityId)
+        : new DeviceAuthorizationTimeline([]),
     );
 
-    return (
-      timeline?.isAuthorizedAt(
-        DeviceCredential.fromWire(author.deviceCredential),
-        new DeviceAuthorizationRevision(author.authorizationRevision),
-      ) ?? false
+    return timeline.isAuthorizedAt(
+      DeviceCredential.fromWire(author.deviceCredential),
+      new DeviceAuthorizationRevision(author.authorizationRevision),
     );
   }
 }

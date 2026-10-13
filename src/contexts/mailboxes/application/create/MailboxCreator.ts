@@ -61,9 +61,9 @@ export default class MailboxCreator {
     }
 
     return this.coordinator.run(async (): Promise<boolean> => {
-      const existing = await this.repository.findById(mailboxId);
+      if (await this.repository.hasById(mailboxId)) {
+        const existing = await this.repository.requireById(mailboxId);
 
-      if (existing) {
         existing.requireHashes(postTokenHash, readTokenHash);
 
         return false;

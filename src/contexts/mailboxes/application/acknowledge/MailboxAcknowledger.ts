@@ -19,9 +19,9 @@ export default class MailboxAcknowledger {
     const readToken = message.readToken.valueOf();
 
     return this.coordinator.run(async (): Promise<void> => {
-      const mailbox = await this.repository.findById(mailboxId);
+      const mailbox = await this.repository.requireById(mailboxId);
 
-      if (!mailbox || !mailbox.acknowledge(readToken, message.upTo)) {
+      if (!mailbox.acknowledge(readToken, message.upTo)) {
         throw new MailboxNotFoundError();
       }
 
