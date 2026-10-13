@@ -59,13 +59,12 @@ describe('IdentityCandidateValidationDomainService', () => {
       ...previousNetworks,
       '550e8400-e29b-41d4-a716-446655440077',
     ];
+    const proof = new IdentityAdmissionProof(mother.id.valueOf(), networks);
     const candidate = await mother.buildNext({
-      admissionNonce: IdentityAdmissionProof.mine(
+      admissionNonce: new IdentityAdmissionProof(
         mother.id.valueOf(),
         previousNetworks,
-        (nonce) =>
-          !IdentityAdmissionProof.isValid(mother.id.valueOf(), networks, nonce),
-      ),
+      ).mine((nonce) => !proof.isValid(nonce)),
       networks,
       previousIdentityExternalIdentifier: 'bafypreviousidentity',
     });
