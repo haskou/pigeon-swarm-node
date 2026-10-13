@@ -33,7 +33,7 @@ describe('ContentReplicationMutationPolicy', () => {
 
     return {
       cid,
-      context: 'ipfs_private_upload',
+      context: 'ipfs_public_upload',
       id: ContentReplication.idOf(networkId, cid),
       networkId,
       ownerIdentityId: OWNER,
@@ -147,6 +147,12 @@ describe('ContentReplicationMutationPolicy', () => {
 
     it('refuses an unknown context', async () => {
       await expect(admit({ context: 'html' })).rejects.toThrow(
+        InvalidPublicMutationError,
+      );
+    });
+
+    it('refuses a legacy private-upload registration: private content is never replicated', async () => {
+      await expect(admit({ context: 'ipfs_private_upload' })).rejects.toThrow(
         InvalidPublicMutationError,
       );
     });

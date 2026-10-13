@@ -281,7 +281,7 @@ async function main(): Promise<void> {
       ContentReplication.create(
         new ContentId(cid),
         new NetworkId(networkId),
-        new ContentReplicationContext('ipfs_private_upload'),
+        new ContentReplicationContext(ContentReplicationContext.PUBLIC_UPLOAD),
         new ContentSize(2048),
         new IdentityId(owner.id),
       ),
@@ -316,6 +316,22 @@ async function main(): Promise<void> {
     await listed(honest),
     [],
     'gated node lists no forged record',
+  );
+
+  stage = 'a signed legacy private-upload registration is refused';
+  const legacy = {
+    ...ownerPayload(cidOf(5)),
+    context: 'ipfs_private_upload',
+  };
+
+  await raw(legacy, sign(owner, legacy as never));
+  await until('control received the legacy registration', async () =>
+    (await rawIds(control)).includes(legacy.id as string),
+  );
+  await pause(3000);
+  assert.ok(
+    !(await listed(honest)).includes(cidOf(5)),
+    'gated node never lists a legacy private registration',
   );
 
   stage = 'a signed registration is admitted';
