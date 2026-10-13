@@ -123,6 +123,13 @@ export default class CommunityRepositoryRouter extends CommunityRepository {
     );
   }
 
+  /** Measures the replicated public store: what peers of the network compare. */
+  public findFrontiersByNetwork(
+    networkId: string,
+  ): Promise<Array<{ communityId: CommunityId; frontier: string[] }>> {
+    return this.publicRepository.findFrontiersByNetwork(networkId);
+  }
+
   public async save(
     operation: CommunityOperation,
     proof: PublicMutationProof,

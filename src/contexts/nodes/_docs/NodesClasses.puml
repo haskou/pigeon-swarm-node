@@ -32,6 +32,16 @@ package "nodes" {
       +eventName(): string
     }
 
+    class NodeCommunityStateWasAnnounced <DomainEvent> {
+      +eventName(): string
+    }
+
+    class NodeCommunityStateDigest <StringValueObject>
+
+    abstract class NodeCommunityStateDigester {
+      +digest(networkId: string): Promise<NodeCommunityStateDigest>
+    }
+
     class NodePeer {
       -id: NodeId
       -owner?: IdentityId
@@ -164,6 +174,14 @@ package "nodes" {
 
     abstract class NodeNetworkSynchronizationMonitor
 
+    class NodeCommunityStateAnnouncer {
+      +announce(): Promise<void>
+    }
+
+    class NodePeerCommunityStateRecorder {
+      +record(message: NodePeerCommunityStateRecordMessage): void
+    }
+
     NodeNetworkAdder --> NodeLoaderService
     NodeNetworkAdder --> NodeSaverService
     NodeNetworkAdder --> NodeNetworkAdderMessage
@@ -182,6 +200,10 @@ package "nodes" {
     NodePeersFinder --> NodePeerRepository
     NodePeersFinder --> NodeRepository
     NodeNetworkSynchronizationFinder --> NodeNetworkSynchronizationMonitor
+    NodeCommunityStateAnnouncer --> NodeNetworkSynchronizationMonitor
+    NodeCommunityStateAnnouncer --> NodeCommunityStateDigester
+    NodeCommunityStateAnnouncer ..> NodeCommunityStateWasAnnounced
+    NodePeerCommunityStateRecorder --> NodeNetworkSynchronizationMonitor
   }
 
   package "infrastructure" {
@@ -196,6 +218,18 @@ package "nodes" {
       +findActive(): Promise<NodePeer[]>
     }
 
+    class InMemoryNodeNetworkSynchronizationMonitor
+
+    class CommunityRepositoryNodeCommunityStateDigester {
+      -communityRepository: CommunityRepository
+    }
+
+    note right of CommunityRepositoryNodeCommunityStateDigester
+      Hashes every community frontier of a network.
+      Equal digests mean equal community state;
+      the digest is never exposed to clients.
+    end note
+
     note right of LocalNodeMetadataRepository
       Active node metadata repository.
       Local embedded storage owns nodeId, owner and
@@ -206,6 +240,8 @@ package "nodes" {
 
     LocalNodeMetadataRepository ..|> NodeRepository
     LocalNodePeerRepository ..|> NodePeerRepository
+    InMemoryNodeNetworkSynchronizationMonitor ..|> NodeNetworkSynchronizationMonitor
+    CommunityRepositoryNodeCommunityStateDigester ..|> NodeCommunityStateDigester
   }
 }
 

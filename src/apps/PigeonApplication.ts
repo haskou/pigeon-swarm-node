@@ -33,6 +33,7 @@ import { MailboxLimitsFromEnvironment } from '../contexts/mailboxes/infrastructu
 import LocalMailboxRepository from '../contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository';
 import NodeNetworkSynchronizationMonitor from '../contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
+import { NodeCommunityStateWasAnnounced } from '../contexts/nodes/domain/events/NodeCommunityStateWasAnnounced';
 import NotificationScopeSettingsRepository from '../contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
 import NotificationScopeSettingsRepositoryRouter from '../contexts/notification-settings/infrastructure/NotificationScopeSettingsRepositoryRouter';
 import { NotificationReplicationLimits } from '../contexts/notifications/domain/NotificationReplicationLimits';
@@ -341,15 +342,22 @@ export default class PigeonApplication {
         },
       ],
     });
-    this.kernel.registerConsumerMiddleware(
-      new IdempotencyConsumerMiddleware({
-        key: (_event, context) => `${context.queueName}:${context.eventId}`,
-        store:
-          this.kernel.di.getService<LocalProcessedDomainEventIdempotencyStore>(
-            LocalProcessedDomainEventIdempotencyStore,
-          ),
-      }),
-    );
+    const idempotency = new IdempotencyConsumerMiddleware({
+      key: (_event, context) => `${context.queueName}:${context.eventId}`,
+      store:
+        this.kernel.di.getService<LocalProcessedDomainEventIdempotencyStore>(
+          LocalProcessedDomainEventIdempotencyStore,
+        ),
+    });
+
+    // Community state announcements repeat every few seconds and are idempotent:
+    // recording each delivery durably would grow the local database forever.
+    this.kernel.registerConsumerMiddleware({
+      handle: (event, next, context) =>
+        context.eventName === NodeCommunityStateWasAnnounced.EVENT_NAME
+          ? next()
+          : idempotency.handle(event, next, context),
+    });
   }
 
   public configureWebSocketEventHub(): void {

@@ -541,6 +541,37 @@ regressions additionally cover the fold, the causal ledger, the admission policy
 the repository. Loopback transport does not validate external NAT traversal or
 calls.
 
+## Community state announcements
+
+Peers joining every OrbitDB store only proves participation. To report content
+equality, every node announces, every 10 seconds and for each network it has
+observed, `nodes.v1.community_state.was_announced`:
+
+- aggregate id: the announcing libp2p peer id of that network
+- `networkId`: routes the announcement inside that network, so private-network
+  announcements are encrypted like any other private event
+- `digest`: SHA-256 (base64url) of the sorted `[communityId, sorted frontier]`
+  pairs of every community of the network, deleted ones included. Frontiers are
+  content hashes of the operation DAG, so equal digests mean equal folded state
+
+The digest never reveals payloads, topics, community ids or counts to observers
+that do not already hold the same state, and the event is never delivered to
+WebSocket clients. For each observed network a receiver keeps at most 256 peer
+digests, drops those older than 35 seconds, and compares them with its own
+digest to derive `communityState` in the
+[network synchronization status](api.md#get-active-peers).
+Announcements are periodic and idempotent, so they bypass the durable consumer
+idempotency store; recording each delivery would grow the local database
+without bound.
+
+Trust boundary: the announcing peer id is claimed, not authenticated. The
+pub/sub layer hands consumers only the decoded payload, never the signing
+gossipsub peer, so the claim cannot be bound to the sender. A network member
+can therefore spoof another peer's state. The announcement is status-only: it
+feeds this diagnostic and never touches replicated data, admission or routing.
+Nodes on older versions never announce and stay `unknown`, which keeps the
+network `syncing`.
+
 ## Other signed public mutations
 
 Signed public mutations (pins, reactions and the other governed collections):

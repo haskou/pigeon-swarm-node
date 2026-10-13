@@ -111,10 +111,11 @@ describe('OrbitDBReplicatedStateRuntime', () => {
       register: jest.fn(),
       unregister: jest.fn(),
     } as unknown as OrbitDBReplicatedStateRegistry;
+    const synchronizationMonitor = fakeSynchronizationMonitor();
     const runtime = new OrbitDBReplicatedStateRuntime(
       networkRegistry,
       replicatedStateRegistry,
-      fakeSynchronizationMonitor(),
+      synchronizationMonitor,
     );
     const open = jest
       .spyOn(OrbitDBPrivateNetworkStores, 'open')
@@ -131,6 +132,9 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     expect(replicatedStateRegistry.register).toHaveBeenCalledWith(
       'network-1',
       stores,
+    );
+    expect(synchronizationMonitor.observe).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'network-1', localPeerId: 'peer-1' }),
     );
   });
 

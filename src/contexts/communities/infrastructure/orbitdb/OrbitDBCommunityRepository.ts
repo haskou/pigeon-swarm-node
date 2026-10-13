@@ -254,6 +254,43 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     return (await this.findState(id))?.frontier ?? [];
   }
 
+  /**
+   * The frontier of every community of `networkId` cached on this node,
+   * deleted ones included, sorted by community id.
+   */
+  public findFrontiersByNetwork(
+    networkId: string,
+  ): Promise<Array<{ communityId: CommunityId; frontier: string[] }>> {
+    return Promise.resolve(
+      this.registry
+        .findCachedHeadsByPrefix(OrbitDBCommunityRepository.HEAD_PREFIX)
+        .flatMap((head) => {
+          const communityId = head.communityId;
+
+          if (
+            head.networkId !== networkId ||
+            typeof communityId !== 'string' ||
+            communityId.length === 0
+          ) {
+            return [];
+          }
+
+          return [
+            {
+              communityId: new CommunityId(communityId),
+              frontier: this.stateOf(
+                communityId,
+                this.operationIndex.recordsFromHead(head),
+              ).frontier,
+            },
+          ];
+        })
+        .sort((left, right) =>
+          left.communityId.valueOf().localeCompare(right.communityId.valueOf()),
+        ),
+    );
+  }
+
   public findDiscoverable(
     options: {
       networkId?: string;

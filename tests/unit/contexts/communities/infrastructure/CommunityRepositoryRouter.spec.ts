@@ -123,6 +123,22 @@ describe('CommunityRepositoryRouter', () => {
     await expect(router.findFrontier(id)).resolves.toEqual(['head']);
   });
 
+  it('reports the replicated frontiers of a network from the public store', async () => {
+    const frontiers = [{ communityId: id, frontier: ['head'] }];
+
+    publicRepository.findFrontiersByNetwork = jest
+      .fn()
+      .mockResolvedValue(frontiers);
+
+    await expect(router.findFrontiersByNetwork('network-1')).resolves.toBe(
+      frontiers,
+    );
+    expect(publicRepository.findFrontiersByNetwork).toHaveBeenCalledWith(
+      'network-1',
+    );
+    expect(authorizationRepository.hasScope).not.toHaveBeenCalled();
+  });
+
   it('removes protected collisions from public list queries', async () => {
     const protectedCommunity = {
       getId: () => id,

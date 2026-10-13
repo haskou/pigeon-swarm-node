@@ -220,6 +220,12 @@ services:
     arguments:
       - '@shared/infrastructure/messageBus/DomainEventConsumer'
       - '@contexts/keychains/application/find-current/CurrentKeychainFinder'
+  apps/consumers/pubsub/nodes/RecordPeerCommunityStateWhenAnnounced:
+    class: /apps/consumers/pubsub/nodes/RecordPeerCommunityStateWhenAnnounced
+    arguments:
+      - '@shared/infrastructure/messageBus/DomainEventConsumer'
+      - >-
+        @contexts/nodes/application/record-peer-community-state/NodePeerCommunityStateRecorder
   apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived:
     class: /apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived
     arguments:
@@ -445,6 +451,11 @@ services:
     class: /apps/schedulers/MailboxExpirationScheduler
     arguments:
       - '@contexts/mailboxes/application/expire/MailboxExpirer'
+  apps/schedulers/NodeCommunityStateAnnouncementScheduler:
+    class: /apps/schedulers/NodeCommunityStateAnnouncementScheduler
+    arguments:
+      - >-
+        @contexts/nodes/application/announce-community-state/NodeCommunityStateAnnouncer
   apps/schedulers/NodeHeartbeatScheduler:
     class: /apps/schedulers/NodeHeartbeatScheduler
     arguments:
@@ -1889,6 +1900,14 @@ services:
       - '@contexts/nodes/domain/services/NodeLoaderService'
       - '@contexts/nodes/domain/services/NodeSaverService'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/nodes/application/announce-community-state/NodeCommunityStateAnnouncer:
+    class: >-
+      /contexts/nodes/application/announce-community-state/NodeCommunityStateAnnouncer
+    arguments:
+      - >-
+        @contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor
+      - '@contexts/nodes/domain/services/NodeCommunityStateDigester'
+      - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/nodes/application/assign-owner/NodeOwnerAssigner:
     class: /contexts/nodes/application/assign-owner/NodeOwnerAssigner
     arguments:
@@ -1911,6 +1930,12 @@ services:
     class: /contexts/nodes/application/load/NodeLoader
     arguments:
       - '@contexts/nodes/domain/services/NodeLoaderService'
+  contexts/nodes/application/record-peer-community-state/NodePeerCommunityStateRecorder:
+    class: >-
+      /contexts/nodes/application/record-peer-community-state/NodePeerCommunityStateRecorder
+    arguments:
+      - >-
+        @contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor
   contexts/nodes/application/register-peer/NodePeerRegistrar:
     class: /contexts/nodes/application/register-peer/NodePeerRegistrar
     arguments:
@@ -1937,6 +1962,8 @@ services:
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/nodes/domain/repositories/NodePeerRepository: '@contexts/nodes/infrastructure/local-db/LocalNodePeerRepository'
   contexts/nodes/domain/repositories/NodeRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeMetadataRepository'
+  contexts/nodes/domain/services/NodeCommunityStateDigester: >-
+    @contexts/nodes/infrastructure/network-synchronization/CommunityRepositoryNodeCommunityStateDigester
   contexts/nodes/domain/services/NodeLoaderService:
     class: /contexts/nodes/domain/services/NodeLoaderService
     arguments:
@@ -1967,6 +1994,12 @@ services:
   contexts/nodes/infrastructure/local-db/mappers/LocalNodeMetadataMapper:
     class: /contexts/nodes/infrastructure/local-db/mappers/LocalNodeMetadataMapper
     arguments: []
+  contexts/nodes/infrastructure/network-synchronization/CommunityRepositoryNodeCommunityStateDigester:
+    class: >-
+      /contexts/nodes/infrastructure/network-synchronization/CommunityRepositoryNodeCommunityStateDigester
+    arguments:
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+    parent: contexts/nodes/domain/services/NodeCommunityStateDigester
   contexts/nodes/infrastructure/network-synchronization/InMemoryNodeNetworkSynchronizationMonitor:
     class: >-
       /contexts/nodes/infrastructure/network-synchronization/InMemoryNodeNetworkSynchronizationMonitor
