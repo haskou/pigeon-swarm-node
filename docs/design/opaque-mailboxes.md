@@ -136,13 +136,26 @@ Backups: managed copies live only in the local database directory. Deleting a
 mailbox removes the rows; copies held in filesystem snapshots or operator backups
 are outside the node's control and are documented as such.
 
-## Availability replication (not yet implemented)
+## Availability replication (node side in place, client not implemented)
 
 By default a mailbox lives on the recipient's home node only. A recipient may
 name additional *availability servers* explicitly; the `PUT` is then repeated on
 each, with the same hashes. Senders append to every listed server and the
 recipient reads from all, deduplicating by `envelopeId`. Nothing is replicated to
 servers the recipient did not choose, and there is no gossip of mailbox state.
+
+The node needs nothing beyond the operations above. Each server keeps its own
+queue, cursors, readers and acknowledgements; a retried append returns its first
+cursor. `test:e2e:real-transport:mailbox-two-node` checks this on two real
+nodes: the same mailbox and envelope on both, an append to one never reaching
+the other, an acknowledgement on one leaving the other's copy, and the second
+node still delivering after the first stops. Creation difficulty depends on each
+node's fill, so a proof mined for one server can be too short for another; that
+server refuses it with `400` and the bits it needs.
+
+Not implemented, in the client: choosing availability servers, telling senders
+about them inside the encrypted channel, fan-out appends, and reading and
+deduplicating across servers.
 
 ## Group fan-out (not yet implemented)
 
