@@ -1,8 +1,5 @@
-import { assert } from '@haskou/value-objects';
-
 import { DeviceAuthorization } from '../../domain/DeviceAuthorization';
 import { DeviceCompromiseCaps } from '../../domain/DeviceCompromiseCaps';
-import { DeviceAuthorizationNotFoundError } from '../../domain/errors/DeviceAuthorizationNotFoundError';
 import { DeviceAuthorizationRepository } from '../../domain/repositories/DeviceAuthorizationRepository';
 import { DeviceAuthorizationFindMessage } from './messages/DeviceAuthorizationFindMessage';
 
@@ -11,14 +8,10 @@ export default class DeviceAuthorizationFinder {
     private readonly repository: DeviceAuthorizationRepository,
   ) {}
 
-  public async find(
+  public find(
     message: DeviceAuthorizationFindMessage,
   ): Promise<DeviceAuthorization> {
-    const authorization = await this.repository.find(message.identityId);
-
-    assert(authorization, new DeviceAuthorizationNotFoundError());
-
-    return authorization;
+    return this.repository.require(message.identityId);
   }
 
   public findCompromisedSince(

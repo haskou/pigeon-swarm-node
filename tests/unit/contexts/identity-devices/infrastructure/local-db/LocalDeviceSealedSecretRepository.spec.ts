@@ -1,5 +1,7 @@
 import { DeviceSealedSecretBundle } from '@app/contexts/identity-devices/domain/DeviceSealedSecretBundle';
 import { DeviceSealedSecretGenerationStaleError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretGenerationStaleError';
+import { DeviceSealedSecretNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretNotFoundError';
+import { InvalidDeviceSealedSecretBundleError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceSealedSecretBundleError';
 import LocalDeviceSealedSecretRepository from '@app/contexts/identity-devices/infrastructure/local-db/LocalDeviceSealedSecretRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
@@ -61,13 +63,31 @@ describe(LocalDeviceSealedSecretRepository.name, () => {
     });
   }
 
-  it('returns undefined for an identity without a bundle', async () => {
+  it('reports an identity without a bundle as absent and rejects requiring it', async () => {
     const repository = new LocalDeviceSealedSecretRepository(database);
     const { identityId } = await singleDeviceFixture();
 
+    await expect(repository.has(new IdentityId(identityId))).resolves.toBe(
+      false,
+    );
     await expect(
-      repository.find(new IdentityId(identityId)),
-    ).resolves.toBeUndefined();
+      repository.require(new IdentityId(identityId)),
+    ).rejects.toThrow(DeviceSealedSecretNotFoundError);
+  });
+
+  it('rejects a malformed stored bundle', async () => {
+    const repository = new LocalDeviceSealedSecretRepository(database);
+    const { identityId } = await singleDeviceFixture();
+    await database.save('device-sealed-secrets', identityId, {
+      generation: 'not a number',
+    });
+
+    await expect(repository.has(new IdentityId(identityId))).resolves.toBe(
+      true,
+    );
+    await expect(
+      repository.require(new IdentityId(identityId)),
+    ).rejects.toThrow(InvalidDeviceSealedSecretBundleError);
   });
 
   it('keeps the newest generation across a restart', async () => {
@@ -81,8 +101,8 @@ describe(LocalDeviceSealedSecretRepository.name, () => {
     database = new EmbeddedLocalDatabase();
     const reopened = new LocalDeviceSealedSecretRepository(database);
 
-    const stored = await reopened.find(new IdentityId(fixture.identityId));
-    expect(stored?.toPrimitives()).toEqual(newest.toPrimitives());
+    const stored = await reopened.require(new IdentityId(fixture.identityId));
+    expect(stored.toPrimitives()).toEqual(newest.toPrimitives());
   });
 
   it('admits exactly one of two concurrent writes at the same generation', async () => {
@@ -110,9 +130,9 @@ describe(LocalDeviceSealedSecretRepository.name, () => {
       DeviceSealedSecretGenerationStaleError,
     );
 
-    const stored = await repository.find(new IdentityId(fixture.identityId));
+    const stored = await repository.require(new IdentityId(fixture.identityId));
     const winners = [first, second].map((bundle) => bundle.toPrimitives());
-    expect(winners).toContainEqual(stored?.toPrimitives());
+    expect(winners).toContainEqual(stored.toPrimitives());
   });
 
   it('rejects an older generation once a newer one is stored', async () => {
@@ -125,8 +145,8 @@ describe(LocalDeviceSealedSecretRepository.name, () => {
       repository.replaceIfNewer(bundleAt(fixture, 2)),
     ).rejects.toThrow(DeviceSealedSecretGenerationStaleError);
 
-    const stored = await repository.find(new IdentityId(fixture.identityId));
-    expect(stored?.toPrimitives()).toEqual(newest.toPrimitives());
+    const stored = await repository.require(new IdentityId(fixture.identityId));
+    expect(stored.toPrimitives()).toEqual(newest.toPrimitives());
   });
 
   it('keeps bundles for different identities apart', async () => {
@@ -135,10 +155,10 @@ describe(LocalDeviceSealedSecretRepository.name, () => {
     const repository = new LocalDeviceSealedSecretRepository(database);
     await repository.replaceIfNewer(bundleAt(alpha, 5));
 
-    await expect(
-      repository.find(new IdentityId(beta.identityId)),
-    ).resolves.toBeUndefined();
-    const stored = await repository.find(new IdentityId(alpha.identityId));
-    expect(stored?.getGeneration().valueOf()).toBe(5);
+    await expect(repository.has(new IdentityId(beta.identityId))).resolves.toBe(
+      false,
+    );
+    const stored = await repository.require(new IdentityId(alpha.identityId));
+    expect(stored.getGeneration().valueOf()).toBe(5);
   });
 });

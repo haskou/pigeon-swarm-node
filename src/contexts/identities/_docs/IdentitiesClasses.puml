@@ -72,7 +72,8 @@ package "identities.domain" {
     +save(identity: Identity): Promise<IdentityExternalIdentifier>
     +findById(id: IdentityId): Promise<Identity>
     +findByHandle(handle: ProfileHandle): Promise<Identity>
-    +findByExternalIdentifier(externalIdentifier): Promise<Identity?>
+    +hasByExternalIdentifier(externalIdentifier): Promise<boolean>
+    +requireByExternalIdentifier(externalIdentifier): Promise<Identity>
     +findCandidateReferencesById(id): Promise<IdentityCandidate[]>
     +findCandidateByExternalIdentifier(id, externalIdentifier): Promise<IdentityCandidate>
     +findCandidateByHandle(handle): Promise<IdentityCandidate>
@@ -198,7 +199,8 @@ package "identities.infrastructure" {
     +save(identity: Identity): Promise<IdentityExternalIdentifier>
     +findById(id: IdentityId): Promise<Identity>
     +findByHandle(handle: ProfileHandle): Promise<Identity>
-    +findByExternalIdentifier(externalIdentifier): Promise<Identity?>
+    +hasByExternalIdentifier(externalIdentifier): Promise<boolean>
+    +requireByExternalIdentifier(externalIdentifier): Promise<Identity>
     +findCandidateByExternalIdentifier(id, externalIdentifier): Promise<IdentityCandidate>
     +findCandidatesById(id: IdentityId): Promise<Identity[]>
   }

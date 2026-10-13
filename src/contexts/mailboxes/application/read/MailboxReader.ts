@@ -23,9 +23,9 @@ export default class MailboxReader {
     const readToken = message.readToken.valueOf();
 
     return this.coordinator.run(async (): Promise<MailboxPage> => {
-      const mailbox = await this.repository.findById(mailboxId);
+      const mailbox = await this.repository.requireById(mailboxId);
 
-      if (!mailbox || !mailbox.acceptsRead(readToken)) {
+      if (!mailbox.acceptsRead(readToken)) {
         throw new MailboxNotFoundError();
       }
 

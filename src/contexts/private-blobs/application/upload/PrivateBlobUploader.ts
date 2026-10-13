@@ -17,10 +17,9 @@ export default class PrivateBlobUploader {
 
   public async upload(message: PrivateBlobUploadMessage): Promise<void> {
     const blobId = message.blobId.valueOf();
-    const blob = await this.repository.findById(blobId);
+    const blob = await this.repository.requireById(blobId);
 
     if (
-      !blob ||
       blob.isExpired(Timestamp.now()) ||
       !blob.acceptsUpload(message.uploadToken.valueOf())
     ) {

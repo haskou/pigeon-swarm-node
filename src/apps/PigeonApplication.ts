@@ -62,8 +62,10 @@ import LocalPrivateOperationUnitOfWork from '../contexts/private-authorization/i
 import { PrivateBlobLimits } from '../contexts/private-blobs/domain/PrivateBlobLimits';
 import PrivateBlobBytesStore from '../contexts/private-blobs/domain/repositories/PrivateBlobBytesStore';
 import PrivateBlobRepository from '../contexts/private-blobs/domain/repositories/PrivateBlobRepository';
+import PrivateBlobOwnerKeyDeriver from '../contexts/private-blobs/domain/services/PrivateBlobOwnerKeyDeriver';
 import { PrivateBlobLimitsFromEnvironment } from '../contexts/private-blobs/infrastructure/environment/PrivateBlobLimitsFromEnvironment';
 import FilePrivateBlobBytesStore from '../contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore';
+import LocalPrivateBlobOwnerKeyDeriver from '../contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobOwnerKeyDeriver';
 import LocalPrivateBlobRepository from '../contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository';
 import { pigeonEnvironmentSchema } from '../shared/infrastructure/environment/PigeonEnvironment';
 import HttpRequestContext from '../shared/infrastructure/express/HttpRequestContext';
@@ -265,6 +267,10 @@ export default class PigeonApplication {
         },
         { token: PrivateBlobRepository, useClass: LocalPrivateBlobRepository },
         { token: PrivateBlobBytesStore, useClass: FilePrivateBlobBytesStore },
+        {
+          token: PrivateBlobOwnerKeyDeriver,
+          useClass: LocalPrivateBlobOwnerKeyDeriver,
+        },
         {
           token: PrivateAuthorizationRepository,
           useClass: LocalPrivateAuthorizationRepository,

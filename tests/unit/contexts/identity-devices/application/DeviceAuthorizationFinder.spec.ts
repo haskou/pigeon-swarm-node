@@ -36,19 +36,21 @@ describe(DeviceAuthorizationFinder.name, () => {
 
   it('returns the current authorization checkpoint', async () => {
     const { authorization, message, repository } = await fixture();
-    repository.find.mockResolvedValue(authorization);
+    repository.require.mockResolvedValue(authorization);
 
     const result = await new DeviceAuthorizationFinder(repository).find(
       message,
     );
 
-    expect(repository.find).toHaveBeenCalledWith(message.identityId);
+    expect(repository.require).toHaveBeenCalledWith(message.identityId);
     expect(result).toBe(authorization);
   });
 
   it('rejects an identity without an authorization checkpoint', async () => {
     const { message, repository } = await fixture();
-    repository.find.mockResolvedValue(undefined);
+    repository.require.mockRejectedValue(
+      new DeviceAuthorizationNotFoundError(),
+    );
 
     await expect(
       new DeviceAuthorizationFinder(repository).find(message),

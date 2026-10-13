@@ -194,7 +194,8 @@ No new persisted state beyond `checkpoint.concurrent` (at most 128 signed
 recoveries, see Recovery). The timeline is derived from the existing
 `device-authorization:<identityId>` document (genesis or checkpoint + the
 transition history, 256 records at most). `OrbitDBDeviceAuthorizationRepository
-.findTimeline` replays it; the verifier caches the result for one second like
+.requireTimeline` replays it (an identity with no document gets an empty
+timeline, which authorizes nothing); the verifier caches the result for one second like
 before. The `overflow` document (history over the shape limits, which
 suspends the identity until recovery) yields a timeline with no credentials, so
 every proof is refused: fail closed, as with the old head check. Its compromise

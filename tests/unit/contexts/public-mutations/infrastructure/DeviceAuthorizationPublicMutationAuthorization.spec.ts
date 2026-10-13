@@ -57,7 +57,8 @@ describe(DeviceAuthorizationPublicMutationAuthorization.name, () => {
     // revision 0 owner, 1 owner+phone, 2 phone revoked, 3 laptop enrolled
     states = [genesis, enrolled, revoked, reenrolled];
     repository = mock<DeviceAuthorizationRepository>();
-    repository.findTimeline.mockResolvedValue(
+    repository.has.mockResolvedValue(true);
+    repository.requireTimeline.mockResolvedValue(
       new DeviceAuthorizationTimeline(states),
     );
   });
@@ -103,7 +104,7 @@ describe(DeviceAuthorizationPublicMutationAuthorization.name, () => {
       false,
     );
 
-    repository.findTimeline.mockResolvedValue(
+    repository.requireTimeline.mockResolvedValue(
       new DeviceAuthorizationTimeline([...states, states[3].enroll(phone)]),
     );
 
@@ -113,18 +114,19 @@ describe(DeviceAuthorizationPublicMutationAuthorization.name, () => {
   });
 
   it('refuses an identity without a replayable authorization', async () => {
-    repository.findTimeline.mockResolvedValue(undefined);
+    repository.has.mockResolvedValue(false);
 
     await expect(
       authorization().isAuthorized(authorOf(owner, 0)),
     ).resolves.toBe(false);
+    expect(repository.requireTimeline).not.toHaveBeenCalled();
   });
 
   it('gives the same verdicts whatever order the states were replayed in', async () => {
     const verdicts = async (
       ordered: DeviceAuthorization[],
     ): Promise<boolean[]> => {
-      repository.findTimeline.mockResolvedValue(
+      repository.requireTimeline.mockResolvedValue(
         new DeviceAuthorizationTimeline(ordered),
       );
       const fresh = authorization();

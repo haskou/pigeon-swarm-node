@@ -23,10 +23,9 @@ export default class PrivateBlobReader {
     message: PrivateBlobReadMessage,
   ): Promise<PrivateBlobDownload> {
     const blobId = message.blobId.valueOf();
-    const blob = await this.repository.findById(blobId);
+    const blob = await this.repository.requireById(blobId);
 
     if (
-      !blob ||
       blob.isExpired(Timestamp.now()) ||
       !blob.acceptsDownload(message.downloadToken.valueOf())
     ) {

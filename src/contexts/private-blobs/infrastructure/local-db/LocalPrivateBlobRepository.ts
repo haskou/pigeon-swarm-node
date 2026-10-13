@@ -1,47 +1,16 @@
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { Timestamp } from '@haskou/value-objects';
-import { createHmac, randomBytes } from 'crypto';
 
+import { PrivateBlobNotFoundError } from '../../domain/errors/PrivateBlobNotFoundError';
 import { PrivateBlob } from '../../domain/PrivateBlob';
-import { PrivateBlobPrimitives } from '../../domain/PrivateBlobPrimitives';
+import { PrivateBlobPrimitivesShape } from '../../domain/PrivateBlobPrimitivesShape';
 import PrivateBlobRepository from '../../domain/repositories/PrivateBlobRepository';
 
 export default class LocalPrivateBlobRepository extends PrivateBlobRepository {
   private static readonly BLOBS = 'private_blobs';
-  private static readonly META = 'private_blob_meta';
-  private static readonly SALT_ID = 'owner-key-salt';
-
-  private saltPromise?: Promise<Buffer>;
 
   constructor(private readonly database: EmbeddedLocalDatabase) {
     super();
-  }
-
-  private salt(): Promise<Buffer> {
-    this.saltPromise ??= this.loadOrCreateSalt();
-
-    return this.saltPromise;
-  }
-
-  private async loadOrCreateSalt(): Promise<Buffer> {
-    const stored = await this.database.findOne(
-      LocalPrivateBlobRepository.META,
-      LocalPrivateBlobRepository.SALT_ID,
-    );
-
-    if (typeof stored?.salt === 'string') {
-      return Buffer.from(stored.salt, 'hex');
-    }
-
-    const salt = randomBytes(32);
-
-    await this.database.save(
-      LocalPrivateBlobRepository.META,
-      LocalPrivateBlobRepository.SALT_ID,
-      { salt: salt.toString('hex') },
-    );
-
-    return salt;
   }
 
   private toBlob(document: Record<string, unknown>): PrivateBlob {
@@ -49,9 +18,11 @@ export default class LocalPrivateBlobRepository extends PrivateBlobRepository {
 
     delete primitives._id;
 
-    return PrivateBlob.fromPrimitives(
-      primitives as unknown as PrivateBlobPrimitives,
-    );
+    if (!PrivateBlobPrimitivesShape.isPrivateBlobPrimitives(primitives)) {
+      throw new Error('Stored private blob is malformed.');
+    }
+
+    return PrivateBlob.fromPrimitives(primitives);
   }
 
   private async all(
@@ -68,15 +39,6 @@ export default class LocalPrivateBlobRepository extends PrivateBlobRepository {
     await this.database.delete(LocalPrivateBlobRepository.BLOBS, id);
   }
 
-  public async findById(id: string): Promise<PrivateBlob | undefined> {
-    const document = await this.database.findOne(
-      LocalPrivateBlobRepository.BLOBS,
-      id,
-    );
-
-    return document ? this.toBlob(document) : undefined;
-  }
-
   public findExpired(now: Timestamp): Promise<PrivateBlob[]> {
     return this.all((blob) => blob.isExpired(now));
   }
@@ -87,10 +49,26 @@ export default class LocalPrivateBlobRepository extends PrivateBlobRepository {
     );
   }
 
-  public async ownerKeyFor(identityId: string): Promise<string> {
-    return createHmac('sha256', await this.salt())
-      .update(identityId)
-      .digest('hex');
+  public async hasById(id: string): Promise<boolean> {
+    const document = await this.database.findOne(
+      LocalPrivateBlobRepository.BLOBS,
+      id,
+    );
+
+    return document !== undefined;
+  }
+
+  public async requireById(id: string): Promise<PrivateBlob> {
+    const document = await this.database.findOne(
+      LocalPrivateBlobRepository.BLOBS,
+      id,
+    );
+
+    if (!document) {
+      throw new PrivateBlobNotFoundError();
+    }
+
+    return this.toBlob(document);
   }
 
   public async reservedBytes(
@@ -107,10 +85,8 @@ export default class LocalPrivateBlobRepository extends PrivateBlobRepository {
   }
 
   public async save(blob: PrivateBlob): Promise<void> {
-    await this.database.save(
-      LocalPrivateBlobRepository.BLOBS,
-      blob.getId(),
-      blob.toPrimitives() as unknown as Record<string, unknown>,
-    );
+    await this.database.save(LocalPrivateBlobRepository.BLOBS, blob.getId(), {
+      ...blob.toPrimitives(),
+    });
   }
 }

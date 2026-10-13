@@ -79,4 +79,33 @@ describe('IdentityPublisher', () => {
     );
     expect(eventPublisher.publish).not.toHaveBeenCalled();
   });
+
+  it('resolves previous identities through has/require when validating the chain', async () => {
+    const identity = new IdentityMother().build();
+    const previous = new IdentityExternalIdentifier('bafkprevious');
+    const missing = new IdentityExternalIdentifier('bafkmissing');
+    repository.hasByExternalIdentifier.mockImplementation(
+      async (externalIdentifier) =>
+        externalIdentifier.valueOf() === previous.valueOf(),
+    );
+    repository.requireByExternalIdentifier.mockResolvedValue(identity);
+    const lookups: Array<Promise<unknown>> = [];
+    validator.isValidChainFor.mockImplementation(
+      async (_identityId, _identity, lookup) => {
+        lookups.push(lookup(previous), lookup(missing));
+
+        return true;
+      },
+    );
+
+    await publisher.publish(
+      new IdentityPublishMessage(identity.toPrimitives()),
+    );
+
+    await expect(Promise.all(lookups)).resolves.toEqual([identity, undefined]);
+    expect(repository.requireByExternalIdentifier).toHaveBeenCalledTimes(1);
+    expect(repository.requireByExternalIdentifier).toHaveBeenCalledWith(
+      previous,
+    );
+  });
 });

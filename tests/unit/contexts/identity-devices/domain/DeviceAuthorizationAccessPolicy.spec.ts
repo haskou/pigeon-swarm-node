@@ -31,7 +31,8 @@ describe(DeviceAuthorizationAccessPolicy.name, () => {
       credential,
       RecoveryAuthority.fromString(recovery.toPrimitives().publicKey),
     );
-    repository.find.mockResolvedValue(authorization);
+    repository.has.mockResolvedValue(true);
+    repository.require.mockResolvedValue(authorization);
   });
 
   it('accepts a credential at the current authorization revision', async () => {
@@ -64,5 +65,19 @@ describe(DeviceAuthorizationAccessPolicy.name, () => {
         DeviceAuthorizationRevision.initial(),
       ),
     ).rejects.toThrow(InvalidDeviceAuthorizationTransitionError);
+  });
+
+  it('rejects an identity without a provisioned authorization', async () => {
+    repository.has.mockResolvedValue(false);
+
+    await expect(
+      policy.assertAuthorized(
+        identityId,
+        credential,
+        DeviceAuthorizationEpoch.genesis(),
+        DeviceAuthorizationRevision.initial(),
+      ),
+    ).rejects.toThrow(InvalidDeviceAuthorizationTransitionError);
+    expect(repository.require).not.toHaveBeenCalled();
   });
 });

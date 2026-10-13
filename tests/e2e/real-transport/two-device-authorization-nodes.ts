@@ -283,7 +283,9 @@ async function main(): Promise<void> {
   await until('both replicas merge concurrent enrollments', async () => {
     const authorizations = await Promise.all(
       nodes.map(async (node) =>
-        (await node.repository!.find(identityId))?.toPrimitives(),
+        (await node.repository!.has(identityId))
+          ? (await node.repository!.require(identityId)).toPrimitives()
+          : undefined,
       ),
     );
 

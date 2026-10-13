@@ -46,10 +46,11 @@ export default class MailboxExpirer {
     for (const mailbox of mailboxes) {
       try {
         await this.coordinator.run(async (): Promise<void> => {
-          const fresh = await this.repository.findById(mailbox.getId());
-
-          if (fresh) {
-            await this.expireOne(fresh, now);
+          if (await this.repository.hasById(mailbox.getId())) {
+            await this.expireOne(
+              await this.repository.requireById(mailbox.getId()),
+              now,
+            );
           }
         });
       } catch {

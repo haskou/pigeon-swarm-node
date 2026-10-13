@@ -5,6 +5,7 @@ import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/Devic
 import { DeviceAuthorizationTimeline } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTimeline';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import { DeviceCompromiseCaps } from '@app/contexts/identity-devices/domain/DeviceCompromiseCaps';
+import { DeviceAuthorizationNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceAuthorizationNotFoundError';
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
 import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
@@ -247,30 +248,35 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     });
   }
 
-  public find(
-    identityId: IdentityId,
-  ): Promise<DeviceAuthorization | undefined> {
+  public has(identityId: IdentityId): Promise<boolean> {
+    return this.lock.run(
+      identityId,
+      async () => (await this.resolveDocument(identityId)) !== undefined,
+    );
+  }
+
+  public require(identityId: IdentityId): Promise<DeviceAuthorization> {
     return this.lock.run(identityId, async () => {
       const document = await this.resolveDocument(identityId);
 
-      return document
-        ? DeviceAuthorization.fromPrimitives(document.authorization)
-        : undefined;
+      assert(document, new DeviceAuthorizationNotFoundError());
+
+      return DeviceAuthorization.fromPrimitives(document.authorization);
     });
   }
 
-  public findTimeline(
+  public requireTimeline(
     identityId: IdentityId,
-  ): Promise<DeviceAuthorizationTimeline | undefined> {
+  ): Promise<DeviceAuthorizationTimeline> {
     return this.lock.run(identityId, async () => {
       const document = await this.resolveDocument(identityId);
 
-      return document
-        ? this.replayer.timelineOf(
-            DeviceAuthorization.fromPrimitives(document.genesis),
-            document,
-          )
-        : undefined;
+      assert(document, new DeviceAuthorizationNotFoundError());
+
+      return this.replayer.timelineOf(
+        DeviceAuthorization.fromPrimitives(document.genesis),
+        document,
+      );
     });
   }
 

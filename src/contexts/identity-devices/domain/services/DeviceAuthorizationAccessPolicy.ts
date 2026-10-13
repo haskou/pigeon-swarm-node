@@ -18,10 +18,15 @@ export default class DeviceAuthorizationAccessPolicy {
     epoch: DeviceAuthorizationEpoch,
     revision: DeviceAuthorizationRevision,
   ): Promise<void> {
-    const authorization = await this.repository.find(identityId);
+    assert(
+      await this.repository.has(identityId),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    const authorization = await this.repository.require(identityId);
 
     assert(
-      authorization?.getEpoch().isEqual(epoch) === true &&
+      authorization.getEpoch().isEqual(epoch) &&
         authorization.isAtRevision(revision) &&
         authorization.isAuthorized(credential),
       new InvalidDeviceAuthorizationTransitionError(),

@@ -1,7 +1,4 @@
-import { assert } from '@haskou/value-objects';
-
 import { DeviceSealedSecretBundle } from '../../domain/DeviceSealedSecretBundle';
-import { DeviceAuthorizationNotFoundError } from '../../domain/errors/DeviceAuthorizationNotFoundError';
 import { DeviceAuthorizationRepository } from '../../domain/repositories/DeviceAuthorizationRepository';
 import { DeviceSealedSecretRepository } from '../../domain/repositories/DeviceSealedSecretRepository';
 import { PublishDeviceSealedSecretBundleMessage } from './messages/PublishDeviceSealedSecretBundleMessage';
@@ -16,11 +13,9 @@ export default class DeviceSealedSecretPublisher {
     message: PublishDeviceSealedSecretBundleMessage,
   ): Promise<void> {
     const bundle = DeviceSealedSecretBundle.fromPrimitives(message.bundle);
-    const authorization = await this.authorizations.find(
+    const authorization = await this.authorizations.require(
       bundle.getIdentityId(),
     );
-
-    assert(authorization, new DeviceAuthorizationNotFoundError());
 
     bundle.assertPublishableBy(authorization);
     await this.sealedSecrets.replaceIfNewer(bundle);

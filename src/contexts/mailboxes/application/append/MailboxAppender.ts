@@ -28,20 +28,22 @@ export default class MailboxAppender {
     const body = message.body.valueOf();
 
     return this.coordinator.run(async () => {
-      const mailbox = await this.repository.findById(mailboxId);
+      const mailbox = await this.repository.requireById(mailboxId);
 
-      if (!mailbox || !mailbox.acceptsPost(postToken)) {
+      if (!mailbox.acceptsPost(postToken)) {
         throw new MailboxNotFoundError();
       }
 
       const size = this.policy.decodedBodySize(body);
-      const known = await this.repository.findCursorByEnvelopeId(
-        mailboxId,
-        envelopeId,
-      );
 
-      if (known !== undefined) {
-        return { created: false, cursor: known };
+      if (await this.repository.hasEnvelope(mailboxId, envelopeId)) {
+        return {
+          created: false,
+          cursor: await this.repository.requireEnvelopeCursor(
+            mailboxId,
+            envelopeId,
+          ),
+        };
       }
 
       const now = Timestamp.now();

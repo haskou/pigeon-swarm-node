@@ -576,17 +576,22 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     throw new IdentityNotFoundError(handle.valueOf());
   }
 
-  public async findByExternalIdentifier(
+  public async hasByExternalIdentifier(
     externalIdentifier: IdentityExternalIdentifier,
-  ): Promise<Identity | undefined> {
+  ): Promise<boolean> {
+    return (await this.findPreviousIdentity(externalIdentifier)) !== undefined;
+  }
+
+  public async requireByExternalIdentifier(
+    externalIdentifier: IdentityExternalIdentifier,
+  ): Promise<Identity> {
     const identity = await this.findPreviousIdentity(externalIdentifier);
 
-    if (identity) {
-      await this.saveMetadata(
-        identity,
-        new IPFSId(externalIdentifier.valueOf()),
-      );
+    if (!identity) {
+      throw new IdentityNotFoundError(externalIdentifier.valueOf());
     }
+
+    await this.saveMetadata(identity, new IPFSId(externalIdentifier.valueOf()));
 
     return identity;
   }

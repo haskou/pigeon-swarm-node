@@ -196,7 +196,8 @@ describe(OrbitDBDeviceAuthorizationRouting.name, () => {
         latest.identity,
       ),
     ]);
-    identityRepository.findByExternalIdentifier.mockResolvedValue(
+    identityRepository.hasByExternalIdentifier.mockResolvedValue(true);
+    identityRepository.requireByExternalIdentifier.mockResolvedValue(
       first.identity,
     );
 
@@ -303,7 +304,7 @@ describe(OrbitDBDeviceAuthorizationRouting.name, () => {
         latest.identity,
       ),
     ]);
-    identityRepository.findByExternalIdentifier.mockResolvedValue(undefined);
+    identityRepository.hasByExternalIdentifier.mockResolvedValue(false);
 
     await expect(routing.resolveTrustedGenesis(identityId)).resolves.toBe(
       undefined,

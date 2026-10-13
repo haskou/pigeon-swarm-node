@@ -5,9 +5,8 @@ import { PrivateAuthorizationReceiptNotFoundError } from '@app/contexts/private-
 import { PrivateAuthorizationReservationNotFoundError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationReservationNotFoundError';
 import { PrivateAuthorizationScopeNotFoundError } from '@app/contexts/private-authorization/domain/errors/PrivateAuthorizationScopeNotFoundError';
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
-import { PrivateAuthorizationCheckpointPrimitives } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpointPrimitives';
+import { PrivateAuthorizationPrimitivesShape } from '@app/contexts/private-authorization/domain/PrivateAuthorizationPrimitivesShape';
 import { PrivateAuthorizationScope } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScope';
-import { PrivateAuthorizationScopePrimitives } from '@app/contexts/private-authorization/domain/PrivateAuthorizationScopePrimitives';
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
 import { PrivateControlOperationPrimitives } from '@app/contexts/private-authorization/domain/PrivateControlOperationPrimitives';
 import { PrivateControlTransitionReservation } from '@app/contexts/private-authorization/domain/PrivateControlTransitionReservation';
@@ -33,25 +32,6 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
     super();
   }
 
-  private isOperation(
-    value: Record<string, unknown>,
-  ): value is Record<string, unknown> & PrivateControlOperationPrimitives {
-    const checks = [
-      typeof value.id === 'string',
-      typeof value.digest === 'string',
-      typeof value.scopeId === 'string',
-      typeof value.authorDeviceKey === 'string',
-      typeof value.authorizationRevision === 'number',
-      typeof value.byteSize === 'number',
-      typeof value.kind === 'string',
-      Array.isArray(value.previousOperationIds),
-      typeof value.mutation === 'object',
-      value.mutation !== null,
-    ];
-
-    return !checks.includes(false);
-  }
-
   private reservationFrom(
     document: Record<string, unknown> | undefined,
   ): PrivateControlTransitionReservation | undefined {
@@ -59,8 +39,9 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
       typeof document?.authorDeviceKey !== 'string' ||
       typeof document.childHeadHash !== 'string' ||
       typeof document.operationId !== 'string' ||
-      !document.parentCheckpoint ||
-      typeof document.parentCheckpoint !== 'object'
+      !PrivateAuthorizationPrimitivesShape.isCheckpointPrimitives(
+        document.parentCheckpoint,
+      )
     ) {
       return undefined;
     }
@@ -69,8 +50,7 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
       authorDeviceKey: document.authorDeviceKey,
       childHeadHash: document.childHeadHash,
       operationId: document.operationId,
-      parentCheckpoint:
-        document.parentCheckpoint as unknown as PrivateAuthorizationCheckpointPrimitives,
+      parentCheckpoint: document.parentCheckpoint,
     });
   }
 
@@ -138,11 +118,13 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
       privateAuthorizationLocalId(scopeId, operationId),
     );
 
-    if (!document || !this.isOperation(document)) return undefined;
+    if (!document) return undefined;
     const receipt = { ...document };
     delete receipt._id;
 
-    return receipt as unknown as PrivateControlOperationPrimitives;
+    return PrivateAuthorizationPrimitivesShape.isOperationPrimitives(receipt)
+      ? receipt
+      : undefined;
   }
 
   private async reservationOf(
@@ -206,13 +188,20 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
     );
 
     if (!document) return undefined;
+    const stored = { ...document };
+    delete stored._id;
+
+    if (!PrivateAuthorizationPrimitivesShape.isStoredScopePrimitives(stored)) {
+      throw new InvalidPrivateAuthorizationError();
+    }
+
     const pendingOperations = (await this.findPending(scopeId)).map((pending) =>
       pending.toPrimitives(),
     );
 
     try {
       return PrivateAuthorizationScope.fromPrimitives({
-        ...(document as unknown as PrivateAuthorizationScopePrimitives),
+        ...stored,
         pendingOperations,
       });
     } catch {
@@ -243,13 +232,16 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
     );
 
     return documents
-      .filter((document) => this.isOperation(document))
       .map((document) => {
         const operation = { ...document };
         delete operation._id;
 
-        return PrivateControlOperation.fromPrimitives(operation);
+        return operation;
       })
+      .filter((operation) =>
+        PrivateAuthorizationPrimitivesShape.isOperationPrimitives(operation),
+      )
+      .map((operation) => PrivateControlOperation.fromPrimitives(operation))
       .sort((left, right) =>
         left.toPrimitives().id.localeCompare(right.toPrimitives().id),
       );

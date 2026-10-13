@@ -2,9 +2,11 @@ import EmbeddedLocalDatabase, {
   EmbeddedLocalDatabaseOperation,
 } from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 
+import { MailboxEnvelopeNotFoundError } from '../../domain/errors/MailboxEnvelopeNotFoundError';
+import { MailboxNotFoundError } from '../../domain/errors/MailboxNotFoundError';
 import { Mailbox } from '../../domain/Mailbox';
 import { MailboxEnvelope } from '../../domain/MailboxEnvelope';
-import { MailboxPrimitives } from '../../domain/MailboxPrimitives';
+import { MailboxPrimitivesShape } from '../../domain/MailboxPrimitivesShape';
 import MailboxRepository from '../../domain/repositories/MailboxRepository';
 
 /**
@@ -36,7 +38,7 @@ export default class LocalMailboxRepository extends MailboxRepository {
 
   private mailboxPut(mailbox: Mailbox): EmbeddedLocalDatabaseOperation {
     return {
-      document: mailbox.toPrimitives() as unknown as Record<string, unknown>,
+      document: { ...mailbox.toPrimitives() },
       id: mailbox.getId(),
       namespace: LocalMailboxRepository.MAILBOXES,
       type: 'put',
@@ -44,42 +46,34 @@ export default class LocalMailboxRepository extends MailboxRepository {
   }
 
   private toEnvelope(document: Record<string, unknown>): MailboxEnvelope {
-    return {
-      body: document.body as string,
-      cursor: document.cursor as number,
-      envelopeId: document.envelopeId as string,
-      size: document.size as number,
-      storedAt: document.storedAt as number,
-    };
+    const envelope = { ...document };
+
+    delete envelope._id;
+
+    if (!MailboxPrimitivesShape.isMailboxEnvelope(envelope)) {
+      throw new Error('Stored mailbox envelope is malformed.');
+    }
+
+    return envelope;
   }
 
-  /**
-   * A document written before the reader set holds one `readTokenHash`. It
-   * becomes the only reader with nothing acknowledged, so its envelopes stay
-   * until that reader acks. The legacy field is dropped on the next write.
-   */
   private toMailbox(document: Record<string, unknown>): Mailbox {
     const primitives = { ...document };
 
     delete primitives._id;
 
-    if (!Array.isArray(primitives.readers)) {
-      primitives.readers = [
-        { ackedCursor: 0, readTokenHash: primitives.readTokenHash },
-      ];
+    if (!MailboxPrimitivesShape.isMailboxPrimitives(primitives)) {
+      throw new Error('Stored mailbox is malformed.');
     }
 
-    delete primitives.readTokenHash;
-
-    return Mailbox.fromPrimitives(primitives as unknown as MailboxPrimitives);
+    return Mailbox.fromPrimitives(primitives);
   }
 
   /**
    * The mailbox count lives in its own document, so creation checks are O(1).
    * create and remove update it in the same batch as the mailbox. Every
    * mailbox mutation runs under MailboxCoordinator, so this read-modify-write
-   * cannot interleave. A database written before the counter existed is
-   * counted once and the result saved.
+   * cannot interleave. An empty database has no counter yet and counts zero.
    */
   private async readCount(): Promise<number> {
     const counter = await this.database.findOne(
@@ -87,21 +81,7 @@ export default class LocalMailboxRepository extends MailboxRepository {
       LocalMailboxRepository.MAILBOX_COUNT_ID,
     );
 
-    if (typeof counter?.count === 'number') {
-      return counter.count;
-    }
-
-    const documents = await this.database.find(
-      LocalMailboxRepository.MAILBOXES,
-    );
-
-    await this.database.save(
-      LocalMailboxRepository.COUNTERS,
-      LocalMailboxRepository.MAILBOX_COUNT_ID,
-      { count: documents.length },
-    );
-
-    return documents.length;
+    return typeof counter?.count === 'number' ? counter.count : 0;
   }
 
   public async commitAppend(
@@ -168,25 +148,25 @@ export default class LocalMailboxRepository extends MailboxRepository {
     ]);
   }
 
-  public async findById(id: string): Promise<Mailbox | undefined> {
+  public async hasById(id: string): Promise<boolean> {
     const document = await this.database.findOne(
       LocalMailboxRepository.MAILBOXES,
       id,
     );
 
-    return document ? this.toMailbox(document) : undefined;
+    return document !== undefined;
   }
 
-  public async findCursorByEnvelopeId(
+  public async hasEnvelope(
     mailboxId: string,
     envelopeId: string,
-  ): Promise<number | undefined> {
+  ): Promise<boolean> {
     const document = await this.database.findOne(
       this.dedupeNamespace(mailboxId),
       envelopeId,
     );
 
-    return typeof document?.cursor === 'number' ? document.cursor : undefined;
+    return document !== undefined;
   }
 
   /**
@@ -218,12 +198,12 @@ export default class LocalMailboxRepository extends MailboxRepository {
   ): Promise<MailboxEnvelope[]> {
     const documents = await this.database.find(
       this.envelopeNamespace(mailboxId),
-      (document) => (document.cursor as number) > after,
     );
 
     return documents
-      .slice(0, limit)
-      .map((document) => this.toEnvelope(document));
+      .map((document) => this.toEnvelope(document))
+      .filter((envelope) => envelope.cursor > after)
+      .slice(0, limit);
   }
 
   public async remove(mailboxId: string): Promise<void> {
@@ -236,9 +216,9 @@ export default class LocalMailboxRepository extends MailboxRepository {
     const floor = existing
       ? Math.max(retired, this.toMailbox(existing).highestCursor())
       : retired;
-    const envelopes = await this.database.find(
-      this.envelopeNamespace(mailboxId),
-    );
+    const envelopes = (
+      await this.database.find(this.envelopeNamespace(mailboxId))
+    ).map((document) => this.toEnvelope(document));
 
     await this.database.commit([
       {
@@ -258,19 +238,48 @@ export default class LocalMailboxRepository extends MailboxRepository {
         namespace: LocalMailboxRepository.COUNTERS,
         type: 'put',
       },
-      ...envelopes.flatMap((document): EmbeddedLocalDatabaseOperation[] => [
+      ...envelopes.flatMap((envelope): EmbeddedLocalDatabaseOperation[] => [
         {
-          id: this.envelopeId(document.cursor as number),
+          id: this.envelopeId(envelope.cursor),
           namespace: this.envelopeNamespace(mailboxId),
           type: 'del',
         },
         {
-          id: document.envelopeId as string,
+          id: envelope.envelopeId,
           namespace: this.dedupeNamespace(mailboxId),
           type: 'del',
         },
       ]),
     ]);
+  }
+
+  public async requireById(id: string): Promise<Mailbox> {
+    const document = await this.database.findOne(
+      LocalMailboxRepository.MAILBOXES,
+      id,
+    );
+
+    if (!document) {
+      throw new MailboxNotFoundError();
+    }
+
+    return this.toMailbox(document);
+  }
+
+  public async requireEnvelopeCursor(
+    mailboxId: string,
+    envelopeId: string,
+  ): Promise<number> {
+    const document = await this.database.findOne(
+      this.dedupeNamespace(mailboxId),
+      envelopeId,
+    );
+
+    if (typeof document?.cursor !== 'number') {
+      throw new MailboxEnvelopeNotFoundError();
+    }
+
+    return document.cursor;
   }
 
   public async save(mailbox: Mailbox): Promise<void> {

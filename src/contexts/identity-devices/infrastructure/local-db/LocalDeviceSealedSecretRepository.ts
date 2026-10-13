@@ -1,7 +1,7 @@
-import {
-  DeviceSealedSecretBundle,
-  DeviceSealedSecretBundlePrimitives,
-} from '@app/contexts/identity-devices/domain/DeviceSealedSecretBundle';
+import { DeviceSealedSecretBundle } from '@app/contexts/identity-devices/domain/DeviceSealedSecretBundle';
+import { DeviceSealedSecretBundlePrimitivesShape } from '@app/contexts/identity-devices/domain/DeviceSealedSecretBundlePrimitivesShape';
+import { DeviceSealedSecretNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceSealedSecretNotFoundError';
+import { InvalidDeviceSealedSecretBundleError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceSealedSecretBundleError';
 import { DeviceSealedSecretRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
@@ -35,35 +35,62 @@ export default class LocalDeviceSealedSecretRepository extends DeviceSealedSecre
     return run;
   }
 
-  public async find(
-    identityId: IdentityId,
-  ): Promise<DeviceSealedSecretBundle | undefined> {
+  private toBundle(
+    document: Record<string, unknown>,
+  ): DeviceSealedSecretBundle {
+    const primitives = { ...document };
+
+    delete primitives._id;
+
+    if (
+      !DeviceSealedSecretBundlePrimitivesShape.isBundlePrimitives(primitives)
+    ) {
+      throw new InvalidDeviceSealedSecretBundleError(
+        'stored bundle is malformed',
+      );
+    }
+
+    return DeviceSealedSecretBundle.fromPrimitives(primitives);
+  }
+
+  public async has(identityId: IdentityId): Promise<boolean> {
     const document = await this.database.findOne(
       NAMESPACE,
       identityId.valueOf(),
     );
 
-    if (!document) {
-      return undefined;
-    }
-
-    return DeviceSealedSecretBundle.fromPrimitives(
-      document as unknown as DeviceSealedSecretBundlePrimitives,
-    );
+    return document !== undefined;
   }
 
   public replaceIfNewer(bundle: DeviceSealedSecretBundle): Promise<void> {
     const identityId = bundle.getIdentityId();
 
     return this.serialize(identityId, async () => {
-      const stored = await this.find(identityId);
-      bundle.assertSupersedes(stored);
-
-      await this.database.save(
+      const document = await this.database.findOne(
         NAMESPACE,
         identityId.valueOf(),
-        bundle.toPrimitives() as unknown as Record<string, unknown>,
       );
+
+      bundle.assertSupersedes(document ? this.toBundle(document) : undefined);
+
+      await this.database.save(NAMESPACE, identityId.valueOf(), {
+        ...bundle.toPrimitives(),
+      });
     });
+  }
+
+  public async require(
+    identityId: IdentityId,
+  ): Promise<DeviceSealedSecretBundle> {
+    const document = await this.database.findOne(
+      NAMESPACE,
+      identityId.valueOf(),
+    );
+
+    if (!document) {
+      throw new DeviceSealedSecretNotFoundError();
+    }
+
+    return this.toBundle(document);
   }
 }
