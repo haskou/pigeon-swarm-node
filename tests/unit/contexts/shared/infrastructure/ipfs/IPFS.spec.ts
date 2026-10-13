@@ -135,14 +135,13 @@ describe('IPFS', () => {
     });
   });
 
-  describe('getJSONFromNetwork', () => {
-    it('should get JSON from a specific network', async () => {
-      const cid = new IPFSId('bafytest');
-      const expected = { data: 'specific' };
+  describe('stopProvidingContentFromNetwork', () => {
+    it('should stop providing content in the requested network', async () => {
+      const cid = new IPFSId('bafystop');
 
-      mockNetwork.getJSON.mockResolvedValue(expected);
+      mockNetwork.stopProvidingContent.mockResolvedValue(undefined);
 
-      const result = await ipfs.getJSONFromNetwork(
+      await ipfs.stopProvidingContentFromNetwork(
         cid,
         '550e8400-e29b-41d4-a716-446655440000',
       );
@@ -150,7 +149,7 @@ describe('IPFS', () => {
       expect(registry.find).toHaveBeenCalledWith(
         '550e8400-e29b-41d4-a716-446655440000',
       );
-      expect(result).toEqual(expected);
+      expect(mockNetwork.stopProvidingContent).toHaveBeenCalledWith(cid);
     });
   });
 
