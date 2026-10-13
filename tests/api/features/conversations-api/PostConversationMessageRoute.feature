@@ -1,8 +1,8 @@
 Feature: Send conversation messages
 
-  Scenario: Send encrypted messages in a one-to-one conversation
+  Scenario: Send encrypted messages in a group conversation
     Given I register a test IPFS network "api-conversation-message-network"
-    And I have created a one-to-one conversation
+    And I have created a group conversation
     And I set an encrypted conversation message body
     And I sign the current conversation message request
     When I POST the message to the current conversation
@@ -11,7 +11,7 @@ Feature: Send conversation messages
 
   Scenario: Send a reply to an existing message
     Given I register a test IPFS network "api-conversation-reply-network"
-    And I have created a one-to-one conversation
+    And I have created a group conversation
     And I have sent an encrypted conversation message
     And I set an encrypted conversation reply body
     And I sign the current conversation message request

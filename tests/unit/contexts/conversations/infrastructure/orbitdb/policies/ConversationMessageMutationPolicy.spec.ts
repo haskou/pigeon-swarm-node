@@ -21,7 +21,7 @@ describe('ConversationMessageMutationPolicy', () => {
   ): Record<string, unknown> {
     return {
       authorId: mother.author.valueOf(),
-      conversationId: mother.build().getId().valueOf(),
+      conversationId: mother.buildGroup().getId().valueOf(),
       createdAt: 1780000000000,
       encryptedPayload: 'payload',
       id: 'message-1',
@@ -58,7 +58,7 @@ describe('ConversationMessageMutationPolicy', () => {
   });
 
   it('accepts a conversation participant author', async () => {
-    const conversation = mother.build();
+    const conversation = mother.buildGroup();
 
     repository.requireMetadataAtFrontier.mockResolvedValue(conversation);
 
@@ -72,12 +72,27 @@ describe('ConversationMessageMutationPolicy', () => {
   it('rejects an author that is not a participant', async () => {
     const outsider = await ConversationMother.generateIdentityId();
 
-    repository.requireMetadataAtFrontier.mockResolvedValue(mother.build());
+    repository.requireMetadataAtFrontier.mockResolvedValue(mother.buildGroup());
 
     await expect(
       policy.assertPermitted(record(), outsider.valueOf(), false, [
         'A'.repeat(43),
       ]),
+    ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+  });
+
+  it('rejects a record of a one-to-one conversation', async () => {
+    const conversation = mother.build();
+
+    repository.requireMetadataAtFrontier.mockResolvedValue(conversation);
+
+    await expect(
+      policy.assertPermitted(
+        record({ conversationId: conversation.getId().valueOf() }),
+        mother.author.valueOf(),
+        false,
+        ['A'.repeat(43)],
+      ),
     ).rejects.toBeInstanceOf(InvalidPublicMutationError);
   });
 });

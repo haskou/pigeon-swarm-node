@@ -143,8 +143,7 @@ export default class Definitions {
   private otherIdentityId: IdentityId | undefined;
   private otherIdentityKeyPair: KeyPair | undefined;
   private rememberedCallJoinRequest:
-    | { body: string | undefined; headers: Record<string, string> }
-    | undefined;
+    { body: string | undefined; headers: Record<string, string> } | undefined;
 
   private ownerIdentityId: IdentityId | undefined;
   private privateBlob:
@@ -4361,6 +4360,93 @@ export default class Definitions {
       'DELETE',
       `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
     );
+  }
+
+  private async conversationPinMutation(
+    kind: 'put' | 'delete',
+  ): Promise<Record<string, unknown>> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    const keyPair = await this.ensureIdentityKeyPair();
+    const identityId = keyPair.toPrimitives().publicKey;
+    const recordId = `conversation:${this.conversationId}:${this.messageId}`;
+    const document = {
+      conversationId: this.conversationId,
+      id: recordId,
+      messageId: this.messageId,
+      pinnedByIdentityId: identityId,
+      scopeType: 'conversation',
+    };
+    const payload =
+      kind === 'put'
+        ? { ...document, createdAt: 1_780_000_000_000 }
+        : { ...document, removed: true };
+    const sequence = kind === 'put' ? 0 : 1;
+    const proofBody = {
+      author: {
+        authorizationRevision: 0,
+        deviceCredential: identityId,
+        identityId,
+      },
+      kind,
+      operationId: `api-conversation-pin-${sequence}`.padEnd(22, '0'),
+      payloadDigest: PublicMutationProof.digestOf(payload),
+      predecessor:
+        sequence === 0 ? null : PublicMutationProof.digestOf({ previous: 0 }),
+      recordId,
+      sequence,
+      store: 'pins',
+      version: 2,
+    } as const;
+
+    return PublicMutationProof.signed(
+      proofBody,
+      keyPair.sign(PublicMutationProof.signingContentOf(proofBody)),
+    ).toPrimitives() as unknown as Record<string, unknown>;
+  }
+
+  @given('I target an unknown conversation message')
+  public iTargetAnUnknownConversationMessage(): void {
+    this.messageId = MessageId.generate().valueOf();
+  }
+
+  @given('I set a conversation message pin body')
+  public async iSetAConversationMessagePinBody(): Promise<void> {
+    this.body = JSON.stringify({
+      createdAt: 1_780_000_000_000,
+      mutation: await this.conversationPinMutation('put'),
+    });
+  }
+
+  @given('I set a conversation message unpin body')
+  public async iSetAConversationMessageUnpinBody(): Promise<void> {
+    this.body = JSON.stringify({
+      mutation: await this.conversationPinMutation('delete'),
+    });
+  }
+
+  /** `{message}` in the path stands for the current message; GET drops the body. */
+  @given(
+    'I sign a {word} request to the current conversation message path {string}',
+  )
+  public async iSignARequestToTheCurrentConversationMessagePath(
+    method: string,
+    suffix: string,
+  ): Promise<void> {
+    if (!this.conversationId || !this.messageId) {
+      throw new Error('Conversation and message must be created first.');
+    }
+
+    const path = `/conversations/${this.conversationId}${suffix.replace(
+      '{message}',
+      encodeURIComponent(this.messageId),
+    )}`;
+
+    this.body = method === 'GET' ? undefined : this.body;
+    this.signedConversationRequest = { method, path };
+    await this.signCurrentRequest(method, path);
   }
 
   @given('I sign the current latest conversation messages request')

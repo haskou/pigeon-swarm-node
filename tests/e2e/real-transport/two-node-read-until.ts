@@ -6,7 +6,7 @@ import type { IdentityFixture, NodeRuntime } from './two-real-node-gossipsub';
 import {
   addPrivateNetwork,
   buildNodeRuntime,
-  createOneToOneConversation,
+  createGroupConversation,
   generateNetworkKey,
   publishIdentity,
   publishKeychain,
@@ -124,9 +124,7 @@ async function unreadCountOf(
     undefined,
     reader,
   );
-  const conversation = conversations.find(
-    (item) => item.id === conversationId,
-  );
+  const conversation = conversations.find((item) => item.id === conversationId);
 
   if (!conversation) {
     throw new Error(`${node.name} does not list the conversation for reader`);
@@ -220,13 +218,14 @@ async function main(): Promise<void> {
     await waitForIdentity(nodeA, bob.id);
     await waitForKeychain(nodeA, bob);
 
-    const conversation = await createOneToOneConversation(
+    // 1:1 read markers travel through opaque mailboxes; the replicated log is group-only.
+    const conversationId = await createGroupConversation(
       nodeA,
+      nodeB,
       alice,
       bob,
       aliceKeychain,
     );
-    const conversationId = conversation.id;
     await waitForConversation(nodeB, bob, conversationId);
 
     // Alice can only mark messages read that someone else wrote, so Bob sends them from node B.
@@ -269,7 +268,10 @@ async function main(): Promise<void> {
 
     assertStatus(
       'Alice marks the first message read',
-      await sendReadUntil(nodeA, signReadUntil(alice, conversationId, first.id)),
+      await sendReadUntil(
+        nodeA,
+        signReadUntil(alice, conversationId, first.id),
+      ),
       200,
     );
     await waitFor(
@@ -360,7 +362,10 @@ async function main(): Promise<void> {
 
     assertStatus(
       'Alice marks the third message read',
-      await sendReadUntil(nodeA, signReadUntil(alice, conversationId, third.id)),
+      await sendReadUntil(
+        nodeA,
+        signReadUntil(alice, conversationId, third.id),
+      ),
       200,
     );
     await waitFor(

@@ -300,16 +300,24 @@ async function main(): Promise<void> {
       nodeBIdentity.id,
     );
 
+    // 1:1 messages travel only through opaque mailboxes; the replicated log is group-only.
+    const messagingGroupId = await createGroupConversation(
+      nodeA,
+      nodeB,
+      nodeAIdentity,
+      nodeBIdentity,
+      nodeAKeychain,
+    );
     const nodeBMessages = listenForDomainEvents(
       nodeB,
       nodeBIdentity,
       'conversations.v1.message.was_sent',
-      conversation.id,
+      messagingGroupId,
     );
     const messageFromA = await sendConversationMessage(
       nodeA,
       nodeAIdentity,
-      conversation.id,
+      messagingGroupId,
       [],
       'node-a-message-payload',
     );
@@ -317,7 +325,7 @@ async function main(): Promise<void> {
     await waitForMessage(
       nodeB,
       nodeBIdentity,
-      conversation.id,
+      messagingGroupId,
       messageFromA.id,
     );
 
@@ -325,7 +333,7 @@ async function main(): Promise<void> {
     const offlineMessageFromA = await sendConversationMessage(
       nodeA,
       nodeAIdentity,
-      conversation.id,
+      messagingGroupId,
       [messageFromA.id],
       'node-a-offline-message-payload',
     );
@@ -334,10 +342,10 @@ async function main(): Promise<void> {
     await waitForMessage(
       nodeB,
       nodeBIdentity,
-      conversation.id,
+      messagingGroupId,
       offlineMessageFromA.id,
     );
-    await waitForConversationTimeline(nodeB, nodeBIdentity, conversation.id, [
+    await waitForConversationTimeline(nodeB, nodeBIdentity, messagingGroupId, [
       messageFromA.id,
       offlineMessageFromA.id,
     ]);
@@ -346,12 +354,12 @@ async function main(): Promise<void> {
       nodeA,
       nodeAIdentity,
       'conversations.v1.message.was_sent',
-      conversation.id,
+      messagingGroupId,
     );
     const messageFromB = await sendConversationMessage(
       nodeB,
       nodeBIdentity,
-      conversation.id,
+      messagingGroupId,
       [offlineMessageFromA.id],
       'node-b-reply-payload',
     );
@@ -359,15 +367,15 @@ async function main(): Promise<void> {
     await waitForMessage(
       nodeA,
       nodeAIdentity,
-      conversation.id,
+      messagingGroupId,
       messageFromB.id,
     );
-    await waitForConversationTimeline(nodeA, nodeAIdentity, conversation.id, [
+    await waitForConversationTimeline(nodeA, nodeAIdentity, messagingGroupId, [
       messageFromA.id,
       offlineMessageFromA.id,
       messageFromB.id,
     ]);
-    await waitForConversationTimeline(nodeB, nodeBIdentity, conversation.id, [
+    await waitForConversationTimeline(nodeB, nodeBIdentity, messagingGroupId, [
       messageFromA.id,
       offlineMessageFromA.id,
       messageFromB.id,
@@ -390,6 +398,7 @@ async function main(): Promise<void> {
           groupId,
           messageFromA: messageFromA.id,
           messageFromB: messageFromB.id,
+          messagingGroupId,
           nodeAIdentityId: nodeAIdentity.id,
           nodeBIdentityId: nodeBIdentity.id,
           offlineMessageFromA: offlineMessageFromA.id,
@@ -836,7 +845,8 @@ async function runNotificationLifecycle(
   );
 }
 
-async function runGroupLifecycle(
+/** Creates a two-member group on node A and waits until node B folds its signed genesis. */
+async function createGroupConversation(
   nodeA: NodeRuntime,
   nodeB: NodeRuntime,
   owner: IdentityFixture,
@@ -884,6 +894,24 @@ async function runGroupLifecycle(
 
     return group?.creatorId === owner.id && group.participantIds.length === 2;
   }, 'node-b to fold the signed group genesis');
+
+  return groupId;
+}
+
+async function runGroupLifecycle(
+  nodeA: NodeRuntime,
+  nodeB: NodeRuntime,
+  owner: IdentityFixture,
+  other: IdentityFixture,
+  keychainExternalIdentifier: string,
+): Promise<string> {
+  const groupId = await createGroupConversation(
+    nodeA,
+    nodeB,
+    owner,
+    other,
+    keychainExternalIdentifier,
+  );
 
   await changeGroup(
     nodeA,
@@ -1592,7 +1620,7 @@ export {
   request,
   waitFor,
   publishKeychain,
-  createOneToOneConversation,
+  createGroupConversation,
   sendConversationMessage,
   waitForIdentity,
   waitForKeychain,

@@ -16,6 +16,7 @@ import { ConversationParticipantNotFoundError } from './errors/ConversationParti
 import { MessageTargetAlreadyDeletedError } from './errors/MessageTargetAlreadyDeletedError';
 import { MessageTargetAuthorMismatchError } from './errors/MessageTargetAuthorMismatchError';
 import { MessageTargetNotFoundError } from './errors/MessageTargetNotFoundError';
+import { OneToOneConversationMessagesNotReplicatedError } from './errors/OneToOneConversationMessagesNotReplicatedError';
 import { ConversationMessageWasDeletedEvent } from './events/ConversationMessageWasDeletedEvent';
 import { ConversationMessageWasEditedEvent } from './events/ConversationMessageWasEditedEvent';
 import { ConversationMessageWasPinnedEvent } from './events/ConversationMessageWasPinnedEvent';
@@ -71,6 +72,7 @@ export class Conversation extends AggregateRoot {
     targetMessageId: MessageId,
   ): void {
     this.assertIsParticipant(authorId);
+    this.assertHasReplicatedMessageLog();
 
     const target = this.findMessageById(targetMessageId);
 
@@ -86,6 +88,13 @@ export class Conversation extends AggregateRoot {
     assert(
       !this.isDeleted(targetMessageId),
       new MessageTargetAlreadyDeletedError(),
+    );
+  }
+
+  private assertHasReplicatedMessageLog(): void {
+    assert(
+      this.type.isGroup(),
+      new OneToOneConversationMessagesNotReplicatedError(),
     );
   }
 
@@ -145,6 +154,7 @@ export class Conversation extends AggregateRoot {
     options: MessageSendOptions = MessageSendOptions.empty(),
   ): MessageSent {
     this.assertIsParticipant(authorId);
+    this.assertHasReplicatedMessageLog();
     this.assertCanReplyToMessage(options.getReplyToMessageId());
     const messagePreviousMessageIds = options.getPreviousMessageIds();
     this.assertPreviousMessagesExist(messagePreviousMessageIds);
@@ -166,7 +176,6 @@ export class Conversation extends AggregateRoot {
       new ConversationMessageWasSentEvent(this.id.valueOf(), {
         authorId: authorId.valueOf(),
         conversationName: this.name?.valueOf(),
-        conversationType: this.type.valueOf(),
         message: message.toPrimitives(),
         messageId: message.getId().valueOf(),
         mutationProof: proof.toPrimitives(),
@@ -179,6 +188,8 @@ export class Conversation extends AggregateRoot {
   }
 
   public registerMessage(message: Message): void {
+    this.assertHasReplicatedMessageLog();
+
     if (this.findMessageById(message.getId())) {
       return;
     }
@@ -206,6 +217,7 @@ export class Conversation extends AggregateRoot {
     options: MessagePollOptions = MessagePollOptions.empty(),
   ): MessagePoll {
     this.assertIsParticipant(authorId);
+    this.assertHasReplicatedMessageLog();
     const previousMessageIds = options.getPreviousMessageIds(
       this.getLastMessageIds(),
     );
@@ -298,6 +310,7 @@ export class Conversation extends AggregateRoot {
 
   public pinMessage(actorId: IdentityId, messageId: MessageId): void {
     this.assertIsParticipant(actorId);
+    this.assertHasReplicatedMessageLog();
     this.record(
       new ConversationMessageWasPinnedEvent(this.id.valueOf(), {
         messageId: messageId.valueOf(),
@@ -310,6 +323,7 @@ export class Conversation extends AggregateRoot {
 
   public unpinMessage(actorId: IdentityId, messageId: MessageId): void {
     this.assertIsParticipant(actorId);
+    this.assertHasReplicatedMessageLog();
     this.record(
       new ConversationMessageWasUnpinnedEvent(this.id.valueOf(), {
         messageId: messageId.valueOf(),

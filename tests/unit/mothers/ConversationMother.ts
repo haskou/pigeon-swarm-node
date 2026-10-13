@@ -1,6 +1,8 @@
+import { GroupConversation } from '@app/contexts/conversations/domain/GroupConversation';
+import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { ConversationType } from '@app/contexts/conversations/domain/value-objects/ConversationType';
-import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
+import { GroupConversationName } from '@app/contexts/conversations/domain/value-objects/GroupConversationName';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
@@ -61,6 +63,24 @@ export class ConversationMother {
         left.valueOf() < right.valueOf() ? -1 : 1,
       ),
       undefined,
+      [],
+      this.author,
+    );
+  }
+
+  /** A group of the author and the recipient, created by the author. */
+  public buildGroup(): GroupConversation {
+    return new GroupConversation(
+      ConversationId.deriveGroup(
+        this.networkId.valueOf(),
+        this.author.valueOf(),
+        'conversation-mother',
+      ),
+      this.networkId,
+      new GroupConversationName('Mother group'),
+      [this.author, this.recipient].sort((left, right) =>
+        left.valueOf() < right.valueOf() ? -1 : 1,
+      ),
       [],
       this.author,
     );

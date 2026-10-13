@@ -322,10 +322,12 @@ async function main(): Promise<void> {
     requireMetadataAtFrontier: (): Promise<Conversation> =>
       Promise.resolve({
         hasParticipant: () => true,
+        isGroup: () => true,
       } as unknown as Conversation),
     requireMetadataById: (): Promise<Conversation> =>
       Promise.resolve({
         hasParticipant: () => true,
+        isGroup: () => true,
       } as unknown as Conversation),
   } as unknown as ConversationRepository;
   const pollAccess = new PollMutationScopeAccess(communities, conversations);
@@ -494,7 +496,7 @@ async function main(): Promise<void> {
   console.log('PASS replayed older put proof refused after removal');
 
   stage = 'conversation pins are governed too';
-  const conversationId = new ConversationId(`one-to-one:${randomUUID()}`);
+  const conversationId = new ConversationId(`group:${randomUUID()}`);
   const conversationMessageId = new MessageId(randomUUID());
   const conversationPinId = `conversation:${conversationId.valueOf()}:${conversationMessageId.valueOf()}`;
   const conversationBase = {
@@ -906,8 +908,8 @@ async function main(): Promise<void> {
     );
   };
   const voteOf = async (): Promise<string[] | undefined> =>
-    (await honest.polls!.requireById(pollId)).toPrimitives()
-      .votes[0]?.optionIds;
+    (await honest.polls!.requireById(pollId)).toPrimitives().votes[0]
+      ?.optionIds;
 
   await castVote(poll, 'a', 0);
   assert.deepEqual(await voteOf(), ['a']);
@@ -1130,7 +1132,8 @@ async function main(): Promise<void> {
   const favoriteCount = async (replica: Replica): Promise<number> => {
     if (!(await replica.stickerLibraries!.hasByIdentityId(identity))) return 0;
 
-    const library = await replica.stickerLibraries!.requireByIdentityId(identity);
+    const library =
+      await replica.stickerLibraries!.requireByIdentityId(identity);
 
     return library.toPrimitives().favoriteStickers.length;
   };

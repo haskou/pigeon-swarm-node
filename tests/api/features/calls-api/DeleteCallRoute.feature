@@ -3,9 +3,9 @@ Feature: End call
   I want to end calls
   So that clients can close active media sessions
 
-  Scenario: End a one-to-one conversation call
+  Scenario: End a group conversation call
     Given I register a test IPFS network "api-calls-end-network"
-    And I have created a one-to-one conversation
+    And I have created a group conversation
     And I set a conversation call body
     And I sign the current call start request
     When I POST to "/calls/"

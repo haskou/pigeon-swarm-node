@@ -42,7 +42,7 @@ describe('ConversationMessageRegistrar', () => {
   }
 
   it('registers a remote candidate that matches the announced message', async () => {
-    const conversation = mother.build();
+    const conversation = mother.buildGroup();
     const conversationId = conversation.getId();
     const messageId = MessageId.generate();
     const candidate = buildCandidate(conversationId, messageId);
@@ -62,7 +62,7 @@ describe('ConversationMessageRegistrar', () => {
   });
 
   it('does not duplicate already registered messages', async () => {
-    const conversation = mother.build();
+    const conversation = mother.buildGroup();
     const conversationId = conversation.getId();
     const messageId = MessageId.generate();
     const candidate = buildCandidate(conversationId, messageId);
@@ -83,7 +83,7 @@ describe('ConversationMessageRegistrar', () => {
   });
 
   it('rejects a remote candidate with a different message id', async () => {
-    const conversation = mother.build();
+    const conversation = mother.buildGroup();
     const conversationId = conversation.getId();
     const announcedMessageId = MessageId.generate();
     const candidate = buildCandidate(conversationId, MessageId.generate());
@@ -104,7 +104,7 @@ describe('ConversationMessageRegistrar', () => {
   });
 
   it('rejects a remote candidate with a different conversation id', async () => {
-    const conversation = mother.build();
+    const conversation = mother.buildGroup();
     const conversationId = conversation.getId();
     const messageId = MessageId.generate();
     const candidate = buildCandidate(
@@ -128,7 +128,7 @@ describe('ConversationMessageRegistrar', () => {
   });
 
   it('persists an announced message with the proof it carried', async () => {
-    const conversation = mother.build();
+    const conversation = mother.buildGroup();
     const conversationId = conversation.getId();
     const messageId = MessageId.generate();
     const candidate = buildCandidate(conversationId, messageId);
@@ -152,7 +152,7 @@ describe('ConversationMessageRegistrar', () => {
   });
 
   it('rejects a remote candidate from a non participant', async () => {
-    const conversation = mother.build();
+    const conversation = mother.buildGroup();
     const conversationId = conversation.getId();
     const messageId = MessageId.generate();
     const outsider = await ConversationMother.generateIdentityId();

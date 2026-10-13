@@ -219,6 +219,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResource'
+        '409':
+          $ref: '#/components/responses/ConversationMessageLogConflict'
     get:
       tags:
         - conversations
@@ -244,12 +246,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessagesResource'
+        '409':
+          $ref: '#/components/responses/ConversationMessageLogConflict'
   /conversations/{conversationId}/messages/read-until:
     put:
       tags:
         - conversations
       summary: Mark conversation messages as read up to a message
-      description: Moves the reader's read marker forward to the given message id and deletes local unread flags up to and including it, then publishes a read event so other nodes can apply the same projection update. A marker never moves backwards. An id older than the stored marker is rejected with 409 and nothing is published. The signed request is kept as the event's `readProof`; receivers act on the event only after the proof verifies and while its timestamp is at most 14 days old and at most 30 seconds ahead of their clock.
+      description: Moves the reader's read marker forward to the given message id and deletes local unread flags up to and including it, then publishes a read event so other nodes can apply the same projection update. Read markers exist only for group conversations; nodes refuse replicated one-to-one markers. A marker never moves backwards. An id older than the stored marker is rejected with 409 and nothing is published. The signed request is kept as the event's `readProof`; receivers act on the event only after the proof verifies and while its timestamp is at most 14 days old and at most 30 seconds ahead of their clock.
       parameters:
         - $ref: '#/components/parameters/ConversationId'
         - $ref: '#/components/parameters/XIdentityId'
@@ -265,7 +269,11 @@ paths:
         '200':
           description: Messages marked as read.
         '409':
-          description: The reader's marker already points at a later message. Nothing is stored or published.
+          description: StaleReadMarkerError when the reader's marker already points at a later message, or OneToOneConversationMessagesNotReplicatedError for a one-to-one conversation. Nothing is stored or published.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationDomainError'
   /conversations/me/drafts:
     get:
       tags:
@@ -335,6 +343,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConversationMessagePinsResource'
+        '409':
+          $ref: '#/components/responses/ConversationMessageLogConflict'
   /conversations/{conversationId}/messages/{messageId}:
     get:
       tags:
@@ -357,6 +367,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResource'
+        '409':
+          $ref: '#/components/responses/ConversationMessageLogConflict'
     delete:
       tags:
         - conversations
@@ -385,6 +397,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResource'
+        '409':
+          $ref: '#/components/responses/ConversationMessageLogConflict'
     put:
       tags:
         - conversations
@@ -413,6 +427,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResource'
+        '409':
+          $ref: '#/components/responses/ConversationMessageLogConflict'
   /conversations/{conversationId}/messages/{messageId}/reactions:
     post:
       tags:
@@ -442,6 +458,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageReactionResource'
+        '409':
+          $ref: '#/components/responses/ConversationMessageLogConflict'
     delete:
       tags:
         - conversations
@@ -470,6 +488,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageReactionResource'
+        '409':
+          $ref: '#/components/responses/ConversationMessageLogConflict'
   /conversations/{conversationId}/messages/{messageId}/pin:
     post:
       tags:
@@ -494,6 +514,8 @@ paths:
       responses:
         '200':
           description: Message pinned.
+        '409':
+          $ref: '#/components/responses/ConversationMessageLogConflict'
     delete:
       tags:
         - conversations
@@ -517,6 +539,8 @@ paths:
       responses:
         '200':
           description: Message unpinned.
+        '409':
+          $ref: '#/components/responses/ConversationMessageLogConflict'
   /conversations/{conversationId}/messages/{messageId}/around:
     get:
       tags:
@@ -549,6 +573,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessagesAroundResource'
+        '409':
+          $ref: '#/components/responses/ConversationMessageLogConflict'
   /conversations/{conversationId}/messages/{messageId}/thread:
     get:
       tags:
@@ -576,7 +602,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessagesResource'
+        '409':
+          $ref: '#/components/responses/ConversationMessageLogConflict'
 components:
+  responses:
+    ConversationMessageLogConflict:
+      description: Domain error. The replicated message log exists only for group conversations, so a participant of a one-to-one conversation gets `OneToOneConversationMessagesNotReplicatedError`; one-to-one messages travel only through opaque mailboxes.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConversationDomainError'
   parameters:
     ConversationId:
       in: path
@@ -609,6 +644,18 @@ components:
       schema:
         type: string
   schemas:
+    ConversationDomainError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: OneToOneConversationMessagesNotReplicatedError
+        message:
+          type: string
+          example: One-to-one conversation messages are not replicated
     ConversationOperationBody:
       type: object
       description: >-
@@ -847,235 +894,7 @@ components:
           maxItems: 64
           items:
             type: string
-            pattern: '^[A-Za-z0-9_-]{43}        predecessor:
-          type: string
-          nullable: true
-          description: Digest of the previous mutation. Null if and only if sequence is 0.
-        sequence:
-          type: integer
-          minimum: 0
-        author:
-          type: object
-          required: [identityId, deviceCredential, authorizationRevision]
-          properties:
-            identityId:
-              type: string
-            deviceCredential:
-              type: string
-            authorizationRevision:
-              type: integer
-              minimum: 0
-              description: Revision of the author's device-authorization chain (GET /identity-devices/authorization) observed when signing. The device is checked against the chain at this revision, not the current head.
-        signature:
-          type: string
-    ConversationMessagePinBody:
-      type: object
-      required: [createdAt, mutation]
-      properties:
-        createdAt:
-          type: integer
-          minimum: 0
-        mutation:
-          $ref: '#/components/schemas/SignedPublicMutation'
-    ConversationMessageUnpinBody:
-      type: object
-      required: [mutation]
-      properties:
-        mutation:
-          $ref: '#/components/schemas/SignedPublicMutation'
-    ConversationMessageReactionBody:
-      type: object
-      required:
-        - emoji
-        - mutation
-      properties:
-        createdAt:
-          type: integer
-          minimum: 0
-          description: Creation time committed by the mutation proof. Ignored on removal.
-        mutation:
-          $ref: '#/components/schemas/SignedPublicMutation'
-        emoji:
-          type: string
-          description: Emoji reaction to add or remove. Reactions are unique by conversation, message, author and emoji.
-          example: 👍
-    ConversationDraftBody:
-      type: object
-      required:
-        - encryptedPayload
-      properties:
-        encryptedPayload:
-          type: string
-          description: Opaque encrypted draft payload owned by the authenticated identity.
-        updatedAt:
-          type: integer
-    ConversationDraftResource:
-      type: object
-      required:
-        - conversationId
-        - encryptedPayload
-        - updatedAt
-      properties:
-        conversationId:
-          type: string
-        encryptedPayload:
-          type: string
-        updatedAt:
-          type: integer
-    ConversationDraftsResource:
-      type: object
-      required:
-        - drafts
-      properties:
-        drafts:
-          type: array
-          items:
-            $ref: '#/components/schemas/ConversationDraftResource'
-    ConversationMessagePinResource:
-      type: object
-      required:
-        - createdAt
-        - message
-        - messageId
-        - pinnedByIdentityId
-      properties:
-        createdAt:
-          type: integer
-        messageId:
-          type: string
-        pinnedByIdentityId:
-          type: string
-        message:
-          $ref: '#/components/schemas/MessageResource'
-    ConversationMessagePinsResource:
-      type: object
-      required:
-        - conversationId
-        - pins
-      properties:
-        conversationId:
-          type: string
-        pins:
-          type: array
-          items:
-            $ref: '#/components/schemas/ConversationMessagePinResource'
-    MessageReactionResource:
-      type: object
-      required:
-        - authorIdentityId
-        - createdAt
-        - emoji
-      properties:
-        authorIdentityId:
-          type: string
-        createdAt:
-          type: integer
-        emoji:
-          type: string
-    MessageResource:
-      type: object
-      required:
-        - id
-        - conversationId
-        - authorIdentityId
-        - type
-        - createdAt
-        - previousMessageIds
-      properties:
-        id:
-          type: string
-        conversationId:
-          type: string
-        authorIdentityId:
-          type: string
-        type:
-          type: string
-        createdAt:
-          type: integer
-        encryptedPayload:
-          type: string
-        previousMessageIds:
-          type: array
-          items:
-            type: string
-        reactions:
-          type: array
-          description: OrbitDB replicated reactions synchronized by conversation events.
-          items:
-            $ref: '#/components/schemas/MessageReactionResource'
-        replyToMessageId:
-          type: string
-        targetMessageId:
-          type: string
-    MessagesResource:
-      type: object
-      required:
-        - conversationId
-        - messages
-      properties:
-        conversationId:
-          type: string
-        messages:
-          type: array
-          description: >
-            Conversation timeline items. Group conversation poll ids are also
-            valid conversation message ids and can be used in later
-            previousMessageIds.
-          items:
-            oneOf:
-              - $ref: '#/components/schemas/MessageResource'
-              - $ref: '#/components/schemas/ConversationCallEventResource'
-              - $ref: '../polls-api/swagger.yaml#/components/schemas/Poll'
-        nextBeforeMessageId:
-          type: string
-    ConversationCallEventResource:
-      type: object
-      required:
-        - id
-        - conversationId
-        - type
-        - callId
-        - callEventType
-        - actorIdentityId
-        - createdAt
-        - durationMs
-      properties:
-        id:
-          type: string
-        conversationId:
-          type: string
-        type:
-          type: string
-          enum:
-            - call_event
-        callId:
-          type: string
-        callEventType:
-          type: string
-          enum:
-            - declined
-            - ended
-            - missed
-        actorIdentityId:
-          type: string
-        createdAt:
-          type: integer
-        durationMs:
-          type: integer
-    MessagesAroundResource:
-      type: object
-      required:
-        - messages
-      properties:
-        messages:
-          type: array
-          items:
-            $ref: '#/components/schemas/MessageResource'
-        previousCursor:
-          type: string
-        nextCursor:
-          type: string
-
+            pattern: '^[A-Za-z0-9_-]{43}$'
           description: Digests of the community or conversation operations observed when signing, strictly ascending. Required, and only allowed, on records scoped to a community or conversation (channel messages and their reactions and pins, invites, membership requests, moderation log, MLS records, polls, conversation messages); the record's permission is judged against the scope folded at exactly this frontier. Read it from GET /communities/{id}/frontier or the conversation frontier before signing.
         predecessor:
           type: string

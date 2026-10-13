@@ -2,7 +2,7 @@ Feature: React to conversation messages
 
   Scenario: Add and list a message reaction
     Given I register a test IPFS network "api-conversation-message-reaction-network"
-    And I have created a one-to-one conversation
+    And I have created a group conversation
     And I have sent an encrypted conversation message
     And I set a conversation message reaction body
     And I sign the current conversation message reaction request
@@ -22,7 +22,7 @@ Feature: React to conversation messages
 
   Scenario: Remove a message reaction
     Given I register a test IPFS network "api-conversation-message-reaction-removal-network"
-    And I have created a one-to-one conversation
+    And I have created a group conversation
     And I have sent an encrypted conversation message
     And I set a conversation message reaction body
     And I sign the current conversation message reaction request

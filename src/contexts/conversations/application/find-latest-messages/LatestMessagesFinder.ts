@@ -3,6 +3,7 @@ import { ConversationMessagesAround } from '@app/contexts/conversations/domain/C
 import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
 import { MessageReaction } from '@app/contexts/conversations/domain/entities/messages/MessageReaction';
 import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
+import { OneToOneConversationMessagesNotReplicatedError } from '@app/contexts/conversations/domain/errors/OneToOneConversationMessagesNotReplicatedError';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import MessageReactionRepository from '@app/contexts/conversations/domain/repositories/MessageReactionRepository';
 import PollRepository from '@app/contexts/polls/domain/repositories/PollRepository';
@@ -30,6 +31,10 @@ export default class LatestMessagesFinder {
 
     if (!conversation.hasParticipant(message.requesterIdentityId)) {
       throw new ConversationParticipantNotFoundError();
+    }
+
+    if (!conversation.isGroup()) {
+      throw new OneToOneConversationMessagesNotReplicatedError();
     }
   }
 

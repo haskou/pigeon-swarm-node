@@ -2,7 +2,7 @@ Feature: Mark conversation messages as read
 
   Scenario: Track and clear unread messages
     Given I register a test IPFS network "api-conversation-unread-network"
-    And I have created a one-to-one conversation
+    And I have created a group conversation
     And I have sent an encrypted conversation message
     And the other identity signs the current conversations request
     When I GET current conversations
