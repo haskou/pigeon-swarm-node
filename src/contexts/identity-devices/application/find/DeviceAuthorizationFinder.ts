@@ -1,6 +1,7 @@
 import { assert } from '@haskou/value-objects';
 
 import { DeviceAuthorization } from '../../domain/DeviceAuthorization';
+import { DeviceCompromiseCaps } from '../../domain/DeviceCompromiseCaps';
 import { DeviceAuthorizationNotFoundError } from '../../domain/errors/DeviceAuthorizationNotFoundError';
 import { DeviceAuthorizationRepository } from '../../domain/repositories/DeviceAuthorizationRepository';
 import { DeviceAuthorizationFindMessage } from './messages/DeviceAuthorizationFindMessage';
@@ -22,7 +23,7 @@ export default class DeviceAuthorizationFinder {
 
   public findCompromisedSince(
     message: DeviceAuthorizationFindMessage,
-  ): Promise<ReadonlyMap<string, number>> {
+  ): Promise<DeviceCompromiseCaps> {
     return this.repository.findCompromisedSince(message.identityId);
   }
 }

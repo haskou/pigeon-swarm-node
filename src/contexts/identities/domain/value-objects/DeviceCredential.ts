@@ -18,4 +18,14 @@ export class DeviceCredential extends PublicKey {
   public getCommitment(): DeviceCredentialCommitment {
     return DeviceCredentialCommitment.fromCredential(this);
   }
+
+  /** Code-unit order: the strict ascending check on compromised credentials. */
+  public isLessThan(other: DeviceCredential): boolean {
+    return this.valueOf() < other.valueOf();
+  }
+
+  /** Locale order: deterministic sort and pick among credentials. */
+  public compareTo(other: DeviceCredential): number {
+    return this.valueOf().localeCompare(other.valueOf());
+  }
 }

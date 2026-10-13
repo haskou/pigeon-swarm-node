@@ -55,7 +55,7 @@ export default class OrbitDBDeviceAuthorizationTransitionProjector {
   ): boolean {
     const operationId = transition.getOperationId().valueOf();
     const pairingId = transition.isEnrollment()
-      ? transition.getPairingId().valueOf()
+      ? transition.requirePairingId().valueOf()
       : undefined;
     const checkpoint = this.sources.effectiveCheckpoint(document);
 

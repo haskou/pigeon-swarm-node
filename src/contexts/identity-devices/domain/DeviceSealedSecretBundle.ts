@@ -1,6 +1,7 @@
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { UniqueObjectArray } from '@haskou/value-objects';
 
 import { DeviceAuthorization } from './DeviceAuthorization';
 import { DeviceSealedSecretGenerationStaleError } from './errors/DeviceSealedSecretGenerationStaleError';
@@ -10,6 +11,8 @@ import { DeviceSealedSecretRecipientsMismatchError } from './errors/DeviceSealed
 import { DeviceSealedSecretRevisionMismatchError } from './errors/DeviceSealedSecretRevisionMismatchError';
 import { InvalidDeviceSealedSecretBundleError } from './errors/InvalidDeviceSealedSecretBundleError';
 import { InvalidDeviceSealedSecretSignatureError } from './errors/InvalidDeviceSealedSecretSignatureError';
+import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
+import { DeviceSealedSecretGeneration } from './value-objects/DeviceSealedSecretGeneration';
 
 export interface DeviceSealedSecretEntryPrimitives {
   recipientCredential: string;
@@ -41,16 +44,27 @@ export interface DeviceSealedSecretSigningInput {
   sealedSecret: string;
 }
 
+interface DeviceSealedSecretEntry {
+  recipientCredential: DeviceCredential;
+  sealedSecret: string;
+  signature: string;
+}
+
 const SIGNING_PURPOSE = 'pigeon:device-sealed-secret:v1';
 const MAX_ENTRIES = 128;
 const SEALED_SECRET_PATTERN = /^[A-Za-z0-9+/=.-]+$/;
 
-function parseCredential(value: string, reason: string): IdentityId {
+function parseOrReject<T>(reason: string, parse: () => T): T {
   try {
-    return new IdentityId(value);
+    return parse();
   } catch {
     throw new InvalidDeviceSealedSecretBundleError(reason);
   }
+}
+
+/** Wire form of a credential: the identity-id body without PEM headers. */
+function toWire(credential: DeviceCredential): string {
+  return new IdentityId(credential.valueOf()).valueOf();
 }
 
 export class DeviceSealedSecretBundle {
@@ -59,20 +73,14 @@ export class DeviceSealedSecretBundle {
   public static fromPrimitives(
     primitives: DeviceSealedSecretBundlePrimitives,
   ): DeviceSealedSecretBundle {
-    if (!Number.isInteger(primitives.generation) || primitives.generation < 1) {
-      throw new InvalidDeviceSealedSecretBundleError(
-        'generation must be a positive integer',
-      );
-    }
-
-    if (
-      !Number.isSafeInteger(primitives.authorizationRevision) ||
-      primitives.authorizationRevision < 0
-    ) {
-      throw new InvalidDeviceSealedSecretBundleError(
-        'authorization revision must be a non-negative integer',
-      );
-    }
+    const generation = parseOrReject(
+      'generation must be a positive integer',
+      () => new DeviceSealedSecretGeneration(primitives.generation),
+    );
+    const authorizationRevision = parseOrReject(
+      'authorization revision must be a non-negative integer',
+      () => new DeviceAuthorizationRevision(primitives.authorizationRevision),
+    );
 
     if (
       primitives.entries.length < 1 ||
@@ -83,20 +91,14 @@ export class DeviceSealedSecretBundle {
       );
     }
 
-    const recipients = new Set<string>();
     const entries = primitives.entries.map((entry) => {
-      const recipientCredential = parseCredential(
-        entry.recipientCredential,
+      const recipientCredential = parseOrReject(
         'recipient credential is malformed',
-      ).valueOf();
-
-      if (recipients.has(recipientCredential)) {
-        throw new InvalidDeviceSealedSecretBundleError(
-          'recipient credentials must be unique',
-        );
-      }
-
-      recipients.add(recipientCredential);
+        () =>
+          DeviceCredential.fromIdentityId(
+            new IdentityId(entry.recipientCredential),
+          ),
+      );
 
       if (
         entry.sealedSecret.length < 1 ||
@@ -122,14 +124,28 @@ export class DeviceSealedSecretBundle {
       };
     });
 
+    if (
+      UniqueObjectArray.fromArray(
+        entries.map((entry) => entry.recipientCredential),
+      ).length !== entries.length
+    ) {
+      throw new InvalidDeviceSealedSecretBundleError(
+        'recipient credentials must be unique',
+      );
+    }
+
     return new DeviceSealedSecretBundle(
-      parseCredential(primitives.identityId, 'identity id is malformed'),
-      parseCredential(
-        primitives.publisherCredential,
-        'publisher credential is malformed',
-      ).valueOf(),
-      primitives.authorizationRevision,
-      primitives.generation,
+      parseOrReject(
+        'identity id is malformed',
+        () => new IdentityId(primitives.identityId),
+      ),
+      parseOrReject('publisher credential is malformed', () =>
+        DeviceCredential.fromIdentityId(
+          new IdentityId(primitives.publisherCredential),
+        ),
+      ),
+      authorizationRevision,
+      generation,
       entries,
     );
   }
@@ -148,24 +164,21 @@ export class DeviceSealedSecretBundle {
 
   private constructor(
     private readonly identityId: IdentityId,
-    private readonly publisherCredential: string,
-    private readonly authorizationRevision: number,
-    private readonly generation: number,
-    private readonly entries: readonly DeviceSealedSecretEntryPrimitives[],
+    private readonly publisherCredential: DeviceCredential,
+    private readonly authorizationRevision: DeviceAuthorizationRevision,
+    private readonly generation: DeviceSealedSecretGeneration,
+    private readonly entries: readonly DeviceSealedSecretEntry[],
   ) {}
 
-  private hasValidSignature(
-    publisher: DeviceCredential,
-    entry: DeviceSealedSecretEntryPrimitives,
-  ): boolean {
+  private hasValidSignature(entry: DeviceSealedSecretEntry): boolean {
     try {
-      return publisher.isValidSignature(
+      return this.publisherCredential.isValidSignature(
         DeviceSealedSecretBundle.signingPayload({
-          authorizationRevision: this.authorizationRevision,
-          generation: this.generation,
+          authorizationRevision: this.authorizationRevision.valueOf(),
+          generation: this.generation.valueOf(),
           identityId: this.identityId.valueOf(),
-          publisherCredential: this.publisherCredential,
-          recipientCredential: entry.recipientCredential,
+          publisherCredential: toWire(this.publisherCredential),
+          recipientCredential: toWire(entry.recipientCredential),
           sealedSecret: entry.sealedSecret,
         }),
         new Signature(entry.signature),
@@ -182,50 +195,44 @@ export class DeviceSealedSecretBundle {
       );
     }
 
-    if (this.authorizationRevision !== authorization.getRevision().valueOf()) {
+    if (!authorization.getRevision().isEqual(this.authorizationRevision)) {
       throw new DeviceSealedSecretRevisionMismatchError();
     }
 
-    const publisher = DeviceCredential.fromIdentityId(
-      new IdentityId(this.publisherCredential),
-    );
-
-    if (!authorization.isAuthorized(publisher)) {
+    if (!authorization.isAuthorized(this.publisherCredential)) {
       throw new DeviceSealedSecretPublisherNotAuthorizedError();
     }
 
-    const authorized = new Set(
-      authorization
-        .getCredentials()
-        .map((credential) => new IdentityId(credential.valueOf()).valueOf()),
+    const authorized = UniqueObjectArray.fromArray(
+      authorization.getCredentials(),
     );
     const recipients = this.entries.map((entry) => entry.recipientCredential);
 
     if (
-      authorized.size !== recipients.length ||
-      recipients.some((recipient) => !authorized.has(recipient))
+      authorized.length !== recipients.length ||
+      recipients.some((recipient) => !authorized.includes(recipient))
     ) {
       throw new DeviceSealedSecretRecipientsMismatchError();
     }
 
     for (const entry of this.entries) {
-      if (!this.hasValidSignature(publisher, entry)) {
+      if (!this.hasValidSignature(entry)) {
         throw new InvalidDeviceSealedSecretSignatureError();
       }
     }
   }
 
   public assertSupersedes(stored: DeviceSealedSecretBundle | undefined): void {
-    if (stored && stored.generation >= this.generation) {
+    if (stored && stored.generation.isGreaterOrEqualThan(this.generation)) {
       throw new DeviceSealedSecretGenerationStaleError();
     }
   }
 
   public deliveryFor(
-    recipientCredential: string,
+    recipientCredential: DeviceCredential,
   ): DeviceSealedSecretDeliveryPrimitives {
-    const entry = this.entries.find(
-      (candidate) => candidate.recipientCredential === recipientCredential,
+    const entry = this.entries.find((candidate) =>
+      candidate.recipientCredential.isEqual(recipientCredential),
     );
 
     if (!entry) {
@@ -233,11 +240,13 @@ export class DeviceSealedSecretBundle {
     }
 
     return {
-      authorizationRevision: this.authorizationRevision,
-      generation: this.generation,
+      authorizationRevision: this.authorizationRevision.valueOf(),
+      generation: this.generation.valueOf(),
       identityId: this.identityId.valueOf(),
-      publisherCredential: this.publisherCredential,
-      ...entry,
+      publisherCredential: toWire(this.publisherCredential),
+      recipientCredential: toWire(entry.recipientCredential),
+      sealedSecret: entry.sealedSecret,
+      signature: entry.signature,
     };
   }
 
@@ -245,21 +254,25 @@ export class DeviceSealedSecretBundle {
     return this.identityId;
   }
 
-  public getGeneration(): number {
+  public getGeneration(): DeviceSealedSecretGeneration {
     return this.generation;
   }
 
-  public getAuthorizationRevision(): number {
+  public getAuthorizationRevision(): DeviceAuthorizationRevision {
     return this.authorizationRevision;
   }
 
   public toPrimitives(): DeviceSealedSecretBundlePrimitives {
     return {
-      authorizationRevision: this.authorizationRevision,
-      entries: this.entries.map((entry) => ({ ...entry })),
-      generation: this.generation,
+      authorizationRevision: this.authorizationRevision.valueOf(),
+      entries: this.entries.map((entry) => ({
+        recipientCredential: toWire(entry.recipientCredential),
+        sealedSecret: entry.sealedSecret,
+        signature: entry.signature,
+      })),
+      generation: this.generation.valueOf(),
       identityId: this.identityId.valueOf(),
-      publisherCredential: this.publisherCredential,
+      publisherCredential: toWire(this.publisherCredential),
     };
   }
 }
