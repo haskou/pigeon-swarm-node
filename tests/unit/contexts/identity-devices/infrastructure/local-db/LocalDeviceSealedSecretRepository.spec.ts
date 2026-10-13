@@ -139,6 +139,6 @@ describe(LocalDeviceSealedSecretRepository.name, () => {
       repository.find(new IdentityId(beta.identityId)),
     ).resolves.toBeUndefined();
     const stored = await repository.find(new IdentityId(alpha.identityId));
-    expect(stored?.getGeneration()).toBe(5);
+    expect(stored?.getGeneration().valueOf()).toBe(5);
   });
 });

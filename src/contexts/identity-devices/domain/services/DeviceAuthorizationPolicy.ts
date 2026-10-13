@@ -8,10 +8,16 @@ import { DeviceAuthorizationTransition } from '../DeviceAuthorizationTransition'
 import { DeviceCompromiseCaps } from '../DeviceCompromiseCaps';
 import { InvalidDeviceAuthorizationTransitionError } from '../errors/InvalidDeviceAuthorizationTransitionError';
 import { DeviceAuthorizationEpoch } from '../value-objects/DeviceAuthorizationEpoch';
+import { DeviceAuthorizationRevision } from '../value-objects/DeviceAuthorizationRevision';
 
 interface Admitted<T> {
   authorization: DeviceAuthorization;
   candidate: DeviceAuthorizationCandidate<T>;
+}
+
+interface RevisionGroup<T> {
+  revision: DeviceAuthorizationRevision;
+  candidates: DeviceAuthorizationCandidate<T>[];
 }
 
 export default class DeviceAuthorizationPolicy {
@@ -67,8 +73,8 @@ export default class DeviceAuthorizationPolicy {
   ): DeviceAuthorization {
     this.verifyDeviceAuthor(authorization, transition);
     this.verifyTargetProof(transition);
-    transition.getPairingId();
-    transition.getPairingExpiration();
+    transition.requirePairingId();
+    transition.requirePairingExpiration();
 
     return authorization.enroll(transition.getTargetCredential());
   }
@@ -108,23 +114,27 @@ export default class DeviceAuthorizationPolicy {
 
   private groupByRevision<T>(
     candidates: DeviceAuthorizationCandidate<T>[],
-  ): Map<number, DeviceAuthorizationCandidate<T>[]> {
-    const groups = new Map<number, DeviceAuthorizationCandidate<T>[]>();
+  ): RevisionGroup<T>[] {
+    const groups: RevisionGroup<T>[] = [];
 
     for (const candidate of candidates) {
-      const revision = candidate.transition.getPreviousRevision().valueOf();
-      const group = groups.get(revision) ?? [];
+      const revision = candidate.transition.getPreviousRevision();
+      const group = groups.find((existing) =>
+        existing.revision.isEqual(revision),
+      );
 
-      group.push(candidate);
-      groups.set(revision, group);
+      if (group) {
+        group.candidates.push(candidate);
+      } else {
+        groups.push({ candidates: [candidate], revision });
+      }
     }
 
-    for (const group of groups.values()) {
-      group.sort((left, right) => {
+    for (const group of groups) {
+      group.candidates.sort((left, right) => {
         const operationOrder = left.transition
           .getOperationId()
-          .valueOf()
-          .localeCompare(right.transition.getOperationId().valueOf());
+          .compareTo(right.transition.getOperationId());
 
         return operationOrder || left.encoding.localeCompare(right.encoding);
       });
@@ -135,11 +145,14 @@ export default class DeviceAuthorizationPolicy {
 
   private admittedAt<T>(
     authorization: DeviceAuthorization,
-    groups: Map<number, DeviceAuthorizationCandidate<T>[]>,
+    groups: RevisionGroup<T>[],
   ): Admitted<T>[] {
     const admitted: Admitted<T>[] = [];
 
-    const candidates = groups.get(authorization.getRevision().valueOf()) ?? [];
+    const group = groups.find((existing) =>
+      existing.revision.isEqual(authorization.getRevision()),
+    );
+    const candidates = group?.candidates ?? [];
 
     for (const candidate of candidates) {
       const application = this.tryApply(authorization, candidate.transition);
@@ -212,7 +225,7 @@ export default class DeviceAuthorizationPolicy {
     }
 
     assert(
-      !transition.getPairingExpiration().isExpiredAt(acceptedAt),
+      !transition.requirePairingExpiration().isExpiredAt(acceptedAt),
       new InvalidDeviceAuthorizationTransitionError(),
     );
   }
@@ -339,8 +352,7 @@ export default class DeviceAuthorizationPolicy {
       const checkpoint = this.checkpointOf(authorization, compacted);
 
       assert(
-        checkpoint.getRevision().valueOf() >
-          authorization.getRevision().valueOf(),
+        checkpoint.getRevision().isGreaterThan(authorization.getRevision()),
         new InvalidDeviceAuthorizationTransitionError(),
       );
 

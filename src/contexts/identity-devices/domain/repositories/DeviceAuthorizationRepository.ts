@@ -5,6 +5,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { DeviceAuthorization } from '../DeviceAuthorization';
 import { DeviceAuthorizationTimeline } from '../DeviceAuthorizationTimeline';
 import { DeviceAuthorizationTransition } from '../DeviceAuthorizationTransition';
+import { DeviceCompromiseCaps } from '../DeviceCompromiseCaps';
 
 export abstract class DeviceAuthorizationRepository {
   public abstract compareAndApply(
@@ -20,10 +21,10 @@ export abstract class DeviceAuthorizationRepository {
     identityId: IdentityId,
   ): Promise<DeviceAuthorizationTimeline | undefined>;
 
-  /** The caps in effect at the head, keyed by compromised credential. */
+  /** The caps in effect at the head. */
   public abstract findCompromisedSince(
     identityId: IdentityId,
-  ): Promise<ReadonlyMap<string, number>>;
+  ): Promise<DeviceCompromiseCaps>;
 
   public abstract provision(
     authorization: DeviceAuthorization,

@@ -72,8 +72,8 @@ describe(DeviceSealedSecretPublisher.name, () => {
     );
 
     const stored = await sealedSecrets.find(new IdentityId(identityId));
-    expect(stored?.getGeneration()).toBe(1);
-    expect(stored?.getAuthorizationRevision()).toBe(0);
+    expect(stored?.getGeneration().valueOf()).toBe(1);
+    expect(stored?.getAuthorizationRevision().valueOf()).toBe(0);
   });
 
   it('replaces the stored generation with a strictly newer one', async () => {
@@ -109,7 +109,7 @@ describe(DeviceSealedSecretPublisher.name, () => {
     );
 
     const stored = await sealedSecrets.find(new IdentityId(identityId));
-    expect(stored?.getGeneration()).toBe(2);
+    expect(stored?.getGeneration().valueOf()).toBe(2);
   });
 
   it('rejects a generation that does not advance the stored one and keeps the stored bundle', async () => {

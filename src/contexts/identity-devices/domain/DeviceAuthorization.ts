@@ -149,13 +149,10 @@ export class DeviceAuthorization extends AggregateRoot {
   ): DeviceAuthorization {
     const availableCredentials =
       MAX_DEVICE_CREDENTIALS - this.credentials.length;
-    const newCredentials = [
-      ...new Map(
-        credentials.map((credential) => [credential.valueOf(), credential]),
-      ).values(),
-    ]
+    const newCredentials = UniqueObjectArray.fromArray(credentials)
       .filter((credential) => !this.isAuthorized(credential))
-      .sort((left, right) => left.valueOf().localeCompare(right.valueOf()))
+      .toArray()
+      .sort((left, right) => left.compareTo(right))
       .slice(0, availableCredentials);
 
     assert(
@@ -247,9 +244,7 @@ export class DeviceAuthorization extends AggregateRoot {
         : [
             this.credentials
               .toArray()
-              .sort((left, right) =>
-                left.valueOf().localeCompare(right.valueOf()),
-              )[0],
+              .sort((left, right) => left.compareTo(right))[0],
           ];
 
     const next = new DeviceAuthorization(
@@ -298,7 +293,7 @@ export class DeviceAuthorization extends AggregateRoot {
     epoch: DeviceAuthorizationEpoch,
   ): DeviceAuthorization {
     assert(
-      revision.valueOf() > this.revision.valueOf(),
+      revision.isGreaterThan(this.revision),
       new InvalidDeviceAuthorizationTransitionError(),
     );
 

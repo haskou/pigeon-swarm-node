@@ -901,7 +901,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
           recovered,
           '00000000-0000-4000-8000-000000000003',
           revisionOf(2),
-          [{ compromisedSince: revisionOf(1), credential: credentialOf(phone) }],
+          [
+            {
+              compromisedSince: revisionOf(1),
+              credential: credentialOf(phone),
+            },
+          ],
         ),
       );
       await repository.compareAndApply(
@@ -963,7 +968,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
           recovered,
           '00000000-0000-4000-8000-000000000003',
           revisionOf(2),
-          [{ compromisedSince: revisionOf(1), credential: credentialOf(phone) }],
+          [
+            {
+              compromisedSince: revisionOf(1),
+              credential: credentialOf(phone),
+            },
+          ],
         ),
       );
       await first.repository.compareAndApply(
@@ -1004,9 +1014,9 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       ];
 
       for (const timeline of timelines) {
-        expect(timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(4))).toBe(
-          false,
-        );
+        expect(
+          timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(4)),
+        ).toBe(false);
         expect(
           timeline?.isAuthorizedAt(credentialOf(recovered), revisionOf(4)),
         ).toBe(true);
@@ -1077,7 +1087,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
             recovered,
             '00000000-0000-4000-8000-000000000002',
             revisionOf(1),
-            [{ compromisedSince: revisionOf(1), credential: credentialOf(phone) }],
+            [
+              {
+                compromisedSince: revisionOf(1),
+                credential: credentialOf(phone),
+              },
+            ],
           ),
         ),
       ).rejects.toThrow();
@@ -1117,7 +1132,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
           recovered,
           '00000000-0000-4000-8000-000000000003',
           revisionOf(2),
-          [{ compromisedSince: revisionOf(1), credential: credentialOf(phone) }],
+          [
+            {
+              compromisedSince: revisionOf(1),
+              credential: credentialOf(phone),
+            },
+          ],
         ),
       );
       const trusted = getHead() as {
@@ -1131,7 +1151,9 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         revisionOf(3),
         credentialOf(recovered),
         DeviceAuthorizationEpoch.fromRecovery(
-          new DeviceAuthorizationOperationId('00000000-0000-4000-8000-000000000003'),
+          new DeviceAuthorizationOperationId(
+            '00000000-0000-4000-8000-000000000003',
+          ),
         ),
       );
       const successorRecovery = recoveryOf(
@@ -1142,13 +1164,17 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         revisionOf(3),
         undefined,
         DeviceAuthorizationEpoch.fromRecovery(
-          new DeviceAuthorizationOperationId('00000000-0000-4000-8000-000000000003'),
+          new DeviceAuthorizationOperationId(
+            '00000000-0000-4000-8000-000000000003',
+          ),
         ),
       );
       const candidateAuthorization = recoveredAuthorization.recoverAt(
         successorRecovery.getRevision(),
         successorRecovery.getTargetCredential(),
-        DeviceAuthorizationEpoch.fromRecovery(successorRecovery.getOperationId()),
+        DeviceAuthorizationEpoch.fromRecovery(
+          successorRecovery.getOperationId(),
+        ),
       );
       const checkpoint = {
         authorization: candidateAuthorization.toPrimitives(),
@@ -1287,8 +1313,10 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       const phoneCredential = credentialOf(phone).valueOf();
 
       expect(
-        await aggregate.repository.findCompromisedSince(identityId),
-      ).toEqual(new Map([[phoneCredential, 1]]));
+        (
+          await aggregate.repository.findCompromisedSince(identityId)
+        ).toPrimitives(),
+      ).toEqual([{ compromisedSince: 1, credential: phoneCredential }]);
       await expect(
         aggregate.repository.compareAndApply(
           recoveryOf(
@@ -1320,8 +1348,10 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
       expect(aggregate.getHead()).not.toHaveProperty('overflow');
       expect(
-        await aggregate.repository.findCompromisedSince(identityId),
-      ).toEqual(new Map([[phoneCredential, 1]]));
+        (
+          await aggregate.repository.findCompromisedSince(identityId)
+        ).toPrimitives(),
+      ).toEqual([{ compromisedSince: 1, credential: phoneCredential }]);
       await aggregate.repository.compareAndApply(
         await enrollment(
           identityId,

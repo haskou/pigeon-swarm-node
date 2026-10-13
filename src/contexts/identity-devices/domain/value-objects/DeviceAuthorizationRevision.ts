@@ -22,4 +22,8 @@ export class DeviceAuthorizationRevision extends Integer {
   public immediatelyFollows(previous: DeviceAuthorizationRevision): boolean {
     return this.valueOf() === previous.next().valueOf();
   }
+
+  public compareTo(other: DeviceAuthorizationRevision): number {
+    return this.valueOf() - other.valueOf();
+  }
 }

@@ -1,8 +1,9 @@
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 export class DeviceSealedSecretFindMessage {
   public constructor(
     public readonly identityId: IdentityId,
-    public readonly recipientCredential: string,
+    public readonly recipientCredential: DeviceCredential,
   ) {}
 }

@@ -97,7 +97,7 @@ export class DeviceAuthorizationTransition {
     });
 
     assert(
-      transition.getRevision().valueOf() === primitives.revision &&
+      transition.getRevision().hasValue(primitives.revision) &&
         transition
           .getTargetCredentialCommitment()
           .hasValue(primitives.targetCredentialCommitment) &&
@@ -208,8 +208,7 @@ export class DeviceAuthorizationTransition {
         (entry, index) =>
           !entry.compromisedSince.isGreaterThan(this.state.previousRevision) &&
           (index === 0 ||
-            entries[index - 1].credential.valueOf() <
-              entry.credential.valueOf()),
+            entries[index - 1].credential.isLessThan(entry.credential)),
       )
     );
   }
@@ -336,7 +335,7 @@ export class DeviceAuthorizationTransition {
     return this.state.targetCredential.getCommitment();
   }
 
-  public getPairingId(): PairingId {
+  public requirePairingId(): PairingId {
     assert(
       this.state.pairing !== undefined,
       new InvalidDeviceAuthorizationTransitionError(),
@@ -345,7 +344,7 @@ export class DeviceAuthorizationTransition {
     return this.state.pairing.getId();
   }
 
-  public getPairingExpiration(): PairingExpiration {
+  public requirePairingExpiration(): PairingExpiration {
     assert(
       this.state.pairing !== undefined,
       new InvalidDeviceAuthorizationTransitionError(),
