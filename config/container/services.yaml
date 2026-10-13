@@ -1590,6 +1590,8 @@ services:
     arguments:
       - >-
         @contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository
+      - >-
+        @contexts/identity-devices/application/publish/DeviceAuthorizationEventPublisher
   contexts/identity-devices/application/find/DeviceAuthorizationFinder:
     class: /contexts/identity-devices/application/find/DeviceAuthorizationFinder
     arguments:
@@ -1606,6 +1608,11 @@ services:
     arguments:
       - >-
         @contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository
+  contexts/identity-devices/application/publish/DeviceAuthorizationEventPublisher:
+    class: >-
+      /contexts/identity-devices/application/publish/DeviceAuthorizationEventPublisher
+    arguments:
+      - '@shared/infrastructure/messageBus/LocalDomainEventPublisher'
   contexts/identity-devices/application/publish/DeviceSealedSecretPublisher:
     class: /contexts/identity-devices/application/publish/DeviceSealedSecretPublisher
     arguments:
@@ -2698,6 +2705,7 @@ services:
   shared/infrastructure/logs/Log: '@shared/infrastructure/logs/WinstonLogger'
   shared/infrastructure/messageBus/DomainEventConsumer: '@shared/infrastructure/messageBus/MessageBus'
   shared/infrastructure/messageBus/DomainEventPublisher: '@shared/infrastructure/messageBus/MessageBus'
+  shared/infrastructure/messageBus/LocalDomainEventPublisher: '@shared/infrastructure/messageBus/MessageBus'
   shared/infrastructure/messageBus/MessageBusAdapter: '@shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter'
   contexts/public-mutations/domain/services/PublicMutationPolicy: >-
     @contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy

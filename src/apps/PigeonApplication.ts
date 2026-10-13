@@ -78,6 +78,7 @@ import { Runtime } from '../shared/infrastructure/lifecycle/Runtime';
 import WinstonLogger from '../shared/infrastructure/logs/WinstonLogger';
 import { DomainEventConsumer } from '../shared/infrastructure/messageBus/DomainEventConsumer';
 import { DomainEventPublisher } from '../shared/infrastructure/messageBus/DomainEventPublisher';
+import { LocalDomainEventPublisher } from '../shared/infrastructure/messageBus/LocalDomainEventPublisher';
 import LocalProcessedDomainEventIdempotencyStore from '../shared/infrastructure/messageBus/LocalProcessedDomainEventIdempotencyStore';
 import MessageBus from '../shared/infrastructure/messageBus/MessageBus';
 import WebSocketClientMessageHandler from '../shared/infrastructure/websocket/WebSocketClientMessageHandler';
@@ -240,6 +241,7 @@ export default class PigeonApplication {
         },
         { token: DomainEventConsumer, useClass: MessageBus },
         { token: DomainEventPublisher, useClass: MessageBus },
+        { token: LocalDomainEventPublisher, useClass: MessageBus },
         {
           token: CallParticipantLeaseRepository,
           useClass: InMemoryCallParticipantLeaseRepository,

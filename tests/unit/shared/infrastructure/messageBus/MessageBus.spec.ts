@@ -86,4 +86,45 @@ describe('MessageBus', () => {
     expect(memoryAdapter.publish).toHaveBeenCalledWith([event]);
     expect(websocketPublish).toHaveBeenCalledWith([event]);
   });
+
+  it('should dispatch local events only to local handlers without transport, websocket or hooks', async () => {
+    process.env.TRANSPORT_DSN = 'in-memory://';
+    const event = new TestDomainEvent('aggregate-id', {});
+    const websocketPublish = jest
+      .spyOn(webSocketEventHub, 'publish')
+      .mockImplementation();
+    const messageBus = new MessageBus(memoryAdapter, libp2pGossipsubAdapter);
+    const handler = jest.fn().mockResolvedValue(undefined);
+
+    await messageBus.consume(
+      'local-queue',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'local-exchange',
+      handler,
+    );
+    await messageBus.publishLocally([event]);
+
+    expect(handler).toHaveBeenCalledWith(event);
+    expect(memoryAdapter.publish).not.toHaveBeenCalled();
+    expect(libp2pGossipsubAdapter.publish).not.toHaveBeenCalled();
+    expect(websocketPublish).not.toHaveBeenCalled();
+  });
+
+  it('should keep local dispatch from failing when a local handler rejects', async () => {
+    process.env.TRANSPORT_DSN = 'in-memory://';
+    const event = new TestDomainEvent('aggregate-id', {});
+    const messageBus = new MessageBus(memoryAdapter, libp2pGossipsubAdapter);
+    const handler = jest.fn().mockRejectedValue(new Error('handler failed'));
+
+    await messageBus.consume(
+      'local-queue',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'local-exchange',
+      handler,
+    );
+
+    await expect(messageBus.publishLocally([event])).resolves.toBeUndefined();
+  });
 });

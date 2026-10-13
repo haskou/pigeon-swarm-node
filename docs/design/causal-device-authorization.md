@@ -238,8 +238,10 @@ the previous behaviour, so no existing signature or document changes.
 ## Local domain events (#460)
 
 Device authorization transitions record domain events on the aggregate, and the
-repository returns them with the applied state. The events are local-only: they
-are not published, not replicated and not pushed over WebSocket.
+repository returns them with the applied state. `DeviceAuthorizationTransitionApplier`
+hands that state to `DeviceAuthorizationEventPublisher`, which pulls the events and
+publishes them through `LocalDomainEventPublisher` to in-process subscribers only.
+They are not published on pubsub, not replicated and not pushed over WebSocket.
 
 | Transition                       | Event                                                                  |
 | -------------------------------- | ---------------------------------------------------------------------- |
@@ -248,9 +250,10 @@ are not published, not replicated and not pushed over WebSocket.
 | `revoke` with `compromisedSince` | also `identity_devices.v1.device_authorization.credential_compromised` |
 | `recover`, `recoverAt`           | `identity_devices.v1.device_authorization.recovered`                   |
 
-Hydration, replay and `requireRecoveryAt` record nothing. Replay discards the
-intermediate states it rebuilds, so only the events of the applied transition
-reach the caller.
+`genesis`, hydration, replay and `requireRecoveryAt` record nothing. The genesis
+is derived from the identity, which already records its own creation, and
+verification rebuilds it. Replay discards the intermediate states it rebuilds, so
+only the events of the applied transition reach the caller.
 
 ## Residuals
 
