@@ -1,7 +1,6 @@
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
 import { ContentId } from '../../domain/value-objects/ContentId';
-import { ContentReplicationContext } from '../../domain/value-objects/ContentReplicationContext';
 import ReplicatedContentStorage from '../content-storage/ReplicatedContentStorage';
 import ContentReplicationStatusFinder from '../find-status/ContentReplicationStatusFinder';
 import { ReplicatedContentStatus } from '../find-status/ReplicatedContentStatus';
@@ -27,20 +26,10 @@ export default class ContentReplicationMaintainer {
     network: ContentNetworkReplicationStatus,
   ): Promise<void> {
     const cid = new ContentId(content.cid);
-    const context = new ContentReplicationContext(content.context);
     const networkId = new NetworkId(network.networkId);
     const maxBytes = Math.min(content.sizeBytes, maxContentSizeBytes);
 
-    if (context.isReplicatedAsBytes()) {
-      await this.contentStorage.findBytesInNetwork(cid, networkId, maxBytes);
-    } else {
-      await this.contentStorage.findJSONInNetwork<unknown>(
-        cid,
-        networkId,
-        maxBytes,
-      );
-    }
-
+    await this.contentStorage.findBytesInNetwork(cid, networkId, maxBytes);
     await this.contentStorage.provideInNetwork(cid, networkId);
   }
 

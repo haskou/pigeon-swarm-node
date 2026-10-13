@@ -19,12 +19,6 @@ export default abstract class ReplicatedContentStorage {
     maxBytes?: number,
   ): Promise<Buffer>;
 
-  public abstract findJSONInNetwork<T>(
-    contentId: ContentId,
-    networkId: NetworkId,
-    maxBytes?: number,
-  ): Promise<T>;
-
   public abstract provideInNetwork(
     contentId: ContentId,
     networkId: NetworkId,

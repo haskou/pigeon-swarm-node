@@ -319,7 +319,7 @@ async function main(): Promise<void> {
   );
 
   stage = 'a signed legacy private-upload registration is refused';
-  const legacy = {
+  const legacy: Record<string, unknown> = {
     ...ownerPayload(cidOf(5)),
     context: 'ipfs_private_upload',
   };
