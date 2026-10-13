@@ -1,3 +1,5 @@
+import { Timestamp } from '@haskou/value-objects';
+
 import NodePeerRepository from '../../domain/repositories/NodePeerRepository';
 import NodeRepository from '../../domain/repositories/NodeRepository';
 import { ActiveNodePeers } from './ActiveNodePeers';
@@ -14,7 +16,9 @@ export default class NodePeersFinder {
     const [localNode, peers] = await Promise.all([
       this.nodeRepository.loadLocalNode(),
       this.repository.findActive(
-        new Date(Date.now() - NodePeersFinder.ACTIVE_WINDOW_MS),
+        new Date(
+          Timestamp.now().toMilliseconds() - NodePeersFinder.ACTIVE_WINDOW_MS,
+        ),
       ),
     ]);
 
