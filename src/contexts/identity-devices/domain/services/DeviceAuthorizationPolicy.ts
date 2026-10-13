@@ -3,6 +3,7 @@ import { Timestamp, assert } from '@haskou/value-objects';
 import { DeviceAuthorization } from '../DeviceAuthorization';
 import { DeviceAuthorizationApplication } from '../DeviceAuthorizationApplication';
 import { DeviceAuthorizationCandidate } from '../DeviceAuthorizationCandidate';
+import { DeviceAuthorizationRecoveryState } from '../DeviceAuthorizationRecoveryState';
 import { DeviceAuthorizationReplayResult } from '../DeviceAuthorizationReplayResult';
 import { DeviceAuthorizationTransition } from '../DeviceAuthorizationTransition';
 import { DeviceCompromiseCaps } from '../DeviceCompromiseCaps';
@@ -105,6 +106,28 @@ export default class DeviceAuthorizationPolicy {
       transition.getTargetCredential(),
       DeviceAuthorizationEpoch.fromRecovery(transition.getOperationId()),
     );
+  }
+
+  /**
+   * One recovery of a lineage: it must apply to the previous state and keep
+   * every cap that state carried at least as tight.
+   */
+  private recoverLineage(
+    previous: DeviceAuthorizationRecoveryState,
+    recovery: DeviceAuthorizationTransition,
+  ): DeviceAuthorizationRecoveryState {
+    const authorization = this.applyRecoveryCheckpoint(
+      previous.authorization,
+      recovery,
+    );
+    const carried = DeviceCompromiseCaps.carriedBy(recovery);
+
+    assert(
+      previous.compromiseCaps.isNotLoosenedBy(carried),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return { authorization, compromiseCaps: carried };
   }
 
   private groupByRevision<T>(
@@ -261,30 +284,43 @@ export default class DeviceAuthorizationPolicy {
    * at and the compromise caps it carries. Every recovery must apply, and a
    * later recovery may tighten or add caps but never drop or loosen one an
    * earlier recovery carried, so no checkpoint re-admits a capped credential.
+   * A concurrent recovery lost the checkpoint to the last one at the same
+   * revision: it must apply where the last one applies, and its carried caps
+   * still hold, so a heal never drops a cap only the losing side carried.
    */
   public replayRecoveryLineage(
     genesis: DeviceAuthorization,
     recoveries: DeviceAuthorizationTransition[],
-  ): {
-    authorization: DeviceAuthorization;
-    compromiseCaps: DeviceCompromiseCaps;
-  } {
-    let authorization = genesis;
-    let compromiseCaps = DeviceCompromiseCaps.none();
+    concurrent: DeviceAuthorizationTransition[] = [],
+  ): DeviceAuthorizationRecoveryState {
+    let previous: DeviceAuthorizationRecoveryState = {
+      authorization: genesis,
+      compromiseCaps: DeviceCompromiseCaps.none(),
+    };
+    let state = previous;
 
     for (const recovery of recoveries) {
-      authorization = this.applyRecoveryCheckpoint(authorization, recovery);
-
-      const carried = DeviceCompromiseCaps.carriedBy(recovery);
-
-      assert(
-        compromiseCaps.isNotLoosenedBy(carried),
-        new InvalidDeviceAuthorizationTransitionError(),
-      );
-      compromiseCaps = carried;
+      previous = state;
+      state = this.recoverLineage(previous, recovery);
     }
 
-    return { authorization, compromiseCaps };
+    const last = recoveries.at(-1);
+
+    return concurrent.reduce((current, sibling) => {
+      assert(
+        last !== undefined &&
+          sibling.getPreviousRevision().isEqual(last.getPreviousRevision()) &&
+          sibling.getOperationId().valueOf() !==
+            last.getOperationId().valueOf(),
+        new InvalidDeviceAuthorizationTransitionError(),
+      );
+      this.recoverLineage(previous, sibling);
+
+      return {
+        authorization: current.authorization,
+        compromiseCaps: current.compromiseCaps.withCompromise(sibling),
+      };
+    }, state);
   }
 
   public apply(

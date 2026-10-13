@@ -109,6 +109,14 @@ frontier), so a credential capped before the checkpoint stays refused after it,
 including when the same key is enrolled again on a post-recovery device. Caps
 only refuse: a carried cap never restores validity to a pre-recovery record.
 
+Two partitions can each recover at the same revision. The merge keeps one
+checkpoint (the lowest canonical form) and keeps every other recovery at that
+revision on the same lineage as signed evidence in `checkpoint.concurrent`.
+Each concurrent recovery must apply where the kept one applies and carry the
+caps of the lineage before it, and the caps it carries merge into the
+checkpoint's caps (lowest revision per credential). A heal therefore never drops
+a cap only the losing partition carried, and the next recovery must carry it.
+
 ## Threat model
 
 Attacker `A` holds the key of a device `D` that was revoked at revision `R`
@@ -182,7 +190,8 @@ too use recovery (hard cut, case 6).
 
 ## Persistence and restart
 
-No new persisted state. The timeline is derived from the existing
+No new persisted state beyond `checkpoint.concurrent` (at most 128 signed
+recoveries, see Recovery). The timeline is derived from the existing
 `device-authorization:<identityId>` document (genesis or checkpoint + the
 transition history, 256 records at most). `OrbitDBDeviceAuthorizationRepository
 .findTimeline` replays it; the verifier caches the result for one second like
@@ -284,11 +293,10 @@ only the events of the applied transition reach the caller.
   recoveries of its lineage. Before the first recovery there are none, and a
   fresh replica no longer holds the pre-recovery revocations, so it accepts the
   carried list as written.
-- **Concurrent recoveries at one revision are not settled by their caps.** The
-  lowest operation UUID wins the tie-break (pubsub protocol). The replayed state
-  merges the caps of every retained candidate at that revision, keeping the
-  minimum per credential, so a losing candidate's caps may still apply. No test
-  covers that interaction; it is an open point.
+- **Concurrent recoveries at different revisions are settled by revision.**
+  The higher recovery wins the checkpoint and the lower branch is discarded with
+  its caps, unless the higher recovery carried them. Concurrent recoveries at
+  one revision keep each other's caps (`checkpoint.concurrent`).
 - **More than 32 capped credentials fails closed.** A recovery that would carry
   more is refused, and nothing is trimmed.
 - **The caps are read in two steps.** The checkpoint and the caps come from
@@ -299,7 +307,7 @@ only the events of the applied transition reach the caller.
 ## Verification
 
 - Unit: `DeviceAuthorizationTimeline` (compromise cap), `DeviceAuthorizationTransition` (shape, canonical order and bound of carried caps, signature coverage), `OrbitDBDeviceAuthorizationRepository`
-  timeline (replay, restart, caps carried across a recovery and refused when a carried cap is dropped, invented or replicated without it, overflowed timeline caps derived from witness sources), `DeviceAuthorizationPublicMutationAuthorization`
+  timeline (replay, restart, caps carried across a recovery and refused when a carried cap is dropped, invented or replicated without it, caps of a concurrent recovery that lost the checkpoint kept after the heal and refused when its signature is forged, overflowed timeline caps derived from witness sources), `DeviceAuthorizationPublicMutationAuthorization`
   (late delivery, backdating at and after the revocation, not-yet-enrolled,
   unreached revision then healed, shuffled state order),
   `PublicMutationVerifier` (version and revision decoding, tampered revision),

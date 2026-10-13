@@ -65,16 +65,34 @@ export default class OrbitDBDeviceAuthorizationDocumentShape {
       (this.isRecord(checkpoint) &&
         this.hasExactKeys(checkpoint, [
           'authorization',
+          ...(checkpoint.concurrent === undefined ? [] : ['concurrent']),
           'lineage',
           'transition',
         ]) &&
         this.isRecord(checkpoint.authorization) &&
-        Array.isArray(checkpoint.lineage) &&
-        checkpoint.lineage.length <= 1024 &&
-        checkpoint.lineage.every((record) =>
-          this.isBoundedTransitionRecord(record),
-        ) &&
+        this.hasConcurrentShape(checkpoint.concurrent) &&
+        this.hasBoundedRecords(checkpoint.lineage, 1024) &&
         this.isBoundedTransitionRecord(checkpoint.transition))
+    );
+  }
+
+  private hasConcurrentShape(concurrent: unknown): boolean {
+    return (
+      concurrent === undefined ||
+      (Array.isArray(concurrent) &&
+        concurrent.length > 0 &&
+        this.hasBoundedRecords(
+          concurrent,
+          OrbitDBDeviceAuthorizationDocumentShape.MAX_CONCURRENT_TRANSITIONS,
+        ))
+    );
+  }
+
+  private hasBoundedRecords(records: unknown, limit: number): boolean {
+    return (
+      Array.isArray(records) &&
+      records.length <= limit &&
+      records.every((record) => this.isBoundedTransitionRecord(record))
     );
   }
 

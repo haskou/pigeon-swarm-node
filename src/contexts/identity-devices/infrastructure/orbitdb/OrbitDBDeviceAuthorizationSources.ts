@@ -82,10 +82,15 @@ export default class OrbitDBDeviceAuthorizationSources {
     return this.preferredSourceCheckpoint(this.documentSources(document));
   }
 
+  /**
+   * The checkpoint of the highest recovery, ties broken by its canonical
+   * form. Every other recovery at that revision on the same lineage lost it:
+   * it is kept as concurrent, so the caps it carries still hold.
+   */
   public preferredSourceCheckpoint(
     sources: OrbitDBDeviceAuthorizationSource[],
   ): OrbitDBDeviceAuthorizationDocument['checkpoint'] {
-    return sources
+    const checkpoints = sources
       .map((source) => source.checkpoint)
       .filter(
         (
@@ -94,13 +99,39 @@ export default class OrbitDBDeviceAuthorizationSources {
           OrbitDBDeviceAuthorizationDocument['checkpoint']
         > => checkpoint !== undefined,
       )
+      .map(({ authorization, concurrent, lineage, transition }) => ({
+        concurrent: concurrent ?? [],
+        recovery: { authorization, lineage, transition },
+      }))
       .sort(
         (left, right) =>
-          right.authorization.revision - left.authorization.revision ||
+          right.recovery.authorization.revision -
+            left.recovery.authorization.revision ||
           this.canonicalizer
-            .serialize(left)
-            .localeCompare(this.canonicalizer.serialize(right)),
-      )[0];
+            .serialize(left.recovery)
+            .localeCompare(this.canonicalizer.serialize(right.recovery)),
+      );
+    const preferred = checkpoints[0]?.recovery;
+
+    if (!preferred) {
+      return undefined;
+    }
+
+    const concurrent = this.uniqueTransitionRecords(
+      checkpoints
+        .filter(
+          ({ recovery }) =>
+            recovery.authorization.revision ===
+              preferred.authorization.revision &&
+            isDeepStrictEqual(recovery.lineage, preferred.lineage),
+        )
+        .map(({ concurrent: lost, recovery }) => [
+          recovery.transition,
+          ...lost,
+        ]),
+    ).filter((record) => !isDeepStrictEqual(record, preferred.transition));
+
+    return concurrent.length > 0 ? { ...preferred, concurrent } : preferred;
   }
 
   public canonicalSources(

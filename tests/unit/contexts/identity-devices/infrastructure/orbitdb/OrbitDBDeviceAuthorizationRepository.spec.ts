@@ -718,6 +718,178 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       }
     });
 
+    /**
+     * Two partitions each recover at revision 3: one after a plain
+     * retirement of the phone, carrying no cap, the other after a compromised
+     * revocation of it, carrying its cap. The uncapped recovery wins the
+     * checkpoint.
+     */
+    async function concurrentRecoveries() {
+      const { genesis, identityId, owner, recovery } = await fixture();
+      const phone = await KeyPair.generate();
+      const laptop = await KeyPair.generate();
+      const keyOf = (key: KeyPair): string => key.toPrimitives().publicKey;
+      const [first, second] = [
+        await KeyPair.generate(),
+        await KeyPair.generate(),
+      ];
+      // The merge keeps the checkpoint whose serialized record sorts first,
+      // which starts with the recovered credential: the recovery without the
+      // cap must sort first so it wins the checkpoint.
+      const [uncappedTarget, cappedTarget] =
+        keyOf(first).localeCompare(keyOf(second)) < 0
+          ? [first, second]
+          : [second, first];
+      const base = repositoryFixture();
+      await provisionAuthorization(base.repository, genesis);
+      await base.repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000001',
+          '10000000-0000-4000-8000-000000000001',
+        ),
+      );
+      await base.repository.compareAndApply(
+        await enrollment(
+          identityId,
+          owner,
+          laptop,
+          '00000000-0000-4000-8000-000000000002',
+          '10000000-0000-4000-8000-000000000002',
+          revisionOf(1),
+        ),
+      );
+      const baseHead = base.getHead() as Record<string, unknown>;
+      const retired = repositoryFixture();
+      const compromised = repositoryFixture();
+      for (const branch of [retired, compromised]) {
+        await provisionAuthorization(branch.repository, genesis);
+        branch.setHead(baseHead);
+      }
+      await retired.repository.compareAndApply(
+        revocation(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000003',
+          revisionOf(2),
+        ),
+      );
+      await retired.repository.compareAndApply(
+        recoveryOf(
+          identityId,
+          recovery,
+          uncappedTarget,
+          '00000000-0000-4000-8000-000000000005',
+          revisionOf(3),
+        ),
+      );
+      await compromised.repository.compareAndApply(
+        revocation(
+          identityId,
+          laptop,
+          phone,
+          '00000000-0000-4000-8000-000000000004',
+          revisionOf(2),
+          DeviceAuthorizationEpoch.genesis(),
+          revisionOf(2),
+        ),
+      );
+      await compromised.repository.compareAndApply(
+        recoveryOf(
+          identityId,
+          recovery,
+          cappedTarget,
+          '00000000-0000-4000-8000-000000000006',
+          revisionOf(3),
+          [
+            {
+              compromisedSince: revisionOf(2),
+              credential: credentialOf(phone),
+            },
+          ],
+        ),
+      );
+
+      return {
+        compromised,
+        genesis,
+        identityId,
+        phone,
+        retired,
+        uncappedTarget,
+      };
+    }
+
+    it('keeps the compromise cap when a concurrent recovery that carries none wins the checkpoint', async () => {
+      const {
+        compromised,
+        genesis,
+        identityId,
+        phone,
+        retired,
+        uncappedTarget,
+      } = await concurrentRecoveries();
+
+      for (const [left, right] of [
+        [retired, compromised],
+        [compromised, retired],
+      ]) {
+        const merged = left.getMerger()?.(
+          left.getHead(),
+          right.getHead() ?? {},
+        ) as Record<string, unknown>;
+        const reader = repositoryFixture();
+        await provisionAuthorization(reader.repository, genesis);
+        reader.setHead(merged);
+        await reader.repository.compareAndApply(
+          await enrollment(
+            identityId,
+            uncappedTarget,
+            phone,
+            '00000000-0000-4000-8000-000000000007',
+            '10000000-0000-4000-8000-000000000007',
+            revisionOf(4),
+            DeviceAuthorizationEpoch.fromRecovery(
+              new DeviceAuthorizationOperationId(
+                '00000000-0000-4000-8000-000000000005',
+              ),
+            ),
+          ),
+        );
+        const timeline = await reader.repository.findTimeline(identityId);
+
+        expect(
+          timeline?.isAuthorizedAt(credentialOf(uncappedTarget), revisionOf(5)),
+        ).toBe(true);
+        expect(
+          timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(5)),
+        ).toBe(false);
+      }
+    });
+
+    it('rejects a replicated checkpoint whose concurrent recovery the recovery authority did not sign', async () => {
+      const { compromised, retired } = await concurrentRecoveries();
+      const merged = retired.getMerger()?.(
+        retired.getHead(),
+        compromised.getHead() ?? {},
+      ) as {
+        checkpoint: {
+          concurrent: { transition: Record<string, unknown> }[];
+          transition: { transition: Record<string, unknown> };
+        };
+      } & Record<string, unknown>;
+      const forged = structuredClone(merged);
+      forged.checkpoint.concurrent[0].transition.signature =
+        merged.checkpoint.transition.transition.signature;
+
+      expect(merged.checkpoint.concurrent).toHaveLength(1);
+      expect(retired.getMerger()?.(undefined, merged)).toEqual(merged);
+      expect(retired.getMerger()?.(undefined, forged)).toBeUndefined();
+    });
+
     it('rejects a compromise revision beyond the revocation it is signed in', () => {
       expect(() =>
         DeviceAuthorizationTransition.revocation(
