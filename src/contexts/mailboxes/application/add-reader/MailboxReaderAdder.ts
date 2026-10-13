@@ -19,18 +19,14 @@ export default class MailboxReaderAdder {
 
   /** Returns false when the hash is already a reader. */
   public add(message: MailboxReaderAddMessage): Promise<boolean> {
-    const mailboxId = message.mailboxId.valueOf();
-    const readToken = message.readToken.valueOf();
-    const readTokenHash = message.readTokenHash.valueOf();
-
     return this.coordinator.run(async (): Promise<boolean> => {
-      const mailbox = await this.repository.requireById(mailboxId);
+      const mailbox = await this.repository.requireById(message.mailboxId);
 
-      if (!mailbox.acceptsRead(readToken)) {
+      if (!mailbox.acceptsRead(message.readToken)) {
         throw new MailboxNotFoundError();
       }
 
-      const added = mailbox.addReader(readTokenHash, this.policy);
+      const added = mailbox.addReader(message.readTokenHash, this.policy);
 
       mailbox.markRead(Timestamp.now());
       await this.repository.save(mailbox);

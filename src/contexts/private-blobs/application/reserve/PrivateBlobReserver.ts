@@ -4,6 +4,8 @@ import { PrivateBlob } from '../../domain/PrivateBlob';
 import PrivateBlobPolicy from '../../domain/PrivateBlobPolicy';
 import PrivateBlobRepository from '../../domain/repositories/PrivateBlobRepository';
 import PrivateBlobOwnerKeyDeriver from '../../domain/services/PrivateBlobOwnerKeyDeriver';
+import { PrivateBlobId } from '../../domain/value-objects/PrivateBlobId';
+import { PrivateBlobSize } from '../../domain/value-objects/PrivateBlobSize';
 import { PrivateBlobReserveMessage } from './messages/PrivateBlobReserveMessage';
 
 export interface PrivateBlobReservation {
@@ -39,20 +41,21 @@ export default class PrivateBlobReserver {
     this.policy.assertQuotaAllowed(message.size, total, owned);
 
     const { blob, downloadToken, uploadToken } = PrivateBlob.reserve({
+      id: PrivateBlobId.generate(),
       now,
       ownerKey,
       retentionMs: this.policy.retentionMs(),
-      size: message.size,
+      size: new PrivateBlobSize(message.size),
       uploadWindowMs: this.policy.uploadWindowMs(),
     });
 
     await this.repository.save(blob);
 
     return {
-      blobId: blob.getId(),
-      downloadToken,
-      expiresAt: blob.getExpiresAt(),
-      uploadToken,
+      blobId: blob.getId().valueOf(),
+      downloadToken: downloadToken.valueOf(),
+      expiresAt: blob.getExpiresAt().toMilliseconds(),
+      uploadToken: uploadToken.valueOf(),
     };
   }
 

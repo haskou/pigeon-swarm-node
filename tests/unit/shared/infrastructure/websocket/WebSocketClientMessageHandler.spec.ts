@@ -9,6 +9,7 @@ import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { Mailbox } from '@app/contexts/mailboxes/domain/Mailbox';
 import MailboxRepository from '@app/contexts/mailboxes/domain/repositories/MailboxRepository';
+import { MailboxReadToken } from '@app/contexts/mailboxes/domain/value-objects/MailboxReadToken';
 import IdentityPresenceHeartbeatRecorder from '@app/contexts/presence/application/record-heartbeat/IdentityPresenceHeartbeatRecorder';
 import { IdentityPresenceHeartbeatMessage } from '@app/contexts/presence/application/record-heartbeat/messages/IdentityPresenceHeartbeatMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -193,7 +194,9 @@ describe('WebSocketClientMessageHandler', () => {
     await expect(
       handler.canReadMailbox('m'.repeat(43), 'r'.repeat(32)),
     ).resolves.toBe(true);
-    expect(mailbox.acceptsRead).toHaveBeenCalledWith('r'.repeat(32));
+    expect(mailbox.acceptsRead).toHaveBeenCalledWith(
+      new MailboxReadToken('r'.repeat(32)),
+    );
   });
 
   it('rejects a read capability that does not match the mailbox', async () => {

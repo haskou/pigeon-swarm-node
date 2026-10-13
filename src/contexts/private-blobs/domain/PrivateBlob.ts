@@ -1,8 +1,13 @@
 import { Timestamp } from '@haskou/value-objects';
-import { randomUUID } from 'crypto';
 
 import { PrivateBlobCapability } from './PrivateBlobCapability';
 import { PrivateBlobPrimitives } from './PrivateBlobPrimitives';
+import { PrivateBlobState } from './PrivateBlobState';
+import { PrivateBlobDownloadToken } from './value-objects/PrivateBlobDownloadToken';
+import { PrivateBlobId } from './value-objects/PrivateBlobId';
+import { PrivateBlobSize } from './value-objects/PrivateBlobSize';
+import { PrivateBlobStatus } from './value-objects/PrivateBlobStatus';
+import { PrivateBlobUploadToken } from './value-objects/PrivateBlobUploadToken';
 
 /**
  * Temporary storage record for one client-encrypted blob. It holds no
@@ -11,92 +16,103 @@ import { PrivateBlobPrimitives } from './PrivateBlobPrimitives';
  */
 export class PrivateBlob {
   public static fromPrimitives(primitives: PrivateBlobPrimitives): PrivateBlob {
-    return new PrivateBlob({ ...primitives });
+    return new PrivateBlob({
+      createdAt: new Timestamp(primitives.createdAt),
+      downloadTokenHash: primitives.downloadTokenHash,
+      expiresAt: new Timestamp(primitives.expiresAt),
+      id: new PrivateBlobId(primitives.id),
+      ownerKey: primitives.ownerKey,
+      retentionMs: primitives.retentionMs,
+      size: new PrivateBlobSize(primitives.size),
+      status: PrivateBlobStatus.fromPrimitives(primitives.state),
+      uploadTokenHash: primitives.uploadTokenHash,
+    });
   }
 
   public static reserve(params: {
+    id: PrivateBlobId;
     now: Timestamp;
     ownerKey: string;
     retentionMs: number;
-    size: number;
+    size: PrivateBlobSize;
     uploadWindowMs: number;
-  }): { blob: PrivateBlob; downloadToken: string; uploadToken: string } {
+  }): {
+    blob: PrivateBlob;
+    downloadToken: PrivateBlobDownloadToken;
+    uploadToken: PrivateBlobUploadToken;
+  } {
     const upload = PrivateBlobCapability.generate();
     const download = PrivateBlobCapability.generate();
-    const uploadDeadline = params.now
-      .addMilliseconds(params.uploadWindowMs)
-      .toMilliseconds();
 
     return {
       blob: new PrivateBlob({
-        createdAt: params.now.toMilliseconds(),
+        createdAt: params.now,
         downloadTokenHash: download.hash,
-        expiresAt: uploadDeadline,
-        id: randomUUID(),
+        expiresAt: params.now.addMilliseconds(params.uploadWindowMs),
+        id: params.id,
         ownerKey: params.ownerKey,
         retentionMs: params.retentionMs,
         size: params.size,
-        state: 'reserved',
+        status: PrivateBlobStatus.RESERVED,
         uploadTokenHash: upload.hash,
       }),
-      downloadToken: download.token,
-      uploadToken: upload.token,
+      downloadToken: new PrivateBlobDownloadToken(download.token),
+      uploadToken: new PrivateBlobUploadToken(upload.token),
     };
   }
 
-  private constructor(private primitives: PrivateBlobPrimitives) {}
+  private constructor(private readonly state: PrivateBlobState) {}
 
-  public acceptsDownload(token: string): boolean {
+  public acceptsDownload(token: PrivateBlobDownloadToken): boolean {
     return (
-      this.primitives.state === 'stored' &&
-      PrivateBlobCapability.matches(token, this.primitives.downloadTokenHash)
+      this.isStored() &&
+      PrivateBlobCapability.matches(
+        token.valueOf(),
+        this.state.downloadTokenHash,
+      )
     );
   }
 
-  public acceptsUpload(token: string): boolean {
+  public acceptsUpload(token: PrivateBlobUploadToken): boolean {
     return PrivateBlobCapability.matches(
-      token,
-      this.primitives.uploadTokenHash,
+      token.valueOf(),
+      this.state.uploadTokenHash,
     );
   }
 
-  public getExpiresAt(): number {
-    return this.primitives.expiresAt;
+  public getExpiresAt(): Timestamp {
+    return this.state.expiresAt;
   }
 
-  public getId(): string {
-    return this.primitives.id;
+  public getId(): PrivateBlobId {
+    return this.state.id;
   }
 
-  public getOwnerKey(): string {
-    return this.primitives.ownerKey;
-  }
-
-  public getRetentionMs(): number {
-    return this.primitives.retentionMs;
-  }
-
-  public getSize(): number {
-    return this.primitives.size;
+  public getSize(): PrivateBlobSize {
+    return this.state.size;
   }
 
   public isExpired(now: Timestamp): boolean {
-    return new Timestamp(this.primitives.expiresAt).isBeforeOrEqual(now);
+    return this.state.expiresAt.isBeforeOrEqual(now);
+  }
+
+  public isOwnedBy(ownerKey: string): boolean {
+    return this.state.ownerKey === ownerKey;
+  }
+
+  /** Stored under a retention shorter than `retentionMs`. */
+  public isStoredWithRetentionBelow(retentionMs: number): boolean {
+    return this.isStored() && this.state.retentionMs < retentionMs;
   }
 
   public isStored(): boolean {
-    return this.primitives.state === 'stored';
+    return this.state.status.isStored();
   }
 
   /** From now on the blob lives for the retention window and is immutable. */
   public markStored(now: Timestamp): void {
-    this.primitives = {
-      ...this.primitives,
-      expiresAt: now
-        .addMilliseconds(this.primitives.retentionMs)
-        .toMilliseconds(),
-      state: 'stored',
-    };
+    this.state.expiresAt = now.addMilliseconds(this.state.retentionMs);
+    this.state.status = PrivateBlobStatus.STORED;
   }
 
   /**
@@ -104,19 +120,27 @@ export class PrivateBlob {
    * deadline is store time plus the new retention.
    */
   public extendRetentionTo(retentionMs: number): void {
-    if (!this.isStored() || this.primitives.retentionMs >= retentionMs) {
+    if (!this.isStoredWithRetentionBelow(retentionMs)) {
       return;
     }
 
-    this.primitives = {
-      ...this.primitives,
-      expiresAt:
-        this.primitives.expiresAt + retentionMs - this.primitives.retentionMs,
-      retentionMs,
-    };
+    this.state.expiresAt = this.state.expiresAt.addMilliseconds(
+      retentionMs - this.state.retentionMs,
+    );
+    this.state.retentionMs = retentionMs;
   }
 
   public toPrimitives(): PrivateBlobPrimitives {
-    return { ...this.primitives };
+    return {
+      createdAt: this.state.createdAt.toMilliseconds(),
+      downloadTokenHash: this.state.downloadTokenHash,
+      expiresAt: this.state.expiresAt.toMilliseconds(),
+      id: this.state.id.valueOf(),
+      ownerKey: this.state.ownerKey,
+      retentionMs: this.state.retentionMs,
+      size: this.state.size.valueOf(),
+      state: this.state.status.valueOf(),
+      uploadTokenHash: this.state.uploadTokenHash,
+    };
   }
 }

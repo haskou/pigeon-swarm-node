@@ -19,24 +19,23 @@ export default class MailboxReaderRevoker {
   ) {}
 
   public async revoke(message: MailboxReaderRevokeMessage): Promise<void> {
-    const mailboxId = message.mailboxId.valueOf();
-    const readToken = message.readToken.valueOf();
-    const readTokenHash = message.readTokenHash.valueOf();
-
     await this.coordinator.run(async (): Promise<void> => {
-      const mailbox = await this.repository.requireById(mailboxId);
+      const mailbox = await this.repository.requireById(message.mailboxId);
 
-      if (!mailbox.acceptsRead(readToken)) {
+      if (!mailbox.acceptsRead(message.readToken)) {
         throw new MailboxNotFoundError();
       }
 
-      mailbox.removeReader(readTokenHash);
+      mailbox.removeReader(message.readTokenHash);
       await this.repository.commitRemoval(
         mailbox,
         await this.settler.settle(mailbox),
       );
     });
 
-    this.notifier.readerRevoked(mailboxId, readTokenHash);
+    this.notifier.readerRevoked(
+      message.mailboxId.valueOf(),
+      message.readTokenHash.valueOf(),
+    );
   }
 }

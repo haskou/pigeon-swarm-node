@@ -11,6 +11,8 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import MailboxRepository from '@app/contexts/mailboxes/domain/repositories/MailboxRepository';
+import { MailboxId } from '@app/contexts/mailboxes/domain/value-objects/MailboxId';
+import { MailboxReadToken } from '@app/contexts/mailboxes/domain/value-objects/MailboxReadToken';
 import IdentityPresenceHeartbeatRecorder from '@app/contexts/presence/application/record-heartbeat/IdentityPresenceHeartbeatRecorder';
 import { IdentityPresenceHeartbeatMessage } from '@app/contexts/presence/application/record-heartbeat/messages/IdentityPresenceHeartbeatMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -226,12 +228,14 @@ export default class WebSocketClientMessageHandler {
     mailboxId: string,
     readToken: string,
   ): Promise<boolean> {
-    if (!(await this.mailboxRepository.hasById(mailboxId))) {
+    const id = new MailboxId(mailboxId);
+
+    if (!(await this.mailboxRepository.hasById(id))) {
       return false;
     }
 
-    const mailbox = await this.mailboxRepository.requireById(mailboxId);
+    const mailbox = await this.mailboxRepository.requireById(id);
 
-    return mailbox.acceptsRead(readToken);
+    return mailbox.acceptsRead(new MailboxReadToken(readToken));
   }
 }

@@ -5,6 +5,7 @@ import { PrivateBlobNotFoundError } from '../../domain/errors/PrivateBlobNotFoun
 import { PrivateBlob } from '../../domain/PrivateBlob';
 import { PrivateBlobPrimitivesShape } from '../../domain/PrivateBlobPrimitivesShape';
 import PrivateBlobRepository from '../../domain/repositories/PrivateBlobRepository';
+import { PrivateBlobId } from '../../domain/value-objects/PrivateBlobId';
 
 export default class LocalPrivateBlobRepository extends PrivateBlobRepository {
   private static readonly BLOBS = 'private_blobs';
@@ -35,8 +36,8 @@ export default class LocalPrivateBlobRepository extends PrivateBlobRepository {
     return documents.map((document) => this.toBlob(document)).filter(matcher);
   }
 
-  public async delete(id: string): Promise<void> {
-    await this.database.delete(LocalPrivateBlobRepository.BLOBS, id);
+  public async delete(id: PrivateBlobId): Promise<void> {
+    await this.database.delete(LocalPrivateBlobRepository.BLOBS, id.valueOf());
   }
 
   public findExpired(now: Timestamp): Promise<PrivateBlob[]> {
@@ -44,24 +45,22 @@ export default class LocalPrivateBlobRepository extends PrivateBlobRepository {
   }
 
   public findStoredRetainedBelow(retentionMs: number): Promise<PrivateBlob[]> {
-    return this.all(
-      (blob) => blob.isStored() && blob.getRetentionMs() < retentionMs,
-    );
+    return this.all((blob) => blob.isStoredWithRetentionBelow(retentionMs));
   }
 
-  public async hasById(id: string): Promise<boolean> {
+  public async hasById(id: PrivateBlobId): Promise<boolean> {
     const document = await this.database.findOne(
       LocalPrivateBlobRepository.BLOBS,
-      id,
+      id.valueOf(),
     );
 
     return document !== undefined;
   }
 
-  public async requireById(id: string): Promise<PrivateBlob> {
+  public async requireById(id: PrivateBlobId): Promise<PrivateBlob> {
     const document = await this.database.findOne(
       LocalPrivateBlobRepository.BLOBS,
-      id,
+      id.valueOf(),
     );
 
     if (!document) {
@@ -78,15 +77,17 @@ export default class LocalPrivateBlobRepository extends PrivateBlobRepository {
     const blobs = await this.all(
       (blob) =>
         !blob.isExpired(now) &&
-        (ownerKey === undefined || blob.getOwnerKey() === ownerKey),
+        (ownerKey === undefined || blob.isOwnedBy(ownerKey)),
     );
 
-    return blobs.reduce((sum, blob) => sum + blob.getSize(), 0);
+    return blobs.reduce((sum, blob) => sum + blob.getSize().valueOf(), 0);
   }
 
   public async save(blob: PrivateBlob): Promise<void> {
-    await this.database.save(LocalPrivateBlobRepository.BLOBS, blob.getId(), {
-      ...blob.toPrimitives(),
-    });
+    await this.database.save(
+      LocalPrivateBlobRepository.BLOBS,
+      blob.getId().valueOf(),
+      { ...blob.toPrimitives() },
+    );
   }
 }

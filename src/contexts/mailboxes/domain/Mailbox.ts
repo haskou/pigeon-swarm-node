@@ -11,7 +11,14 @@ import { MailboxCapability } from './MailboxCapability';
 import { MailboxEnvelope } from './MailboxEnvelope';
 import MailboxPolicy from './MailboxPolicy';
 import { MailboxPrimitives } from './MailboxPrimitives';
+import { MailboxReaderCursor } from './MailboxReaderCursor';
 import { MailboxReaderPrimitives } from './MailboxReaderPrimitives';
+import { MailboxState } from './MailboxState';
+import { MailboxId } from './value-objects/MailboxId';
+import { MailboxPostToken } from './value-objects/MailboxPostToken';
+import { MailboxPostTokenHash } from './value-objects/MailboxPostTokenHash';
+import { MailboxReadToken } from './value-objects/MailboxReadToken';
+import { MailboxReadTokenHash } from './value-objects/MailboxReadTokenHash';
 
 /**
  * Queue owned by one receiving relationship direction. It stores no identity,
@@ -19,31 +26,41 @@ import { MailboxReaderPrimitives } from './MailboxReaderPrimitives';
  */
 export class Mailbox {
   public static create(params: {
-    id: string;
+    id: MailboxId;
     now: Timestamp;
-    postTokenHash: string;
-    readTokenHash: string;
+    postTokenHash: MailboxPostTokenHash;
+    readTokenHash: MailboxReadTokenHash;
     appendTokens: number;
     firstCursor: number;
   }): Mailbox {
     return new Mailbox({
-      appendRefilledAt: params.now.toMilliseconds(),
+      appendRefilledAt: params.now,
       appendTokens: params.appendTokens,
       bytes: 0,
-      createdAt: params.now.toMilliseconds(),
+      createdAt: params.now,
       envelopeCount: 0,
       id: params.id,
-      lastReadAt: params.now.toMilliseconds(),
+      lastReadAt: params.now,
       nextCursor: params.firstCursor,
       postTokenHash: params.postTokenHash,
-      readers: [{ ackedCursor: 0, readTokenHash: params.readTokenHash }],
+      readers: [MailboxReaderCursor.start(params.readTokenHash)],
     });
   }
 
   public static fromPrimitives(primitives: MailboxPrimitives): Mailbox {
     return new Mailbox({
-      ...primitives,
-      readers: primitives.readers.map((reader) => ({ ...reader })),
+      appendRefilledAt: new Timestamp(primitives.appendRefilledAt),
+      appendTokens: primitives.appendTokens,
+      bytes: primitives.bytes,
+      createdAt: new Timestamp(primitives.createdAt),
+      envelopeCount: primitives.envelopeCount,
+      id: new MailboxId(primitives.id),
+      lastReadAt: new Timestamp(primitives.lastReadAt),
+      nextCursor: primitives.nextCursor,
+      postTokenHash: new MailboxPostTokenHash(primitives.postTokenHash),
+      readers: primitives.readers.map((reader) =>
+        MailboxReaderCursor.fromPrimitives(reader),
+      ),
     });
   }
 
@@ -61,7 +78,13 @@ export class Mailbox {
       .filter((mailbox) =>
         mailbox.isIdleAndEmpty(now, MailboxPolicy.EVICTION_IDLE_MS),
       )
-      .sort((a, b) => a.getLastReadAt() - b.getLastReadAt());
+      .sort((a, b) => {
+        if (a.state.lastReadAt.isBefore(b.state.lastReadAt)) {
+          return -1;
+        }
+
+        return b.state.lastReadAt.isBefore(a.state.lastReadAt) ? 1 : 0;
+      });
 
     if (candidates.length < needed) {
       throw new MailboxLimitReachedError();
@@ -70,16 +93,16 @@ export class Mailbox {
     return candidates.slice(0, needed);
   }
 
-  private constructor(private primitives: MailboxPrimitives) {}
+  private constructor(private readonly state: MailboxState) {}
 
   /**
    * Scans every reader so the timing does not reveal which one matched.
    */
-  private readerFor(token: string): MailboxReaderPrimitives | undefined {
-    let match: MailboxReaderPrimitives | undefined;
+  private readerFor(token: MailboxReadToken): MailboxReaderCursor | undefined {
+    let match: MailboxReaderCursor | undefined;
 
-    for (const reader of this.primitives.readers) {
-      if (MailboxCapability.matches(token, reader.readTokenHash)) {
+    for (const reader of this.state.readers) {
+      if (reader.acceptsRead(token)) {
         match = reader;
       }
     }
@@ -87,11 +110,14 @@ export class Mailbox {
     return match;
   }
 
-  public acceptsPost(token: string): boolean {
-    return MailboxCapability.matches(token, this.primitives.postTokenHash);
+  public acceptsPost(token: MailboxPostToken): boolean {
+    return MailboxCapability.matches(
+      token.valueOf(),
+      this.state.postTokenHash.valueOf(),
+    );
   }
 
-  public acceptsRead(token: string): boolean {
+  public acceptsRead(token: MailboxReadToken): boolean {
     return this.readerFor(token) !== undefined;
   }
 
@@ -100,17 +126,14 @@ export class Mailbox {
    * `upTo`. The cursor only moves forward and never past the newest envelope.
    * Returns false when no reader holds the token.
    */
-  public acknowledge(token: string, upTo: number): boolean {
+  public acknowledge(token: MailboxReadToken, upTo: number): boolean {
     const reader = this.readerFor(token);
 
     if (!reader) {
       return false;
     }
 
-    reader.ackedCursor = Math.max(
-      reader.ackedCursor,
-      Math.min(upTo, this.highestCursor()),
-    );
+    reader.acknowledge(upTo, this.highestCursor());
 
     return true;
   }
@@ -119,51 +142,51 @@ export class Mailbox {
    * Adds a reader with nothing acknowledged, so it receives the retained
    * backlog. Returns false when the hash already belongs to a reader.
    */
-  public addReader(readTokenHash: string, policy: MailboxPolicy): boolean {
+  public addReader(
+    readTokenHash: MailboxReadTokenHash,
+    policy: MailboxPolicy,
+  ): boolean {
     if (this.hasReader(readTokenHash)) {
       return false;
     }
 
-    if (this.primitives.readers.length >= policy.maxReaders()) {
+    if (this.state.readers.length >= policy.maxReaders()) {
       throw new MailboxReaderLimitReachedError();
     }
 
-    this.primitives.readers.push({ ackedCursor: 0, readTokenHash });
+    this.state.readers.push(MailboxReaderCursor.start(readTokenHash));
 
     return true;
   }
 
-  public getId(): string {
-    return this.primitives.id;
-  }
-
-  public getLastReadAt(): number {
-    return this.primitives.lastReadAt;
+  public getId(): MailboxId {
+    return this.state.id;
   }
 
   /** Throws unless the hashes match: a repeated create must carry the same ones. */
-  public requireHashes(postTokenHash: string, readTokenHash: string): void {
+  public requireHashes(
+    postTokenHash: MailboxPostTokenHash,
+    readTokenHash: MailboxReadTokenHash,
+  ): void {
     if (
-      this.primitives.postTokenHash !== postTokenHash ||
+      !this.state.postTokenHash.isEqual(postTokenHash) ||
       !this.hasReader(readTokenHash)
     ) {
       throw new MailboxConflictError();
     }
   }
 
-  public hasReader(readTokenHash: string): boolean {
-    return this.primitives.readers.some(
-      (reader) => reader.readTokenHash === readTokenHash,
-    );
+  public hasReader(readTokenHash: MailboxReadTokenHash): boolean {
+    return this.state.readers.some((reader) => reader.holds(readTokenHash));
   }
 
   public highestCursor(): number {
-    return this.primitives.nextCursor - 1;
+    return this.state.nextCursor - 1;
   }
 
   /** Unread for the whole retention window: the mailbox itself is removed. */
   public isExpired(now: Timestamp, policy: MailboxPolicy): boolean {
-    return new Timestamp(this.primitives.lastReadAt)
+    return this.state.lastReadAt
       .addMilliseconds(policy.retentionMs())
       .isBeforeOrEqual(now);
   }
@@ -171,31 +194,29 @@ export class Mailbox {
   /** Empty and unread for `idleMs`: the only mailboxes eviction may remove. */
   public isIdleAndEmpty(now: Timestamp, idleMs: number): boolean {
     return (
-      this.primitives.envelopeCount === 0 &&
-      new Timestamp(this.primitives.lastReadAt)
-        .addMilliseconds(idleMs)
-        .isBeforeOrEqual(now)
+      this.state.envelopeCount === 0 &&
+      this.state.lastReadAt.addMilliseconds(idleMs).isBeforeOrEqual(now)
     );
   }
 
   public markRead(now: Timestamp): void {
-    this.primitives.lastReadAt = now.toMilliseconds();
+    this.state.lastReadAt = now;
   }
 
   /** Never drops older envelopes: past a limit the append fails. */
   public reserveEnvelope(size: number, policy: MailboxPolicy): number {
     if (
-      this.primitives.envelopeCount + 1 > policy.maxEnvelopesPerMailbox() ||
-      this.primitives.bytes + size > policy.maxBytesPerMailbox()
+      this.state.envelopeCount + 1 > policy.maxEnvelopesPerMailbox() ||
+      this.state.bytes + size > policy.maxBytesPerMailbox()
     ) {
       throw new MailboxFullError();
     }
 
-    const cursor = this.primitives.nextCursor;
+    const cursor = this.state.nextCursor;
 
-    this.primitives.nextCursor += 1;
-    this.primitives.envelopeCount += 1;
-    this.primitives.bytes += size;
+    this.state.nextCursor += 1;
+    this.state.envelopeCount += 1;
+    this.state.bytes += size;
 
     return cursor;
   }
@@ -206,36 +227,29 @@ export class Mailbox {
    * a restart does not reset it. A refused append leaves the state untouched.
    */
   public consumeAppend(now: Timestamp, policy: MailboxPolicy): void {
-    const nowMs = now.toMilliseconds();
-
     const perMinute = policy.maxAppendsPerMinute();
 
     if (perMinute === 0) {
       return;
     }
 
-    // Documents written before the bucket existed start with a full bucket.
-    const stored = Number.isFinite(this.primitives.appendTokens)
-      ? this.primitives.appendTokens
-      : perMinute;
-    const refilledAt = Number.isFinite(this.primitives.appendRefilledAt)
-      ? this.primitives.appendRefilledAt
-      : nowMs;
+    const elapsedMs =
+      now.toMilliseconds() - this.state.appendRefilledAt.toMilliseconds();
     const refilled =
-      stored + (Math.max(0, nowMs - refilledAt) * perMinute) / 60_000;
+      this.state.appendTokens + (Math.max(0, elapsedMs) * perMinute) / 60_000;
     const available = Math.min(perMinute, refilled);
 
     if (available < 1) {
       throw new MailboxAppendRateLimitedError();
     }
 
-    this.primitives.appendTokens = available - 1;
-    this.primitives.appendRefilledAt = nowMs;
+    this.state.appendTokens = available - 1;
+    this.state.appendRefilledAt = now;
   }
 
   public releaseEnvelopes(removed: MailboxEnvelope[]): void {
-    this.primitives.envelopeCount -= removed.length;
-    this.primitives.bytes -= removed.reduce(
+    this.state.envelopeCount -= removed.length;
+    this.state.bytes -= removed.reduce(
       (sum, envelope) => sum + envelope.size,
       0,
     );
@@ -243,27 +257,27 @@ export class Mailbox {
 
   /** Copies, so reader state only changes through this entity. */
   public readers(): MailboxReaderPrimitives[] {
-    return this.primitives.readers.map((reader) => ({ ...reader }));
+    return this.state.readers.map((reader) => reader.toPrimitives());
   }
 
   /**
    * Revokes one reader. The last reader cannot be revoked: a mailbox with no
    * reader could never be read or settled again.
    */
-  public removeReader(readTokenHash: string): void {
-    const index = this.primitives.readers.findIndex(
-      (reader) => reader.readTokenHash === readTokenHash,
+  public removeReader(readTokenHash: MailboxReadTokenHash): void {
+    const index = this.state.readers.findIndex((reader) =>
+      reader.holds(readTokenHash),
     );
 
     if (index === -1) {
       throw new MailboxReaderNotFoundError();
     }
 
-    if (this.primitives.readers.length === 1) {
+    if (this.state.readers.length === 1) {
       throw new MailboxLastReaderError();
     }
 
-    this.primitives.readers.splice(index, 1);
+    this.state.readers.splice(index, 1);
   }
 
   /**
@@ -271,12 +285,23 @@ export class Mailbox {
    * deleted. Zero with no readers, so nothing is deleted.
    */
   public settledCursor(): number {
-    const cursors = this.primitives.readers.map((reader) => reader.ackedCursor);
+    const cursors = this.state.readers.map((reader) => reader.getAckedCursor());
 
     return cursors.length === 0 ? 0 : Math.min(...cursors);
   }
 
   public toPrimitives(): MailboxPrimitives {
-    return { ...this.primitives, readers: this.readers() };
+    return {
+      appendRefilledAt: this.state.appendRefilledAt.toMilliseconds(),
+      appendTokens: this.state.appendTokens,
+      bytes: this.state.bytes,
+      createdAt: this.state.createdAt.toMilliseconds(),
+      envelopeCount: this.state.envelopeCount,
+      id: this.state.id.valueOf(),
+      lastReadAt: this.state.lastReadAt.toMilliseconds(),
+      nextCursor: this.state.nextCursor,
+      postTokenHash: this.state.postTokenHash.valueOf(),
+      readers: this.readers(),
+    };
   }
 }

@@ -1,5 +1,7 @@
 import { Mailbox } from '../Mailbox';
 import { MailboxEnvelope } from '../MailboxEnvelope';
+import { MailboxEnvelopeId } from '../value-objects/MailboxEnvelopeId';
+import { MailboxId } from '../value-objects/MailboxId';
 
 export default abstract class MailboxRepository {
   public abstract count(): Promise<number>;
@@ -18,20 +20,20 @@ export default abstract class MailboxRepository {
 
   public abstract create(mailbox: Mailbox): Promise<void>;
 
-  public abstract hasById(id: string): Promise<boolean>;
+  public abstract hasById(id: MailboxId): Promise<boolean>;
 
   /** Rejects with MailboxNotFoundError when the mailbox is absent. */
-  public abstract requireById(id: string): Promise<Mailbox>;
+  public abstract requireById(id: MailboxId): Promise<Mailbox>;
 
   public abstract hasEnvelope(
-    mailboxId: string,
-    envelopeId: string,
+    mailboxId: MailboxId,
+    envelopeId: MailboxEnvelopeId,
   ): Promise<boolean>;
 
   /** Rejects with MailboxEnvelopeNotFoundError when the envelope is absent. */
   public abstract requireEnvelopeCursor(
-    mailboxId: string,
-    envelopeId: string,
+    mailboxId: MailboxId,
+    envelopeId: MailboxEnvelopeId,
   ): Promise<number>;
 
   /** Highest cursor any removed mailbox reached on this node; 0 when none. */
@@ -41,12 +43,12 @@ export default abstract class MailboxRepository {
 
   /** Envelopes with cursor greater than `after`, in cursor order. */
   public abstract listEnvelopes(
-    mailboxId: string,
+    mailboxId: MailboxId,
     after: number,
     limit: number,
   ): Promise<MailboxEnvelope[]>;
 
-  public abstract remove(mailboxId: string): Promise<void>;
+  public abstract remove(mailboxId: MailboxId): Promise<void>;
 
   /** Persists the whole mailbox document: counters, readers and last read. */
   public abstract save(mailbox: Mailbox): Promise<void>;

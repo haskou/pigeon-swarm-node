@@ -22,21 +22,20 @@ export default class PrivateBlobReader {
   public async open(
     message: PrivateBlobReadMessage,
   ): Promise<PrivateBlobDownload> {
-    const blobId = message.blobId.valueOf();
-    const blob = await this.repository.requireById(blobId);
+    const blob = await this.repository.requireById(message.blobId);
 
     if (
       blob.isExpired(Timestamp.now()) ||
-      !blob.acceptsDownload(message.downloadToken.valueOf())
+      !blob.acceptsDownload(message.downloadToken)
     ) {
       throw new PrivateBlobNotFoundError();
     }
 
-    const size = blob.getSize();
+    const size = blob.getSize().valueOf();
     const range = message.rangeRequest
       ? PrivateBlobByteRange.resolve(message.rangeRequest, size)
       : undefined;
 
-    return { range, size, stream: this.bytes.read(blobId, range) };
+    return { range, size, stream: this.bytes.read(message.blobId, range) };
   }
 }

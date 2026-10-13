@@ -17,11 +17,11 @@ export default class PrivateBlobUploader {
 
   public async upload(message: PrivateBlobUploadMessage): Promise<void> {
     const blobId = message.blobId.valueOf();
-    const blob = await this.repository.requireById(blobId);
+    const blob = await this.repository.requireById(message.blobId);
 
     if (
       blob.isExpired(Timestamp.now()) ||
-      !blob.acceptsUpload(message.uploadToken.valueOf())
+      !blob.acceptsUpload(message.uploadToken)
     ) {
       throw new PrivateBlobNotFoundError();
     }
@@ -37,7 +37,7 @@ export default class PrivateBlobUploader {
     this.inProgress.add(blobId);
 
     try {
-      await this.bytes.write(blobId, message.source, blob.getSize());
+      await this.bytes.write(message.blobId, message.source, blob.getSize());
       blob.markStored(Timestamp.now());
       await this.repository.save(blob);
     } finally {

@@ -33,6 +33,8 @@ import { MailboxReaderNotFoundError } from '@app/contexts/mailboxes/domain/error
 import { MailboxCreationDifficulty } from '@app/contexts/mailboxes/domain/MailboxCreationDifficulty';
 import { MailboxCreationProof } from '@app/contexts/mailboxes/domain/MailboxCreationProof';
 import MailboxPolicy from '@app/contexts/mailboxes/domain/MailboxPolicy';
+import { MailboxEnvelopeId } from '@app/contexts/mailboxes/domain/value-objects/MailboxEnvelopeId';
+import { MailboxId } from '@app/contexts/mailboxes/domain/value-objects/MailboxId';
 import { MailboxLimitsFromEnvironment } from '@app/contexts/mailboxes/infrastructure/environment/MailboxLimitsFromEnvironment';
 import LocalMailboxRepository from '@app/contexts/mailboxes/infrastructure/local-db/LocalMailboxRepository';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
@@ -633,7 +635,9 @@ describe('mailboxes', () => {
         new MailboxCreateMessage(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
       ),
     ).resolves.toBe(true);
-    await expect(repository.hasById(MAILBOX)).resolves.toBe(false);
+    await expect(repository.hasById(new MailboxId(MAILBOX))).resolves.toBe(
+      false,
+    );
     await expect(repository.count()).resolves.toBe(1);
     clock.mockRestore();
   });
@@ -653,7 +657,9 @@ describe('mailboxes', () => {
         new MailboxCreateMessage(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
       ),
     ).rejects.toBeInstanceOf(MailboxLimitReachedError);
-    await expect(repository.hasById(MAILBOX)).resolves.toBe(true);
+    await expect(repository.hasById(new MailboxId(MAILBOX))).resolves.toBe(
+      true,
+    );
     clock.mockRestore();
   });
 
@@ -686,8 +692,10 @@ describe('mailboxes', () => {
         new MailboxCreateMessage(FRESH, POST_HASH, READ_HASH, FULL_NONCE),
       ),
     ).resolves.toBe(true);
-    await expect(repository.hasById(MAILBOX)).resolves.toBe(false);
-    await expect(repository.hasById(SECOND)).resolves.toBe(true);
+    await expect(repository.hasById(new MailboxId(MAILBOX))).resolves.toBe(
+      false,
+    );
+    await expect(repository.hasById(new MailboxId(SECOND))).resolves.toBe(true);
     clock.mockRestore();
   });
 
@@ -708,8 +716,10 @@ describe('mailboxes', () => {
       ),
     ).rejects.toBeInstanceOf(MailboxLimitReachedError);
     await expect(repository.count()).resolves.toBe(3);
-    await expect(repository.hasById(MAILBOX)).resolves.toBe(true);
-    await expect(repository.hasById(SECOND)).resolves.toBe(true);
+    await expect(repository.hasById(new MailboxId(MAILBOX))).resolves.toBe(
+      true,
+    );
+    await expect(repository.hasById(new MailboxId(SECOND))).resolves.toBe(true);
     clock.mockRestore();
   });
 
@@ -1013,17 +1023,19 @@ describe('mailboxes', () => {
   });
 
   it('requireById rejects an unknown mailbox with MailboxNotFoundError', async () => {
-    await expect(repository.requireById(FRESH)).rejects.toBeInstanceOf(
-      MailboxNotFoundError,
-    );
+    await expect(
+      repository.requireById(new MailboxId(FRESH)),
+    ).rejects.toBeInstanceOf(MailboxNotFoundError);
   });
 
   it('requireEnvelopeCursor rejects an unknown envelope with MailboxEnvelopeNotFoundError', async () => {
-    await expect(repository.hasEnvelope(MAILBOX, 'a'.repeat(22))).resolves.toBe(
-      false,
-    );
+    const envelopeId = new MailboxEnvelopeId('a'.repeat(22));
+
     await expect(
-      repository.requireEnvelopeCursor(MAILBOX, 'a'.repeat(22)),
+      repository.hasEnvelope(new MailboxId(MAILBOX), envelopeId),
+    ).resolves.toBe(false);
+    await expect(
+      repository.requireEnvelopeCursor(new MailboxId(MAILBOX), envelopeId),
     ).rejects.toBeInstanceOf(MailboxEnvelopeNotFoundError);
   });
 
@@ -1042,8 +1054,8 @@ describe('mailboxes', () => {
       readTokenHash: READ_HASH,
     });
 
-    await expect(repository.hasById(legacy)).resolves.toBe(true);
-    await expect(repository.requireById(legacy)).rejects.toThrow(
+    await expect(repository.hasById(new MailboxId(legacy))).resolves.toBe(true);
+    await expect(repository.requireById(new MailboxId(legacy))).rejects.toThrow(
       'Stored mailbox is malformed.',
     );
   });
@@ -1062,8 +1074,46 @@ describe('mailboxes', () => {
       postTokenHash: sha(POST),
     });
 
-    await expect(repository.requireById(broken)).rejects.toThrow(
+    await expect(repository.requireById(new MailboxId(broken))).rejects.toThrow(
       'Stored mailbox is malformed.',
     );
   });
+
+  it.each([
+    ['without the append bucket fields', {}],
+    ['with a NaN append bucket', { appendRefilledAt: NaN, appendTokens: NaN }],
+  ])(
+    'refuses appends to a stored mailbox %s instead of skipping the rate limit',
+    async (_case, bucket) => {
+      const unbucketed = 'u'.repeat(43);
+      await database.save('mailboxes', unbucketed, {
+        bytes: 0,
+        createdAt: Date.now(),
+        envelopeCount: 0,
+        id: unbucketed,
+        lastReadAt: Date.now(),
+        nextCursor: 1,
+        postTokenHash: POST_HASH,
+        readers: [{ ackedCursor: 0, readTokenHash: READ_HASH }],
+        ...bucket,
+      });
+
+      await expect(
+        appender.append(
+          new MailboxAppendMessage(
+            unbucketed,
+            POST,
+            'a'.repeat(22),
+            body(1024),
+          ),
+        ),
+      ).rejects.toThrow('Stored mailbox is malformed.');
+      await expect(
+        repository.hasEnvelope(
+          new MailboxId(unbucketed),
+          new MailboxEnvelopeId('a'.repeat(22)),
+        ),
+      ).resolves.toBe(false);
+    },
+  );
 });

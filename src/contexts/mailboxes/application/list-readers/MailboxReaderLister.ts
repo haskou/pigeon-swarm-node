@@ -17,12 +17,9 @@ export default class MailboxReaderLister {
   public async list(
     message: MailboxReaderListMessage,
   ): Promise<{ maxReaders: number; readers: MailboxReaderPrimitives[] }> {
-    const mailboxId = message.mailboxId.valueOf();
-    const readToken = message.readToken.valueOf();
+    const mailbox = await this.repository.requireById(message.mailboxId);
 
-    const mailbox = await this.repository.requireById(mailboxId);
-
-    if (!mailbox.acceptsRead(readToken)) {
+    if (!mailbox.acceptsRead(message.readToken)) {
       throw new MailboxNotFoundError();
     }
 

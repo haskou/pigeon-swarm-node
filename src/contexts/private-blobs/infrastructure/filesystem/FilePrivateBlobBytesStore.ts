@@ -8,6 +8,8 @@ import { pipeline } from 'stream/promises';
 import { PrivateBlobUploadSizeMismatchError } from '../../domain/errors/PrivateBlobUploadSizeMismatchError';
 import { PrivateBlobByteRange } from '../../domain/PrivateBlobByteRange';
 import PrivateBlobBytesStore from '../../domain/repositories/PrivateBlobBytesStore';
+import { PrivateBlobId } from '../../domain/value-objects/PrivateBlobId';
+import { PrivateBlobSize } from '../../domain/value-objects/PrivateBlobSize';
 
 /**
  * Blob bytes on the local filesystem, never in IPFS, OrbitDB or any
@@ -21,12 +23,14 @@ export default class FilePrivateBlobBytesStore extends PrivateBlobBytesStore {
     return path.resolve(pigeonEnvironment().PRIVATE_BLOB_STORAGE_PATH);
   }
 
-  private pathFor(id: string, suffix: string): string {
-    if (!FilePrivateBlobBytesStore.ID.test(id)) {
+  private pathFor(id: PrivateBlobId, suffix: string): string {
+    const name = id.valueOf();
+
+    if (!FilePrivateBlobBytesStore.ID.test(name)) {
       throw new Error('Invalid private blob id');
     }
 
-    return path.join(this.directory(), `${id}.${suffix}`);
+    return path.join(this.directory(), `${name}.${suffix}`);
   }
 
   private limiter(size: number): {
@@ -51,13 +55,13 @@ export default class FilePrivateBlobBytesStore extends PrivateBlobBytesStore {
     return { counter, received: () => received };
   }
 
-  public async delete(id: string): Promise<void> {
+  public async delete(id: PrivateBlobId): Promise<void> {
     await rm(this.pathFor(id, 'blob'), { force: true });
     await rm(this.pathFor(id, 'part'), { force: true });
   }
 
   /** Only names this store writes are listed; other files are never touched. */
-  public async listIds(): Promise<string[]> {
+  public async listIds(): Promise<PrivateBlobId[]> {
     let names: string[];
 
     try {
@@ -80,20 +84,21 @@ export default class FilePrivateBlobBytesStore extends PrivateBlobBytesStore {
       }
     }
 
-    return [...ids];
+    return [...ids].map((id) => new PrivateBlobId(id));
   }
 
-  public read(id: string, range?: PrivateBlobByteRange): Readable {
+  public read(id: PrivateBlobId, range?: PrivateBlobByteRange): Readable {
     return createReadStream(this.pathFor(id, 'blob'), range);
   }
 
   public async write(
-    id: string,
+    id: PrivateBlobId,
     source: Readable,
-    size: number,
+    size: PrivateBlobSize,
   ): Promise<void> {
+    const expected = size.valueOf();
     const partial = this.pathFor(id, 'part');
-    const { counter, received } = this.limiter(size);
+    const { counter, received } = this.limiter(expected);
 
     await mkdir(this.directory(), { mode: 0o700, recursive: true });
 
@@ -104,7 +109,7 @@ export default class FilePrivateBlobBytesStore extends PrivateBlobBytesStore {
         createWriteStream(partial, { flags: 'w', mode: 0o600 }),
       );
 
-      if (received() !== size) {
+      if (received() !== expected) {
         throw new PrivateBlobUploadSizeMismatchError();
       }
 
