@@ -15,10 +15,13 @@ import OrbitDBDeviceAuthorizationReplayer from '@app/contexts/identity-devices/i
 import OrbitDBDeviceAuthorizationSources from '@app/contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationSources';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import Kernel from '@haskou/ddd-kernel';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
 describe(OrbitDBDeviceAuthorizationReplayer.name, () => {
+  afterEach(() => jest.restoreAllMocks());
+
   const now = new Timestamp(1_800_000_000_000);
   const canonicalizer = new OrbitDBDeviceAuthorizationCanonicalizer();
   const replayer = new OrbitDBDeviceAuthorizationReplayer(
@@ -122,6 +125,40 @@ describe(OrbitDBDeviceAuthorizationReplayer.name, () => {
   ): OrbitDBDeviceAuthorizationTransitionRecord {
     return { transition: transition.toPrimitives() };
   }
+
+  it('excludes a malformed history record and logs only the rejected count', async () => {
+    const logger = {
+      debug: jest.fn(),
+      error: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+    };
+
+    jest.spyOn(Kernel, 'logger', 'get').mockReturnValue(logger);
+
+    const { genesis, identityId, owner } = await fixture();
+    const device = await KeyPair.generate();
+    const enrolled = record(
+      enrollment(
+        identityId,
+        owner,
+        device,
+        '00000000-0000-4000-8000-000000000001',
+        '10000000-0000-4000-8000-000000000001',
+      ),
+    );
+    const malformed = {
+      transition: { ...enrolled.transition, malformed: true },
+    } as unknown as OrbitDBDeviceAuthorizationTransitionRecord;
+
+    const replay = replayer.rebuild(genesis, [enrolled, malformed]);
+
+    expect(replay.history).toEqual([enrolled]);
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.warn).toHaveBeenCalledWith(
+      'OrbitDB device authorization replay rejected records: count=1',
+    );
+  });
 
   it('lets a recovery at the base revision take precedence over concurrent enrollments', async () => {
     const {
