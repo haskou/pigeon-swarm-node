@@ -4428,6 +4428,10 @@ kind, payload, recipientIdentityId})))`, and the signed `mutation` targets store
 `mlsRecords`.
 Publishing the same record twice is a no-op.
 
+Byte-exact vectors (canonical JSON, record id and proof record id) are in
+[`tests/fixtures/mls-record-id-vectors.json`](../tests/fixtures/mls-record-id-vectors.json),
+checked by the `MLSRecordIdVectors` unit spec.
+
 The proof record id is `community:<communityId>:mls:<recordId>`, and the proof is a
 `put` (records cannot be deleted). `payloadDigest` covers the stored document
 `{ authorIdentityId, communityId, createdAt, epoch?, groupId, id, kind, payload,
