@@ -1,7 +1,6 @@
 import IdentityAdmissionLoadRepository from '@app/contexts/identities/domain/repositories/IdentityAdmissionLoadRepository';
 import IdentityAdmissionPricingDomainService from '@app/contexts/identities/domain/services/IdentityAdmissionPricingDomainService';
 import { IdentityAdmissionDifficulty } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionDifficulty';
-import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Timestamp } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -88,16 +87,14 @@ describe(IdentityAdmissionPricingDomainService.name, () => {
     expect(load.countRecent).not.toHaveBeenCalled();
   });
 
-  it('charges the entered networks against the published version', async () => {
-    const published = new IdentityExternalIdentifier('bafkidentity');
+  it('charges the entered networks against the admitted identity', async () => {
+    await pricing.charge(mother.id, [NETWORK]);
 
-    await pricing.charge(published, [NETWORK]);
-
-    expect(load.record).toHaveBeenCalledWith(published, [NETWORK]);
+    expect(load.record).toHaveBeenCalledWith(mother.id, [NETWORK]);
   });
 
   it('charges nothing when no network is entered', async () => {
-    await pricing.charge(new IdentityExternalIdentifier('bafkidentity'), []);
+    await pricing.charge(mother.id, []);
 
     expect(load.record).not.toHaveBeenCalled();
   });

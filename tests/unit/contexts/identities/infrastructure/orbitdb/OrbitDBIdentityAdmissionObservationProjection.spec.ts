@@ -13,6 +13,8 @@ import { mock, MockProxy } from 'jest-mock-extended';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 
 const HORIZON = IdentityAdmissionDifficulty.FRESHNESS_HORIZON_MS;
+const HOSTED_NETWORK = '550e8400-e29b-41d4-a716-446655440000';
+const OTHER_NETWORK = '550e8400-e29b-41d4-a716-446655440009';
 
 describe(OrbitDBIdentityAdmissionObservationProjection.name, () => {
   let registry: MockProxy<OrbitDBReplicatedStateRegistry>;
@@ -51,6 +53,9 @@ describe(OrbitDBIdentityAdmissionObservationProjection.name, () => {
     registry = mock<OrbitDBReplicatedStateRegistry>();
     metadataIndex = mock<OrbitDBIdentityMetadataIndex>();
     observer = mock<IdentityAdmissionObserver>();
+    registry.hostsNetwork.mockImplementation(
+      (networkId) => networkId === HOSTED_NETWORK,
+    );
     registry.onDocumentUpdated.mockImplementation((_, candidate) => {
       listener = candidate;
 
@@ -78,14 +83,23 @@ describe(OrbitDBIdentityAdmissionObservationProjection.name, () => {
     );
   });
 
-  it('observes a fresh, canonical genesis', async () => {
-    const record = recordOf(new IdentityMother().build(), 'bafkgenesis');
+  it('observes a fresh, canonical genesis with the networks this node hosts', async () => {
+    const record = recordOf(
+      await new IdentityMother().buildNext({
+        networks: [HOSTED_NETWORK, OTHER_NETWORK],
+        previousIdentityExternalIdentifier: undefined,
+        version: 1,
+      }),
+      'bafkgenesis',
+    );
     metadataIndex.verifiedRecordOf.mockResolvedValue(record);
 
     await listener(documentOf(record));
 
     expect(observer.observe).toHaveBeenCalledWith(
-      new IdentityAdmissionObservationMessage(record.identity, record.cid),
+      new IdentityAdmissionObservationMessage(record.identity, record.cid, [
+        HOSTED_NETWORK,
+      ]),
     );
     expect(metadataIndex.findRetainedVersion).not.toHaveBeenCalled();
   });
@@ -107,6 +121,7 @@ describe(OrbitDBIdentityAdmissionObservationProjection.name, () => {
       new IdentityAdmissionObservationMessage(
         update.identity,
         update.cid,
+        [HOSTED_NETWORK],
         previous.identity,
       ),
     );

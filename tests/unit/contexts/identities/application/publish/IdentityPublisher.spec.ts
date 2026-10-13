@@ -11,6 +11,7 @@ import { IdentityAdmissionDifficulty } from '@app/contexts/identities/domain/val
 import { IdentityAdmissionProof } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionProof';
 import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import DeviceAuthorizationProvisioner from '@app/contexts/identity-devices/application/provision/DeviceAuthorizationProvisioner';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -210,9 +211,10 @@ describe('IdentityPublisher', () => {
         new IdentityPublishMessage(identity.toPrimitives()),
       );
 
-      expect(admissionLoad.record).toHaveBeenCalledWith(PUBLISHED, [
-        new NetworkId(NETWORK),
-      ]);
+      expect(admissionLoad.record).toHaveBeenCalledWith(
+        new IdentityId(identity.toPrimitives().id),
+        [new NetworkId(NETWORK)],
+      );
       expect(admissionLoad.record.mock.invocationCallOrder[0]).toBeGreaterThan(
         saver.save.mock.invocationCallOrder[0],
       );
@@ -276,7 +278,7 @@ describe('IdentityPublisher', () => {
         new IdentityPublishMessage(update.toPrimitives()),
       );
 
-      expect(admissionLoad.record).toHaveBeenCalledWith(PUBLISHED, [
+      expect(admissionLoad.record).toHaveBeenCalledWith(mother.id, [
         new NetworkId(ADDED_NETWORK),
       ]);
     });

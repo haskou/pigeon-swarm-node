@@ -5,7 +5,7 @@ import IdentityAdmissionLoadRepository from '@app/contexts/identities/domain/rep
 import IdentityAdmissionPricingDomainService from '@app/contexts/identities/domain/services/IdentityAdmissionPricingDomainService';
 import { IdentityAdmissionDifficulty } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionDifficulty';
 import { IdentityAdmissionProof } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionProof';
-import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -16,6 +16,24 @@ const ADDED_NETWORK = '550e8400-e29b-41d4-a716-446655440001';
 const FREE = IdentityAdmissionDifficulty.FREE_ADMISSIONS_PER_WINDOW;
 const HORIZON = IdentityAdmissionDifficulty.FRESHNESS_HORIZON_MS;
 const OBSERVED = 'bafkobserved';
+const HOSTED = [NETWORK, ADDED_NETWORK];
+
+function observation(
+  identity: Identity,
+  hostedNetworks: string[] = HOSTED,
+  previous?: Identity,
+): IdentityAdmissionObservationMessage {
+  return new IdentityAdmissionObservationMessage(
+    identity,
+    OBSERVED,
+    hostedNetworks,
+    previous,
+  );
+}
+
+function identityIdOf(identity: Identity): IdentityId {
+  return new IdentityId(identity.toPrimitives().id);
+}
 
 describe(IdentityAdmissionObserver.name, () => {
   let load: MockProxy<IdentityAdmissionLoadRepository>;
@@ -72,23 +90,18 @@ describe(IdentityAdmissionObserver.name, () => {
   it('counts a fresh genesis that pays what this node asks', async () => {
     const identity = await genesisProvenAt(16);
 
-    await observer.observe(
-      new IdentityAdmissionObservationMessage(identity, OBSERVED),
-    );
+    await observer.observe(observation(identity));
 
-    expect(load.record).toHaveBeenCalledWith(
-      new IdentityExternalIdentifier(OBSERVED),
-      [new NetworkId(NETWORK)],
-    );
+    expect(load.record).toHaveBeenCalledWith(identityIdOf(identity), [
+      new NetworkId(NETWORK),
+    ]);
   });
 
   it('ignores admissions signed outside the freshness horizon', async () => {
     for (const timestamp of [signedAt - HORIZON - 1, signedAt + HORIZON + 1]) {
       const identity = await genesisProvenAt(16, timestamp);
 
-      await observer.observe(
-        new IdentityAdmissionObservationMessage(identity, OBSERVED),
-      );
+      await observer.observe(observation(identity));
     }
 
     expect(load.countRecent).not.toHaveBeenCalled();
@@ -99,9 +112,7 @@ describe(IdentityAdmissionObserver.name, () => {
     const identity = await genesisProvenAt(16);
     loadPerNetwork({ [NETWORK]: FREE });
 
-    await observer.observe(
-      new IdentityAdmissionObservationMessage(identity, OBSERVED),
-    );
+    await observer.observe(observation(identity));
 
     expect(load.record).not.toHaveBeenCalled();
   });
@@ -110,9 +121,7 @@ describe(IdentityAdmissionObserver.name, () => {
     const identity = await genesisProvenAt(17);
     loadPerNetwork({ [NETWORK]: FREE });
 
-    await observer.observe(
-      new IdentityAdmissionObservationMessage(identity, OBSERVED),
-    );
+    await observer.observe(observation(identity));
 
     expect(load.record).toHaveBeenCalledTimes(1);
   });
@@ -124,14 +133,11 @@ describe(IdentityAdmissionObserver.name, () => {
       networks: [NETWORK, ADDED_NETWORK],
     });
 
-    await observer.observe(
-      new IdentityAdmissionObservationMessage(update, OBSERVED, previous),
-    );
+    await observer.observe(observation(update, HOSTED, previous));
 
-    expect(load.record).toHaveBeenCalledWith(
-      new IdentityExternalIdentifier(OBSERVED),
-      [new NetworkId(ADDED_NETWORK)],
-    );
+    expect(load.record).toHaveBeenCalledWith(identityIdOf(update), [
+      new NetworkId(ADDED_NETWORK),
+    ]);
   });
 
   it('counts nothing for an update that keeps its networks', async () => {
@@ -139,26 +145,48 @@ describe(IdentityAdmissionObserver.name, () => {
     const previous = mother.build();
     const update = await mother.buildNext();
 
-    await observer.observe(
-      new IdentityAdmissionObservationMessage(update, OBSERVED, previous),
-    );
+    await observer.observe(observation(update, HOSTED, previous));
 
     expect(load.record).not.toHaveBeenCalled();
   });
 
-  it('counts every network of an update whose previous version is unknown here', async () => {
+  it('counts every hosted network of an update whose previous version is unknown here', async () => {
     const mother = new IdentityMother();
     const update = await mother.buildNext({
       networks: [NETWORK, ADDED_NETWORK],
     });
 
-    await observer.observe(
-      new IdentityAdmissionObservationMessage(update, OBSERVED),
-    );
+    await observer.observe(observation(update));
 
-    expect(load.record).toHaveBeenCalledWith(
-      new IdentityExternalIdentifier(OBSERVED),
-      [new NetworkId(NETWORK), new NetworkId(ADDED_NETWORK)],
+    expect(load.record).toHaveBeenCalledWith(identityIdOf(update), [
+      new NetworkId(NETWORK),
+      new NetworkId(ADDED_NETWORK),
+    ]);
+  });
+
+  it('counts and prices only the networks this node hosts', async () => {
+    const mother = new IdentityMother();
+    const update = await mother.buildNext({
+      networks: [NETWORK, ADDED_NETWORK],
+    });
+    loadPerNetwork({ [ADDED_NETWORK]: FREE });
+
+    await observer.observe(observation(update, [NETWORK]));
+
+    expect(load.countRecent).not.toHaveBeenCalledWith(
+      new NetworkId(ADDED_NETWORK),
     );
+    expect(load.record).toHaveBeenCalledWith(identityIdOf(update), [
+      new NetworkId(NETWORK),
+    ]);
+  });
+
+  it('counts nothing for an admission into networks this node does not host', async () => {
+    const identity = await genesisProvenAt(16);
+
+    await observer.observe(observation(identity, [ADDED_NETWORK]));
+
+    expect(load.countRecent).not.toHaveBeenCalled();
+    expect(load.record).not.toHaveBeenCalled();
   });
 });

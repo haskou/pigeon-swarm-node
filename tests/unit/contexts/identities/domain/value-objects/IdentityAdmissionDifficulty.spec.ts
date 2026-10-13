@@ -50,6 +50,18 @@ describe('IdentityAdmissionDifficulty', () => {
     );
   });
 
+  it('saturates at the first load that asks the cap', () => {
+    const saturating =
+      IdentityAdmissionDifficulty.SATURATING_ADMISSIONS_PER_WINDOW;
+
+    expect(
+      IdentityAdmissionDifficulty.forRecentAdmissions(saturating).valueOf(),
+    ).toBe(IdentityAdmissionDifficulty.MAX_BITS);
+    expect(
+      IdentityAdmissionDifficulty.forRecentAdmissions(saturating - 1).valueOf(),
+    ).toBeLessThan(IdentityAdmissionDifficulty.MAX_BITS);
+  });
+
   it('never decreases as load grows', () => {
     let previous = IdentityAdmissionDifficulty.floor();
 
