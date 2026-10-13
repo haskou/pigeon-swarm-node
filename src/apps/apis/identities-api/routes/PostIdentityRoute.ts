@@ -1,4 +1,5 @@
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
+import { InsufficientIdentityAdmissionProofError } from '@app/contexts/identities/domain/errors/InsufficientIdentityAdmissionProofError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
@@ -11,6 +12,7 @@ import IdentityNetworkAdmissionRateLimiter from '../IdentityNetworkAdmissionRate
 import IdentityPublishRateLimiter from '../IdentityPublishRateLimiter';
 import { PostIdentityRequest } from '../requests/PostIdentityRequest';
 import { IdentityViewModel } from '../view-model/IdentityViewModel';
+import { InsufficientAdmissionProofViewModel } from '../view-model/InsufficientAdmissionProofViewModel';
 
 @JsonController('/identities')
 export class PostIdentityRoute extends Route {
@@ -45,16 +47,26 @@ export class PostIdentityRoute extends Route {
     await this.rateLimiter.consume(new IdentityId(body.id));
     await this.networkAdmissionRateLimiter.consume(body.networks);
 
-    const request = new PostIdentityRequest(body);
-    const candidate = await this.identityPublisher.publish(
-      request.getIdentityPublishMessage(),
-    );
+    try {
+      const candidate = await this.identityPublisher.publish(
+        new PostIdentityRequest(body).getIdentityPublishMessage(),
+      );
+      const viewModel = new IdentityViewModel(
+        candidate.getIdentity(),
+        candidate.getExternalIdentifier(),
+      );
 
-    const viewModel = new IdentityViewModel(
-      candidate.getIdentity(),
-      candidate.getExternalIdentifier(),
-    );
+      return response
+        .status(HttpRouteStatusEnum.OK)
+        .send(viewModel.toResource());
+    } catch (error: unknown) {
+      if (error instanceof InsufficientIdentityAdmissionProofError) {
+        return response
+          .status(HttpRouteStatusEnum.BAD_REQUEST)
+          .json(new InsufficientAdmissionProofViewModel(error).toResource());
+      }
 
-    return response.status(HttpRouteStatusEnum.OK).send(viewModel.toResource());
+      throw error;
+    }
   }
 }

@@ -1,9 +1,9 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import FixedWindowCounter from '@app/shared/infrastructure/local-db/FixedWindowCounter';
 
 import { IdentityPublishRateLimitExceededError } from './errors/IdentityPublishRateLimitExceededError';
-import FixedWindowCounter from './FixedWindowCounter';
 
 /** Caps the identity versions one identity may publish through this node per minute. */
 export default class IdentityPublishRateLimiter {

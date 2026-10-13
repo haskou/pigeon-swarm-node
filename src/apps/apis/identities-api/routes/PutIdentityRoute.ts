@@ -1,6 +1,7 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
 import { IdentityUpdateRequesterMismatchError } from '@app/contexts/identities/domain/errors/IdentityUpdateRequesterMismatchError';
+import { InsufficientIdentityAdmissionProofError } from '@app/contexts/identities/domain/errors/InsufficientIdentityAdmissionProofError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
@@ -20,6 +21,7 @@ import IdentityNetworkAdmissionRateLimiter from '../IdentityNetworkAdmissionRate
 import IdentityPublishRateLimiter from '../IdentityPublishRateLimiter';
 import { PutIdentityRequest } from '../requests/PutIdentityRequest';
 import { IdentityViewModel } from '../view-model/IdentityViewModel';
+import { InsufficientAdmissionProofViewModel } from '../view-model/InsufficientAdmissionProofViewModel';
 
 @JsonController('/identities')
 export class PutIdentityRoute extends Route {
@@ -71,17 +73,27 @@ export class PutIdentityRoute extends Route {
     await this.rateLimiter.consume(authenticatedIdentityId);
     await this.networkAdmissionRateLimiter.consume(body.networks);
 
-    const candidate = await this.identityPublisher.publish(
-      new PutIdentityRequest(body).getIdentityPublishMessage(),
-    );
-
-    return response
-      .status(HttpRouteStatusEnum.OK)
-      .send(
-        new IdentityViewModel(
-          candidate.getIdentity(),
-          candidate.getExternalIdentifier(),
-        ).toResource(),
+    try {
+      const candidate = await this.identityPublisher.publish(
+        new PutIdentityRequest(body).getIdentityPublishMessage(),
       );
+
+      return response
+        .status(HttpRouteStatusEnum.OK)
+        .send(
+          new IdentityViewModel(
+            candidate.getIdentity(),
+            candidate.getExternalIdentifier(),
+          ).toResource(),
+        );
+    } catch (error: unknown) {
+      if (error instanceof InsufficientIdentityAdmissionProofError) {
+        return response
+          .status(HttpRouteStatusEnum.BAD_REQUEST)
+          .json(new InsufficientAdmissionProofViewModel(error).toResource());
+      }
+
+      throw error;
+    }
   }
 }

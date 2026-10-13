@@ -24,6 +24,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IdentityResource'
+        '400':
+          description: Invalid body, or an admissionNonce below the difficulty this node asks while a network is busy here. A short proof gets `requiredDifficultyBits`; mine again at that difficulty and retry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsufficientAdmissionProofResource'
         '429':
           description: Identity publication rate limit exceeded (code 429040, IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE publications per identity per minute). Identity admission network quota exceeded (code 429041, IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE, off by default). Identity admission rate limit per client address exceeded (code 429042, IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE, default 30).
   /identities/{reference}:
@@ -85,12 +91,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IdentityResource'
+        '400':
+          description: Invalid body, or an admissionNonce below the difficulty this node asks for networks the update adds while they are busy here. A short proof gets `requiredDifficultyBits`. Updates that keep their networks are never asked for more.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsufficientAdmissionProofResource'
         '429':
           description: Identity publication rate limit exceeded (code 429040). Identity admission network quota exceeded (code 429041, off by default). Identity admission rate limit per client address exceeded (code 429042).
 components:
   schemas:
     PostIdentityBody:
       $ref: '#/components/schemas/SignedIdentityBody'
+    InsufficientAdmissionProofResource:
+      type: object
+      required:
+        - code
+        - errors
+        - httpStatus
+        - message
+        - requiredDifficultyBits
+      properties:
+        code:
+          type: string
+          example: BadRequestError
+        errors:
+          type: array
+          items: {}
+        httpStatus:
+          type: integer
+          example: 400
+        message:
+          type: string
+        requiredDifficultyBits:
+          type: integer
+          minimum: 16
+          maximum: 20
+          description: Leading zero bits the admissionNonce must have for this node to accept the publication now.
     SignedIdentityBody:
       type: object
       additionalProperties: false
@@ -113,7 +150,7 @@ components:
           type: string
           minLength: 1
           maxLength: 64
-          description: Proof-of-work nonce bound to the identity id and its sorted network ids. SHA-256 of `pigeon-identity-admission:v1:<id>:<networks>:<nonce>` must have 16 leading zero bits (a fixed protocol constant). Covered by the identity signature.
+          description: Proof-of-work nonce bound to the identity id and its sorted network ids. SHA-256 of `pigeon-identity-admission:v1:<id>:<networks>:<nonce>` must have 16 leading zero bits (a fixed protocol constant). Through this API, a node may ask up to 20 bits for networks that already took 60 or more admissions on it in the current minute (one more bit per doubling); see the 400 response. Covered by the identity signature.
         authorizationRevision:
           type: integer
           minimum: 0

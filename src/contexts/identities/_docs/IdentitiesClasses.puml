@@ -13,6 +13,8 @@ package "identities.domain" {
     -profile: Profile
     -publication: IdentityPublication
     +fromSignedPublication(primitives): Identity
+    +hasValidAdmissionProof(difficulty = floor): boolean
+    +networksAddedSince(previous: Identity): NetworkId[]
   }
 
   class Profile {
@@ -33,6 +35,21 @@ package "identities.domain" {
   class DeviceCredentialCommitment <<ValueObject>>
   class RecoveryAuthority <<ValueObject>>
   class IdentityAuthorizationRevision <<ValueObject>>
+
+  class IdentityAdmissionDifficulty <<ValueObject>> {
+    +FREE_ADMISSIONS_PER_WINDOW = 60
+    +MAX_BITS = 20
+    +floor(): IdentityAdmissionDifficulty
+    +forRecentAdmissions(count): IdentityAdmissionDifficulty
+    +hardest(other): IdentityAdmissionDifficulty
+  }
+
+  note right of IdentityAdmissionDifficulty
+    Local API policy only: floor 16 bits,
+    +1 bit per doubling above 60 admissions
+    per network per window, max 20.
+    Replicated records stay valid at 16.
+  end note
 
   class IdentityCandidate {
     -externalIdentifier: IdentityExternalIdentifier
@@ -82,6 +99,11 @@ package "identities.domain" {
 
   interface IdentityNetworkRepository {
     +findByIdentityId(identityId: IdentityId): Promise<NetworkId[]>
+  }
+
+  interface IdentityAdmissionLoadRepository {
+    +countRecent(networkId: NetworkId): Promise<number>
+    +record(networkIds: NetworkId[]): Promise<void>
   }
 
   class IdentitySaverService {
@@ -136,6 +158,8 @@ package "identities.application" {
 
   IdentityPublisher --> IdentitySaverService
   IdentityPublisher --> IdentityRepository
+  IdentityPublisher --> IdentityAdmissionLoadRepository
+  IdentityPublisher ..> IdentityAdmissionDifficulty
   IdentityFinder --> IdentityFinderService
   IdentityCandidateRegistrar --> IdentityRepository
   IdentityNetworksFinder --> IdentityNetworkRepository
@@ -195,6 +219,16 @@ package "identities.infrastructure" {
     +findByIdentityId(identityId): Promise<NetworkId[]>
   }
 
+  class LocalIdentityAdmissionLoadRepository {
+    +countRecent(networkId): Promise<number>
+    +record(networkIds): Promise<void>
+  }
+
+  note right of LocalIdentityAdmissionLoadRepository
+    Fixed 60 s window in the node's local
+    database, keyed by network id only.
+  end note
+
   class IpfsIdentityRepository {
     +save(identity: Identity): Promise<IdentityExternalIdentifier>
     +findById(id: IdentityId): Promise<Identity>
@@ -213,6 +247,7 @@ package "identities.infrastructure" {
 
   IpfsIdentityRepository ..|> IdentityRepository
   MetadataIdentityNetworkRepository ..|> IdentityNetworkRepository
+  LocalIdentityAdmissionLoadRepository ..|> IdentityAdmissionLoadRepository
   OrbitDBIdentityMetadataIndex ..|> IdentityMetadataIndex
   OrbitDBIdentityMetadataIndex --> IdentityHandleOwnershipDomainService
   IpfsIdentityRepository --> IdentityHandleOwnershipDomainService

@@ -13,6 +13,7 @@ import { IdentityPublication } from './IdentityPublication';
 import { IdentitySignaturePayload } from './IdentitySignaturePayload';
 import { DeviceCredential } from './value-objects/DeviceCredential';
 import { DeviceCredentialCommitment } from './value-objects/DeviceCredentialCommitment';
+import { IdentityAdmissionDifficulty } from './value-objects/IdentityAdmissionDifficulty';
 import { IdentityAdmissionProof } from './value-objects/IdentityAdmissionProof';
 import { IdentityAuthorizationRevision } from './value-objects/IdentityAuthorizationRevision';
 import { IdentityExternalIdentifier } from './value-objects/IdentityExternalIdentifier';
@@ -91,13 +92,30 @@ export class Identity extends AggregateRoot {
     );
   }
 
-  public hasValidAdmissionProof(): boolean {
+  public hasValidAdmissionProof(
+    difficulty: IdentityAdmissionDifficulty = IdentityAdmissionDifficulty.floor(),
+  ): boolean {
     const proof = new IdentityAdmissionProof(
       this.id.valueOf(),
       this.networks.toArray().map((networkId) => networkId.valueOf()),
     );
 
-    return proof.isValid(this.publication.getAdmissionNonce());
+    return proof.isValid(
+      this.publication.getAdmissionNonce(),
+      difficulty.valueOf(),
+    );
+  }
+
+  /** Networks this version enters that `previous` was not already in. */
+  public networksAddedSince(previous: Identity): NetworkId[] {
+    return this.networks
+      .toArray()
+      .filter(
+        (networkId) =>
+          !previous.networks
+            .toArray()
+            .some((previousNetworkId) => previousNetworkId.isEqual(networkId)),
+      );
   }
 
   public hasHandle(handle: ProfileHandle): boolean {
