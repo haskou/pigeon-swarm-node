@@ -257,27 +257,25 @@ N = group members including the sender. Values are from code unless marked.
 - A joiner gets no MLS epoch secrets from before the join. Mailbox envelopes are deleted
   on full acknowledgement and expire after 14 days (`own-copy-and-history-backfill.md`
   L13). After 14 days the mailbox holds no group history for anyone.
-- Group history lives in clients. Pre-cutover messages stay in the legacy OrbitDB log.
-- The legacy group log becomes read-only at cutover (D14). Old group messages are not
-  re-encrypted into MLS.
-- A new device of an existing member gets no backfill from mailboxes, as with 1:1. The
-  choice follows the own-copy document: the pairing export (its option 1) or the legacy
-  read until retirement (its D2 and D3). The pairing export must cover group records
-  too. This document does not decide that.
+- Group history lives in clients. The cutover removes the replicated group message log
+  (D14): its messages are not migrated, not re-encrypted into MLS, and not readable
+  from the node afterwards. Clients keep only what they already hold locally.
+- A new device of an existing member gets no backfill from mailboxes, as with 1:1. As in
+  the own-copy document (D2 and D3, resolved), the pairing export is the only backfill
+  source and it must cover group records too. With no authorized device online, older
+  group history is lost. There is no legacy history read.
 - The client keeps past epoch secrets for the drain window `D` (D10), so messages posted
   before a commit still decrypt after it. A message that cannot be decrypted after the
   window is shown as undecryptable. It is not dropped silently. A sender learns of
   failure only while the message is still in its queue.
 
-## Stays on legacy
+## Stays on the replicated path
 
 | Item | Why it stays | Node sees in clear |
 | --- | --- | --- |
 | Identity publication with `mailboxHome` | discovery of home nodes; parsed as the `IdentityMailboxHome` value object (`src/contexts/identities/domain/value-objects/IdentityMailboxHome.ts`: http or https URL, at most 255 characters) | identity id, home node |
 | Roster ops `member_added`, `member_removed` | commit ordering (D7) and the roster itself (D15) | group id, member identity ids, timing |
 | Invitation notifications `group_conversation_invitation` | carries the Welcome and `gen_k` (D8) | recipient identity, conversation id, type |
-| Legacy group message log | read-only after cutover | all current fields in clear |
-| Legacy group key | readable history only; new groups do not create it | keychain entry |
 | Private blobs (#290) | large attachments; retention `max(PRIVATE_BLOB_RETENTION_MS, MAILBOX_RETENTION_MS)` (`own-copy-and-history-backfill.md` L56, #446) | blob ids |
 | Own copy and pairing export | own devices and history | per own-copy document |
 | MLS key packages | existing path; location not checked here `[INFERENCE]` | key package |
@@ -326,7 +324,7 @@ is the reason the no-plaintext-participant-list goal is not met for groups.
 | D11 | Old inbox deletion | owner DELETEs `I(Y,k)` 24 hours after applying the commit; 14-day idle expiry is the backstop | immediate delete: loses in-flight messages |
 | D12 | Removed-member spam | accepted; bounded by 120 per minute and the 1000-envelope cap; MLS rejects unknown senders on read | node-side writer sets: see D3 |
 | D13 | Joiner history | none before join | sealed export from a member: later, as part of the pairing export |
-| D14 | Existing groups at cutover | legacy writes stop for groups moved to MLS; legacy history is read-only; users re-create groups | in-place migration of legacy keys: no re-encryption of old content. Product sign-off pending |
+| D14 | Existing groups at cutover | one clean cutover for every group: the replicated group message routes, their replication and the group key are removed; old group history is not migrated and is lost from the node; users re-create groups | per-group flag with read-only legacy history: rejected (no legacy paths). In-place migration of legacy keys: rejected (no re-encryption of old content) |
 | D15 | Roster | stays plaintext in this phase; the goal is not met for groups | encrypt roster ops (`node-written-collections.md` slice 1, planned, not built), or remove the roster from the node. Needs an owner decision |
 | D16 | Group size cap | 256 on the mailbox path (`MAX_GROUP_PARTICIPANTS`) | raise: upload grows linearly with N |
 | D17 | Message rate | 120 per minute per group, the inbox append limit | raise the limit: needs a node change; measure first |
@@ -348,9 +346,8 @@ Not part of this PR.
    existing create, append, read, ack and readers routes cover the flow.
 5. Staging: N = 256, the 120-per-minute ceiling, offline-member fill, inbox counts per
    node (D20).
-6. Cutover (D14): per-group flag. Legacy writes stop for MLS groups; legacy reads stay.
-7. Retire the legacy group write path after the pairing export covers group records
-   (own-copy D2).
+6. Cutover (D14): one release for every group. Remove the replicated group message
+   routes, their replication and the group key. No per-group flag and no legacy reads.
 
 ## Verification
 
