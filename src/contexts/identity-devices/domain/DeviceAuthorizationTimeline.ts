@@ -22,9 +22,8 @@ export class DeviceAuthorizationTimeline {
     states: DeviceAuthorization[],
     private readonly compromiseCaps: DeviceCompromiseCaps = DeviceCompromiseCaps.none(),
   ) {
-    this.states = [...states].sort(
-      (left, right) =>
-        left.getRevision().valueOf() - right.getRevision().valueOf(),
+    this.states = [...states].sort((left, right) =>
+      left.getRevision().compareTo(right.getRevision()),
     );
   }
 

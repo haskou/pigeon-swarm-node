@@ -4,6 +4,7 @@ import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/I
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationTimeline } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTimeline';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
+import { DeviceCompromiseCaps } from '@app/contexts/identity-devices/domain/DeviceCompromiseCaps';
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
 import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
@@ -275,24 +276,16 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
 
   public findCompromisedSince(
     identityId: IdentityId,
-  ): Promise<ReadonlyMap<string, number>> {
+  ): Promise<DeviceCompromiseCaps> {
     return this.lock.run(identityId, async () => {
       const document = await this.resolveDocument(identityId);
 
       return document
-        ? new Map(
-            this.replayer
-              .compromiseCapsOf(
-                DeviceAuthorization.fromPrimitives(document.genesis),
-                document,
-              )
-              .toPrimitives()
-              .map((entry): [string, number] => [
-                entry.credential,
-                entry.compromisedSince,
-              ]),
+        ? this.replayer.compromiseCapsOf(
+            DeviceAuthorization.fromPrimitives(document.genesis),
+            document,
           )
-        : new Map<string, number>();
+        : DeviceCompromiseCaps.none();
     });
   }
 

@@ -7,16 +7,10 @@ describe('IdentityAdmissionProof', () => {
   ];
 
   function mine(identityId: string, networkIds: string[], bits: number) {
+    const proof = new IdentityAdmissionProof(identityId, networkIds);
     let nonce = 0;
 
-    while (
-      !IdentityAdmissionProof.isValid(
-        identityId,
-        networkIds,
-        nonce.toString(),
-        bits,
-      )
-    ) {
+    while (!proof.isValid(nonce.toString(), bits)) {
       nonce += 1;
     }
 
@@ -25,17 +19,13 @@ describe('IdentityAdmissionProof', () => {
 
   it('accepts a mined nonce and is independent of network order', () => {
     const nonce = mine('identity-a', networks, 10);
+    const reversed = [...networks].reverse();
 
     expect(
-      IdentityAdmissionProof.isValid('identity-a', networks, nonce, 10),
+      new IdentityAdmissionProof('identity-a', networks).isValid(nonce, 10),
     ).toBe(true);
     expect(
-      IdentityAdmissionProof.isValid(
-        'identity-a',
-        [...networks].reverse(),
-        nonce,
-        10,
-      ),
+      new IdentityAdmissionProof('identity-a', reversed).isValid(nonce, 10),
     ).toBe(true);
   });
 
@@ -43,7 +33,7 @@ describe('IdentityAdmissionProof', () => {
     const nonce = mine('identity-a', networks, 12);
 
     expect(
-      IdentityAdmissionProof.isValid('identity-b', networks, nonce, 12),
+      new IdentityAdmissionProof('identity-b', networks).isValid(nonce, 12),
     ).toBe(false);
   });
 
@@ -51,7 +41,7 @@ describe('IdentityAdmissionProof', () => {
     const nonce = mine('identity-a', [networks[0]], 12);
 
     expect(
-      IdentityAdmissionProof.isValid('identity-a', networks, nonce, 12),
+      new IdentityAdmissionProof('identity-a', networks).isValid(nonce, 12),
     ).toBe(false);
   });
 
@@ -59,7 +49,7 @@ describe('IdentityAdmissionProof', () => {
     const easy = mine('identity-a', networks, 4);
 
     expect(
-      IdentityAdmissionProof.isValid('identity-a', networks, easy, 24),
+      new IdentityAdmissionProof('identity-a', networks).isValid(easy, 24),
     ).toBe(false);
   });
 
@@ -67,7 +57,7 @@ describe('IdentityAdmissionProof', () => {
     'rejects a missing or oversized nonce (%s)',
     (nonce) => {
       expect(
-        IdentityAdmissionProof.isValid('identity-a', networks, nonce, 1),
+        new IdentityAdmissionProof('identity-a', networks).isValid(nonce, 1),
       ).toBe(false);
     },
   );
@@ -77,12 +67,11 @@ describe('IdentityAdmissionProof', () => {
     process.env.IDENTITY_ADMISSION_DIFFICULTY_BITS = '4';
 
     try {
-      const nonce = IdentityAdmissionProof.mine('identity-a', networks);
+      const proof = new IdentityAdmissionProof('identity-a', networks);
+      const nonce = proof.mine();
 
       expect(IdentityAdmissionProof.DIFFICULTY_BITS).toBe(16);
-      expect(
-        IdentityAdmissionProof.isValid('identity-a', networks, nonce, 16),
-      ).toBe(true);
+      expect(proof.isValid(nonce, 16)).toBe(true);
     } finally {
       if (previous === undefined)
         delete process.env.IDENTITY_ADMISSION_DIFFICULTY_BITS;

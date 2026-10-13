@@ -89,12 +89,11 @@ async function verify(node: NodeRuntime): Promise<void> {
   const readTokenHash = createHash('sha256').update(readToken).digest('hex');
   const put = await fetch(`${node.baseUrl}/mailboxes/${mailboxId}`, {
     body: JSON.stringify({
-      creationNonce: MailboxCreationProof.mine(
+      creationNonce: new MailboxCreationProof(
         mailboxId,
         postTokenHash,
         readTokenHash,
-        MailboxCreationDifficulty.MIN_BITS,
-      ),
+      ).mine(MailboxCreationDifficulty.MIN_BITS),
       postTokenHash,
       readTokenHash,
     }),

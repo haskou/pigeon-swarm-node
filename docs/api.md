@@ -68,6 +68,12 @@ Implemented:
   rejected with `401`; the guard is in-memory and per node
 - Cucumber scenarios for invalid and stale signed requests
 
+Byte-exact vectors for the canonical request payload and its Ed25519 signature
+are in [`tests/fixtures/signed-http-request-vectors.json`](../tests/fixtures/signed-http-request-vectors.json),
+checked by the `SignedHttpRequestVectors` unit spec. They cover a lowercase
+method, a request without a body, and a raw binary body, and they require that a
+changed path, method, body or timestamp is rejected.
+
 ## Public mutation proof (authorization revision)
 
 Every client-signed record (`SignedPublicMutation`) is a proof body plus its
@@ -1842,6 +1848,11 @@ material. They never contain encrypted private keys, protected root-key
 envelopes, password KDF parameters, device unlock secrets or recovery secrets.
 Identity payloads containing those fields are rejected.
 
+The identity self-signature preimage (`IdentitySignatureDomainService`) and its
+signature are pinned byte for byte in
+[`tests/fixtures/identity-signature-vectors.json`](../tests/fixtures/identity-signature-vectors.json),
+checked by the `IdentitySignatureVectors` unit spec.
+
 ### Get identity
 
 ```http
@@ -2782,6 +2793,10 @@ Implemented:
   than 30 seconds ahead of the consumer's clock, is dropped the same way; late
   receipts inside the window still apply (residual risks: "Conversation read
   receipts" in `docs/pubsub-sync-protocol.md`)
+- byte-exact read proof vectors (signing content, signature, and the accept or
+  reject outcome of `MessageReadProofVerifier`) are in
+  [`tests/fixtures/message-read-proof-vectors.json`](../tests/fixtures/message-read-proof-vectors.json),
+  checked by the `MessageReadProofVectors` unit spec
 - send a Web Push control payload of type `notifications_cleared` to the
   reader identity subscriptions so service workers can close displayed
   notifications sharing the conversation's opaque group tag (see

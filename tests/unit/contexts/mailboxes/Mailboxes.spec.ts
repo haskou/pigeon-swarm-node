@@ -60,8 +60,8 @@ const OTHER_READ_HASH = sha(OTHER_READ);
 const DAY = 24 * 60 * 60 * 1000;
 const IDLE_MS = MailboxPolicy.EVICTION_IDLE_MS;
 /**
- * MailboxCreationProof.mine(FRESH, POST_HASH, READ_HASH, 20), computed once:
- * mining 20 bits takes about seven seconds under jest.
+ * Mined once with `new MailboxCreationProof(FRESH, POST_HASH, READ_HASH)`
+ * `.mine(20)`; mining 20 bits takes about seven seconds under jest.
  */
 const FULL_NONCE = '1761816';
 
@@ -73,13 +73,12 @@ const proofMeeting = (
   meets: number,
   misses: number,
 ): string => {
+  const proof = new MailboxCreationProof(id, postHash, readHash);
+
   for (let nonce = 0; ; nonce += 1) {
     const candidate = nonce.toString();
 
-    if (
-      MailboxCreationProof.isValid(id, postHash, readHash, candidate, meets) &&
-      !MailboxCreationProof.isValid(id, postHash, readHash, candidate, misses)
-    ) {
+    if (proof.isValid(candidate, meets) && !proof.isValid(candidate, misses)) {
       return candidate;
     }
   }
@@ -150,7 +149,7 @@ describe('mailboxes', () => {
         id,
         postHash,
         readHash,
-        MailboxCreationProof.mine(id, postHash, readHash, difficultyBits),
+        new MailboxCreationProof(id, postHash, readHash).mine(difficultyBits),
       ),
     );
 
@@ -561,12 +560,11 @@ describe('mailboxes', () => {
 
   it('refuses creation without a proof of work bound to that mailbox', async () => {
     const other = 'n'.repeat(43);
-    const forMailbox = MailboxCreationProof.mine(
+    const forMailbox = new MailboxCreationProof(
       MAILBOX,
       sha(POST),
       sha(READ),
-      MailboxCreationDifficulty.MIN_BITS,
-    );
+    ).mine(MailboxCreationDifficulty.MIN_BITS);
 
     await expect(
       creator.create(new MailboxCreateMessage(other, sha(POST), sha(READ), '')),
@@ -583,10 +581,7 @@ describe('mailboxes', () => {
 
   it('keeps the full-capacity fixture valid at the full difficulty', () => {
     expect(
-      MailboxCreationProof.isValid(
-        FRESH,
-        POST_HASH,
-        READ_HASH,
+      new MailboxCreationProof(FRESH, POST_HASH, READ_HASH).isValid(
         FULL_NONCE,
         MailboxCreationDifficulty.MAX_BITS,
       ),
