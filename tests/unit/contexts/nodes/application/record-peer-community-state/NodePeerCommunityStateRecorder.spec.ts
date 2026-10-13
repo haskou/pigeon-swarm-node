@@ -55,7 +55,8 @@ describe('NodePeerCommunityStateRecorder', () => {
 
   it('rejects an announcement for a malformed network id', () => {
     expect(
-      () => new NodePeerCommunityStateRecordMessage('network', 'peer-1', digest),
+      () =>
+        new NodePeerCommunityStateRecordMessage('network', 'peer-1', digest),
     ).toThrow();
   });
 });

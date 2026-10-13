@@ -120,7 +120,10 @@ describe('OrbitDBCommunityRepository', () => {
     const frontiers = await repository.findFrontiersByNetwork(networkId);
 
     expect(
-      frontiers.map(({ communityId: id, frontier }) => [id.valueOf(), frontier]),
+      frontiers.map(({ communityId: id, frontier }) => [
+        id.valueOf(),
+        frontier,
+      ]),
     ).toEqual([[communityId.valueOf(), [joined.getHash()]]]);
     await expect(
       repository.findFrontiersByNetwork('another-network'),

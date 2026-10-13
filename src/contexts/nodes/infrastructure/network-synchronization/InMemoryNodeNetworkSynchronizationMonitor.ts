@@ -1,7 +1,5 @@
-import {
-  NodeNetworkCommunityState,
-  NodeNetworkCommunityStateStatus,
-} from '@app/contexts/nodes/application/find-network-synchronization/NodeNetworkCommunityStateStatus';
+import { NodeNetworkCommunityState } from '@app/contexts/nodes/application/find-network-synchronization/NodeNetworkCommunityState';
+import { NodeNetworkCommunityStateStatus } from '@app/contexts/nodes/application/find-network-synchronization/NodeNetworkCommunityStateStatus';
 import { NodeNetworkStoreSynchronizationStatus } from '@app/contexts/nodes/application/find-network-synchronization/NodeNetworkStoreSynchronizationStatus';
 import NodeNetworkSynchronizationMonitor from '@app/contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import { NodeNetworkSynchronizationSource } from '@app/contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationSource';
@@ -15,11 +13,11 @@ type PeerCommunityState = {
 };
 
 export default class InMemoryNodeNetworkSynchronizationMonitor extends NodeNetworkSynchronizationMonitor {
-  /** Announcements arrive every 10 seconds; three missed ones make a peer unknown. */
-  public static COMMUNITY_STATE_TTL_MS = 35_000;
-
   /** Caps the announcements kept per network against peer id flooding. */
   private static readonly MAX_PEER_COMMUNITY_STATES = 256;
+
+  /** Announcements arrive every 10 seconds; three missed ones make a peer unknown. */
+  public static COMMUNITY_STATE_TTL_MS = 35_000;
 
   private changedAt = Date.now();
 

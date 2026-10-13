@@ -32,6 +32,7 @@ export default abstract class CommunityRepository {
   public abstract findFrontiersByNetwork(
     networkId: string,
   ): Promise<Array<{ communityId: CommunityId; frontier: string[] }>>;
+
   /** Appends an operation the client already signed. */
   public abstract save(
     operation: CommunityOperation,
