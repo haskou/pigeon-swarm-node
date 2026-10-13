@@ -698,11 +698,11 @@ Byte-exact vectors live in
 [`tests/fixtures/call-event-vectors.json`](../tests/fixtures/call-event-vectors.json)
 and are checked by the `CallEventVectors` unit spec.
 
-| Record | id | Author | Written by |
-| --- | --- | --- | --- |
-| `call_start` | `call:<callId>` | the creator | `POST /calls` |
+| Record             | id                                       | Author          | Written by                                                                                                                         |
+| ------------------ | ---------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `call_start`       | `call:<callId>`                          | the creator     | `POST /calls`                                                                                                                      |
 | `call_participant` | `call-participant:<callId>:<identityId>` | the participant | `POST /calls/{callId}/participants`, `DELETE /calls/{callId}/participants/me`; community calls verify the record and store nothing |
-| `call_end` | `call-end:<callId>` | the ender | `DELETE /calls/{callId}` |
+| `call_end`         | `call-end:<callId>`                      | the ender       | `DELETE /calls/{callId}`                                                                                                           |
 
 **Call id.** The id is derived, never chosen: the first 16 bytes of
 `sha256(utf8(creatorIdentityId + ":" + nonce))`, with byte 6 replaced by
@@ -744,7 +744,11 @@ is a positive integer:
   "networkId": "<networkId>",
   "nonce": "<nonce>",
   "participantIds": [],
-  "scope": { "channelId": "<voiceChannelId>", "communityId": "<communityId>", "type": "community_channel" },
+  "scope": {
+    "channelId": "<voiceChannelId>",
+    "communityId": "<communityId>",
+    "type": "community_channel"
+  },
   "scopeType": "call_start",
   "sessionEpoch": 1,
   "startedAt": 1770000000000
@@ -1535,7 +1539,7 @@ The replicated record is stored in the gated `contentReplication` collection:
 
 - record id: `content:<networkId>:<cid>`
 - payload (signed): `{ cid, context, id, networkId, ownerIdentityId,
-  scopeType: "content_replication", sizeBytes }`, with `scopeType` exactly
+scopeType: "content_replication", sizeBytes }`, with `scopeType` exactly
   `content_replication` and `ownerIdentityId` the signing identity
 - `mutation` is a `PublicMutationProof` with `store: "contentReplication"`,
   `kind: "put"`, `recordId` = the record id and `payloadDigest` = the digest of
@@ -1599,16 +1603,16 @@ Response:
 
 Node-local queues of opaque ciphertext envelopes. Mailboxes are never written to OrbitDB, IPFS, the DHT or pubsub. No request carries an identity; authorization is a bearer capability only, and the node keeps the SHA-256 of each capability. Design: `docs/design/opaque-mailboxes.md`.
 
-| Step | Auth | Notes |
-| --- | --- | --- |
-| `PUT /mailboxes/{mailboxId}` | None, rate limited per client address (see `API_TRUST_PROXY`) | Body `{ postTokenHash, readTokenHash, creationNonce }` (hex SHA-256 and a proof of work). `readTokenHash` becomes the mailbox's first reader; further readers join through `POST /mailboxes/{mailboxId}/readers`, never through this route. The SHA-256 over the mailbox id, both hashes and the nonce must start with the current difficulty: 16 zero bits while the node holds at most half of `MAILBOX_MAX_COUNT`, rising in four steps above half capacity to 20 bits at the limit (about 65k hashes at 16, about 1M at 20). A replay of an existing mailbox is checked against the current difficulty too. `201` created, `200` identical replay, `400` invalid body or nonce (a proof short of the current difficulty adds `requiredDifficultyBits`), `409` different hashes, `429` rate or `MAILBOX_MAX_COUNT` limit. |
-| `POST /mailboxes/{mailboxId}/envelopes` | `Bearer <postToken>` | Body `{ envelopeId, body }`. `body` is base64url and must decode to exactly 1024, 4096, 16384 or 65536 bytes (else `400`). `201` with `{ cursor }`; a repeated `envelopeId` returns `200` with the first cursor and stores nothing. A full mailbox returns `409`; nothing older is ever dropped. Appends are rate limited per mailbox (`429`, `MAILBOX_APPEND_RATE_PER_MINUTE`); a repeated `envelopeId` is not charged. |
-| `GET /mailboxes/{mailboxId}/envelopes?after=&limit=` | `Bearer <readToken>` | Envelopes with cursor greater than `after`, oldest first, at most 100, with `hasMore`. `Cache-Control: no-store`. A read keeps the mailbox live. |
-| `POST /mailboxes/{mailboxId}/ack` | `Bearer <readToken>` | Body `{ upTo }`. Records this reader's cursor, only forward and capped at the newest envelope. Envelopes up to and including `upTo` are deleted once every reader has acked them. `204`. |
-| `GET /mailboxes/{mailboxId}/readers` | `Bearer <readToken>` | `200` with `{ maxReaders, readers: [{ ackedCursor, readTokenHash }] }`. Lists reader hashes and each reader's acknowledged cursor, never tokens. `Cache-Control: no-store`. `404` for an unknown mailbox or wrong capability. |
-| `POST /mailboxes/{mailboxId}/readers` | `Bearer <readToken>` | Body `{ readTokenHash }` (hex SHA-256 of the new device's read token). Adds a reader with nothing acknowledged, so it receives the retained backlog. `201` added, `200` already a reader, `409` at `MAILBOX_MAX_READERS`, `404` for a post token or wrong capability. |
-| `DELETE /mailboxes/{mailboxId}/readers/{readTokenHash}` | `Bearer <readToken>` | Revokes that reader. `204`. `404` for an unknown reader hash. `409` for the last reader, which cannot be revoked. Envelopes it was holding back are deleted once the remaining readers have acked them. Closes that reader's realtime subscriptions. |
-| `DELETE /mailboxes/{mailboxId}` | `Bearer <readToken>` | Deletes the mailbox and its envelopes. `204`. Closes every realtime subscription to it. |
+| Step                                                    | Auth                                                          | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PUT /mailboxes/{mailboxId}`                            | None, rate limited per client address (see `API_TRUST_PROXY`) | Body `{ postTokenHash, readTokenHash, creationNonce }` (hex SHA-256 and a proof of work). `readTokenHash` becomes the mailbox's first reader; further readers join through `POST /mailboxes/{mailboxId}/readers`, never through this route. The SHA-256 over the mailbox id, both hashes and the nonce must start with the current difficulty: 16 zero bits while the node holds at most half of `MAILBOX_MAX_COUNT`, rising in four steps above half capacity to 20 bits at the limit (about 65k hashes at 16, about 1M at 20). A replay of an existing mailbox is checked against the current difficulty too. `201` created, `200` identical replay, `400` invalid body or nonce (a proof short of the current difficulty adds `requiredDifficultyBits`), `409` different hashes, `429` rate or `MAILBOX_MAX_COUNT` limit. |
+| `POST /mailboxes/{mailboxId}/envelopes`                 | `Bearer <postToken>`                                          | Body `{ envelopeId, body }`. `body` is base64url and must decode to exactly 1024, 4096, 16384 or 65536 bytes (else `400`). `201` with `{ cursor }`; a repeated `envelopeId` returns `200` with the first cursor and stores nothing. A full mailbox returns `409`; nothing older is ever dropped. Appends are rate limited per mailbox (`429`, `MAILBOX_APPEND_RATE_PER_MINUTE`); a repeated `envelopeId` is not charged.                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `GET /mailboxes/{mailboxId}/envelopes?after=&limit=`    | `Bearer <readToken>`                                          | Envelopes with cursor greater than `after`, oldest first, at most 100, with `hasMore`. `Cache-Control: no-store`. A read keeps the mailbox live.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `POST /mailboxes/{mailboxId}/ack`                       | `Bearer <readToken>`                                          | Body `{ upTo }`. Records this reader's cursor, only forward and capped at the newest envelope. Envelopes up to and including `upTo` are deleted once every reader has acked them. `204`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `GET /mailboxes/{mailboxId}/readers`                    | `Bearer <readToken>`                                          | `200` with `{ maxReaders, readers: [{ ackedCursor, readTokenHash }] }`. Lists reader hashes and each reader's acknowledged cursor, never tokens. `Cache-Control: no-store`. `404` for an unknown mailbox or wrong capability.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `POST /mailboxes/{mailboxId}/readers`                   | `Bearer <readToken>`                                          | Body `{ readTokenHash }` (hex SHA-256 of the new device's read token). Adds a reader with nothing acknowledged, so it receives the retained backlog. `201` added, `200` already a reader, `409` at `MAILBOX_MAX_READERS`, `404` for a post token or wrong capability.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `DELETE /mailboxes/{mailboxId}/readers/{readTokenHash}` | `Bearer <readToken>`                                          | Revokes that reader. `204`. `404` for an unknown reader hash. `409` for the last reader, which cannot be revoked. Envelopes it was holding back are deleted once the remaining readers have acked them. Closes that reader's realtime subscriptions.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `DELETE /mailboxes/{mailboxId}`                         | `Bearer <readToken>`                                          | Deletes the mailbox and its envelopes. `204`. Closes every realtime subscription to it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 - `mailboxId` is 32 bytes base64url; capabilities are sent only in `Authorization`, never the URL.
 - Creation proof preimage: `pigeon-mailbox-creation:v1:<mailboxId>:<postTokenHash>:<readTokenHash>:<creationNonce>` (1 to 64 character nonce). Byte-exact vectors (preimage, digest, leading zero bits, mined nonce) are in [`tests/fixtures/mailbox-creation-proof-vectors.json`](../tests/fixtures/mailbox-creation-proof-vectors.json), checked by the `MailboxCreationProofVectors` unit spec.
@@ -1634,12 +1638,12 @@ Node-local storage for client-encrypted bytes. Blobs are never added to IPFS, th
 
 Authorization is split so a streamed body never has to be buffered for signing:
 
-| Step | Auth | Notes |
-| --- | --- | --- |
-| `POST /private-blobs` | Signed request | Body `{ "size": <bytes> }`. Checks size limit and quotas. Returns `201` with `{ blobId, uploadToken, downloadToken, expiresAt }`. Invalid size: `400`. Quota exceeded: `413`. |
-| `PUT /private-blobs/{blobId}` | `Authorization: Bearer <uploadToken>` | Raw bytes, streamed. Must be exactly the reserved size, else `400` and nothing is kept. Returns `204`. Second upload: `409`. |
-| `GET /private-blobs/{blobId}` | `Authorization: Bearer <downloadToken>` | Single `Range: bytes=` supported (`206`/`416`). `Cache-Control: no-store`. |
-| `DELETE /private-blobs/{blobId}` | `Authorization: Bearer <uploadToken>` | Removes bytes and record on this node only. Returns `204`. |
+| Step                             | Auth                                    | Notes                                                                                                                                                                         |
+| -------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /private-blobs`            | Signed request                          | Body `{ "size": <bytes> }`. Checks size limit and quotas. Returns `201` with `{ blobId, uploadToken, downloadToken, expiresAt }`. Invalid size: `400`. Quota exceeded: `413`. |
+| `PUT /private-blobs/{blobId}`    | `Authorization: Bearer <uploadToken>`   | Raw bytes, streamed. Must be exactly the reserved size, else `400` and nothing is kept. Returns `204`. Second upload: `409`.                                                  |
+| `GET /private-blobs/{blobId}`    | `Authorization: Bearer <downloadToken>` | Single `Range: bytes=` supported (`206`/`416`). `Cache-Control: no-store`.                                                                                                    |
+| `DELETE /private-blobs/{blobId}` | `Authorization: Bearer <uploadToken>`   | Removes bytes and record on this node only. Returns `204`.                                                                                                                    |
 
 - Capabilities are 256-bit random values sent only in the `Authorization` header (never the URL); the node keeps their SHA-256 and compares in constant time.
 - A wrong, swapped, missing or expired capability, an unknown id and a not-yet-uploaded blob all return the same `404`.
@@ -1961,6 +1965,28 @@ Byte-exact vectors (preimage, digest, leading zero bits, mined nonce) are in
 [`tests/fixtures/identity-admission-proof-vectors.json`](../tests/fixtures/identity-admission-proof-vectors.json),
 checked by the `IdentityAdmissionProofVectors` unit spec.
 
+Through `POST /identities` and `PUT /identities/{identityId}`, a node may ask
+more than 16 bits for the networks an identity enters (all of them for a new
+identity, only the added ones for an update) while they are busy on that node.
+Up to 60 admissions per network per minute on the node the floor applies; after
+that the node adds one bit per doubling, up to 20 bits (60: 17, 120: 18,
+240: 19, 480: 20). A shorter proof is refused with `400` and the bits it needs:
+
+```json
+{
+  "code": "BadRequestError",
+  "errors": [],
+  "httpStatus": 400,
+  "message": "Identity admission needs an admissionNonce with 17 leading zero bits while the network is busy on this node.",
+  "requiredDifficultyBits": 17
+}
+```
+
+Mine a new nonce with at least `requiredDifficultyBits` leading zero bits, sign
+again and retry. Updates that keep their networks are never asked for more.
+Only accepted publications count towards the load. Replicated records are still
+valid at 16 bits.
+
 Undefined optional properties are omitted before signing. Handles must already
 be normalized. Current requests reject `encryptedKeyPair`,
 `encryptedPrivateKey`, `encryptedMasterKey` and `masterKeyDerivation`.
@@ -2052,7 +2078,13 @@ bytes of compact JSON with exactly these keys in this order, without a domain
 prefix:
 
 ```json
-{"encryptedPayload":"<encryptedKeychainPayload>","ownerIdentityId":"<identityId>","previousKeychainExternalIdentifier":"<externalIdentifier>","timestamp":1770000000000,"version":2}
+{
+  "encryptedPayload": "<encryptedKeychainPayload>",
+  "ownerIdentityId": "<identityId>",
+  "previousKeychainExternalIdentifier": "<externalIdentifier>",
+  "timestamp": 1770000000000,
+  "version": 2
+}
 ```
 
 `ownerIdentityId` is the identity id without PEM headers, taken from the signed
@@ -2117,7 +2149,7 @@ POST /conversations
 ```
 
 A conversation is not a replicated document: its roster is the deterministic fold
-of the operations its members signed (see *Signed conversation operations*). Creating
+of the operations its members signed (see _Signed conversation operations_). Creating
 one stores the signed genesis `conversation_created`. The node never signs for a
 user and there is no unsigned fallback.
 
@@ -2438,7 +2470,11 @@ ascending, unique, at most 64 digests, and is the same array in the record and i
   "payloadDigest": "<base64url sha256 of canonical record with id>",
   "predecessor": null,
   "sequence": 0,
-  "author": { "identityId": "<identityId>", "deviceCredential": "<credential>", "authorizationRevision": 0 },
+  "author": {
+    "identityId": "<identityId>",
+    "deviceCredential": "<credential>",
+    "authorizationRevision": 0
+  },
   "signature": "<Ed25519 signature by the device key, as the crypto library emits it>"
 }
 ```
@@ -2470,15 +2506,15 @@ in a total order (parents first, lowest digest first among concurrent ones) and
 each is authorized again at that point, so concurrent conflicting changes converge
 on every node.
 
-| Route | action | `args` |
-| --- | --- | --- |
-| `POST /conversations` (group) | `conversation_created` | `{type: "group", name, nonce, participantIds}` |
-| `POST /conversations` (1:1) | `conversation_created` | `{type: "one-to-one", participantIds}` |
-| `POST /conversations/{id}/members` | `member_added` | `{identityId}` |
-| `DELETE /conversations/{id}/members/{identityId}` | `member_removed` | `{identityId}` |
-| `DELETE /conversations/{id}/members/me` | `member_left` | `{}` |
-| `PUT /conversations/{id}/admins/{identityId}` | `admin_promoted` | `{identityId}` |
-| `DELETE /conversations/{id}/admins/{identityId}` | `admin_demoted` | `{identityId}` |
+| Route                                             | action                 | `args`                                         |
+| ------------------------------------------------- | ---------------------- | ---------------------------------------------- |
+| `POST /conversations` (group)                     | `conversation_created` | `{type: "group", name, nonce, participantIds}` |
+| `POST /conversations` (1:1)                       | `conversation_created` | `{type: "one-to-one", participantIds}`         |
+| `POST /conversations/{id}/members`                | `member_added`         | `{identityId}`                                 |
+| `DELETE /conversations/{id}/members/{identityId}` | `member_removed`       | `{identityId}`                                 |
+| `DELETE /conversations/{id}/members/me`           | `member_left`          | `{}`                                           |
+| `PUT /conversations/{id}/admins/{identityId}`     | `admin_promoted`       | `{identityId}`                                 |
+| `DELETE /conversations/{id}/admins/{identityId}`  | `admin_demoted`        | `{identityId}`                                 |
 
 Each `args` accepts exactly the listed keys (an extra or missing key is refused).
 `participantIds` of a genesis is strictly ascending, unique and includes the
@@ -2535,7 +2571,21 @@ DELETE /conversations/{id}/admins/<B>                     action admin_demoted  
 For the first line the creator `<A>` signs the record
 
 ```json
-{"action":"conversation_created","args":{"name":"Project room","nonce":"n-1","participantIds":["<A>","<B>"],"type":"group"},"authorIdentityId":"<A>","conversationId":"group:<sha256>","createdAt":1773848829055,"networkId":"<N>","parents":[],"scopeType":"conversation_operation"}
+{
+  "action": "conversation_created",
+  "args": {
+    "name": "Project room",
+    "nonce": "n-1",
+    "participantIds": ["<A>", "<B>"],
+    "type": "group"
+  },
+  "authorIdentityId": "<A>",
+  "conversationId": "group:<sha256>",
+  "createdAt": 1773848829055,
+  "networkId": "<N>",
+  "parents": [],
+  "scopeType": "conversation_operation"
+}
 ```
 
 (keys shown in canonical order), computes `digest` of that JSON, adds
@@ -2553,7 +2603,7 @@ assert it reproduces them.
 ### Conversation members and admins
 
 Each route below carries `{ "operation": { "createdAt", "parents", "mutation" } }`
-(see *Signed conversation operations*), is authenticated with the signed HTTP
+(see _Signed conversation operations_), is authenticated with the signed HTTP
 headers, and answers the updated `ConversationResource`.
 
 ```http
@@ -2976,9 +3026,9 @@ they live inside the `communities` context.
 
 Implemented mutating endpoints use signed HTTP requests with `X-Identity-Id`,
 `X-Timestamp` and `X-Signature`. Every route that changes a community also
-carries a client-signed `operation` (see *Signed community operations*), and
+carries a client-signed `operation` (see _Signed community operations_), and
 moderation routes additionally carry a client-signed `moderationLog` (see
-*Signed moderation log entries*).
+_Signed moderation log entries_).
 
 ### Signed community operations
 
@@ -3036,23 +3086,23 @@ with code `CommunityOperationLimitExceededError` (`Community operation limit
 exceeded`) and stores nothing. An operation another author signed concurrently
 beyond that quota is skipped by the fold on every node without any error.
 
-| Route | action | `args` |
-| --- | --- | --- |
-| `POST /communities` | `community_created` | `{nonce, name, description, visibility, discoverable, autoJoinEnabled, avatar?, banner?}` |
-| `PATCH /communities/{id}` | `community_updated` | `{name, description, avatar?, banner?, discoverable?, autoJoinEnabled?}` |
-| `POST .../channels/text`, `.../channels/voice` | `channel_created` | `{channelId, name, type}` |
-| `PATCH .../channels/{channelId}` | `channel_renamed` | `{channelId, name}` |
-| `DELETE .../channels/{channelId}` | `channel_deleted` | `{channelId}` |
-| `PATCH .../channels/{channelId}/permissions` | `channel_permissions_updated` | `{channelId, visibleRoleIds}` |
-| `POST .../roles` | `role_created` | `{roleId, name, permissions}` |
-| `PATCH .../roles/{roleId}` | `role_updated` | `{roleId, name, permissions}` |
-| `DELETE .../roles/{roleId}` | `role_deleted` | `{roleId}` |
-| `PUT .../members/{identityId}/roles` | `member_roles_updated` | `{identityId, roleIds}` |
-| `POST .../bans` | `member_banned` | `{identityId}` |
-| `DELETE .../bans/{identityId}` | `member_unbanned` | `{identityId}` |
-| `DELETE .../members/{identityId}/kick` | `member_kicked` | `{identityId}` |
-| `DELETE .../members/me` | `member_left` | `{identityId}` |
-| `POST .../join-requests` (auto-join), `PATCH .../membership-requests/{id}` (accept), `POST .../invites/{token}/accept` | `member_joined` | `{identityId, method, reference?}` |
+| Route                                                                                                                  | action                        | `args`                                                                                    |
+| ---------------------------------------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------- |
+| `POST /communities`                                                                                                    | `community_created`           | `{nonce, name, description, visibility, discoverable, autoJoinEnabled, avatar?, banner?}` |
+| `PATCH /communities/{id}`                                                                                              | `community_updated`           | `{name, description, avatar?, banner?, discoverable?, autoJoinEnabled?}`                  |
+| `POST .../channels/text`, `.../channels/voice`                                                                         | `channel_created`             | `{channelId, name, type}`                                                                 |
+| `PATCH .../channels/{channelId}`                                                                                       | `channel_renamed`             | `{channelId, name}`                                                                       |
+| `DELETE .../channels/{channelId}`                                                                                      | `channel_deleted`             | `{channelId}`                                                                             |
+| `PATCH .../channels/{channelId}/permissions`                                                                           | `channel_permissions_updated` | `{channelId, visibleRoleIds}`                                                             |
+| `POST .../roles`                                                                                                       | `role_created`                | `{roleId, name, permissions}`                                                             |
+| `PATCH .../roles/{roleId}`                                                                                             | `role_updated`                | `{roleId, name, permissions}`                                                             |
+| `DELETE .../roles/{roleId}`                                                                                            | `role_deleted`                | `{roleId}`                                                                                |
+| `PUT .../members/{identityId}/roles`                                                                                   | `member_roles_updated`        | `{identityId, roleIds}`                                                                   |
+| `POST .../bans`                                                                                                        | `member_banned`               | `{identityId}`                                                                            |
+| `DELETE .../bans/{identityId}`                                                                                         | `member_unbanned`             | `{identityId}`                                                                            |
+| `DELETE .../members/{identityId}/kick`                                                                                 | `member_kicked`               | `{identityId}`                                                                            |
+| `DELETE .../members/me`                                                                                                | `member_left`                 | `{identityId}`                                                                            |
+| `POST .../join-requests` (auto-join), `PATCH .../membership-requests/{id}` (accept), `POST .../invites/{token}/accept` | `member_joined`               | `{identityId, method, reference?}`                                                        |
 
 `member_joined` carries `method` `added`, `approval`, `invitation`, `invite_link` or
 `automatic`, and `reference` exactly for `approval`, `invitation` and
@@ -3203,7 +3253,11 @@ Request:
   "discoverable": true,
   "autoJoinEnabled": false,
   "visibility": "private",
-  "operation": { "createdAt": 1773848829055, "parents": [], "mutation": { "...": "SignedPublicMutation" } }
+  "operation": {
+    "createdAt": 1773848829055,
+    "parents": [],
+    "mutation": { "...": "SignedPublicMutation" }
+  }
 }
 ```
 
@@ -3282,7 +3336,11 @@ Request:
   "banner": "<publicBannerCid>",
   "discoverable": false,
   "autoJoinEnabled": true,
-  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
+  "operation": {
+    "createdAt": 1773848829055,
+    "parents": ["<frontier>"],
+    "mutation": { "...": "SignedPublicMutation" }
+  }
 }
 ```
 
@@ -3415,8 +3473,15 @@ Request:
   "status": "accepted",
   "updatedAt": 1780000000000,
   "mutation": { "...": "SignedPublicMutation" },
-  "moderationLog": { "createdAt": 1780000000000, "mutation": { "...": "SignedPublicMutation" } },
-  "operation": { "createdAt": 1780000000000, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
+  "moderationLog": {
+    "createdAt": 1780000000000,
+    "mutation": { "...": "SignedPublicMutation" }
+  },
+  "operation": {
+    "createdAt": 1780000000000,
+    "parents": ["<frontier>"],
+    "mutation": { "...": "SignedPublicMutation" }
+  }
 }
 ```
 
@@ -3586,8 +3651,15 @@ Ban request:
 {
   "identityId": "<identityId>",
   "reason": "optional moderation note",
-  "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "SignedPublicMutation" } },
-  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
+  "moderationLog": {
+    "createdAt": 1773848829055,
+    "mutation": { "...": "SignedPublicMutation" }
+  },
+  "operation": {
+    "createdAt": 1773848829055,
+    "parents": ["<frontier>"],
+    "mutation": { "...": "SignedPublicMutation" }
+  }
 }
 ```
 
@@ -3687,24 +3759,24 @@ target.id, createdAt])` (UTF-8). `createdAt` is the same value as
 details it computes from the request, and the entry is only admitted when they
 match what was signed and the actor holds the permission for the action.
 
-| Route | action | target | details |
-| --- | --- | --- | --- |
-| `PATCH /communities/{id}` | `community_updated` | community, `communityId` | `{autoJoinEnabled, avatar, banner, description, discoverable, name}` as sent in the request (absent or empty `avatar`, `banner`, `autoJoinEnabled`, `discoverable` omitted) |
-| `POST .../channels/text`, `.../channels/voice` | `channel_created` | channel, derived channel id | `{name, type: "text" \| "voice"}` |
-| `PATCH .../channels/{channelId}` | `channel_renamed` | channel, `channelId` | `{name}` |
-| `DELETE .../channels/{channelId}` | `channel_deleted` | channel, `channelId` | `{type}` |
-| `PATCH .../channels/{channelId}/permissions` | `channel_permissions_updated` | channel, `channelId` | `{visibleRoleIds}` |
-| `POST .../roles` | `role_created` | role, derived role id | `{name, permissions}` |
-| `PATCH .../roles/{roleId}` | `role_updated` | role, `roleId` | `{name, permissions}` |
-| `DELETE .../roles/{roleId}` | `role_deleted` | role, `roleId` | `{}` |
-| `PUT .../members/{identityId}/roles` | `member_roles_updated` | member, `identityId` | `{roleIds}` |
-| `POST .../bans` | `member_banned` | member, banned `identityId` | `{reason}` |
-| `DELETE .../bans/{identityId}` | `member_unbanned` | member, `identityId` | `{}` |
-| `DELETE .../members/{identityId}/kick` | `member_kicked` | member, `identityId` | `{}` |
-| `POST .../invites` | `invite_link_created` | invite, invite `token` | `{expiresAt, maxUses}` |
-| `POST .../members` | `invitation_created` | membership_request, request id | `{identityId}` (the invited identity) |
-| `PATCH /communities/membership-requests/{requestId}` | `membership_request_accepted` or `membership_request_declined` | membership_request, `requestId` | `{identityId, type}` of the request |
-| `DELETE .../channels/{channelId}/messages/{messageId}` | `message_deleted` | message, `messageId` | `{channelId, targetMessageAuthorId}` |
+| Route                                                  | action                                                         | target                          | details                                                                                                                                                                     |
+| ------------------------------------------------------ | -------------------------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PATCH /communities/{id}`                              | `community_updated`                                            | community, `communityId`        | `{autoJoinEnabled, avatar, banner, description, discoverable, name}` as sent in the request (absent or empty `avatar`, `banner`, `autoJoinEnabled`, `discoverable` omitted) |
+| `POST .../channels/text`, `.../channels/voice`         | `channel_created`                                              | channel, derived channel id     | `{name, type: "text" \| "voice"}`                                                                                                                                           |
+| `PATCH .../channels/{channelId}`                       | `channel_renamed`                                              | channel, `channelId`            | `{name}`                                                                                                                                                                    |
+| `DELETE .../channels/{channelId}`                      | `channel_deleted`                                              | channel, `channelId`            | `{type}`                                                                                                                                                                    |
+| `PATCH .../channels/{channelId}/permissions`           | `channel_permissions_updated`                                  | channel, `channelId`            | `{visibleRoleIds}`                                                                                                                                                          |
+| `POST .../roles`                                       | `role_created`                                                 | role, derived role id           | `{name, permissions}`                                                                                                                                                       |
+| `PATCH .../roles/{roleId}`                             | `role_updated`                                                 | role, `roleId`                  | `{name, permissions}`                                                                                                                                                       |
+| `DELETE .../roles/{roleId}`                            | `role_deleted`                                                 | role, `roleId`                  | `{}`                                                                                                                                                                        |
+| `PUT .../members/{identityId}/roles`                   | `member_roles_updated`                                         | member, `identityId`            | `{roleIds}`                                                                                                                                                                 |
+| `POST .../bans`                                        | `member_banned`                                                | member, banned `identityId`     | `{reason}`                                                                                                                                                                  |
+| `DELETE .../bans/{identityId}`                         | `member_unbanned`                                              | member, `identityId`            | `{}`                                                                                                                                                                        |
+| `DELETE .../members/{identityId}/kick`                 | `member_kicked`                                                | member, `identityId`            | `{}`                                                                                                                                                                        |
+| `POST .../invites`                                     | `invite_link_created`                                          | invite, invite `token`          | `{expiresAt, maxUses}`                                                                                                                                                      |
+| `POST .../members`                                     | `invitation_created`                                           | membership_request, request id  | `{identityId}` (the invited identity)                                                                                                                                       |
+| `PATCH /communities/membership-requests/{requestId}`   | `membership_request_accepted` or `membership_request_declined` | membership_request, `requestId` | `{identityId, type}` of the request                                                                                                                                         |
+| `DELETE .../channels/{channelId}/messages/{messageId}` | `message_deleted`                                              | message, `messageId`            | `{channelId, targetMessageAuthorId}`                                                                                                                                        |
 
 Channel and role creation derive the id from the `createdAt` of the signed
 community operation (`operation.createdAt`), not from `moderationLog.createdAt`
@@ -3846,8 +3918,15 @@ Role body:
 {
   "name": "Admin",
   "permissions": ["manage_channels", "create_invites"],
-  "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "SignedPublicMutation" } },
-  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
+  "moderationLog": {
+    "createdAt": 1773848829055,
+    "mutation": { "...": "SignedPublicMutation" }
+  },
+  "operation": {
+    "createdAt": 1773848829055,
+    "parents": ["<frontier>"],
+    "mutation": { "...": "SignedPublicMutation" }
+  }
 }
 ```
 
@@ -3856,8 +3935,15 @@ Member role replacement body:
 ```json
 {
   "roleIds": ["<roleId>"],
-  "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "SignedPublicMutation" } },
-  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
+  "moderationLog": {
+    "createdAt": 1773848829055,
+    "mutation": { "...": "SignedPublicMutation" }
+  },
+  "operation": {
+    "createdAt": 1773848829055,
+    "parents": ["<frontier>"],
+    "mutation": { "...": "SignedPublicMutation" }
+  }
 }
 ```
 
@@ -3885,8 +3971,15 @@ Request:
 ```json
 {
   "name": "general",
-  "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "SignedPublicMutation" } },
-  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
+  "moderationLog": {
+    "createdAt": 1773848829055,
+    "mutation": { "...": "SignedPublicMutation" }
+  },
+  "operation": {
+    "createdAt": 1773848829055,
+    "parents": ["<frontier>"],
+    "mutation": { "...": "SignedPublicMutation" }
+  }
 }
 ```
 
@@ -3907,8 +4000,15 @@ Request:
 ```json
 {
   "name": "Voice",
-  "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "SignedPublicMutation" } },
-  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
+  "moderationLog": {
+    "createdAt": 1773848829055,
+    "mutation": { "...": "SignedPublicMutation" }
+  },
+  "operation": {
+    "createdAt": 1773848829055,
+    "parents": ["<frontier>"],
+    "mutation": { "...": "SignedPublicMutation" }
+  }
 }
 ```
 
@@ -3931,8 +4031,15 @@ Request:
 ```json
 {
   "name": "announcements",
-  "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "SignedPublicMutation" } },
-  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
+  "moderationLog": {
+    "createdAt": 1773848829055,
+    "mutation": { "...": "SignedPublicMutation" }
+  },
+  "operation": {
+    "createdAt": 1773848829055,
+    "parents": ["<frontier>"],
+    "mutation": { "...": "SignedPublicMutation" }
+  }
 }
 ```
 
@@ -3953,8 +4060,15 @@ Request:
 ```json
 {
   "visibleRoleIds": ["everyone", "<roleId>"],
-  "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "SignedPublicMutation" } },
-  "operation": { "createdAt": 1773848829055, "parents": ["<frontier>"], "mutation": { "...": "SignedPublicMutation" } }
+  "moderationLog": {
+    "createdAt": 1773848829055,
+    "mutation": { "...": "SignedPublicMutation" }
+  },
+  "operation": {
+    "createdAt": 1773848829055,
+    "parents": ["<frontier>"],
+    "mutation": { "...": "SignedPublicMutation" }
+  }
 }
 ```
 
@@ -4655,13 +4769,15 @@ Request:
 
 ```json
 {
-  "mutation": { "...": "client-signed removal proof for the `messages` record" },
+  "mutation": {
+    "...": "client-signed removal proof for the `messages` record"
+  },
   "moderationLog": { "createdAt": 1773848829055, "mutation": { "...": "..." } }
 }
 ```
 
 `mutation` is the signed tombstone of the message record. `moderationLog` is
-the signed `message_deleted` entry (see *Signed moderation log entries*) with
+the signed `message_deleted` entry (see _Signed moderation log entries_) with
 target `message`/`messageId` and details `{ channelId, targetMessageAuthorId }`.
 
 Response:
@@ -4802,8 +4918,7 @@ Implemented:
   different ones
 - replication quota: the gate bounds what it keeps per author instead. It
   admits at most `NOTIFICATIONS_MAX_INVITATIONS_PER_IDENTITY` (default 10000)
-  invitations per inviter and `NOTIFICATIONS_MAX_STATES_PER_IDENTITY` (default
-  30000) state records per recipient. The budget is deterministic: the genuine
+  invitations per inviter and `NOTIFICATIONS_MAX_STATES_PER_IDENTITY` (default 30000) state records per recipient. The budget is deterministic: the genuine
   records of one author sort by id and the first ones that fit are admitted, so
   the verdict depends only on the stored records, never on arrival order. Only
   records whose proof verifies for their own payload count, so a forged record
@@ -5240,8 +5355,8 @@ forged, copied, stale or wrong-author proofs fail with 409.
 - Store `stickerPacks`: one whole-pack document per pack, signed by the owner. The
   proof has `recordId = <packId>`, kind `put`, and `payloadDigest` covers
   `{ id, name, ownerIdentityId, createdAt, updatedAt, stickers: [{ id, type,
-  assetCid, contentType, sizeBytes, dimensions: { width, height } }], scopeType:
-  "sticker_pack" }` without `proof`. Packs are never deleted.
+assetCid, contentType, sizeBytes, dimensions: { width, height } }], scopeType:
+"sticker_pack" }` without `proof`. Packs are never deleted.
 - Store `stickerUserLibraries`: independent signed records, author = `identityId`:
   - `sticker_favorite`, id `favorite:<identityId>:<packId>:<stickerId>`:
     `{ id, identityId, packId, stickerId, favoritedAt, scopeType }`; removal is a
@@ -5740,14 +5855,47 @@ written in the order shown below and properties whose value is `undefined` are
 omitted. The target proof preimage is:
 
 ```json
-{"domain":"pigeon:device-authorization:proof-of-possession:v2","transition":{"authorCredential":"<public credential>","authorizedAt":1770000000000,"epoch":"genesis","identityId":"<identity id>","operation":"enroll","operationId":"<uuid>","pairingExpiration":1770000060000,"pairingId":"<uuid>","previousRevision":0,"revision":1,"targetCredential":"<public credential>","targetCredentialCommitment":"<lowercase SHA-256 hex>"}}
+{
+  "domain": "pigeon:device-authorization:proof-of-possession:v2",
+  "transition": {
+    "authorCredential": "<public credential>",
+    "authorizedAt": 1770000000000,
+    "epoch": "genesis",
+    "identityId": "<identity id>",
+    "operation": "enroll",
+    "operationId": "<uuid>",
+    "pairingExpiration": 1770000060000,
+    "pairingId": "<uuid>",
+    "previousRevision": 0,
+    "revision": 1,
+    "targetCredential": "<public credential>",
+    "targetCredentialCommitment": "<lowercase SHA-256 hex>"
+  }
+}
 ```
 
 After inserting the resulting target signature, the author signature preimage
 is:
 
 ```json
-{"domain":"pigeon:device-authorization:transition:v3","proofOfPossession":"<target signature>","transition":{"authorCredential":"<public credential>","authorizedAt":1770000000000,"epoch":"genesis","identityId":"<identity id>","operation":"enroll","operationId":"<uuid>","pairingExpiration":1770000060000,"pairingId":"<uuid>","previousRevision":0,"revision":1,"targetCredential":"<public credential>","targetCredentialCommitment":"<lowercase SHA-256 hex>"}}
+{
+  "domain": "pigeon:device-authorization:transition:v3",
+  "proofOfPossession": "<target signature>",
+  "transition": {
+    "authorCredential": "<public credential>",
+    "authorizedAt": 1770000000000,
+    "epoch": "genesis",
+    "identityId": "<identity id>",
+    "operation": "enroll",
+    "operationId": "<uuid>",
+    "pairingExpiration": 1770000060000,
+    "pairingId": "<uuid>",
+    "previousRevision": 0,
+    "revision": 1,
+    "targetCredential": "<public credential>",
+    "targetCredentialCommitment": "<lowercase SHA-256 hex>"
+  }
+}
 ```
 
 Revocation omits `authorizedAt`, `pairingExpiration`, `pairingId` and
@@ -5854,7 +6002,15 @@ with keys in exactly this (alphabetical) order. Every credential and the
 identity id is the body-only base64 form, without the PEM header and footer:
 
 ```json
-{"authorizationRevision":2,"generation":3,"identityId":"<identity id>","publisherCredential":"<device credential>","purpose":"pigeon:device-sealed-secret:v1","recipientCredential":"<device credential>","sealedSecret":"v2.x25519-hkdf-sha256-aes-256-gcm.…"}
+{
+  "authorizationRevision": 2,
+  "generation": 3,
+  "identityId": "<identity id>",
+  "publisherCredential": "<device credential>",
+  "purpose": "pigeon:device-sealed-secret:v1",
+  "recipientCredential": "<device credential>",
+  "sealedSecret": "v2.x25519-hkdf-sha256-aes-256-gcm.…"
+}
 ```
 
 Read the caller's own entry of the stored generation with:

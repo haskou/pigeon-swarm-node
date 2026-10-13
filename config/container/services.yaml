@@ -37,9 +37,6 @@ services:
       - '@contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry'
       - '@apps/apis/calls-api/CallRelayRecordRegistry'
       - '@apps/apis/calls-api/CallRelayCredentialIssuer'
-  apps/apis/identities-api/FixedWindowCounter:
-    class: /apps/apis/identities-api/FixedWindowCounter
-    arguments: []
   apps/apis/identities-api/IdentityAdmissionSourceRateLimiter:
     class: /apps/apis/identities-api/IdentityAdmissionSourceRateLimiter
     arguments: []
@@ -1518,11 +1515,14 @@ services:
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
       - >-
         @contexts/identity-devices/application/provision/DeviceAuthorizationProvisioner
+      - '@contexts/identities/domain/repositories/IdentityAdmissionLoadRepository'
   contexts/identities/application/register-candidate/IdentityCandidateRegistrar:
     class: >-
       /contexts/identities/application/register-candidate/IdentityCandidateRegistrar
     arguments:
       - '@contexts/identities/domain/repositories/IdentityRepository'
+  contexts/identities/domain/repositories/IdentityAdmissionLoadRepository: >-
+    @contexts/identities/infrastructure/local-db/LocalIdentityAdmissionLoadRepository
   contexts/identities/domain/repositories/IdentityNetworkRepository: >-
     @contexts/identities/infrastructure/metadata/MetadataIdentityNetworkRepository
   contexts/identities/domain/repositories/IdentityRepository: '@contexts/identities/infrastructure/ipfs/IpfsIdentityRepository'
@@ -1565,6 +1565,12 @@ services:
   contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper:
     class: /contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper
     arguments: []
+  contexts/identities/infrastructure/local-db/LocalIdentityAdmissionLoadRepository:
+    class: >-
+      /contexts/identities/infrastructure/local-db/LocalIdentityAdmissionLoadRepository
+    arguments:
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+    parent: contexts/identities/domain/repositories/IdentityAdmissionLoadRepository
   contexts/identities/infrastructure/metadata/IdentityMetadataIndex: '@contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMetadataIndex'
   contexts/identities/infrastructure/metadata/MetadataIdentityNetworkRepository:
     class: >-
@@ -2620,6 +2626,9 @@ services:
     arguments: []
   shared/infrastructure/local-db/EmbeddedLocalDatabase:
     class: /shared/infrastructure/local-db/EmbeddedLocalDatabase
+    arguments: []
+  shared/infrastructure/local-db/FixedWindowCounter:
+    class: /shared/infrastructure/local-db/FixedWindowCounter
     arguments: []
   shared/infrastructure/logs/WinstonLogger:
     class: /shared/infrastructure/logs/WinstonLogger

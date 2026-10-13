@@ -1,8 +1,8 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import FixedWindowCounter from '@app/shared/infrastructure/local-db/FixedWindowCounter';
 
 import { IdentityNetworkAdmissionRateLimitExceededError } from './errors/IdentityNetworkAdmissionRateLimitExceededError';
-import FixedWindowCounter from './FixedWindowCounter';
 
 /**
  * Optionally caps the identity admissions this node accepts into each network

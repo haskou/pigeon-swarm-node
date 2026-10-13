@@ -21,6 +21,7 @@ import ConversationRepository from '@app/contexts/conversations/domain/repositor
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
+import IdentityAdmissionLoadRepository from '@app/contexts/identities/domain/repositories/IdentityAdmissionLoadRepository';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
@@ -41,6 +42,7 @@ import { PrivateAuthorizationRepository } from '@app/contexts/private-authorizat
 import Ed25519PrivateDeviceCredentialCodec from '@app/contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
@@ -96,6 +98,7 @@ type StickerPackDocument = Record<string, unknown> & {
 
 @binding()
 export default class Definitions {
+  private admissionProofBits: number | undefined;
   private binaryBody: Buffer | undefined;
   private readonly notificationSettingsSequences = new Map<string, number>();
   private readonly communityRecordSequences = new Map<string, number>();
@@ -246,7 +249,11 @@ export default class Definitions {
       picture: undefined,
     };
     const signaturePayload = {
-      admissionNonce: mineAdmissionNonce(ownerIdentityId.valueOf(), networks),
+      admissionNonce: mineAdmissionNonce(
+        ownerIdentityId.valueOf(),
+        networks,
+        this.admissionProofBits,
+      ),
       authorizationRevision: 0,
       deviceCredential: deviceCredential.valueOf(),
       deviceCredentialCommitment: deviceCredential.getCommitment().valueOf(),
@@ -1418,6 +1425,7 @@ export default class Definitions {
     this.callMutationDisabled = false;
     this.callProofs.clear();
     this.callJoined.clear();
+    this.admissionProofBits = undefined;
     this.communityChannelId = undefined;
     this.communityChannelMessageId = undefined;
     this.communityThreadRootMessageId = undefined;
@@ -1803,6 +1811,29 @@ export default class Definitions {
   public identityAdmissionsAreLimitedToPerSourcePerMinute(limit: number): void {
     process.env.IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE =
       String(limit);
+  }
+
+  @given('identity admission proofs are mined at exactly {int} bits')
+  public identityAdmissionProofsAreMinedAtExactly(bits: number): void {
+    this.admissionProofBits = bits;
+  }
+
+  @given(
+    'this node recently accepted {int} identity admissions into the current network',
+  )
+  public async thisNodeRecentlyAcceptedIdentityAdmissions(
+    admissions: number,
+  ): Promise<void> {
+    const load = Kernel.di.getService<IdentityAdmissionLoadRepository>(
+      IdentityAdmissionLoadRepository,
+    );
+    const network = new NetworkId(
+      this.currentNetworkId ?? '123e4567-e89b-12d3-a456-426614174000',
+    );
+
+    for (let admission = 0; admission < admissions; admission += 1) {
+      await load.record([network]);
+    }
   }
 
   @given(

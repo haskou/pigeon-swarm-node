@@ -1,14 +1,19 @@
 import DeviceAuthorizationProvisioner from '@app/contexts/identity-devices/application/provision/DeviceAuthorizationProvisioner';
 import { DeviceAuthorizationProvisionMessage } from '@app/contexts/identity-devices/application/provision/messages/DeviceAuthorizationProvisionMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { assert } from '@haskou/value-objects';
 
+import { InsufficientIdentityAdmissionProofError } from '../../domain/errors/InsufficientIdentityAdmissionProofError';
 import { InvalidIdentityCandidateError } from '../../domain/errors/InvalidIdentityCandidateError';
+import { Identity } from '../../domain/Identity';
 import { IdentityCandidate } from '../../domain/IdentityCandidate';
+import IdentityAdmissionLoadRepository from '../../domain/repositories/IdentityAdmissionLoadRepository';
 import IdentityRepository from '../../domain/repositories/IdentityRepository';
 import IdentityCandidateValidationDomainService from '../../domain/services/IdentityCandidateValidationDomainService';
 import IdentitySaverService from '../../domain/services/IdentitySaverService';
+import { IdentityAdmissionDifficulty } from '../../domain/value-objects/IdentityAdmissionDifficulty';
 import { IdentityPublishMessage } from './messages/IdentityPublishMessage';
 
 export default class IdentityPublisher {
@@ -18,7 +23,47 @@ export default class IdentityPublisher {
     private readonly validator: IdentityCandidateValidationDomainService,
     private readonly eventPublisher: DomainEventPublisher,
     private readonly deviceAuthorizationProvisioner: DeviceAuthorizationProvisioner,
+    private readonly admissionLoad: IdentityAdmissionLoadRepository,
   ) {}
+
+  /** Networks this version enters for the first time: all of them for a genesis. */
+  private async admittedNetworks(identity: Identity): Promise<NetworkId[]> {
+    const previousReference = identity.getPreviousReference();
+
+    if (!previousReference) {
+      return identity.getNetworkIds();
+    }
+
+    // The chain was validated just before, so the previous version exists.
+    const previous =
+      await this.repository.requireByExternalIdentifier(previousReference);
+
+    return identity.networksAddedSince(previous);
+  }
+
+  /**
+   * Raises the proof this node asks of new admissions while their networks are
+   * busy here. Updates that keep their networks reuse their proof unchanged.
+   */
+  private async assertAdmissionDifficulty(
+    identity: Identity,
+    admittedNetworks: NetworkId[],
+  ): Promise<void> {
+    let required = IdentityAdmissionDifficulty.floor();
+
+    for (const networkId of admittedNetworks) {
+      required = required.hardest(
+        IdentityAdmissionDifficulty.forRecentAdmissions(
+          await this.admissionLoad.countRecent(networkId),
+        ),
+      );
+    }
+
+    assert(
+      identity.hasValidAdmissionProof(required),
+      new InsufficientIdentityAdmissionProofError(required.valueOf()),
+    );
+  }
 
   public async publish(
     message: IdentityPublishMessage,
@@ -37,6 +82,10 @@ export default class IdentityPublisher {
     if (!isValid) {
       throw new InvalidIdentityCandidateError();
     }
+
+    const admittedNetworks = await this.admittedNetworks(identity);
+
+    await this.assertAdmissionDifficulty(identity, admittedNetworks);
 
     const externalIdentifier =
       await this.saver.calculateExternalIdentifier(identity);
@@ -63,6 +112,10 @@ export default class IdentityPublisher {
       await this.deviceAuthorizationProvisioner.withdraw(provisionMessage);
 
       throw error;
+    }
+
+    if (admittedNetworks.length > 0) {
+      await this.admissionLoad.record(admittedNetworks);
     }
 
     const events = identity.pullDomainEvents();

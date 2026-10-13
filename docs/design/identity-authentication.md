@@ -125,6 +125,23 @@ charge each client address against `IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_M
 cannot spend the identity or network counters. The count is in memory and local
 to the node, and it is keyed by address, not by network.
 
+Load-adaptive difficulty (API only): `IdentityPublisher` asks more of the proof
+while a network is busy on this node. For each network an identity enters
+through this node's API (all networks of a genesis, only the added ones of an
+update), `LocalIdentityAdmissionLoadRepository` counts the admissions this node
+accepted into it in a fixed 60 s window, keyed by network id only. Up to
+`IdentityAdmissionDifficulty.FREE_ADMISSIONS_PER_WINDOW` (60) the floor of 16
+bits applies; beyond that one bit is added per doubling of the count (60: 17,
+120: 18, 240: 19, 480 and above: 20, `MAX_BITS`), and the hardest network sets
+the requirement. A proof below it gets `400` with `requiredDifficultyBits`, so
+the client mines again. A published version is charged after it is saved;
+rejected or failed publications charge nothing. Updates that keep their
+networks reuse their proof and are never asked for more. Normal use pays no
+extra latency: at fewer than 60 new admissions per minute into a network on
+one node, the requirement stays at the floor. This is admission policy, not a
+validity rule: the gate and chain validation still check every record at 16
+bits, so validity converges while each node prices its own API.
+
 ## Order and convergence
 
 Every decision depends only on the set of admitted records: gate admission is a
@@ -134,32 +151,44 @@ heal yields the same owner and the same latest identity.
 
 ## Bounds
 
-| Bound | Value |
-| --- | --- |
-| Record size | 64 KiB |
-| Networks per identity | 32 |
-| Retained versions per identity | 64 (`MAX_CANDIDATES_PER_IDENTITY`) |
-| Remote handle candidates | 32 |
-| Publications per identity per minute | `IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE`, default 30, `429` code `429040` |
-| Admissions per network per minute on this node | `IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE`, default 0 (off), `429` code `429041` |
-| Admissions per client address per minute on this node | `IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE`, default 30, `429` code `429042` |
+| Bound                                                 | Value                                                                                                                |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Record size                                           | 64 KiB                                                                                                               |
+| Networks per identity                                 | 32                                                                                                                   |
+| Retained versions per identity                        | 64 (`MAX_CANDIDATES_PER_IDENTITY`)                                                                                   |
+| Remote handle candidates                              | 32                                                                                                                   |
+| Publications per identity per minute                  | `IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE`, default 30, `429` code `429040`                                          |
+| Admissions per network per minute on this node        | `IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE`, default 0 (off), `429` code `429041`                           |
+| Admissions per client address per minute on this node | `IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE`, default 30, `429` code `429042`                                 |
+| Admission proof asked through this node's API         | 16 bits up to 60 admissions per network per minute, +1 bit per doubling, max 20; `400` with `requiredDifficultyBits` |
 
-Admission cost is a fixed protocol constant, not adaptive. Difficulty derived
-from observed load or record counts would not converge, because nodes see
-different record subsets. A network-wide admission cap is not enforced either:
-16-bit proofs are cheap to produce, so a convergent cap turns a sybil flood into
-a registration outage for everyone (DoS amplification). The per-node network
-quota is off by default for the same reason: it lets a flood at one node block
-registrations there for the window. Measured proof cost (Node `sha256`, mean
-nonce about 66k): 16 bits median 41 ms (p90 157 ms, max 438 ms); 18 bits median
-187 ms; 20 bits median 836 ms. Headless Chromium at 16 bits: median 0.8 s at 1x
-CPU, 3.5 s at 4x. Raising the constant makes honest clients, including mobile,
-pay the cost on every identity, and it does not address GPU-scale attackers.
+The protocol admission cost is a fixed constant. Difficulty derived from
+observed load or record counts would not converge as a validity rule, because
+nodes see different record subsets; that is why load only raises what a node
+asks through its own API (above) and never what it accepts over replication. A
+network-wide admission cap is not enforced either: 16-bit proofs are cheap to
+produce, so a convergent cap turns a sybil flood into a registration outage for
+everyone (DoS amplification). The per-node network quota is off by default for
+the same reason: it lets a flood at one node block registrations there for the
+window, where adaptive difficulty only makes them dearer. Measured proof cost
+(Node `sha256`, mean nonce about 66k): 16 bits median 41 ms (p90 157 ms, max
+438 ms); 18 bits median 187 ms; 20 bits median 836 ms. Headless Chromium at 16
+bits: median 0.8 s at 1x CPU, 3.5 s at 4x. Raising the constant makes honest
+clients, including mobile, pay the cost on every identity, and it does not
+address GPU-scale attackers.
 
-Memory-hard proofs (scrypt, argon2) are rejected as well. Verification costs about
-as much as minting. The gate verifies every replicated record on every node, so a
-cheap signer could make each node spend that cost per bogus record, where one
-SHA-256 costs far less today. This is not benchmarked here.
+Memory-hard proofs (scrypt, argon2) are rejected as well. Verification costs
+as much as one minting attempt, and every node verifies every replicated record
+(the gate) and re-verifies chains of up to 256 versions on read. Measured on an
+Apple M-series laptop, Node 24, one evaluation: one SHA-256 is about 1.4 µs;
+`scrypt` (r=8, p=1) takes 2 ms at 1 MiB, 11 ms at 4 MiB, 23 ms at 8 MiB, 47 ms
+at 16 MiB and 134 ms at 32 MiB. A 16 MiB proof is about 33,000 SHA-256
+verifications, so each bogus record a cheap signer replicates would cost every
+node about 47 ms, and a 256-version chain read about 12 s. Browser clients pay
+more per attempt (pure JavaScript in V8: `scrypt` 26 ms at 4 MiB and 69 ms at
+16 MiB; `argon2id` t=1 33 ms at 4 MiB and 140 ms at 16 MiB), several times more
+on mobile. Any memory size that slows GPUs meaningfully hands that verification
+cost to every honest node.
 
 Claimants of a handle are deliberately not capped: evicting a lower ranked
 claimant would make the owner depend on the order of past events (a node that
@@ -184,6 +213,10 @@ claiming that handle, which is the sybil non-goal below.
 - `IdentityPublishRateLimiter.spec.ts`.
 - `IdentityAdmissionSourceRateLimiter.spec.ts` and `ClientRateWindows.spec.ts`;
   the per-source POST and PUT scenarios in `PostIdentityRoute.feature`.
+- `IdentityAdmissionDifficulty.spec.ts`, `LocalIdentityAdmissionLoadRepository.spec.ts`
+  and `IdentityPublisher.spec.ts` (raised requirement, charging after save,
+  network-keeping updates exempt); the busy-network POST scenarios in
+  `PostIdentityRoute.feature`.
 - `yarn test:integration:forged-identities` (real-transport e2e).
 
 ## Remaining non-goals
@@ -193,10 +226,12 @@ claiming that handle, which is the sybil non-goal below.
 - Minting many valid identities (sybil) is made costly by the admission proof
   but not prevented; only an admission authority could do that. The caps bound
   the cost to honest nodes.
-- GPU-scale minting is slowed by a constant factor, not stopped. The per-source
-  limit binds only the HTTP routes on each node, per client address: replicated
-  records are not rate limited, and an attacker with many addresses or their own
-  node is not bounded by it.
+- GPU-scale minting is slowed by a constant factor, not stopped. Adaptive
+  difficulty and the per-source limit bind only the HTTP routes of each node:
+  an attacker publishing through their own node, or straight into replication,
+  pays the 16-bit floor, and an attacker with many addresses spread over many
+  nodes stays below each node's free allowance. No convergent network-wide
+  bound on minting exists without an admission authority.
 - A handle is a claim, not an authority: the identity id (public key) remains
   the authoritative reference.
 - The identity-key holder can equivocate on its own genesis; a peer without the
