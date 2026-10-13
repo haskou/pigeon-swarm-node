@@ -718,7 +718,13 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       }
     });
 
-    it('keeps the compromise cap when a concurrent recovery that carries none wins the checkpoint', async () => {
+    /**
+     * Two partitions each recover at revision 3: one after a plain
+     * retirement of the phone, carrying no cap, the other after a compromised
+     * revocation of it, carrying its cap. The uncapped recovery wins the
+     * checkpoint.
+     */
+    async function concurrentRecoveries() {
       const { genesis, identityId, owner, recovery } = await fixture();
       const phone = await KeyPair.generate();
       const laptop = await KeyPair.generate();
@@ -807,6 +813,26 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         ),
       );
 
+      return {
+        compromised,
+        genesis,
+        identityId,
+        phone,
+        retired,
+        uncappedTarget,
+      };
+    }
+
+    it('keeps the compromise cap when a concurrent recovery that carries none wins the checkpoint', async () => {
+      const {
+        compromised,
+        genesis,
+        identityId,
+        phone,
+        retired,
+        uncappedTarget,
+      } = await concurrentRecoveries();
+
       for (const [left, right] of [
         [retired, compromised],
         [compromised, retired],
@@ -842,6 +868,26 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
           timeline?.isAuthorizedAt(credentialOf(phone), revisionOf(5)),
         ).toBe(false);
       }
+    });
+
+    it('rejects a replicated checkpoint whose concurrent recovery the recovery authority did not sign', async () => {
+      const { compromised, retired } = await concurrentRecoveries();
+      const merged = retired.getMerger()?.(
+        retired.getHead(),
+        compromised.getHead() ?? {},
+      ) as {
+        checkpoint: {
+          concurrent: { transition: Record<string, unknown> }[];
+          transition: { transition: Record<string, unknown> };
+        };
+      } & Record<string, unknown>;
+      const forged = structuredClone(merged);
+      forged.checkpoint.concurrent[0].transition.signature =
+        merged.checkpoint.transition.transition.signature;
+
+      expect(merged.checkpoint.concurrent).toHaveLength(1);
+      expect(retired.getMerger()?.(undefined, merged)).toEqual(merged);
+      expect(retired.getMerger()?.(undefined, forged)).toBeUndefined();
     });
 
     it('rejects a compromise revision beyond the revocation it is signed in', () => {

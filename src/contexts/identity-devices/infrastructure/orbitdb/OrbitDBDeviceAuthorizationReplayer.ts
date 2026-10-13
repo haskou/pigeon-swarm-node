@@ -1,5 +1,6 @@
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationCandidate } from '@app/contexts/identity-devices/domain/DeviceAuthorizationCandidate';
+import { DeviceAuthorizationRecoveryState } from '@app/contexts/identity-devices/domain/DeviceAuthorizationRecoveryState';
 import { DeviceAuthorizationTimeline } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTimeline';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import { DeviceCompromiseCaps } from '@app/contexts/identity-devices/domain/DeviceCompromiseCaps';
@@ -201,18 +202,19 @@ export default class OrbitDBDeviceAuthorizationReplayer {
 
   /**
    * The replay base of a recovery checkpoint: the authorization it recovered
-   * to and the compromise caps it carries forward. The whole lineage must
-   * replay, and the stored authorization must match what it replays to.
+   * to and the compromise caps it carries forward, merged with the caps of
+   * every concurrent recovery that lost it. The whole lineage must replay,
+   * and the stored authorization must match what it replays to.
    */
   public checkpointState(
     genesis: DeviceAuthorization,
     checkpoint: NonNullable<OrbitDBDeviceAuthorizationDocument['checkpoint']>,
-  ): {
-    authorization: DeviceAuthorization;
-    compromiseCaps: DeviceCompromiseCaps;
-  } {
-    const recoveries = [...checkpoint.lineage, checkpoint.transition].map(
-      (record) => {
+  ): DeviceAuthorizationRecoveryState {
+    const [recoveries, concurrent] = [
+      [...checkpoint.lineage, checkpoint.transition],
+      checkpoint.concurrent ?? [],
+    ].map((records) =>
+      records.map((record) => {
         const transition = this.transitionFromRecord(record);
 
         assert(
@@ -221,9 +223,13 @@ export default class OrbitDBDeviceAuthorizationReplayer {
         );
 
         return transition;
-      },
+      }),
     );
-    const state = this.policy.replayRecoveryLineage(genesis, recoveries);
+    const state = this.policy.replayRecoveryLineage(
+      genesis,
+      recoveries,
+      concurrent,
+    );
 
     assert(
       isDeepStrictEqual(
@@ -296,7 +302,10 @@ export default class OrbitDBDeviceAuthorizationReplayer {
     return this.sources.canonicalSources(
       sources.map((source) => ({
         checkpoint,
-        history: isDeepStrictEqual(source.checkpoint, checkpoint)
+        history: isDeepStrictEqual(
+          source.checkpoint?.transition,
+          checkpoint.transition,
+        )
           ? this.rebuild(authorization, source.history).history
           : [],
       })),

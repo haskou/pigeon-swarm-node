@@ -4,6 +4,7 @@ import { OrbitDBDeviceAuthorizationTransitionRecord } from './OrbitDBDeviceAutho
 export interface OrbitDBDeviceAuthorizationSource {
   checkpoint?: {
     authorization: DeviceAuthorizationPrimitives;
+    concurrent?: OrbitDBDeviceAuthorizationTransitionRecord[];
     lineage: OrbitDBDeviceAuthorizationTransitionRecord[];
     transition: OrbitDBDeviceAuthorizationTransitionRecord;
   };

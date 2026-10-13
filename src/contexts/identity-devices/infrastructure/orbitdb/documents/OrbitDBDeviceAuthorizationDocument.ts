@@ -9,6 +9,11 @@ export interface OrbitDBDeviceAuthorizationDocument extends Record<
   authorization: DeviceAuthorizationPrimitives;
   checkpoint?: {
     authorization: DeviceAuthorizationPrimitives;
+    /**
+     * Recoveries at the checkpoint's revision that lost it. Each carries caps
+     * that still hold after the heal.
+     */
+    concurrent?: OrbitDBDeviceAuthorizationTransitionRecord[];
     lineage: OrbitDBDeviceAuthorizationTransitionRecord[];
     transition: OrbitDBDeviceAuthorizationTransitionRecord;
   };
