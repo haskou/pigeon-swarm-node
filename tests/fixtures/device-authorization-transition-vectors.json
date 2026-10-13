@@ -1,0 +1,198 @@
+{
+  "description": "Device authorization transitions signed with node:crypto Ed25519 (pure, no prehash) over UTF-8 JSON. The proof of possession is the target key signing {domain:\"pigeon:device-authorization:proof-of-possession:v2\",transition}; the signature is the author device (enroll, revoke) or the recovery authority (recover) signing {domain:\"pigeon:device-authorization:transition:v3\",proofOfPossession,transition}. transition members are in alphabetical order, absent members are omitted, revision is previousRevision + 1, targetCredentialCommitment is sha256 hex of the target credential PEM, identityId is the PEM body without headers, compromisedCredentials are sorted by credential in code-unit order and omitted when empty. Signatures are base64. Inputs list compromised credentials in the order given to the UI.",
+  "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+  "keys": {
+    "author": {
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEILhM/Og/YsJDrQ5bHC68xC4Z6PHTzt7K6x8uI7mgkbmo\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n"
+    },
+    "recoveryAuthority": {
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIPM5FrW9m58V9r7jeT6PYmGgjBRWQEnFTVjDWAqBwJ1O\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAg7qnu9yqeICSVqQgPNAPTrN6XJ/UCNYX6GVh5/zZRBg=\n-----END PUBLIC KEY-----\n"
+    },
+    "target": {
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIBrm6anqlxeYpC25u/o3VTbPTqM8KgA9XIqju/coazQJ\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n"
+    }
+  },
+  "credentials": {
+    "revoked": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAoWVhDK9BFkmPX87HXDH/69mV6gDONvAYCBVUOh2gmes=\n-----END PUBLIC KEY-----\n"
+  },
+  "cases": [
+    {
+      "name": "enrollment carries the pairing and both signatures",
+      "input": {
+        "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+        "authorizedAt": 1760000000000,
+        "epoch": "genesis",
+        "operation": "enroll",
+        "operationId": "3f1d2c4b-8a7e-4f60-9b12-5c3d4e6f7a80",
+        "pairingExpiration": 1760000300000,
+        "pairingId": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+        "previousRevision": 0,
+        "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n"
+      },
+      "signer": "author",
+      "expected": {
+        "proofOfPossessionPayload": "{\"domain\":\"pigeon:device-authorization:proof-of-possession:v2\",\"transition\":{\"authorCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\\n-----END PUBLIC KEY-----\\n\",\"authorizedAt\":1760000000000,\"epoch\":\"genesis\",\"identityId\":\"MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=\",\"operation\":\"enroll\",\"operationId\":\"3f1d2c4b-8a7e-4f60-9b12-5c3d4e6f7a80\",\"pairingExpiration\":1760000300000,\"pairingId\":\"c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f\",\"previousRevision\":0,\"revision\":1,\"targetCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\\n-----END PUBLIC KEY-----\\n\",\"targetCredentialCommitment\":\"fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c\"}}",
+        "signingPayload": "{\"domain\":\"pigeon:device-authorization:transition:v3\",\"proofOfPossession\":\"aOcJKfwT3xT604gMOyneoaHPkg+OUTU7aYarncadI8RqI+P+lc+wx29+WqNFwsPLPewxeFplNFkGcqpBtNNkDw==\",\"transition\":{\"authorCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\\n-----END PUBLIC KEY-----\\n\",\"authorizedAt\":1760000000000,\"epoch\":\"genesis\",\"identityId\":\"MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=\",\"operation\":\"enroll\",\"operationId\":\"3f1d2c4b-8a7e-4f60-9b12-5c3d4e6f7a80\",\"pairingExpiration\":1760000300000,\"pairingId\":\"c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f\",\"previousRevision\":0,\"revision\":1,\"targetCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\\n-----END PUBLIC KEY-----\\n\",\"targetCredentialCommitment\":\"fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c\"}}",
+        "transition": {
+          "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+          "authorizedAt": 1760000000000,
+          "epoch": "genesis",
+          "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+          "operation": "enroll",
+          "operationId": "3f1d2c4b-8a7e-4f60-9b12-5c3d4e6f7a80",
+          "pairingExpiration": 1760000300000,
+          "pairingId": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+          "previousRevision": 0,
+          "revision": 1,
+          "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+          "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+          "proofOfPossession": "aOcJKfwT3xT604gMOyneoaHPkg+OUTU7aYarncadI8RqI+P+lc+wx29+WqNFwsPLPewxeFplNFkGcqpBtNNkDw==",
+          "signature": "O6gyL4A/pms3EmEqMYmwoMsvtdWdWczgIm2tw4LEXzNqK66KM3g/ZBmdKenhXvB6Kl1CnQIVuXDisqK25mBDDQ=="
+        }
+      }
+    },
+    {
+      "name": "revocation in a recovered epoch has no proof of possession",
+      "input": {
+        "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+        "epoch": "0b9c6f1e-5a43-4d6e-9f0a-2c7d8e1b3a54",
+        "operation": "revoke",
+        "operationId": "7e5a3c1b-9d2f-4e8a-b6c4-1f3e5d7b9a02",
+        "previousRevision": 3,
+        "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAoWVhDK9BFkmPX87HXDH/69mV6gDONvAYCBVUOh2gmes=\n-----END PUBLIC KEY-----\n"
+      },
+      "signer": "author",
+      "expected": {
+        "proofOfPossessionPayload": null,
+        "signingPayload": "{\"domain\":\"pigeon:device-authorization:transition:v3\",\"transition\":{\"authorCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\\n-----END PUBLIC KEY-----\\n\",\"epoch\":\"0b9c6f1e-5a43-4d6e-9f0a-2c7d8e1b3a54\",\"identityId\":\"MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=\",\"operation\":\"revoke\",\"operationId\":\"7e5a3c1b-9d2f-4e8a-b6c4-1f3e5d7b9a02\",\"previousRevision\":3,\"revision\":4,\"targetCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAoWVhDK9BFkmPX87HXDH/69mV6gDONvAYCBVUOh2gmes=\\n-----END PUBLIC KEY-----\\n\",\"targetCredentialCommitment\":\"9580448bcdbcf05a6d0c9c8cb58583c24996fd918267b0e0065286d39e7e7c49\"}}",
+        "transition": {
+          "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+          "epoch": "0b9c6f1e-5a43-4d6e-9f0a-2c7d8e1b3a54",
+          "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+          "operation": "revoke",
+          "operationId": "7e5a3c1b-9d2f-4e8a-b6c4-1f3e5d7b9a02",
+          "previousRevision": 3,
+          "revision": 4,
+          "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAoWVhDK9BFkmPX87HXDH/69mV6gDONvAYCBVUOh2gmes=\n-----END PUBLIC KEY-----\n",
+          "targetCredentialCommitment": "9580448bcdbcf05a6d0c9c8cb58583c24996fd918267b0e0065286d39e7e7c49",
+          "signature": "lPKL+rdNRMXB2JMx9CKpn3Mb28sJO5tD6DzWRdKPzl59VNnsOsVKRNXDLPumC6h2fOnMRrWAPldv9MANdZsmCA=="
+        }
+      }
+    },
+    {
+      "name": "revocation as compromised binds compromisedSince",
+      "input": {
+        "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+        "compromisedSince": 2,
+        "epoch": "genesis",
+        "operation": "revoke",
+        "operationId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+        "previousRevision": 4,
+        "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAoWVhDK9BFkmPX87HXDH/69mV6gDONvAYCBVUOh2gmes=\n-----END PUBLIC KEY-----\n"
+      },
+      "signer": "author",
+      "expected": {
+        "proofOfPossessionPayload": null,
+        "signingPayload": "{\"domain\":\"pigeon:device-authorization:transition:v3\",\"transition\":{\"authorCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\\n-----END PUBLIC KEY-----\\n\",\"compromisedSince\":2,\"epoch\":\"genesis\",\"identityId\":\"MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=\",\"operation\":\"revoke\",\"operationId\":\"a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d\",\"previousRevision\":4,\"revision\":5,\"targetCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAoWVhDK9BFkmPX87HXDH/69mV6gDONvAYCBVUOh2gmes=\\n-----END PUBLIC KEY-----\\n\",\"targetCredentialCommitment\":\"9580448bcdbcf05a6d0c9c8cb58583c24996fd918267b0e0065286d39e7e7c49\"}}",
+        "transition": {
+          "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+          "compromisedSince": 2,
+          "epoch": "genesis",
+          "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+          "operation": "revoke",
+          "operationId": "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+          "previousRevision": 4,
+          "revision": 5,
+          "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAoWVhDK9BFkmPX87HXDH/69mV6gDONvAYCBVUOh2gmes=\n-----END PUBLIC KEY-----\n",
+          "targetCredentialCommitment": "9580448bcdbcf05a6d0c9c8cb58583c24996fd918267b0e0065286d39e7e7c49",
+          "signature": "TqvIONqbcCUB6InQ3YM/PWikdzpWEH/Z+Vz77su8lsTjGvWO93kLuoCafhQMoTBAIPG2miU9MWquCyqpmtKeAw=="
+        }
+      }
+    },
+    {
+      "name": "recovery without caps omits compromisedCredentials and authorCredential",
+      "input": {
+        "epoch": "genesis",
+        "operation": "recover",
+        "operationId": "0b9c6f1e-5a43-4d6e-9f0a-2c7d8e1b3a54",
+        "previousRevision": 5,
+        "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n"
+      },
+      "signer": "recoveryAuthority",
+      "expected": {
+        "proofOfPossessionPayload": "{\"domain\":\"pigeon:device-authorization:proof-of-possession:v2\",\"transition\":{\"epoch\":\"genesis\",\"identityId\":\"MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=\",\"operation\":\"recover\",\"operationId\":\"0b9c6f1e-5a43-4d6e-9f0a-2c7d8e1b3a54\",\"previousRevision\":5,\"revision\":6,\"targetCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\\n-----END PUBLIC KEY-----\\n\",\"targetCredentialCommitment\":\"fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c\"}}",
+        "signingPayload": "{\"domain\":\"pigeon:device-authorization:transition:v3\",\"proofOfPossession\":\"1PzndAhjT2YpQEe+PdY9WGQ1gE2YTWlBe0ANJi6CppntRO5Qo0tonnoI/QT29W2iO4cxcMsWPzK2eo6/DRWgBA==\",\"transition\":{\"epoch\":\"genesis\",\"identityId\":\"MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=\",\"operation\":\"recover\",\"operationId\":\"0b9c6f1e-5a43-4d6e-9f0a-2c7d8e1b3a54\",\"previousRevision\":5,\"revision\":6,\"targetCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\\n-----END PUBLIC KEY-----\\n\",\"targetCredentialCommitment\":\"fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c\"}}",
+        "transition": {
+          "epoch": "genesis",
+          "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+          "operation": "recover",
+          "operationId": "0b9c6f1e-5a43-4d6e-9f0a-2c7d8e1b3a54",
+          "previousRevision": 5,
+          "revision": 6,
+          "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+          "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+          "proofOfPossession": "1PzndAhjT2YpQEe+PdY9WGQ1gE2YTWlBe0ANJi6CppntRO5Qo0tonnoI/QT29W2iO4cxcMsWPzK2eo6/DRWgBA==",
+          "signature": "TsawRnK7XsybN7GclmokXhzvuSa2YuC5KiBYWrUbhgGY43eklMDEdy77uaaGsUr111UN932mMYvUZ3USIqQfAw=="
+        }
+      }
+    },
+    {
+      "name": "recovery sorts carried caps by credential",
+      "input": {
+        "compromisedCredentials": [
+          {
+            "compromisedSince": 4,
+            "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAilF95ZNXKyS+E5QGmpLGg4QqVWUxJpGIDv19/m6FK+s=\n-----END PUBLIC KEY-----\n"
+          },
+          {
+            "compromisedSince": 0,
+            "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAAIBF68l7t90k2KkfSp00W2W44y03gRDqxaVzqwjc090=\n-----END PUBLIC KEY-----\n"
+          },
+          {
+            "compromisedSince": 2,
+            "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAg2a5ellzWLruuD2k5Q1nsQLjWbDpCc2QU9QktJihaNA=\n-----END PUBLIC KEY-----\n"
+          }
+        ],
+        "epoch": "0b9c6f1e-5a43-4d6e-9f0a-2c7d8e1b3a54",
+        "operation": "recover",
+        "operationId": "5d7f9b1a-3c5e-4a70-8b2d-4f6a8c0e2b46",
+        "previousRevision": 6,
+        "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n"
+      },
+      "signer": "recoveryAuthority",
+      "expected": {
+        "proofOfPossessionPayload": "{\"domain\":\"pigeon:device-authorization:proof-of-possession:v2\",\"transition\":{\"compromisedCredentials\":[{\"compromisedSince\":0,\"credential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAAIBF68l7t90k2KkfSp00W2W44y03gRDqxaVzqwjc090=\\n-----END PUBLIC KEY-----\\n\"},{\"compromisedSince\":2,\"credential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAg2a5ellzWLruuD2k5Q1nsQLjWbDpCc2QU9QktJihaNA=\\n-----END PUBLIC KEY-----\\n\"},{\"compromisedSince\":4,\"credential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAilF95ZNXKyS+E5QGmpLGg4QqVWUxJpGIDv19/m6FK+s=\\n-----END PUBLIC KEY-----\\n\"}],\"epoch\":\"0b9c6f1e-5a43-4d6e-9f0a-2c7d8e1b3a54\",\"identityId\":\"MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=\",\"operation\":\"recover\",\"operationId\":\"5d7f9b1a-3c5e-4a70-8b2d-4f6a8c0e2b46\",\"previousRevision\":6,\"revision\":7,\"targetCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\\n-----END PUBLIC KEY-----\\n\",\"targetCredentialCommitment\":\"fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c\"}}",
+        "signingPayload": "{\"domain\":\"pigeon:device-authorization:transition:v3\",\"proofOfPossession\":\"7HE+aehev7FUW6PerJotb2tJq+VLrhp712kbpYA4kbHMDAmEtxe4gWhIzwO5W6k7JvImdtPltYZKdg6MYz40BA==\",\"transition\":{\"compromisedCredentials\":[{\"compromisedSince\":0,\"credential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAAIBF68l7t90k2KkfSp00W2W44y03gRDqxaVzqwjc090=\\n-----END PUBLIC KEY-----\\n\"},{\"compromisedSince\":2,\"credential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAg2a5ellzWLruuD2k5Q1nsQLjWbDpCc2QU9QktJihaNA=\\n-----END PUBLIC KEY-----\\n\"},{\"compromisedSince\":4,\"credential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEAilF95ZNXKyS+E5QGmpLGg4QqVWUxJpGIDv19/m6FK+s=\\n-----END PUBLIC KEY-----\\n\"}],\"epoch\":\"0b9c6f1e-5a43-4d6e-9f0a-2c7d8e1b3a54\",\"identityId\":\"MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=\",\"operation\":\"recover\",\"operationId\":\"5d7f9b1a-3c5e-4a70-8b2d-4f6a8c0e2b46\",\"previousRevision\":6,\"revision\":7,\"targetCredential\":\"-----BEGIN PUBLIC KEY-----\\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\\n-----END PUBLIC KEY-----\\n\",\"targetCredentialCommitment\":\"fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c\"}}",
+        "transition": {
+          "compromisedCredentials": [
+            {
+              "compromisedSince": 0,
+              "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAAIBF68l7t90k2KkfSp00W2W44y03gRDqxaVzqwjc090=\n-----END PUBLIC KEY-----\n"
+            },
+            {
+              "compromisedSince": 2,
+              "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAg2a5ellzWLruuD2k5Q1nsQLjWbDpCc2QU9QktJihaNA=\n-----END PUBLIC KEY-----\n"
+            },
+            {
+              "compromisedSince": 4,
+              "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAilF95ZNXKyS+E5QGmpLGg4QqVWUxJpGIDv19/m6FK+s=\n-----END PUBLIC KEY-----\n"
+            }
+          ],
+          "epoch": "0b9c6f1e-5a43-4d6e-9f0a-2c7d8e1b3a54",
+          "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+          "operation": "recover",
+          "operationId": "5d7f9b1a-3c5e-4a70-8b2d-4f6a8c0e2b46",
+          "previousRevision": 6,
+          "revision": 7,
+          "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+          "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+          "proofOfPossession": "7HE+aehev7FUW6PerJotb2tJq+VLrhp712kbpYA4kbHMDAmEtxe4gWhIzwO5W6k7JvImdtPltYZKdg6MYz40BA==",
+          "signature": "bpkmHbU71X3o9BMYkJ5NaOxOEVHmwT0eIlQmtZhMp8BKyuDnsDamSEuhuXHC5j6qyMPRR0fzzWD+UppT6Xb1Aw=="
+        }
+      }
+    }
+  ]
+}

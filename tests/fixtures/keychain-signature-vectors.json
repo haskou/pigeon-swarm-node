@@ -1,0 +1,84 @@
+{
+  "description": "Keychain signatures: the owner identity key signs, with Ed25519 (pure, no prehash, base64), the UTF-8 JSON of {encryptedPayload, ownerIdentityId, previousKeychainExternalIdentifier, timestamp, version} in that order, with ownerIdentityId as the PEM body without headers and previousKeychainExternalIdentifier omitted when there is none. There is no domain prefix. encryptedPayload is opaque to the signature. Generated with node:crypto.",
+  "ownerIdentityId": "MCowBQYDK2VwAyEABw7I6MtMuLnEfRhg97TZ9BiO0XXJ/ijsmvf9z2pOtoM=",
+  "keys": {
+    "owner": {
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIJ1PcKjzhbJDaNnp/dRm4wqV6VKqJoN8hdcbO3EYykoG\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEABw7I6MtMuLnEfRhg97TZ9BiO0XXJ/ijsmvf9z2pOtoM=\n-----END PUBLIC KEY-----\n"
+    },
+    "stranger": {
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIDqrrNZkrm4wNuaEus6YE4AKu3OPNL8BGYDvYYRMZa5C\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEACyWUzJw/XsKF3u76mOwVyvuiuSle1aU7NK8wn/2jL7A=\n-----END PUBLIC KEY-----\n"
+    }
+  },
+  "accepted": [
+    {
+      "name": "first version omits the previous keychain",
+      "input": {
+        "encryptedPayload": "v1.aes-256-gcm.sSrjKFZxuYVj9GJa.oxuTXYCt5Zxizp9sU1SGJTveskyw9sK7L73GbFlhjOGE+KjEOu2We/5PW32ZpjLtm6nePgPVQwv1NA==.zizNAkLhf6o4PG/ffMOrPw==",
+        "previousKeychainExternalIdentifier": null,
+        "timestamp": 1760000000000,
+        "version": 1
+      },
+      "expected": {
+        "signingPayload": "{\"encryptedPayload\":\"v1.aes-256-gcm.sSrjKFZxuYVj9GJa.oxuTXYCt5Zxizp9sU1SGJTveskyw9sK7L73GbFlhjOGE+KjEOu2We/5PW32ZpjLtm6nePgPVQwv1NA==.zizNAkLhf6o4PG/ffMOrPw==\",\"ownerIdentityId\":\"MCowBQYDK2VwAyEABw7I6MtMuLnEfRhg97TZ9BiO0XXJ/ijsmvf9z2pOtoM=\",\"timestamp\":1760000000000,\"version\":1}",
+        "signature": "jj8Krg1r+WHf72eYOuw4ssfMvCDFQ7FPVYfZod8M8urcAY+a5VrKR0voQJe/x2SZYpglqvfu4VWejNSL6yQwBg=="
+      }
+    },
+    {
+      "name": "next version binds the previous keychain",
+      "input": {
+        "encryptedPayload": "v1.aes-256-gcm.feMwTm3K8bnd/y0z.korMG+IM5xYcU8IL3s0VrEt0rlshEPkYtLT+m3Lvi/Cu/H65PLZ1mgnkQ6yTOIhaAsNrjZggYb3T0g==.KYANSaeW/iWukgm4JZcdaQ==",
+        "previousKeychainExternalIdentifier": "zdpuAnvHw2ZJ4bGq6LQ2QYW8Rw9cH4v3sQ2mE8tK1xN5pR7uD",
+        "timestamp": 1760000060000,
+        "version": 2
+      },
+      "expected": {
+        "signingPayload": "{\"encryptedPayload\":\"v1.aes-256-gcm.feMwTm3K8bnd/y0z.korMG+IM5xYcU8IL3s0VrEt0rlshEPkYtLT+m3Lvi/Cu/H65PLZ1mgnkQ6yTOIhaAsNrjZggYb3T0g==.KYANSaeW/iWukgm4JZcdaQ==\",\"ownerIdentityId\":\"MCowBQYDK2VwAyEABw7I6MtMuLnEfRhg97TZ9BiO0XXJ/ijsmvf9z2pOtoM=\",\"previousKeychainExternalIdentifier\":\"zdpuAnvHw2ZJ4bGq6LQ2QYW8Rw9cH4v3sQ2mE8tK1xN5pR7uD\",\"timestamp\":1760000060000,\"version\":2}",
+        "signature": "OfbM2cyBj+GvMzVQsz2qLrisIon/hbrb9Dv2c5W1l+CV48ZGKa4d+jSexJEgsZv1p4ozJSNdyaZlRxyYu90zDg=="
+      }
+    }
+  ],
+  "rejected": [
+    {
+      "name": "signature by another identity",
+      "input": {
+        "encryptedPayload": "v1.aes-256-gcm.feMwTm3K8bnd/y0z.korMG+IM5xYcU8IL3s0VrEt0rlshEPkYtLT+m3Lvi/Cu/H65PLZ1mgnkQ6yTOIhaAsNrjZggYb3T0g==.KYANSaeW/iWukgm4JZcdaQ==",
+        "previousKeychainExternalIdentifier": "zdpuAnvHw2ZJ4bGq6LQ2QYW8Rw9cH4v3sQ2mE8tK1xN5pR7uD",
+        "timestamp": 1760000060000,
+        "version": 2,
+        "signature": "38+PRZ4tLNxRpNybjmih7bk+t94QibGX2dN5c7XRsYI/DfVkUAZP5+xoJNzLT0URBKGROxdh1IKbLjqapT61Bw=="
+      }
+    },
+    {
+      "name": "signature moved to another chain position",
+      "input": {
+        "encryptedPayload": "v1.aes-256-gcm.feMwTm3K8bnd/y0z.korMG+IM5xYcU8IL3s0VrEt0rlshEPkYtLT+m3Lvi/Cu/H65PLZ1mgnkQ6yTOIhaAsNrjZggYb3T0g==.KYANSaeW/iWukgm4JZcdaQ==",
+        "previousKeychainExternalIdentifier": null,
+        "timestamp": 1760000060000,
+        "version": 2,
+        "signature": "OfbM2cyBj+GvMzVQsz2qLrisIon/hbrb9Dv2c5W1l+CV48ZGKa4d+jSexJEgsZv1p4ozJSNdyaZlRxyYu90zDg=="
+      }
+    },
+    {
+      "name": "signature replayed on another version",
+      "input": {
+        "encryptedPayload": "v1.aes-256-gcm.feMwTm3K8bnd/y0z.korMG+IM5xYcU8IL3s0VrEt0rlshEPkYtLT+m3Lvi/Cu/H65PLZ1mgnkQ6yTOIhaAsNrjZggYb3T0g==.KYANSaeW/iWukgm4JZcdaQ==",
+        "previousKeychainExternalIdentifier": "zdpuAnvHw2ZJ4bGq6LQ2QYW8Rw9cH4v3sQ2mE8tK1xN5pR7uD",
+        "timestamp": 1760000060000,
+        "version": 3,
+        "signature": "OfbM2cyBj+GvMzVQsz2qLrisIon/hbrb9Dv2c5W1l+CV48ZGKa4d+jSexJEgsZv1p4ozJSNdyaZlRxyYu90zDg=="
+      }
+    },
+    {
+      "name": "signature replayed on another payload",
+      "input": {
+        "encryptedPayload": "v1.aes-256-gcm.sSrjKFZxuYVj9GJa.oxuTXYCt5Zxizp9sU1SGJTveskyw9sK7L73GbFlhjOGE+KjEOu2We/5PW32ZpjLtm6nePgPVQwv1NA==.zizNAkLhf6o4PG/ffMOrPw==",
+        "previousKeychainExternalIdentifier": "zdpuAnvHw2ZJ4bGq6LQ2QYW8Rw9cH4v3sQ2mE8tK1xN5pR7uD",
+        "timestamp": 1760000060000,
+        "version": 2,
+        "signature": "OfbM2cyBj+GvMzVQsz2qLrisIon/hbrb9Dv2c5W1l+CV48ZGKa4d+jSexJEgsZv1p4ozJSNdyaZlRxyYu90zDg=="
+      }
+    }
+  ]
+}

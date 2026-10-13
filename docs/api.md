@@ -2047,6 +2047,20 @@ Implemented:
 - persist metadata in OrbitDB replicated metadata
 - publish keychain announcement through the domain event publisher
 
+`signature` is the owner identity key's base64 Ed25519 signature over the UTF-8
+bytes of compact JSON with exactly these keys in this order, without a domain
+prefix:
+
+```json
+{"encryptedPayload":"<encryptedKeychainPayload>","ownerIdentityId":"<identityId>","previousKeychainExternalIdentifier":"<externalIdentifier>","timestamp":1770000000000,"version":2}
+```
+
+`ownerIdentityId` is the identity id without PEM headers, taken from the signed
+request. `previousKeychainExternalIdentifier` is omitted when it is `null`.
+Byte-exact vectors (signing payload, signature and rejected replays) are in
+[`tests/fixtures/keychain-signature-vectors.json`](../tests/fixtures/keychain-signature-vectors.json),
+checked by the `KeychainSignatureVectors` unit spec.
+
 ### Get current keychain
 
 ```http
@@ -5721,7 +5735,11 @@ refused, even inside the interval where it was authorized. Omit it to retire
 the device. Recovery also omits `authorCredential`; its target proof
 uses the proof envelope above, and the recovery authority signs the transition
 envelope. Credentials and signatures use their API string representation
-without decoding or normalization.
+without decoding or normalization. Byte-exact vectors for enrollment,
+revocation (plain and compromised) and recovery (with and without
+`compromisedCredentials`) are in
+[`tests/fixtures/device-authorization-transition-vectors.json`](../tests/fixtures/device-authorization-transition-vectors.json),
+checked by the `DeviceAuthorizationTransitionVectors` unit spec.
 
 A recovery may carry `compromisedCredentials`, a list of one to 32
 `{compromisedSince, credential}` entries strictly ascending by `credential`,
