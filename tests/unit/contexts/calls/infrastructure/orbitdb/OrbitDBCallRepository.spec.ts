@@ -303,8 +303,26 @@ describe('OrbitDBCallRepository', () => {
 
     const loser = await repository.requireById(new CallId(loserId));
     expect(loser.isActive()).toBe(false);
+    expect(loser.toPrimitives().supersededByCallId).toBe(winnerId);
     const winner = await repository.requireById(new CallId(winnerId));
     expect(winner.toPrimitives().status).toBe('active');
+    expect(winner.toPrimitives().supersededByCallId).toBeUndefined();
+  });
+
+  it('names no winner for a community call its creator ended', async () => {
+    const start = communityStart();
+    const end = signCallEnd({
+      at: now() + 1,
+      callId: start.callId,
+      signer: creator,
+    });
+
+    await replicate(start.payload, start.proof);
+    await replicate(end.payload, end.proof);
+
+    const ended = await repository.requireById(new CallId(start.callId));
+    expect(ended.isActive()).toBe(false);
+    expect(ended.toPrimitives().supersededByCallId).toBeUndefined();
   });
 
   it('verifies but does not store a community participant record', async () => {

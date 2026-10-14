@@ -76,6 +76,30 @@ describe('live call privacy', () => {
     ).not.toHaveProperty('endedByIdentityId');
   });
 
+  it('names the winning call of a superseded community call and nothing else', () => {
+    const loser = startCall();
+    const winner = startCall();
+    const superseded = Call.fromPrimitives({
+      ...loser.toPrimitives(),
+      endedAt: Date.now(),
+      status: 'ended',
+      supersededByCallId: winner.getId().valueOf(),
+    });
+    const ended = startCall();
+    ended.end(creator);
+
+    expect(new CallViewModel(superseded, [], []).toResource()).toMatchObject({
+      status: 'ended',
+      supersededByCallId: winner.getId().valueOf(),
+    });
+    expect(new CallViewModel(winner, [], []).toResource()).not.toHaveProperty(
+      'supersededByCallId',
+    );
+    expect(new CallViewModel(ended, [], []).toResource()).not.toHaveProperty(
+      'supersededByCallId',
+    );
+  });
+
   it('exposes only current presence, without departed identities, session history or transport diagnostics', () => {
     const call = startCall();
     call.joinOrAdd(other);
