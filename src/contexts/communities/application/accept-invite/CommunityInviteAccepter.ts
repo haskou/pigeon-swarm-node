@@ -1,4 +1,5 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
+import { Timestamp } from '@haskou/value-objects';
 
 import { Community } from '../../domain/Community';
 import CommunityInviteRepository from '../../domain/repositories/CommunityInviteRepository';
@@ -31,6 +32,7 @@ export default class CommunityInviteAccepter {
       await this.inviteRepository.countUses(invite),
       message.usedAt,
     );
+    invite.assertRedeemableAt(new Timestamp(message.operation.createdAt));
     await this.inviteRepository.recordUse(
       invite,
       message.actorIdentityId,

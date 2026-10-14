@@ -23,6 +23,8 @@ export class CommunityInvite {
         communityId.valueOf(),
         creatorIdentityId.valueOf(),
         nonce.valueOf(),
+        maxUses.valueOf(),
+        expiresAt?.valueOf(),
       ),
       communityId,
       creatorIdentityId,
@@ -42,7 +44,9 @@ export class CommunityInvite {
       new IdentityId(primitives.creatorIdentityId),
       new CommunityInviteNonce(primitives.nonce),
       new Timestamp(primitives.createdAt),
-      primitives.expiresAt ? new Timestamp(primitives.expiresAt) : undefined,
+      primitives.expiresAt === undefined
+        ? undefined
+        : new Timestamp(primitives.expiresAt),
       new CommunityInviteMaxUses(primitives.maxUses),
     );
   }
@@ -62,14 +66,23 @@ export class CommunityInvite {
   }
 
   /**
+   * Throws once `at` reaches the expiry. Replicas check the time the use or
+   * the join was signed, so the verdict never changes as wall clocks advance.
+   */
+  public assertRedeemableAt(at: Timestamp): void {
+    assert(!this.isExpired(at), new CommunityInviteExpiredError());
+  }
+
+  /**
    * Uses are signed records written by each acceptor, so concurrent
-   * acceptances on partitioned nodes can exceed maxUses.
+   * acceptances on partitioned nodes can exceed maxUses: replicas never cap
+   * them, nor the joins they allow.
    */
   public checkAcceptanceAvailability(
     uses: CommunityInviteUses,
     now: Timestamp = Timestamp.now(),
   ): void {
-    assert(!this.isExpired(now), new CommunityInviteExpiredError());
+    this.assertRedeemableAt(now);
     assert(
       uses.isLessThan(this.maxUses),
       new CommunityInviteUsesExceededError(),

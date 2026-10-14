@@ -3,8 +3,9 @@ import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
 import { PublicMutationExpectation } from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { assert } from '@haskou/value-objects';
+import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
+import { CommunityInvite } from '../../../domain/entities/invites/CommunityInvite';
 import { InvalidCommunityOperationError } from '../../../domain/errors/InvalidCommunityOperationError';
 import { CommunityOperation } from '../../../domain/operations/CommunityOperation';
 import { CommunityOperationArgumentReader } from '../../../domain/operations/CommunityOperationArgumentReader';
@@ -98,7 +99,12 @@ export default class CommunityOperationMutationPolicy extends PublicMutationPoli
   /**
    * An `invite_link` join signs the invite reference of the token, never the
    * token: the member's signed invite use names the token whose reference it
-   * is, and that invite must belong to the same community.
+   * is, and that invite must belong to the same community and still be
+   * redeemable when the join was signed. The token commits to the invite
+   * limits, so no replicated record can rewrite them. maxUses is not
+   * enforced here: concurrent joins have no single order to count them in,
+   * and a cap on the folded history would let any token holder evict an
+   * admitted member with a backdated join.
    */
   private async assertInviteRedeemed(
     operation: CommunityOperation,
@@ -124,17 +130,23 @@ export default class CommunityOperationMutationPolicy extends PublicMutationPoli
         record.id === `invite-use:${record.token}:${member}` &&
         new CommunityInviteToken(record.token).toReference() === reference,
     );
-
-    assert(
-      use !== undefined &&
-        records.some(
-          (record) =>
-            record.scopeType === 'community_invite' &&
-            record.id === use.token &&
-            record.communityId === communityId,
-        ),
-      new InvalidCommunityOperationError(),
+    const record = records.find(
+      (candidate) =>
+        candidate.scopeType === 'community_invite' &&
+        use !== undefined &&
+        candidate.id === use.token &&
+        candidate.communityId === communityId,
     );
+
+    assert(record !== undefined, new InvalidCommunityOperationError());
+
+    try {
+      CommunityInvite.fromPrimitives(
+        record as PrimitiveOf<CommunityInvite>,
+      ).assertRedeemableAt(new Timestamp(operation.getCreatedAt()));
+    } catch {
+      throw new InvalidCommunityOperationError();
+    }
   }
 
   /** A join that needs a reference must point at the signed record allowing it. */

@@ -73,6 +73,8 @@ export default class CommunityInviteMutationPolicy extends PublicMutationPolicy 
         record.communityId as string,
         record.creatorIdentityId as string,
         record.nonce as string,
+        record.maxUses as number,
+        record.expiresAt as number | undefined,
       ).valueOf();
 
       if (
