@@ -117,12 +117,17 @@ export default class ContentReplicationStatusFinder {
   }
 
   /**
-   * Ids of the responsible registrations each network's budget covers. Every
-   * owner's registration of a CID competes within that owner's share, so a
-   * CID is held when any of its owners' shares covers it.
+   * The registration the budget charged for each responsible id it covers.
+   * Every owner's registration of a CID competes within that owner's share,
+   * so a CID is held when any of its owners' shares covers it; when several
+   * do, the largest charged one is kept. Its size caps the fetch, so a CID
+   * selected for a small registration is never fetched under a larger one.
    */
-  private heldWithinBudget(responsible: ContentReplication[]): Set<string> {
+  private chargedWithinBudget(
+    responsible: ContentReplication[],
+  ): Map<string, ContentReplication> {
     const byNetwork = new Map<string, ContentReplication[]>();
+    const charged = new Map<string, ContentReplication>();
 
     responsible.forEach((registration) => {
       const networkId = registration.getNetworkId().valueOf();
@@ -137,13 +142,17 @@ export default class ContentReplicationStatusFinder {
       byNetwork.set(networkId, [registration]);
     });
 
-    return new Set(
-      [...byNetwork.values()].flatMap((registrations) =>
-        this.allocator
-          .select(registrations, this.budget)
-          .map((registration) => registration.getId()),
-      ),
+    byNetwork.forEach((registrations) =>
+      this.allocator.select(registrations, this.budget).forEach((selected) => {
+        const kept = charged.get(selected.getId());
+
+        if (!kept || kept.getSizeBytes().isLessThan(selected.getSizeBytes())) {
+          charged.set(selected.getId(), selected);
+        }
+      }),
     );
+
+    return charged;
   }
 
   public async find(): Promise<ContentReplicationStatus> {
@@ -183,7 +192,7 @@ export default class ContentReplicationStatusFinder {
         )
         .map(({ content }) => content.getId()),
     );
-    const held = this.heldWithinBudget(
+    const charged = this.chargedWithinBudget(
       registrations.filter((registration) =>
         localResponsibleIds.has(registration.getId()),
       ),
@@ -193,11 +202,11 @@ export default class ContentReplicationStatusFinder {
       contents: placements.map(
         ({ activeNodeIds, content, responsibleNodeIds }) =>
           this.buildContentStatus(
-            content,
+            charged.get(content.getId()) ?? content,
             activeNodeIds,
             responsibleNodeIds,
             localNodeId,
-            held.has(content.getId()),
+            charged.has(content.getId()),
           ),
       ),
       localNodeId,

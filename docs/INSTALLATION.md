@@ -154,7 +154,7 @@ installed `web-push` module path.
 | `NOTIFICATIONS_MAX_STATES_PER_IDENTITY` | `30000` | No | Maximum stored notification states per identity. |
 | `CONTENT_REPLICATION_MAX_RECORDS_PER_IDENTITY` | `10000` | No | Maximum replicated content records per identity. |
 | `CONTENT_REPLICATION_QUOTA_BYTES` | `1073741824` | No | Replicated content byte quota (1 GiB). |
-| `CONTENT_REPLICATION_NETWORK_BUDGET_BYTES` | `34359738368` | No | Content bytes this node fetches and provides per network across all owners (32 GiB), shared fairly by owner; responsible replicas beyond it are deferred. |
+| `CONTENT_REPLICATION_NETWORK_BUDGET_BYTES` | `34359738368` | No | Content bytes replication maintenance schedules per network across all owners (32 GiB), shared fairly by owner; responsible replicas beyond it are deferred. A value that is not a positive integer falls back to the default. |
 | `LINK_PREVIEW_RATE_LIMIT_PER_MINUTE` | `30` | No | Link preview requests per minute. |
 
 ## IPFS Variables
