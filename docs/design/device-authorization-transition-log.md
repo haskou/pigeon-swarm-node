@@ -226,7 +226,9 @@ In every case a wipe needs a signature from a key that had the power to remove
   replay order without rejected records, the checkpoint lineage and concurrent
   recoveries, and the frontier of an overflowed document.
 - Repository, finder and request authenticator unit specs, including a valid
-  but unauthorized device proof.
+  but unauthorized device proof, and the `GetDeviceAuthorizationTransitionLogRequest`
+  spec for every refused `after` shape (leading zeros, signs, exponents,
+  unsafe integers, repeated or nested query values).
 - `DeviceAuthorizationTransitionLogVectors` unit spec: every read and verdict
   of the shared vectors, signatures verified.
 - `DeviceAuthorizationRoute.feature`: the owner and the recovery authority read
