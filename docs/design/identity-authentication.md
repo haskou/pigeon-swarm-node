@@ -259,7 +259,12 @@ claiming that handle, which is the sybil non-goal below.
   backdate a claim.
 - Minting many valid identities (sybil) is made costly by the admission proof
   but not prevented; only an admission authority could do that. The caps bound
-  the cost to honest nodes.
+  the cost to honest nodes: replicated content, which each identity may claim
+  up to its per-network quota, is bounded on every node by a per-network
+  budget shared fairly by owner (`CONTENT_REPLICATION_NETWORK_BUDGET_BYTES`).
+  That budget limits new fetches only, never removes bytes already held, and
+  does not bound the number of registration records each identity may
+  replicate, nor the per-author notification records.
 - GPU-scale minting is slowed by a constant factor, not stopped. Adaptive
   difficulty and the per-source limit bind only the HTTP routes of each node.
   The network-wide count makes admissions through every honest node's API

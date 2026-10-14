@@ -1154,6 +1154,9 @@ services:
       - '@contexts/nodes/domain/repositories/NodeRepository'
       - '@contexts/nodes/domain/repositories/NodePeerRepository'
       - '@contexts/content-replication/domain/ContentReplicationPolicy'
+      - '@contexts/content-replication/domain/ContentReplicationNetworkBudget'
+      - >-
+        @contexts/content-replication/domain/services/ContentReplicationBudgetAllocator
   contexts/content-replication/application/find-summary/ContentReplicationStatusSummaryFinder:
     class: >-
       /contexts/content-replication/application/find-summary/ContentReplicationStatusSummaryFinder
@@ -1222,6 +1225,10 @@ services:
     @contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicationRepository
   contexts/content-replication/domain/repositories/ContentReplicationStatusSummaryRepository: >-
     @contexts/content-replication/infrastructure/local-db/LocalContentReplicationStatusSummaryRepository
+  contexts/content-replication/domain/services/ContentReplicationBudgetAllocator:
+    class: >-
+      /contexts/content-replication/domain/services/ContentReplicationBudgetAllocator
+    arguments: []
   contexts/content-replication/infrastructure/ipfs/IpfsContentStorage:
     class: /contexts/content-replication/infrastructure/ipfs/IpfsContentStorage
     arguments:
@@ -2592,6 +2599,8 @@ services:
     synthetic: true
   ddd-kernel.override.factory.ContentReplicationLimits:
     synthetic: true
+  ddd-kernel.override.factory.ContentReplicationNetworkBudget:
+    synthetic: true
   ddd-kernel.override.factory.NotificationReplicationLimits:
     synthetic: true
   shared/infrastructure/lifecycle/Runtime: '@apps/apis/calls-api/CallRelayRuntime'
@@ -2631,4 +2640,5 @@ services:
   contexts/mailboxes/domain/MailboxLimits: '@ddd-kernel.override.factory.MailboxLimits'
   contexts/private-blobs/domain/PrivateBlobLimits: '@ddd-kernel.override.factory.PrivateBlobLimits'
   contexts/content-replication/domain/ContentReplicationLimits: '@ddd-kernel.override.factory.ContentReplicationLimits'
+  contexts/content-replication/domain/ContentReplicationNetworkBudget: '@ddd-kernel.override.factory.ContentReplicationNetworkBudget'
   contexts/notifications/domain/NotificationReplicationLimits: '@ddd-kernel.override.factory.NotificationReplicationLimits'

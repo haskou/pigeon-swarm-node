@@ -22,7 +22,9 @@ import PrivateCommunityGenesisAuthorizer from '../contexts/communities/applicati
 import CommunityRepository from '../contexts/communities/domain/repositories/CommunityRepository';
 import CommunityRepositoryRouter from '../contexts/communities/infrastructure/CommunityRepositoryRouter';
 import { ContentReplicationLimits } from '../contexts/content-replication/domain/ContentReplicationLimits';
+import { ContentReplicationNetworkBudget } from '../contexts/content-replication/domain/ContentReplicationNetworkBudget';
 import { ContentReplicationLimitsFromEnvironment } from '../contexts/content-replication/infrastructure/environment/ContentReplicationLimitsFromEnvironment';
+import { ContentReplicationNetworkBudgetFromEnvironment } from '../contexts/content-replication/infrastructure/environment/ContentReplicationNetworkBudgetFromEnvironment';
 import DiagnosticsSessionRepository from '../contexts/diagnostics/domain/repositories/DiagnosticsSessionRepository';
 import InMemoryDiagnosticsSessionRepository from '../contexts/diagnostics/infrastructure/memory/InMemoryDiagnosticsSessionRepository';
 import { DeviceAuthorizationRepository } from '../contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
@@ -341,6 +343,11 @@ export default class PigeonApplication {
         {
           token: ContentReplicationLimits,
           useFactory: () => ContentReplicationLimitsFromEnvironment.load(),
+        },
+        {
+          token: ContentReplicationNetworkBudget,
+          useFactory: () =>
+            ContentReplicationNetworkBudgetFromEnvironment.load(),
         },
         {
           token: NotificationReplicationLimits,

@@ -31,6 +31,10 @@ export const pigeonEnvironmentSchema = {
     defaultValue: 10_000,
     type: 'number',
   },
+  CONTENT_REPLICATION_NETWORK_BUDGET_BYTES: {
+    defaultValue: 32 * 1024 ** 3,
+    type: 'number',
+  },
   CONTENT_REPLICATION_QUOTA_BYTES: {
     defaultValue: 1024 ** 3,
     type: 'number',

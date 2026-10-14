@@ -1664,6 +1664,26 @@ scopeType: "content_replication", sizeBytes }`, with `scopeType` exactly
   deterministic: records sort by id and the first ones that fit are admitted
 - only a record that passes the gate is ever fetched or provided, and the fetch
   is capped at the declared `sizeBytes`
+- replication maintenance on each node schedules at most
+  `CONTENT_REPLICATION_NETWORK_BUDGET_BYTES` (32 GiB) of registered content per
+  network across every owner. This is local policy: it never changes which
+  records are valid nor which nodes are responsible. The budget is shared
+  max-min fairly by owner: each owner's records are taken smallest first (then
+  by CID), always serving next the record that leaves its owner holding the
+  fewest bytes, so a large record waits for every smaller owner's whole set and
+  many identities flooding a network cannot starve an owner that holds less
+  than the fair share. Each owner's registration of a CID is charged to that
+  owner's share; the CID is held when any of them is covered, and its fetch is
+  capped at the largest covered registration's `sizeBytes`, never at a larger
+  uncovered one. Responsible records beyond the budget are deferred: neither
+  fetched nor provided by maintenance, and reported by the maintenance log as
+  `deferred`
+- the budget bounds what is registered at one time, not total disk: the
+  selection is recomputed every maintenance run, so new registrations can
+  defer a CID held before, and withdrawing then re-registering frees budget
+  while bytes already fetched are never removed. `GET /ipfs/{cid}` still
+  fetches any CID on demand, deferred ones included, without authentication
+  and without a size cap
 
 Byte-exact vectors (ids, digests and signing content) are in
 `tests/fixtures/content-replication-vectors.json`.
