@@ -156,7 +156,7 @@ describe('Community operation vectors', () => {
     expect(digestOfText(`pigeon:community-invite-reference:v1\n${token}`)).toBe(
       reference,
     );
-    expect(new CommunityInviteToken(token).toJoinReference()).toBe(reference);
+    expect(new CommunityInviteToken(token).toReference()).toBe(reference);
     expect(joined?.input.args.reference).toBe(reference);
     expect(JSON.stringify(joined)).not.toContain(token);
   });

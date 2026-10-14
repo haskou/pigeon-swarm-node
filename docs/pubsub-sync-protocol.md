@@ -651,6 +651,10 @@ target.id, createdAt]))`, immutable (tombstones are always rejected; the
   in the current community (channels, roles, bans, kicks with manage members,
   invites, request decisions, owner for profile updates, message author or
   manage messages for message deletions). Heads are index wrappers under collection `moderationLogs`.
+  An `invite_link_created` `target.id` is the invite reference, never the token
+  (see `docs/api.md`); the node builds it on `POST .../invites`, while
+  admission cannot tell a reference from a token, so a creator replicating its
+  own token there only leaks an invite it could share anyway.
 - Every node verifies on write, on replicated read, on head hydration and on the
   persisted head cache: signature, scope binding, the device in the identity's
   device authorization chain at the claimed revision, and the community permission (pin needs

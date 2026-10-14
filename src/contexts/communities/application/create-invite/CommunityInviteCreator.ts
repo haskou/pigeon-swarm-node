@@ -1,4 +1,5 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
+import { StringValueObject } from '@haskou/value-objects';
 
 import { CommunityInvite } from '../../domain/entities/invites/CommunityInvite';
 import { CommunityModerationTarget } from '../../domain/entities/moderation/CommunityModerationTarget';
@@ -35,7 +36,7 @@ export default class CommunityInviteCreator {
       CommunityModerationAction.INVITE_LINK_CREATED,
       CommunityModerationTarget.create(
         CommunityModerationTargetType.INVITE,
-        invite.getToken(),
+        new StringValueObject(invite.getToken().toReference()),
       ),
       message.moderationLog,
       {

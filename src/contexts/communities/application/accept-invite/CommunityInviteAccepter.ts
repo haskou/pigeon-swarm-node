@@ -44,7 +44,7 @@ export default class CommunityInviteAccepter {
       {
         identityId: message.actorIdentityId.valueOf(),
         method: CommunityJoinMethod.INVITE_LINK.valueOf(),
-        reference: invite.getToken().toJoinReference(),
+        reference: invite.getToken().toReference(),
       },
     );
     community.acceptInvite(message.actorIdentityId, invite);

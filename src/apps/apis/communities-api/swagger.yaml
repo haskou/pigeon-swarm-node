@@ -221,7 +221,7 @@ paths:
       tags:
         - communities
       summary: List community moderation log entries
-      description: Requires manage_members. Returns OrbitDB replicated audit entries for administrative actions such as role changes, channel changes, invitations, membership decisions, bans, and moderated message deletes.
+      description: 'Requires manage_members. Returns OrbitDB replicated audit entries for administrative actions such as role changes, channel changes, invitations, membership decisions, bans, and moderated message deletes. An invite_link_created entry names the invite by its reference base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken))), never by the token, because manage_members does not grant create_invites.'
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: query
@@ -2352,7 +2352,7 @@ components:
             $ref: '#/components/schemas/CommunityOperationRecord'
     CommunityModerationLogBody:
       type: object
-      description: Client-signed moderation log entry, kept as the audit trail beside the signed community operation (separate signature, separate store). The mutation signs {action, actorIdentityId, communityId, createdAt, details, id, scopeType 'community_moderation_log', target {id, type}} in store moderationLogs, recordId = id, sequence 0, signer = the acting moderator. id is the first 24 hex chars of sha256(JSON.stringify([communityId, actorIdentityId, action, target.type, target.id, createdAt])). For channel and role creation target.id is the channel/role id derived from the operation createdAt, not from this createdAt.
+      description: 'Client-signed moderation log entry, kept as the audit trail beside the signed community operation (separate signature, separate store). The mutation signs {action, actorIdentityId, communityId, createdAt, details, id, scopeType ''community_moderation_log'', target {id, type}} in store moderationLogs, recordId = id, sequence 0, signer = the acting moderator. id is the first 24 hex chars of sha256(JSON.stringify([communityId, actorIdentityId, action, target.type, target.id, createdAt])). For channel and role creation target.id is the channel/role id derived from the operation createdAt, not from this createdAt. For invite_link_created target.id is the invite reference base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken))), never the token.'
       required:
         - createdAt
         - mutation

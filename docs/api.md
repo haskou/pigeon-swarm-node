@@ -3388,7 +3388,7 @@ checked by the `CommunityModerationLogVectors` unit spec.
 | `POST .../bans`                                        | `member_banned`                                                | member, banned `identityId`     | `{reason}`                                                                                                                                                                  |
 | `DELETE .../bans/{identityId}`                         | `member_unbanned`                                              | member, `identityId`            | `{}`                                                                                                                                                                        |
 | `DELETE .../members/{identityId}/kick`                 | `member_kicked`                                                | member, `identityId`            | `{}`                                                                                                                                                                        |
-| `POST .../invites`                                     | `invite_link_created`                                          | invite, invite `token`          | `{expiresAt, maxUses}`                                                                                                                                                      |
+| `POST .../invites`                                     | `invite_link_created`                                          | invite, invite reference        | `{expiresAt, maxUses}`                                                                                                                                                      |
 | `POST .../members`                                     | `invitation_created`                                           | membership_request, request id  | `{identityId}` (the invited identity)                                                                                                                                       |
 | `PATCH /communities/membership-requests/{requestId}`   | `membership_request_accepted` or `membership_request_declined` | membership_request, `requestId` | `{identityId, type}` of the request                                                                                                                                         |
 | `DELETE .../channels/{channelId}/messages/{messageId}` | `message_deleted`                                              | message, `messageId`            | `{channelId, targetMessageAuthorId}`                                                                                                                                        |
@@ -3402,6 +3402,14 @@ community state comes only from the signed community operation that every one
 of these routes also takes (see "Signed community operations"). The `DELETE`
 routes for channel, role, ban and member kick take
 `{ "moderationLog": { "createdAt", "mutation" }, "operation": { ... } }`.
+
+An `invite_link_created` target never carries the invite token: `target.id` is
+the invite reference
+`base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken)))`,
+the same value an `invite_link` `member_joined` signs as `reference`. Reading
+the log needs `manage_members`, not `create_invites`, so a token there would let
+a member manager hand out working invite links. The node rebuilds the entry
+with the reference, so a client that signs the token is refused.
 
 Permissions checked against the signed actor: channel actions need
 `manage_channels`, role and member-role actions `manage_roles`, bans

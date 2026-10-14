@@ -652,7 +652,7 @@ export default class Definitions {
               communityId,
               actorIdentityId,
               text.nonce,
-            ).valueOf(),
+            ).toReference(),
             type: 'invite',
           },
         }),
