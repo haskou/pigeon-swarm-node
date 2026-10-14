@@ -10,6 +10,7 @@ import { OrbitDBDatabase } from './OrbitDBDatabase';
 import { OrbitDBDocumentHistory } from './OrbitDBDocumentHistory';
 import { OrbitDBEntry } from './OrbitDBEntry';
 import { OrbitDBHeadHistoryReader } from './OrbitDBHeadHistoryReader';
+import { OrbitDBHeadReadmission } from './OrbitDBHeadReadmission';
 import { OrbitDBHeadRecordMerger } from './OrbitDBHeadRecordMerger';
 import { OrbitDBHeadRecordScope } from './OrbitDBHeadRecordScope';
 import { OrbitDBHeadRepairPublisher } from './OrbitDBHeadRepairPublisher';
@@ -167,6 +168,8 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private readonly readmissions = new OrbitDBRecordReadmission();
 
+  private readonly headReadmissions = new OrbitDBRecordReadmission();
+
   private headCache?: OrbitDBReplicatedHeadCache;
 
   private mutationGate?: OrbitDBMutationGate;
@@ -307,18 +310,18 @@ export default class OrbitDBReplicatedStateRegistry {
    * empty gated collection, is demoted to the oldest possible timestamp: it
    * can never replace a head built from admitted records. Rejection can be
    * transient (the community that grants the permission may replicate after
-   * the head), so a demoted head is re-admitted a few times with backoff.
+   * the head), so a demoted head is offered again while its network stays
+   * registered.
    */
   private async admitHead(
     value: Record<string, unknown>,
-    onReadmitted?: (admitted: Record<string, unknown>) => void,
-    attempt: number = 0,
+    readmission?: OrbitDBHeadReadmission,
   ): Promise<Record<string, unknown>> {
     if (!this.mutationGate) return value;
     const { admitted, degraded } = await this.admitGatedCollections(value);
 
-    if (degraded && onReadmitted) {
-      this.scheduleReadmission(value, onReadmitted, attempt);
+    if (degraded && readmission) {
+      this.scheduleReadmission(value, admitted, readmission);
     }
 
     return degraded ? { ...admitted, updatedAt: 0 } : admitted;
@@ -397,23 +400,57 @@ export default class OrbitDBReplicatedStateRegistry {
     return { admitted, degraded };
   }
 
+  /**
+   * Each offer that admits more records than the last one delivers the
+   * still demoted head, so the records already proven show up before the
+   * rest; an offer that admits nothing new delivers nothing.
+   */
   private scheduleReadmission(
     value: Record<string, unknown>,
-    onReadmitted: (admitted: Record<string, unknown>) => void,
-    attempt: number,
+    admitted: Record<string, unknown>,
+    { networkId, onReadmitted }: OrbitDBHeadReadmission,
   ): void {
-    const delay = OrbitDBRecordReadmission.DELAYS_MS[attempt];
+    let admittedRecords = this.gatedRecordCount(admitted);
 
-    if (delay === undefined) return;
-    const timer = setTimeout(() => {
-      void this.admitHead(value, onReadmitted, attempt + 1)
-        .then(onReadmitted)
-        .catch(() => {
-          Kernel.logger.warn?.('OrbitDB head re-admission failed');
-        });
-    }, delay);
+    this.headReadmissions.schedule(
+      async (): Promise<boolean> => {
+        const offered = await this.admitGatedCollections(value);
 
-    timer.unref();
+        if (!offered.degraded) {
+          await onReadmitted(offered.admitted);
+
+          return true;
+        }
+        const offeredRecords = this.gatedRecordCount(offered.admitted);
+
+        if (offeredRecords > admittedRecords) {
+          admittedRecords = offeredRecords;
+          await onReadmitted({ ...offered.admitted, updatedAt: 0 });
+        }
+
+        return false;
+      },
+      () => this.storesByNetworkId.has(networkId),
+    );
+  }
+
+  private gatedRecordCount(value: Record<string, unknown>): number {
+    let count = 0;
+
+    for (const [collection, records] of Object.entries(value)) {
+      if (this.isGatedHeadCollection(collection, records))
+        count += records.length;
+    }
+
+    return count;
+  }
+
+  /**
+   * Admitted state can be what a rejected record or a demoted head rests on.
+   */
+  private wakeReadmissions(): void {
+    this.readmissions.wake();
+    this.headReadmissions.wake();
   }
 
   private isGatedHeadCollection(
@@ -516,13 +553,19 @@ export default class OrbitDBReplicatedStateRegistry {
   ): Promise<void> {
     if (await this.admitRecord(storeName, document)) {
       await deliver();
+      this.wakeReadmissions();
 
       return;
     }
 
     this.readmissions.schedule(
-      () => this.admitRecord(storeName, document),
-      deliver,
+      async (): Promise<boolean> => {
+        if (!(await this.admitRecord(storeName, document))) return false;
+        await deliver();
+        this.wakeReadmissions();
+
+        return true;
+      },
       () => this.isRegisteredStore(storeName, store),
     );
   }
@@ -865,9 +908,11 @@ export default class OrbitDBReplicatedStateRegistry {
 
     let persisted = true;
     const recordKey = record.key;
-    const value = await this.admitHead(record.value, (readmitted) =>
-      this.cacheReadmittedHead(networkId, recordKey, readmitted),
-    );
+    const value = await this.admitHead(record.value, {
+      networkId,
+      onReadmitted: (readmitted) =>
+        this.cacheReadmittedHead(networkId, recordKey, readmitted),
+    });
 
     const keys = await this.admittedHeadKeys(
       this.headKeyDeriver.cachedKeys(record.key, value),
@@ -1030,6 +1075,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
     if (accepted) {
       cache.set(key, candidate);
+      this.wakeReadmissions();
 
       return candidate;
     }
@@ -1258,7 +1304,9 @@ export default class OrbitDBReplicatedStateRegistry {
         ),
       );
 
-    await gated(await this.admitHead(received, gated));
+    await gated(
+      await this.admitHead(received, { networkId, onReadmitted: gated }),
+    );
   }
 
   private isMergeableHeadKey(key: unknown): key is string {
@@ -1443,9 +1491,11 @@ export default class OrbitDBReplicatedStateRegistry {
       for (const head of heads) {
         this.markPersistedHeadKey(networkId, head.key);
         const headKey = head.key;
-        const value = await this.admitHead(head.value, (readmitted) =>
-          this.cacheReadmittedHead(networkId, headKey, readmitted),
-        );
+        const value = await this.admitHead(head.value, {
+          networkId,
+          onReadmitted: (readmitted) =>
+            this.cacheReadmittedHead(networkId, headKey, readmitted),
+        });
 
         await this.cacheReadmittedHead(networkId, headKey, value, false);
       }

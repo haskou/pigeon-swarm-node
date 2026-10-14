@@ -419,7 +419,8 @@ a `reference` that must resolve to signed `requests` records: an accepted
 `community_membership_request` of the right type for the member, or a
 `community_invite` plus the `community_invite_use` record of the member. An
 operation with an unknown parent or unreplicated evidence is not stored; its head
-is demoted and re-admitted after 2 s, 10 s and 60 s.
+is demoted and re-admitted when the evidence replicates (see
+[readmission](#readmission-of-rejected-records)).
 
 Limits: a member that holds a valid device can sign as many operations as it likes,
 and every replica stores and folds all of them, so growth is bounded by two rules
@@ -503,7 +504,8 @@ wall clock and restarts:
 - a revoked device cannot claim the revocation revision or later: the
   revocation transition is the frontier, no separate field exists;
 - a revision above the local head is not yet verifiable: the record is refused
-  and the head re-admitted (2 s, 10 s, 60 s) once the chain replicates;
+  and the head re-admitted once the chain replicates (see
+  [readmission](#readmission-of-rejected-records));
 - payload timestamps never take part, so a fake `createdAt` does not help.
 
 Chosen bound: the whole interval in which the device was authorized
@@ -678,8 +680,30 @@ target.id, createdAt]))`, immutable (tombstones are always rejected; the
   poll, channel message) are still evaluated against the community state folded
   at admission, not at a causal frontier, so records of a member who later lost
   the permission stop being admitted. A head rejected
-  because the community has not replicated yet is re-admitted after 2 s, 10 s
-  and 60 s. Authorization lookups are coalesced for 1 s per batch.
+  because the community has not replicated yet is re-admitted when it does
+  (see below). Authorization lookups are coalesced for 1 s per batch.
+
+#### Readmission of rejected records
+
+A replicated document the gate rejects, and a head demoted because some of its
+records were rejected, are offered to the gate again: 2 s, 10 s and 60 s after the
+rejection, and in between, at most once every 2 s, whenever the node admits new
+replicated state (an admitted document or a newly cached head, including a local
+projection such as the identity metadata of an admitted identity). The second
+trigger matters because the record usually rests on exactly that state: on a
+slow node a joiner's identity can replicate after the community head that lists
+its join, and the head would otherwise stay demoted until the 60 s retry.
+
+- The gate decides every offer in full; a readmitted record is one the gate
+  accepts now. Readmission never widens what is admitted.
+- A demoted head that admits more records than before is delivered again, still
+  demoted, until every record is admitted.
+- At most 256 rejected documents and 256 demoted heads wait at once; past that a
+  rejection is final. One offer per record runs at a time.
+- New state never extends the wait: after the 60 s attempt the rejection is final,
+  and a record of a store or network that is no longer registered is dropped.
+- The 2 s wake delay outlasts the 1 s authorization lookup cache, so an offer sees
+  the state that woke it.
 
 ### Replicated store audit
 
