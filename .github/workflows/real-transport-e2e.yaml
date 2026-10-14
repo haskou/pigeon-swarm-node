@@ -102,10 +102,6 @@ jobs:
         run: yarn test:e2e:real-transport:private-blob-availability
         timeout-minutes: 4
 
-      - name: Read-until receipt proof
-        run: yarn test:e2e:real-transport:read-until
-        timeout-minutes: 4
-
       - name: Network-wide identity admission load
         run: yarn test:e2e:real-transport:identity-admission-load
         timeout-minutes: 4

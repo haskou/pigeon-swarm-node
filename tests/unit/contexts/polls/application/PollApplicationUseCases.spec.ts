@@ -1,8 +1,6 @@
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { Conversation } from '@app/contexts/conversations/domain/Conversation';
-import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { PollVoteCastMessage } from '@app/contexts/polls/application/cast-vote/messages/PollVoteCastMessage';
 import { PollVoteCaster } from '@app/contexts/polls/application/cast-vote/PollVoteCaster';
@@ -222,30 +220,37 @@ describe('Poll application use cases', () => {
     expect(repository.saveClose).not.toHaveBeenCalled();
   });
 
-  it('PollTimelineMessageRegistrar adds a poll to a conversation timeline', async () => {
-    const conversationRepository = mock<ConversationRepository>();
+  it('PollTimelineMessageRegistrar adds a community channel poll to its timeline', async () => {
     const communityRepository = mock<CommunityChannelMessageRepository>();
-    const conversation = mock<Conversation>();
-    const conversationScope = PollScope.groupConversation(
-      new ConversationId('conversation-1'),
+    const mutationProof = PublicMutationProof.fromPrimitives(await proof());
+
+    await new PollTimelineMessageRegistrar(communityRepository).register(
+      new PollTimelineMessageRegisterMessage(
+        creatorIdentityId,
+        createPoll(),
+        mutationProof,
+      ),
     );
+
+    expect(communityRepository.save).toHaveBeenCalledWith(
+      expect.anything(),
+      mutationProof,
+    );
+  });
+
+  it('PollTimelineMessageRegistrar writes nothing for a group conversation poll', async () => {
+    const communityRepository = mock<CommunityChannelMessageRepository>();
     const conversationPoll = Poll.create(
       new PollId('poll-2'),
       new IdentityId(creatorIdentityId),
-      conversationScope,
+      PollScope.groupConversation(new ConversationId('conversation-1')),
       new PollQuestion('Choose one'),
       pollOptions(),
       new Timestamp(createdAt),
       { allowsMultipleVotes: false },
     );
 
-    conversationRepository.hasById.mockResolvedValue(true);
-    conversationRepository.requireById.mockResolvedValue(conversation);
-
-    await new PollTimelineMessageRegistrar(
-      conversationRepository,
-      communityRepository,
-    ).register(
+    await new PollTimelineMessageRegistrar(communityRepository).register(
       new PollTimelineMessageRegisterMessage(
         creatorIdentityId,
         conversationPoll,
@@ -253,11 +258,6 @@ describe('Poll application use cases', () => {
       ),
     );
 
-    expect(conversation.addPollMessage).toHaveBeenCalledTimes(1);
-    expect(conversationRepository.save).toHaveBeenCalledWith(
-      conversation,
-      new Map([['poll-2', expect.anything()]]),
-    );
     expect(communityRepository.save).not.toHaveBeenCalled();
   });
 });

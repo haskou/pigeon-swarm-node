@@ -50,13 +50,16 @@ export class PostPollRoute extends PollRouteSupport {
         body.mutation,
       ),
     );
-    await this.timelineRegistrar.register(
-      new PollTimelineMessageRegisterMessage(
-        actor.valueOf(),
-        poll,
-        PublicMutationProof.fromPrimitives(body.timelineMutation),
-      ),
-    );
+
+    if (body.timelineMutation) {
+      await this.timelineRegistrar.register(
+        new PollTimelineMessageRegisterMessage(
+          actor.valueOf(),
+          poll,
+          PublicMutationProof.fromPrimitives(body.timelineMutation),
+        ),
+      );
+    }
 
     return response
       .status(HttpRouteStatusEnum.OK)

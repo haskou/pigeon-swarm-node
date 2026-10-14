@@ -308,7 +308,6 @@ describe('Call', () => {
       networkId,
       new GroupConversationName('Two-member group'),
       [creator, recipient],
-      [],
       creator,
     );
     const call = Call.start(

@@ -49,7 +49,6 @@ describe('CallLeaver', () => {
               networkId,
               new GroupConversationName('Two-member group'),
               participants,
-              [],
               creator,
             )
           : new OneToOneConversation(
@@ -58,7 +57,6 @@ describe('CallLeaver', () => {
               ConversationType.ONE_TO_ONE,
               participants,
               undefined,
-              [],
               creator,
             );
       const call = Call.start(

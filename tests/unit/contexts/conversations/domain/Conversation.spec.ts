@@ -1,425 +1,48 @@
-import { MessageMetadata } from '@app/contexts/conversations/domain/entities/messages/MessageMetadata';
-import { MessageSent } from '@app/contexts/conversations/domain/entities/messages/MessageSent';
-import { ConversationParticipantNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationParticipantNotFoundError';
-import { MessageTargetAlreadyDeletedError } from '@app/contexts/conversations/domain/errors/MessageTargetAlreadyDeletedError';
-import { MessageTargetAuthorMismatchError } from '@app/contexts/conversations/domain/errors/MessageTargetAuthorMismatchError';
-import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageTargetNotFoundError';
-import { OneToOneConversationMessagesNotReplicatedError } from '@app/contexts/conversations/domain/errors/OneToOneConversationMessagesNotReplicatedError';
-import { ConversationMessageWasDeletedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasDeletedEvent';
-import { ConversationMessageWasEditedEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasEditedEvent';
-import { ConversationMessageWasSentEvent } from '@app/contexts/conversations/domain/events/ConversationMessageWasSentEvent';
-import { GroupConversation } from '@app/contexts/conversations/domain/GroupConversation';
-import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
-import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
-import { MessageEditOptions } from '@app/contexts/conversations/domain/value-objects/MessageEditOptions';
-import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
-import { MessageSendOptions } from '@app/contexts/conversations/domain/value-objects/MessageSendOptions';
-import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
-import { PollId } from '@app/contexts/polls/domain/value-objects/PollId';
+import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { Timestamp } from '@haskou/value-objects';
 
 import { ConversationMother } from '../../../mothers/ConversationMother';
-import { messageProof } from '../support/messageProof';
 
 describe('Conversation', () => {
   let author: IdentityId;
   let recipient: IdentityId;
   let outsider: IdentityId;
   let mother: ConversationMother;
-  let conversation: GroupConversation;
 
   beforeEach(async () => {
     mother = await ConversationMother.create();
     author = mother.author;
     recipient = mother.recipient;
     outsider = await ConversationMother.generateIdentityId();
-    conversation = mother.buildGroup();
   });
 
-  describe('sendMessage', () => {
-    it('should add a sent message and record a domain event', () => {
-      conversation.pullDomainEvents();
+  it('should expose only roster metadata, never messages', () => {
+    const primitives = mother.buildGroup().toPrimitives();
 
-      const message = conversation.sendMessage(
-        author,
-        new EncryptedMessagePayload('encrypted-payload'),
-        messageProof(),
-        new MessageSendOptions(),
-      );
-
-      expect(message).toBeInstanceOf(MessageSent);
-      expect(conversation.toPrimitives().messages).toHaveLength(1);
-      expect(conversation.toPrimitives().messages[0]).toEqual(
-        expect.objectContaining({
-          authorId: author.valueOf(),
-          encryptedPayload: 'encrypted-payload',
-          type: MessageType.SENT.valueOf(),
-        }),
-      );
-      const events = conversation.pullDomainEvents();
-
-      expect(events).toEqual([expect.any(ConversationMessageWasSentEvent)]);
-      expect(events[0].attributes).toEqual({
-        authorId: author.valueOf(),
-        conversationName: 'Mother group',
-        message: message.toPrimitives(),
-        messageId: message.getId().valueOf(),
-        mutationProof: messageProof().toPrimitives(),
-        networkId: mother.networkId.valueOf(),
-        participantIds: conversation
-          .getParticipantIds()
-          .map((id) => id.valueOf()),
-      });
-    });
-
-    it('should reject messages from non participants', () => {
-      expect(() =>
-        conversation.sendMessage(
-          outsider,
-          new EncryptedMessagePayload('encrypted-payload'),
-          messageProof(),
-        ),
-      ).toThrow(ConversationParticipantNotFoundError);
-    });
-
-    it('should add a sent reply message', () => {
-      const target = conversation.sendMessage(
-        author,
-        new EncryptedMessagePayload('target-payload'),
-        messageProof(),
-      );
-      const newer = conversation.sendMessage(
-        author,
-        new EncryptedMessagePayload('newer-payload'),
-        messageProof(),
-      );
-
-      const reply = conversation.sendMessage(
-        recipient,
-        new EncryptedMessagePayload('reply-payload'),
-        messageProof(),
-        new MessageSendOptions(
-          undefined,
-          undefined,
-          [newer.getId()],
-          target.getId(),
-        ),
-      );
-
-      expect(reply.getReplyToMessageId()?.valueOf()).toBe(
-        target.getId().valueOf(),
-      );
-      expect(conversation.toPrimitives().messages[2]).toEqual(
-        expect.objectContaining({
-          encryptedPayload: 'reply-payload',
-          previousMessageIds: [newer.getId().valueOf()],
-          replyToMessageId: target.getId().valueOf(),
-          type: MessageType.SENT.valueOf(),
-        }),
-      );
-    });
-
-    it('should reject replies to unknown messages', () => {
-      expect(() =>
-        conversation.sendMessage(
-          author,
-          new EncryptedMessagePayload('reply-payload'),
-          messageProof(),
-          new MessageSendOptions(
-            undefined,
-            undefined,
-            [],
-            MessageId.generate(),
-          ),
-        ),
-      ).toThrow(MessageTargetNotFoundError);
-    });
-
-    it('should reject explicit previous ids that do not exist', () => {
-      expect(() =>
-        conversation.sendMessage(
-          author,
-          new EncryptedMessagePayload('message-payload'),
-          messageProof(),
-          new MessageSendOptions(undefined, undefined, [MessageId.generate()]),
-        ),
-      ).toThrow(MessageTargetNotFoundError);
-    });
-
-    it('should reject replies to deleted messages', () => {
-      const target = conversation.sendMessage(
-        author,
-        new EncryptedMessagePayload('target-payload'),
-        messageProof(),
-      );
-      conversation.deleteMessage(author, target.getId(), messageProof());
-
-      expect(() =>
-        conversation.sendMessage(
-          recipient,
-          new EncryptedMessagePayload('reply-payload'),
-          messageProof(),
-          new MessageSendOptions(undefined, undefined, [], target.getId()),
-        ),
-      ).toThrow(MessageTargetAlreadyDeletedError);
-    });
+    expect(Object.keys(primitives).sort()).toEqual([
+      'adminIds',
+      'creatorId',
+      'id',
+      'name',
+      'networkId',
+      'participantIds',
+      'type',
+    ]);
   });
 
-  describe('editMessage', () => {
-    it('should add an edited message', () => {
-      const sent = conversation.sendMessage(
-        author,
-        new EncryptedMessagePayload('original-payload'),
-        messageProof(),
-      );
-      conversation.pullDomainEvents();
+  it('should know its participants', () => {
+    const conversation = mother.build();
 
-      const edited = conversation.editMessage(
-        author,
-        sent.getId(),
-        new EncryptedMessagePayload('edited-payload'),
-        messageProof(),
-      );
-
-      expect(edited.getTargetMessageId().valueOf()).toBe(
-        sent.getId().valueOf(),
-      );
-      expect(conversation.toPrimitives().messages).toHaveLength(2);
-      const events = conversation.pullDomainEvents();
-
-      expect(events).toEqual([expect.any(ConversationMessageWasEditedEvent)]);
-      expect(events[0].attributes).toEqual({
-        message: edited.toPrimitives(),
-        messageId: edited.getId().valueOf(),
-        mutationProof: messageProof().toPrimitives(),
-        networkId: mother.networkId.valueOf(),
-        participantIds: conversation
-          .getParticipantIds()
-          .map((id) => id.valueOf()),
-        targetMessageId: sent.getId().valueOf(),
-      });
-    });
-
-    it('should reject edits by a different participant', () => {
-      const sent = conversation.sendMessage(
-        author,
-        new EncryptedMessagePayload('original-payload'),
-        messageProof(),
-      );
-
-      expect(() =>
-        conversation.editMessage(
-          recipient,
-          sent.getId(),
-          new EncryptedMessagePayload('edited-payload'),
-          messageProof(),
-        ),
-      ).toThrow(MessageTargetAuthorMismatchError);
-    });
-
-    it('should reject edits for unknown targets', () => {
-      expect(() =>
-        conversation.editMessage(
-          author,
-          MessageId.generate(),
-          new EncryptedMessagePayload('edited-payload'),
-          messageProof(),
-        ),
-      ).toThrow(MessageTargetNotFoundError);
-    });
-
-    it('should reject edits with unknown previous ids', () => {
-      const sent = conversation.sendMessage(
-        author,
-        new EncryptedMessagePayload('original-payload'),
-        messageProof(),
-      );
-
-      expect(() =>
-        conversation.editMessage(
-          author,
-          sent.getId(),
-          new EncryptedMessagePayload('edited-payload'),
-          messageProof(),
-          new MessageEditOptions(undefined, undefined, [MessageId.generate()]),
-        ),
-      ).toThrow(MessageTargetNotFoundError);
-    });
+    expect(conversation.hasParticipant(author)).toBe(true);
+    expect(conversation.hasParticipant(recipient)).toBe(true);
+    expect(conversation.hasParticipant(outsider)).toBe(false);
   });
 
-  describe('addPollMessage', () => {
-    it('should add a poll message that can be used as a previous message', () => {
-      const poll = conversation.addPollMessage(author, PollId.generate());
+  it('should round-trip its primitives', () => {
+    const group = mother.buildGroup();
 
-      const message = conversation.sendMessage(
-        author,
-        new EncryptedMessagePayload('message-after-poll'),
-        messageProof(),
-        new MessageSendOptions(undefined, undefined, [poll.getId()]),
-      );
-
-      expect(conversation.toPrimitives().messages[0]).toEqual(
-        expect.objectContaining({
-          id: poll.getId().valueOf(),
-          pollId: poll.getId().valueOf(),
-          type: MessageType.POLL.valueOf(),
-        }),
-      );
-      expect(message.getPreviousMessageIds()[0].isEqual(poll.getId())).toBe(
-        true,
-      );
-    });
-  });
-
-  describe('deleteMessage', () => {
-    it('should add a deleted message', () => {
-      const sent = conversation.sendMessage(
-        author,
-        new EncryptedMessagePayload('original-payload'),
-        messageProof(),
-      );
-      conversation.pullDomainEvents();
-
-      const deleted = conversation.deleteMessage(
-        author,
-        sent.getId(),
-        messageProof(),
-      );
-
-      expect(deleted.getTargetMessageId().valueOf()).toBe(
-        sent.getId().valueOf(),
-      );
-      expect(conversation.toPrimitives().messages).toHaveLength(2);
-      const events = conversation.pullDomainEvents();
-
-      expect(events).toEqual([expect.any(ConversationMessageWasDeletedEvent)]);
-      expect(events[0].attributes).toEqual({
-        message: deleted.toPrimitives(),
-        messageId: deleted.getId().valueOf(),
-        mutationProof: messageProof().toPrimitives(),
-        networkId: mother.networkId.valueOf(),
-        participantIds: conversation
-          .getParticipantIds()
-          .map((id) => id.valueOf()),
-        targetMessageId: sent.getId().valueOf(),
-      });
-    });
-
-    it('should use the target message as the deleted message previous id', () => {
-      const target = conversation.sendMessage(
-        author,
-        new EncryptedMessagePayload('target-payload'),
-        messageProof(),
-      );
-      conversation.sendMessage(
-        author,
-        new EncryptedMessagePayload('newer-payload'),
-        messageProof(),
-      );
-
-      const deleted = conversation.deleteMessage(
-        author,
-        target.getId(),
-        messageProof(),
-      );
-
-      expect(deleted.toPrimitives().previousMessageIds).toEqual([
-        target.getId().valueOf(),
-      ]);
-    });
-
-    it('should reject deleting the same message twice', () => {
-      const sent = conversation.sendMessage(
-        author,
-        new EncryptedMessagePayload('original-payload'),
-        messageProof(),
-      );
-
-      conversation.deleteMessage(author, sent.getId(), messageProof());
-
-      expect(() =>
-        conversation.deleteMessage(author, sent.getId(), messageProof()),
-      ).toThrow(MessageTargetAlreadyDeletedError);
-    });
-  });
-
-  describe('one-to-one message log', () => {
-    let oneToOne: OneToOneConversation;
-
-    beforeEach(() => {
-      oneToOne = mother.build();
-    });
-
-    it.each<[string, (target: OneToOneConversation) => unknown]>([
-      [
-        'sendMessage',
-        (target) =>
-          target.sendMessage(
-            author,
-            new EncryptedMessagePayload('encrypted-payload'),
-            messageProof(),
-          ),
-      ],
-      [
-        'registerMessage',
-        (target) =>
-          target.registerMessage(
-            MessageSent.create(
-              new MessageMetadata(
-                MessageId.generate(),
-                target.getId(),
-                author,
-                [],
-                Timestamp.now(),
-              ),
-              new EncryptedMessagePayload('encrypted-payload'),
-            ),
-          ),
-      ],
-      [
-        'addPollMessage',
-        (target) => target.addPollMessage(author, PollId.generate()),
-      ],
-      [
-        'editMessage',
-        (target) =>
-          target.editMessage(
-            author,
-            MessageId.generate(),
-            new EncryptedMessagePayload('edited-payload'),
-            messageProof(),
-          ),
-      ],
-      [
-        'deleteMessage',
-        (target) =>
-          target.deleteMessage(author, MessageId.generate(), messageProof()),
-      ],
-      [
-        'pinMessage',
-        (target) => target.pinMessage(author, MessageId.generate()),
-      ],
-      [
-        'unpinMessage',
-        (target) => target.unpinMessage(author, MessageId.generate()),
-      ],
-    ])('should reject %s', (_operation, operation) => {
-      expect(() => operation(oneToOne)).toThrow(
-        OneToOneConversationMessagesNotReplicatedError,
-      );
-      expect(oneToOne.toPrimitives().messages).toEqual([]);
-      expect(oneToOne.pullDomainEvents()).toEqual([]);
-    });
-
-    it('should keep rejecting non participants as such', () => {
-      expect(() =>
-        oneToOne.sendMessage(
-          outsider,
-          new EncryptedMessagePayload('encrypted-payload'),
-          messageProof(),
-        ),
-      ).toThrow(ConversationParticipantNotFoundError);
-    });
+    expect(
+      Conversation.fromPrimitives(group.toPrimitives()).toPrimitives(),
+    ).toEqual(group.toPrimitives());
   });
 });

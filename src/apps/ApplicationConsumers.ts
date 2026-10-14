@@ -6,12 +6,6 @@ import RegisterCommunityChannelMessageEditionWhenAnnounced from '@app/apps/consu
 import RegisterCommunityReactionWhenAdded from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenAdded';
 import RegisterCommunityReactionWhenRemoved from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageReactionWhenRemoved';
 import RegisterCommunityChannelMessageWhenAnnounced from '@app/apps/consumers/pubsub/communities/RegisterCommunityChannelMessageWhenAnnounced';
-import MarkMessagesReadWhenAnnounced from '@app/apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced';
-import RegisterMessageDeletionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageDeletionWhenAnnounced';
-import RegisterMessageEditionWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced';
-import RegisterMessageReactionWhenAdded from '@app/apps/consumers/pubsub/conversations/RegisterMessageReactionWhenAdded';
-import RegisterMessageReactionWhenRemoved from '@app/apps/consumers/pubsub/conversations/RegisterMessageReactionWhenRemoved';
-import RegisterMessageWhenAnnounced from '@app/apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced';
 import RegisterIdentityWhenPublished from '@app/apps/consumers/pubsub/identities/RegisterIdentityWhenPublished';
 import SynchronizeIdentityWhenUpdated from '@app/apps/consumers/pubsub/identities/SynchronizeIdentityWhenUpdated';
 import ProvisionDeviceAuthorizationWhenIdentityCreated from '@app/apps/consumers/pubsub/identity-devices/ProvisionDeviceAuthorizationWhenIdentityCreated';
@@ -21,10 +15,8 @@ import SynchronizeKeychainWhenUpdated from '@app/apps/consumers/pubsub/keychains
 import RecordPeerCommunityStateWhenAnnounced from '@app/apps/consumers/pubsub/nodes/RecordPeerCommunityStateWhenAnnounced';
 import RegisterNodePeerWhenHeartbeatReceived from '@app/apps/consumers/pubsub/nodes/RegisterNodePeerWhenHeartbeatReceived';
 import RegisterIdentityPresenceWhenUpdated from '@app/apps/consumers/pubsub/presence/RegisterIdentityPresenceWhenUpdated';
-import ClearPushNotificationWhenConversationMessagesRead from '@app/apps/consumers/pubsub/push/ClearPushNotificationWhenConversationMessagesRead';
 import SendPushNotificationWhenCallStarted from '@app/apps/consumers/pubsub/push/SendPushNotificationWhenCallStarted';
 import SendPushNotificationWhenCommunityMessageSent from '@app/apps/consumers/pubsub/push/SendPushNotificationWhenCommunityMessageSent';
-import SendPushNotificationWhenConversationMessageSent from '@app/apps/consumers/pubsub/push/SendPushNotificationWhenConversationMessageSent';
 import SendPushNotificationWhenNotificationCreated from '@app/apps/consumers/pubsub/push/SendPushNotificationWhenNotificationCreated';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 
@@ -40,12 +32,6 @@ export const applicationConsumers: ApplicationServiceClass<Consumer>[] = [
   SynchronizeIdentityWhenUpdated,
   RegisterKeychainWhenPublished,
   SynchronizeKeychainWhenUpdated,
-  RegisterMessageWhenAnnounced,
-  RegisterMessageEditionWhenAnnounced,
-  RegisterMessageDeletionWhenAnnounced,
-  RegisterMessageReactionWhenAdded,
-  RegisterMessageReactionWhenRemoved,
-  MarkMessagesReadWhenAnnounced,
   RegisterNodePeerWhenHeartbeatReceived,
   RecordPeerCommunityStateWhenAnnounced,
   RegisterCommunityChannelMessageWhenAnnounced,
@@ -54,9 +40,7 @@ export const applicationConsumers: ApplicationServiceClass<Consumer>[] = [
   RegisterCommunityReactionWhenAdded,
   RegisterCommunityReactionWhenRemoved,
   RegisterIdentityPresenceWhenUpdated,
-  SendPushNotificationWhenConversationMessageSent,
   SendPushNotificationWhenCommunityMessageSent,
   SendPushNotificationWhenNotificationCreated,
   SendPushNotificationWhenCallStarted,
-  ClearPushNotificationWhenConversationMessagesRead,
 ];

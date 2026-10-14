@@ -4,10 +4,7 @@ import { ConversationOperationLimits } from '@app/contexts/conversations/domain/
 import { ConversationStateFold } from '@app/contexts/conversations/domain/operations/ConversationStateFold';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { ConversationOperationAction } from '@app/contexts/conversations/domain/value-objects/ConversationOperationAction';
-import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
-import OrbitDBConversationMessageMapper from '@app/contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBConversationMessageMapper';
 import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
-import ConversationMessageMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageMutationPolicy';
 import ConversationOperationMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationOperationMutationPolicy';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
@@ -28,7 +25,7 @@ import { orbitDBRuntimeAdapter } from '@app/contexts/shared/infrastructure/orbit
 import Kernel from '@haskou/ddd-kernel';
 import { KeyPair, PrivateKey } from '@haskou/pigeon-swarm-crypto';
 import assert from 'node:assert/strict';
-import { generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto';
+import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -56,7 +53,6 @@ type Replica = {
   stores?: {
     conversationOperations: OrbitDBDatabase;
     heads: OrbitDBDatabase;
-    messages: OrbitDBDatabase;
   };
   registry?: OrbitDBReplicatedStateRegistry;
   repository?: OrbitDBConversationRepository;
@@ -141,21 +137,16 @@ async function open(replica: Replica): Promise<void> {
       sync: false,
       type: 'keyvalue',
     }),
-    messages: await documents('messages'),
   };
   for (const store of Object.values(replica.stores))
     store.events.on('error', () => undefined);
   const registry = new OrbitDBReplicatedStateRegistry();
-  const repository = new OrbitDBConversationRepository(
-    registry,
-    new OrbitDBConversationMessageMapper(),
-  );
+  const repository = new OrbitDBConversationRepository(registry);
 
   if (replica.gated)
     registry.addMutationGate(
       new PublicMutationGate(new PublicMutationVerifier(authorization), [
         new ConversationOperationMutationPolicy(),
-        new ConversationMessageMutationPolicy(repository),
       ]),
     );
   replica.registry = registry;
@@ -477,48 +468,6 @@ async function assertControlHoldsForged(
   assert.ok(
     forgedIds.some((forgedId) => held.has(forgedId)),
     'The ungated control node must replicate and index the forged records, otherwise the test proves nothing',
-  );
-}
-
-function messageRecord(
-  author: ConversationOperationSigner,
-  conversationId: ConversationId,
-  frontier: string[],
-): Record<string, unknown> {
-  const id = MessageId.generate().valueOf();
-  const message = {
-    authorId: author.id,
-    conversationId: conversationId.valueOf(),
-    createdAt: clock++,
-    encryptedPayload: 'payload',
-    id,
-    previousMessageIds: [] as string[],
-    scopeType: 'conversation',
-    type: 'sent',
-  };
-  const body = {
-    author: {
-      authorizationRevision: 0,
-      deviceCredential: author.deviceCredential,
-      identityId: author.id,
-    },
-    frontier,
-    kind: 'put',
-    operationId: randomBytes(16).toString('base64url'),
-    payloadDigest: PublicMutationProof.digestOf(message),
-    predecessor: null as string | null,
-    recordId: id,
-    sequence: 0,
-    store: 'messages',
-    version: 2,
-  } as const;
-
-  return PublicMutationRecord.withProof(
-    message,
-    PublicMutationProof.signed(
-      body,
-      author.deviceKeyPair.sign(PublicMutationProof.signingContentOf(body)),
-    ),
   );
 }
 
@@ -951,49 +900,6 @@ async function main(): Promise<void> {
   console.log(
     `PASS the operation over the author quota rejected (quota lowered to ${QUOTA} for the run)`,
   );
-
-  stage = 'removed members cannot post messages';
-  const head = await honest.repository!.findFrontier(group.id);
-  const accepted = messageRecord(erin, group.id, head);
-  const fromRemoved = messageRecord(dave, group.id, head);
-  const fromLeft = messageRecord(bob, group.id, head);
-  const fromOutsider = messageRecord(mallory, group.id, head);
-
-  await pause(1200);
-  for (const message of [accepted, fromRemoved, fromLeft, fromOutsider])
-    await malicious.stores!.messages.put!(message);
-  await until('member message visible on the honest node', () =>
-    honest.repository!.hasMessage(
-      group.id,
-      new MessageId(accepted.id as string),
-    ),
-  );
-  await until('forged messages reached the control node', async () => {
-    for (const message of [fromRemoved, fromLeft, fromOutsider])
-      if (
-        !(await control.repository!.hasMessage(
-          group.id,
-          new MessageId(message.id as string),
-        ))
-      )
-        return false;
-
-    return true;
-  });
-  await pause(2000);
-  for (const message of [fromRemoved, fromLeft, fromOutsider])
-    assert.equal(
-      await honest.repository!.hasMessage(
-        group.id,
-        new MessageId(message.id as string),
-      ),
-      false,
-      'A message of a removed, departed or foreign author must not be served',
-    );
-  console.log(
-    'PASS messages of a removed member, a departed member and a non member rejected',
-  );
-  void frank;
 }
 
 const watchdog = setTimeout(() => {

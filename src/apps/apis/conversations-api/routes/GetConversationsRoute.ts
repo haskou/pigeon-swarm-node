@@ -1,6 +1,4 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import ConversationUnreadCounter from '@app/contexts/conversations/application/count-unread-conversations/ConversationUnreadCounter';
-import { ConversationsUnreadCountMessage } from '@app/contexts/conversations/application/count-unread-conversations/messages/ConversationsUnreadCountMessage';
 import ConversationsFinder from '@app/contexts/conversations/application/find-conversations/ConversationsFinder';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
@@ -14,10 +12,6 @@ import { ConversationsViewModel } from '../view-model/ConversationsViewModel';
 export class GetConversationsRoute extends Route {
   private readonly finder: ConversationsFinder =
     this.get<ConversationsFinder>(ConversationsFinder);
-
-  private readonly unreadCounter = this.get<ConversationUnreadCounter>(
-    ConversationUnreadCounter,
-  );
 
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
@@ -39,17 +33,9 @@ export class GetConversationsRoute extends Route {
         beforeConversationId,
       ).getMessage(),
     );
-    const unreadCounts = await this.unreadCounter.count(
-      new ConversationsUnreadCountMessage(
-        requesterIdentityId.valueOf(),
-        conversations.map((conversation) => conversation.getId().valueOf()),
-      ),
-    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(
-        new ConversationsViewModel(conversations, unreadCounts).toResource(),
-      );
+      .send(new ConversationsViewModel(conversations).toResource());
   }
 }

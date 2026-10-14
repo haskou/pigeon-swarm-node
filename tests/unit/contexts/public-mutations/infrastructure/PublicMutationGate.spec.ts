@@ -15,7 +15,6 @@ import CommunityMembershipRequestMutationPolicy from '@app/contexts/communities/
 import CommunityModerationLogMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityModerationLogMutationPolicy';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import ConversationMessagePinMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy';
 import NotificationScopeSettingsMutationPolicy from '@app/contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy';
 import PollCloseMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollCloseMutationPolicy';
 import PollMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollMutationPolicy';
@@ -246,7 +245,7 @@ describe('PublicMutationGate over pins', () => {
   });
 });
 
-describe('PublicMutationGate over conversation pins', () => {
+describe('PublicMutationGate over conversation-scoped pins', () => {
   const author = 'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=';
   const conversationId = 'group:c1';
   const id = `conversation:${conversationId}:m1`;
@@ -259,7 +258,6 @@ describe('PublicMutationGate over conversation pins', () => {
     scopeType: 'conversation',
   };
   const authorization = mock<PublicMutationAuthorAuthorization>();
-  const conversationRepository = mock<ConversationRepository>();
   const communityRepository = mock<CommunityRepository>();
   let gate: PublicMutationGate;
 
@@ -295,43 +293,13 @@ describe('PublicMutationGate over conversation pins', () => {
 
   beforeEach(() => {
     authorization.isAuthorized.mockResolvedValue(true);
-    conversationRepository.requireMetadataAtFrontier.mockResolvedValue(
-      mock<Conversation>({
-        hasParticipant: jest.fn(() => true),
-        isGroup: jest.fn(() => true),
-      }),
-    );
     gate = new PublicMutationGate(new PublicMutationVerifier(authorization), [
       new CommunityChannelMessagePinMutationPolicy(communityRepository),
-      new ConversationMessagePinMutationPolicy(conversationRepository),
     ]);
   });
 
-  it('admits a signed conversation pin from a participant', async () => {
-    await expect(gate.accepts('pins', await sign(pin))).resolves.toBe(true);
-  });
-
-  it('rejects a pin from someone who is not a participant', async () => {
-    conversationRepository.requireMetadataAtFrontier.mockResolvedValue(
-      mock<Conversation>({
-        hasParticipant: jest.fn(() => false),
-        isGroup: jest.fn(() => true),
-      }),
-    );
-
+  it('rejects a signed conversation pin: conversation timelines never reach the node', async () => {
     await expect(gate.accepts('pins', await sign(pin))).resolves.toBe(false);
-  });
-
-  it('rejects a conversation proof copied onto another conversation', async () => {
-    const signed = await sign(pin);
-
-    await expect(
-      gate.accepts('pins', {
-        ...signed,
-        conversationId: 'group:c2',
-        id: 'conversation:group:c2:m1',
-      }),
-    ).resolves.toBe(false);
   });
 
   it('rejects a record whose scope type has no policy in the collection', async () => {
@@ -340,10 +308,6 @@ describe('PublicMutationGate over conversation pins', () => {
     await expect(gate.accepts('pins', await sign(unknownScope))).resolves.toBe(
       false,
     );
-  });
-
-  it('rejects an unsigned conversation pin', async () => {
-    await expect(gate.accepts('pins', pin)).resolves.toBe(false);
   });
 });
 

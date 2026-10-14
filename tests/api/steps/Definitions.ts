@@ -15,8 +15,6 @@ import { CommunityRequestId } from '@app/contexts/communities/domain/value-objec
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
-import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import IdentityAdmissionLoadRepository from '@app/contexts/identities/domain/repositories/IdentityAdmissionLoadRepository';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
@@ -4089,104 +4087,6 @@ export default class Definitions {
     await this.signCurrentRequest('POST', `/calls/${this.callId}/signals`);
   }
 
-  @given('I set an encrypted conversation message body')
-  public async iSetAnEncryptedConversationMessageBody(): Promise<void> {
-    const id = MessageId.generate().valueOf();
-    const createdAt = Date.now();
-
-    this.body = JSON.stringify({
-      createdAt,
-      encryptedPayload: 'encrypted-message-payload',
-      id,
-      mutation: await this.conversationMessageMutation({
-        conversationId: this.conversationId || '',
-        createdAt,
-        encryptedPayload: 'encrypted-message-payload',
-        id,
-        previousMessageIds: [],
-        type: MessageType.SENT.valueOf(),
-      }),
-      previousMessageIds: [],
-    });
-  }
-
-  @given('I set an encrypted conversation reply body')
-  public async iSetAnEncryptedConversationReplyBody(): Promise<void> {
-    if (!this.messageId) {
-      throw new Error('Message must be created first.');
-    }
-
-    const id = MessageId.generate().valueOf();
-    const createdAt = Date.now();
-
-    this.body = JSON.stringify({
-      createdAt,
-      encryptedPayload: 'encrypted-reply-payload',
-      id,
-      mutation: await this.conversationMessageMutation({
-        conversationId: this.conversationId || '',
-        createdAt,
-        encryptedPayload: 'encrypted-reply-payload',
-        id,
-        previousMessageIds: [this.messageId],
-        replyToMessageId: this.messageId,
-        type: MessageType.SENT.valueOf(),
-      }),
-      previousMessageIds: [this.messageId],
-      replyToMessageId: this.messageId,
-    });
-  }
-
-  @given('I set a delete conversation message body')
-  public async iSetADeleteConversationMessageBody(): Promise<void> {
-    if (!this.conversationId || !this.messageId) {
-      throw new Error('Conversation and message must be created first.');
-    }
-
-    const id = MessageId.generate().valueOf();
-    const createdAt = Date.now();
-
-    this.body = JSON.stringify({
-      createdAt,
-      id,
-      mutation: await this.conversationMessageMutation({
-        conversationId: this.conversationId,
-        createdAt,
-        id,
-        previousMessageIds: [this.messageId],
-        targetMessageId: this.messageId,
-        type: MessageType.DELETED.valueOf(),
-      }),
-    });
-  }
-
-  @given('I set an edit conversation message body')
-  public async iSetAnEditConversationMessageBody(): Promise<void> {
-    if (!this.conversationId || !this.messageId) {
-      throw new Error('Conversation and message must be created first.');
-    }
-
-    const id = MessageId.generate().valueOf();
-    const createdAt = Date.now();
-    const previousMessageIds = [this.messageId];
-
-    this.body = JSON.stringify({
-      createdAt,
-      encryptedPayload: 'edited-message-payload',
-      id,
-      mutation: await this.conversationMessageMutation({
-        conversationId: this.conversationId,
-        createdAt,
-        encryptedPayload: 'edited-message-payload',
-        id,
-        previousMessageIds,
-        targetMessageId: this.messageId,
-        type: MessageType.EDITED.valueOf(),
-      }),
-      previousMessageIds,
-    });
-  }
-
   private communityMessageRecord(messageId: string): {
     authorIdentityId: string;
     channelId: string;
@@ -4480,194 +4380,9 @@ export default class Definitions {
     });
   }
 
-  private async conversationReactionMutationBody(
-    kind: 'put' | 'delete',
-  ): Promise<string> {
-    if (!this.conversationId || !this.messageId) {
-      throw new Error('Conversation and message must be created first.');
-    }
-
-    const keyPair = await this.ensureIdentityKeyPair();
-    const identityId = keyPair.toPrimitives().publicKey;
-    const emoji = '👍';
-    const createdAt = 1_780_000_000_000;
-    const recordId = [
-      'conversation',
-      this.conversationId,
-      this.messageId,
-      identityId,
-      emoji,
-    ].join(':');
-    const document = {
-      authorId: identityId,
-      conversationId: this.conversationId,
-      emoji,
-      id: recordId,
-      messageId: this.messageId,
-      scopeType: 'conversation',
-    };
-    const payload =
-      kind === 'put'
-        ? { ...document, createdAt }
-        : { ...document, removed: true };
-    const sequence = kind === 'put' ? 0 : 1;
-    const proofBody = {
-      author: {
-        authorizationRevision: 0,
-        deviceCredential: identityId,
-        identityId,
-      },
-      kind,
-      operationId: `api-conversation-reaction-${sequence}`.padEnd(22, '0'),
-      payloadDigest: PublicMutationProof.digestOf(payload),
-      predecessor:
-        sequence === 0 ? null : PublicMutationProof.digestOf({ previous: 0 }),
-      recordId,
-      sequence,
-      store: 'reactions',
-      version: 2,
-    } as const;
-    const proof = PublicMutationProof.signed(
-      proofBody,
-      keyPair.sign(PublicMutationProof.signingContentOf(proofBody)),
-    );
-
-    return JSON.stringify({
-      ...(kind === 'put' ? { createdAt } : {}),
-      emoji,
-      mutation: proof.toPrimitives(),
-    });
-  }
-
-  @given('I set a conversation message reaction body')
-  public async iSetAConversationMessageReactionBody(): Promise<void> {
-    this.body = await this.conversationReactionMutationBody('put');
-  }
-
-  @given('I sign the current conversation message request')
-  public async iSignTheCurrentConversationMessageRequest(): Promise<void> {
-    if (!this.conversationId) {
-      throw new Error('Conversation must be created first.');
-    }
-
-    await this.signCurrentRequest(
-      'POST',
-      `/conversations/${this.conversationId}/messages`,
-    );
-  }
-
-  @given('I sign the current conversation message deletion request')
-  public async iSignTheCurrentConversationMessageDeletionRequest(): Promise<void> {
-    if (!this.conversationId || !this.messageId) {
-      throw new Error('Conversation and message must be created first.');
-    }
-
-    await this.signCurrentRequest(
-      'DELETE',
-      `/conversations/${this.conversationId}/messages/${this.messageId}`,
-    );
-  }
-
-  @given('I sign the current conversation message edition request')
-  public async iSignTheCurrentConversationMessageEditionRequest(): Promise<void> {
-    if (!this.conversationId || !this.messageId) {
-      throw new Error('Conversation and message must be created first.');
-    }
-
-    await this.signCurrentRequest(
-      'PUT',
-      `/conversations/${this.conversationId}/messages/${this.messageId}`,
-    );
-  }
-
-  @given('I sign the current conversation message reaction request')
-  public async iSignTheCurrentConversationMessageReactionRequest(): Promise<void> {
-    if (!this.conversationId || !this.messageId) {
-      throw new Error('Conversation and message must be created first.');
-    }
-
-    await this.signCurrentRequest(
-      'POST',
-      `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
-    );
-  }
-
-  @given('I sign the current conversation message reaction removal request')
-  public async iSignTheCurrentConversationMessageReactionRemovalRequest(): Promise<void> {
-    if (!this.conversationId || !this.messageId) {
-      throw new Error('Conversation and message must be created first.');
-    }
-
-    this.body = await this.conversationReactionMutationBody('delete');
-    await this.signCurrentRequest(
-      'DELETE',
-      `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
-    );
-  }
-
-  private async conversationPinMutation(
-    kind: 'put' | 'delete',
-  ): Promise<Record<string, unknown>> {
-    if (!this.conversationId || !this.messageId) {
-      throw new Error('Conversation and message must be created first.');
-    }
-
-    const keyPair = await this.ensureIdentityKeyPair();
-    const identityId = keyPair.toPrimitives().publicKey;
-    const recordId = `conversation:${this.conversationId}:${this.messageId}`;
-    const document = {
-      conversationId: this.conversationId,
-      id: recordId,
-      messageId: this.messageId,
-      pinnedByIdentityId: identityId,
-      scopeType: 'conversation',
-    };
-    const payload =
-      kind === 'put'
-        ? { ...document, createdAt: 1_780_000_000_000 }
-        : { ...document, removed: true };
-    const sequence = kind === 'put' ? 0 : 1;
-    const proofBody = {
-      author: {
-        authorizationRevision: 0,
-        deviceCredential: identityId,
-        identityId,
-      },
-      kind,
-      operationId: `api-conversation-pin-${sequence}`.padEnd(22, '0'),
-      payloadDigest: PublicMutationProof.digestOf(payload),
-      predecessor:
-        sequence === 0 ? null : PublicMutationProof.digestOf({ previous: 0 }),
-      recordId,
-      sequence,
-      store: 'pins',
-      version: 2,
-    } as const;
-
-    return PublicMutationProof.signed(
-      proofBody,
-      keyPair.sign(PublicMutationProof.signingContentOf(proofBody)),
-    ).toPrimitives() as unknown as Record<string, unknown>;
-  }
-
   @given('I target an unknown conversation message')
   public iTargetAnUnknownConversationMessage(): void {
-    this.messageId = MessageId.generate().valueOf();
-  }
-
-  @given('I set a conversation message pin body')
-  public async iSetAConversationMessagePinBody(): Promise<void> {
-    this.body = JSON.stringify({
-      createdAt: 1_780_000_000_000,
-      mutation: await this.conversationPinMutation('put'),
-    });
-  }
-
-  @given('I set a conversation message unpin body')
-  public async iSetAConversationMessageUnpinBody(): Promise<void> {
-    this.body = JSON.stringify({
-      mutation: await this.conversationPinMutation('delete'),
-    });
+    this.messageId = randomUUID();
   }
 
   /** `{message}` in the path stands for the current message; GET drops the body. */
@@ -4690,19 +4405,6 @@ export default class Definitions {
     this.body = method === 'GET' ? undefined : this.body;
     this.signedConversationRequest = { method, path };
     await this.signCurrentRequest(method, path);
-  }
-
-  @given('I sign the current latest conversation messages request')
-  public async iSignTheCurrentLatestConversationMessagesRequest(): Promise<void> {
-    if (!this.conversationId) {
-      throw new Error('Conversation must be created first.');
-    }
-
-    this.body = undefined;
-    await this.signCurrentRequest(
-      'GET',
-      `/conversations/${this.conversationId}/messages`,
-    );
   }
 
   @given('I sign the current identity keychain request')
@@ -4822,50 +4524,6 @@ export default class Definitions {
   public async iSignTheCurrentConversationsRequest(): Promise<void> {
     this.body = undefined;
     await this.signCurrentRequest('GET', '/conversations/');
-  }
-
-  @given('the other identity signs the current conversations request')
-  public async theOtherIdentitySignsTheCurrentConversationsRequest(): Promise<void> {
-    const keyPair = await this.ensureOtherIdentityKeyPair();
-
-    this.body = undefined;
-    await this.signCurrentRequest(
-      'GET',
-      '/conversations/',
-      String(Date.now()),
-      keyPair,
-      this.otherIdentityId,
-    );
-  }
-
-  @given('I set a read conversation messages body')
-  public iSetAReadConversationMessagesBody(): void {
-    if (!this.messageId) {
-      throw new Error('Message must be created first.');
-    }
-
-    this.body = JSON.stringify({
-      messageId: this.messageId,
-    });
-  }
-
-  @given(
-    'the other identity signs the current read conversation messages request',
-  )
-  public async theOtherIdentitySignsTheCurrentReadConversationMessagesRequest(): Promise<void> {
-    if (!this.conversationId) {
-      throw new Error('Conversation must be created first.');
-    }
-
-    const keyPair = await this.ensureOtherIdentityKeyPair();
-
-    await this.signCurrentRequest(
-      'PUT',
-      `/conversations/${this.conversationId}/messages/read-until`,
-      String(Date.now()),
-      keyPair,
-      this.otherIdentityId,
-    );
   }
 
   @given('I sign the current conversations request with an expired timestamp')
@@ -5617,49 +5275,6 @@ export default class Definitions {
     });
   }
 
-  @given('I have sent an encrypted conversation message')
-  public async iHaveSentAnEncryptedConversationMessage(): Promise<void> {
-    if (!this.conversationId) {
-      throw new Error('Conversation must be created first.');
-    }
-
-    await this.iSetAnEncryptedConversationMessageBody();
-    await this.iSignTheCurrentConversationMessageRequest();
-
-    this.response = await this.restClient.post(
-      `/conversations/${this.conversationId}/messages`,
-      JSON.parse(this.body || '{}'),
-      { headers: this.headers },
-    );
-
-    if (this.response.status !== 200) {
-      throw new Error(
-        `Could not send message: ${JSON.stringify(this.response.data)}`,
-      );
-    }
-
-    this.messageId = this.response.data.id;
-  }
-
-  @given('I have reacted to the sent message')
-  public async iHaveReactedToTheSentMessage(): Promise<void> {
-    if (!this.conversationId || !this.messageId) {
-      throw new Error('Conversation and message must be created first.');
-    }
-
-    this.response = await this.restClient.post(
-      `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
-      JSON.parse(this.body || '{}'),
-      { headers: this.headers },
-    );
-
-    if (this.response.status !== 200) {
-      throw new Error(
-        `Could not react to message: ${JSON.stringify(this.response.data)}`,
-      );
-    }
-  }
-
   @given('I have created a private community text channel')
   public async iHaveCreatedAPrivateCommunityTextChannel(): Promise<void> {
     this.iSetAPrivateCommunityBody();
@@ -6219,19 +5834,6 @@ export default class Definitions {
     );
   }
 
-  @when('I PUT the current conversation messages read marker')
-  public async iPUTTheCurrentConversationMessagesReadMarker(): Promise<void> {
-    if (!this.conversationId) {
-      throw new Error('Conversation must be created first.');
-    }
-
-    this.response = await this.restClient.put(
-      `/conversations/${this.conversationId}/messages/read-until`,
-      this.body && JSON.parse(this.body),
-      { headers: this.headers },
-    );
-  }
-
   @when('I PUT the created identity')
   public async iPUTTheCreatedIdentity(): Promise<void> {
     if (!this.createdIdentityId) {
@@ -6240,15 +5842,6 @@ export default class Definitions {
 
     this.response = await this.restClient.put(
       `/identities/${encodeURIComponent(this.createdIdentityId)}`,
-      this.body && JSON.parse(this.body),
-      { headers: this.headers },
-    );
-  }
-
-  @when('I PATCH {string}')
-  public async iPATCH(path: string): Promise<void> {
-    this.response = await this.restClient.patch(
-      path,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
@@ -6869,43 +6462,6 @@ export default class Definitions {
     );
   }
 
-  @when('I POST the message to the current conversation')
-  public async iPostTheMessageToTheCurrentConversation(): Promise<void> {
-    if (!this.conversationId) {
-      throw new Error('Conversation must be created first.');
-    }
-
-    this.response = await this.restClient.post(
-      `/conversations/${this.conversationId}/messages`,
-      this.body && JSON.parse(this.body),
-      { headers: this.headers },
-    );
-  }
-
-  @when('I GET latest messages from the current conversation')
-  public async iGetLatestMessagesFromTheCurrentConversation(): Promise<void> {
-    if (!this.conversationId) {
-      throw new Error('Conversation must be created first.');
-    }
-
-    this.response = await this.restClient.get(
-      `/conversations/${this.conversationId}/messages?limit=50`,
-      this.headers,
-    );
-  }
-
-  @when('I GET latest messages before the sent message')
-  public async iGetLatestMessagesBeforeTheSentMessage(): Promise<void> {
-    if (!this.conversationId || !this.messageId) {
-      throw new Error('Conversation and message must be created first.');
-    }
-
-    this.response = await this.restClient.get(
-      `/conversations/${this.conversationId}/messages?limit=50&beforeMessageId=${this.messageId}`,
-      this.headers,
-    );
-  }
-
   @when('I GET the authenticated identity keychain')
   public async iGetTheAuthenticatedIdentityKeychain(): Promise<void> {
     if (!this.ownerIdentityId) {
@@ -6999,58 +6555,6 @@ export default class Definitions {
   public async iDELETE(path: string): Promise<void> {
     this.response = await this.restClient.delete(
       path,
-      this.body && JSON.parse(this.body),
-      { headers: this.headers },
-    );
-  }
-
-  @when('I DELETE the sent message from the current conversation')
-  public async iDELETETheSentMessageFromTheCurrentConversation(): Promise<void> {
-    if (!this.conversationId || !this.messageId) {
-      throw new Error('Conversation and message must be created first.');
-    }
-
-    this.response = await this.restClient.delete(
-      `/conversations/${this.conversationId}/messages/${this.messageId}`,
-      this.body && JSON.parse(this.body),
-      { headers: this.headers },
-    );
-  }
-
-  @when('I PUT the sent message in the current conversation')
-  public async iPUTTheSentMessageInTheCurrentConversation(): Promise<void> {
-    if (!this.conversationId || !this.messageId) {
-      throw new Error('Conversation and message must be created first.');
-    }
-
-    this.response = await this.restClient.put(
-      `/conversations/${this.conversationId}/messages/${this.messageId}`,
-      this.body && JSON.parse(this.body),
-      { headers: this.headers },
-    );
-  }
-
-  @when('I POST the reaction to the sent message')
-  public async iPOSTTheReactionToTheSentMessage(): Promise<void> {
-    if (!this.conversationId || !this.messageId) {
-      throw new Error('Conversation and message must be created first.');
-    }
-
-    this.response = await this.restClient.post(
-      `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
-      this.body && JSON.parse(this.body),
-      { headers: this.headers },
-    );
-  }
-
-  @when('I DELETE the reaction from the sent message')
-  public async iDELETETheReactionFromTheSentMessage(): Promise<void> {
-    if (!this.conversationId || !this.messageId) {
-      throw new Error('Conversation and message must be created first.');
-    }
-
-    this.response = await this.restClient.delete(
-      `/conversations/${this.conversationId}/messages/${this.messageId}/reactions`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
@@ -7158,11 +6662,6 @@ export default class Definitions {
         : undefined;
       expect(currentCall).to.not.equal(undefined);
     }
-  }
-
-  @then('response body should contain')
-  public responseBodyShouldContainObject(objectToContain: string): void {
-    expect(JSON.stringify(this.response.data)).to.contain(objectToContain);
   }
 
   @then('response body should not contain {string}')
@@ -7289,14 +6788,6 @@ export default class Definitions {
     expect(actualValue).to.contain(
       expectedValue,
       `Header ${headerName} does not contain expected value. Expected to contain: ${expectedValue}, Actual: ${actualValue}`,
-    );
-  }
-
-  @then('response header {string} should not exist')
-  public responseHeaderShouldNotExist(headerName: string): void {
-    const actualValue = this.response.headers[headerName.toLowerCase()];
-    expect(actualValue).to.be.undefined(
-      `Header ${headerName} should not exist but found: ${actualValue}`,
     );
   }
 

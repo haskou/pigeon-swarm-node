@@ -2,35 +2,32 @@
 
 Refs [#289](https://github.com/haskou/pigeon-swarm-node/issues/289).
 
-Status: design for the group part of #289. Nothing in this document is implemented.
-Group conversations need MLS, which is not built. UI `docs/mls-group-encryption.md`
-marks group conversations out of scope and tracks them under UI
-[#174](https://github.com/haskou/pigeon-swarm-ui/issues/174). This document extends
-the 1:1 contract in `docs/design/opaque-mailboxes.md` and leaves history to
-`docs/design/own-copy-and-history-backfill.md`.
+Status: implemented. Every non-community group conversation runs on per-member
+mailboxes with MLS. The client is in pigeon-swarm-ui `src/contexts/groupMailboxes/`
+(UI `docs/opaque-mailboxes-client.md`, "Group mailbox key schedule" and "Group
+conversation cutover"; UI `docs/mls-group-encryption.md`). The node adds no route
+for it. This document extends the 1:1 contract in `docs/design/opaque-mailboxes.md`
+and leaves history to `docs/design/own-copy-and-history-backfill.md`.
 
 ## Problem
 
-Group conversations are still on the legacy path:
+A group conversation needs private delivery with real removal:
 
-- Every group message is an OrbitDB document replicated to every node.
-  `authorId`, `conversationId`, `createdAt`, `previousMessageIds`, `scopeType` and
-  `type` are in clear. Only `encryptedPayload` is ciphertext
-  (`src/contexts/conversations/infrastructure/orbitdb/documents/OrbitDBConversationMessageDocument.ts`).
-- Membership is a plaintext roster. `Conversation.participantIds` is a plain list
+- Data replicated as OrbitDB documents reaches every node, with author,
+  conversation and timing in clear. Group messages must not travel that way.
+- Membership is a roster on the node. `Conversation.participantIds` is a plain list
   (`src/contexts/conversations/domain/Conversation.ts`).
-- A group has one symmetric key, created once (`createGroupConversationKeyEntry` in
-  UI `src/contexts/conversations/infrastructure/http/PigeonConversationCommandsApi.ts`).
-  It is sealed to each invitee. `removeMember` signs `member_removed` and deletes
-  the roster entry, but does not rotate the key. Replication still gives the removed
-  member's node every new ciphertext, so removal revokes nothing.
-- Group conversations do not use MLS. MLS in the UI is confined to
-  `src/contexts/communities/infrastructure/mls/`.
+- One symmetric key per group, sealed to each invitee, revokes nothing on removal:
+  the removed member keeps the key. Removal needs a key change.
 
-1:1 mailboxes already give opaque, capability-based delivery (`opaque-mailboxes.md`).
+1:1 mailboxes give opaque, capability-based delivery (`opaque-mailboxes.md`).
 Group delivery needs three things 1:1 does not have: a routing unit per member that
 does not need a conversation-to-member table on the node, revocation on removal,
 and one encryption per message with N appends for the copies.
+
+The node has no group message, read marker or unread route. Read state and unread
+counts are computed in the client. The node sends no push notification for group
+mailbox envelopes and no push to clear one.
 
 ## Goals and non-goals
 
@@ -47,13 +44,13 @@ Goals:
 
 Non-goals (stated so nobody claims them):
 
-- Hiding the group roster from the node. The roster stays on legacy and is plaintext
-  there. This does not meet the no-plaintext-participant-list goal for groups until
-  decision D15 is resolved.
+- Hiding the group roster from the node. The roster stays in the signed conversation
+  operation log and is plaintext there. This does not meet the
+  no-plaintext-participant-list goal for groups (D15).
 - Hiding IP addresses, connection timing or the shape of fan-out bursts.
 - Giving a joiner history from before it joined. MLS gives no past epoch secrets to
   a joiner.
-- Backfilling legacy group messages into MLS.
+- Unread counts or push from the node. Read state is device-local in the client.
 - Protecting against a member who leaks plaintext.
 
 ## Model
@@ -106,7 +103,7 @@ readToken(Y,k) = HKDF(rootKey_Y, "pigeon/mailbox/read/v1" || mailboxId(Y,k))    
 ### Why the slot is derived
 
 If `mailboxId` were a function of the identity id alone, anyone holding the identity
-records the node already keeps (the signed identity payload and the legacy roster)
+records the node already keeps (the signed identity payload and the roster)
 could compute and link the inbox. The slot mixes in `gen_k`, which only members of the
 generation hold, so the node and outsiders still cannot link an inbox to an identity.
 A random slot carried in an MLS leaf extension was considered and dropped: it needs a
@@ -120,11 +117,11 @@ A slot is per identity, not per device. All devices of `Y` read the same inbox (
 
 1. The creator makes the MLS group, `gen_0`, and inbox `I(creator,0)`. The inbox is
    created with a PUT and creation proof of work (see Costs).
-2. The inviter asks the invitee for a key package and gets it back as encrypted
-   control records over their existing 1:1 mailbox (see Control traffic).
+2. The inviter asks the invitee for a key package and gets it back as sealed control
+   letters (see Control traffic).
 3. Each invitee is added by an MLS Add in a commit, which advances the generation to
-   `k`. The inviter sends the joiner `{welcome, k}` as an encrypted control record
-   over the same 1:1 mailbox (D8). The joiner exports `gen_k` itself from the epoch
+   `k`. The inviter sends the joiner `{welcome, k}` as a sealed control letter
+   (D8). The joiner exports `gen_k` itself from the epoch
    the Welcome puts it in, so `gen_k` never travels and an inviter cannot hand it a
    generation the other members do not use. `k` is public; a wrong `k` only
    mislabels it. Each Welcome opens once per device.
@@ -157,7 +154,9 @@ Removal of Carol at generation `k`:
    id, post token or envelope key of the new generation. Her access to new traffic
    ends.
 
-Leave: the leaver sends a self-removal proposal, and a remaining member commits it.
+Leave and removal both start from the roster. The member with the lowest identity
+id among those still in both the roster and the MLS group commits every removal,
+then every add, on its next sync, so members never race each other's commits.
 The rest of the flow is the same.
 
 Device removal: a device is an MLS leaf (D19), so removing it is a removal commit and
@@ -185,8 +184,8 @@ No control message travels in clear and none uses a new node route.
 
 | Record | Path | Protection |
 | --- | --- | --- |
-| Key package request and response | 1:1 mailbox between inviter and invitee | 1:1 envelope encryption |
-| Welcome `{welcome, k}` | 1:1 mailbox between inviter and joiner | 1:1 envelope encryption; the Welcome is also sealed to the key package |
+| Key package request and response | signed, sealed `group_conversation_invitation` notification to the peer | sealed to the recipient; not shown in the notification list |
+| Welcome `{welcome, k}` | signed, sealed `group_conversation_invitation` notification to the joiner | sealed to the recipient; the Welcome is also sealed to the key package |
 | Commit (add, remove, update) | `I(Y,k)` of every member, in the delivery generation | D5 per-copy AEAD around the MLS bytes |
 | Application message | `I(Y,k)` of every member, in the current generation | D5 per-copy AEAD around one MLS ciphertext |
 
@@ -298,13 +297,11 @@ N = group members including the sender. Values are from code unless marked.
 - A joiner gets no MLS epoch secrets from before the join. Mailbox envelopes are deleted
   on full acknowledgement and expire after 14 days (`own-copy-and-history-backfill.md`
   L13). After 14 days the mailbox holds no group history for anyone.
-- Group history lives in clients. The cutover removes the replicated group message log
-  (D14): its messages are not migrated, not re-encrypted into MLS, and not readable
-  from the node afterwards. Clients keep only what they already hold locally.
+- Group history lives in clients. The node holds no group message log.
 - A new device of an existing member gets no backfill from mailboxes, as with 1:1. As in
   the own-copy document (D2 and D3, resolved), the pairing export is the only backfill
   source and it must cover group records too. With no authorized device online, older
-  group history is lost. There is no legacy history read.
+  group history is lost.
 - The client keeps past epoch secrets for the drain window `D` (D10), so messages posted
   before a commit still decrypt after it. A message that cannot be decrypted after the
   window is shown as undecryptable. It is not dropped silently. A sender learns of
@@ -316,10 +313,10 @@ N = group members including the sender. Values are from code unless marked.
 | --- | --- | --- |
 | Identity publication with `mailboxHome` | discovery of home nodes; parsed as the `IdentityMailboxHome` value object (`src/contexts/identities/domain/value-objects/IdentityMailboxHome.ts`: http or https URL, at most 255 characters) | identity id, home node |
 | Roster ops `member_added`, `member_removed` | the roster itself (D15); members check MLS leaves against it | group id, member identity ids, timing |
-| Invitation notifications `group_conversation_invitation` | tells the invitee a conversation exists; carries no Welcome and no `gen_k` (D8) | recipient identity, conversation id, type |
+| Invitation notifications `group_conversation_invitation` | tells the invitee a conversation exists; also carries sealed control letters (key package request and response, `{welcome, k}`) (D8) | recipient identity, conversation id, type, timing |
 | Private blobs (#290) | large attachments; retention `max(PRIVATE_BLOB_RETENTION_MS, MAILBOX_RETENTION_MS)` (`own-copy-and-history-backfill.md` L56, #446) | blob ids |
 | Own copy and pairing export | own devices and history | per own-copy document |
-| MLS key packages | not stored on the node for group conversations; exchanged as control records over the 1:1 mailbox | nothing beyond the 1:1 mailbox metadata |
+| MLS key packages | not stored on the node for group conversations; exchanged as sealed control letters | sender, recipient, conversation id and timing of the notification |
 
 Discovery: a sender reads each member's `mailboxHome` from its signed identity payload.
 It derives inbox ids from `gen_k` and the slots. No group directory is needed. A member
@@ -329,20 +326,20 @@ and the group path inherits it. The UI router falls back to the local node
 
 ## Metadata leakage
 
-| Signal | Legacy group today | With group mailboxes |
-| --- | --- | --- |
-| Conversation id per message | in clear (`conversationId`) | not in mailbox data; still in roster and invitations |
-| Sender identity per message | in clear (`authorId`) | not in mailbox data; inside MLS |
-| Message type and scope | in clear (`type`, `scopeType`) | not in mailbox data |
-| Who is in the group | plaintext roster | still plaintext (D15) |
-| Group size | from roster | from roster; also from fan-out burst |
-| Message timing per group | per message | per inbox append burst; N appends from one client reveal one fan-out |
-| Membership change | roster op | roster op plus rotation burst: N - 1 PUTs from N - 1 clients |
-| Inbox linkage across generations | n/a | none; ids change per generation and carry no identity |
-| Copy linkage across inboxes | n/a | none with D5 option A; prefix match with option B |
-| Sizes | exact | bucketed |
-| 404, 409, 429 responses | n/a | reveal an inbox's absence or fill |
-| IP address and timing | visible | visible (non-goal) |
+| Signal | With group mailboxes |
+| --- | --- |
+| Conversation id per message | not in mailbox data; in roster and invitations |
+| Sender identity per message | not in mailbox data; inside MLS |
+| Message type and scope | not in mailbox data |
+| Who is in the group | plaintext roster (D15) |
+| Group size | from roster; also from fan-out burst |
+| Message timing per group | per inbox append burst; N appends from one client reveal one fan-out |
+| Membership change | roster op plus rotation burst: N - 1 PUTs from N - 1 clients |
+| Inbox linkage across generations | none; ids change per generation and carry no identity |
+| Copy linkage across inboxes | none with D5 option A; prefix match with option B |
+| Sizes | bucketed |
+| 404, 409, 429 responses | reveal an inbox's absence or fill |
+| IP address and timing | visible (non-goal) |
 
 The design removes message-level metadata: conversation id, sender, type, and per-message
 participants. Group-level metadata stays. The roster is the largest remaining leak. It
@@ -359,48 +356,45 @@ is the reason the no-plaintext-participant-list goal is not met for groups.
 | D5 | Envelope payload | MLS bytes unchanged inside a per-copy AEAD with random nonce, AAD `mailboxId` | option B, no outer layer: `group_id` and `epoch` readable in clear, copies linkable by prefix. Needs Main sign-off |
 | D6 | Commit path | commits fan out through inboxes, like messages | node commit log: reveals group timing and needs a new table |
 | D7 | Commit ordering | lowest commit id per epoch, as in the community MLS path; the client keeps the previous epoch to switch | roster op carrying the epoch: needs a roster format change; node commit log: a new store |
-| D8 | Invitation | key package exchange and `{welcome, k}` as encrypted control records over the inviter's 1:1 mailbox | inside the legacy `group_conversation_invitation` notification: puts the Welcome on the replicated path |
+| D8 | Invitation | key package exchange and `{welcome, k}` as sealed control letters in signed `group_conversation_invitation` notifications | over the inviter's 1:1 mailbox: needs a 1:1 inbox between every inviter and joiner |
 | D9 | Sender delivery | durable outbound queue; backoff on 404, 409, 429; re-encrypt under the current epoch if the generation changed; expire after 14 days and report failure | silent drop, as 1:1 does on 404 (`own-copy-and-history-backfill.md` L23): rejected |
 | D10 | Past epoch secrets | keep them for the drain window `D` | drop them: loses messages posted before a commit |
 | D11 | Old inbox deletion | owner DELETEs `I(Y,k)` 6 hours after applying the commit; 14-day idle expiry is the backstop | immediate delete: loses in-flight messages; 24 hours: a longer window for spam from a removed member |
 | D12 | Removed-member spam | accepted; bounded by 120 per minute and the 1000-envelope cap; MLS rejects unknown senders on read | node-side writer sets: see D3 |
 | D13 | Joiner history | none before join | sealed export from a member: later, as part of the pairing export |
-| D14 | Existing groups at cutover | one clean cutover for every group: the replicated group message routes, their replication and the group key are removed; old group history is not migrated and is lost from the node; users re-create groups | per-group flag with read-only legacy history: rejected (no legacy paths). In-place migration of legacy keys: rejected (no re-encryption of old content) |
-| D15 | Roster | stays plaintext in this phase; the goal is not met for groups | encrypt roster ops (`node-written-collections.md` slice 1, planned, not built), or remove the roster from the node. Needs an owner decision |
+| D14 | Existing groups | groups run only on mailboxes; the node keeps no group message log and the client does not migrate older group data; such groups are re-created | per-group flag: rejected (one delivery path) |
+| D15 | Roster | stays plaintext in the signed conversation operation log; the goal is not met for groups | encrypt roster ops, or remove the roster from the node. Needs an owner decision |
 | D16 | Group size cap | 256 on the mailbox path (`MAX_GROUP_PARTICIPANTS`) | raise: upload grows linearly with N |
 | D17 | Message rate | 120 per minute per group, the inbox append limit | raise the limit: needs a node change; measure first |
 | D18 | Large payloads | private blobs (#290); the envelope carries a reference only | envelopes up to 65504 bytes: N x cost per copy |
 | D19 | MLS leaf granularity | device leaves, so device revocation is a removal commit | identity leaves: device revocation needs a separate rotation path |
-| D20 | Capacity | measure inbox count and append load on staging before cutover | none; a required measurement, not a choice |
+| D20 | Capacity | measure inbox count and append load on staging | none; a required measurement, not a choice |
 
-## Implementation plan
+## Implementation
 
-Not part of this PR.
+1. UI group MLS (#174): one MLS group per conversation (`GroupMailboxMlsEngine`);
+   `gen_k` from the exporter after each add or removal; the slot derived from `gen_k`
+   and the identity id.
+2. UI derivation (`GroupMailboxKeySchedule`) for the slot, `mailboxId`, `postToken`,
+   `envelopeKey` and `readToken`, with test vectors for each HKDF label.
+3. UI control letters (`GroupMailboxControl`), send and receive through the mailbox
+   path (`GroupMailboxOutbox`, `GroupMailboxInboxSync`), durable outbound queue (D9),
+   past generations (D10), MLS sender check on every record.
+4. Node: no group-specific endpoint. The mailbox routes cover the flow:
+   `PUT /mailboxes/{id}`, `POST /mailboxes/{id}/envelopes`,
+   `GET /mailboxes/{id}/envelopes`, `POST /mailboxes/{id}/ack`, the reader routes,
+   and `DELETE /mailboxes/{id}` for D11. The node keeps the roster in the signed
+   conversation operation log and has no group message routes.
 
-1. Group MLS in UI (#174): one MLS group per conversation; `gen_k` from the exporter
-   after each add or removal; the slot derived from `gen_k` and the identity id.
-2. UI: a derivation module for the slot, `mailboxId`, `postToken`, `envelopeKey` and
-   `readToken`, with test vectors for each HKDF label.
-3. UI: control traffic as encrypted records (see Control traffic); send and receive
-   for group conversations through the mailbox path; durable outbound queue (D9);
-   past epoch secrets (D10); MLS sender check on every record.
-4. Node: no new endpoint. The existing routes cover the flow: `PUT /mailboxes/{id}`,
-   `POST /mailboxes/{id}/envelopes`, `GET /mailboxes/{id}/envelopes`,
-   `POST /mailboxes/{id}/ack`, the reader routes, and `DELETE /mailboxes/{id}` for
-   D11.
-5. Staging: N = 256, the 120-per-minute ceiling, offline-member fill, inbox counts per
-   node (D20).
-6. Cutover (D14): one release for every group. Remove the replicated group message
-   routes, their replication and the group key. No per-group flag and no legacy reads.
+Open in the UI: background unread counts, thread reply counts and the outbox UI of
+group conversations; abandoning a locally persisted commit (#380); authenticated
+MLS credentials (#375); sealing MLS state with the device root (#376).
 
 ## Verification
 
-- This PR changes one file: `docs/design/group-mailboxes.md`. No code or tests changed.
-  CI is the gate.
-- Checked by reading the sources listed under References and the mailbox routes in
-  `src/apps/apis/mailboxes-api/routes/`.
-- Checked in the UI (haskou/pigeon-swarm-ui#174): the `ts-mls` exporter and the slot
-  derivation, with test vectors.
+- UI: `GroupMailboxKeySchedule.spec.ts` checks the derivation vectors (`yarn test:crypto`).
+- Node: the mailbox routes in `src/apps/apis/mailboxes-api/routes/` and
+  `test:e2e:real-transport:mailbox-two-node`.
 - Not verified: the RFC 9420 header claim behind D5; proof-of-work timing at 16 and 20
   bits; capacity at N = 256 and inbox counts (D20); cross-node group delivery.
 
@@ -408,12 +402,10 @@ Not part of this PR.
 
 - `docs/design/opaque-mailboxes.md`, the 1:1 contract this document extends
 - `docs/design/own-copy-and-history-backfill.md`
-- `docs/design/node-written-collections.md`, roster plan, not built
 - `src/contexts/mailboxes/domain/MailboxPolicy.ts`
 - `src/contexts/conversations/domain/operations/ConversationOperationLimits.ts`
 - `src/contexts/conversations/domain/Conversation.ts`
-- `src/contexts/conversations/infrastructure/orbitdb/documents/OrbitDBConversationMessageDocument.ts`
 - `src/contexts/identities/domain/value-objects/IdentityMailboxHome.ts`
 - UI (origin/main): `docs/opaque-mailboxes-client.md`, `docs/mls-group-encryption.md`,
-  `src/contexts/conversations/infrastructure/http/PigeonConversationCommandsApi.ts`
+  `src/contexts/groupMailboxes/`
 - Issue #289 comments, 2026-10-12T15:07, T16:22 and T16:31

@@ -116,7 +116,7 @@ signature:
 
 `frontier` is present only on records scoped to a community or conversation
 (channel messages, reactions, pins, invites, membership requests, moderation
-log, MLS records, polls, conversation messages, reactions and pins) and absent
+log, MLS records, polls) and absent
 everywhere else; the node rejects a scoped record without it and any other
 record with it. It lists 1–64 digests of the scope's operations, strictly
 ascending, that the author had observed (`GET /communities/:id/frontier`,
@@ -412,11 +412,6 @@ Implemented:
 - deliver notification events only to the notification recipient
 - deliver conversation events only to the conversation participants when the
   event carries `participantIds`
-- deliver `conversations.v1.messages.were_read` receipts only to the conversation
-  participants this node already knows, and only after `readProof` verifies for
-  the event's conversation, message and reader and its `timestamp` is inside the
-  14 day freshness window; the `participantIds` on a receipt are not used for
-  routing because they arrive from the network unverified
 - deliver presence events only to the connections of the identity they describe
 - deliver conversation call snapshots only to currently authorized participants;
   community call snapshots go to clients with current voice-channel access
@@ -433,14 +428,6 @@ Event contracts used by frontend:
 
 | Event type                                            | Aggregate id      | Attributes used by clients/routing                                                                                         |
 | ----------------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `conversations.v1.message.was_sent`                   | conversation id   | `messageId`, `authorId`, `networkId`, `participantIds`                                                                     |
-| `conversations.v1.message.was_edited`                 | conversation id   | `messageId`, `targetMessageId`, `networkId`, `participantIds`                                                              |
-| `conversations.v1.message.was_deleted`                | conversation id   | `messageId`, `targetMessageId`, `networkId`, `participantIds`                                                              |
-| `conversations.v1.message.was_pinned`                 | conversation id   | `messageId`, `pinnedByIdentityId`, `networkId`, `participantIds`                                                           |
-| `conversations.v1.message.was_unpinned`               | conversation id   | `messageId`, `unpinnedByIdentityId`, `networkId`, `participantIds`                                                         |
-| `conversations.v1.messages.were_read`                 | conversation id   | `messageId`, `readerIdentityId`, `networkId`, `participantIds`                                                             |
-| `conversations.v1.message.reaction.was_added`         | conversation id   | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds`                                               |
-| `conversations.v1.message.reaction.was_removed`       | conversation id   | `messageId`, `authorId`, `emoji`, `createdAt`, `networkId`, `participantIds`                                               |
 | `calls.v1.call.snapshot_changed`                      | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
 | `calls.v1.call.started`                               | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
 | `calls.v1.participant.joined`                         | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
@@ -478,11 +465,6 @@ Event contracts used by frontend:
 | `nodes.v1.node.network.was_added`                     | node id           | node/network metadata                                                                                                      |
 | `nodes.v1.node.network.was_removed`                   | node id           | `networkId`                                                                                                                |
 | `nodes.v1.node.relay_configuration.was_updated`       | node id           | `relayConfiguration`                                                                                                       |
-
-For `conversations.v1.message.*`, use `event.aggregate_id` as
-`conversationId` and `event.attributes.messageId` as the message id to fetch.
-For `conversations.v1.messages.were_read`, use `event.aggregate_id` as
-`conversationId` and refresh the conversation unread counters if needed.
 
 For call lifecycle and signalling events, use `event.aggregate_id` as
 `callId`. Browser notifications for `calls.v1.participant_lease.was_updated`
@@ -1347,7 +1329,7 @@ Implemented:
 - remove the network from local node metadata
 - stop the runtime IPFS network and delete the local IPFS storage folder for that network
 - delete local and replicated data scoped to that network:
-  conversations, conversation messages/reactions/unread markers, communities and their channel messages/reactions/invites/requests/moderation logs, calls, polls, missed-call notifications, peer network references and content replication records
+  conversations, communities and their channel messages/reactions/invites/requests/moderation logs, calls, polls, missed-call notifications, peer network references and content replication records
 - preserve identity metadata that still belongs to other networks by removing only the deleted `networkId`
 - delete identity metadata only when the deleted network was its only network
 
@@ -2198,7 +2180,6 @@ Implemented:
 - require signed request auth
 - list conversations where the authenticated identity participates
 - support `limit` and `beforeConversationId`
-- include `unreadCount` for the authenticated identity
 
 ### Create a conversation
 
@@ -2264,8 +2245,7 @@ Response:
   "participantIds": ["<authenticatedIdentityId>", "<participantIdentityId>"],
   "adminIds": [],
   "creatorId": "<authenticatedIdentityId>",
-  "type": "group",
-  "unreadCount": 0
+  "type": "group"
 }
 ```
 
@@ -2290,187 +2270,6 @@ Implemented:
 Standalone group conversations are different from future community channels:
 groups use explicit `participantIds`, while community channel access will be
 based on community membership/roles.
-
-### Conversation message log scope
-
-The replicated conversation message log (messages, edits, deletions, polls,
-reactions, pins, read markers, threads and the message timeline) exists only for
-group conversations. One-to-one conversations exchange messages only through
-opaque mailboxes. Every message route below answers a participant of a 1:1
-conversation with `409`; a non-participant still gets the participant error first:
-
-```json
-{
-  "code": "OneToOneConversationMessagesNotReplicatedError",
-  "message": "One-to-one conversation messages are not replicated"
-}
-```
-
-Nodes also refuse replicated 1:1 message, reaction, pin and read-marker records,
-and drop 1:1 message, edit, deletion, reaction and read events received over
-PubSub without fanning them out. A 1:1 keeps its signed genesis, its listing
-entry, its frontier and its calls.
-
-### Get latest messages
-
-```http
-GET /conversations/{conversationId}/messages?limit=50&beforeMessageId=<messageId>
-```
-
-Response:
-
-```json
-{
-  "conversationId": "group:<id>",
-  "messages": [
-    {
-      "id": "<messageId>",
-      "type": "sent",
-      "authorIdentityId": "<identityId>",
-      "createdAt": 1773848829055,
-      "encryptedPayload": "<encryptedMessagePayload>",
-      "previousMessageIds": [],
-      "replyToMessageId": "<messageId>",
-      "reactions": [
-        {
-          "authorIdentityId": "<identityId>",
-          "createdAt": 1773848829055,
-          "emoji": "👍"
-        }
-      ]
-    },
-    {
-      "id": "call-event:<callId>:ended:<identityId>",
-      "conversationId": "group:<id>",
-      "type": "call_event",
-      "callId": "<callId>",
-      "callEventType": "ended",
-      "actorIdentityId": "<identityId>",
-      "createdAt": 1773848869055,
-      "durationMs": 40000
-    },
-    {
-      "id": "<pollId>",
-      "type": "poll",
-      "creatorIdentityId": "<identityId>",
-      "createdAt": 1773848879055,
-      "question": "Pizza or sushi?",
-      "options": [
-        { "id": "pizza", "text": "Pizza" },
-        { "id": "sushi", "text": "Sushi" }
-      ],
-      "allowsMultipleVotes": true,
-      "scope": {
-        "type": "group_conversation",
-        "conversationId": "group:<id>"
-      },
-      "status": "open",
-      "votes": []
-    }
-  ],
-  "nextBeforeMessageId": "<messageId>"
-}
-```
-
-Implemented:
-
-- require signed request auth
-- return the latest messages ordered from oldest to newest in the page
-- include non-encrypted `call_event` system items for calls scoped to the
-  group conversation, with `callEventType` equal to `ended`, `declined` or `missed`
-- include `poll` timeline items scoped to the group conversation. For group
-  conversations, the poll `id` is also registered as a conversation message id,
-  so it is valid in later `previousMessageIds`.
-- when `beforeMessageId` is provided, return messages older than that message
-
-### Get one message
-
-```http
-GET /conversations/{conversationId}/messages/{messageId}
-```
-
-Response:
-
-```json
-{
-  "id": "<messageId>",
-  "conversationId": "group:<id>",
-  "authorIdentityId": "<identityId>",
-  "type": "sent",
-  "createdAt": 1773848829055,
-  "encryptedPayload": "<encryptedMessagePayload>",
-  "previousMessageIds": [],
-  "replyToMessageId": "<messageId>",
-  "reactions": []
-}
-```
-
-Implemented:
-
-- require signed request auth
-- require the authenticated identity to be a conversation participant
-- return one message by id so WebSocket clients can fetch only the announced
-  message instead of reloading the whole page
-
-### Get messages around one message
-
-```http
-GET /conversations/{conversationId}/messages/{messageId}/around?before=20&after=20
-```
-
-Response:
-
-```json
-{
-  "messages": [],
-  "previousCursor": "<messageBeforeWindowOrNull>",
-  "nextCursor": "<messageAfterWindowOrNull>"
-}
-```
-
-Implemented:
-
-- require signed request auth
-- require the authenticated identity to be a conversation participant
-- return a window ordered from oldest to newest around `messageId`
-- include cursors when there are more messages before or after the returned
-  window
-- support reply navigation when the replied-to message is not currently loaded
-
-### Get conversation thread replies
-
-```http
-GET /conversations/{conversationId}/messages/{messageId}/thread?limit=50
-```
-
-Response:
-
-```json
-{
-  "conversationId": "group:<id>",
-  "messages": [
-    {
-      "id": "<replyMessageId>",
-      "conversationId": "group:<id>",
-      "authorIdentityId": "<identityId>",
-      "type": "sent",
-      "createdAt": 1773848829055,
-      "encryptedPayload": "<encryptedMessagePayload>",
-      "previousMessageIds": ["<messageId>"],
-      "replyToMessageId": "<messageId>",
-      "reactions": []
-    }
-  ],
-  "nextBeforeMessageId": "<replyMessageId>"
-}
-```
-
-Implemented:
-
-- require signed request auth
-- require the authenticated identity to be a conversation participant
-- return messages whose `replyToMessageId` points to the requested root message
-- order replies from oldest to newest
 
 ### Signed conversation operations
 
@@ -2593,9 +2392,8 @@ every node folds it):
 - `admin_promoted`: only by the creator; the target is a member, not the creator and
   not already an admin. `admin_demoted`: only by the creator; the target is an admin.
 - A 1:1 is immutable: it accepts its genesis and refuses every other operation.
-- Group messages, pins, reactions and read markers, and the calls of both kinds,
-  authorize against the folded roster (1:1 from the signed genesis); a removed
-  member loses access.
+- Group polls and the calls of both kinds authorize against the folded roster
+  (1:1 from the signed genesis); a removed member loses access.
 
 **Limits.** `args` is at most 4096 bytes of JSON, a group has at most 256 members and
 an identity other than the creator signs at most 1000 operations per conversation
@@ -2722,354 +2520,20 @@ Implemented:
 - the backend treats `encryptedPayload` as opaque client-encrypted data
 - saving or deleting a draft requires conversation participation
 
-### Conversation pins
+### Conversation messages
 
-```http
-GET /conversations/{conversationId}/pins
-POST /conversations/{conversationId}/messages/{messageId}/pin
-DELETE /conversations/{conversationId}/messages/{messageId}/pin
-```
+The node stores no conversation messages. Messages, edits, deletions, reactions,
+pins and history of one-to-one and group conversations travel only through
+opaque mailboxes (see _Mailbox HTTP API_, `docs/design/opaque-mailboxes.md` and
+`docs/design/group-mailboxes.md`). There are no `/conversations/{conversationId}/messages`
+or `/conversations/{conversationId}/pins` routes.
 
-List response:
-
-```json
-{
-  "conversationId": "group:<id>",
-  "pins": [
-    {
-      "messageId": "<messageId>",
-      "pinnedByIdentityId": "<identityId>",
-      "createdAt": 1773848829055,
-      "message": {
-        "id": "<messageId>",
-        "conversationId": "group:<id>",
-        "authorIdentityId": "<identityId>",
-        "type": "sent",
-        "createdAt": 1773848829055,
-        "encryptedPayload": "<encryptedMessagePayload>",
-        "previousMessageIds": [],
-        "reactions": []
-      }
-    }
-  ]
-}
-```
-
-Pin requests carry `{ "createdAt": <ms>, "mutation": SignedPublicMutation }`;
-unpin requests carry `{ "mutation": SignedPublicMutation }` with a `delete` proof.
-Conversation pins and reactions use the same proof rules as the community ones
-(see Community channel pins), with `scopeType: "conversation"`: the conversation
-must be a group and the proof author one of its participants, and missing, forged,
-copied-scope, stale or revoked-device proofs fail with 409. Replicated records
-without a valid proof, or for a 1:1 conversation, are ignored by every node.
-
-Implemented:
-
-- require signed request auth
-- require the authenticated identity to be a conversation participant
-- pins are OrbitDB replicated metadata; message IPFS documents are not rewritten
-- pinning validates that the target message exists locally
-
-### Send message
-
-```http
-POST /conversations/{conversationId}/messages
-```
-
-Request:
-
-```json
-{
-  "id": "<clientGeneratedMessageId>",
-  "createdAt": 1773848829055,
-  "encryptedPayload": "<encryptedMessagePayload>",
-  "previousMessageIds": ["<lastKnownMessageId>"],
-  "replyToMessageId": "<messageId>",
-  "mutation": SignedPublicMutation
-}
-```
-
-Response:
-
-```json
-{
-  "id": "<messageId>",
-  "conversationId": "group:<id>",
-  "authorIdentityId": "<identityId>",
-  "type": "sent",
-  "createdAt": 1773848829055,
-  "encryptedPayload": "<encryptedMessagePayload>",
-  "previousMessageIds": [],
-  "replyToMessageId": "<messageId>",
-  "reactions": []
-}
-```
-
-Implemented:
-
-- require a client-encrypted payload; a 1:1 conversation is refused with `409`
-  (`OneToOneConversationMessagesNotReplicatedError`)
-- accept optional `previousMessageIds`; when omitted, the node uses an empty
-  list. The signed record must carry exactly the array sent in the body
-- allow replies by sending `replyToMessageId` with the id of an existing,
-  non-deleted `sent` message in the same conversation
-- require a client-signed `mutation` (see below); there is no unsigned fallback
-- persist immutable message document in IPFS
-- persist the signed message record in the OrbitDB `messages` store
-- publish `ConversationMessageWasSentEvent` with `messageId`, `authorId`,
-  `mutationProof`, `networkId` and `participantIds`
-- derive unread state from OrbitDB replicated read markers and message metadata
-- attachment CIDs and metadata belong inside the client-encrypted payload; private
-  attachment bytes must be encrypted by the client and uploaded first as a
-  private blob (`POST /private-blobs`, then `PUT /private-blobs/{blobId}`)
-
-### Edit message
-
-```http
-PUT /conversations/{conversationId}/messages/{messageId}
-```
-
-Request:
-
-```json
-{
-  "id": "<clientGeneratedEditionMessageId>",
-  "createdAt": 1773848829055,
-  "encryptedPayload": "<updatedEncryptedMessagePayload>",
-  "previousMessageIds": ["<editedMessageId>"],
-  "mutation": SignedPublicMutation
-}
-```
-
-Response:
-
-```json
-{
-  "id": "<editionMessageId>",
-  "conversationId": "group:<id>",
-  "authorIdentityId": "<identityId>",
-  "type": "edited",
-  "createdAt": 1773848829055,
-  "encryptedPayload": "<updatedEncryptedMessagePayload>",
-  "previousMessageIds": ["<editedMessageId>"],
-  "reactions": [],
-  "targetMessageId": "<editedMessageId>"
-}
-```
-
-Implemented:
-
-- require signed request auth
-- only allow the original message author to edit the message
-- reject edits for deleted messages
-- require a client-signed `mutation` over the edited-message record
-- use `targetMessageId` from the path and default `previousMessageIds` to
-  `[messageId]` when the body omits it
-- persist the immutable `edited` record in IPFS
-- publish `ConversationMessageWasEditedEvent` with `messageId`,
-  `targetMessageId`, `networkId` and `participantIds`
-- consuming nodes register the edit through the existing conversation message
-  registrar
-
-#### Signed conversation message records
-
-Every conversation message (`sent`, `edited`, `deleted` and the `poll`
-timeline message) is an immutable record in the replicated `messages` store,
-written once with a client-signed `SignedPublicMutation`: `store: "messages"`,
-`recordId` = the message `id`, `kind: "put"`, `sequence: 0`,
-`predecessor: null`, signed by an authorized device of the author. `payloadDigest`
-commits to this record (the stored document without `proof`), whose field set is
-closed:
-
-```json
-{
-  "authorId": "<identityId>",
-  "conversationId": "<conversationId>",
-  "createdAt": 1773848829055,
-  "encryptedPayload": "<only sent/edited>",
-  "id": "<messageId>",
-  "pollId": "<only poll>",
-  "previousMessageIds": [],
-  "replyToMessageId": "<optional, sent only>",
-  "scopeType": "conversation",
-  "targetMessageId": "<only edited/deleted>",
-  "type": "sent | edited | deleted | poll"
-}
-```
-
-Optional fields are omitted when absent. `authorId` is the authenticated identity.
-`edited` and `deleted` default `previousMessageIds` to `[targetMessageId]`
-(the path `messageId`); `sent` defaults to `[]`. Nodes reject records whose
-conversation is not a group or whose author is not a conversation participant.
-
-### Mark messages as read
-
-```http
-PUT /conversations/{conversationId}/messages/read-until
-```
-
-Request:
-
-```json
-{
-  "messageId": "<messageId>"
-}
-```
-
-Response:
-
-```json
-{
-  "status": "read"
-}
-```
-
-Implemented:
-
-- require signed request auth
-- require the authenticated identity to be a conversation participant
-- update the OrbitDB replicated read marker for the authenticated identity up to
-  and including `messageId`; nodes refuse a replicated read marker whose
-  `conversationId` is not a group
-- reject a `messageId` older than the stored marker with `409` (`StaleReadMarkerError`); the stored marker stays and no event is published
-- publish `ConversationMessagesWereReadEvent` with `messageId`,
-  `readerIdentityId`, `networkId`, `participantIds` and `readProof` (the reader's
-  signed request)
-- consuming nodes verify `readProof` against the reader's identity key before
-  they apply the same replicated read marker update locally; unproven receipts
-  are dropped. A receipt whose `timestamp` is more than 14 days old, or more
-  than 30 seconds ahead of the consumer's clock, is dropped the same way; late
-  receipts inside the window still apply (residual risks: "Conversation read
-  receipts" in `docs/pubsub-sync-protocol.md`)
-- byte-exact read proof vectors (signing content, signature, and the accept or
-  reject outcome of `MessageReadProofVerifier`) are in
-  [`tests/fixtures/message-read-proof-vectors.json`](../tests/fixtures/message-read-proof-vectors.json),
-  checked by the `MessageReadProofVectors` unit spec
-- send a Web Push control payload of type `notifications_cleared` to the
-  reader identity subscriptions so service workers can close displayed
-  notifications sharing the conversation's opaque group tag (see
-  "Payload contract" under Push Notification HTTP API)
-
-### Add message reaction
-
-```http
-POST /conversations/{conversationId}/messages/{messageId}/reactions
-```
-
-Request:
-
-```json
-{
-  "emoji": "👍",
-  "createdAt": 1773848829055,
-  "mutation": { "...": "SignedPublicMutation" }
-}
-```
-
-Response:
-
-```json
-{
-  "authorIdentityId": "<identityId>",
-  "createdAt": 1773848829055,
-  "emoji": "👍"
-}
-```
-
-Implemented:
-
-- require signed request auth
-- require the authenticated identity to be a conversation participant
-- require the target message to exist and be visible locally
-- store reactions in OrbitDB replicated metadata; message IPFS documents are not
-  rewritten
-- keep reactions unique by conversation id, message id, author id and emoji
-- include reactions in `GET /conversations/{conversationId}/messages`,
-  `GET /conversations/{conversationId}/messages/{messageId}` and
-  `GET /conversations/{conversationId}/messages/{messageId}/around`
-- publish `conversations.v1.message.reaction.was_added` with `messageId`,
-  `authorId`, `emoji`, `createdAt`, `networkId` and `participantIds`
-
-### Remove message reaction
-
-```http
-DELETE /conversations/{conversationId}/messages/{messageId}/reactions
-```
-
-Request:
-
-```json
-{
-  "emoji": "👍",
-  "mutation": { "...": "SignedPublicMutation (kind delete)" }
-}
-```
-
-Response:
-
-```json
-{
-  "authorIdentityId": "<identityId>",
-  "createdAt": 1773848829055,
-  "emoji": "👍"
-}
-```
-
-Implemented:
-
-- require signed request auth
-- remove only the authenticated participant reaction for the provided emoji
-- publish `conversations.v1.message.reaction.was_removed` with `messageId`,
-  `authorId`, `emoji`, `createdAt`, `networkId` and `participantIds`
-- synchronize the removal with other nodes through the conversation PubSub
-  consumers
-
-### Delete message
-
-```http
-DELETE /conversations/{conversationId}/messages/{messageId}
-```
-
-Request:
-
-```json
-{
-  "id": "<clientGeneratedDeletionMessageId>",
-  "createdAt": 1773848829055,
-  "mutation": SignedPublicMutation
-}
-```
-
-Response:
-
-```json
-{
-  "id": "<deletionMessageId>",
-  "conversationId": "group:<id>",
-  "authorIdentityId": "<identityId>",
-  "type": "deleted",
-  "createdAt": 1773848829055,
-  "previousMessageIds": ["<deletedMessageId>"],
-  "reactions": [],
-  "targetMessageId": "<deletedMessageId>"
-}
-```
-
-Implemented:
-
-- require signed request auth
-- only allow the original message author to delete the message
-- require a client-signed `mutation` over the deleted-message record, with
-  `previousMessageIds: [messageId]`
-- persist the immutable `deleted` record in IPFS
-- publish `ConversationMessageWasDeletedEvent` with `messageId`,
-  `targetMessageId`, `networkId` and `participantIds`
-- readers hide the target message when a `deleted` message from the same author
-  targets it (no unsigned tombstone is written)
-- remove unread flags for the deleted target message
-- remove the target message block from local IPFS blockstores when present
-- apply the same invalidation/removal when a deletion event is consumed from
-  another node
+- Read state is device-local: the node keeps no read markers and no unread
+  counts, because it cannot read sealed content. Clients compute unread state.
+- The node sends no Web Push for mailbox messages and cannot clear a push that
+  another device already showed.
+- Every node refuses replicated `messages`, `pins` and `reactions` records scoped
+  to a conversation; those stores carry community channel records only.
 
 Signed HTTP request validation:
 
@@ -5198,7 +4662,6 @@ replace WebSocket realtime and it does not carry decrypted message content.
 
 Backend sends push for:
 
-- conversation messages
 - community text channel messages
 - invitation notifications
 - missed-call notifications
@@ -5208,6 +4671,12 @@ When the recipient presence is `busy`, backend suppresses pushes for message
 and call categories. Invitation notifications are still delivered. Notification
 settings can additionally suppress push delivery by conversation, community or
 community channel.
+
+The node sends no push for one-to-one or group conversation messages: they
+travel sealed through opaque mailboxes, so the node cannot tell a message from
+other mailbox traffic. Read state is device-local, so the node also cannot clear
+a notification another device already showed; each device closes its own
+notifications when it reads the conversation.
 
 Server operators must configure:
 
@@ -5238,10 +4707,9 @@ does not send outbound Web Push requests.
 Every Web Push body is a UTF-8 JSON object padded to exactly 1024 bytes, so the
 ciphertext length does not reveal the notification type. Fields:
 
-- `type`: `message`, `call`, `notification` or `notifications_cleared`
+- `type`: `message`, `call` or `notification`
 - `title`, `body`: fixed display text (no message, sender or party names)
 - `tag`: group key the service worker uses to replace or close notifications
-- `tags`: present only on `notifications_cleared`, with the same group keys
 - `padding`: filler the client ignores
 
 Payloads never carry conversation, message, community, channel, call,
@@ -5254,10 +4722,10 @@ Example decrypted by the browser:
 
 ```json
 {
-  "body": "You have a new message.",
+  "body": "You have a new community message.",
   "padding": "xxxxxxxx",
-  "tag": "conversation:<digest>",
-  "title": "New message",
+  "tag": "community:<digest>",
+  "title": "New community message",
   "type": "message"
 }
 ```
@@ -5660,20 +5128,18 @@ Body: `{ "usedAt": <ms>, "mutation": SignedPublicMutation (recent put) }`.
 Polls are interactive timeline items. They can live in a community text channel
 or in a group conversation.
 
-Group conversation polls are also registered as conversation message ids. The
-poll `id` returned in the conversation messages timeline can be used by the
-next message as `previousMessageIds: ["<pollId>"]`.
+The node writes no timeline message for a group conversation poll: the group
+timeline lives only in the members' opaque mailboxes, and the client places the
+poll in it. `timelineMutation` is required for `community_channel` polls and
+ignored for `group_conversation` polls.
 
 Community text channel polls are also registered as channel message ids. The
 poll `id` returned in the community channel messages timeline can be used as
 `beforeMessageId` in pagination.
 
-Poll resources include `"type": "poll"` and are also returned inside the
-existing `messages` arrays for their scope:
-
-- `GET /conversations/{conversationId}/messages` for group conversation polls
-- `GET /communities/{communityId}/channels/{channelId}/messages` for community
-  text channel polls
+Community channel poll resources include `"type": "poll"` and are also
+returned inside the `messages` array of
+`GET /communities/{communityId}/channels/{channelId}/messages`.
 
 Poll events are emitted through websocket as domain events:
 
@@ -6225,47 +5691,16 @@ discards it, exactly as with any secret it already held; the hand-over only
 guarantees that the old generation and the retired device's own entry stop
 being served the moment the retirement applies.
 
-## Planned API
-
-The following API shapes are not implemented yet. They are kept here as design
-notes for upcoming conversation sync and realtime work.
-
-### Edit message
-
-```http
-PATCH /conversations/{conversationId}/messages/{messageId}
-```
-
-Planned:
-
-- model edit as a new immutable message document
-- define author-only rule
-- define editable message types
-- define projection returned to clients
-
-### Synchronize conversation
-
-```http
-POST /conversations/{conversationId}/sync
-```
-
-Planned:
-
-- define anti-entropy strategy
-- define response when no peer has missing messages
-- define response when only one peer has missing messages
-- define sync cursor persistence
-
 ## Node-to-Node Flow
 
 Client realtime does not replace PubSub. The intended flow is:
 
 ```text
-Client A -> Node A: POST /conversations/{id}/messages
+Client A -> Node A: POST /communities/{id}/channels/{channelId}/messages
 Node A -> IPFS: store immutable encrypted message document
 Node A -> OrbitDB: index replicated metadata
 Node A -> DomainEventPublisher: publish accepted domain event
-Node A -> PubSub: announce conversation message
+Node A -> PubSub: announce channel message
 Node B <- PubSub: receive announcement
 Node B -> IPFS: fetch message document
 Node B -> Domain: validate candidate

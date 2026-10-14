@@ -1,4 +1,3 @@
-import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
 import { IdentityPresenceNotFoundError } from '@app/contexts/presence/domain/errors/IdentityPresenceNotFoundError';
 import IdentityPresenceRepository from '@app/contexts/presence/domain/repositories/IdentityPresenceRepository';
@@ -27,36 +26,7 @@ class TestDomainEvent extends DomainEvent {
 }
 
 describe('PushNotificationDispatcher', () => {
-  it('sends conversation message push notifications to recipients only', async () => {
-    const authorIdentityId = await generateIdentityId();
-    const recipientIdentityId = await generateIdentityId();
-    const subscription = createSubscription(recipientIdentityId);
-    const delivery = mockDelivery(true);
-    const dispatcher = createDispatcher({
-      delivery,
-      subscriptions: [subscription],
-    });
-    const event = new TestDomainEvent('conversation-id', {
-      authorId: authorIdentityId.valueOf(),
-      eventName: 'conversations.v1.message.was_sent',
-      messageId: 'message-id',
-      participantIds: [
-        authorIdentityId.valueOf(),
-        recipientIdentityId.valueOf(),
-      ],
-    });
-
-    await dispatcher.dispatch(event);
-
-    expect(delivery.send).toHaveBeenCalledWith(
-      subscription,
-      expect.objectContaining({
-        type: 'message',
-      }),
-    );
-  });
-
-  it('keeps social and message identifiers out of message push payloads', async () => {
+  it('sends no push for conversation messages, which only travel through opaque mailboxes', async () => {
     const authorIdentityId = await generateIdentityId();
     const recipientIdentityId = await generateIdentityId();
     const delivery = mockDelivery(true);
@@ -64,27 +34,20 @@ describe('PushNotificationDispatcher', () => {
       delivery,
       subscriptions: [createSubscription(recipientIdentityId)],
     });
-    const event = new TestDomainEvent('conversation-id', {
-      authorId: authorIdentityId.valueOf(),
-      eventName: 'conversations.v1.message.was_sent',
-      messageId: 'message-id',
-      participantIds: [
-        authorIdentityId.valueOf(),
-        recipientIdentityId.valueOf(),
-      ],
-    });
 
-    await dispatcher.dispatch(event);
+    await dispatcher.dispatch(
+      new TestDomainEvent('conversation-id', {
+        authorId: authorIdentityId.valueOf(),
+        eventName: 'conversations.v1.message.was_sent',
+        messageId: 'message-id',
+        participantIds: [
+          authorIdentityId.valueOf(),
+          recipientIdentityId.valueOf(),
+        ],
+      }),
+    );
 
-    const payload = sentPayload(delivery);
-
-    expect(payload).not.toHaveProperty('data');
-    expectNoIdentifiers(payload, [
-      'conversation-id',
-      'message-id',
-      authorIdentityId.valueOf(),
-      recipientIdentityId.valueOf(),
-    ]);
+    expect(delivery.send).not.toHaveBeenCalled();
   });
 
   it('keeps community channel identifiers out of channel message push payloads', async () => {
@@ -178,15 +141,7 @@ describe('PushNotificationDispatcher', () => {
       delivery,
       subscriptions: [createSubscription(recipientIdentityId)],
     });
-    const event = new TestDomainEvent('conversation-id', {
-      authorId: authorIdentityId.valueOf(),
-      eventName: 'conversations.v1.message.was_sent',
-      messageId: 'message-id',
-      participantIds: [
-        authorIdentityId.valueOf(),
-        recipientIdentityId.valueOf(),
-      ],
-    });
+    const event = channelMessageEvent(authorIdentityId, recipientIdentityId);
 
     await dispatcher.dispatch(event);
 
@@ -203,15 +158,7 @@ describe('PushNotificationDispatcher', () => {
       presences: [createAvailablePresence(recipientIdentityId.valueOf())],
       subscriptions: [subscription],
     });
-    const event = new TestDomainEvent('conversation-id', {
-      authorId: authorIdentityId.valueOf(),
-      eventName: 'conversations.v1.message.was_sent',
-      messageId: 'message-id',
-      participantIds: [
-        authorIdentityId.valueOf(),
-        recipientIdentityId.valueOf(),
-      ],
-    });
+    const event = channelMessageEvent(authorIdentityId, recipientIdentityId);
 
     await dispatcher.dispatch(event);
 
@@ -221,30 +168,6 @@ describe('PushNotificationDispatcher', () => {
         type: 'message',
       }),
     );
-  });
-
-  it('does not send stale message pushes when the message was already read', async () => {
-    const authorIdentityId = await generateIdentityId();
-    const recipientIdentityId = await generateIdentityId();
-    const delivery = mockDelivery(true);
-    const dispatcher = createDispatcher({
-      delivery,
-      subscriptions: [createSubscription(recipientIdentityId)],
-      unreadMessages: [],
-    });
-    const event = new TestDomainEvent('conversation-id', {
-      authorId: authorIdentityId.valueOf(),
-      eventName: 'conversations.v1.message.was_sent',
-      messageId: 'message-id',
-      participantIds: [
-        authorIdentityId.valueOf(),
-        recipientIdentityId.valueOf(),
-      ],
-    });
-
-    await dispatcher.dispatch(event);
-
-    expect(delivery.send).not.toHaveBeenCalled();
   });
 
   it('keeps invitation push notifications while recipient is busy', async () => {
@@ -294,83 +217,20 @@ describe('PushNotificationDispatcher', () => {
       subscription.getEndpoint(),
     );
   });
-
-  it('sends notification clear pushes only to the reader identity', async () => {
-    const readerIdentityId = await generateIdentityId();
-    const otherIdentityId = await generateIdentityId();
-    const readerSubscription = createSubscription(readerIdentityId);
-    const otherSubscription = createSubscription(otherIdentityId);
-    const delivery = mockDelivery(true);
-    const dispatcher = createDispatcher({
-      busyIdentityIds: [readerIdentityId.valueOf()],
-      delivery,
-      subscriptions: [readerSubscription, otherSubscription],
-    });
-    const event = new TestDomainEvent('conversation-id', {
-      eventName: 'conversations.v1.messages.were_read',
-      messageId: 'message-id',
-      participantIds: [readerIdentityId.valueOf(), otherIdentityId.valueOf()],
-      readerIdentityId: readerIdentityId.valueOf(),
-    });
-
-    await dispatcher.dispatch(event);
-
-    expect(delivery.send).toHaveBeenCalledTimes(1);
-    const payload = sentPayload(delivery);
-
-    expect(payload).toEqual(
-      expect.objectContaining({
-        tag: expect.any(String),
-        tags: [payload.tag],
-        type: 'notifications_cleared',
-      }),
-    );
-    expect(payload).not.toHaveProperty('data');
-    expectNoIdentifiers(payload, ['conversation-id', 'message-id']);
-  });
-
-  it('groups a conversation message and its clear push under the same opaque tag', async () => {
-    const authorIdentityId = await generateIdentityId();
-    const readerIdentityId = await generateIdentityId();
-    const delivery = mockDelivery(true);
-    const dispatcher = createDispatcher({
-      delivery,
-      subscriptions: [createSubscription(readerIdentityId)],
-    });
-
-    await dispatcher.dispatch(
-      new TestDomainEvent('conversation-id', {
-        authorId: authorIdentityId.valueOf(),
-        eventName: 'conversations.v1.message.was_sent',
-        messageId: 'message-id',
-        participantIds: [
-          authorIdentityId.valueOf(),
-          readerIdentityId.valueOf(),
-        ],
-      }),
-    );
-    await dispatcher.dispatch(
-      new TestDomainEvent('conversation-id', {
-        eventName: 'conversations.v1.messages.were_read',
-        messageId: 'message-id',
-        participantIds: [
-          authorIdentityId.valueOf(),
-          readerIdentityId.valueOf(),
-        ],
-        readerIdentityId: readerIdentityId.valueOf(),
-      }),
-    );
-
-    const [messagePayload, clearPayload] = (
-      delivery.send as jest.Mock
-    ).mock.calls.map(([, payload]) => payload);
-
-    expect(messagePayload.tag).toEqual(expect.any(String));
-    expect(messagePayload.tag).not.toContain('conversation-id');
-    expect(clearPayload.tags).toEqual([messagePayload.tag]);
-    expect(clearPayload.tag).toBe(messagePayload.tag);
-  });
 });
+
+function channelMessageEvent(
+  authorIdentityId: IdentityId,
+  recipientIdentityId: IdentityId,
+): TestDomainEvent {
+  return new TestDomainEvent('community-id', {
+    authorIdentityId: authorIdentityId.valueOf(),
+    channelId: 'channel-id',
+    eventName: 'communities.v1.channel.message.was_sent',
+    memberIds: [authorIdentityId.valueOf(), recipientIdentityId.valueOf()],
+    messageId: 'message-id',
+  });
+}
 
 function sentPayload(
   delivery: PushNotificationDelivery,
@@ -459,9 +319,7 @@ function mockPresenceRepository(options: {
   busyIdentityIds: string[];
   presences: IdentityPresence[];
 }): IdentityPresenceRepository {
-  const presenceOf = (
-    identityId: IdentityId,
-  ): IdentityPresence | undefined => {
+  const presenceOf = (identityId: IdentityId): IdentityPresence | undefined => {
     if (options.busyIdentityIds.includes(identityId.valueOf())) {
       return createBusyPresence(identityId.valueOf());
     }
@@ -505,28 +363,6 @@ function mockRepository(
   };
 }
 
-function mockConversationRepository(
-  unreadMessages?: string[],
-): ConversationRepository {
-  return {
-    hasUnreadMessageForRecipient: jest.fn(
-      async (
-        recipientIdentityId: IdentityId,
-        conversationId,
-        messageId,
-      ): Promise<boolean> => {
-        if (!unreadMessages) {
-          return true;
-        }
-
-        return unreadMessages.includes(
-          `${recipientIdentityId.valueOf()}:${conversationId.valueOf()}:${messageId.valueOf()}`,
-        );
-      },
-    ),
-  } as unknown as ConversationRepository;
-}
-
 function emptySettingsRepository(): NotificationScopeSettingsRepository {
   return {
     delete: jest.fn(),
@@ -558,7 +394,6 @@ function createDispatcher(options: {
   presences?: IdentityPresence[];
   repository?: PushSubscriptionRepository;
   subscriptions: PushSubscription[];
-  unreadMessages?: string[];
 }): PushNotificationDispatcher {
   return new PushNotificationDispatcher(
     options.repository ?? mockRepository(options.subscriptions),
@@ -566,7 +401,6 @@ function createDispatcher(options: {
       busyIdentityIds: options.busyIdentityIds ?? [],
       presences: options.presences ?? [],
     }),
-    mockConversationRepository(options.unreadMessages),
     options.delivery,
     new NotificationDeliveryPreferenceChecker(emptySettingsRepository()),
   );

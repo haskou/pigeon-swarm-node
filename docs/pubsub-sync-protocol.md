@@ -131,52 +131,13 @@ The event attributes are:
 `selectedStatus`, `status`, and `updatedAt` are always present. `networkIds`
 may be empty, which targets every configured network (see above).
 
-## Conversation read receipts
+## Conversation messages
 
-`conversations.v1.messages.were_read` carries the reader's signed
-`PUT /conversations/{conversationId}/messages/read-until` request as
-`readProof`: method, path, timestamp, body and signature. Receivers verify it
-with the reader's identity key over the canonical payload that
-`SignedHttpRequestVerifier` uses. A receipt updates read state, reaches
-WebSocket clients and clears push notifications only when the proof verifies
-for the event's conversation, message and reader, and its `timestamp` is no
-older than 14 days (`MessageReadProof.MAX_AGE_MS`) and no more than 30 seconds
-ahead of the receiving node's clock (`MessageReadProof.MAX_FUTURE_SKEW_MS`).
-Late receipts from readers that were offline still apply inside that window.
-Push clearing sends `notifications_cleared` only to that verified reader.
-
-Read receipts and read-marker heads exist only for group conversations. A
-receipt for a one-to-one conversation is refused like an unproven one, and the
-head merger refuses a `read-marker:` head whose `conversationId` is not a
-`group:` id, so 1:1 read state travels only through opaque mailboxes.
-
-A receipt that marks an earlier message than the reader's stored marker is
-refused by the store, so the marker never moves back. Such a receipt is not
-forwarded to WebSocket clients either. Receipts for the stored marker's own
-message, and for a message this node has not replicated yet, are still accepted
-and forwarded (see residual risks).
-
-Residual risks accepted for this change:
-
-- A receipt replayed inside the 14 day window is applied again. The marker
-  stays monotonic, so a replay cannot move it back, but a replay of the receipt
-  for the stored marker's own message is forwarded to WebSocket clients and
-  re-clears push. Receipts carry no nonce, so the window bounds replay instead
-  of preventing it.
-- The replicated read-marker head is unsigned and has no freshness gate. Nodes
-  apply the stored head, so a writer to that store can change it without a
-  receipt. A time window on the head is not applied: heads are read on every
-  lookup, so a window would drop valid markers once it closed, and message ids
-  are opaque, so a head cannot be bound to a signed message id.
-- Other conversation gossip is not signed per event; only receipts carry proofs.
-- `network_synchronization_status` is reported for the whole node, not per
-  private network.
-- Upgraded nodes drop proofless receipts from older nodes, so those receipts do
-  not update read state or clear push until the sender upgrades.
-- Authentic receipts for the stored marker's own message, or for a message this
-  node has not replicated yet, are still forwarded to WebSocket clients. The
-  store accepts them without an order check, so a client can briefly show a read
-  state the replicated head has not confirmed.
+No conversation message travels over node gossip. Messages, edits, deletions,
+reactions, pins and history of one-to-one and group conversations travel only
+through opaque mailboxes, sealed by the clients. Nodes publish no message, read
+or reaction events for conversations and keep no read markers: read state is
+device-local on each client.
 
 ## Durable call state convergence
 
@@ -587,7 +548,8 @@ gossipsub peer, so the claim cannot be bound to the sender. A network member
 can therefore spoof another peer's state. The announcement is status-only: it
 feeds this diagnostic and never touches replicated data, admission or routing.
 Nodes on older versions never announce and stay `unknown`, which keeps the
-network `syncing`.
+network `syncing`. `network_synchronization_status` is reported for the whole
+node, not per private network.
 
 ## Other signed public mutations
 
@@ -599,13 +561,10 @@ Signed public mutations (pins, reactions and the other governed collections):
 authorizationRevision }` and an
   Ed25519 signature by the device. `payloadDigest` covers the document without
   `proof`, so ids, scope (community/channel/message) and author are bound.
-- Community and conversation reaction events carry the proof as `mutationProof`;
-  consumers pass it to the repository, which re-verifies it. Conversation records
-  use `scopeType: "conversation"`; the conversation must be a group and the author
-  a participant of the roster folded from the signed `conversationOperations`.
-  One-to-one conversations have no replicated messages, pins, reactions or read
-  markers: their records are rejected, and 1:1 message, edit, deletion and
-  reaction events are dropped without network fan-out.
+- Community reaction events carry the proof as `mutationProof`; consumers pass
+  it to the repository, which re-verifies it. `messages`, `pins` and `reactions`
+  hold community channel records only; a record scoped to a conversation has no
+  policy and is rejected.
   Policies are looked up by collection and `scopeType`, so a record whose scope
   type has no policy in a governed collection is rejected.
 - `notificationSettings` documents (public scopes only) are governed the same way
@@ -632,12 +591,11 @@ recipientIdentityId})))`, so a peer cannot claim an id for content it did not
   recipient must be a member too. `payload` is opaque base64 (at most 262144
   characters); the node never parses it. Heads are index wrappers under
   collection `mlsRecords`, keyed `community-mls-index:<community>`.
-- `messages` documents are governed with scope types `community_channel`
+- `messages` documents are governed with scope type `community_channel`
   (record id `community:<community>:<channel>:<message>:<author>`; an edit is
   a higher-sequence put, a delete is a `delete` tombstone signed by the author
-  or a moderator) and `conversation` (one immutable record per sent, edited,
-  deleted or poll event of a group conversation, id = message id). Node-authored
-  system and call messages are not part of this path.
+  or a moderator). Node-authored system and call messages are not part of this
+  path.
 - `polls` documents are governed with three scope types: `poll` (author =
   `creatorIdentityId`, id = client-chosen poll id, immutable), `poll_vote`
   (author = voter, id `poll-vote:<pollId>:<voterIdentityId>`, replaced by a
@@ -736,7 +694,7 @@ protects the collection and what a malicious peer can still do.
 | Store                                                                                                                        | Writer                                                                 | Policy                                                                                                                                                                                 | Status                                                                      |
 | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | `communityOperations`                                                                                                        | `OrbitDBCommunityRepository`                                           | `CommunityOperationGate`, see [Community signed operations](#community-signed-operations)                                                                                              | Signed (#316)                                                               |
-| `messages`, `mlsRecords`, `pins`, `reactions`, `requests`, `polls`, `stickerPacks`, `stickerUserLibraries`, `moderationLogs` | the community, conversation, poll, sticker and moderation repositories | `PublicMutationGate`, see [Other signed public mutations](#other-signed-public-mutations)                                                                                              | Signed                                                                      |
+| `messages`, `mlsRecords`, `pins`, `reactions`, `requests`, `polls`, `stickerPacks`, `stickerUserLibraries`, `moderationLogs` | the community, poll, sticker and moderation repositories               | `PublicMutationGate`, see [Other signed public mutations](#other-signed-public-mutations)                                                                                              | Signed                                                                      |
 | `notificationSettings`                                                                                                       | `OrbitDBNotificationScopeSettingsRepository`                           | `PublicMutationGate` (`notification_settings`, #349)                                                                                                                                   | Signed                                                                      |
 | `keychains`                                                                                                                  | `OrbitDBKeychainMetadataIndex`                                         | `OrbitDBKeychainMutationGate`, see [Keychains](#keychains)                                                                                                                             | Self-authenticating (this change)                                           |
 | `identities` (identity metadata)                                                                                             | `OrbitDBIdentityMetadataIndex`                                         | identity-key signature plus canonical CID, see [Identities](#identities-and-device-authorization)                                                                                      | Self-authenticating (#361), see [design](design/identity-authentication.md) |

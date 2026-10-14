@@ -1,9 +1,7 @@
 import 'reflect-metadata';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { ConversationOperationAction } from '@app/contexts/conversations/domain/value-objects/ConversationOperationAction';
-import OrbitDBConversationMessageMapper from '@app/contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBConversationMessageMapper';
 import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
-import ConversationMessageMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageMutationPolicy';
 import ConversationOperationMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationOperationMutationPolicy';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
@@ -65,7 +63,6 @@ type Replica = {
   stores?: {
     conversationOperations: OrbitDBDatabase;
     heads: OrbitDBDatabase;
-    messages: OrbitDBDatabase;
     calls: OrbitDBDatabase;
   };
   registry?: OrbitDBReplicatedStateRegistry;
@@ -142,22 +139,17 @@ async function open(replica: Replica): Promise<void> {
       sync: false,
       type: 'keyvalue',
     }),
-    messages: await documents('messages'),
     calls: await documents('calls'),
   };
   for (const store of Object.values(replica.stores))
     store.events.on('error', () => undefined);
   const registry = new OrbitDBReplicatedStateRegistry();
-  const conversations = new OrbitDBConversationRepository(
-    registry,
-    new OrbitDBConversationMessageMapper(),
-  );
+  const conversations = new OrbitDBConversationRepository(registry);
 
   if (replica.gated)
     registry.addMutationGate(
       new PublicMutationGate(new PublicMutationVerifier(authorization), [
         new ConversationOperationMutationPolicy(),
-        new ConversationMessageMutationPolicy(conversations),
         new CallStartMutationPolicy(registry, conversations, noCommunities),
         new CallParticipantMutationPolicy(registry, noCommunities),
         new CallEndMutationPolicy(registry),

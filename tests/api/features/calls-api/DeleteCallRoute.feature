@@ -16,11 +16,6 @@ Feature: End call
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | status | ended |
-    And I sign the current latest conversation messages request
-    When I GET latest messages from the current conversation
-    Then response code is equal to 200
-    And response body should contain "call_event"
-    And response body should contain "ended"
 
   Scenario: Reject ending a call without a signed mutation
     Given I register a test IPFS network "api-calls-unsigned-end-network"

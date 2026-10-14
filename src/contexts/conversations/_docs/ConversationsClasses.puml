@@ -7,25 +7,18 @@ package "conversations.domain" {
     -id: ConversationId
     -networkId: NetworkId
     -type: ConversationType
-    -name?: GroupConversationName
     -participants: IdentityId[]
-    -messages: Message[]
+    -name?: GroupConversationName
     -admins: ConversationAdmins
-    -createdAt: Timestamp
-    -assertHasReplicatedMessageLog(): void
     +hasParticipant(identityId: IdentityId): boolean
-    +record(message: Message): void
-    +latestEvents(limit: number): Message[]
-    +missingEvents(known: MessageId[]): Message[]
+    +isGroup(): boolean
+    +isAdmin(identityId: IdentityId): boolean
+    +getAdminIds(): IdentityId[]
+    +getCreatorId(): IdentityId | undefined
   }
 
-  class OneToOneConversation {
-    +create(first: IdentityId, second: IdentityId, networkId: NetworkId): OneToOneConversation
-  }
-
-  class GroupConversation {
-    +create(name: GroupConversationName, participants: IdentityId[], networkId: NetworkId): GroupConversation
-  }
+  class OneToOneConversation
+  class GroupConversation
 
   class ConversationType <<ValueObject>>
   class GroupConversationName <<ValueObject>>
@@ -33,8 +26,13 @@ package "conversations.domain" {
     -creatorId?: IdentityId
     -adminIds: IdentityId[]
   }
-  class MessageSendOptions <<ValueObject>>
-  class MessageEditOptions <<ValueObject>>
+
+  class ConversationDraft {
+    -conversationId: ConversationId
+    -encryptedPayload: EncryptedMessagePayload
+    -updatedAt: Timestamp
+  }
+  class EncryptedMessagePayload <<ValueObject>>
 
   class ConversationOperation <<ValueObject>> {
     +id: conversation:<conversationId>:op:<digest>
@@ -59,115 +57,37 @@ package "conversations.domain" {
   }
   class InvalidConversationOperationError
   class ConversationOperationLimitExceededError
-  class OneToOneConversationMessagesNotReplicatedError
-
-  abstract class Message <<Entity>> {
-    -metadata: MessageMetadata
-    +verify(): boolean
-  }
-
-  class MessageMetadata {
-    -id: MessageId
-    -conversationId: ConversationId
-    -authorId: IdentityId
-    -createdAt: Timestamp
-    -previousMessageIds: MessageId[]
-    -replyToMessageId?: MessageId
-    -targetMessageId?: MessageId
-  }
-
-  class MessageSent {
-    -payload: EncryptedPayload
-  }
-
-  class MessageEdited {
-    -targetMessageId: MessageId
-    -payload: EncryptedPayload
-  }
-
-  class MessageDeleted {
-    -targetMessageId: MessageId
-  }
-
-  class ConversationMessageWasSentEvent {
-    +eventName(): string
-  }
-
-  class ConversationMessageWasEditedEvent {
-    +eventName(): string
-  }
-
-  class ConversationMessageWasDeletedEvent {
-    +eventName(): string
-  }
-
-  class ConversationMessagesWereReadEvent {
-    +eventName(): string
-  }
-
-  class MessageReaction {
-    -conversationId: ConversationId
-    -messageId: MessageId
-    -authorId: IdentityId
-    -emoji: MessageReactionEmoji
-    -createdAt: Timestamp
-  }
-
-  class MessageReactionEmoji <<ValueObject>>
-
-  class ConversationMessageReactionWasAddedEvent {
-    +eventName(): string
-  }
-
-  class ConversationMessageReactionWasRemovedEvent {
-    +eventName(): string
-  }
 
   interface ConversationRepository {
-    +save(conversation: Conversation): Promise<void>
     +hasById(id: ConversationId): Promise<boolean>
-    +requireById(id: ConversationId): Promise<Conversation>
     +requireMetadataById(id: ConversationId): Promise<Conversation>
-    +findGroup(id: ConversationId): Promise<GroupConversation>
-    +requireMessageById(conversationId: ConversationId, messageId: MessageId): Promise<Message>
-    +hasMessage(conversationId: ConversationId, messageId: MessageId): Promise<boolean>
-    +findLatestMessages(conversationId: ConversationId, limit: number, beforeMessageId?: MessageId): Promise<Message[]>
-    +findMessagesAround(conversationId: ConversationId, messageId: MessageId, before: number, after: number): Promise<ConversationMessagesAround>
-    +findThreadMessages(conversationId: ConversationId, rootMessageId: MessageId, limit: number): Promise<Message[]>
-    +countUnreadByRecipient(recipientIdentityId: IdentityId, conversationIds: ConversationId[]): Promise<Map<string, number>>
-    +hasUnreadMessageForRecipient(recipientIdentityId: IdentityId, conversationId: ConversationId, messageId: MessageId): Promise<boolean>
-    +markReadUntil(conversationId: ConversationId, recipientIdentityId: IdentityId, messageId: MessageId, networkId?: NetworkId): Promise<void>
+    +requireMetadataAtFrontier(id: ConversationId, frontier: string[]): Promise<Conversation>
+    +findByParticipant(participantId: IdentityId, limit: number, beforeConversationId?: ConversationId): Promise<Conversation[]>
+    +findFrontier(id: ConversationId): Promise<string[]>
+    +findOperations(id: ConversationId): Promise<ConversationOperation[]>
+    +saveOperation(operation: ConversationOperation, proof: PublicMutationProof): Promise<void>
   }
 
-  interface MessageReactionRepository {
-    +save(reaction: MessageReaction): Promise<void>
-    +delete(reaction: MessageReaction): Promise<void>
-    +findByMessageIds(conversationId: ConversationId, messageIds: MessageId[]): Promise<MessageReaction[]>
-    +findCandidates(conversationId: ConversationId): Promise<MessageReaction[]>
-  }
+  interface ConversationDraftRepository
+
+  note right of ConversationRepository
+    Conversations are metadata only. Messages,
+    reactions, pins and read state never reach
+    the node; they travel through opaque mailboxes.
+  end note
 
   Conversation <|-- OneToOneConversation
   Conversation <|-- GroupConversation
-  Conversation *--> "0..*" Message
   Conversation --> NetworkId
   Conversation --> ConversationType
   Conversation --> GroupConversationName
-  Message <|-- MessageSent
-  Message <|-- MessageEdited
-  Message <|-- MessageDeleted
-  Message *--> MessageMetadata
+  Conversation --> ConversationAdmins
   Conversation o--> IdentityId
-MessageSent --> EncryptedPayload
-MessageEdited --> MessageId
-  MessageDeleted --> MessageId
-  Conversation ..> MessageSendOptions
-  Conversation ..> MessageEditOptions
-  MessageReaction --> ConversationId
-  MessageReaction --> MessageId
-  MessageReaction --> IdentityId
-  MessageReaction --> MessageReactionEmoji
+  ConversationDraft --> ConversationId
+  ConversationDraft --> EncryptedMessagePayload
   ConversationRepository --> Conversation
-  MessageReactionRepository --> MessageReaction
+  ConversationRepository ..> ConversationOperation
+  ConversationDraftRepository --> ConversationDraft
   ConversationStateFold ..> ConversationOperation
   ConversationStateFold ..> ConversationOperationApplier
   ConversationOperationApplier --> ConversationRoster
@@ -176,13 +96,6 @@ MessageEdited --> MessageId
   ConversationOperation --> ConversationOperationAction
   ConversationRoster ..> InvalidConversationOperationError
   ConversationOperationLimits ..> ConversationOperationLimitExceededError
-  Conversation ..> OneToOneConversationMessagesNotReplicatedError
-  Conversation ..> ConversationMessageWasSentEvent
-  Conversation ..> ConversationMessageWasEditedEvent
-  Conversation ..> ConversationMessageWasDeletedEvent
-  ConversationRepository ..> ConversationMessagesWereReadEvent
-  MessageReaction ..> ConversationMessageReactionWasAddedEvent
-  MessageReaction ..> ConversationMessageReactionWasRemovedEvent
 }
 
 package "conversations.application" {
@@ -198,165 +111,43 @@ package "conversations.application" {
     +find(id: ConversationId, requester: IdentityId): Promise<string[]>
   }
 
-  class MessageSender {
-    +send(command): Promise<MessageSent>
-  }
-
-  class MessageReceiver {
-    +receive(command): Promise<void>
-  }
-
-  class LatestMessagesFinder {
-    +find(query): Promise<Message[]>
-    +findTimeline(query): Promise<ConversationMessagesTimeline>
-  }
-
   class ConversationsFinder {
     +find(query): Promise<Conversation[]>
   }
 
-  class ConversationUnreadCounter {
-    +count(message): Promise<Map<string, number>>
-  }
-
-  class ConversationMessagesTimeline {
-    +messages(): Message[]
-    +reactions(): MessageReaction[]
-    +calls(): Call[]
-    +polls(): Poll[]
-  }
-
-  class MessageEditor {
-    +edit(command): Promise<MessageId>
-  }
-
-  class MessageDeleter {
-    +delete(command): Promise<MessageId>
-  }
-
-  class MessageReactionAdder {
-    +add(command): Promise<MessageReaction>
-  }
-
-  class MessageReactionRemover {
-    +remove(command): Promise<MessageReaction>
-  }
-
-  class ConversationMessageRegistrar {
-    +register(message): Promise<void>
-  }
-
-  class MessagesReadMarker {
-    +mark(message): Promise<void>
-  }
-
-  class MessagesReadRegistrar {
-    +register(message): Promise<void>
-  }
-
-  class MessageReadProofVerifier {
-    +verify(message)
-  }
-
-  class MessageReactionRegistrar {
-    +register(message): Promise<void>
-    +unregister(message): Promise<void>
-  }
-
-  class DomainEventPublisher {
-    +publish(domainEvents): Promise<void>
-  }
+  class ConversationDraftSaver
+  class ConversationDraftDeleter
+  class ConversationDraftsFinder
+  class ConversationDraftAccess
 
   ConversationCreator --> ConversationRepository
   ConversationMemberChanger --> ConversationRepository
   ConversationFrontierFinder --> ConversationRepository
-  MessageSender --> ConversationRepository
-  MessageSender --> PollRepository
-  MessageSender --> DomainEventPublisher
-  MessageReceiver --> ConversationRepository
-  LatestMessagesFinder --> ConversationRepository
-  LatestMessagesFinder --> MessageReactionRepository
-  LatestMessagesFinder --> CallRepository
-  LatestMessagesFinder --> PollRepository
   ConversationsFinder --> ConversationRepository
-  ConversationUnreadCounter --> ConversationRepository
-  MessageEditor --> ConversationRepository
-  MessageEditor --> DomainEventPublisher
-  MessageDeleter --> ConversationRepository
-  MessageDeleter --> DomainEventPublisher
-  MessageReactionAdder --> ConversationRepository
-  MessageReactionAdder --> MessageReactionRepository
-  MessageReactionAdder --> DomainEventPublisher
-  MessageReactionRemover --> ConversationRepository
-  MessageReactionRemover --> MessageReactionRepository
-  MessageReactionRemover --> DomainEventPublisher
-  ConversationMessageRegistrar --> ConversationRepository
-  MessagesReadMarker --> ConversationRepository
-  MessagesReadMarker --> DomainEventPublisher
-  MessagesReadRegistrar --> ConversationRepository
-  MessageReactionRegistrar --> ConversationRepository
-  MessageReactionRegistrar --> MessageReactionRepository
+  ConversationDraftSaver --> ConversationDraftRepository
+  ConversationDraftSaver ..> ConversationDraftAccess
+  ConversationDraftDeleter --> ConversationDraftRepository
+  ConversationDraftDeleter ..> ConversationDraftAccess
+  ConversationDraftsFinder --> ConversationDraftRepository
+  ConversationDraftAccess --> ConversationRepository
 }
 
 package "conversations.infrastructure" {
-  class IpfsMessageDocument {
-    -messageId: string
-    -conversationId: string
-    -authorId: string
-    -type: string
-    -replyToMessageId?: string
-    -targetMessageId?: string
-    -payload: object
-    -previousMessageIds: string[]
-    -createdAt: number
-  }
-
-  class OrbitDBConversationMessageDocument {
-    -id: string
-    -conversationId: string
-    -authorId: string
-    -scopeType: string
-    -type: string
-    -createdAt: number
-    -encryptedPayload?: string
-    -pollId?: string
-    -replyToMessageId?: string
-    -targetMessageId?: string
-    -previousMessageIds: string[]
-    -proof: PublicMutationProof
-  }
-
   class OrbitDBConversationRepository
-  class OrbitDBMessageReactionRepository
-  class OrbitDBMessageReactionDocument {
-    -id: string
-    -conversationId: string
-    -messageId: string
-    -authorId: string
-    -emoji: string
-    -createdAt: number
-  }
   class ConversationOperationMutationPolicy
-
-  class Libp2pGossipsubMessageBusAdapter
+  class LocalConversationDraftRepository
 
   note right of OrbitDBConversationRepository
     Folds the Conversation roster from the signed
     conversationOperations store; the participant
     index is local. Writes go through
     ConversationOperationMutationPolicy.
-    Message storage and read markers are
-    replicated projections, not storage documents.
   end note
 
   OrbitDBConversationRepository ..|> ConversationRepository
   OrbitDBConversationRepository ..> ConversationOperationMutationPolicy
   OrbitDBConversationRepository ..> ConversationStateFold
-  OrbitDBConversationRepository --> OrbitDBConversationMessageDocument
-  OrbitDBConversationRepository ..> IpfsMessageDocument
-  OrbitDBMessageReactionRepository ..|> MessageReactionRepository
-  OrbitDBMessageReactionRepository --> OrbitDBMessageReactionDocument
-  Libp2pGossipsubMessageBusAdapter ..> DomainEventPublisher
+  LocalConversationDraftRepository ..|> ConversationDraftRepository
 }
 
 @enduml

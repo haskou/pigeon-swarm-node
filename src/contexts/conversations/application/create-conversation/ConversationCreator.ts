@@ -62,7 +62,7 @@ export default class ConversationCreator {
     const conversationId = message.genesis.getConversationId();
 
     if (await this.conversationRepository.hasById(conversationId)) {
-      return this.conversationRepository.requireById(conversationId);
+      return this.conversationRepository.requireMetadataById(conversationId);
     }
 
     // The roster rules (participants, sizes) are checked before anything is stored.
@@ -77,6 +77,6 @@ export default class ConversationCreator {
       new InvalidConversationOperationError(),
     );
 
-    return this.conversationRepository.requireById(conversationId);
+    return this.conversationRepository.requireMetadataById(conversationId);
   }
 }

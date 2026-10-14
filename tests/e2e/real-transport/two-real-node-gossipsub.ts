@@ -3,10 +3,7 @@ import 'module-alias/register';
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { ConversationOperationAction } from '@app/contexts/conversations/domain/value-objects/ConversationOperationAction';
-import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
-import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
-import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
@@ -130,11 +127,6 @@ type CallResponse = {
 type ConversationListResponse = {
   conversations?: ConversationResponse[];
   data?: ConversationResponse[];
-};
-
-type MessageListResponse = {
-  data?: Array<{ id: string }>;
-  messages?: Array<{ id: string }>;
 };
 
 type PeersResponse = {
@@ -300,87 +292,6 @@ async function main(): Promise<void> {
       nodeBIdentity.id,
     );
 
-    // 1:1 messages travel only through opaque mailboxes; the replicated log is group-only.
-    const messagingGroupId = await createGroupConversation(
-      nodeA,
-      nodeB,
-      nodeAIdentity,
-      nodeBIdentity,
-      nodeAKeychain,
-    );
-    const nodeBMessages = listenForDomainEvents(
-      nodeB,
-      nodeBIdentity,
-      'conversations.v1.message.was_sent',
-      messagingGroupId,
-    );
-    const messageFromA = await sendConversationMessage(
-      nodeA,
-      nodeAIdentity,
-      messagingGroupId,
-      [],
-      'node-a-message-payload',
-    );
-    await nodeBMessages;
-    await waitForMessage(
-      nodeB,
-      nodeBIdentity,
-      messagingGroupId,
-      messageFromA.id,
-    );
-
-    await stopNode(nodeB);
-    const offlineMessageFromA = await sendConversationMessage(
-      nodeA,
-      nodeAIdentity,
-      messagingGroupId,
-      [messageFromA.id],
-      'node-a-offline-message-payload',
-    );
-
-    await startNode(nodeB);
-    await waitForMessage(
-      nodeB,
-      nodeBIdentity,
-      messagingGroupId,
-      offlineMessageFromA.id,
-    );
-    await waitForConversationTimeline(nodeB, nodeBIdentity, messagingGroupId, [
-      messageFromA.id,
-      offlineMessageFromA.id,
-    ]);
-
-    const nodeAMessages = listenForDomainEvents(
-      nodeA,
-      nodeAIdentity,
-      'conversations.v1.message.was_sent',
-      messagingGroupId,
-    );
-    const messageFromB = await sendConversationMessage(
-      nodeB,
-      nodeBIdentity,
-      messagingGroupId,
-      [offlineMessageFromA.id],
-      'node-b-reply-payload',
-    );
-    await nodeAMessages;
-    await waitForMessage(
-      nodeA,
-      nodeAIdentity,
-      messagingGroupId,
-      messageFromB.id,
-    );
-    await waitForConversationTimeline(nodeA, nodeAIdentity, messagingGroupId, [
-      messageFromA.id,
-      offlineMessageFromA.id,
-      messageFromB.id,
-    ]);
-    await waitForConversationTimeline(nodeB, nodeBIdentity, messagingGroupId, [
-      messageFromA.id,
-      offlineMessageFromA.id,
-      messageFromB.id,
-    ]);
-
     const groupId = await runGroupLifecycle(
       nodeA,
       nodeB,
@@ -396,12 +307,8 @@ async function main(): Promise<void> {
           callSignalId: callSignal.signalId,
           conversationId: conversation.id,
           groupId,
-          messageFromA: messageFromA.id,
-          messageFromB: messageFromB.id,
-          messagingGroupId,
           nodeAIdentityId: nodeAIdentity.id,
           nodeBIdentityId: nodeBIdentity.id,
-          offlineMessageFromA: offlineMessageFromA.id,
           result: 'PASS',
           transportDsn: 'libp2p-gossipsub://',
         },
@@ -993,65 +900,6 @@ async function createOneToOneConversation(
   );
 }
 
-async function sendConversationMessage(
-  node: NodeRuntime,
-  author: IdentityFixture,
-  conversationId: string,
-  previousMessageIds: string[],
-  encryptedPayload: string,
-): Promise<{ id: string }> {
-  const id = MessageId.generate().valueOf();
-  const createdAt = Date.now();
-  const record = {
-    authorId: author.id,
-    conversationId,
-    createdAt,
-    encryptedPayload,
-    id,
-    previousMessageIds,
-    scopeType: 'conversation',
-    type: MessageType.SENT.valueOf(),
-  };
-  const { frontier } = await request<{ frontier: string[] }>(
-    node,
-    'GET',
-    `/conversations/${encodeURIComponent(conversationId)}/frontier`,
-    undefined,
-    author,
-  );
-  const mutationBody = {
-    author: {
-      authorizationRevision: 0,
-      deviceCredential: author.deviceCredential,
-      identityId: author.id,
-    },
-    frontier,
-    kind: 'put',
-    operationId: randomBytes(16).toString('base64url'),
-    payloadDigest: PublicMutationProof.digestOf(record),
-    predecessor: null as string | null,
-    recordId: id,
-    sequence: 0,
-    store: 'messages',
-    version: 2,
-  } as const;
-  const body = {
-    createdAt,
-    encryptedPayload,
-    id,
-    mutation: PublicMutationProof.signed(
-      mutationBody,
-      author.deviceKeyPair.sign(
-        PublicMutationProof.signingContentOf(mutationBody),
-      ),
-    ).toPrimitives(),
-    previousMessageIds,
-  };
-  const path = `/conversations/${encodeURIComponent(conversationId)}/messages`;
-
-  return request<ConversationResponse>(node, 'POST', path, body, author);
-}
-
 async function waitForIdentity(
   node: NodeRuntime,
   identityId: string,
@@ -1144,99 +992,6 @@ async function waitForCallParticipantConnection(
 
     return participant?.connected === true;
   }, `${node.name} to receive the participant lease for ${participantIdentityId}`);
-}
-
-async function waitForMessage(
-  node: NodeRuntime,
-  identity: IdentityFixture,
-  conversationId: string,
-  messageId: string,
-): Promise<void> {
-  const path = `/conversations/${encodeURIComponent(
-    conversationId,
-  )}/messages/${encodeURIComponent(messageId)}`;
-
-  await waitFor(
-    async () =>
-      (await requestMaybe(node, 'GET', path, undefined, identity)) !==
-      undefined,
-    `${node.name} to sync message ${messageId}`,
-  );
-}
-
-async function waitForConversationTimeline(
-  node: NodeRuntime,
-  identity: IdentityFixture,
-  conversationId: string,
-  messageIds: string[],
-): Promise<void> {
-  const path = `/conversations/${encodeURIComponent(
-    conversationId,
-  )}/messages?limit=30`;
-
-  await waitFor(async () => {
-    const response = await requestMaybe<MessageListResponse>(
-      node,
-      'GET',
-      path,
-      undefined,
-      identity,
-    );
-    const messages = Array.isArray(response?.messages)
-      ? response.messages
-      : response?.data;
-
-    if (!Array.isArray(messages)) {
-      return false;
-    }
-
-    const listedMessageIds = messages.map((message: { id: string }) => {
-      return message.id;
-    });
-
-    return messageIds.every((messageId) =>
-      listedMessageIds.includes(messageId),
-    );
-  }, `${node.name} to list synced messages in ${conversationId}`);
-}
-
-async function listenForDomainEvents(
-  node: NodeRuntime,
-  identity: IdentityFixture,
-  eventType: string,
-  aggregateId: string,
-): Promise<void> {
-  const ticket = await issueRealtimeTicket(node, identity.keyPair);
-  const ws = connectRealtimeSocket(node, ticket);
-
-  await new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      ws.close();
-      reject(
-        new Error(
-          `${node.name} did not receive ${eventType} for ${aggregateId}`,
-        ),
-      );
-    }, WAIT_TIMEOUT_MS);
-
-    ws.on('message', (data) => {
-      const message = JSON.parse(data.toString());
-
-      if (
-        message.type === 'domain_event' &&
-        message.event?.type === eventType &&
-        message.event?.aggregate_id === aggregateId
-      ) {
-        clearTimeout(timeout);
-        ws.close();
-        resolve();
-      }
-    });
-    ws.on('error', (error) => {
-      clearTimeout(timeout);
-      reject(error);
-    });
-  });
 }
 
 async function receiveAndAcknowledgeCallSignal(
@@ -1621,11 +1376,9 @@ export {
   waitFor,
   publishKeychain,
   createGroupConversation,
-  sendConversationMessage,
   waitForIdentity,
   waitForKeychain,
   waitForConversation,
-  waitForMessage,
   NETWORK_ID,
 };
 export type { NodeRuntime, IdentityFixture };
