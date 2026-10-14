@@ -31,7 +31,7 @@ SERVICE_NAME=pigeon-swarm
 
 ## Startup Failures
 
-If initialization fails (for example an invalid environment value or an unwritable `IPFS_STORAGE_PATH`), the node logs `Application error`, stops the services it already started on a best-effort basis (at most 10 seconds), and exits with status `1`. Container restart policies such as Docker `on-failure` act on that status. Fix the reported error before starting the node again.
+If initialization fails (for example an invalid environment value, an `API_PORT` already in use by another process, which logs `API server could not listen on port <port>`, or an unwritable `IPFS_STORAGE_PATH`), the node logs `Application error`, stops the services it already started on a best-effort basis (at most 10 seconds), and exits with status `1`. Container restart policies such as Docker `on-failure` act on that status. Fix the reported error before starting the node again.
 
 ## Frontend Static Assets
 

@@ -389,6 +389,16 @@ export default class PigeonApplication {
     const routePrefix = this.getRoutePrefix().toString();
 
     await server.run();
+
+    // ExpressKernelServer.run() also resolves when listen fails (Express 5
+    // passes the `error` event to the listen callback), so an API port already
+    // in use would leave the node running without its API.
+    if (!server.server.listening) {
+      throw new Error(
+        `API server could not listen on port ${this.kernel.environment.API_PORT}`,
+      );
+    }
+
     this.webSocketRealtimeServer.attach(
       server.server,
       `${routePrefix}/realtime/v1`,
