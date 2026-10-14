@@ -1,9 +1,8 @@
-import { DeviceAuthorizationCheckpointCandidate } from '@app/contexts/identity-devices/domain/DeviceAuthorizationCheckpointCandidate';
+import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { isDeepStrictEqual } from 'node:util';
 
-import { OrbitDBDeviceAuthorizationContendingCheckpoint } from './documents/OrbitDBDeviceAuthorizationContendingCheckpoint';
 import { OrbitDBDeviceAuthorizationDocument } from './documents/OrbitDBDeviceAuthorizationDocument';
 import { OrbitDBDeviceAuthorizationSource } from './documents/OrbitDBDeviceAuthorizationSource';
 import { OrbitDBDeviceAuthorizationTransitionRecord } from './documents/OrbitDBDeviceAuthorizationTransitionRecord';
@@ -88,54 +87,70 @@ export default class OrbitDBDeviceAuthorizationSources {
   }
 
   /**
-   * Maps source checkpoints to the domain checkpoint precedence. Recoveries
-   * contending with the preferred one are kept as concurrent, so the caps
-   * they carry still hold.
+   * Maps source checkpoints to the domain checkpoint precedence. Every
+   * recovery a source checkpoint records off the preferred lineage, at any
+   * revision, lost to it: the domain policy keeps those whose caps must still
+   * hold as concurrent, so a heal never drops a cap only a losing side carried.
    */
   public preferredSourceCheckpoint(
     sources: OrbitDBDeviceAuthorizationSource[],
   ): OrbitDBDeviceAuthorizationDocument['checkpoint'] {
-    const precedence = this.policy.preferCheckpoint(
-      sources
-        .map((source) => source.checkpoint)
-        .filter(
-          (
-            checkpoint,
-          ): checkpoint is NonNullable<
-            OrbitDBDeviceAuthorizationDocument['checkpoint']
-          > => checkpoint !== undefined,
-        )
-        .map(
-          ({
-            authorization,
-            concurrent,
-            lineage,
-            transition,
-          }): DeviceAuthorizationCheckpointCandidate<OrbitDBDeviceAuthorizationContendingCheckpoint> => {
-            const recovery = { authorization, lineage, transition };
+    const checkpoints = sources
+      .map((source) => source.checkpoint)
+      .filter(
+        (
+          checkpoint,
+        ): checkpoint is NonNullable<
+          OrbitDBDeviceAuthorizationDocument['checkpoint']
+        > => checkpoint !== undefined,
+      );
+    const preferred = this.policy.preferCheckpoint(
+      checkpoints.map(({ authorization, lineage, transition }) => {
+        const recovery = { authorization, lineage, transition };
 
-            return {
-              encoding: this.canonicalizer.serialize(recovery),
-              payload: { concurrent: concurrent ?? [], recovery },
-              revision: new DeviceAuthorizationRevision(authorization.revision),
-              sharesLineageWith: (other) =>
-                isDeepStrictEqual(other.payload.recovery.lineage, lineage),
-            };
-          },
-        ),
+        return {
+          encoding: this.canonicalizer.serialize(recovery),
+          payload: recovery,
+          revision: new DeviceAuthorizationRevision(authorization.revision),
+        };
+      }),
     );
 
-    if (!precedence) {
+    if (!preferred) {
       return undefined;
     }
 
-    const preferred = precedence.preferred.recovery;
-    const concurrent = this.uniqueTransitionRecords(
-      precedence.contenders.map(({ concurrent: lost, recovery }) => [
-        recovery.transition,
-        ...lost,
-      ]),
-    ).filter((record) => !isDeepStrictEqual(record, preferred.transition));
+    const preferredPath = new Set(
+      [...preferred.lineage, preferred.transition].map((record) =>
+        this.canonicalizer.serialize(record),
+      ),
+    );
+    const concurrent = this.policy.heldLostRecoveries(
+      DeviceAuthorizationTransition.fromPrimitives(
+        preferred.transition.transition,
+      ),
+      this.uniqueTransitionRecords(
+        checkpoints.map(({ concurrent: lost, lineage, transition }) => [
+          ...lineage,
+          transition,
+          ...(lost ?? []),
+        ]),
+      ).flatMap((record) => {
+        const encoding = this.canonicalizer.serialize(record);
+
+        return preferredPath.has(encoding)
+          ? []
+          : [
+              {
+                encoding,
+                payload: record,
+                transition: DeviceAuthorizationTransition.fromPrimitives(
+                  record.transition,
+                ),
+              },
+            ];
+      }),
+    );
 
     return concurrent.length > 0 ? { ...preferred, concurrent } : preferred;
   }

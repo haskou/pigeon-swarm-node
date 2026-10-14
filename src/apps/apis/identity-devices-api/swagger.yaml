@@ -439,7 +439,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DeviceAuthorizationTransition'
-          description: Recoveries at the checkpoint's predecessor that lost the checkpoint. Their carried caps still hold; they never count as removal evidence.
+          description: Recoveries that lost the checkpoint, at its revision or an earlier one, and still carry a cap it lacks, with the lost recoveries they recovered from. Their carried caps still hold; they never count as removal evidence.
         identityId:
           type: string
         recoveries:

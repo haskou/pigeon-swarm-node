@@ -921,7 +921,12 @@ compare it with their receipt clock: a fully signed enrollment may arrive after 
 offline partition and must replay identically everywhere. Pairing and operation
 identifiers remain permanent replay tombstones. Signed time never grants authority
 or wins a conflict. A transition authored from a losing branch is rechecked against
-the selected checkpoint before it can affect later revisions.
+the selected checkpoint before it can affect later revisions. When healed
+replicas hold different recovery checkpoints, the merge keeps the one at the
+highest revision (the lowest canonical form among equals) and keeps every lost
+recovery, at any revision, that carries a compromise cap the kept one lacks, with
+the lost recoveries it recovered from, in `checkpoint.concurrent` (at most 128).
+A heal therefore never drops a cap that only a losing partition's recovery carried.
 
 ## Live call projection boundary
 

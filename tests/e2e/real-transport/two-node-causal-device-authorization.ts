@@ -6,10 +6,12 @@ import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/I
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
+import { DeviceCompromisedCredential } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionState';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 import DeviceAuthorizationPublicMutationAuthorization from '@app/contexts/public-mutations/infrastructure/DeviceAuthorizationPublicMutationAuthorization';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
+import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { PairingAuthorization } from '@app/contexts/identity-devices/domain/value-objects/PairingAuthorization';
@@ -208,6 +210,7 @@ function enrollment(
   operationId: string,
   pairingId: string,
   previousRevision = DeviceAuthorizationRevision.initial(),
+  epoch = DeviceAuthorizationEpoch.genesis(),
 ): DeviceAuthorizationTransition {
   const unsigned = DeviceAuthorizationTransition.enrollment(
     identityId,
@@ -220,6 +223,7 @@ function enrollment(
       new PairingExpiration(now.valueOf() + 60_000),
       now,
     ),
+    epoch,
   );
 
   const proven = unsigned.provePossession(
@@ -250,6 +254,30 @@ function revocation(
   );
 
   return unsigned.authorize(owner.sign(unsigned.getSigningPayload()));
+}
+
+function signedRecovery(
+  identityId: IdentityId,
+  authority: KeyPair,
+  target: KeyPair,
+  operationId: string,
+  previousRevision: number,
+  epoch = DeviceAuthorizationEpoch.genesis(),
+  compromisedCredentials?: DeviceCompromisedCredential[],
+): DeviceAuthorizationTransition {
+  const unsigned = DeviceAuthorizationTransition.recovery(
+    identityId,
+    new DeviceAuthorizationOperationId(operationId),
+    new DeviceAuthorizationRevision(previousRevision),
+    DeviceCredential.fromString(target.toPrimitives().publicKey),
+    epoch,
+    compromisedCredentials,
+  );
+  const proven = unsigned.provePossession(
+    target.sign(unsigned.getProofOfPossessionPayload()),
+  );
+
+  return proven.authorizeRecovery(authority.sign(proven.getSigningPayload()));
 }
 
 function proofOf(
@@ -349,6 +377,201 @@ async function restart(
     new IdentityVersion(1),
     new IdentityExternalIdentifier('bafy-genesis'),
   );
+}
+
+/**
+ * Two isolated replicas recover one identity concurrently at different
+ * revisions: the earlier recovery caps the stolen phone, the later one
+ * carries no cap. After the heal every replica settles on the later recovery,
+ * and the phone stays refused, even re-enrolled by the device that won.
+ */
+async function verifyCrossRevisionRecoveries(
+  swarmKey: PrivateKey,
+): Promise<void> {
+  stage = 'partitioned cross-revision recoveries';
+  const capped = await createReplica('capped', swarmKey);
+  const uncapped = await createReplica('uncapped', swarmKey);
+  const [
+    identity,
+    owner,
+    authority,
+    phone,
+    laptop,
+    tablet,
+    cappedTarget,
+    uncappedTarget,
+  ] = await Promise.all(Array.from({ length: 8 }, () => KeyPair.generate()));
+  const identityId = new IdentityId(identity.toPrimitives().publicKey);
+  const genesis = DeviceAuthorization.genesis(
+    identityId,
+    [new NetworkId(networkId)],
+    DeviceCredential.fromString(owner.toPrimitives().publicKey),
+    RecoveryAuthority.fromString(authority.toPrimitives().publicKey),
+  );
+
+  // Both sides: 1 + phone, 2 + laptop.
+  for (const replica of [capped, uncapped]) {
+    await replica.repository!.provision(
+      genesis,
+      new IdentityVersion(1),
+      new IdentityExternalIdentifier('bafy-genesis'),
+    );
+    await replica.repository!.compareAndApply(
+      enrollment(
+        identityId,
+        owner,
+        phone,
+        '00000000-0000-4000-8000-000000000021',
+        '10000000-0000-4000-8000-000000000021',
+      ),
+    );
+    await replica.repository!.compareAndApply(
+      enrollment(
+        identityId,
+        owner,
+        laptop,
+        '00000000-0000-4000-8000-000000000022',
+        '10000000-0000-4000-8000-000000000022',
+        new DeviceAuthorizationRevision(1),
+      ),
+    );
+  }
+
+  // Capped side: 3 phone revoked as compromised since 2, 4 recovered with
+  // the phone capped.
+  await capped.repository!.compareAndApply(
+    revocation(
+      identityId,
+      laptop,
+      phone,
+      '00000000-0000-4000-8000-000000000023',
+      2,
+      2,
+    ),
+  );
+  await capped.repository!.compareAndApply(
+    signedRecovery(
+      identityId,
+      authority,
+      cappedTarget,
+      '00000000-0000-4000-8000-000000000024',
+      3,
+      DeviceAuthorizationEpoch.genesis(),
+      [
+        {
+          compromisedSince: new DeviceAuthorizationRevision(2),
+          credential: DeviceCredential.fromString(
+            phone.toPrimitives().publicKey,
+          ),
+        },
+      ],
+    ),
+  );
+  // Uncapped side: 3 phone revoked, 4 + tablet, 5 recovered without a cap.
+  await uncapped.repository!.compareAndApply(
+    revocation(
+      identityId,
+      owner,
+      phone,
+      '00000000-0000-4000-8000-000000000025',
+      2,
+    ),
+  );
+  await uncapped.repository!.compareAndApply(
+    enrollment(
+      identityId,
+      owner,
+      tablet,
+      '00000000-0000-4000-8000-000000000026',
+      '10000000-0000-4000-8000-000000000026',
+      new DeviceAuthorizationRevision(3),
+    ),
+  );
+  await uncapped.repository!.compareAndApply(
+    signedRecovery(
+      identityId,
+      authority,
+      uncappedTarget,
+      '00000000-0000-4000-8000-000000000027',
+      4,
+    ),
+  );
+
+  stage = 'cross-revision recoveries healed';
+  await connect(capped, uncapped);
+  await startSynchronization([capped, uncapped]);
+  for (const replica of [capped, uncapped]) {
+    await until(`${replica.name} settles on the later recovery`, async () => {
+      const authorization = await replica.repository!.require(identityId);
+
+      return authorization.toPrimitives().revision === 5;
+    });
+  }
+
+  // 6: the device that won re-enrolls the phone.
+  await uncapped.repository!.compareAndApply(
+    enrollment(
+      identityId,
+      uncappedTarget,
+      phone,
+      '00000000-0000-4000-8000-000000000028',
+      '10000000-0000-4000-8000-000000000028',
+      new DeviceAuthorizationRevision(5),
+      DeviceAuthorizationEpoch.fromRecovery(
+        new DeviceAuthorizationOperationId(
+          '00000000-0000-4000-8000-000000000027',
+        ),
+      ),
+    ),
+  );
+  for (const replica of [capped, uncapped]) {
+    await until(`${replica.name} reaches the re-enrolment`, async () => {
+      const authorization = await replica.repository!.require(identityId);
+
+      return authorization.toPrimitives().revision === 6;
+    });
+  }
+
+  const afterHeal: Array<[string, KeyPair, number, boolean]> = [
+    ['device of the recovery that won', uncappedTarget, 6, true],
+    ['stolen phone re-enrolled past its cap', phone, 6, false],
+    ['stolen phone before its cap, replaced by recovery', phone, 1, false],
+    [
+      'device of the recovery that lost, below the head',
+      cappedTarget,
+      4,
+      false,
+    ],
+    ['device of the recovery that lost, at the head', cappedTarget, 6, false],
+    ['tablet enrolled before the recovery that won', tablet, 4, false],
+  ];
+  await expectVerdicts('capped healed node', capped, identityId, afterHeal);
+  await expectVerdicts('uncapped healed node', uncapped, identityId, afterHeal);
+
+  stage = 'cross-revision recoveries after a restart';
+  await restart(uncapped, genesis);
+  await expectVerdicts(
+    'restarted uncapped node',
+    uncapped,
+    identityId,
+    afterHeal,
+  );
+
+  stage = 'cross-revision recoveries on a fresh replica';
+  const late = await createReplica('late', swarmKey);
+  await late.repository!.provision(
+    genesis,
+    new IdentityVersion(1),
+    new IdentityExternalIdentifier('bafy-genesis'),
+  );
+  await connect(late, capped);
+  await startSynchronization([late]);
+  await until('the fresh replica reaches the re-enrolment', async () => {
+    const authorization = await late.repository!.require(identityId);
+
+    return authorization.toPrimitives().revision === 6;
+  });
+  await expectVerdicts('fresh replica', late, identityId, afterHeal);
 }
 
 async function main(): Promise<void> {
@@ -512,27 +735,22 @@ async function main(): Promise<void> {
   stage = 'recovery checkpoint';
   await startSynchronization([second]);
   const recovered = await KeyPair.generate();
-  const unsignedRecovery = DeviceAuthorizationTransition.recovery(
-    identityId,
-    new DeviceAuthorizationOperationId('00000000-0000-4000-8000-000000000017'),
-    new DeviceAuthorizationRevision(6),
-    DeviceCredential.fromString(recovered.toPrimitives().publicKey),
-    undefined,
-    [
-      {
-        compromisedSince: new DeviceAuthorizationRevision(5),
-        credential: DeviceCredential.fromString(
-          tablet.toPrimitives().publicKey,
-        ),
-      },
-    ],
-  );
-  const provenRecovery = unsignedRecovery.provePossession(
-    recovered.sign(unsignedRecovery.getProofOfPossessionPayload()),
-  );
   await first.repository!.compareAndApply(
-    provenRecovery.authorizeRecovery(
-      recovery.sign(provenRecovery.getSigningPayload()),
+    signedRecovery(
+      identityId,
+      recovery,
+      recovered,
+      '00000000-0000-4000-8000-000000000017',
+      6,
+      DeviceAuthorizationEpoch.genesis(),
+      [
+        {
+          compromisedSince: new DeviceAuthorizationRevision(5),
+          credential: DeviceCredential.fromString(
+            tablet.toPrimitives().publicKey,
+          ),
+        },
+      ],
     ),
   );
   await until('second reaches the recovery checkpoint', async () => {
@@ -593,8 +811,10 @@ async function main(): Promise<void> {
     afterRecovery,
   );
 
+  await verifyCrossRevisionRecoveries(swarmKey);
+
   console.log(
-    'PASS causal device authorization: two real private Helia/OrbitDB replicas evaluated signed records at the claimed authorization revision (late delivery honoured, backdating past the revocation refused, a key revoked as compromised refused from the compromise frontier the owner signed even inside its authorized interval, unreplicated revisions refused until healed, identical verdicts after a restart, and a recovery checkpoint that replaced every pre-recovery credential and revision on the author, healed, fresh and restarted replicas). Local loopback transport only; no external NAT claim.',
+    'PASS causal device authorization: two real private Helia/OrbitDB replicas evaluated signed records at the claimed authorization revision (late delivery honoured, backdating past the revocation refused, a key revoked as compromised refused from the compromise frontier the owner signed even inside its authorized interval, unreplicated revisions refused until healed, identical verdicts after a restart, and a recovery checkpoint that replaced every pre-recovery credential and revision on the author, healed, fresh and restarted replicas), and two isolated replicas whose concurrent recoveries at different revisions healed to the later recovery while the compromise cap only the earlier one carried kept refusing the stolen key, re-enrolled or not, on both, restarted and fresh replicas. Local loopback transport only; no external NAT claim.',
   );
 }
 
