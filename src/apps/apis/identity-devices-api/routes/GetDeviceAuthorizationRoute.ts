@@ -106,7 +106,7 @@ export class GetDeviceAuthorizationRoute extends Route {
   @Get('/:identityId/transitions')
   public async findTransitions(
     @Param('identityId') identityId: string,
-    @QueryParam('after') after: unknown,
+    @QueryParam('after') after: string | undefined,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
