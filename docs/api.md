@@ -153,6 +153,15 @@ exact signing vectors for every store are in `tests/fixtures/*-vectors.json`
 (`author.authorizationRevision: 0`, `version: 2`). The design, threat model and
 the chosen bound are in `docs/design/causal-device-authorization.md`.
 
+**Network binding.** Any peer of a network can write to that network's replicated
+stores, so a validly signed record that names another network could be copied
+into them. A node therefore reads a signed record whose top-level `networkId`
+names a network only from the store of that network: a copy found in any other
+network's store is ignored. It is never returned, projected or counted, and a
+per-identity quota of its network never sees it. Records that name no single
+network (for example identities, whose `networkIds` list their memberships, or
+channel messages, scoped by community) are not affected by this rule.
+
 ## Path Parameters
 
 Path parameters must be percent-encoded with `encodeURIComponent` before being

@@ -1695,6 +1695,103 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     });
   });
 
+  describe('gated records read from another network store', () => {
+    const acceptingGate = (): MockProxy<OrbitDBMutationGate> => {
+      const gate = mock<OrbitDBMutationGate>();
+
+      gate.governs.mockImplementation((name) => name === 'contentReplication');
+      gate.governsHead.mockReturnValue(false);
+      gate.accepts.mockResolvedValue(true);
+
+      return gate;
+    };
+
+    const registration = (
+      id: string,
+      networkId?: string,
+    ): Record<string, unknown> => ({
+      cid: id,
+      id,
+      ...(networkId ? { networkId } : {}),
+      ownerIdentityId: 'owner',
+      scopeType: 'content_replication',
+      sizeBytes: 1,
+    });
+
+    const plantedNetworks = async (): Promise<{
+      registry: OrbitDBReplicatedStateRegistry;
+      firstNetworkStore: Store;
+    }> => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const firstNetwork = createStores();
+      const secondNetwork = createStores();
+
+      registry.addMutationGate(acceptingGate());
+      await registry.register('network-1', firstNetwork.stores);
+      await registry.register('network-2', secondNetwork.stores);
+      await firstNetwork.contentReplication.put(
+        registration('planted', 'network-2'),
+      );
+      await secondNetwork.contentReplication.put(
+        registration('genuine', 'network-2'),
+      );
+
+      return { firstNetworkStore: firstNetwork.contentReplication, registry };
+    };
+
+    it('never returns a record of one network from the store of another', async () => {
+      const { registry } = await plantedNetworks();
+      const ofSecondNetwork = (document: Record<string, unknown>): boolean =>
+        document.networkId === 'network-2';
+
+      const everyNetwork = await registry.queryDocuments(
+        'contentReplication',
+        ofSecondNetwork,
+      );
+      const firstNetworkOnly = await registry.queryDocuments(
+        'contentReplication',
+        () => true,
+        ['network-1'],
+      );
+
+      expect(everyNetwork.map((document) => document.id)).toEqual(['genuine']);
+      expect(firstNetworkOnly).toEqual([]);
+    });
+
+    it('never projects a record of one network from the store of another', async () => {
+      const { firstNetworkStore, registry } = await plantedNetworks();
+      const projected: unknown[] = [];
+
+      await registry.onDocumentUpdated('contentReplication', (document) => {
+        projected.push(document.id);
+      });
+      firstNetworkStore.emitUpdate({
+        payload: {
+          key: 'updated',
+          value: registration('updated', 'network-2'),
+        },
+      });
+      await flushPromises();
+
+      expect(projected).toEqual(['genuine']);
+      registry.clear();
+    });
+
+    it('still returns a gated record that names no network', async () => {
+      const { firstNetworkStore, registry } = await plantedNetworks();
+
+      await firstNetworkStore.put(registration('unscoped'));
+
+      const documents = await registry.queryDocuments(
+        'contentReplication',
+        () => true,
+        ['network-1'],
+      );
+
+      expect(documents.map((document) => document.id)).toEqual(['unscoped']);
+    });
+  });
+
   it('does not replace a newer cached head with an older replicated update', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const firstNetwork = createStores();
