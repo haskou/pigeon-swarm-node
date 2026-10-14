@@ -109,13 +109,19 @@ frontier), so a credential capped before the checkpoint stays refused after it,
 including when the same key is enrolled again on a post-recovery device. Caps
 only refuse: a carried cap never restores validity to a pre-recovery record.
 
-Two partitions can each recover at the same revision. The merge keeps one
-checkpoint (the lowest canonical form) and keeps every other recovery at that
-revision on the same lineage as signed evidence in `checkpoint.concurrent`.
-Each concurrent recovery must apply where the kept one applies and carry the
-caps of the lineage before it, and the caps it carries merge into the
-checkpoint's caps (lowest revision per credential). A heal therefore never drops
-a cap only the losing partition carried, and the next recovery must carry it.
+Partitions can each recover, at one revision or at different ones. The merge
+keeps one checkpoint: the recovery at the highest revision, ties broken by the
+lowest canonical form. Every other recovery the merged sides recorded off its
+lineage lost, and stays as signed evidence in `checkpoint.concurrent` while it
+carries a cap the kept recovery does not carry at least as tight, together with
+the lost recoveries it recovered from. A lost recovery must apply to the state
+it recovered from, the one state of its epoch on the kept lineage or another
+lost recovery, never above the kept recovery's revision, and the caps it
+carries merge into the checkpoint's caps (lowest revision per credential). A
+heal therefore never drops a cap only a losing partition's recovery carried,
+whatever revision it recovered at, and the next recovery must carry it. A lost
+recovery whose caps the kept one already carries adds nothing and is dropped,
+so repeated heals do not pile up losers.
 
 ## Threat model
 
@@ -302,10 +308,25 @@ local secrets. A revoked device reads up to the group that removed it. See
   recoveries of its lineage. Before the first recovery there are none, and a
   fresh replica no longer holds the pre-recovery revocations, so it accepts the
   carried list as written.
-- **Concurrent recoveries at different revisions are settled by revision.**
-  The higher recovery wins the checkpoint and the lower branch is discarded with
-  its caps, unless the higher recovery carried them. Concurrent recoveries at
-  one revision keep each other's caps (`checkpoint.concurrent`).
+- **A losing branch keeps only the caps its recoveries carried.** A heal keeps
+  the caps of every lost recovery, at any revision. A compromise revocation on
+  a losing branch that no recovery of that branch carried is history before
+  the kept checkpoint and is discarded with it, unless the kept recovery
+  carried the cap. This is the same family as the authorizing device's view
+  above.
+- **A recovery that supersedes an overflow replaces it whole.** A recovery
+  document at or above an overflowed document's revision wins the merge as it
+  is, so a lost recovery recorded only by the overflow's witness sources is not
+  kept with it.
+- **At most 128 held lost recoveries.** A heal that would hold more yields a
+  checkpoint the document shape check refuses. Only the recovery authority can
+  cause it, by signing that many capped recoveries that lose.
+- **The browser client proves only lost recoveries at the winner's
+  predecessor.** `pigeon-swarm-ui` still requires every entry of
+  `concurrentRecoveries` to share the last recovery's predecessor. A log that
+  holds a recovery lost at an earlier revision, or on another lost recovery,
+  reads as unproven there: the client does not wipe, but cannot prove a
+  genuine removal from that log either.
 - **More than 32 capped credentials fails closed.** A recovery that would carry
   more is refused, and nothing is trimmed.
 - **The caps are read in two steps.** The checkpoint and the caps come from
@@ -316,7 +337,7 @@ local secrets. A revoked device reads up to the group that removed it. See
 ## Verification
 
 - Unit: `DeviceAuthorizationTimeline` (compromise cap), `DeviceAuthorizationTransition` (shape, canonical order and bound of carried caps, signature coverage), `OrbitDBDeviceAuthorizationRepository`
-  timeline (replay, restart, caps carried across a recovery and refused when a carried cap is dropped, invented or replicated without it, caps of a concurrent recovery that lost the checkpoint kept after the heal and refused when its signature is forged, overflowed timeline caps derived from witness sources), `DeviceAuthorizationPublicMutationAuthorization`
+  timeline (replay, restart, caps carried across a recovery and refused when a carried cap is dropped, invented or replicated without it, caps of a concurrent recovery that lost the checkpoint kept after the heal and refused when its signature is forged, also when it lost at an earlier revision or to a later recovery of its own lineage, lost recoveries chained from one another kept together, covered lost recoveries dropped, overflowed timeline caps derived from witness sources), `DeviceAuthorizationPolicy` (lost recovery lineage replay and its refusals, held lost recoveries), `DeviceAuthorizationPublicMutationAuthorization`
   (late delivery, backdating at and after the revocation, not-yet-enrolled,
   unreached revision then healed, shuffled state order),
   `PublicMutationVerifier` (version and revision decoding, tampered revision),
@@ -330,6 +351,10 @@ local secrets. A revoked device reads up to the group that removed it. See
   checkpoint at revision 7 carrying the stolen tablet's compromise cap, verified on the author, a healed, a restarted and a
   fresh replica: the pre-recovery owner, phone, stolen tablet and watch are
   refused, and the recovered device is accepted only at its checkpoint revision;
+  then two isolated replicas of another identity recover concurrently at
+  revisions 4 and 5, only the earlier recovery capping a stolen phone: after
+  the heal both replicas, a restarted and a fresh replica settle on revision 5
+  and refuse the phone, also once the winning device re-enrolls it;
   in `test:ci`).
   The existing `forged-*`, `two-real-node-gossipsub` and call scripts keep
   covering the admission gates end to end.

@@ -49,9 +49,11 @@ primitives equal the stored signed record field for field.
 - `recoveries` is the recovery lineage of the node's replay base, oldest first
   (`checkpoint.lineage` followed by `checkpoint.transition`). It is empty
   before the first recovery.
-- `concurrentRecoveries` holds the recoveries at the checkpoint's predecessor
-  that lost the checkpoint (`checkpoint.concurrent`). Their carried caps still
-  hold, so a client needs them to replay the same base.
+- `concurrentRecoveries` holds the recoveries that lost the checkpoint and
+  still hold (`checkpoint.concurrent`), at any revision up to the
+  checkpoint's: each one carrying a cap the checkpoint does not carry at least
+  as tight, and the lost recoveries such a one recovered from. Their carried
+  caps still hold, so a client needs them to replay the same base.
 - `transitions` is the history the replay accepted from that base, in replay
   order: revision groups ascending, each group in the shared tie-break order,
   equivalent duplicates compacted. Records the replay rejected are never
@@ -131,8 +133,10 @@ To decide whether it was removed:
 2. Replay `recoveries` and `concurrentRecoveries` from the genesis with the
    shared lineage rules: each recovery verifies its proof of possession and the
    recovery authority signature, chains from the previous one and is in its
-   epoch; each concurrent recovery shares the last recovery's predecessor.
-   Any failure means the body proves nothing.
+   epoch; each concurrent recovery, by ascending revision, is at most the last
+   recovery's revision and applies to the one replayed state in its epoch (the
+   genesis, a recovery or an earlier concurrent recovery), whose own epoch no
+   replayed state has yet. Any failure means the body proves nothing.
 3. Replay `transitions` from that base with the shared policy (identity, epoch,
    exact predecessor, next revision, authorized author signature, proof of
    possession, then the per-group checkpoint rule: a recovery first, then
@@ -189,7 +193,7 @@ A single malicious node holds every stored record and can serve any bytes.
   signed `C`'s revocation.
 - **Choose among genuine competing recoveries.** Recoveries at different
   revisions of the same epoch resolve by highest revision, then canonical
-  encoding, and the losers at the winner's predecessor are only concurrent.
+  encoding, and every lost recovery is only concurrent.
   Serving a lineage that ends in a recovery not targeting `C`, while hiding a
   later one that does, shows a reset the recovery authority genuinely signed.
 - **Serve a genuine removal from a partition that later healed differently.**
@@ -216,6 +220,11 @@ In every case a wipe needs a signature from a key that had the power to remove
   the disclosure is computed from one consistent log.
 - A single node can suppress the auto-wipe indefinitely; liveness needs more
   than one node, which the client controls.
+- `pigeon-swarm-ui` still applies the older step 2 rule (every concurrent
+  recovery shares the last recovery's predecessor). A body holding a recovery
+  lost at an earlier revision, or on another lost recovery, reads as unproven
+  there and never wipes, so a removed device behind such a heal keeps its data
+  until the client adopts the rule above.
 
 ## Verification
 

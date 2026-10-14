@@ -5382,7 +5382,9 @@ Every entry is a stored transition in exactly the primitives
 and `signature`; the node never re-signs or rewrites one and serves only
 records its replay accepted. `recoveries` is the recovery lineage of the
 replay base (oldest first, empty before the first recovery),
-`concurrentRecoveries` holds the recoveries that lost that checkpoint, and
+`concurrentRecoveries` holds the recoveries that lost that checkpoint, at its
+revision or an earlier one, and still carry a cap it lacks (with the lost
+recoveries they recovered from), and
 `transitions` is the accepted history from that base in replay order. The
 recovery authority reads all three lists. A device authorized in some replayed
 state reads both recovery lists and the transitions whose `previousRevision` is
