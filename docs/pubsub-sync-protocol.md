@@ -392,7 +392,13 @@ a `reference` that must resolve to signed `requests` records: an accepted
 `invite_link` reference is the invite reference
 `base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + token)))`,
 never the token, because every member reads the operations; the use record names
-the token whose reference it is. An
+the token whose reference it is. An `invite_link` join is refused once the
+invite has expired at the operation's signer-chosen `createdAt`. Replicas do not
+cap `maxUses`: the joins have no single order, so a fold cap would let any token
+holder evict an honest member with a backdated join. Every member can read the
+token, so a backdated or malicious join past `maxUses` or `expiresAt` cannot be
+refuted until joins prove possession without revealing the token (#550).
+Invites cannot be revoked yet. An
 operation with an unknown parent or unreplicated evidence is not stored; its head
 is demoted and re-admitted when the evidence replicates (see
 [readmission](#readmission-of-rejected-records)).
@@ -601,10 +607,11 @@ authorizationRevision }` and an
   owner (`identityId`) and the record id is `<identityId>:<scopeKey>`.
 - `requests` documents are governed with three scope types.
   `community_invite` (author = `creatorIdentityId`; id = token =
-  `base64url(sha256(JSON([communityId, creatorIdentityId, nonce])))`, immutable),
+  `base64url(sha256(JSON([communityId, creatorIdentityId, nonce, maxUses, expiresAt ?? null])))`,
+  so the token commits to the invite limits; immutable),
   `community_invite_use` (author = the acceptor, id
-  `invite-use:<token>:<identityId>`; the use count is the number of use records,
-  so `maxUses` can overshoot while nodes are partitioned) and
+  `invite-use:<token>:<identityId>`; refused once the invite has expired at
+  `usedAt`; `maxUses` is checked only by the accepting node's API) and
   `community_membership_request` (id derived from community, type, creator,
   identity and `createdAt`; creator and identity are immutable, the status moves
   from `pending` to `accepted`/`declined` by the authorised party: invitee,
