@@ -12,7 +12,6 @@ import { MailboxEnvelope } from './MailboxEnvelope';
 import MailboxPolicy from './MailboxPolicy';
 import { MailboxPrimitives } from './MailboxPrimitives';
 import { MailboxReaderCursor } from './MailboxReaderCursor';
-import { MailboxReaderPrimitives } from './MailboxReaderPrimitives';
 import { MailboxState } from './MailboxState';
 import { MailboxId } from './value-objects/MailboxId';
 import { MailboxPostToken } from './value-objects/MailboxPostToken';
@@ -256,8 +255,8 @@ export class Mailbox {
   }
 
   /** Copies, so reader state only changes through this entity. */
-  public readers(): MailboxReaderPrimitives[] {
-    return this.state.readers.map((reader) => reader.toPrimitives());
+  public readers(): MailboxReaderCursor[] {
+    return this.state.readers.map((reader) => reader.copy());
   }
 
   /**
@@ -301,7 +300,7 @@ export class Mailbox {
       lastReadAt: this.state.lastReadAt.toMilliseconds(),
       nextCursor: this.state.nextCursor,
       postTokenHash: this.state.postTokenHash.valueOf(),
-      readers: this.readers(),
+      readers: this.state.readers.map((reader) => reader.toPrimitives()),
     };
   }
 }

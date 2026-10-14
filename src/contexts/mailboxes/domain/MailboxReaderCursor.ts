@@ -41,6 +41,10 @@ export class MailboxReaderCursor {
     );
   }
 
+  public copy(): MailboxReaderCursor {
+    return new MailboxReaderCursor(this.readTokenHash, this.ackedCursor);
+  }
+
   public getAckedCursor(): number {
     return this.ackedCursor;
   }

@@ -25,7 +25,7 @@ export default class MailboxReaderLister {
 
     return {
       maxReaders: this.policy.maxReaders(),
-      readers: mailbox.readers(),
+      readers: mailbox.readers().map((reader) => reader.toPrimitives()),
     };
   }
 }
