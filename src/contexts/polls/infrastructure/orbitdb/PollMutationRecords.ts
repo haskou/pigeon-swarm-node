@@ -1,3 +1,5 @@
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Timestamp } from '@haskou/value-objects';
@@ -17,11 +19,7 @@ export default class PollMutationRecords {
 
   public static readonly CLOSE = 'poll_close';
 
-  public static readonly SCOPE_FIELDS = [
-    'channelId',
-    'communityId',
-    'conversationId',
-  ];
+  public static readonly SCOPE_FIELDS = ['channelId', 'communityId'];
 
   private static assertSameId(record: Record<string, unknown>, id: string) {
     if (record.id !== id) throw new InvalidPublicMutationError();
@@ -38,23 +36,6 @@ export default class PollMutationRecords {
     return vote;
   }
 
-  private static scopeTypeOf(
-    record: Record<string, unknown>,
-  ): 'community_channel' | 'group_conversation' | undefined {
-    const { channelId, communityId, conversationId } = record;
-    const hasCommunity =
-      typeof communityId === 'string' && typeof channelId === 'string';
-    const hasGroup = typeof conversationId === 'string';
-
-    if (hasCommunity && conversationId === undefined) {
-      return 'community_channel';
-    }
-
-    return hasGroup && communityId === undefined && channelId === undefined
-      ? 'group_conversation'
-      : undefined;
-  }
-
   public static voteId(pollId: string, voterIdentityId: string): string {
     return `poll-vote:${new PollId(pollId).valueOf()}:${new IdentityId(voterIdentityId).valueOf()}`;
   }
@@ -64,38 +45,29 @@ export default class PollMutationRecords {
   }
 
   public static scopeFields(scope: PollScope): Record<string, string> {
-    return scope.match<Record<string, string>>({
-      communityChannel: (communityId, channelId) => ({
-        channelId: channelId.valueOf(),
-        communityId: communityId.valueOf(),
-      }),
-      groupConversation: (conversationId) => ({
-        conversationId: conversationId.valueOf(),
-      }),
-    });
+    return {
+      channelId: scope.getChannelId().valueOf(),
+      communityId: scope.getCommunityId().valueOf(),
+    };
   }
 
-  /** Throws unless the record names exactly one valid scope. */
+  /** Throws unless the record names a valid community channel and nothing else. */
   public static scopeOf(record: Record<string, unknown>): PollScope {
-    const { channelId, communityId, conversationId } = record;
-    const resolved = PollMutationRecords.scopeTypeOf(record);
+    const { channelId, communityId } = record;
 
-    if (!resolved) throw new InvalidPublicMutationError();
+    if (
+      'conversationId' in record ||
+      typeof communityId !== 'string' ||
+      typeof channelId !== 'string'
+    ) {
+      throw new InvalidPublicMutationError();
+    }
 
     try {
-      const scope = PollScope.fromPrimitives({
-        channelId: channelId as string | undefined,
-        communityId: communityId as string | undefined,
-        conversationId: conversationId as string | undefined,
-        type: resolved,
-      });
-
-      scope.match<void>({
-        communityChannel: () => undefined,
-        groupConversation: () => undefined,
-      });
-
-      return scope;
+      return PollScope.communityChannel(
+        new CommunityId(communityId),
+        new CommunityChannelId(channelId),
+      );
     } catch {
       throw new InvalidPublicMutationError();
     }

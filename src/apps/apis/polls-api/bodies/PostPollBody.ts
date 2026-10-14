@@ -10,7 +10,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 
@@ -20,9 +19,8 @@ export class PostPollBody {
   @IsObject()
   public readonly mutation: Record<string, unknown>;
 
-  @ValidateIf((body: PostPollBody) => body.scopeType === 'community_channel')
   @IsObject()
-  public readonly timelineMutation?: Record<string, unknown>;
+  public readonly timelineMutation: Record<string, unknown>;
 
   @IsInt()
   public readonly createdAt: number;
@@ -34,20 +32,13 @@ export class PostPollBody {
   @IsBoolean()
   public readonly allowsMultipleVotes: boolean;
 
-  @ValidateIf((body: PostPollBody) => body.scopeType === 'community_channel')
   @IsString()
   @IsNotEmpty()
-  public readonly channelId?: string;
+  public readonly channelId: string;
 
-  @ValidateIf((body: PostPollBody) => body.scopeType === 'community_channel')
   @IsString()
   @IsNotEmpty()
-  public readonly communityId?: string;
-
-  @ValidateIf((body: PostPollBody) => body.scopeType === 'group_conversation')
-  @IsString()
-  @IsNotEmpty()
-  public readonly conversationId?: string;
+  public readonly communityId: string;
 
   @IsOptional()
   @IsInt()
@@ -65,6 +56,6 @@ export class PostPollBody {
   public readonly question: string;
 
   @IsString()
-  @IsIn(['community_channel', 'group_conversation'])
-  public readonly scopeType: 'community_channel' | 'group_conversation';
+  @IsIn(['community_channel'])
+  public readonly scopeType: 'community_channel';
 }

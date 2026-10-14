@@ -43,10 +43,7 @@ export class Poll extends AggregateRoot {
       [],
     );
     const primitives = poll.toPrimitives();
-    const eventStreamId = scope.match({
-      communityChannel: (communityId) => communityId.valueOf(),
-      groupConversation: (conversationId) => conversationId.valueOf(),
-    });
+    const eventStreamId = scope.getCommunityId().valueOf();
 
     poll.record(
       new PollWasCreatedEvent(eventStreamId, {

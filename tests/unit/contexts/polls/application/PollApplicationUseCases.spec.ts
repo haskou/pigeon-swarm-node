@@ -1,7 +1,6 @@
 import CommunityChannelMessageRepository from '@app/contexts/communities/domain/repositories/CommunityChannelMessageRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { PollVoteCastMessage } from '@app/contexts/polls/application/cast-vote/messages/PollVoteCastMessage';
 import { PollVoteCaster } from '@app/contexts/polls/application/cast-vote/PollVoteCaster';
 import { PollCloseMessage } from '@app/contexts/polls/application/close/messages/PollCloseMessage';
@@ -236,29 +235,6 @@ describe('Poll application use cases', () => {
       expect.anything(),
       mutationProof,
     );
-  });
-
-  it('PollTimelineMessageRegistrar writes nothing for a group conversation poll', async () => {
-    const communityRepository = mock<CommunityChannelMessageRepository>();
-    const conversationPoll = Poll.create(
-      new PollId('poll-2'),
-      new IdentityId(creatorIdentityId),
-      PollScope.groupConversation(new ConversationId('conversation-1')),
-      new PollQuestion('Choose one'),
-      pollOptions(),
-      new Timestamp(createdAt),
-      { allowsMultipleVotes: false },
-    );
-
-    await new PollTimelineMessageRegistrar(communityRepository).register(
-      new PollTimelineMessageRegisterMessage(
-        creatorIdentityId,
-        conversationPoll,
-        PublicMutationProof.fromPrimitives(await proof()),
-      ),
-    );
-
-    expect(communityRepository.save).not.toHaveBeenCalled();
   });
 });
 

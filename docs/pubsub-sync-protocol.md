@@ -594,7 +594,7 @@ recipientIdentityId})))`, so a peer cannot claim an id for content it did not
   (author = voter, id `poll-vote:<pollId>:<voterIdentityId>`, replaced by a
   higher sequence, removed by a signed tombstone) and `poll_close` (author =
   `closedByIdentityId`, id `poll-close:<pollId>`). Authors must be allowed in
-  the community channel or be participants of the group conversation. Readers
+  the community channel; a record carrying `conversationId` is rejected. Readers
   assemble the poll from its records and ignore ballots dated after the earliest
   close. Heads are index wrappers under collection `polls`.
 - `stickerPacks` and `stickerUserLibraries` documents are governed too. Packs use

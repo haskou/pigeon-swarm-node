@@ -1,5 +1,4 @@
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
-import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { CommunityChannelPollScopeAuthorizeMessage } from '@app/contexts/polls/application/authorize-poll-scope/messages/CommunityChannelPollScopeAuthorizeMessage';
 import PollScopeAuthorizer from '@app/contexts/polls/application/authorize-poll-scope/PollScopeAuthorizer';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -8,16 +7,11 @@ describe('PollScopeAuthorizer', () => {
   const actorIdentityId =
     'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=';
   let communityRepository: MockProxy<CommunityRepository>;
-  let conversationRepository: MockProxy<ConversationRepository>;
   let authorizer: PollScopeAuthorizer;
 
   beforeEach(() => {
     communityRepository = mock<CommunityRepository>();
-    conversationRepository = mock<ConversationRepository>();
-    authorizer = new PollScopeAuthorizer(
-      communityRepository,
-      conversationRepository,
-    );
+    authorizer = new PollScopeAuthorizer(communityRepository);
   });
 
   it('authorizes community poll creation without exposing a member audience', async () => {
@@ -38,12 +32,10 @@ describe('PollScopeAuthorizer', () => {
     expect(authorizeTextChannelPollCreation).toHaveBeenCalledTimes(1);
     expect(resolution.audience.toPrimitives()).toEqual({
       memberIds: undefined,
-      participantIds: undefined,
     });
     expect(resolution.scope.toPrimitives()).toEqual({
       channelId: 'channel-1',
       communityId: 'community-1',
-      conversationId: undefined,
       type: 'community_channel',
     });
   });

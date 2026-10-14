@@ -2,8 +2,6 @@ import CommunityRepository from '@app/contexts/communities/domain/repositories/C
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
-import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -31,7 +29,6 @@ export default class OrbitDBPollRepository extends PollRepository {
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
     private readonly communityRepository: CommunityRepository,
-    private readonly conversationRepository: ConversationRepository,
     private readonly publicStorageGuard: PrivateCommunityPublicStorageGuard,
   ) {
     super();
@@ -57,10 +54,6 @@ export default class OrbitDBPollRepository extends PollRepository {
     return `poll-community-channel-index:${communityId}:${channelId}`;
   }
 
-  private groupConversationIndexHeadKey(conversationId: string): string {
-    return `poll-group-conversation-index:${conversationId}`;
-  }
-
   private isRecord(record: PollRecord): boolean {
     try {
       if (record.scopeType === PollMutationRecords.POLL) {
@@ -84,43 +77,30 @@ export default class OrbitDBPollRepository extends PollRepository {
   }
 
   private async resolveNetworkId(poll: Poll): Promise<string> {
-    return poll.getScope().match<Promise<string>>({
-      communityChannel: async (communityId) => {
-        const community =
-          await this.communityRepository.requireById(communityId);
+    const community = await this.communityRepository.requireById(
+      poll.getScope().getCommunityId(),
+    );
 
-        return community.toPrimitives().networkId;
-      },
-      groupConversation: async (conversationId) => {
-        const conversation =
-          await this.conversationRepository.requireMetadataById(conversationId);
-
-        return conversation.toPrimitives().networkId;
-      },
-    });
+    return community.toPrimitives().networkId;
   }
 
   private runWhilePublicCommunityScope<T>(
     poll: Poll,
     action: () => Promise<T>,
   ): Promise<T> {
-    return poll.getScope().match<Promise<T>>({
-      communityChannel: (communityId) =>
-        this.publicStorageGuard.runWhilePublic(communityId, action),
-      groupConversation: action,
-    });
+    return this.publicStorageGuard.runWhilePublic(
+      poll.getScope().getCommunityId(),
+      action,
+    );
   }
 
   private scopeIndexKey(poll: Poll): string {
-    return poll.getScope().match<string>({
-      communityChannel: (communityId, channelId) =>
-        this.communityChannelIndexHeadKey(
-          communityId.valueOf(),
-          channelId.valueOf(),
-        ),
-      groupConversation: (conversationId) =>
-        this.groupConversationIndexHeadKey(conversationId.valueOf()),
-    });
+    const scope = poll.getScope();
+
+    return this.communityChannelIndexHeadKey(
+      scope.getCommunityId().valueOf(),
+      scope.getChannelId().valueOf(),
+    );
   }
 
   private sameScope(record: PollRecord, poll: Poll): boolean {
@@ -302,18 +282,6 @@ export default class OrbitDBPollRepository extends PollRepository {
         limit,
         beforeCreatedAt,
       ),
-    );
-  }
-
-  public findByGroupConversation(
-    conversationId: ConversationId,
-    limit: number,
-    beforeCreatedAt?: number,
-  ): Promise<Poll[]> {
-    return this.loadMany(
-      this.groupConversationIndexHeadKey(conversationId.valueOf()),
-      limit,
-      beforeCreatedAt,
     );
   }
 

@@ -13,8 +13,6 @@ import CommunityInviteMutationPolicy from '@app/contexts/communities/infrastruct
 import CommunityInviteUseMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy';
 import CommunityMembershipRequestMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy';
 import CommunityModerationLogMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityModerationLogMutationPolicy';
-import { Conversation } from '@app/contexts/conversations/domain/Conversation';
-import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import NotificationScopeSettingsMutationPolicy from '@app/contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy';
 import PollCloseMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollCloseMutationPolicy';
 import PollMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollMutationPolicy';
@@ -943,7 +941,6 @@ describe('PublicMutationGate over polls', () => {
   };
   const authorization = mock<PublicMutationAuthorAuthorization>();
   const communityRepository = mock<CommunityRepository>();
-  const conversationRepository = mock<ConversationRepository>();
   const community = mock<Community>();
   let gate: PublicMutationGate;
 
@@ -983,10 +980,7 @@ describe('PublicMutationGate over polls', () => {
     communityRepository.requireAtFrontier.mockResolvedValue(community);
     community.authorizeTextChannelPollCreation.mockReset();
     community.authorizeTextChannelPollVote.mockReset();
-    const access = new PollMutationScopeAccess(
-      communityRepository,
-      conversationRepository,
-    );
+    const access = new PollMutationScopeAccess(communityRepository);
 
     gate = new PublicMutationGate(new PublicMutationVerifier(authorization), [
       new PollMutationPolicy(access),
@@ -1096,8 +1090,7 @@ describe('PublicMutationGate over polls', () => {
     ).resolves.toBe(true);
   });
 
-  it('rejects a conversation-scoped poll even from a group participant', async () => {
-    const conversation = mock<Conversation>();
+  it('rejects a conversation-scoped poll', async () => {
     const groupPoll = {
       allowsMultipleVotes: false,
       conversationId: 'group:1',
@@ -1109,11 +1102,6 @@ describe('PublicMutationGate over polls', () => {
       scopeType: 'poll',
     };
 
-    conversationRepository.requireMetadataAtFrontier.mockResolvedValue(
-      conversation,
-    );
-    conversation.isGroup.mockReturnValue(true);
-    conversation.hasParticipant.mockReturnValue(true);
     await expect(
       gate.accepts('polls', await sign(groupPoll, creator)),
     ).resolves.toBe(false);

@@ -2,8 +2,6 @@ import CommunityRepository from '@app/contexts/communities/domain/repositories/C
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
-import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { Poll } from '@app/contexts/polls/domain/Poll';
 import { PollOption } from '@app/contexts/polls/domain/PollOption';
 import { PollScope } from '@app/contexts/polls/domain/PollScope';
@@ -78,21 +76,17 @@ describe('OrbitDBPollRepository', () => {
   const networkId = '550e8400-e29b-41d4-a716-446655440002';
   const communityId = new CommunityId('community-1');
   const channelId = new CommunityChannelId('channel-1');
-  const conversationId = new ConversationId('group:conversation-1');
   let polls: ReturnType<typeof createStore>;
   let registry: OrbitDBReplicatedStateRegistry;
   let repository: OrbitDBPollRepository;
   let communityRepository: MockProxy<CommunityRepository>;
-  let conversationRepository: MockProxy<ConversationRepository>;
   let publicStorageGuard: PrivateCommunityPublicStorageGuard;
 
-  function poll(scope: 'community_channel' | 'group_conversation'): Poll {
+  function poll(): Poll {
     return Poll.create(
-      new PollId(`poll-${scope === 'community_channel' ? 'c' : 'g'}`),
+      new PollId('poll-c'),
       new IdentityId(creatorIdentityId),
-      scope === 'community_channel'
-        ? PollScope.communityChannel(communityId, channelId)
-        : PollScope.groupConversation(conversationId),
+      PollScope.communityChannel(communityId, channelId),
       new PollQuestion('Question?'),
       [
         PollOption.create(new PollOptionId('yes-1'), new PollOptionText('Yes')),
@@ -145,7 +139,6 @@ describe('OrbitDBPollRepository', () => {
     polls = createStore();
     registry = new OrbitDBReplicatedStateRegistry();
     communityRepository = mock<CommunityRepository>();
-    conversationRepository = mock<ConversationRepository>();
     publicStorageGuard = new PrivateCommunityPublicStorageGuard(
       {
         hasScope: jest.fn().mockResolvedValue(false),
@@ -159,13 +152,9 @@ describe('OrbitDBPollRepository', () => {
     communityRepository.requireById.mockResolvedValue({
       toPrimitives: () => ({ networkId }),
     } as never);
-    conversationRepository.requireMetadataById.mockResolvedValue({
-      toPrimitives: () => ({ networkId }),
-    } as never);
     repository = new OrbitDBPollRepository(
       registry,
       communityRepository,
-      conversationRepository,
       publicStorageGuard,
     );
   });
@@ -179,7 +168,7 @@ describe('OrbitDBPollRepository', () => {
   }
 
   it('reads community channel polls from the scope index after saving', async () => {
-    const savedPoll = poll('community_channel');
+    const savedPoll = poll();
 
     await save(savedPoll);
     const storedDocument = await polls.get(savedPoll.getId().valueOf());
@@ -203,23 +192,8 @@ describe('OrbitDBPollRepository', () => {
     expect(storedDocument).not.toHaveProperty('status');
   });
 
-  it('reads group conversation polls from the scope index after saving', async () => {
-    const savedPoll = poll('group_conversation');
-
-    await save(savedPoll);
-
-    const result = await repository.findByGroupConversation(conversationId, 10);
-
-    expect(result.map((item) => item.toPrimitives().id)).toEqual([
-      savedPoll.getId().valueOf(),
-    ]);
-    expect(conversationRepository.requireMetadataById).toHaveBeenCalledWith(
-      conversationId,
-    );
-  });
-
   it('replays ballots, a replaced ballot and a tombstone over the poll', async () => {
-    const savedPoll = poll('community_channel');
+    const savedPoll = poll();
 
     await save(savedPoll);
     await saveVote(savedPoll, 'yes-1', 1);
@@ -247,13 +221,13 @@ describe('OrbitDBPollRepository', () => {
   });
 
   it('closes a poll and ignores ballots cast after the close', async () => {
-    const savedPoll = poll('community_channel');
+    const savedPoll = poll();
 
     await save(savedPoll);
     await saveVote(savedPoll, 'yes-1', 1, 1_780_000_000_500);
     const closer = new IdentityId(creatorIdentityId);
     const closedAt = new Timestamp(1_780_000_000_300);
-    const closing = poll('community_channel');
+    const closing = poll();
 
     closing.close(closedAt);
     await repository.saveClose(
@@ -270,7 +244,7 @@ describe('OrbitDBPollRepository', () => {
   });
 
   it('rejects a stale ballot', async () => {
-    const savedPoll = poll('community_channel');
+    const savedPoll = poll();
 
     await save(savedPoll);
     await saveVote(savedPoll, 'yes-1', 2);
@@ -279,7 +253,7 @@ describe('OrbitDBPollRepository', () => {
   });
 
   it('ignores a ballot recorded for another scope', async () => {
-    const savedPoll = poll('community_channel');
+    const savedPoll = poll();
 
     await save(savedPoll);
     const foreign = PollScope.communityChannel(
@@ -336,21 +310,19 @@ describe('OrbitDBPollRepository', () => {
     repository = new OrbitDBPollRepository(
       registry,
       communityRepository,
-      conversationRepository,
       new PrivateCommunityPublicStorageGuard(
         { hasScope: jest.fn().mockResolvedValue(false) } as never,
         coordinator,
       ),
     );
 
-    await expect(save(poll('community_channel'))).resolves.toBe(undefined);
+    await expect(save(poll())).resolves.toBe(undefined);
   });
 
   it('rejects protected community polls before publishing them', async () => {
     repository = new OrbitDBPollRepository(
       registry,
       communityRepository,
-      conversationRepository,
       new PrivateCommunityPublicStorageGuard(
         {
           hasScope: jest.fn().mockResolvedValue(true),
@@ -359,9 +331,7 @@ describe('OrbitDBPollRepository', () => {
       ),
     );
 
-    await expect(save(poll('community_channel'))).rejects.toThrow(
-      'Invalid private authorization',
-    );
+    await expect(save(poll())).rejects.toThrow('Invalid private authorization');
     expect(polls.put).not.toHaveBeenCalled();
   });
 

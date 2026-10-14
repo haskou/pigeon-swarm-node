@@ -1,6 +1,5 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import { CommunityChannelPollScopeAuthorizeMessage } from '@app/contexts/polls/application/authorize-poll-scope/messages/CommunityChannelPollScopeAuthorizeMessage';
-import { GroupConversationPollScopeAuthorizeMessage } from '@app/contexts/polls/application/authorize-poll-scope/messages/GroupConversationPollScopeAuthorizeMessage';
 import PollScopeAuthorizer from '@app/contexts/polls/application/authorize-poll-scope/PollScopeAuthorizer';
 import { PollScopeResolution } from '@app/contexts/polls/application/authorize-poll-scope/PollScopeResolution';
 import { PollFindMessage } from '@app/contexts/polls/application/find/messages/PollFindMessage';
@@ -51,18 +50,6 @@ export abstract class PollRouteSupport extends Route {
         actor.valueOf(),
         communityId,
         channelId,
-      ),
-    );
-  }
-
-  protected async groupConversationScope(
-    actor: IdentityId,
-    conversationId: string,
-  ): Promise<PollScopeResolution> {
-    return this.scopeAuthorizer.authorizeGroupConversation(
-      new GroupConversationPollScopeAuthorizeMessage(
-        actor.valueOf(),
-        conversationId,
       ),
     );
   }

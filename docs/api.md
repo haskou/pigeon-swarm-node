@@ -461,7 +461,7 @@ Event contracts used by frontend:
 | `communities.v1.channel.message.was_unpinned`         | community id      | `communityId`, `channelId`, `messageId`, `unpinnedByIdentityId`, `networkId`, `memberIds`                                  |
 | `communities.v1.channel.message.reaction.was_added`   | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`                |
 | `communities.v1.channel.message.reaction.was_removed` | community id      | `communityId`, `channelId`, `messageId`, `authorIdentityId`, `emoji`, `createdAt`, `networkId`, `memberIds`                |
-| `polls.v1.poll.was_created`                           | poll scope id     | `pollId`, `poll`, `participantIds` for group conversations                                                                 |
+| `polls.v1.poll.was_created`                           | poll scope id     | `pollId`, `poll`                                                                                                           |
 | `stickers.v1.pack.was_created`                        | sticker pack id   | `packId`, `ownerIdentityId`, `pack`                                                                                        |
 | `stickers.v1.user_library.was_created`                | identity id       | `identityId`, `library`                                                                                                    |
 | `notifications.v1.notification.was_created`           | notification id   | `recipientIdentityId`, `type`                                                                                              |
@@ -2482,7 +2482,7 @@ every node folds it):
 - `admin_promoted`: only by the creator; the target is a member, not the creator and
   not already an admin. `admin_demoted`: only by the creator; the target is an admin.
 - A 1:1 is immutable: it accepts its genesis and refuses every other operation.
-- Group polls and the calls of both kinds authorize against the folded roster
+- Calls of both kinds authorize against the folded roster
   (1:1 from the signed genesis); a removed member loses access.
 
 **Limits.** `args` is at most 4096 bytes of JSON, a group has at most 256 members and
@@ -5344,13 +5344,9 @@ Body: `{ "usedAt": <ms>, "mutation": SignedPublicMutation (recent put) }`.
 
 ## Polls API
 
-Polls are interactive timeline items. They can live in a community text channel
-or in a group conversation.
-
-The node writes no timeline message for a group conversation poll: the group
-timeline lives only in the members' opaque mailboxes, and the client places the
-poll in it. `timelineMutation` is required for `community_channel` polls and
-ignored for `group_conversation` polls.
+Polls are interactive timeline items in a community text channel. Group
+conversation polls are end-to-end encrypted MLS records in the group mailbox and
+never reach this API. `timelineMutation` is required.
 
 Community text channel polls are also registered as channel message ids. The
 poll `id` returned in the community channel messages timeline can be used as
@@ -5368,7 +5364,7 @@ Poll events are emitted through websocket as domain events:
 - `polls.v1.poll.was_closed`
 
 Community poll events are scoped by community/channel and do not expose the
-member list. Group conversation poll events include `participantIds`.
+member list.
 
 ### Create poll
 
@@ -5383,7 +5379,7 @@ Requires signed HTTP headers. Polls are public replicated records (store
 record without `proof`: `allowsMultipleVotes`, `createdAt`, `creatorIdentityId`,
 `expiresAt` (omitted when none), `id` (= `pollId`), `options` (`{id,text}`),
 `question`, `scopeType: "poll"` and the scope fields (`communityId` +
-`channelId`, or `conversationId`).
+`channelId`; a record carrying `conversationId` is rejected).
 
 Community channel poll:
 
@@ -5402,30 +5398,10 @@ Community channel poll:
 }
 ```
 
-Group conversation poll:
-
-```json
-{
-  "pollId": "<pollId>",
-  "createdAt": 1780000000000,
-  "mutation": { "...": "SignedPublicMutation" },
-  "scopeType": "group_conversation",
-  "conversationId": "<groupConversationId>",
-  "question": "Pizza or sushi?",
-  "options": [
-    { "id": "pizza", "text": "Pizza" },
-    { "id": "sushi", "text": "Sushi" }
-  ],
-  "allowsMultipleVotes": true
-}
-```
-
 Rules:
 
 - community channel polls require membership, channel visibility and
   `create_polls`
-- group conversation polls require the authenticated identity to be a
-  participant of a `group` conversation
 - a poll must have 2-10 options
 - option ids are client-provided stable strings unique inside the poll
 - question max length is 200 characters
