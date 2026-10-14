@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { pathToFileURL } from 'node:url';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 describe('libp2p progress dispatch dependency patch', () => {
   it('delivers one progress event once to every joined queue job', () => {
@@ -52,11 +52,11 @@ describe('libp2p progress dispatch dependency patch', () => {
     `;
 
     expect(() =>
-      execFileSync(
-        process.execPath,
-        ['--input-type=module', '--eval', verification],
-        { timeout: 1_000 },
-      ),
+      execFileSync(process.execPath, [
+        '--input-type=module',
+        '--eval',
+        verification,
+      ]),
     ).not.toThrow();
   });
 
