@@ -61,7 +61,7 @@ const READ_HASH = sha(READ);
 const OTHER_READ = 's'.repeat(43);
 const OTHER_READ_HASH = sha(OTHER_READ);
 const DAY = 24 * 60 * 60 * 1000;
-const IDLE_MS = MailboxPolicy.EVICTION_IDLE_MS;
+const IDLE_MS = MailboxPolicy.EVICTION_IDLE.getTotalMilliseconds().valueOf();
 /**
  * Mined once with `new MailboxCreationProof(FRESH, POST_HASH, READ_HASH)`
  * `.mine(20)`; mining 20 bits takes about seven seconds under jest.
