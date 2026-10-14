@@ -27,10 +27,13 @@ interface VectorCase {
   derived: {
     digest: string;
     digestPreimage: string;
+    identitySignature: string;
+    identitySigningContent: string;
     mutation: Record<string, unknown>;
     mutationBody: Record<string, unknown>;
     payload: Record<string, unknown> & {
       id: string;
+      identitySignature: string;
       parents: string[];
     };
     payloadCanonical: string;
@@ -38,6 +41,7 @@ interface VectorCase {
     recordId: string;
     requestOperation: {
       createdAt: number;
+      identitySignature: string;
       mutation: Record<string, unknown>;
       parents: string[];
     };
@@ -168,13 +172,17 @@ describe('Community operation vectors', () => {
     const signer = vectors.keys[input.signer];
 
     it('recomputes digests and signing content from the canonical JSON alone', () => {
-      const { id, ...content } = derived.payload;
+      const { id, identitySignature, ...content } = derived.payload;
       const digest = digestOfText(canonicalize(content) as string);
 
       expect(canonicalize(content)).toBe(derived.digestPreimage);
       expect(digest).toBe(derived.digest);
       expect(id).toBe(`community:${input.communityId}:op:${digest}`);
       expect(derived.recordId).toBe(id);
+      expect(derived.identitySigningContent).toBe(
+        `pigeon:community-operation:v1\n${id}`,
+      );
+      expect(identitySignature).toBe(derived.identitySignature);
       expect(canonicalize(derived.payload)).toBe(derived.payloadCanonical);
       expect(digestOfText(derived.payloadCanonical)).toBe(
         derived.payloadDigest,
@@ -203,27 +211,32 @@ describe('Community operation vectors', () => {
       });
       expect(derived.requestOperation).toEqual({
         createdAt: input.createdAt,
+        identitySignature: derived.identitySignature,
         mutation: derived.mutation,
         parents: derived.payload.parents,
       });
     });
 
-    it('signs with the fixed key to the fixed signature', () => {
-      const content = Buffer.from(derived.signingContent);
+    it('signs with the fixed key to the fixed signatures', () => {
+      const privateKey = createPrivateKey(signer.privateKeyPem);
+      const publicKey = createPublicKey(signer.publicKeyPem);
 
-      expect(
-        sign(null, content, createPrivateKey(signer.privateKeyPem)).toString(
-          'base64',
-        ),
-      ).toBe(derived.signature);
-      expect(
-        verify(
-          null,
-          content,
-          createPublicKey(signer.publicKeyPem),
-          Buffer.from(derived.signature, 'base64'),
-        ),
-      ).toBe(true);
+      for (const [content, signature] of [
+        [derived.signingContent, derived.signature],
+        [derived.identitySigningContent, derived.identitySignature],
+      ]) {
+        expect(
+          sign(null, Buffer.from(content), privateKey).toString('base64'),
+        ).toBe(signature);
+        expect(
+          verify(
+            null,
+            Buffer.from(content),
+            publicKey,
+            Buffer.from(signature, 'base64'),
+          ),
+        ).toBe(true);
+      }
     });
 
     it('is rebuilt byte for byte by the domain code from the inputs', () => {
@@ -233,12 +246,18 @@ describe('Community operation vectors', () => {
         authorIdentityId: new IdentityId(signer.identityId),
         communityId: new CommunityId(input.communityId),
         createdAt: input.createdAt,
+        identitySignature: derived.identitySignature,
         networkId: new NetworkId(input.networkId),
         parents: input.parents,
       });
 
+      expect(() => operation.assertIdentitySigned()).not.toThrow();
+      expect(operation.getId()).toBe(derived.recordId);
       expect(operation.toPrimitives()).toEqual(derived.payload);
       expect(operation.getHash()).toBe(derived.digest);
+      expect(
+        CommunityOperation.identitySigningContentOf(operation.getId()),
+      ).toBe(derived.identitySigningContent);
       expect(PublicMutationProof.digestOf(operation.toPrimitives())).toBe(
         derived.payloadDigest,
       );

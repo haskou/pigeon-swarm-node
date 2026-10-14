@@ -11,7 +11,6 @@ import {
   genesis,
   join,
   mallory,
-  networkId,
   operation,
   owner,
 } from './CommunityOperationFixtures';
@@ -152,9 +151,10 @@ describe('CommunityStateFold', () => {
 
   it('rejects a genesis whose community id is not derived from owner and nonce', () => {
     expect(() =>
-      CommunityOperation.create({
-        action: CommunityOperationAction.COMMUNITY_CREATED,
-        args: {
+      operation(
+        CommunityOperationAction.COMMUNITY_CREATED,
+        owner,
+        {
           autoJoinEnabled: false,
           description: 'A community',
           discoverable: true,
@@ -162,12 +162,8 @@ describe('CommunityStateFold', () => {
           nonce: 'another-nonce',
           visibility: 'public',
         },
-        authorIdentityId: owner,
-        communityId,
-        createdAt: 1,
-        networkId,
-        parents: [],
-      }),
+        [],
+      ),
     ).toThrow();
   });
 

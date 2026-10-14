@@ -3,16 +3,22 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { CommunityOperationAction } from '@app/contexts/communities/domain/value-objects/CommunityOperationAction';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
 
-export const owner = new IdentityId(
-  'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
-);
-export const alice = new IdentityId(
-  'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=',
-);
-export const mallory = new IdentityId(
-  'MCowBQYDK2VwAyEAVqz7Fhhakf52gpEbnr//2PWqXYG/RqMhUUe5SE1h1XA=',
-);
+const identityKeys = new Map<string, PrivateKey>();
+
+function identity(): IdentityId {
+  const key = PrivateKey.generate();
+  const identityId = new IdentityId(key.getPublicKey().toString());
+
+  identityKeys.set(identityId.valueOf(), key);
+
+  return identityId;
+}
+
+export const owner = identity();
+export const alice = identity();
+export const mallory = identity();
 export const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440000');
 export const nonce = 'genesis-nonce';
 export const communityId = CommunityId.derive(
@@ -21,6 +27,20 @@ export const communityId = CommunityId.derive(
   nonce,
 );
 
+/** Signs `id` the way `author`'s identity key signs its community operations. */
+export function identitySignatureOf(author: IdentityId, id: string): string {
+  const key = identityKeys.get(author.valueOf());
+
+  if (!key) throw new Error(`No identity key for ${author.valueOf()}`);
+
+  return key.sign(CommunityOperation.identitySigningContentOf(id)).toString();
+}
+
+/** A well-formed identity signature over no operation, for use cases whose store and gate are mocked. */
+export const unverifiedIdentitySignature = PrivateKey.generate()
+  .sign('unverified')
+  .toString();
+
 export function operation(
   action: CommunityOperationAction,
   author: IdentityId,
@@ -28,7 +48,7 @@ export function operation(
   parents: CommunityOperation[],
   createdAt = 1,
 ): CommunityOperation {
-  return CommunityOperation.create({
+  const attributes = {
     action,
     args,
     authorIdentityId: author,
@@ -36,6 +56,14 @@ export function operation(
     createdAt,
     networkId,
     parents: parents.map((parent) => parent.getHash()),
+  };
+
+  return CommunityOperation.create({
+    ...attributes,
+    identitySignature: identitySignatureOf(
+      author,
+      CommunityOperation.recordIdFor(attributes),
+    ),
   });
 }
 

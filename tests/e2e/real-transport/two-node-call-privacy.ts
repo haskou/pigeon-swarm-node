@@ -440,7 +440,7 @@ async function main(): Promise<void> {
       createdAt: Date.now(),
       networkId: NETWORK_ID,
       parents: [],
-      signer: identities[0],
+      signer: { ...identities[0], identityKeyPair: identities[0].keyPair },
     });
     const community = await request<{ id: string }>(
       nodes[0],
@@ -510,7 +510,7 @@ async function main(): Promise<void> {
       createdAt: channelCreatedAt,
       networkId: NETWORK_ID,
       parents: [genesis.operation.getHash()],
-      signer: identities[0],
+      signer: { ...identities[0], identityKeyPair: identities[0].keyPair },
     });
     const channel = await request<{ id: string }>(
       nodes[0],
@@ -597,7 +597,7 @@ async function main(): Promise<void> {
           createdAt: joinAcceptedAt,
           networkId: NETWORK_ID,
           parents: replicated.frontier,
-          signer: identities[1],
+          signer: { ...identities[1], identityKeyPair: identities[1].keyPair },
         });
 
         await request(
@@ -863,7 +863,7 @@ async function main(): Promise<void> {
           createdAt: Date.now(),
           networkId: NETWORK_ID,
           parents: beforeLeave.frontier,
-          signer: identities[1],
+          signer: { ...identities[1], identityKeyPair: identities[1].keyPair },
         }).body,
       },
       identities[1],

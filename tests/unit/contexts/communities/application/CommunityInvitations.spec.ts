@@ -25,7 +25,10 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { signedMutation } from '../../public-mutations/support/signedMutation';
-import { genesis } from '../domain/operations/CommunityOperationFixtures';
+import {
+  genesis,
+  unverifiedIdentitySignature,
+} from '../domain/operations/CommunityOperationFixtures';
 
 const COMMUNITY_ID = '550e8400-e29b-41d4-a716-446655440000';
 const INVITE_TOKEN = 'invite-token';
@@ -44,6 +47,7 @@ describe('Community invitation use cases', () => {
   let proof: Record<string, unknown>;
   let operation: {
     createdAt: number;
+    identitySignature: string;
     mutation: unknown;
     parents: string[];
   };
@@ -71,6 +75,7 @@ describe('Community invitation use cases', () => {
           store: 'communityOperations',
         })
       ).toPrimitives(),
+      identitySignature: unverifiedIdentitySignature,
       parents: [genesis().getHash()],
     };
   });

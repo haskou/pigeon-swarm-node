@@ -11,11 +11,13 @@ export interface CommunityOperationSigner {
   deviceCredential: string;
   deviceKeyPair: KeyPair;
   id: string;
+  identityKeyPair: KeyPair;
 }
 
 /** The `operation` field every community-mutating request carries. */
 export interface SignedCommunityOperationBody {
   createdAt: number;
+  identitySignature: string;
   mutation: Record<string, unknown>;
   parents: string[];
 }
@@ -55,7 +57,8 @@ export function signCommunityOperationRecord(
 
 /**
  * Builds and signs a `communityOperations` put the way a client does: the
- * payload is the operation, the proof binds it to the signer's device.
+ * signer's identity key signs the operation id, the payload is the signed
+ * operation, the proof binds it to the signer's device.
  */
 export function signCommunityOperation(input: {
   action: string;
@@ -66,7 +69,7 @@ export function signCommunityOperation(input: {
   parents: string[];
   signer: CommunityOperationSigner;
 }): SignedCommunityOperation {
-  const operation = CommunityOperation.create({
+  const attributes = {
     action: new CommunityOperationAction(input.action),
     args: input.args,
     authorIdentityId: new IdentityId(input.signer.id),
@@ -74,6 +77,17 @@ export function signCommunityOperation(input: {
     createdAt: input.createdAt,
     networkId: new NetworkId(input.networkId),
     parents: input.parents,
+  };
+  const identitySignature = input.signer.identityKeyPair
+    .sign(
+      CommunityOperation.identitySigningContentOf(
+        CommunityOperation.recordIdFor(attributes),
+      ),
+    )
+    .toString();
+  const operation = CommunityOperation.create({
+    ...attributes,
+    identitySignature,
   });
   const proof = signCommunityOperationRecord(
     operation.toPrimitives(),
@@ -83,6 +97,7 @@ export function signCommunityOperation(input: {
   return {
     body: {
       createdAt: input.createdAt,
+      identitySignature,
       mutation: proof.toPrimitives() as unknown as Record<string, unknown>,
       parents: operation.getParents(),
     },

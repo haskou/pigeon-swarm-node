@@ -8,6 +8,7 @@ import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
 import { mock } from 'jest-mock-extended';
 
 import { signedMutation } from '../../public-mutations/support/signedMutation';
+import { unverifiedIdentitySignature } from '../domain/operations/CommunityOperationFixtures';
 
 const OWNER_ID = 'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=';
 const NETWORK_ID = '550e8400-e29b-41d4-a716-446655440000';
@@ -32,6 +33,7 @@ describe('CommunityCreator', () => {
       'Architecture refactor test community',
       {
         createdAt: 1780000000000,
+        identitySignature: unverifiedIdentitySignature,
         mutation: mutation.toPrimitives(),
         parents: [],
       },

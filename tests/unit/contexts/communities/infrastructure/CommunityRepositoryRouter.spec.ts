@@ -25,6 +25,7 @@ describe('CommunityRepositoryRouter', () => {
       findByMember: jest.fn().mockResolvedValue([]),
       findDiscoverable: jest.fn().mockResolvedValue([]),
       findFrontier: jest.fn().mockResolvedValue(['head']),
+      findOperations: jest.fn(),
       save: jest.fn(),
     } as unknown as jest.Mocked<OrbitDBCommunityRepository>;
     privateRepository = {
@@ -121,6 +122,27 @@ describe('CommunityRepositoryRouter', () => {
     authorizationRepository.hasScope.mockResolvedValue(false);
 
     await expect(router.findFrontier(id)).resolves.toEqual(['head']);
+  });
+
+  it('serves no operations for a protected scope and the public ones otherwise', async () => {
+    const operations = [{} as CommunityOperation];
+    publicRepository.findOperations.mockResolvedValue(operations);
+
+    await expect(router.findOperations(id, undefined, 500)).resolves.toEqual(
+      [],
+    );
+    expect(publicRepository.findOperations).not.toHaveBeenCalled();
+
+    authorizationRepository.hasScope.mockResolvedValue(false);
+
+    await expect(router.findOperations(id, 'after', 2)).resolves.toBe(
+      operations,
+    );
+    expect(publicRepository.findOperations).toHaveBeenCalledWith(
+      id,
+      'after',
+      2,
+    );
   });
 
   it('reports the replicated frontiers of a network from the public store', async () => {

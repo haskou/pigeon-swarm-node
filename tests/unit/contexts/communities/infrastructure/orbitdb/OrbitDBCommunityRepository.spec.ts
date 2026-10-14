@@ -103,6 +103,58 @@ describe('OrbitDBCommunityRepository', () => {
     );
   });
 
+  describe('findOperations', () => {
+    it('serves every stored operation by digest, including the ones the fold skipped', async () => {
+      const created = genesis();
+      const joined = join([created], alice);
+      const skipped = ban([created], alice, mallory);
+      const stored = [created, joined, skipped];
+
+      for (const operationToSave of stored) await save(operationToSave);
+      await flushBackgroundTasks();
+
+      const operations = await repository.findOperations(
+        communityId,
+        undefined,
+        500,
+      );
+
+      expect(operations.map((found) => found.toPrimitives())).toEqual(
+        stored
+          .sort((left, right) => (left.getHash() < right.getHash() ? -1 : 1))
+          .map((expected) => expected.toPrimitives()),
+      );
+    });
+
+    it('pages after an exclusive digest up to the limit', async () => {
+      const created = genesis();
+      const operations = [
+        created,
+        join([created], alice),
+        join([created], mallory),
+      ];
+      const digests = operations.map((stored) => stored.getHash()).sort();
+
+      for (const stored of operations) await save(stored);
+      await flushBackgroundTasks();
+
+      const page = async (after: string | undefined, limit: number) =>
+        (await repository.findOperations(communityId, after, limit)).map(
+          (found) => found.getHash(),
+        );
+
+      await expect(page(undefined, 2)).resolves.toEqual(digests.slice(0, 2));
+      await expect(page(digests[0], 500)).resolves.toEqual(digests.slice(1));
+      await expect(page(digests[2], 500)).resolves.toEqual([]);
+    });
+
+    it('serves nothing for an unknown community', async () => {
+      await expect(
+        repository.findOperations(communityId, undefined, 500),
+      ).resolves.toEqual([]);
+    });
+  });
+
   it('knows nothing about a community without a stored operation', async () => {
     await expect(repository.hasById(communityId)).resolves.toBe(false);
     await expect(repository.findFrontier(communityId)).resolves.toEqual([]);
