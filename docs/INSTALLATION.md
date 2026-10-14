@@ -48,6 +48,15 @@ If `ROUTE_PREFIX` is configured, HTTP requests under that prefix go to the API.
 Other paths can be served from `public/` so browser refreshes and direct frontend
 routes resolve to the bundled frontend.
 
+Files served from `public/`, including the `index.html` fallback, carry
+`Content-Security-Policy: frame-ancestors 'none'` and `X-Frame-Options: DENY`
+(no other site can frame the client), `X-Content-Type-Options: nosniff`,
+`Referrer-Policy: no-referrer` and
+`Permissions-Policy: camera=(self), microphone=(self), display-capture=(self), geolocation=()`.
+The client's own Content Security Policy is a meta tag in `index.html`, where
+`frame-ancestors` has no effect. API responses do not get these headers. A
+reverse proxy in front of the node should keep them.
+
 ## Core Variables
 
 | Variable | Default | Required | Description |

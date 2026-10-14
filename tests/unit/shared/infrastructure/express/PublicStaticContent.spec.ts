@@ -1,5 +1,5 @@
-import { RoutePrefix } from '@haskou/ddd-kernel/adapters/ui';
 import { PublicStaticContent } from '@app/shared/infrastructure/express/PublicStaticContent';
+import { RoutePrefix } from '@haskou/ddd-kernel/adapters/ui';
 import express from 'express';
 import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
 import { Server } from 'http';
