@@ -39,9 +39,11 @@ export default class PrivateBlobPolicy {
 
   public retention(): Duration {
     // A blob must outlive every mailbox envelope that may reference it.
-    return Duration.fromMilliseconds(
-      Math.max(this.limits.blobRetentionMs, this.limits.mailboxRetentionMs),
-    );
+    const { blobRetention, mailboxRetention } = this.limits;
+
+    return blobRetention.isGreaterThan(mailboxRetention)
+      ? blobRetention
+      : mailboxRetention;
   }
 
   public totalQuotaBytes(): number {
@@ -49,6 +51,6 @@ export default class PrivateBlobPolicy {
   }
 
   public uploadWindow(): Duration {
-    return Duration.fromMilliseconds(this.limits.uploadWindowMs);
+    return this.limits.uploadWindow;
   }
 }
