@@ -3,8 +3,8 @@ import Kernel from '@haskou/ddd-kernel';
 /**
  * One rejected record waiting to be offered again. It is offered after each
  * backoff delay and whenever it is woken; one offer runs at a time, and the
- * record settles once it is delivered, its store is gone, or the last delay
- * passed.
+ * record settles once it is delivered, its store is gone, the last delay
+ * passed, or a newer rejection of the same record replaced it.
  */
 export class OrbitDBPendingRecordReadmission {
   private attempt = 0;
@@ -41,9 +41,14 @@ export class OrbitDBPendingRecordReadmission {
   }
 
   private settle(): void {
+    if (this.settled) return;
     this.settled = true;
     clearTimeout(this.timer);
     this.onSettled();
+  }
+
+  public cancel(): void {
+    this.settle();
   }
 
   public start(): void {

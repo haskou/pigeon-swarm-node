@@ -698,12 +698,24 @@ its join, and the head would otherwise stay demoted until the 60 s retry.
   accepts now. Readmission never widens what is admitted.
 - A demoted head that admits more records than before is delivered again, still
   demoted, until every record is admitted.
-- At most 256 rejected documents and 256 demoted heads wait at once; past that a
-  rejection is final. One offer per record runs at a time.
-- New state never extends the wait: after the 60 s attempt the rejection is final,
-  and a record of a store or network that is no longer registered is dropped.
+- At most 256 rejected documents per store and 256 demoted heads per network
+  wait at once; past that a rejection of that store or network is final. A flood
+  in one network never takes the place of the records of another; communities
+  that share a network (and its stores) share its places.
+- A newer demoted value of the same head replaces the pending one and gets the
+  full wait, so re-gossiping a head occupies one place, not one per copy.
+- A wake offers the pending records one after the other, and at most one wake
+  runs at a time; one offer per record runs at a time.
+- New state never extends the wait: wake offers fall inside the same 72 s, after
+  the 60 s attempt the rejection is final, and a record of a store or network
+  that is no longer registered is dropped.
+- A wake is not scoped to the network or store that admitted the state: the
+  state a record rests on often lives elsewhere (a community operation rests on
+  an identity and a device authorization).
 - The 2 s wake delay outlasts the 1 s authorization lookup cache, so an offer sees
-  the state that woke it.
+  the state that woke it. Worst case per scope: 256 records offered about 39
+  times each (3 retries and a wake every 2 s for 72 s); a head offer runs the
+  gate once per gated record it carries.
 
 ### Replicated store audit
 

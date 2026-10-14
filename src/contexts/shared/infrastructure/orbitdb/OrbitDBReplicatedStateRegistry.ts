@@ -408,12 +408,14 @@ export default class OrbitDBReplicatedStateRegistry {
   private scheduleReadmission(
     value: Record<string, unknown>,
     admitted: Record<string, unknown>,
-    { networkId, onReadmitted }: OrbitDBHeadReadmission,
+    { key, networkId, onReadmitted }: OrbitDBHeadReadmission,
   ): void {
     let admittedRecords = this.gatedRecordCount(admitted);
 
-    this.headReadmissions.schedule(
-      async (): Promise<boolean> => {
+    this.headReadmissions.schedule({
+      isCurrent: () => this.storesByNetworkId.has(networkId),
+      key,
+      offer: async (): Promise<boolean> => {
         const offered = await this.admitGatedCollections(value);
 
         if (!offered.degraded) {
@@ -430,8 +432,8 @@ export default class OrbitDBReplicatedStateRegistry {
 
         return false;
       },
-      () => this.storesByNetworkId.has(networkId),
-    );
+      scope: networkId,
+    });
   }
 
   private gatedRecordCount(value: Record<string, unknown>): number {
@@ -558,16 +560,17 @@ export default class OrbitDBReplicatedStateRegistry {
       return;
     }
 
-    this.readmissions.schedule(
-      async (): Promise<boolean> => {
+    this.readmissions.schedule({
+      isCurrent: () => this.isRegisteredStore(storeName, store),
+      offer: async (): Promise<boolean> => {
         if (!(await this.admitRecord(storeName, document))) return false;
         await deliver();
         this.wakeReadmissions();
 
         return true;
       },
-      () => this.isRegisteredStore(storeName, store),
-    );
+      scope: store,
+    });
   }
 
   private headSignature(heads: OrbitDBEntry[] | undefined): string | undefined {
@@ -909,6 +912,7 @@ export default class OrbitDBReplicatedStateRegistry {
     let persisted = true;
     const recordKey = record.key;
     const value = await this.admitHead(record.value, {
+      key: `cached:${recordKey}`,
       networkId,
       onReadmitted: (readmitted) =>
         this.cacheReadmittedHead(networkId, recordKey, readmitted),
@@ -1304,8 +1308,14 @@ export default class OrbitDBReplicatedStateRegistry {
         ),
       );
 
+    const key = entry.payload?.key;
+
     await gated(
-      await this.admitHead(received, { networkId, onReadmitted: gated }),
+      await this.admitHead(received, {
+        key: key === undefined ? undefined : `update:${key}`,
+        networkId,
+        onReadmitted: gated,
+      }),
     );
   }
 
@@ -1492,6 +1502,7 @@ export default class OrbitDBReplicatedStateRegistry {
         this.markPersistedHeadKey(networkId, head.key);
         const headKey = head.key;
         const value = await this.admitHead(head.value, {
+          key: `cached:${headKey}`,
           networkId,
           onReadmitted: (readmitted) =>
             this.cacheReadmittedHead(networkId, headKey, readmitted),

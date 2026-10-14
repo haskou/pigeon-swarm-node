@@ -11,7 +11,7 @@ import { OrbitDBPendingRecordReadmission } from './OrbitDBPendingRecordReadmissi
  * arrived. Past the last backoff delay the rejection is final.
  */
 export class OrbitDBRecordReadmission {
-  private static readonly MAX_PENDING = 256;
+  private static readonly MAX_PENDING_PER_SCOPE = 256;
 
   public static readonly DELAYS_MS = [2_000, 10_000, 60_000];
 
@@ -22,45 +22,99 @@ export class OrbitDBRecordReadmission {
    */
   public static readonly WAKE_DELAY_MS = 2_000;
 
-  private readonly pending = new Set<OrbitDBPendingRecordReadmission>();
+  private readonly pendingByScope = new Map<
+    string | object,
+    Map<unknown, OrbitDBPendingRecordReadmission>
+  >();
 
   private wakeTimer?: NodeJS.Timeout;
 
+  private draining = false;
+
+  private rewake = false;
+
+  private async drain(): Promise<void> {
+    this.draining = true;
+
+    try {
+      const readmissions = [...this.pendingByScope.values()].flatMap(
+        (pending) => [...pending.values()],
+      );
+
+      for (const readmission of readmissions) await readmission.offer();
+    } finally {
+      this.draining = false;
+
+      if (this.rewake) {
+        this.rewake = false;
+        this.wake();
+      }
+    }
+  }
+
   /**
-   * The pending offers are bounded so that a flood of rejected records cannot
-   * pin them in memory or multiply the work of a wake; past the bound a
-   * rejection is final, as it was before records were re-admitted. `offer`
-   * admits and delivers the record, and resolves whether it is settled.
+   * The pending offers are bounded per scope (a network or a store), so a
+   * flood of rejected records cannot pin them in memory, multiply the work
+   * of a wake, or take the place of the records of another scope; past the
+   * bound a rejection is final. A record with a key replaces the pending
+   * record of the same key: it is the newer rejection, and gets the full
+   * wait. `offer` admits and delivers the record, and resolves whether it is
+   * settled.
    */
-  public schedule(
-    offer: () => Promise<boolean>,
-    isCurrent: () => boolean,
-  ): void {
-    if (this.pending.size >= OrbitDBRecordReadmission.MAX_PENDING) return;
+  public schedule({
+    isCurrent,
+    key,
+    offer,
+    scope,
+  }: {
+    isCurrent: () => boolean;
+    key?: string;
+    offer: () => Promise<boolean>;
+    scope: string | object;
+  }): void {
+    const pending =
+      this.pendingByScope.get(scope) ??
+      new Map<unknown, OrbitDBPendingRecordReadmission>();
+    const entryKey = key ?? Symbol('record');
+
+    pending.get(entryKey)?.cancel();
+
+    if (pending.size >= OrbitDBRecordReadmission.MAX_PENDING_PER_SCOPE) return;
     const readmission = new OrbitDBPendingRecordReadmission(
       OrbitDBRecordReadmission.DELAYS_MS,
       offer,
       isCurrent,
-      () => this.pending.delete(readmission),
+      () => {
+        if (pending.get(entryKey) !== readmission) return;
+        pending.delete(entryKey);
+
+        if (pending.size === 0) this.pendingByScope.delete(scope);
+      },
     );
 
-    this.pending.add(readmission);
+    pending.set(entryKey, readmission);
+    this.pendingByScope.set(scope, pending);
     readmission.start();
   }
 
   /**
-   * Signals that the node admitted new replicated state. It never extends
-   * how long a record waits: the backoff schedule alone retires it.
+   * Signals that the node admitted new replicated state. The pending records
+   * are offered one after the other, never more than one wake at a time. A
+   * wake never extends how long a record waits: the backoff schedule alone
+   * retires it.
    */
   public wake(): void {
-    if (this.wakeTimer || this.pending.size === 0) return;
+    if (this.draining) {
+      this.rewake = true;
+
+      return;
+    }
+
+    if (this.wakeTimer || this.pendingByScope.size === 0) return;
 
     this.wakeTimer = setTimeout(() => {
       this.wakeTimer = undefined;
-
-      for (const readmission of [...this.pending]) {
-        void readmission.offer();
-      }
+      void this.drain();
     }, OrbitDBRecordReadmission.WAKE_DELAY_MS);
     this.wakeTimer.unref();
   }
