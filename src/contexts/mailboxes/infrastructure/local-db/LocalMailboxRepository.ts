@@ -8,6 +8,7 @@ import { Mailbox } from '../../domain/Mailbox';
 import { MailboxEnvelope } from '../../domain/MailboxEnvelope';
 import { MailboxPrimitivesShape } from '../../domain/MailboxPrimitivesShape';
 import MailboxRepository from '../../domain/repositories/MailboxRepository';
+import { MailboxCursor } from '../../domain/value-objects/MailboxCursor';
 import { MailboxEnvelopeId } from '../../domain/value-objects/MailboxEnvelopeId';
 import { MailboxId } from '../../domain/value-objects/MailboxId';
 
@@ -176,13 +177,15 @@ export default class LocalMailboxRepository extends MailboxRepository {
    * mailbox starts above it, so no cursor a client still holds can match a
    * new envelope. One number for the node, not one per mailbox: no tombstones.
    */
-  public async highestRetiredCursor(): Promise<number> {
+  public async highestRetiredCursor(): Promise<MailboxCursor> {
     const floor = await this.database.findOne(
       LocalMailboxRepository.COUNTERS,
       LocalMailboxRepository.RETIRED_CURSOR_ID,
     );
 
-    return typeof floor?.cursor === 'number' ? floor.cursor : 0;
+    return typeof floor?.cursor === 'number'
+      ? new MailboxCursor(floor.cursor)
+      : MailboxCursor.none();
   }
 
   public async listAll(): Promise<Mailbox[]> {
@@ -216,7 +219,7 @@ export default class LocalMailboxRepository extends MailboxRepository {
     const count = await this.readCount();
     const retired = await this.highestRetiredCursor();
     const floor = existing
-      ? Math.max(retired, this.toMailbox(existing).highestCursor())
+      ? retired.max(this.toMailbox(existing).highestCursor())
       : retired;
     const envelopes = (
       await this.database.find(this.envelopeNamespace(mailboxId))
@@ -235,7 +238,7 @@ export default class LocalMailboxRepository extends MailboxRepository {
         type: 'put',
       },
       {
-        document: { cursor: floor },
+        document: { cursor: floor.valueOf() },
         id: LocalMailboxRepository.RETIRED_CURSOR_ID,
         namespace: LocalMailboxRepository.COUNTERS,
         type: 'put',

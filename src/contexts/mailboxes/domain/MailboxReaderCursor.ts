@@ -1,5 +1,6 @@
 import { MailboxCapability } from './MailboxCapability';
 import { MailboxReaderPrimitives } from './MailboxReaderPrimitives';
+import { MailboxCursor } from './value-objects/MailboxCursor';
 import { MailboxReadToken } from './value-objects/MailboxReadToken';
 import { MailboxReadTokenHash } from './value-objects/MailboxReadTokenHash';
 
@@ -10,7 +11,7 @@ export class MailboxReaderCursor {
   ): MailboxReaderCursor {
     return new MailboxReaderCursor(
       new MailboxReadTokenHash(primitives.readTokenHash),
-      primitives.ackedCursor,
+      new MailboxCursor(primitives.ackedCursor),
     );
   }
 
@@ -18,12 +19,12 @@ export class MailboxReaderCursor {
   public static start(
     readTokenHash: MailboxReadTokenHash,
   ): MailboxReaderCursor {
-    return new MailboxReaderCursor(readTokenHash, 0);
+    return new MailboxReaderCursor(readTokenHash, MailboxCursor.none());
   }
 
   private constructor(
     private readonly readTokenHash: MailboxReadTokenHash,
-    private ackedCursor: number,
+    private ackedCursor: MailboxCursor,
   ) {}
 
   public acceptsRead(token: MailboxReadToken): boolean {
@@ -34,18 +35,15 @@ export class MailboxReaderCursor {
   }
 
   /** Moves forward only, and never past `highestCursor`. */
-  public acknowledge(upTo: number, highestCursor: number): void {
-    this.ackedCursor = Math.max(
-      this.ackedCursor,
-      Math.min(upTo, highestCursor),
-    );
+  public acknowledge(upTo: MailboxCursor, highestCursor: MailboxCursor): void {
+    this.ackedCursor = this.ackedCursor.max(upTo.min(highestCursor));
   }
 
   public copy(): MailboxReaderCursor {
     return new MailboxReaderCursor(this.readTokenHash, this.ackedCursor);
   }
 
-  public getAckedCursor(): number {
+  public getAckedCursor(): MailboxCursor {
     return this.ackedCursor;
   }
 
@@ -55,7 +53,7 @@ export class MailboxReaderCursor {
 
   public toPrimitives(): MailboxReaderPrimitives {
     return {
-      ackedCursor: this.ackedCursor,
+      ackedCursor: this.ackedCursor.valueOf(),
       readTokenHash: this.readTokenHash.valueOf(),
     };
   }

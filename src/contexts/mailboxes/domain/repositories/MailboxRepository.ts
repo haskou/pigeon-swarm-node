@@ -1,5 +1,6 @@
 import { Mailbox } from '../Mailbox';
 import { MailboxEnvelope } from '../MailboxEnvelope';
+import { MailboxCursor } from '../value-objects/MailboxCursor';
 import { MailboxEnvelopeId } from '../value-objects/MailboxEnvelopeId';
 import { MailboxId } from '../value-objects/MailboxId';
 
@@ -36,8 +37,8 @@ export default abstract class MailboxRepository {
     envelopeId: MailboxEnvelopeId,
   ): Promise<number>;
 
-  /** Highest cursor any removed mailbox reached on this node; 0 when none. */
-  public abstract highestRetiredCursor(): Promise<number>;
+  /** Highest cursor any removed mailbox reached on this node; `none()` when none. */
+  public abstract highestRetiredCursor(): Promise<MailboxCursor>;
 
   public abstract listAll(): Promise<Mailbox[]>;
 

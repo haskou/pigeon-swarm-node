@@ -117,7 +117,7 @@ any user identifier:
   past the limit fails with `429`/`409`, never drops older envelopes silently;
 - maximum bytes per mailbox and maximum mailbox count per node;
 - creation difficulty by fill: 16 leading zero bits while the node holds at most half of `MAILBOX_MAX_COUNT`, rising in four steps above half capacity to 20 bits at the limit (`MailboxCreationDifficulty`). A short proof, or a replay checked against the current difficulty, is refused with `400` and the bits it needs. The check is stateless and runs before any lookup, so an unproven request learns nothing about which ids exist;
-- at the count limit, creation evicts the least recently read mailboxes that are empty and unread for 7 days (`MailboxPolicy.EVICTION_IDLE_MS`), all or nothing; with too few such mailboxes it is refused with `429`;
+- at the count limit, creation evicts the least recently read mailboxes that are empty and unread for 7 days (`MailboxPolicy.EVICTION_IDLE`), all or nothing; with too few such mailboxes it is refused with `429`;
 - per-client fixed-window cap on creation, keyed by the socket address (or the forwarded address behind a proxy named by `API_TRUST_PROXY`; IPv6 per /64), plus a per-mailbox append rate;
 - retention window (default 14 days). A background scheduler deletes expired
   envelopes and idle mailboxes; a mailbox with no read for the window is deleted;
