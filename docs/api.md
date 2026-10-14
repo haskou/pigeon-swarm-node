@@ -1275,6 +1275,8 @@ Implemented:
 
 - require signed request auth from the current node owner; unowned nodes reject
   the request with 403 because nobody can consent
+- refuse a replay of an already accepted signed request with 401 (see
+  _Authentication_), so a captured request cannot reopen or replace a session
 - require `consent: true` and `minutes` between 1 and 60; otherwise 409
 - replace any previous session with a fresh, empty one
 - record content-retrieval progress lines only while the session is open. Lines
