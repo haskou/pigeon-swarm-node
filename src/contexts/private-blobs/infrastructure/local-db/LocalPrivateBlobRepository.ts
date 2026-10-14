@@ -1,11 +1,12 @@
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
-import { Timestamp } from '@haskou/value-objects';
+import { Duration, Timestamp } from '@haskou/value-objects';
 
 import { PrivateBlobNotFoundError } from '../../domain/errors/PrivateBlobNotFoundError';
 import { PrivateBlob } from '../../domain/PrivateBlob';
 import { PrivateBlobPrimitivesShape } from '../../domain/PrivateBlobPrimitivesShape';
 import PrivateBlobRepository from '../../domain/repositories/PrivateBlobRepository';
 import { PrivateBlobId } from '../../domain/value-objects/PrivateBlobId';
+import { PrivateBlobOwnerKey } from '../../domain/value-objects/PrivateBlobOwnerKey';
 
 export default class LocalPrivateBlobRepository extends PrivateBlobRepository {
   private static readonly BLOBS = 'private_blobs';
@@ -44,8 +45,8 @@ export default class LocalPrivateBlobRepository extends PrivateBlobRepository {
     return this.all((blob) => blob.isExpired(now));
   }
 
-  public findStoredRetainedBelow(retentionMs: number): Promise<PrivateBlob[]> {
-    return this.all((blob) => blob.isStoredWithRetentionBelow(retentionMs));
+  public findStoredRetainedBelow(retention: Duration): Promise<PrivateBlob[]> {
+    return this.all((blob) => blob.isStoredWithRetentionBelow(retention));
   }
 
   public async hasById(id: PrivateBlobId): Promise<boolean> {
@@ -72,7 +73,7 @@ export default class LocalPrivateBlobRepository extends PrivateBlobRepository {
 
   public async reservedBytes(
     now: Timestamp,
-    ownerKey?: string,
+    ownerKey?: PrivateBlobOwnerKey,
   ): Promise<number> {
     const blobs = await this.all(
       (blob) =>

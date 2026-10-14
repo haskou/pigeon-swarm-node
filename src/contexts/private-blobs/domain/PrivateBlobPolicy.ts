@@ -1,3 +1,5 @@
+import { Duration } from '@haskou/value-objects';
+
 import { PrivateBlobQuotaExceededError } from './errors/PrivateBlobQuotaExceededError';
 import { PrivateBlobSizeInvalidError } from './errors/PrivateBlobSizeInvalidError';
 import { PrivateBlobLimits } from './PrivateBlobLimits';
@@ -35,11 +37,10 @@ export default class PrivateBlobPolicy {
     return this.limits.ownerQuotaBytes;
   }
 
-  public retentionMs(): number {
+  public retention(): Duration {
     // A blob must outlive every mailbox envelope that may reference it.
-    return Math.max(
-      this.limits.blobRetentionMs,
-      this.limits.mailboxRetentionMs,
+    return Duration.fromMilliseconds(
+      Math.max(this.limits.blobRetentionMs, this.limits.mailboxRetentionMs),
     );
   }
 
@@ -47,7 +48,7 @@ export default class PrivateBlobPolicy {
     return this.limits.totalQuotaBytes;
   }
 
-  public uploadWindowMs(): number {
-    return this.limits.uploadWindowMs;
+  public uploadWindow(): Duration {
+    return Duration.fromMilliseconds(this.limits.uploadWindowMs);
   }
 }

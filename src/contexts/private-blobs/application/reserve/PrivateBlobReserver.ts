@@ -30,9 +30,7 @@ export default class PrivateBlobReserver {
     this.policy.assertSizeAllowed(message.size);
 
     const now = Timestamp.now();
-    const ownerKey = await this.ownerKeys.derive(
-      message.ownerIdentityId.valueOf(),
-    );
+    const ownerKey = await this.ownerKeys.derive(message.ownerIdentityId);
     const [total, owned] = await Promise.all([
       this.repository.reservedBytes(now),
       this.repository.reservedBytes(now, ownerKey),
@@ -44,9 +42,9 @@ export default class PrivateBlobReserver {
       id: PrivateBlobId.generate(),
       now,
       ownerKey,
-      retentionMs: this.policy.retentionMs(),
+      retention: this.policy.retention(),
       size: new PrivateBlobSize(message.size),
-      uploadWindowMs: this.policy.uploadWindowMs(),
+      uploadWindow: this.policy.uploadWindow(),
     });
 
     await this.repository.save(blob);

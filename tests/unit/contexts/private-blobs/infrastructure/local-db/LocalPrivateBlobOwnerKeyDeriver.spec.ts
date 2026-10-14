@@ -1,11 +1,16 @@
 import LocalPrivateBlobOwnerKeyDeriver from '@app/contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobOwnerKeyDeriver';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
 
-const ALICE = 'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=';
-const BOB = 'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=';
+const ALICE = new IdentityId(
+  'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
+);
+const BOB = new IdentityId(
+  'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=',
+);
 
 describe('LocalPrivateBlobOwnerKeyDeriver', () => {
   const previousPath = process.env.PIGEON_LOCAL_DB_PATH;
@@ -34,7 +39,7 @@ describe('LocalPrivateBlobOwnerKeyDeriver', () => {
   it('derives the same key for the same identity', async () => {
     const deriver = new LocalPrivateBlobOwnerKeyDeriver(database);
 
-    await expect(deriver.derive(ALICE)).resolves.toBe(
+    await expect(deriver.derive(ALICE)).resolves.toEqual(
       await deriver.derive(ALICE),
     );
   });
@@ -42,7 +47,7 @@ describe('LocalPrivateBlobOwnerKeyDeriver', () => {
   it('derives different keys for different identities', async () => {
     const deriver = new LocalPrivateBlobOwnerKeyDeriver(database);
 
-    await expect(deriver.derive(ALICE)).resolves.not.toBe(
+    await expect(deriver.derive(ALICE)).resolves.not.toEqual(
       await deriver.derive(BOB),
     );
   });
@@ -54,12 +59,14 @@ describe('LocalPrivateBlobOwnerKeyDeriver', () => {
 
     await expect(
       new LocalPrivateBlobOwnerKeyDeriver(database).derive(ALICE),
-    ).resolves.toBe(first);
+    ).resolves.toEqual(first);
   });
 
   it('never exposes the raw identity id as the key', async () => {
-    await expect(
-      new LocalPrivateBlobOwnerKeyDeriver(database).derive(ALICE),
-    ).resolves.not.toContain(ALICE);
+    const key = await new LocalPrivateBlobOwnerKeyDeriver(database).derive(
+      ALICE,
+    );
+
+    expect(key.valueOf()).not.toContain(ALICE.valueOf());
   });
 });

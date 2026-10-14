@@ -13,11 +13,12 @@ import PrivateBlobPolicy from '@app/contexts/private-blobs/domain/PrivateBlobPol
 import PrivateBlobRepository from '@app/contexts/private-blobs/domain/repositories/PrivateBlobRepository';
 import PrivateBlobOwnerKeyDeriver from '@app/contexts/private-blobs/domain/services/PrivateBlobOwnerKeyDeriver';
 import { PrivateBlobId } from '@app/contexts/private-blobs/domain/value-objects/PrivateBlobId';
+import { PrivateBlobOwnerKey } from '@app/contexts/private-blobs/domain/value-objects/PrivateBlobOwnerKey';
 import { PrivateBlobLimitsFromEnvironment } from '@app/contexts/private-blobs/infrastructure/environment/PrivateBlobLimitsFromEnvironment';
 import FilePrivateBlobBytesStore from '@app/contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
-import { Timestamp } from '@haskou/value-objects';
+import { Duration, Timestamp } from '@haskou/value-objects';
 import { randomUUID } from 'crypto';
 import {
   existsSync,
@@ -56,16 +57,16 @@ class MemoryRepository extends PrivateBlobRepository {
   }
 
   public async findStoredRetainedBelow(
-    retentionMs: number,
+    retention: Duration,
   ): Promise<PrivateBlob[]> {
     return [...this.blobs.values()].filter((blob) =>
-      blob.isStoredWithRetentionBelow(retentionMs),
+      blob.isStoredWithRetentionBelow(retention),
     );
   }
 
   public async reservedBytes(
     now: Timestamp,
-    ownerKey?: string,
+    ownerKey?: PrivateBlobOwnerKey,
   ): Promise<number> {
     return [...this.blobs.values()]
       .filter(
@@ -82,8 +83,10 @@ class MemoryRepository extends PrivateBlobRepository {
 }
 
 class HexOwnerKeyDeriver extends PrivateBlobOwnerKeyDeriver {
-  public async derive(identityId: string): Promise<string> {
-    return `owner:${Buffer.from(identityId).toString('hex')}`;
+  public async derive(identityId: IdentityId): Promise<PrivateBlobOwnerKey> {
+    return new PrivateBlobOwnerKey(
+      `owner:${Buffer.from(identityId.valueOf()).toString('hex')}`,
+    );
   }
 }
 
@@ -589,12 +592,12 @@ describe('private blob store', () => {
     const floored = new PrivateBlobPolicy(
       PrivateBlobLimitsFromEnvironment.load(),
     );
-    expect(floored.retentionMs()).toBe(5000);
+    expect(floored.retention()).toEqual(Duration.fromMilliseconds(5000));
 
     process.env.PRIVATE_BLOB_RETENTION_MS = '9000';
     const widened = new PrivateBlobPolicy(
       PrivateBlobLimitsFromEnvironment.load(),
     );
-    expect(widened.retentionMs()).toBe(9000);
+    expect(widened.retention()).toEqual(Duration.fromMilliseconds(9000));
   });
 });

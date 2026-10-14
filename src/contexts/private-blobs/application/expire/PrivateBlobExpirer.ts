@@ -31,13 +31,13 @@ export default class PrivateBlobExpirer {
    * extended; the next sweep retries them.
    */
   private async alignRetention(): Promise<number> {
-    const floorMs = this.policy.retentionMs();
-    const stale = await this.repository.findStoredRetainedBelow(floorMs);
+    const floor = this.policy.retention();
+    const stale = await this.repository.findStoredRetainedBelow(floor);
     let failed = 0;
 
     for (const blob of stale) {
       try {
-        blob.extendRetentionTo(floorMs);
+        blob.extendRetentionTo(floor);
         await this.repository.save(blob);
       } catch {
         failed += 1;

@@ -1,7 +1,9 @@
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { createHmac, randomBytes } from 'crypto';
 
 import PrivateBlobOwnerKeyDeriver from '../../domain/services/PrivateBlobOwnerKeyDeriver';
+import { PrivateBlobOwnerKey } from '../../domain/value-objects/PrivateBlobOwnerKey';
 
 /**
  * HMAC-SHA256 of the identity id under a random per-node salt. The salt is
@@ -39,11 +41,13 @@ export default class LocalPrivateBlobOwnerKeyDeriver extends PrivateBlobOwnerKey
     return salt;
   }
 
-  public async derive(identityId: string): Promise<string> {
+  public async derive(identityId: IdentityId): Promise<PrivateBlobOwnerKey> {
     this.saltPromise ??= this.loadOrCreateSalt();
 
-    return createHmac('sha256', await this.saltPromise)
-      .update(identityId)
-      .digest('hex');
+    return new PrivateBlobOwnerKey(
+      createHmac('sha256', await this.saltPromise)
+        .update(identityId.valueOf())
+        .digest('hex'),
+    );
   }
 }
