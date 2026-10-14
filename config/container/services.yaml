@@ -2001,7 +2001,6 @@ services:
     class: /contexts/polls/application/authorize-poll-scope/PollScopeAuthorizer
     arguments:
       - '@contexts/communities/domain/repositories/CommunityRepository'
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
   contexts/polls/application/find/PollFinder:
     class: /contexts/polls/application/find/PollFinder
     arguments:
@@ -2018,7 +2017,6 @@ services:
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - '@contexts/communities/domain/repositories/CommunityRepository'
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
       - '@contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard'
     parent: contexts/polls/domain/repositories/PollRepository
   contexts/polls/infrastructure/orbitdb/PollMutationRecords:
@@ -2038,7 +2036,6 @@ services:
     class: /contexts/polls/infrastructure/orbitdb/policies/PollMutationScopeAccess
     arguments:
       - '@contexts/communities/domain/repositories/CommunityRepository'
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
   contexts/polls/infrastructure/orbitdb/policies/PollVoteMutationPolicy:
     class: /contexts/polls/infrastructure/orbitdb/policies/PollVoteMutationPolicy
     arguments:

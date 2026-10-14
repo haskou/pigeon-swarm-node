@@ -1,6 +1,5 @@
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Timestamp } from '@haskou/value-objects';
@@ -12,12 +11,6 @@ export default abstract class PollRepository {
   public abstract findByCommunityChannel(
     communityId: CommunityId,
     channelId: CommunityChannelId,
-    limit: number,
-    beforeCreatedAt?: number,
-  ): Promise<Poll[]>;
-
-  public abstract findByGroupConversation(
-    conversationId: ConversationId,
     limit: number,
     beforeCreatedAt?: number,
   ): Promise<Poll[]>;

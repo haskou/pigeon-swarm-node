@@ -2,10 +2,6 @@ import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { Conversation } from '@app/contexts/conversations/domain/Conversation';
-import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
-import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationFrontier } from '@app/contexts/public-mutations/domain/PublicMutationFrontier';
 import { ShortLivedLookup } from '@app/contexts/public-mutations/infrastructure/ShortLivedLookup';
@@ -17,14 +13,7 @@ import { PollScope } from '../../../domain/PollScope';
 export default class PollMutationScopeAccess {
   private readonly communities = new ShortLivedLookup<Community | undefined>();
 
-  private readonly conversations = new ShortLivedLookup<
-    Conversation | undefined
-  >();
-
-  constructor(
-    private readonly communityRepository: CommunityRepository,
-    private readonly conversationRepository: ConversationRepository,
-  ) {}
+  constructor(private readonly communityRepository: CommunityRepository) {}
 
   private async loadCommunityAtFrontier(
     communityId: CommunityId,
@@ -42,56 +31,27 @@ export default class PollMutationScopeAccess {
     }
   }
 
-  private async loadConversationAtFrontier(
-    conversationId: ConversationId,
-    frontier: string[],
-  ): Promise<Conversation | undefined> {
-    try {
-      return await this.conversationRepository.requireMetadataAtFrontier(
-        conversationId,
-        frontier,
-      );
-    } catch (error) {
-      if (error instanceof ConversationNotFoundError) return undefined;
-
-      throw error;
-    }
-  }
-
-  private assert(
+  private async assert(
     scope: PollScope,
     frontier: string[],
     identityId: string,
     action: 'manage' | 'vote',
   ): Promise<void> {
     const actor = new IdentityId(identityId);
+    const communityId = scope.getCommunityId();
+    const channelId = scope.getChannelId();
+    const community = await this.communities.get(
+      PublicMutationFrontier.keyOf(communityId.valueOf(), frontier),
+      () => this.loadCommunityAtFrontier(communityId, frontier),
+    );
 
-    return scope.match<Promise<void>>({
-      communityChannel: async (communityId, channelId) => {
-        const community = await this.communities.get(
-          PublicMutationFrontier.keyOf(communityId.valueOf(), frontier),
-          () => this.loadCommunityAtFrontier(communityId, frontier),
-        );
+    if (!community) throw new InvalidPublicMutationError();
 
-        if (!community) throw new InvalidPublicMutationError();
-
-        if (action === 'manage') {
-          community.authorizeTextChannelPollCreation(actor, channelId);
-        } else {
-          community.authorizeTextChannelPollVote(actor, channelId);
-        }
-      },
-      groupConversation: async (conversationId) => {
-        const conversation = await this.conversations.get(
-          PublicMutationFrontier.keyOf(conversationId.valueOf(), frontier),
-          () => this.loadConversationAtFrontier(conversationId, frontier),
-        );
-
-        if (!conversation?.isGroup() || !conversation.hasParticipant(actor)) {
-          throw new InvalidPublicMutationError();
-        }
-      },
-    });
+    if (action === 'manage') {
+      community.authorizeTextChannelPollCreation(actor, channelId);
+    } else {
+      community.authorizeTextChannelPollVote(actor, channelId);
+    }
   }
 
   /** Throws unless the identity may create or close polls in the scope. */

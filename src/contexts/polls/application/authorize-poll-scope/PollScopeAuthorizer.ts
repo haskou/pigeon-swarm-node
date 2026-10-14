@@ -1,20 +1,14 @@
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
-import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import { InvalidPollScopeError } from '@app/contexts/polls/domain/errors/InvalidPollScopeError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Poll } from '../../domain/Poll';
 import { PollAudience } from '../../domain/PollAudience';
 import { PollScope } from '../../domain/PollScope';
 import { CommunityChannelPollScopeAuthorizeMessage } from './messages/CommunityChannelPollScopeAuthorizeMessage';
-import { GroupConversationPollScopeAuthorizeMessage } from './messages/GroupConversationPollScopeAuthorizeMessage';
 import { PollScopeResolution } from './PollScopeResolution';
 
 export default class PollScopeAuthorizer {
-  constructor(
-    private readonly communityRepository: CommunityRepository,
-    private readonly conversationRepository: ConversationRepository,
-  ) {}
+  constructor(private readonly communityRepository: CommunityRepository) {}
 
   private async authorizeCommunityChannel(
     message: CommunityChannelPollScopeAuthorizeMessage,
@@ -42,31 +36,21 @@ export default class PollScopeAuthorizer {
     );
   }
 
-  private async authorizePollScope(
+  private authorizePollScope(
     actorIdentityId: IdentityId,
     poll: Poll,
     action: 'create' | 'vote',
   ): Promise<PollScopeResolution> {
-    return poll.getScope().match<Promise<PollScopeResolution>>({
-      communityChannel: (communityId, channelId) => {
-        const message = new CommunityChannelPollScopeAuthorizeMessage(
-          actorIdentityId.valueOf(),
-          communityId.valueOf(),
-          channelId.valueOf(),
-        );
+    const scope = poll.getScope();
 
-        return action === 'create'
-          ? this.authorizeCommunityChannelCreation(message)
-          : this.authorizeCommunityChannelVote(message);
-      },
-      groupConversation: (conversationId) =>
-        this.authorizeGroupConversation(
-          new GroupConversationPollScopeAuthorizeMessage(
-            actorIdentityId.valueOf(),
-            conversationId.valueOf(),
-          ),
-        ),
-    });
+    return this.authorizeCommunityChannel(
+      new CommunityChannelPollScopeAuthorizeMessage(
+        actorIdentityId.valueOf(),
+        scope.getCommunityId().valueOf(),
+        scope.getChannelId().valueOf(),
+      ),
+      action,
+    );
   }
 
   public authorizeCommunityChannelCreation(
@@ -79,26 +63,6 @@ export default class PollScopeAuthorizer {
     message: CommunityChannelPollScopeAuthorizeMessage,
   ): Promise<PollScopeResolution> {
     return this.authorizeCommunityChannel(message, 'vote');
-  }
-
-  public async authorizeGroupConversation(
-    message: GroupConversationPollScopeAuthorizeMessage,
-  ): Promise<PollScopeResolution> {
-    const conversation = await this.conversationRepository.requireMetadataById(
-      message.conversationId,
-    );
-
-    if (
-      !conversation.isGroup() ||
-      !conversation.hasParticipant(message.actorIdentityId)
-    ) {
-      throw new InvalidPollScopeError();
-    }
-
-    return new PollScopeResolution(
-      PollAudience.conversationParticipants(conversation.getParticipantIds()),
-      PollScope.groupConversation(conversation.getId()),
-    );
   }
 
   public authorizePollManagement(

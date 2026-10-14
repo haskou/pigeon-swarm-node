@@ -21,19 +21,17 @@ export class PostPollRoute extends PollRouteSupport {
 
   @Post('/')
   public async createPoll(
-    @Body() body: PostPollBody,
+    @Body({ validate: { forbidNonWhitelisted: true, whitelist: true } })
+    body: PostPollBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const actor = await this.authenticate(request);
-    const scopeAccess =
-      body.scopeType === 'community_channel'
-        ? await this.communityChannelScope(
-            actor,
-            body.communityId || '',
-            body.channelId || '',
-          )
-        : await this.groupConversationScope(actor, body.conversationId || '');
+    const scopeAccess = await this.communityChannelScope(
+      actor,
+      body.communityId,
+      body.channelId,
+    );
     const poll = await this.creator.create(
       new PollCreateMessage(
         body.pollId,
@@ -51,15 +49,13 @@ export class PostPollRoute extends PollRouteSupport {
       ),
     );
 
-    if (body.timelineMutation) {
-      await this.timelineRegistrar.register(
-        new PollTimelineMessageRegisterMessage(
-          actor.valueOf(),
-          poll,
-          PublicMutationProof.fromPrimitives(body.timelineMutation),
-        ),
-      );
-    }
+    await this.timelineRegistrar.register(
+      new PollTimelineMessageRegisterMessage(
+        actor.valueOf(),
+        poll,
+        PublicMutationProof.fromPrimitives(body.timelineMutation),
+      ),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

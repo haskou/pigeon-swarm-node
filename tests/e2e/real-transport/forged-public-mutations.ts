@@ -24,8 +24,6 @@ import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/
 import CommunityInviteMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy';
 import CommunityModerationLogMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityModerationLogMutationPolicy';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
-import { Conversation } from '@app/contexts/conversations/domain/Conversation';
-import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
 import { NotificationScopeSettingsPreferences } from '@app/contexts/notification-settings/domain/NotificationScopeSettingsPreferences';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
@@ -229,10 +227,6 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
       requireById: (): Promise<unknown> =>
         Promise.resolve({ toPrimitives: () => ({ networkId }) }),
     } as never,
-    {
-      requireMetadataById: (): Promise<unknown> =>
-        Promise.resolve({ toPrimitives: () => ({ networkId }) }),
-    } as never,
     new PrivateCommunityPublicStorageGuard(
       {
         hasScope: (): Promise<boolean> => Promise.resolve(false),
@@ -310,19 +304,7 @@ async function main(): Promise<void> {
     requireAtFrontier: (): Promise<Community> => Promise.resolve(community),
     requireById: (): Promise<Community> => Promise.resolve(community),
   } as unknown as CommunityRepository;
-  const conversations = {
-    requireMetadataAtFrontier: (): Promise<Conversation> =>
-      Promise.resolve({
-        hasParticipant: () => true,
-        isGroup: () => true,
-      } as unknown as Conversation),
-    requireMetadataById: (): Promise<Conversation> =>
-      Promise.resolve({
-        hasParticipant: () => true,
-        isGroup: () => true,
-      } as unknown as Conversation),
-  } as unknown as ConversationRepository;
-  const pollAccess = new PollMutationScopeAccess(communities, conversations);
+  const pollAccess = new PollMutationScopeAccess(communities);
   const gate = new PublicMutationGate(
     new PublicMutationVerifier(authorization),
     [

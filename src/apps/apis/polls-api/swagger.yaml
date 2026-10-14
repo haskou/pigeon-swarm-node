@@ -8,7 +8,7 @@ paths:
   /polls/:
     post:
       tags: [polls]
-      summary: Create a poll in a community text channel or group conversation
+      summary: Create a poll in a community text channel
       security:
         - signedRequest: []
       parameters:
@@ -149,6 +149,9 @@ components:
         - pollId
         - question
         - scopeType
+        - channelId
+        - communityId
+        - timelineMutation
       properties:
         pollId:
           type: string
@@ -159,15 +162,13 @@ components:
         mutation:
           $ref: '#/components/schemas/SignedPublicMutation'
         timelineMutation:
-          description: Signed public mutation (store messages) for the poll timeline message, with record id community:<communityId>:<channelId>:<pollId>:<creator>. Required for community_channel and ignored for group_conversation; a group conversation timeline lives only in the members' opaque mailboxes, so the node writes no timeline message for a group poll.
+          description: Signed public mutation (store messages) for the poll timeline message, with record id community:<communityId>:<channelId>:<pollId>:<creator>. Required.
           $ref: '#/components/schemas/SignedPublicMutation'
         allowsMultipleVotes:
           type: boolean
         channelId:
           type: string
         communityId:
-          type: string
-        conversationId:
           type: string
         expiresAt:
           type: integer
@@ -189,7 +190,7 @@ components:
           maxLength: 200
         scopeType:
           type: string
-          enum: [community_channel, group_conversation]
+          enum: [community_channel]
     PostPollVoteBody:
       type: object
       required:
@@ -326,11 +327,9 @@ components:
               type: string
             communityId:
               type: string
-            conversationId:
-              type: string
             type:
               type: string
-              enum: [community_channel, group_conversation]
+              enum: [community_channel]
         status:
           type: string
           enum: [open, closed]

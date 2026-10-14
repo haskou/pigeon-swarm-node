@@ -10,9 +10,8 @@ export interface PollResource {
   }[];
   question: string;
   scope: {
-    channelId?: string;
-    communityId?: string;
-    conversationId?: string;
+    channelId: string;
+    communityId: string;
     type: string;
   };
   status: string;
