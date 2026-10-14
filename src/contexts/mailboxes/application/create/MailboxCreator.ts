@@ -72,7 +72,7 @@ export default class MailboxCreator {
         await this.evictIdleEmpty(count - max + 1, now);
       }
 
-      const firstCursor = (await this.repository.highestRetiredCursor()) + 1;
+      const firstCursor = (await this.repository.highestRetiredCursor()).next();
 
       await this.repository.create(
         Mailbox.create({

@@ -1,5 +1,6 @@
 import { MailboxAppendRateLimitedError } from '@app/contexts/mailboxes/domain/errors/MailboxAppendRateLimitedError';
 import { MailboxConflictError } from '@app/contexts/mailboxes/domain/errors/MailboxConflictError';
+import { MailboxCursorInvalidError } from '@app/contexts/mailboxes/domain/errors/MailboxCursorInvalidError';
 import { MailboxEnvelopeInvalidError } from '@app/contexts/mailboxes/domain/errors/MailboxEnvelopeInvalidError';
 import { MailboxFullError } from '@app/contexts/mailboxes/domain/errors/MailboxFullError';
 import { MailboxLastReaderError } from '@app/contexts/mailboxes/domain/errors/MailboxLastReaderError';
@@ -55,7 +56,10 @@ export abstract class MailboxRouteSupport extends Route {
       throw new NotFoundError(error.message);
     }
 
-    if (error instanceof MailboxEnvelopeInvalidError) {
+    if (
+      error instanceof MailboxEnvelopeInvalidError ||
+      error instanceof MailboxCursorInvalidError
+    ) {
       throw new BadRequestError(error.message);
     }
 

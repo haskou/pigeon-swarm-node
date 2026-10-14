@@ -1,4 +1,4 @@
-import { Timestamp } from '@haskou/value-objects';
+import { Duration, Timestamp } from '@haskou/value-objects';
 
 import { MailboxEnvelopeInvalidError } from './errors/MailboxEnvelopeInvalidError';
 import { MailboxEnvelope } from './MailboxEnvelope';
@@ -17,7 +17,7 @@ export default class MailboxPolicy {
   public static readonly MAX_PAGE = 100;
 
   /** Empty and unread for this long: only such mailboxes may be evicted at capacity. */
-  public static readonly EVICTION_IDLE_MS = 7 * 24 * 60 * 60 * 1000;
+  public static readonly EVICTION_IDLE = Duration.fromDays(7);
 
   constructor(private readonly limits: MailboxLimits) {}
 
@@ -44,11 +44,11 @@ export default class MailboxPolicy {
     envelopes: MailboxEnvelope[],
     now: Timestamp,
   ): MailboxEnvelope[] {
-    const retentionMs = this.retentionMs();
+    const retention = this.retention();
 
     return envelopes.filter((envelope) =>
       new Timestamp(envelope.storedAt)
-        .addMilliseconds(retentionMs)
+        .addDuration(retention)
         .isBeforeOrEqual(now),
     );
   }
@@ -73,7 +73,7 @@ export default class MailboxPolicy {
     return this.limits.maxReaders;
   }
 
-  public retentionMs(): number {
-    return this.limits.retentionMs;
+  public retention(): Duration {
+    return this.limits.retention;
   }
 }

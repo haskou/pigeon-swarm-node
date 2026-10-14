@@ -48,7 +48,7 @@ export default class MailboxAppender {
       const now = Timestamp.now();
       mailbox.consumeAppend(now, this.policy);
 
-      const cursor = mailbox.reserveEnvelope(size, this.policy);
+      const cursor = mailbox.reserveEnvelope(size, this.policy).valueOf();
 
       await this.repository.commitAppend(mailbox, {
         body,

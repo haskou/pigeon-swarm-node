@@ -1,6 +1,7 @@
 import { Timestamp } from '@haskou/value-objects';
 
 import { MailboxReaderCursor } from './MailboxReaderCursor';
+import { MailboxCursor } from './value-objects/MailboxCursor';
 import { MailboxId } from './value-objects/MailboxId';
 import { MailboxPostTokenHash } from './value-objects/MailboxPostTokenHash';
 
@@ -12,7 +13,7 @@ export interface MailboxState {
   envelopeCount: number;
   id: MailboxId;
   lastReadAt: Timestamp;
-  nextCursor: number;
+  nextCursor: MailboxCursor;
   postTokenHash: MailboxPostTokenHash;
   readers: MailboxReaderCursor[];
 }

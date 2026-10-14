@@ -1,5 +1,6 @@
 import { MailboxLimits } from '@app/contexts/mailboxes/domain/MailboxLimits';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { Duration } from '@haskou/value-objects';
 
 /** Reads the operator-configured mailbox bounds from the process environment. */
 export class MailboxLimitsFromEnvironment {
@@ -12,7 +13,7 @@ export class MailboxLimitsFromEnvironment {
       environment.MAILBOX_MAX_ENVELOPES,
       environment.MAILBOX_MAX_COUNT,
       environment.MAILBOX_MAX_READERS,
-      environment.MAILBOX_RETENTION_MS,
+      Duration.fromMilliseconds(environment.MAILBOX_RETENTION_MS),
     );
   }
 }

@@ -1,4 +1,4 @@
-import { Timestamp } from '@haskou/value-objects';
+import { Duration, Timestamp } from '@haskou/value-objects';
 
 import { MailboxAppendRateLimitedError } from './errors/MailboxAppendRateLimitedError';
 import { MailboxConflictError } from './errors/MailboxConflictError';
@@ -13,6 +13,7 @@ import MailboxPolicy from './MailboxPolicy';
 import { MailboxPrimitives } from './MailboxPrimitives';
 import { MailboxReaderCursor } from './MailboxReaderCursor';
 import { MailboxState } from './MailboxState';
+import { MailboxCursor } from './value-objects/MailboxCursor';
 import { MailboxId } from './value-objects/MailboxId';
 import { MailboxPostToken } from './value-objects/MailboxPostToken';
 import { MailboxPostTokenHash } from './value-objects/MailboxPostTokenHash';
@@ -30,7 +31,7 @@ export class Mailbox {
     postTokenHash: MailboxPostTokenHash;
     readTokenHash: MailboxReadTokenHash;
     appendTokens: number;
-    firstCursor: number;
+    firstCursor: MailboxCursor;
   }): Mailbox {
     return new Mailbox({
       appendRefilledAt: params.now,
@@ -55,7 +56,7 @@ export class Mailbox {
       envelopeCount: primitives.envelopeCount,
       id: new MailboxId(primitives.id),
       lastReadAt: new Timestamp(primitives.lastReadAt),
-      nextCursor: primitives.nextCursor,
+      nextCursor: new MailboxCursor(primitives.nextCursor),
       postTokenHash: new MailboxPostTokenHash(primitives.postTokenHash),
       readers: primitives.readers.map((reader) =>
         MailboxReaderCursor.fromPrimitives(reader),
@@ -75,7 +76,7 @@ export class Mailbox {
   ): Mailbox[] {
     const candidates = mailboxes
       .filter((mailbox) =>
-        mailbox.isIdleAndEmpty(now, MailboxPolicy.EVICTION_IDLE_MS),
+        mailbox.isIdleAndEmpty(now, MailboxPolicy.EVICTION_IDLE),
       )
       .sort((a, b) => {
         if (a.state.lastReadAt.isBefore(b.state.lastReadAt)) {
@@ -125,7 +126,7 @@ export class Mailbox {
    * `upTo`. The cursor only moves forward and never past the newest envelope.
    * Returns false when no reader holds the token.
    */
-  public acknowledge(token: MailboxReadToken, upTo: number): boolean {
+  public acknowledge(token: MailboxReadToken, upTo: MailboxCursor): boolean {
     const reader = this.readerFor(token);
 
     if (!reader) {
@@ -179,22 +180,22 @@ export class Mailbox {
     return this.state.readers.some((reader) => reader.holds(readTokenHash));
   }
 
-  public highestCursor(): number {
-    return this.state.nextCursor - 1;
+  public highestCursor(): MailboxCursor {
+    return this.state.nextCursor.previous();
   }
 
   /** Unread for the whole retention window: the mailbox itself is removed. */
   public isExpired(now: Timestamp, policy: MailboxPolicy): boolean {
     return this.state.lastReadAt
-      .addMilliseconds(policy.retentionMs())
+      .addDuration(policy.retention())
       .isBeforeOrEqual(now);
   }
 
-  /** Empty and unread for `idleMs`: the only mailboxes eviction may remove. */
-  public isIdleAndEmpty(now: Timestamp, idleMs: number): boolean {
+  /** Empty and unread for `idle`: the only mailboxes eviction may remove. */
+  public isIdleAndEmpty(now: Timestamp, idle: Duration): boolean {
     return (
       this.state.envelopeCount === 0 &&
-      this.state.lastReadAt.addMilliseconds(idleMs).isBeforeOrEqual(now)
+      this.state.lastReadAt.addDuration(idle).isBeforeOrEqual(now)
     );
   }
 
@@ -203,7 +204,7 @@ export class Mailbox {
   }
 
   /** Never drops older envelopes: past a limit the append fails. */
-  public reserveEnvelope(size: number, policy: MailboxPolicy): number {
+  public reserveEnvelope(size: number, policy: MailboxPolicy): MailboxCursor {
     if (
       this.state.envelopeCount + 1 > policy.maxEnvelopesPerMailbox() ||
       this.state.bytes + size > policy.maxBytesPerMailbox()
@@ -213,7 +214,7 @@ export class Mailbox {
 
     const cursor = this.state.nextCursor;
 
-    this.state.nextCursor += 1;
+    this.state.nextCursor = cursor.next();
     this.state.envelopeCount += 1;
     this.state.bytes += size;
 
@@ -281,12 +282,18 @@ export class Mailbox {
 
   /**
    * The cursor every reader has acknowledged. Envelopes at or below it can be
-   * deleted. Zero with no readers, so nothing is deleted.
+   * deleted. None with no readers, so nothing is deleted.
    */
-  public settledCursor(): number {
-    const cursors = this.state.readers.map((reader) => reader.getAckedCursor());
+  public settledCursor(): MailboxCursor {
+    const [first, ...rest] = this.state.readers.map((reader) =>
+      reader.getAckedCursor(),
+    );
 
-    return cursors.length === 0 ? 0 : Math.min(...cursors);
+    if (!first) {
+      return MailboxCursor.none();
+    }
+
+    return rest.reduce((lowest, cursor) => lowest.min(cursor), first);
   }
 
   public toPrimitives(): MailboxPrimitives {
@@ -298,7 +305,7 @@ export class Mailbox {
       envelopeCount: this.state.envelopeCount,
       id: this.state.id.valueOf(),
       lastReadAt: this.state.lastReadAt.toMilliseconds(),
-      nextCursor: this.state.nextCursor,
+      nextCursor: this.state.nextCursor.valueOf(),
       postTokenHash: this.state.postTokenHash.valueOf(),
       readers: this.state.readers.map((reader) => reader.toPrimitives()),
     };

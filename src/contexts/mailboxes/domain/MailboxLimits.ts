@@ -1,3 +1,5 @@
+import { Duration } from '@haskou/value-objects';
+
 /** Operator-configured mailbox bounds, bound by composition. */
 export class MailboxLimits {
   constructor(
@@ -6,6 +8,6 @@ export class MailboxLimits {
     public readonly maxEnvelopesPerMailbox: number,
     public readonly maxMailboxes: number,
     public readonly maxReaders: number,
-    public readonly retentionMs: number,
+    public readonly retention: Duration,
   ) {}
 }

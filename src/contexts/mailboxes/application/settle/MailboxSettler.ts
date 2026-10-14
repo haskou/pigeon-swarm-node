@@ -17,7 +17,9 @@ export default class MailboxSettler {
       0,
       Number.MAX_SAFE_INTEGER,
     );
-    const removed = all.filter((envelope) => envelope.cursor <= settled);
+    const removed = all.filter((envelope) =>
+      settled.isGreaterOrEqualThan(envelope.cursor),
+    );
 
     mailbox.releaseEnvelopes(removed);
 
