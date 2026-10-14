@@ -180,6 +180,10 @@ jobs:
         run: yarn test:integration:forged-community-operations
         timeout-minutes: 4
 
+      - name: Concurrent community changes
+        run: yarn test:integration:concurrent-community-changes
+        timeout-minutes: 4
+
       - name: Forged conversations
         run: yarn test:integration:forged-conversations
         timeout-minutes: 4
