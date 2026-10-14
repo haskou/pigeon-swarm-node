@@ -3,8 +3,6 @@ import { Timestamp, assert } from '@haskou/value-objects';
 import { DeviceAuthorization } from '../DeviceAuthorization';
 import { DeviceAuthorizationApplication } from '../DeviceAuthorizationApplication';
 import { DeviceAuthorizationCandidate } from '../DeviceAuthorizationCandidate';
-import { DeviceAuthorizationCheckpointCandidate } from '../DeviceAuthorizationCheckpointCandidate';
-import { DeviceAuthorizationCheckpointPrecedence } from '../DeviceAuthorizationCheckpointPrecedence';
 import { DeviceAuthorizationOverflowBound } from '../DeviceAuthorizationOverflowBound';
 import { DeviceAuthorizationRecoveryState } from '../DeviceAuthorizationRecoveryState';
 import { DeviceAuthorizationReplayResult } from '../DeviceAuthorizationReplayResult';
@@ -133,6 +131,34 @@ export default class DeviceAuthorizationPolicy {
     );
 
     return { authorization, compromiseCaps: carried };
+  }
+
+  /**
+   * The state a lost recovery recovered from: the one state, on the lineage
+   * or a lost recovery replayed before it, in the epoch it is signed in. Its
+   * own epoch must be new, so one recovery is never replayed twice.
+   */
+  private lostRecoveryBase(
+    states: DeviceAuthorizationRecoveryState[],
+    lost: DeviceAuthorizationTransition,
+  ): DeviceAuthorizationRecoveryState {
+    const recoveredEpoch = DeviceAuthorizationEpoch.fromRecovery(
+      lost.getOperationId(),
+    );
+    const [base, ...ambiguous] = states.filter(({ authorization }) =>
+      authorization.getEpoch().isEqual(lost.getEpoch()),
+    );
+
+    assert(
+      base !== undefined &&
+        ambiguous.length === 0 &&
+        !states.some(({ authorization }) =>
+          authorization.getEpoch().isEqual(recoveredEpoch),
+        ),
+      new InvalidDeviceAuthorizationTransitionError(),
+    );
+
+    return base;
   }
 
   private groupByRevision<T>(
@@ -342,42 +368,45 @@ export default class DeviceAuthorizationPolicy {
    * at and the compromise caps it carries. Every recovery must apply, and a
    * later recovery may tighten or add caps but never drop or loosen one an
    * earlier recovery carried, so no checkpoint re-admits a capped credential.
-   * A concurrent recovery lost the checkpoint to the last one at the same
-   * revision: it must apply where the last one applies, and its carried caps
-   * still hold, so a heal never drops a cap only the losing side carried.
+   * A concurrent recovery lost the checkpoint to the last one, at its revision
+   * or an earlier one: it must apply to the state it recovered from, on the
+   * lineage or another lost recovery, and its carried caps still hold, so a
+   * heal never drops a cap only the losing side carried.
    */
   public replayRecoveryLineage(
     genesis: DeviceAuthorization,
     recoveries: DeviceAuthorizationTransition[],
     concurrent: DeviceAuthorizationTransition[] = [],
   ): DeviceAuthorizationRecoveryState {
-    let previous: DeviceAuthorizationRecoveryState = {
+    let head: DeviceAuthorizationRecoveryState = {
       authorization: genesis,
       compromiseCaps: DeviceCompromiseCaps.none(),
     };
-    let state = previous;
+    const states = [head];
 
     for (const recovery of recoveries) {
-      previous = state;
-      state = this.recoverLineage(previous, recovery);
+      head = this.recoverLineage(head, recovery);
+      states.push(head);
     }
 
     const last = recoveries.at(-1);
+    let { compromiseCaps } = head;
 
-    return concurrent.reduce((current, sibling) => {
+    for (const lost of [...concurrent].sort((left, right) =>
+      left.getRevision().compareTo(right.getRevision()),
+    )) {
       assert(
         last !== undefined &&
-          sibling.getPreviousRevision().isEqual(last.getPreviousRevision()) &&
-          sibling.getOperationId().isNotEqual(last.getOperationId()),
+          !lost.getRevision().isGreaterThan(last.getRevision()),
         new InvalidDeviceAuthorizationTransitionError(),
       );
-      this.recoverLineage(previous, sibling);
+      states.push(
+        this.recoverLineage(this.lostRecoveryBase(states, lost), lost),
+      );
+      compromiseCaps = compromiseCaps.withCompromise(lost);
+    }
 
-      return {
-        authorization: current.authorization,
-        compromiseCaps: current.compromiseCaps.withCompromise(sibling),
-      };
-    }, state);
+    return { authorization: head.authorization, compromiseCaps };
   }
 
   public apply(
@@ -455,31 +484,61 @@ export default class DeviceAuthorizationPolicy {
 
   /**
    * The preferred recovery checkpoint is the one at the highest revision,
-   * ties broken by canonical encoding. Checkpoints at that revision on the
-   * same lineage contend with it and are kept as concurrent recoveries.
+   * ties broken by canonical encoding.
    */
   public preferCheckpoint<T>(
-    candidates: DeviceAuthorizationCheckpointCandidate<T>[],
-  ): DeviceAuthorizationCheckpointPrecedence<T> | undefined {
-    const ordered = [...candidates].sort((left, right) =>
+    candidates: DeviceAuthorizationSourceCandidate<T>[],
+  ): T | undefined {
+    const [preferred] = [...candidates].sort((left, right) =>
       this.precedenceOrder(left, right),
     );
-    const [preferred] = ordered;
 
-    if (!preferred) {
-      return undefined;
+    return preferred?.payload;
+  }
+
+  /**
+   * The recoveries that lost the checkpoint to `winner` and still hold: each
+   * one carrying a cap the winner does not carry at least as tight, and every
+   * lost recovery such a one recovered from, so its replay base stays on the
+   * record. A lost recovery whose every cap the winner carries adds nothing;
+   * dropping it keeps repeated heals from piling up losers. Kept in the order
+   * given.
+   */
+  public heldLostRecoveries<T>(
+    winner: DeviceAuthorizationTransition,
+    lost: DeviceAuthorizationCandidate<T>[],
+  ): T[] {
+    const winnerCaps = DeviceCompromiseCaps.carriedBy(winner);
+    const held = new Set(
+      lost.filter(
+        ({ transition }) =>
+          !DeviceCompromiseCaps.carriedBy(transition).isNotLoosenedBy(
+            winnerCaps,
+          ),
+      ),
+    );
+
+    // A Set iteration also visits the entries added while it runs, so this
+    // walks every held recovery back through the lost ones it recovered from.
+    for (const { transition: recovered } of held) {
+      for (const candidate of lost) {
+        if (
+          recovered
+            .getEpoch()
+            .isEqual(
+              DeviceAuthorizationEpoch.fromRecovery(
+                candidate.transition.getOperationId(),
+              ),
+            )
+        ) {
+          held.add(candidate);
+        }
+      }
     }
 
-    return {
-      contenders: ordered
-        .filter(
-          (candidate) =>
-            candidate.revision.isEqual(preferred.revision) &&
-            candidate.sharesLineageWith(preferred),
-        )
-        .map(({ payload }) => payload),
-      preferred: preferred.payload,
-    };
+    return lost
+      .filter((candidate) => held.has(candidate))
+      .map(({ payload }) => payload);
   }
 
   /**
