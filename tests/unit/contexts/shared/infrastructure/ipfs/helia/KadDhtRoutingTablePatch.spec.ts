@@ -16,6 +16,10 @@ describe('Kademlia routing table dependency patch', () => {
       import assert from 'node:assert/strict'
       import { KBucket } from ${JSON.stringify(moduleUrl)}
 
+      // A loaded machine can hold this process for over a second before the
+      // traversal runs; the outcome must not depend on that delay.
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1_200)
+
       const kBucket = Object.create(KBucket.prototype)
       const first = { peerId: 'first' }
       const second = { peerId: 'second' }

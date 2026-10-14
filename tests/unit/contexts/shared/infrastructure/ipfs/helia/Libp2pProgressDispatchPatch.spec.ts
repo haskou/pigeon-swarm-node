@@ -13,6 +13,10 @@ describe('libp2p progress dispatch dependency patch', () => {
       import assert from 'node:assert/strict'
       import { Queue } from ${JSON.stringify(moduleUrl)}
 
+      // A loaded machine can hold this process for over a second before the
+      // dispatch runs; the outcome must not depend on that delay.
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1_200)
+
       const jobCount = 28
       const queues = Array.from({ length: jobCount }, () => new Queue())
       const progressDispatchers = []
