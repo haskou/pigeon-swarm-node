@@ -434,8 +434,19 @@ Conflict rules:
 
 - Operations on different fields, roles, channels or members do not conflict; all of
   them apply.
-- Concurrent operations on the same field apply in the total order, so the same
-  operation wins on every replica.
+- Some operations carry a whole value built on the state their author saw: the
+  profile (`community_updated`), the roles of one member (`member_roles_updated`),
+  the roles that see a channel (`channel_permissions_updated`) and a role
+  (`role_updated`). When one is concurrent with operations ordered before it, the
+  fold rebases it (`CommunityOperationRebase`) from the state of its parents onto
+  the state it applies to: a single value (name, description, avatar, banner, a
+  setting the operation sets, a role name) takes the operation's value only if its
+  author changed it, and a set (role ids, visible role ids, role permissions) keeps
+  the current entries minus the ones the author removed plus the ones the author
+  added. Concurrent changes to different fields or entries therefore all survive,
+  and the rebased operation is still authorized against the state it applies to.
+- Concurrent changes to the same single value apply in the total order, so the
+  same operation wins on every replica.
 - A ban, kick or leave ordered before a concurrent operation of the removed member
   makes that operation unauthorized and it is skipped. Ordered after it, the
   operation stays applied.
@@ -516,8 +527,11 @@ fresh registry and catches it up, applies a signed tombstone (the last member
 leaving) and rejects a later revival, and rejects operations of a revoked device.
 Fixtures own and remove their temporary data. The check runs in `test:ci`; unit
 regressions additionally cover the fold, the causal ledger, the admission policy and
-the repository. Loopback transport does not validate external NAT traversal or
-calls.
+the repository. `yarn test:integration:concurrent-community-changes` runs two real
+Helia/OrbitDB replicas over loopback, partitions them, authors concurrent profile,
+role, channel-visibility and ban changes in both total orders, reconnects them and
+asserts that both replicas converge on a state keeping every independent change.
+Loopback transport does not validate external NAT traversal or calls.
 
 ## Community state announcements
 

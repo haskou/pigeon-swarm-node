@@ -487,8 +487,20 @@ package "communities/domain" {
 
   class CommunityOperationApplier {
     + create(genesis): Community
-    + apply(community, operation): void
+    + apply(community, operation, base?): void
   }
+
+  class CommunityOperationRebase {
+    + rebases(operation): boolean
+    + argumentsOf(operation, base, current): CommunityOperationArguments
+  }
+
+  interface CommunityOperationRebaseTarget {
+    + intended: CommunityOperationSnapshot
+    + of(community): CommunityOperationSnapshot?
+  }
+
+  class CommunityOperationSnapshot
 
   class CommunityOperationLedger {
     + admit(operation): void
@@ -522,6 +534,9 @@ package "communities/domain" {
     one that was not allowed then is skipped, and so is
     one past the author quota (the founder has none).
     The last member leaving is the tombstone.
+    A concurrent whole value (profile, member roles,
+    channel visibility, role) is rebased from the state
+    of its parents onto the state it applies to.
   end note
 
   class CommunityOperationAction
@@ -636,6 +651,10 @@ CommunityChannelMessageReaction --> CommunityId
   CommunityRepository ..> CommunityOperation
   CommunityOperationApplier ..> CommunityOperation
   CommunityOperationApplier ..> Community
+  CommunityOperationApplier ..> CommunityOperationRebase : concurrent whole values
+  CommunityOperationRebase ..> CommunityOperationRebaseTarget
+  CommunityOperationRebaseTarget ..> CommunityOperationSnapshot
+  CommunityStateFold ..> CommunityOperationRebase : base of concurrent operations
   CommunityOperationLedger ..> CommunityOperation
   CommunityOperationLedger ..> CommunityOperationLimits : author quota
   CommunityStateFold ..> CommunityOperationLimits : skips over quota

@@ -20,6 +20,8 @@ import { CommunityRoleName } from '../value-objects/CommunityRoleName';
 import { CommunityVisibility } from '../value-objects/CommunityVisibility';
 import { CommunityOperation } from './CommunityOperation';
 import { CommunityOperationArgumentReader } from './CommunityOperationArgumentReader';
+import { CommunityOperationArguments } from './CommunityOperationArguments';
+import { CommunityOperationRebase } from './CommunityOperationRebase';
 
 /**
  * Turns one operation into a state change of the community aggregate. The
@@ -48,7 +50,11 @@ import { CommunityOperationArgumentReader } from './CommunityOperationArgumentRe
 export class CommunityOperationApplier {
   private static readonly HANDLERS: Record<
     string,
-    (community: Community, operation: CommunityOperation) => void
+    (
+      community: Community,
+      operation: CommunityOperation,
+      args: CommunityOperationArguments,
+    ) => void
   > = {
     [CommunityOperationAction.CHANNEL_CREATED.valueOf()]: (community, op) =>
       CommunityOperationApplier.createChannel(community, op),
@@ -57,11 +63,16 @@ export class CommunityOperationApplier {
     [CommunityOperationAction.CHANNEL_PERMISSIONS_UPDATED.valueOf()]: (
       community,
       op,
-    ) => CommunityOperationApplier.updateChannelPermissions(community, op),
+      args,
+    ) =>
+      CommunityOperationApplier.updateChannelPermissions(community, op, args),
     [CommunityOperationAction.CHANNEL_RENAMED.valueOf()]: (community, op) =>
       CommunityOperationApplier.renameChannel(community, op),
-    [CommunityOperationAction.COMMUNITY_UPDATED.valueOf()]: (community, op) =>
-      CommunityOperationApplier.updateProfile(community, op),
+    [CommunityOperationAction.COMMUNITY_UPDATED.valueOf()]: (
+      community,
+      op,
+      args,
+    ) => CommunityOperationApplier.updateProfile(community, op, args),
     [CommunityOperationAction.MEMBER_BANNED.valueOf()]: (community, op) =>
       community.banMember(
         op.getAuthorIdentityId(),
@@ -79,7 +90,8 @@ export class CommunityOperationApplier {
     [CommunityOperationAction.MEMBER_ROLES_UPDATED.valueOf()]: (
       community,
       op,
-    ) => CommunityOperationApplier.assignRoles(community, op),
+      args,
+    ) => CommunityOperationApplier.assignRoles(community, op, args),
     [CommunityOperationAction.MEMBER_UNBANNED.valueOf()]: (community, op) =>
       community.unbanMember(
         op.getAuthorIdentityId(),
@@ -89,8 +101,8 @@ export class CommunityOperationApplier {
       CommunityOperationApplier.createRole(community, op),
     [CommunityOperationAction.ROLE_DELETED.valueOf()]: (community, op) =>
       CommunityOperationApplier.deleteRole(community, op),
-    [CommunityOperationAction.ROLE_UPDATED.valueOf()]: (community, op) =>
-      CommunityOperationApplier.updateRole(community, op),
+    [CommunityOperationAction.ROLE_UPDATED.valueOf()]: (community, op, args) =>
+      CommunityOperationApplier.updateRole(community, op, args),
   };
 
   private static member(operation: CommunityOperation): IdentityId {
@@ -104,9 +116,10 @@ export class CommunityOperationApplier {
   private static updateProfile(
     community: Community,
     operation: CommunityOperation,
+    args: CommunityOperationArguments,
   ): void {
     const reader = new CommunityOperationArgumentReader(
-      operation.getArguments(),
+      args,
       ['description', 'name'],
       ['autoJoinEnabled', 'avatar', 'banner', 'discoverable'],
     );
@@ -190,11 +203,12 @@ export class CommunityOperationApplier {
   private static updateChannelPermissions(
     community: Community,
     operation: CommunityOperation,
+    args: CommunityOperationArguments,
   ): void {
-    const reader = new CommunityOperationArgumentReader(
-      operation.getArguments(),
-      ['channelId', 'visibleRoleIds'],
-    );
+    const reader = new CommunityOperationArgumentReader(args, [
+      'channelId',
+      'visibleRoleIds',
+    ]);
 
     community.updateChannelPermissions(
       operation.getAuthorIdentityId(),
@@ -242,11 +256,13 @@ export class CommunityOperationApplier {
   private static updateRole(
     community: Community,
     operation: CommunityOperation,
+    args: CommunityOperationArguments,
   ): void {
-    const reader = new CommunityOperationArgumentReader(
-      operation.getArguments(),
-      ['name', 'permissions', 'roleId'],
-    );
+    const reader = new CommunityOperationArgumentReader(args, [
+      'name',
+      'permissions',
+      'roleId',
+    ]);
 
     community.updateRole(
       operation.getAuthorIdentityId(),
@@ -275,11 +291,12 @@ export class CommunityOperationApplier {
   private static assignRoles(
     community: Community,
     operation: CommunityOperation,
+    args: CommunityOperationArguments,
   ): void {
-    const reader = new CommunityOperationArgumentReader(
-      operation.getArguments(),
-      ['identityId', 'roleIds'],
-    );
+    const reader = new CommunityOperationArgumentReader(args, [
+      'identityId',
+      'roleIds',
+    ]);
 
     community.assignRoles(
       operation.getAuthorIdentityId(),
@@ -365,10 +382,15 @@ export class CommunityOperationApplier {
     );
   }
 
-  /** Applies a non genesis operation; throws when it is not permitted. */
+  /**
+   * Applies a non genesis operation; throws when it is not permitted. With
+   * `base`, the state of its parents, the operation is rebased on `community`
+   * (see `CommunityOperationRebase`) so it keeps concurrent changes.
+   */
   public static apply(
     community: Community,
     operation: CommunityOperation,
+    base?: Community,
   ): void {
     const handler = Object.hasOwn(
       CommunityOperationApplier.HANDLERS,
@@ -385,6 +407,12 @@ export class CommunityOperationApplier {
       new InvalidCommunityOperationError(),
     );
 
-    handler(community, operation);
+    handler(
+      community,
+      operation,
+      base
+        ? CommunityOperationRebase.argumentsOf(operation, base, community)
+        : operation.getArguments(),
+    );
   }
 }
