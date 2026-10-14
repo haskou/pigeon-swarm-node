@@ -134,9 +134,9 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     ]);
   }
 
-  private async findCachedCandidateRecords(
-    identityId?: string,
-  ): Promise<IdentityMetadataRecord[]> {
+  private async findCachedCandidateRecords(): Promise<
+    IdentityMetadataRecord[]
+  > {
     const projected = (
       await Promise.all(
         this.registry
@@ -144,12 +144,10 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
           .map((document) => this.verifiedRecordOf(document)),
       )
     ).filter(
-      (document): document is IdentityMetadataRecord =>
-        document !== undefined &&
-        (!identityId || document.identityId === identityId),
+      (document): document is IdentityMetadataRecord => document !== undefined,
     );
 
-    return [...this.retainedRecords(identityId), ...projected];
+    return [...this.retainedRecords(), ...projected];
   }
 
   private async findHead(
@@ -281,6 +279,11 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
     return Promise.resolve(record ? [record] : []);
   }
 
+  /**
+   * Identity heads are admitted only under the key of the identity that signed
+   * them, so the identity's own head and its retained candidates hold every
+   * verified version; other identities' heads are never verified.
+   */
   public async findByIdentityId(
     identityId: IdentityId,
   ): Promise<IdentityMetadataRecord[]> {
@@ -292,7 +295,7 @@ export default class OrbitDBIdentityMetadataIndex extends IdentityMetadataIndex 
 
     return this.deduplicateDocuments([
       ...(matchingHead ? [matchingHead] : []),
-      ...(await this.findCachedCandidateRecords(identityId.valueOf())),
+      ...this.retainedRecords(identityId.valueOf()),
     ]);
   }
 
