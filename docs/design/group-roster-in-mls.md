@@ -56,7 +56,7 @@ rules the node enforces today (`ConversationRoster.ts:40-160`):
 | create | `createGroup` with the extension; `conversationId` = `group:` + base64url(sha256(JSON{creatorIdentityId, networkId, nonce})) | committer's identity is `creatorId`; 1 to `MAX_GROUP_PARTICIPANTS` members; `adminIds` is a subset of `memberIds` |
 | add | GCE(roster + Y), plus Add of Y's leaves when a key package is at hand | committer is creator or admin; Y not a member; size cap |
 | remove | GCE(roster - X) and Remove of all of X's leaves in the same commit | creator or admin; X is not the creator; only the creator removes an admin |
-| leave | GCE(roster - self) | any member but the creator. The lead committer removes the leaves on its next sync, as today |
+| leave | GCE(roster - self): self leaves `memberIds` and, when self is an admin, `adminIds` in the same GCE | any member but the creator; an admin leaves without a prior demote. The lead committer removes the leaves on its next sync, as today |
 | promote, demote | GCE with the new `adminIds` | creator only; the target is a member; the creator is never in `adminIds` |
 | leaf changes | Add or Remove without GCE (reconcile, device add, revoke) | as today: leaves must match roster identities and verified devices (#375, #441) |
 
@@ -68,8 +68,10 @@ the table above, with its rule satisfied:
 - `version` and `conversationId` never change after create, and `creatorId` never
   changes.
 - `memberIds` changes by exactly one identity (add, remove, leave) or not at all.
-- `adminIds` changes by exactly one identity (promote, demote), or loses the removed
-  identity in a remove of an admin, or not at all.
+- `adminIds` changes by exactly one identity (promote, demote), or loses the departing
+  identity when an admin is removed or leaves, or not at all. A remove or leave of an
+  admin that keeps it in `adminIds` is rejected, so `adminIds` stays a subset of
+  `memberIds` in every epoch, as create requires and the welcome checks expect.
 - `name` never changes: nobody may rename a group, as today (the node has no rename
   operation). A rename needs its own operation and rule in a later design.
 - A commit with more than one GCE proposal, an unknown `version`, or an unknown field is
@@ -196,13 +198,33 @@ conversation id travels inside the seal. Admission keeps the signature check and
 per-inviter quota (`GenuineRecordQuota`, `NOTIFICATIONS_MAX_INVITATIONS_PER_IDENTITY`,
 default 10 000 retained, plus the local per-minute write cap).
 
-Per-recipient cap. Without `subjectId` a stranger can fill a recipient's pending
-invitations from many identities. The node retains at most 100 pending (unanswered)
-group invitation letters per recipient (`NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_RECIPIENT`).
-When the cap is full, a new letter evicts the oldest pending letter by admission time
-(the node does not know the recipient's contacts, so the rule is by age only). Letters the recipient answered or
-dismissed do not count. The client keeps its own list and drops letters it already
-handled.
+Recipient caps. Without `subjectId` a stranger can fill a recipient's pending
+invitations, and one inviter's quota (10 000) is far above any per-recipient bound. A
+letter is pending while the recipient has signed no `accepted` or `declined` state record
+for it (`PATCH /notifications/{notificationId}`). Of the pending group invitation letters
+addressed to one recipient, the node keeps and lists at most:
+
+- 4 per (inviter, recipient) pair
+  (`NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_PAIR`), enough for two invitations in
+  flight (a key package request and a `{welcome, k}` letter each);
+- 100 per recipient in total
+  (`NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_RECIPIENT`).
+
+Both caps take the pending letters in ascending record id order, the order admission
+already uses (`GenuineRecordQuota`), first per pair and then per recipient. A letter
+beyond either cap is evicted: the node does not list it and drops it on compaction. The
+kept set is a function of the letters and state records a node holds, not of their
+arrival time, so every node that holds the same records keeps the same letters. A
+state record frees its letter's slot on every node, and the next letter by record id
+takes it. Admission itself is unchanged: signature check and per-inviter quota. The
+client keeps its own list and drops letters it already handled.
+
+Residual (suppression): one inviter holds at most 4 of the 100 slots, so filling a
+recipient's slots needs at least 25 identities. Record ids are content-bound sha256
+values that the sender can grind by re-sealing, so such a set can also place its letters
+ahead of letters from honest inviters and keep new honest letters evicted. The recipient
+frees slots by declining; invitations from contacts over 1:1 conversations and
+community invitations are not affected.
 
 Letter dedupe. The client deduplicates by the sealed content: after opening a letter it
 keys it by `(sender identity, conversationId, letter kind, key package reference or
@@ -234,10 +256,10 @@ accept, as a community invitation does today.
 | --- | --- |
 | Node-enforced add and remove authorisation: the node refuses an op that breaks a rule before anyone sees it | each member judges each commit by the roster agreed in the MLS transcript, default deny on the roster diff, committer verified through the device chain. A malicious member can post rejected commits into inboxes; honest members drop them, and the post rate is bounded by the inbox append limit |
 | Node-side order of roster ops (the op log decides who acted first) | the same-epoch priority rule (removals first, then the creator, then the lowest commit id). Residual: an offline member can adopt a stale branch on reconnect |
-| Server-side membership checks on list, frontier, drafts, control letters, polls, calls, typing and presence | list, polls and typing move inside the MLS group; drafts use opaque keys; calls use a capability bound to the epoch; control letters keep the signature and per-inviter quota, add a per-recipient pending cap, and, for non-contacts, ask the recipient first; presence stops flowing through groups |
+| Server-side membership checks on list, frontier, drafts, control letters, polls, calls, typing and presence | list, polls and typing move inside the MLS group; drafts use opaque keys; calls use a capability bound to the epoch; control letters keep the signature and per-inviter quota, add per-pair and per-recipient pending caps kept by record id, and, for non-contacts, ask the recipient first; presence stops flowing through groups |
 | Plaintext `subjectId` on letters, used to group and dedupe them | dedupe by the sealed key `(sender, conversationId, kind, key package reference or welcome epoch)` after opening |
 | Delivery fan-out by participant id (typing relay, call events, identity updates) | fan-out to inboxes whose ids derive from `gen_k` (already the case for messages and commits); call events reach capability holders |
-| Abuse controls and quotas per group: `MAX_GROUP_PARTICIPANTS`, per-author op limits, the roster gate on letters | members enforce the size cap in the roster check and the joiner checks it on the welcome; inbox append limits and mailbox capacity bound traffic per inbox; the letter quota is per inviter and the pending cap per recipient; the node no longer stores group ops, so group creation costs it nothing |
+| Abuse controls and quotas per group: `MAX_GROUP_PARTICIPANTS`, per-author op limits, the roster gate on letters | members enforce the size cap in the roster check and the joiner checks it on the welcome; inbox append limits and mailbox capacity bound traffic per inbox; the letter quota is per inviter and the pending caps per (inviter, recipient) and per recipient; the node no longer stores group ops, so group creation costs it nothing |
 | An independent roster for welcome checks | the welcome checks and the confirmation rule (creator verified from outside the welcome, or a pinned contact other than the welcomer, never an identity added with J). A group with neither stays "not yet verified" |
 | Group discovery after losing every device | none. A member re-adds the identity; a new device of a known identity is added by a sibling device (D19) |
 
@@ -256,15 +278,16 @@ accept, as a community invitation does today.
 | Members disagree on the roster | possible across fetch times (frontier race, removal gap) | not possible within an epoch; across branches only as the residual above |
 | Removed admin welcomes a new member into a stale fork | refused: the joiner checks the node roster | possible, contained: the fork stays unconfirmed because only the verified creator or a pinned contact other than the welcomer confirms, never a sybil added with J; an unconfirmed group emits no MLS output at all. Residual: J sees a "not yet verified" group |
 | Contact auto-answers a key package request into a fork | not applicable | the answer yields a pending, unconfirmed membership only |
-| Stranger sends sealed letters | anyone who first adds the recipient to a group, which needs no consent | anyone, within the per-inviter quota and the per-recipient pending cap (oldest evicted); non-contacts need the recipient's acceptance before a key package goes out |
+| Stranger sends sealed letters | anyone who first adds the recipient to a group, which needs no consent | anyone, within the per-inviter quota; at most 4 pending letters per (inviter, recipient) and 100 per recipient, kept by record id on every node; non-contacts need the recipient's acceptance before a key package goes out |
+| Strangers suppress a recipient's group invitations | not possible: no per-recipient cap | residual: 25 or more identities, grinding record ids, can keep a recipient's 100 pending slots full and honest letters evicted until the recipient declines theirs |
 | Spam into a group | bounded by the roster gate and inbox limits | bounded by inbox limits; inbox ids are unknown to non-members |
 | Removed member that was offline past retention | sees the roster op | sees a group that stays quiet. Residual: the UI marks a group without a new generation for longer than the retention window as stale; that is a hint, not a proof |
 
 Conclusion: the target is at least as safe as today for every threat in the table except
 the stale-fork welcome and the stale branch after an offline race, which the
-confirmation rule and the priority rule contain, and the two residuals named in the
-table (identity-signed call leases, the stale hint). With these rules the design is safe
-to implement.
+confirmation rule and the priority rule contain, and the three residuals named in the
+table (identity-signed call leases, the stale hint, invitation suppression by 25 or more
+identities). With these rules the design is safe to implement.
 
 ## Slices
 
@@ -283,8 +306,8 @@ and merges when `real-node-e2e` is green.
    device-chain committer check, the same-epoch priority rule (and the group inbox
    commit id derivation, stated), the welcome checks, the confirmation rule with the
    no-output rule for unconfirmed groups and the "not yet verified" UI state, local
-   group list, roster-free control letters with the per-recipient pending cap and
-   sealed-key dedupe; the node deletes group conversations (group branch of
+   group list, roster-free control letters with the per-pair and per-recipient pending
+   caps and sealed-key dedupe; the node deletes group conversations (group branch of
    `POST /conversations`, group rows in the list, member and admin routes, group
    frontier and drafts, group ops in `conversationOperations`, the participant check on
    `group_conversation_invitation`).
