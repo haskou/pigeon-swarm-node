@@ -3,8 +3,6 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { PrimitiveOf } from '@haskou/value-objects';
 
 import { Conversation } from './Conversation';
-import { Message } from './entities/messages/Message';
-import { MessageFactory } from './entities/messages/MessageFactory';
 import { ConversationAdmins } from './value-objects/ConversationAdmins';
 import { ConversationId } from './value-objects/ConversationId';
 import { ConversationType } from './value-objects/ConversationType';
@@ -26,9 +24,6 @@ export class GroupConversation extends Conversation {
       primitives.participantIds.map(
         (participantId) => new IdentityId(participantId),
       ),
-      primitives.messages.map((message) =>
-        MessageFactory.fromPrimitives(message),
-      ),
       primitives.creatorId ? new IdentityId(primitives.creatorId) : undefined,
       (primitives.adminIds ?? []).map((adminId) => new IdentityId(adminId)),
     );
@@ -39,7 +34,6 @@ export class GroupConversation extends Conversation {
     networkId: NetworkId,
     name: GroupConversationName,
     participants: IdentityId[],
-    messages: Message[] = [],
     creatorId: IdentityId | undefined = undefined,
     adminIds: IdentityId[] = [],
   ) {
@@ -49,7 +43,6 @@ export class GroupConversation extends Conversation {
       ConversationType.GROUP,
       participants,
       name,
-      messages,
       new ConversationAdmins(creatorId, adminIds),
     );
   }

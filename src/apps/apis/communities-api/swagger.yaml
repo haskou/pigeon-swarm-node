@@ -1926,7 +1926,16 @@ components:
           $ref: '#/components/schemas/SignedPublicMutation'
     MLSRecordResource:
       type: object
-      required: [recordId, communityId, groupId, kind, payload, authorIdentityId, createdAt]
+      required:
+        [
+          recordId,
+          communityId,
+          groupId,
+          kind,
+          payload,
+          authorIdentityId,
+          createdAt,
+        ]
       properties:
         recordId:
           type: string
@@ -2494,7 +2503,7 @@ components:
           items:
             type: string
             pattern: '^[A-Za-z0-9_-]{43}$'
-          description: Digests of the community or conversation operations observed when signing, strictly ascending. Required, and only allowed, on records scoped to a community or conversation (channel messages and their reactions and pins, invites, membership requests, moderation log, MLS records, polls, conversation messages); the record's permission is judged against the scope folded at exactly this frontier. Read it from GET /communities/{id}/frontier or the conversation frontier before signing.
+          description: Digests of the community or conversation operations observed when signing, strictly ascending. Required, and only allowed, on records scoped to a community or conversation (channel messages and their reactions and pins, invites, membership requests, moderation log, MLS records, polls); the record's permission is judged against the scope folded at exactly this frontier. Read it from GET /communities/{id}/frontier or the conversation frontier before signing.
         predecessor:
           type: string
           nullable: true

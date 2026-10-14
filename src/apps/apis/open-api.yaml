@@ -248,20 +248,6 @@ paths:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1admins~1{identityId}'
   /conversations/{conversationId}/draft:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1draft'
-  /conversations/{conversationId}/pins:
-    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1pins'
-  /conversations/{conversationId}/messages:
-    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages'
-  /conversations/{conversationId}/messages/read-until:
-    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages~1read-until'
-  /conversations/{conversationId}/messages/{messageId}:
-    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages~1{messageId}'
-  /conversations/{conversationId}/messages/{messageId}/around:
-    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages~1{messageId}~1around'
-  /conversations/{conversationId}/messages/{messageId}/pin:
-    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages~1{messageId}~1pin'
-  /conversations/{conversationId}/messages/{messageId}/thread:
-    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1messages~1{messageId}~1thread'
   /identities/:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1'
   /identities/{reference}:

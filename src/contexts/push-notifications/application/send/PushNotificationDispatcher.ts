@@ -1,6 +1,3 @@
-import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
 import { NotificationDeliveryShouldSendPushMessage } from '@app/contexts/notification-settings/application/should-deliver/messages/NotificationDeliveryShouldSendPushMessage';
 import NotificationDeliveryPreferenceChecker from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
 import { NotificationSettingScopeType } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScopeType';
@@ -29,21 +26,6 @@ export default class PushNotificationDispatcher {
 
   private static optionalIdentityId(value: unknown): IdentityId | undefined {
     return typeof value === 'string' ? new IdentityId(value) : undefined;
-  }
-
-  private static unreadMessageFromEvent(
-    event: DomainEvent,
-  ): PushNotificationIntent['unreadMessage'] {
-    const messageId = event.attributes.messageId;
-
-    if (typeof messageId !== 'string') {
-      return undefined;
-    }
-
-    return {
-      conversationId: new ConversationId(event.aggregateId),
-      messageId: new MessageId(messageId),
-    };
   }
 
   private static objectField(value: object, field: string): unknown {
@@ -93,7 +75,6 @@ export default class PushNotificationDispatcher {
   constructor(
     private readonly subscriptionRepository: PushSubscriptionRepository,
     private readonly presenceRepository: IdentityPresenceRepository,
-    private readonly conversationRepository: ConversationRepository,
     private readonly delivery: PushNotificationDelivery,
     private readonly preferenceChecker: NotificationDeliveryPreferenceChecker,
   ) {}
@@ -109,42 +90,6 @@ export default class PushNotificationDispatcher {
     return identityIds.filter((identityId) =>
       identityId.isNotEqual(actorIdentityId),
     );
-  }
-
-  private messageIntent(event: DomainEvent): PushNotificationIntent {
-    const actorIdentityId = PushNotificationDispatcher.optionalIdentityId(
-      event.attributes.authorId,
-    );
-    const recipientIdentityIds = this.withoutActor(
-      PushNotificationDispatcher.identityIdsFrom(
-        event.attributes.participantIds,
-      ),
-      actorIdentityId,
-    );
-
-    return {
-      mentionsEveryoneOrHere: Boolean(event.attributes.mentionsEveryoneOrHere),
-      mentionsRecipientIdentityIds: PushNotificationDispatcher.identityIdsFrom(
-        event.attributes.mentionedIdentityIds,
-      ),
-      mentionsRoleIdentityIds: PushNotificationDispatcher.identityIdsFrom(
-        event.attributes.mentionedRoleMemberIds,
-      ),
-      payload: {
-        body: 'You have a new message.',
-        tag: PushNotificationGroupTag.of('conversation', event.aggregateId),
-        title: 'New message',
-        type: 'message',
-      },
-      recipientIdentityIds,
-      respectBusy: true,
-      respectPreferences: true,
-      scope: {
-        conversationId: event.aggregateId,
-        type: NotificationSettingScopeType.CONVERSATION,
-      },
-      unreadMessage: PushNotificationDispatcher.unreadMessageFromEvent(event),
-    };
   }
 
   private communityMessageIntent(event: DomainEvent): PushNotificationIntent {
@@ -242,35 +187,6 @@ export default class PushNotificationDispatcher {
     };
   }
 
-  private clearConversationNotificationsIntent(
-    event: DomainEvent,
-  ): PushNotificationIntent {
-    const readerIdentityId = PushNotificationDispatcher.optionalIdentityId(
-      event.attributes.readerIdentityId,
-    );
-    const tag = PushNotificationGroupTag.of('conversation', event.aggregateId);
-
-    return {
-      mentionsEveryoneOrHere: false,
-      mentionsRecipientIdentityIds: [],
-      mentionsRoleIdentityIds: [],
-      payload: {
-        body: '',
-        tag,
-        tags: [tag],
-        title: 'Notifications updated',
-        type: 'notifications_cleared',
-      },
-      recipientIdentityIds: readerIdentityId ? [readerIdentityId] : [],
-      respectBusy: false,
-      respectPreferences: false,
-      scope: {
-        conversationId: event.aggregateId,
-        type: NotificationSettingScopeType.CONVERSATION,
-      },
-    };
-  }
-
   private notificationBody(notificationType: string): string {
     if (notificationType === 'missed_call') {
       return 'You missed a call.';
@@ -289,16 +205,12 @@ export default class PushNotificationDispatcher {
 
   private intentFor(event: DomainEvent): PushNotificationIntent | undefined {
     switch (event.eventName()) {
-      case 'conversations.v1.message.was_sent':
-        return this.messageIntent(event);
       case 'communities.v1.channel.message.was_sent':
         return this.communityMessageIntent(event);
       case 'notifications.v1.notification.was_created':
         return this.notificationIntent(event);
       case 'calls.v1.call.started':
         return this.callIntent(event);
-      case 'conversations.v1.messages.were_read':
-        return this.clearConversationNotificationsIntent(event);
       default:
         return undefined;
     }
@@ -322,30 +234,11 @@ export default class PushNotificationDispatcher {
     return presence.isBusy();
   }
 
-  private async shouldSkipForReadMessage(
-    identityId: IdentityId,
-    intent: PushNotificationIntent,
-  ): Promise<boolean> {
-    if (!intent.unreadMessage) {
-      return false;
-    }
-
-    return !(await this.conversationRepository.hasUnreadMessageForRecipient(
-      identityId,
-      intent.unreadMessage.conversationId,
-      intent.unreadMessage.messageId,
-    ));
-  }
-
   private async sendToIdentity(
     identityId: IdentityId,
     intent: PushNotificationIntent,
   ): Promise<void> {
     if (await this.shouldSkipForBusy(identityId, intent.respectBusy)) {
-      return;
-    }
-
-    if (await this.shouldSkipForReadMessage(identityId, intent)) {
       return;
     }
 

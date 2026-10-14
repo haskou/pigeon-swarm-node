@@ -1,10 +1,6 @@
 import { CallViewModel } from '@app/apps/apis/calls-api/view-model/CallViewModel';
 import CallEventAttestor from '@app/contexts/calls/application/attest-event/CallEventAttestor';
 import { CallEventAttestation } from '@app/contexts/calls/domain/CallEventAttestation';
-import { MessageReadProofVerifier } from '@app/contexts/conversations/application/verify-message-read-proof/MessageReadProofVerifier';
-import { MessageReadProofVerifyMessage } from '@app/contexts/conversations/application/verify-message-read-proof/messages/MessageReadProofVerifyMessage';
-import { ConversationMessagesWereReadEvent } from '@app/contexts/conversations/domain/events/ConversationMessagesWereReadEvent';
-import { MessageReadProof } from '@app/contexts/conversations/domain/value-objects/MessageReadProof';
 import { MailboxCapability } from '@app/contexts/mailboxes/domain/MailboxCapability';
 import { NodeCommunityStateWasAnnounced } from '@app/contexts/nodes/domain/events/NodeCommunityStateWasAnnounced';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -53,13 +49,9 @@ const MAX_CLIENTS_PER_IDENTITY = 16;
 const MAX_CLIENT_MESSAGES_PER_WINDOW = 200;
 const CLIENT_MESSAGE_WINDOW_MS = 10_000;
 
-const CONVERSATION_READ_RECEIPT_EVENT = 'conversations.v1.messages.were_read';
-
 export class WebSocketEventHub {
   private readonly conversationCallEventMapper =
     new ConversationCallEventRealtimeMapper();
-
-  private readonly readProofVerifier = new MessageReadProofVerifier();
 
   private clientMessageHandler?: WebSocketClientMessageHandler;
 
@@ -103,12 +95,6 @@ export class WebSocketEventHub {
     const recipients = new Set<string>();
 
     if (this.shouldSuppressCallParticipantLeaseEvent(event)) {
-      return recipients;
-    }
-
-    // Receipts carry a claimed participantIds list from the network, so they
-    // are delivered only through the locally known conversation roster.
-    if (event.eventName() === CONVERSATION_READ_RECEIPT_EVENT) {
       return recipients;
     }
 
@@ -416,22 +402,6 @@ export class WebSocketEventHub {
         scope.channelId,
       )) || []
     ).filter((recipient) => !baseRecipients.has(recipient));
-
-    this.sendToRecipients(recipients, message);
-  }
-
-  private async relayConversationReadReceipt(
-    event: DomainEvent,
-    message: WebSocketRealtimeMessage,
-  ): Promise<void> {
-    if (event.eventName() !== CONVERSATION_READ_RECEIPT_EVENT) {
-      return;
-    }
-
-    const recipients =
-      (await this.clientMessageHandler?.findConversationParticipantIds(
-        event.aggregateId,
-      )) || [];
 
     this.sendToRecipients(recipients, message);
   }
@@ -865,23 +835,6 @@ export class WebSocketEventHub {
    */
   public publishFromNetwork(events: DomainEvent[]): void {
     for (const event of events) {
-      // Read receipts change read state, so unproven ones never reach clients.
-      if (event.eventName() === ConversationMessagesWereReadEvent.EVENT_NAME) {
-        const now = Date.now();
-        const verified = this.readProofVerifier.verify(
-          new MessageReadProofVerifyMessage(
-            event.aggregateId,
-            String(event.attributes.readerIdentityId),
-            String(event.attributes.messageId),
-            event.attributes.readProof,
-          ),
-        );
-
-        if (!verified || !MessageReadProof.isFresh(verified.claim, now)) {
-          continue;
-        }
-      }
-
       if (!CallEventAttestation.isLifecycleEvent(event)) {
         this.publish([event]);
         continue;
@@ -930,9 +883,6 @@ export class WebSocketEventHub {
           Kernel.logger?.error('WebSocket community poll fanout failed');
         },
       );
-      this.relayConversationReadReceipt(event, domainEventMessage).catch(() => {
-        Kernel.logger?.error('WebSocket read receipt fanout failed');
-      });
       const conversationCallEvents =
         this.conversationCallEventMapper.toEvents(event);
 

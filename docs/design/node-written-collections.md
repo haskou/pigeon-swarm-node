@@ -58,9 +58,9 @@ recommended design does not need it.
   `collection\nscopeType`. A policy supplies `expectationOf(record)`
   (`authorIdentityId`, `recordId`, `store`) and `assertPermitted(record,
   authorIdentityId, isDeletion)`; `PublicMutationRecordShape` fixes the field
-  set. `ConversationMessageReactionMutationPolicy` is the template (derives the
-  id from fields, rejects mismatch, looks up conversation metadata through a
-  `ShortLivedLookup`, checks `hasParticipant`).
+  set. `CommunityChannelMessageReactionMutationPolicy` is the template (derives
+  the id from fields, rejects mismatch, looks up the community at the record's
+  frontier through a `ShortLivedLookup`, checks membership).
 - `OrbitDBMutationGate.governs/accepts/governsHead/acceptsHead`, composed via
   `OrbitDBReplicatedStateRegistry.addMutationGate`. The registry re-evaluates
   rejected records in a loop until no progress (`OrbitDBReplicatedStateRegistry`
@@ -82,7 +82,7 @@ recommended design does not need it.
   lastEventType?, name?, networkId, participantIds[], receivedAt?, type,
   updatedAt?}`: no creator, no signature.
 - `OrbitDBConversationMapper.toDocument` stamps `updatedAt: Date.now()` on every
-  save, and every message save rewrites the document.
+  save.
   `OrbitDBConversationIndex.shouldReplace` compares
   `max(updatedAt, receivedAt, createdAt)`, so a document with a higher
   `updatedAt` replaces the real one: add the attacker to `participantIds`,
@@ -90,9 +90,9 @@ recommended design does not need it.
 - `RegisterConversationWhenAnnounced` registers a conversation announced over
   pubsub with no signature check when no metadata exists.
 - This is the authority root: `CallScopeResolver`, `CallAccessAuthorizer`, and
-  the message, pin and reaction policies call `findMetadataById` +
-  `hasParticipant`. Forged metadata therefore grants read/write authority over
-  messages, pins, reactions and calls of the victim conversation.
+  the poll policies call `findMetadataById` + `hasParticipant`. Forged metadata
+  therefore grants read/write authority over polls and calls of the victim
+  conversation.
 - Group membership does not change today (there is no add/remove/leave use
   case), but the owner requires it to: groups gain roles and membership changes.
 
@@ -149,7 +149,7 @@ reused unchanged: `PublicMutationProof`, `PublicMutationPolicy`,
 
 Canonicalization, digest and signature are exactly those of
 `PublicMutationRecord.withProof`. Removed fields: `updatedAt`, `receivedAt`,
-`lastEventId`, `lastEventType` (local-only, derived from the message store).
+`lastEventId`, `lastEventType` (local-only).
 
 | Action | Args | Authorization (against the folded past) |
 | --- | --- | --- |
@@ -194,9 +194,9 @@ State is the Kahn-ordered fold of the operations (lowest digest first among the
 ready ones), each authorized against the prefix it builds on; an operation that
 its prefix does not authorize is skipped, so every replica folds the same
 membership whatever order operations arrive in. Concurrent add/remove of the
-same member converges by digest order. Message, pin, reaction, poll and call
-policies read membership from this fold (1:1: from the genesis); a message that
-arrives before its conversation is refused and re-admitted by the registry.
+same member converges by digest order. Poll and call policies read membership
+from this fold (1:1: from the genesis); a record that arrives before its
+conversation is refused and re-admitted by the registry.
 
 ### UI/API contract changes
 
@@ -219,7 +219,7 @@ arrives before its conversation is refused and re-admitted by the registry.
   creator; an admin cannot remove an admin), leave (a member leaves; the creator
   cannot), 1:1 refuses every further operation; argument-size and quota limits.
 - Unit: shuffled arrival orders fold to the same state; vectors spec.
-- Unit/integration: message, pin, reaction, poll and `CallAccessAuthorizer`
+- Unit/integration: poll and `CallAccessAuthorizer`
   decisions use the folded state; a forged conversation grants nothing.
 - Real transport e2e `forged-conversations` on three nodes in the style of
   `forged-keychains`: honest gated nodes, one malicious ungated node, one
@@ -232,8 +232,8 @@ arrives before its conversation is refused and re-admitted by the registry.
 ### Migration
 
 Drop the `conversations` store and the `conversation:*` and
-`conversation-participant-index:*` head keys; messages in old conversations
-become unreachable. No data migration (no production data).
+`conversation-participant-index:*` head keys. No data migration (no production
+data).
 
 ## Slice 2: notifications
 
@@ -719,7 +719,7 @@ security input there.
 
 | Rank | Slice | Value | Effort | Why this order |
 | --- | --- | --- | --- | --- |
-| 1 | Conversations | Very high: it is the authority root for messages, pins, reactions and calls; forging it is a takeover | Large: signed operation log for groups (roles, add/remove/leave), immutable signed 1:1 genesis, `mutation` on `POST /conversations` | Everything else depends on admitted conversation state |
+| 1 | Conversations | Very high: it is the authority root for polls and calls; forging it is a takeover | Large: signed operation log for groups (roles, add/remove/leave), immutable signed 1:1 genesis, `mutation` on `POST /conversations` | Everything else depends on admitted conversation state |
 | 2 | Notifications | High: fake invitation with an attacker key breaks confidentiality; forged push | Small-medium: two policies, verify the already-stored signature intent, missed-call becomes local | Depends only on slice 1 |
 | 3 | Content replication | Medium-high: arbitrary fetch and pin (disk/bandwidth), data-loss via claims, content-type overwrite | Small for `maxBytes` and claim removal, medium for signed registration | The `maxBytes` commit is the cheapest protection in the whole issue |
 | 4 | Calls | Medium-high: forged ringing/push, channel blocking, epoch poisoning | Large: new event log, derived state machine, three endpoints, client changes | Needs slice 1; largest rewrite |

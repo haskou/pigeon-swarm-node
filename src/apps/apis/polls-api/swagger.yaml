@@ -149,7 +149,6 @@ components:
         - pollId
         - question
         - scopeType
-        - timelineMutation
       properties:
         pollId:
           type: string
@@ -160,7 +159,7 @@ components:
         mutation:
           $ref: '#/components/schemas/SignedPublicMutation'
         timelineMutation:
-          description: Signed public mutation (store messages) for the poll timeline message. Community scope uses record id community:<communityId>:<channelId>:<pollId>:<creator>; conversation scope uses the pollId.
+          description: Signed public mutation (store messages) for the poll timeline message, with record id community:<communityId>:<channelId>:<pollId>:<creator>. Required for community_channel and ignored for group_conversation; a group conversation timeline lives only in the members' opaque mailboxes, so the node writes no timeline message for a group poll.
           $ref: '#/components/schemas/SignedPublicMutation'
         allowsMultipleVotes:
           type: boolean
@@ -259,7 +258,7 @@ components:
           items:
             type: string
             pattern: '^[A-Za-z0-9_-]{43}$'
-          description: Digests of the community or conversation operations observed when signing, strictly ascending. Required, and only allowed, on records scoped to a community or conversation (channel messages and their reactions and pins, invites, membership requests, moderation log, MLS records, polls, conversation messages); the record's permission is judged against the scope folded at exactly this frontier. Read it from GET /communities/{id}/frontier or the conversation frontier before signing.
+          description: Digests of the community or conversation operations observed when signing, strictly ascending. Required, and only allowed, on records scoped to a community or conversation (channel messages and their reactions and pins, invites, membership requests, moderation log, MLS records, polls); the record's permission is judged against the scope folded at exactly this frontier. Read it from GET /communities/{id}/frontier or the conversation frontier before signing.
         predecessor:
           type: string
           nullable: true

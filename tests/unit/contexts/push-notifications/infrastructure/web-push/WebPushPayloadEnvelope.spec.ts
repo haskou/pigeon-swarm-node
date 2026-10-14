@@ -20,10 +20,6 @@ describe('WebPushPayloadEnvelope', () => {
       payloadOfType('message'),
       payloadOfType('call', { body: 'Someone is calling you.' }),
       payloadOfType('notification', { body: 'You missed a call.' }),
-      payloadOfType('notifications_cleared', {
-        body: '',
-        tags: ['conversation:0123456789abcdef0123456789abcdef'],
-      }),
     ].map((payload) =>
       Buffer.byteLength(WebPushPayloadEnvelope.encode(payload) ?? ''),
     );
@@ -32,26 +28,20 @@ describe('WebPushPayloadEnvelope', () => {
       WebPushPayloadEnvelope.BYTE_LENGTH,
       WebPushPayloadEnvelope.BYTE_LENGTH,
       WebPushPayloadEnvelope.BYTE_LENGTH,
-      WebPushPayloadEnvelope.BYTE_LENGTH,
     ]);
   });
 
   it('keeps the fields the service worker reads', () => {
     const encoded = WebPushPayloadEnvelope.encode(
-      payloadOfType('notifications_cleared', {
-        body: '',
-        tags: ['conversation:0123456789abcdef0123456789abcdef'],
-        title: 'Notifications updated',
-      }),
+      payloadOfType('notification', { body: 'You missed a call.' }),
     );
 
     expect(JSON.parse(encoded ?? '')).toEqual(
       expect.objectContaining({
-        body: '',
+        body: 'You missed a call.',
         tag: 'conversation:0123456789abcdef0123456789abcdef',
-        tags: ['conversation:0123456789abcdef0123456789abcdef'],
-        title: 'Notifications updated',
-        type: 'notifications_cleared',
+        title: 'New message',
+        type: 'notification',
       }),
     );
   });

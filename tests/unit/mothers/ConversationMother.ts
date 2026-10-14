@@ -63,7 +63,6 @@ export class ConversationMother {
         left.valueOf() < right.valueOf() ? -1 : 1,
       ),
       undefined,
-      [],
       this.author,
     );
   }
@@ -81,7 +80,6 @@ export class ConversationMother {
       [this.author, this.recipient].sort((left, right) =>
         left.valueOf() < right.valueOf() ? -1 : 1,
       ),
-      [],
       this.author,
     );
   }

@@ -5,7 +5,7 @@ Refs haskou/pigeon-swarm-node#289. No node code changes: both slices are client 
 Status:
 
 - (a) Own copy: client slice implemented on `feat/289-own-copy-sync` in pigeon-swarm-ui (`886be304`, `157460ce`, tests `118188b5`). No node change needed.
-- (b) Backfill for new or restored devices: decided. The pairing export is the only backfill source, implemented in pigeon-swarm-ui #350 (`DirectMessageHistoryTransfer`). One-to-one history has no other source: there is no legacy history read and no backfill from the node.
+- (b) Backfill for new or restored devices: decided. The pairing export is the only backfill source, implemented in pigeon-swarm-ui #350 (`DirectMessageHistoryTransfer`). One-to-one history has no other source: the node keeps no message history and does no backfill.
 
 ## Problem
 
@@ -43,7 +43,7 @@ Per mailbox the node holds at most `MAILBOX_MAX_ENVELOPES` (1000) envelopes and 
 ### Options
 
 1. **Pairing export (chosen).** An authorized device that holds the conversation streams its local history to the enrolling device.
-2. **Legacy history as the backfill source (rejected).** One-to-one conversations no longer use the replicated conversation message log, so there is no legacy history to read.
+2. **Node history as the backfill source (rejected).** The node keeps no conversation message log, so there is no node-side history to read.
 3. **Own-inbox snapshot (rejected).** Write a conversation snapshot into the own inbox. The inbox is deleted on full acknowledgement, expires after 14 days, and each envelope is capped at `MailboxEnvelopeCipher.MAX_PLAINTEXT_BYTES` (65504). A snapshot is therefore not durable, and it cannot serve as a restore source.
 4. **No backfill.** Applies only when no authorized device is online to export; see below.
 
@@ -59,15 +59,15 @@ Per mailbox the node holds at most `MAILBOX_MAX_ENVELOPES` (1000) envelopes and 
 
 ### Restore without an online device
 
-After a restore with no authorized device online, the pairing export has no source. The restored device starts with the envelopes still held in its inboxes (at most 14 days) and loses older one-to-one history. This loss is accepted: there is no legacy history read and no node-side backfill.
+After a restore with no authorized device online, the pairing export has no source. The restored device starts with the envelopes still held in its inboxes (at most 14 days) and loses older one-to-one history. This loss is accepted: the node keeps no message history and does no backfill.
 
 ## Decisions
 
 | #   | Decision                                                                                                                              | Outcome                                                                                               |
 | --- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | D1  | Own-copy inbox: keep the shared self-inbox (shipped, additive), or add a root-derived own-copy inbox that only own devices can write. | Slice (a) ships on the shared self-inbox. A root-derived inbox, if adopted, ships as a clean cutover. |
-| D2  | Backfill: pairing export, or legacy history.                                                                                          | Resolved: pairing export only (pigeon-swarm-ui #350). No legacy history path.                         |
-| D3  | Restore without an online device: accept loss, or keep a legacy history read.                                                         | Resolved: accept loss of history older than the mailbox retention. No legacy read and no backfill.    |
+| D2  | Backfill: pairing export, or node-side history.                                                                                       | Resolved: pairing export only (pigeon-swarm-ui #350). The node keeps no message history.              |
+| D3  | Restore without an online device: accept loss, or keep a node-side history read.                                                      | Resolved: accept loss of history older than the mailbox retention. No node read and no backfill.      |
 | D4  | Self-inbox capacity: measure only, or reserve capacity for own copies.                                                                | Measure the fill in staging. No node change now.                                                      |
 
 ## Verification

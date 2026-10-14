@@ -26,10 +26,6 @@ import CommunityModerationLogMutationPolicy from '@app/contexts/communities/infr
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
-import OrbitDBConversationMessagePinRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationMessagePinRepository';
-import ConversationMessagePinMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy';
 import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
 import { NotificationScopeSettingsPreferences } from '@app/contexts/notification-settings/domain/NotificationScopeSettingsPreferences';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
@@ -103,7 +99,6 @@ type Replica = {
   registry?: OrbitDBReplicatedStateRegistry;
   pins?: OrbitDBCommunityChannelMessagePinRepository;
   invites?: OrbitDBCommunityInviteRepository;
-  conversationPins?: OrbitDBConversationMessagePinRepository;
   settings?: OrbitDBNotificationScopeSettingsRepository;
   stickerPacks?: OrbitDBStickerPackRepository;
   stickerLibraries?: OrbitDBStickerUserLibraryRepository;
@@ -225,9 +220,6 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
       new PrivateAuthorizationStorageCoordinator(),
     ),
   );
-  replica.conversationPins = new OrbitDBConversationMessagePinRepository(
-    replica.registry,
-  );
   replica.settings = new OrbitDBNotificationScopeSettingsRepository(
     replica.registry,
   );
@@ -336,7 +328,6 @@ async function main(): Promise<void> {
     [
       new CommunityChannelMessagePinMutationPolicy(communities),
       new CommunityChannelMessageMutationPolicy(communities),
-      new ConversationMessagePinMutationPolicy(conversations),
       new NotificationScopeSettingsMutationPolicy(),
       new CommunityInviteMutationPolicy(communities as never),
       new CommunityModerationLogMutationPolicy(communities as never),
@@ -494,112 +485,6 @@ async function main(): Promise<void> {
   );
   assert.equal(await listed(honest), 0);
   console.log('PASS replayed older put proof refused after removal');
-
-  stage = 'conversation pins are governed too';
-  const conversationId = new ConversationId(`group:${randomUUID()}`);
-  const conversationMessageId = new MessageId(randomUUID());
-  const conversationPinId = `conversation:${conversationId.valueOf()}:${conversationMessageId.valueOf()}`;
-  const conversationBase = {
-    conversationId: conversationId.valueOf(),
-    id: conversationPinId,
-    messageId: conversationMessageId.valueOf(),
-    pinnedByIdentityId: author,
-    scopeType: 'conversation',
-  };
-  const conversationProof = (
-    kind: 'put' | 'delete',
-    sequence: number,
-    payload: Record<string, unknown>,
-  ): PublicMutationProof => {
-    const body = {
-      author: {
-        authorizationRevision: 0,
-        deviceCredential: author,
-        identityId: author,
-      },
-      frontier: FRONTIER,
-      kind,
-      operationId: `forged-conv-${sequence}`.padEnd(22, '0'),
-      payloadDigest: PublicMutationProof.digestOf(payload),
-      predecessor:
-        sequence === 0 ? null : PublicMutationProof.digestOf({ previous: 0 }),
-      recordId: conversationPinId,
-      sequence,
-      store: 'pins',
-      version: 2,
-    } as const;
-
-    return PublicMutationProof.signed(
-      body,
-      device.sign(PublicMutationProof.signingContentOf(body)),
-    );
-  };
-  const conversationPinCount = async (replica: Replica): Promise<number> =>
-    (await replica.conversationPins!.findByConversation(conversationId)).length;
-
-  await honest.conversationPins!.pin(
-    conversationId,
-    conversationMessageId,
-    identity,
-    new Timestamp(1780000000000),
-    conversationProof('put', 0, {
-      ...conversationBase,
-      createdAt: 1780000000000,
-    }),
-  );
-  await until('conversation pin visible on the honest replica', async () => {
-    return (await conversationPinCount(honest)) === 1;
-  });
-  await until('conversation pin reached the malicious store', async () => {
-    const stored = await malicious.stores!.pins.query!(
-      (record) => record.id === conversationPinId,
-    );
-
-    return stored.length === 1;
-  });
-  await malicious.stores!.pins.put!({
-    ...conversationBase,
-    removed: true,
-    updatedAt: Date.now() + 10 ** 12,
-  });
-  await until('forged conversation tombstone reached honest', async () => {
-    const stored = await honest.stores!.pins.query!(
-      (record) => record.id === conversationPinId && record.removed === true,
-    );
-
-    return stored.length === 1;
-  });
-  await pause(1500);
-  assert.equal(
-    await conversationPinCount(honest),
-    1,
-    'forged tombstone must not remove the conversation pin',
-  );
-  console.log('PASS forged conversation tombstone rejected by the honest node');
-
-  await honest.conversationPins!.unpin(
-    conversationId,
-    conversationMessageId,
-    identity,
-    conversationProof('delete', 1, { ...conversationBase, removed: true }),
-  );
-  await until('signed conversation removal applied', async () => {
-    return (await conversationPinCount(honest)) === 0;
-  });
-  await assert.rejects(
-    honest.conversationPins!.pin(
-      conversationId,
-      conversationMessageId,
-      identity,
-      new Timestamp(1780000000000),
-      conversationProof('put', 0, {
-        ...conversationBase,
-        createdAt: 1780000000000,
-      }),
-    ),
-    /ublic mutation|tale/i,
-  );
-  console.log('PASS conversation signed removal applied, replay refused');
 
   stage = 'notification settings are governed too';
   const settingsScope = NotificationSettingScope.community(

@@ -146,42 +146,6 @@ services:
       - '@contexts/communities/domain/repositories/CommunityRepository'
       - >-
         @apps/consumers/pubsub/communities/CommunityChannelMessageCandidateRegistrar
-  apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced:
-    class: /apps/consumers/pubsub/conversations/MarkMessagesReadWhenAnnounced
-    arguments:
-      - '@shared/infrastructure/messageBus/DomainEventConsumer'
-      - >-
-        @contexts/conversations/application/mark-messages-read/MessagesReadRegistrar
-  apps/consumers/pubsub/conversations/RegisterMessageDeletionWhenAnnounced:
-    class: /apps/consumers/pubsub/conversations/RegisterMessageDeletionWhenAnnounced
-    arguments:
-      - '@shared/infrastructure/messageBus/DomainEventConsumer'
-      - >-
-        @contexts/conversations/application/register-message/ConversationMessageRegistrar
-  apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced:
-    class: /apps/consumers/pubsub/conversations/RegisterMessageEditionWhenAnnounced
-    arguments:
-      - '@shared/infrastructure/messageBus/DomainEventConsumer'
-      - >-
-        @contexts/conversations/application/register-message/ConversationMessageRegistrar
-  apps/consumers/pubsub/conversations/RegisterMessageReactionWhenAdded:
-    class: /apps/consumers/pubsub/conversations/RegisterMessageReactionWhenAdded
-    arguments:
-      - '@shared/infrastructure/messageBus/DomainEventConsumer'
-      - >-
-        @contexts/conversations/application/register-reaction/MessageReactionRegistrar
-  apps/consumers/pubsub/conversations/RegisterMessageReactionWhenRemoved:
-    class: /apps/consumers/pubsub/conversations/RegisterMessageReactionWhenRemoved
-    arguments:
-      - '@shared/infrastructure/messageBus/DomainEventConsumer'
-      - >-
-        @contexts/conversations/application/register-reaction/MessageReactionRegistrar
-  apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced:
-    class: /apps/consumers/pubsub/conversations/RegisterMessageWhenAnnounced
-    arguments:
-      - '@shared/infrastructure/messageBus/DomainEventConsumer'
-      - >-
-        @contexts/conversations/application/register-message/ConversationMessageRegistrar
   apps/consumers/pubsub/identities/RegisterIdentityWhenPublished:
     class: /apps/consumers/pubsub/identities/RegisterIdentityWhenPublished
     arguments:
@@ -236,13 +200,6 @@ services:
     arguments:
       - '@shared/infrastructure/messageBus/DomainEventConsumer'
       - '@contexts/presence/domain/repositories/IdentityPresenceRepository'
-  apps/consumers/pubsub/push/ClearPushNotificationWhenConversationMessagesRead:
-    class: >-
-      /apps/consumers/pubsub/push/ClearPushNotificationWhenConversationMessagesRead
-    arguments:
-      - '@shared/infrastructure/messageBus/DomainEventConsumer'
-      - '@contexts/push-notifications/application/send/PushNotificationDispatcher'
-    parent: apps/consumers/pubsub/push/SendPushNotificationWhenEventReceived
   apps/consumers/pubsub/push/SendPushNotificationWhenCallStarted:
     class: /apps/consumers/pubsub/push/SendPushNotificationWhenCallStarted
     arguments:
@@ -252,13 +209,6 @@ services:
     parent: apps/consumers/pubsub/push/SendPushNotificationWhenEventReceived
   apps/consumers/pubsub/push/SendPushNotificationWhenCommunityMessageSent:
     class: /apps/consumers/pubsub/push/SendPushNotificationWhenCommunityMessageSent
-    arguments:
-      - '@shared/infrastructure/messageBus/DomainEventConsumer'
-      - '@contexts/push-notifications/application/send/PushNotificationDispatcher'
-    parent: apps/consumers/pubsub/push/SendPushNotificationWhenEventReceived
-  apps/consumers/pubsub/push/SendPushNotificationWhenConversationMessageSent:
-    class: >-
-      /apps/consumers/pubsub/push/SendPushNotificationWhenConversationMessageSent
     arguments:
       - '@shared/infrastructure/messageBus/DomainEventConsumer'
       - '@contexts/push-notifications/application/send/PushNotificationDispatcher'
@@ -334,12 +284,6 @@ services:
     arguments:
       - >-
         @contexts/conversations/infrastructure/orbitdb/policies/ConversationOperationMutationPolicy
-      - >-
-        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageMutationPolicy
-      - >-
-        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy
-      - >-
-        @contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy
       - >-
         @contexts/notification-settings/infrastructure/orbitdb/policies/NotificationScopeSettingsMutationPolicy
   apps/initializers/public-mutations/NotificationMutationPolicies:
@@ -1308,20 +1252,9 @@ services:
       - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
       - '@contexts/content-replication/domain/ContentReplicationLimits'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
-  contexts/conversations/application/add-reaction/MessageReactionAdder:
-    class: /contexts/conversations/application/add-reaction/MessageReactionAdder
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-      - '@contexts/conversations/domain/repositories/MessageReactionRepository'
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/conversations/application/change-members/ConversationMemberChanger:
     class: >-
       /contexts/conversations/application/change-members/ConversationMemberChanger
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-  contexts/conversations/application/count-unread-conversations/ConversationUnreadCounter:
-    class: >-
-      /contexts/conversations/application/count-unread-conversations/ConversationUnreadCounter
     arguments:
       - '@contexts/conversations/domain/repositories/ConversationRepository'
   contexts/conversations/application/create-conversation/ConversationCreator:
@@ -1332,16 +1265,6 @@ services:
       - '@contexts/keychains/domain/repositories/KeychainRepository'
       - >-
         @contexts/keychains/domain/services/KeychainCandidateValidationDomainService
-  contexts/conversations/application/delete-message/MessageDeleter:
-    class: /contexts/conversations/application/delete-message/MessageDeleter
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-  contexts/conversations/application/edit-message/MessageEditor:
-    class: /contexts/conversations/application/edit-message/MessageEditor
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/conversations/application/find-conversations/ConversationsFinder:
     class: /contexts/conversations/application/find-conversations/ConversationsFinder
     arguments:
@@ -1351,14 +1274,6 @@ services:
       /contexts/conversations/application/find-frontier/ConversationFrontierFinder
     arguments:
       - '@contexts/conversations/domain/repositories/ConversationRepository'
-  contexts/conversations/application/find-latest-messages/LatestMessagesFinder:
-    class: >-
-      /contexts/conversations/application/find-latest-messages/LatestMessagesFinder
-    arguments:
-      - '@contexts/calls/domain/repositories/CallRepository'
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-      - '@contexts/polls/domain/repositories/PollRepository'
-      - '@contexts/conversations/domain/repositories/MessageReactionRepository'
   contexts/conversations/application/manage-draft/ConversationDraftAccess:
     class: /contexts/conversations/application/manage-draft/ConversationDraftAccess
     arguments:
@@ -1377,138 +1292,20 @@ services:
     class: /contexts/conversations/application/manage-draft/ConversationDraftsFinder
     arguments:
       - '@contexts/conversations/domain/repositories/ConversationDraftRepository'
-  contexts/conversations/application/manage-pin/ConversationMessagePinAccess:
-    class: >-
-      /contexts/conversations/application/manage-pin/ConversationMessagePinAccess
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-  contexts/conversations/application/manage-pin/ConversationMessagePinner:
-    class: /contexts/conversations/application/manage-pin/ConversationMessagePinner
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-      - >-
-        @contexts/conversations/domain/repositories/ConversationMessagePinRepository
-      - >-
-        @contexts/conversations/application/manage-pin/ConversationMessagePinAccess
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-  contexts/conversations/application/manage-pin/ConversationMessagePinsFinder:
-    class: >-
-      /contexts/conversations/application/manage-pin/ConversationMessagePinsFinder
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-      - >-
-        @contexts/conversations/domain/repositories/ConversationMessagePinRepository
-      - >-
-        @contexts/conversations/application/manage-pin/ConversationMessagePinAccess
-  contexts/conversations/application/manage-pin/ConversationMessageUnpinner:
-    class: /contexts/conversations/application/manage-pin/ConversationMessageUnpinner
-    arguments:
-      - >-
-        @contexts/conversations/domain/repositories/ConversationMessagePinRepository
-      - >-
-        @contexts/conversations/application/manage-pin/ConversationMessagePinAccess
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-  contexts/conversations/application/mark-messages-read/MessagesReadMarker:
-    class: /contexts/conversations/application/mark-messages-read/MessagesReadMarker
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-  contexts/conversations/application/mark-messages-read/MessagesReadRegistrar:
-    class: >-
-      /contexts/conversations/application/mark-messages-read/MessagesReadRegistrar
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-  contexts/conversations/application/register-message/ConversationMessageRegistrar:
-    class: >-
-      /contexts/conversations/application/register-message/ConversationMessageRegistrar
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-  contexts/conversations/application/register-reaction/MessageReactionRegistrar:
-    class: >-
-      /contexts/conversations/application/register-reaction/MessageReactionRegistrar
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-      - '@contexts/conversations/domain/repositories/MessageReactionRepository'
-  contexts/conversations/application/remove-reaction/MessageReactionRemover:
-    class: /contexts/conversations/application/remove-reaction/MessageReactionRemover
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-      - '@contexts/conversations/domain/repositories/MessageReactionRepository'
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-  contexts/conversations/application/send-message/MessageSender:
-    class: /contexts/conversations/application/send-message/MessageSender
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/conversations/domain/repositories/ConversationDraftRepository: >-
     @contexts/conversations/infrastructure/local-db/LocalConversationDraftRepository
-  contexts/conversations/domain/repositories/ConversationMessagePinRepository: >-
-    @contexts/conversations/infrastructure/orbitdb/OrbitDBConversationMessagePinRepository
   contexts/conversations/domain/repositories/ConversationRepository: '@contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository'
-  contexts/conversations/domain/repositories/MessageReactionRepository: >-
-    @contexts/conversations/infrastructure/orbitdb/OrbitDBMessageReactionRepository
-  contexts/conversations/infrastructure/ipfs/mappers/IpfsMessageMapper:
-    class: /contexts/conversations/infrastructure/ipfs/mappers/IpfsMessageMapper
-    arguments: []
   contexts/conversations/infrastructure/local-db/LocalConversationDraftRepository:
     class: >-
       /contexts/conversations/infrastructure/local-db/LocalConversationDraftRepository
     arguments:
       - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
     parent: contexts/conversations/domain/repositories/ConversationDraftRepository
-  contexts/conversations/infrastructure/orbitdb/OrbitDBConversationMessageIndex:
-    class: >-
-      /contexts/conversations/infrastructure/orbitdb/OrbitDBConversationMessageIndex
-    arguments:
-      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
-  contexts/conversations/infrastructure/orbitdb/OrbitDBConversationMessagePinRepository:
-    class: >-
-      /contexts/conversations/infrastructure/orbitdb/OrbitDBConversationMessagePinRepository
-    arguments:
-      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
-    parent: >-
-      contexts/conversations/domain/repositories/ConversationMessagePinRepository
   contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository:
     class: >-
       /contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
-      - >-
-        @contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBConversationMessageMapper
-  contexts/conversations/infrastructure/orbitdb/OrbitDBMessageReactionRepository:
-    class: >-
-      /contexts/conversations/infrastructure/orbitdb/OrbitDBMessageReactionRepository
-    arguments:
-      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
-      - >-
-        @contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBMessageReactionMapper
-    parent: contexts/conversations/domain/repositories/MessageReactionRepository
-  contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBConversationMessageMapper:
-    class: >-
-      /contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBConversationMessageMapper
-    arguments: []
-  contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBMessageReactionMapper:
-    class: >-
-      /contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBMessageReactionMapper
-    arguments: []
-  contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageMutationPolicy:
-    class: >-
-      /contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageMutationPolicy
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
-  contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy:
-    class: >-
-      /contexts/conversations/infrastructure/orbitdb/policies/ConversationMessagePinMutationPolicy
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
-  contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy:
-    class: >-
-      /contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageReactionMutationPolicy
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
-    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/conversations/infrastructure/orbitdb/policies/ConversationOperationMutationPolicy:
     class: >-
       /contexts/conversations/infrastructure/orbitdb/policies/ConversationOperationMutationPolicy
@@ -2182,7 +1979,6 @@ services:
     class: >-
       /contexts/polls/application/register-timeline-message/PollTimelineMessageRegistrar
     arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
       - >-
         @contexts/communities/domain/repositories/CommunityChannelMessageRepository
   contexts/polls/domain/repositories/PollRepository: '@contexts/polls/infrastructure/orbitdb/OrbitDBPollRepository'
@@ -2470,7 +2266,6 @@ services:
       - >-
         @contexts/push-notifications/domain/repositories/PushSubscriptionRepository
       - '@contexts/presence/domain/repositories/IdentityPresenceRepository'
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
       - '@contexts/push-notifications/application/send/PushNotificationDelivery'
       - >-
         @contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker

@@ -35,6 +35,6 @@ export default class ConversationMemberChanger {
     );
     await this.repository.saveOperation(operation, message.operation.proof);
 
-    return this.repository.requireById(message.conversationId);
+    return this.repository.requireMetadataById(message.conversationId);
   }
 }

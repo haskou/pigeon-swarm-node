@@ -1,23 +1,22 @@
 # Opaque mailboxes for private message delivery
 
-Status: design for [#289](https://github.com/haskou/pigeon-swarm-node/issues/289), partly implemented.
-Implemented: the domain, local storage, HTTP API, the content-free realtime hint,
-the adaptive creation proof of work with idle eviction at capacity, the per-mailbox
-append rate limit, the creation client key with `API_TRUST_PROXY`, and a two-node
-real-transport proof. The UI client (key schedule, send/receive, cursor recovery)
-is merged in pigeon-swarm-ui #252 and #257. Open: mailbox key rotation,
-direct-message wiring (#258), wrapper integration, and retiring the replicated
-collections. It is the contract that the
-implementation PRs, and [#290](https://github.com/haskou/pigeon-swarm-node/issues/290)
-(private blobs), build on.
+Status: implemented for [#289](https://github.com/haskou/pigeon-swarm-node/issues/289).
+The node side covers the domain, local storage, HTTP API, the content-free realtime
+hint, the adaptive creation proof of work with idle eviction at capacity, the
+per-mailbox append rate limit, the creation client key with `API_TRUST_PROXY`, and
+a two-node real-transport proof. The UI client (key schedule, send/receive, cursor
+recovery, availability servers) is in pigeon-swarm-ui. One-to-one and group
+messages, edits, deletions, reactions and pins travel only through mailboxes.
+Mailbox key rotation is not implemented. This is the contract that
+[#290](https://github.com/haskou/pigeon-swarm-node/issues/290) (private blobs)
+builds on.
 
 ## Problem
 
-Conversations and messages are replicated as OrbitDB documents to every node in
-a network. Any node therefore learns who talks to whom, when, and how much.
-Protected private scopes already refuse the public repositories
-(`docs/private-operation-authorization.md`), but ordinary private content has no
-transport yet. This design supplies it.
+Data replicated as OrbitDB documents reaches every node in a network. Any node
+therefore learns who talks to whom, when, and how much. Private message content
+needs a transport that hides this. Protected private scopes refuse the public
+repositories (`docs/private-operation-authorization.md`).
 
 ## Goals and non-goals
 
@@ -38,7 +37,11 @@ Non-goals (stated so nobody claims them):
 - hiding IP addresses, connection timing and envelope sizes from the node that
   serves the mailbox;
 - protecting against a recipient or author who leaks plaintext;
-- long-term history. History belongs to the client; the server is a queue.
+- long-term history. History belongs to the client; the server is a queue;
+- read state and unread counts. The node cannot see sealed content, so read state
+  lives in the client. Own devices share it through `read` records in the
+  identity's own inbox; the peer never receives them. The node sends no push
+  notification for mailbox envelopes and no push to clear one.
 
 ## Model
 
@@ -136,7 +139,7 @@ Backups: managed copies live only in the local database directory. Deleting a
 mailbox removes the rows; copies held in filesystem snapshots or operator backups
 are outside the node's control and are documented as such.
 
-## Availability replication (node side in place, client not implemented)
+## Availability replication
 
 By default a mailbox lives on the recipient's home node only. A recipient may
 name additional *availability servers* explicitly; the `PUT` is then repeated on
@@ -153,23 +156,24 @@ node still delivering after the first stops. Creation difficulty depends on each
 node's fill, so a proof mined for one server can be too short for another; that
 server refuses it with `400` and the bits it needs.
 
-Not implemented, in the client: choosing availability servers, telling senders
-about them inside the encrypted channel, fan-out appends, and reading and
-deduplicating across servers.
+The client picks up to three availability servers from its build configuration,
+opens its inbox on each, announces them to the peer inside the encrypted channel,
+fans out every append to the peer's announced servers with one `envelopeId`, and
+reads and deduplicates across servers (pigeon-swarm-ui
+`docs/opaque-mailboxes-client.md`, "Availability servers").
 
-## Group fan-out (not yet implemented)
+## Group fan-out
 
 The sender holds one `(mailboxId, postToken)` per member, delivered inside the
 group's encrypted channel. Sending is N appends. This costs O(N) requests but
-means no server holds a conversation-to-recipient table. Large groups may batch
-appends to one availability server in a single request; the server still sees
-independent mailboxes.
+means no server holds a conversation-to-recipient table. See
+`docs/design/group-mailboxes.md`.
 
 ## Per-device read capabilities
 
 Every device of one identity derives the same root read token for a mailbox id
-(`readToken` above). With one shared cursor, an acknowledgement from one device
-hid envelopes from the others. A mailbox now holds a bounded set of readers,
+(`readToken` above). One shared cursor would let an acknowledgement from one
+device hide envelopes from the others, so a mailbox holds a bounded set of readers,
 each `{ readTokenHash, ackedCursor }`, capped by `MAILBOX_MAX_READERS` (default
 `129`: the root reader plus one per device, enough for all 128 devices an identity
 may hold). The root reader from `PUT` stays registered. A device that holds the root
@@ -250,7 +254,7 @@ Network-level protection (Tor, mixnets, relays) is out of scope.
 - #291: presence, signalling and receipts must also stop using identity-addressed
   fan-out; ephemeral state stays in memory and never enters mailboxes.
 
-## Implementation status
+## Implementation
 
 1. Domain and storage: `Mailbox` aggregate, capability hashing, quotas, expiry
    scheduler and local database repository, with unit tests for every limit and
@@ -260,7 +264,8 @@ Network-level protection (Tor, mixnets, relays) is out of scope.
 3. Real-transport tests proving mailbox records and envelopes never reach the
    DHT, public IPFS or pubsub, and that an offline recipient receives pending
    envelopes after reconnect.
-4. UI key schedule, send/receive and cursor recovery (pigeon-swarm-ui #252 and
-   #257). Mailbox rotation is not implemented.
-5. One-to-one messages travel only through mailboxes: the replicated
-   conversation routes reject one-to-one messages and read markers.
+4. UI key schedule, send/receive, cursor recovery and availability servers
+   (pigeon-swarm-ui `docs/opaque-mailboxes-client.md`). Mailbox rotation is not
+   implemented.
+5. The node has no conversation message routes. One-to-one and group messages
+   travel only through mailboxes.

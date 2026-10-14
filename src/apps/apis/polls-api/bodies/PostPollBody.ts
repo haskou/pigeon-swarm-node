@@ -20,8 +20,9 @@ export class PostPollBody {
   @IsObject()
   public readonly mutation: Record<string, unknown>;
 
+  @ValidateIf((body: PostPollBody) => body.scopeType === 'community_channel')
   @IsObject()
-  public readonly timelineMutation: Record<string, unknown>;
+  public readonly timelineMutation?: Record<string, unknown>;
 
   @IsInt()
   public readonly createdAt: number;

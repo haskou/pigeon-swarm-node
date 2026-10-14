@@ -1,9 +1,7 @@
 import 'reflect-metadata';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { ConversationOperationAction } from '@app/contexts/conversations/domain/value-objects/ConversationOperationAction';
-import OrbitDBConversationMessageMapper from '@app/contexts/conversations/infrastructure/orbitdb/mappers/OrbitDBConversationMessageMapper';
 import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
-import ConversationMessageMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationMessageMutationPolicy';
 import ConversationOperationMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationOperationMutationPolicy';
 import { Notification } from '@app/contexts/notifications/domain/Notification';
 import { NotificationReplicationLimits } from '@app/contexts/notifications/domain/NotificationReplicationLimits';
@@ -61,7 +59,6 @@ type Replica = {
   stores?: {
     conversationOperations: OrbitDBDatabase;
     heads: OrbitDBDatabase;
-    messages: OrbitDBDatabase;
     notifications: OrbitDBDatabase;
   };
   registry?: OrbitDBReplicatedStateRegistry;
@@ -140,16 +137,12 @@ async function open(replica: Replica): Promise<void> {
       sync: false,
       type: 'keyvalue',
     }),
-    messages: await documents('messages'),
     notifications: await documents('notifications'),
   };
   for (const store of Object.values(replica.stores))
     store.events.on('error', () => undefined);
   const registry = new OrbitDBReplicatedStateRegistry();
-  const conversations = new OrbitDBConversationRepository(
-    registry,
-    new OrbitDBConversationMessageMapper(),
-  );
+  const conversations = new OrbitDBConversationRepository(registry);
 
   const verifier = new PublicMutationVerifier(authorization);
 
@@ -173,7 +166,6 @@ async function open(replica: Replica): Promise<void> {
     registry.addMutationGate(
       new PublicMutationGate(verifier, [
         new ConversationOperationMutationPolicy(),
-        new ConversationMessageMutationPolicy(conversations),
         invitations,
         states,
       ]),

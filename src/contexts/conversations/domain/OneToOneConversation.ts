@@ -3,8 +3,6 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { assert, PrimitiveOf } from '@haskou/value-objects';
 
 import { Conversation } from './Conversation';
-import { Message } from './entities/messages/Message';
-import { MessageFactory } from './entities/messages/MessageFactory';
 import { ConversationMustHaveTwoDifferentParticipantsError } from './errors/ConversationMustHaveTwoDifferentParticipantsError';
 import { ConversationAdmins } from './value-objects/ConversationAdmins';
 import { ConversationId } from './value-objects/ConversationId';
@@ -26,9 +24,6 @@ export class OneToOneConversation extends Conversation {
         (participantId) => new IdentityId(participantId),
       ),
       undefined,
-      primitives.messages.map((message) =>
-        MessageFactory.fromPrimitives(message),
-      ),
       primitives.creatorId ? new IdentityId(primitives.creatorId) : undefined,
     );
   }
@@ -39,7 +34,6 @@ export class OneToOneConversation extends Conversation {
     type: ConversationType,
     participants: IdentityId[],
     name: undefined = undefined,
-    messages: Message[] = [],
     creatorId: IdentityId | undefined = undefined,
   ) {
     super(
@@ -48,7 +42,6 @@ export class OneToOneConversation extends Conversation {
       type,
       participants,
       name,
-      messages,
       new ConversationAdmins(creatorId),
     );
 

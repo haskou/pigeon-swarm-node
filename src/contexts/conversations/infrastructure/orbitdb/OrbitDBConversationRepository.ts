@@ -1,9 +1,5 @@
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
-import { ConversationMessagesAround } from '@app/contexts/conversations/domain/ConversationMessagesAround';
-import { Message } from '@app/contexts/conversations/domain/entities/messages/Message';
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
-import { MessageTargetNotFoundError } from '@app/contexts/conversations/domain/errors/MessageTargetNotFoundError';
-import { OneToOneConversationMessagesNotReplicatedError } from '@app/contexts/conversations/domain/errors/OneToOneConversationMessagesNotReplicatedError';
 import { GroupConversation } from '@app/contexts/conversations/domain/GroupConversation';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { ConversationOperation } from '@app/contexts/conversations/domain/operations/ConversationOperation';
@@ -13,20 +9,11 @@ import { ConversationState } from '@app/contexts/conversations/domain/operations
 import { ConversationStateFold } from '@app/contexts/conversations/domain/operations/ConversationStateFold';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { MessageId } from '@app/contexts/conversations/domain/value-objects/MessageId';
-import { MessageType } from '@app/contexts/conversations/domain/value-objects/MessageType';
-import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { Timestamp } from '@haskou/value-objects';
-
-import { OrbitDBConversationMessageDocument } from './documents/OrbitDBConversationMessageDocument';
-import OrbitDBConversationMessageMapper from './mappers/OrbitDBConversationMessageMapper';
-import OrbitDBConversationMessageIndex from './OrbitDBConversationMessageIndex';
 
 type FoldedConversation = { createdAt: number; roster: ConversationRoster };
 
@@ -39,7 +26,6 @@ type FoldedConversation = { createdAt: number; roster: ConversationRoster };
  */
 export default class OrbitDBConversationRepository implements ConversationRepository {
   private static readonly HEAD_PREFIX = 'conversation-operation-index:';
-  private static readonly READ_MARKER_HEAD_PREFIX = 'read-marker:';
   private static readonly MAX_FOLDED_CONVERSATIONS = 2_048;
 
   private readonly folded = new Map<
@@ -47,15 +33,9 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     { createdAt: number; signature: string; state: ConversationState }
   >();
 
-  private readonly messageIndex: OrbitDBConversationMessageIndex;
-
   private readonly operationIndex: OrbitDBHeadIndex<Record<string, unknown>>;
 
-  constructor(
-    private readonly registry: OrbitDBReplicatedStateRegistry,
-    private readonly messageMapper: OrbitDBConversationMessageMapper,
-  ) {
-    this.messageIndex = new OrbitDBConversationMessageIndex(this.registry);
+  constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     this.operationIndex = new OrbitDBHeadIndex(this.registry, {
       collectionName: 'conversationOperations',
       documentFromRecord: (record) => record,
@@ -67,10 +47,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     this.registry.registerHeadRecordMerger(
       OrbitDBConversationRepository.HEAD_PREFIX,
       (current, candidate) => this.mergeHeads(current, candidate),
-    );
-    this.registry.registerHeadRecordMerger(
-      OrbitDBConversationRepository.READ_MARKER_HEAD_PREFIX,
-      (current, candidate) => this.mergeReadMarkers(current, candidate),
     );
   }
 
@@ -220,17 +196,13 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       );
   }
 
-  private conversationOf(
-    found: FoldedConversation,
-    messages: Message[] = [],
-  ): Conversation {
+  private conversationOf(found: FoldedConversation): Conversation {
     const { admins, creator, id, members, name, networkId, type } =
       found.roster.toPrimitives();
     const primitives = {
       adminIds: admins,
       creatorId: creator,
       id,
-      messages: messages.map((message) => message.toPrimitives()),
       name,
       networkId,
       participantIds: members,
@@ -270,226 +242,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     );
   }
 
-  private assertAllProofed(
-    messages: { id: string }[],
-    proofs: ReadonlyMap<string, PublicMutationProof>,
-  ): void {
-    if (messages.some((message) => !proofs.has(message.id))) {
-      throw new InvalidPublicMutationError();
-    }
-  }
-
-  private async putMessage(
-    conversation: Conversation,
-    messageId: string,
-    proofs: ReadonlyMap<string, PublicMutationProof>,
-  ): Promise<void> {
-    const domainMessage = conversation.findMessageById(
-      new MessageId(messageId),
-    );
-    const proof = proofs.get(messageId);
-
-    if (!domainMessage || !proof) {
-      return;
-    }
-
-    await this.registry.putDocument(
-      'messages',
-      PublicMutationRecord.withProof(
-        this.messageMapper.toDocument(domainMessage),
-        proof,
-      ),
-    );
-  }
-
-  private numberValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): number | undefined {
-    const value = document[attribute];
-
-    return typeof value === 'number' ? value : undefined;
-  }
-
-  private stringValue(
-    document: Record<string, unknown>,
-    attribute: string,
-  ): string | undefined {
-    const value = document[attribute];
-
-    return typeof value === 'string' ? value : undefined;
-  }
-
-  private messageCreatedAtFromExternalId(
-    conversationId: ConversationId,
-    messageId: MessageId,
-  ): number | undefined {
-    const prefix = `${conversationId.valueOf()}:`;
-    const value = messageId.valueOf();
-
-    if (!value.startsWith(prefix)) {
-      return undefined;
-    }
-
-    const [createdAt] = value.slice(prefix.length).split(':');
-    const timestamp = Number(createdAt);
-
-    return Number.isInteger(timestamp) ? timestamp : undefined;
-  }
-
-  private async readMarkerNetworkId(
-    conversationId: ConversationId,
-    networkId?: NetworkId,
-  ): Promise<string | undefined> {
-    if (networkId) {
-      return networkId.valueOf();
-    }
-
-    return (await this.findFolded(conversationId))?.roster.getNetworkId();
-  }
-
-  private deduplicateMessages(
-    documents: OrbitDBConversationMessageDocument[],
-  ): OrbitDBConversationMessageDocument[] {
-    return this.messageIndex.deduplicate(documents);
-  }
-
-  private async findMessageDocumentsByConversationId(
-    conversationId: ConversationId,
-  ): Promise<OrbitDBConversationMessageDocument[]> {
-    return this.messageIndex.findByConversationId(conversationId);
-  }
-
-  private async unreadCountForConversation(
-    recipientIdentityId: IdentityId,
-    conversationId: ConversationId,
-  ): Promise<[string, number]> {
-    const [marker, documents] = await Promise.all([
-      this.registry.findHead(
-        this.readMarkerHeadKey(conversationId, recipientIdentityId),
-      ),
-      this.findMessageDocumentsByConversationId(conversationId),
-    ]);
-    const messageId = marker
-      ? this.stringValue(marker, 'messageId')
-      : undefined;
-    const readUntil =
-      (marker ? this.numberValue(marker, 'messageCreatedAt') : undefined) ??
-      documents.find((document) => document.id === messageId)?.createdAt;
-    const unreadCount = documents.filter((document) =>
-      this.isUnreadFor(document, recipientIdentityId, readUntil),
-    ).length;
-
-    return [conversationId.valueOf(), unreadCount];
-  }
-
-  private async readMarkerMessageCreatedAt(
-    conversationId: ConversationId,
-    recipientIdentityId: IdentityId,
-  ): Promise<number | undefined> {
-    const marker = await this.registry.findHead(
-      this.readMarkerHeadKey(conversationId, recipientIdentityId),
-    );
-    const messageId = marker
-      ? this.stringValue(marker, 'messageId')
-      : undefined;
-
-    if (!messageId) {
-      return undefined;
-    }
-
-    const message = await this.findMessageDocumentById(
-      conversationId,
-      new MessageId(messageId),
-    );
-
-    return message?.createdAt;
-  }
-
-  /**
-   * A read marker only moves forward. The candidate replaces the current
-   * marker when it marks the same or a later message, so a replayed, delayed
-   * or replicated older marker never rolls the reader back. Every replica
-   * applies this rule to the replicated head. A 1:1 marker is refused: 1:1
-   * read state travels only through opaque mailboxes.
-   */
-  private mergeReadMarkers(
-    current: Record<string, unknown> | undefined,
-    candidate: Record<string, unknown>,
-  ): Record<string, unknown> {
-    const conversationId = this.stringValue(candidate, 'conversationId');
-
-    if (!conversationId || !new ConversationId(conversationId).isGroup()) {
-      throw new OneToOneConversationMessagesNotReplicatedError();
-    }
-
-    if (!current) return candidate;
-
-    const candidatePosition = this.readMarkerPosition(candidate);
-
-    return candidatePosition >= this.readMarkerPosition(current)
-      ? candidate
-      : current;
-  }
-
-  private readMarkerPosition(
-    marker: Record<string, unknown> | undefined,
-  ): number {
-    return (
-      (marker ? this.numberValue(marker, 'messageCreatedAt') : undefined) ??
-      Number.NEGATIVE_INFINITY
-    );
-  }
-
-  private readMarkerHeadKey(
-    conversationId: ConversationId,
-    recipientIdentityId: IdentityId,
-  ): string {
-    return `${OrbitDBConversationRepository.READ_MARKER_HEAD_PREFIX}${conversationId.valueOf()}:${recipientIdentityId.valueOf()}`;
-  }
-
-  private async findMessageDocumentById(
-    conversationId: ConversationId,
-    messageId: MessageId,
-  ): Promise<OrbitDBConversationMessageDocument | undefined> {
-    return this.messageIndex.findById(conversationId, messageId);
-  }
-
-  private async findMessagesByConversationId(
-    conversationId: ConversationId,
-  ): Promise<Message[]> {
-    return (await this.findMessageDocumentsByConversationId(conversationId))
-      .sort((left, right) => left.createdAt - right.createdAt)
-      .map((document) => this.messageMapper.toDomain(document));
-  }
-
-  private isUnreadFor(
-    document: OrbitDBConversationMessageDocument,
-    recipientIdentityId: IdentityId,
-    readUntilCreatedAt?: number,
-  ): boolean {
-    return (
-      (document.type === MessageType.SENT.valueOf() ||
-        document.type === MessageType.POLL.valueOf()) &&
-      document.authorId !== recipientIdentityId.valueOf() &&
-      (readUntilCreatedAt === undefined ||
-        document.createdAt > readUntilCreatedAt)
-    );
-  }
-
-  public async requireById(
-    conversationId: ConversationId,
-  ): Promise<Conversation> {
-    const found = await this.findFolded(conversationId);
-
-    if (!found) throw new ConversationNotFoundError(conversationId);
-
-    return this.conversationOf(
-      found,
-      await this.findMessagesByConversationId(conversationId),
-    );
-  }
-
   public async hasById(conversationId: ConversationId): Promise<boolean> {
     return (await this.findFolded(conversationId)) !== undefined;
   }
@@ -523,20 +275,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     return this.conversationOf({ createdAt: 0, roster });
   }
 
-  public async requireCandidateMessageById(
-    conversationId: ConversationId,
-    messageId: MessageId,
-  ): Promise<Message> {
-    const document = await this.findMessageDocumentById(
-      conversationId,
-      messageId,
-    );
-
-    if (!document) throw new ConversationNotFoundError(conversationId);
-
-    return this.messageMapper.toDomain(document);
-  }
-
   public findByParticipant(
     participantId: IdentityId,
     limit: number,
@@ -557,227 +295,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
         .slice(0, limit)
         .map((found) => this.conversationOf(found)),
     );
-  }
-
-  public async findLatestMessages(
-    conversationId: ConversationId,
-    limit: number,
-    beforeMessageId?: MessageId,
-  ): Promise<Message[]> {
-    const documents =
-      await this.findMessageDocumentsByConversationId(conversationId);
-    const beforeDocument = beforeMessageId
-      ? documents.find((document) => document.id === beforeMessageId.valueOf())
-      : undefined;
-
-    return documents
-      .filter((document) =>
-        beforeDocument ? document.createdAt < beforeDocument.createdAt : true,
-      )
-      .sort((left, right) => right.createdAt - left.createdAt)
-      .slice(0, limit)
-      .reverse()
-      .map((document) => this.messageMapper.toDomain(document));
-  }
-
-  public async requireMessageById(
-    conversationId: ConversationId,
-    messageId: MessageId,
-  ): Promise<Message> {
-    const document = await this.findMessageDocumentById(
-      conversationId,
-      messageId,
-    );
-
-    if (!document) throw new MessageTargetNotFoundError();
-
-    return this.messageMapper.toDomain(document);
-  }
-
-  public async hasMessage(
-    conversationId: ConversationId,
-    messageId: MessageId,
-  ): Promise<boolean> {
-    return (
-      (await this.findMessageDocumentById(conversationId, messageId)) !==
-      undefined
-    );
-  }
-
-  public async findMessagesAround(
-    conversationId: ConversationId,
-    messageId: MessageId,
-    before: number,
-    after: number,
-  ): Promise<ConversationMessagesAround> {
-    const documents = (
-      await this.findMessageDocumentsByConversationId(conversationId)
-    ).sort((left, right) => left.createdAt - right.createdAt);
-    const targetIndex = documents.findIndex(
-      (document) => document.id === messageId.valueOf(),
-    );
-
-    if (targetIndex === -1) {
-      return new ConversationMessagesAround([]);
-    }
-
-    const start = Math.max(0, targetIndex - before);
-    const end = Math.min(documents.length, targetIndex + after + 1);
-
-    return new ConversationMessagesAround(
-      documents
-        .slice(start, end)
-        .map((document) => this.messageMapper.toDomain(document)),
-      documents[targetIndex + after + 1]?.id
-        ? new MessageId(documents[targetIndex + after + 1].id)
-        : undefined,
-      documents[targetIndex - before - 1]?.id
-        ? new MessageId(documents[targetIndex - before - 1].id)
-        : undefined,
-    );
-  }
-
-  public async findThreadMessages(
-    conversationId: ConversationId,
-    rootMessageId: MessageId,
-    limit: number,
-  ): Promise<Message[]> {
-    const documents = (
-      await this.findMessageDocumentsByConversationId(conversationId)
-    ).filter(
-      (document) => document.replyToMessageId === rootMessageId.valueOf(),
-    );
-
-    return this.deduplicateMessages(documents)
-      .sort((left, right) => left.createdAt - right.createdAt)
-      .slice(0, limit)
-      .map((document) => this.messageMapper.toDomain(document));
-  }
-
-  public async countUnreadByRecipient(
-    recipientIdentityId: IdentityId,
-    conversationIds: ConversationId[],
-  ): Promise<Map<string, number>> {
-    const counts = new Map<string, number>();
-
-    if (conversationIds.length === 0) {
-      return counts;
-    }
-
-    const unreadCounts = await Promise.all(
-      conversationIds.map((conversationId) =>
-        this.unreadCountForConversation(recipientIdentityId, conversationId),
-      ),
-    );
-
-    for (const [conversationId, unreadCount] of unreadCounts) {
-      if (unreadCount > 0) {
-        counts.set(conversationId, unreadCount);
-      }
-    }
-
-    return counts;
-  }
-
-  public async hasUnreadMessageForRecipient(
-    recipientIdentityId: IdentityId,
-    conversationId: ConversationId,
-    messageId: MessageId,
-  ): Promise<boolean> {
-    const document = await this.findMessageDocumentById(
-      conversationId,
-      messageId,
-    );
-
-    if (!document) {
-      return false;
-    }
-
-    return this.isUnreadFor(
-      document,
-      recipientIdentityId,
-      await this.readMarkerMessageCreatedAt(
-        conversationId,
-        recipientIdentityId,
-      ),
-    );
-  }
-
-  /**
-   * Resolves to `false` when the stored marker already points at a later
-   * message: the stored marker is kept and the caller must not publish.
-   * Every other outcome resolves to `true`.
-   */
-  public async markReadUntil(
-    conversationId: ConversationId,
-    recipientIdentityId: IdentityId,
-    messageId: MessageId,
-    networkId?: NetworkId,
-  ): Promise<boolean> {
-    const externalMessageCreatedAt = this.messageCreatedAtFromExternalId(
-      conversationId,
-      messageId,
-    );
-    const message =
-      externalMessageCreatedAt !== undefined
-        ? undefined
-        : await this.findMessageDocumentById(conversationId, messageId);
-    const messageCreatedAt = externalMessageCreatedAt ?? message?.createdAt;
-
-    if (messageCreatedAt === undefined) {
-      return true;
-    }
-
-    const markerNetworkId = await this.readMarkerNetworkId(
-      conversationId,
-      networkId,
-    );
-
-    const key = this.readMarkerHeadKey(conversationId, recipientIdentityId);
-    const storedPosition = this.readMarkerPosition(
-      this.registry.findCachedHead(key),
-    );
-
-    if (storedPosition > messageCreatedAt) {
-      return false;
-    }
-
-    const marker = {
-      conversationId: conversationId.valueOf(),
-      messageCreatedAt,
-      messageId: messageId.valueOf(),
-      networkId: markerNetworkId,
-      readAt: Timestamp.now().valueOf(),
-      recipientIdentityId: recipientIdentityId.valueOf(),
-    };
-    const markerNetworkIds = markerNetworkId ? [markerNetworkId] : [];
-
-    this.registry.replicateHeadInBackground(key, marker, markerNetworkIds);
-
-    return true;
-  }
-
-  /**
-   * Persists the new messages of a conversation. The conversation itself is
-   * never written here: it exists only as signed operations, see
-   * `saveOperation`.
-   */
-  public async save(
-    conversation: Conversation,
-    proofs: ReadonlyMap<string, PublicMutationProof> = new Map(),
-  ): Promise<void> {
-    const conversationId = conversation.getId();
-    const existingMessageIds =
-      await this.messageIndex.findStoredIds(conversationId);
-    const newMessages = conversation
-      .toPrimitives()
-      .messages.filter((message) => !existingMessageIds.has(message.id));
-
-    this.assertAllProofed(newMessages, proofs);
-
-    for (const message of newMessages) {
-      await this.putMessage(conversation, message.id, proofs);
-    }
   }
 
   public async saveOperation(
@@ -829,9 +346,5 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       conversationId.valueOf(),
       await this.operationIndex.findRecords(this.headKey(conversationId)),
     );
-  }
-
-  public async republishLocalRoutingRecords(): Promise<number> {
-    return Promise.resolve(0);
   }
 }

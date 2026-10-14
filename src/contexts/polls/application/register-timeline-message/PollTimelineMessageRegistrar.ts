@@ -4,39 +4,18 @@ import CommunityChannelMessageRepository from '@app/contexts/communities/domain/
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { MessagePollOptions } from '@app/contexts/conversations/domain/value-objects/MessagePollOptions';
 
 import { PollTimelineMessageRegisterMessage } from './messages/PollTimelineMessageRegisterMessage';
 
+/**
+ * Community channels keep their timeline on the node, so a poll there becomes a
+ * channel message. A group conversation timeline lives only in the members'
+ * opaque mailboxes: the node writes nothing for it.
+ */
 export default class PollTimelineMessageRegistrar {
   constructor(
-    private readonly conversationRepository: ConversationRepository,
-
     private readonly communityMessageRepository: CommunityChannelMessageRepository,
   ) {}
-
-  private async registerConversationTimelineMessage(
-    message: PollTimelineMessageRegisterMessage,
-    conversationId: ConversationId,
-  ): Promise<void> {
-    if (!(await this.conversationRepository.hasById(conversationId))) {
-      return;
-    }
-
-    const conversation =
-      await this.conversationRepository.requireById(conversationId);
-    conversation.addPollMessage(
-      message.actorIdentityId,
-      message.poll.getId(),
-      new MessagePollOptions(message.poll.getCreatedAt(), undefined, []),
-    );
-    await this.conversationRepository.save(
-      conversation,
-      new Map([[message.poll.getId().valueOf(), message.proof]]),
-    );
-  }
 
   private async registerCommunityChannelTimelineMessage(
     message: PollTimelineMessageRegisterMessage,
@@ -68,8 +47,7 @@ export default class PollTimelineMessageRegistrar {
           communityId,
           channelId,
         ),
-      groupConversation: (conversationId) =>
-        this.registerConversationTimelineMessage(message, conversationId),
+      groupConversation: () => Promise.resolve(),
     });
   }
 }
