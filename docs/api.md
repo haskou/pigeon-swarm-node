@@ -5890,6 +5890,53 @@ current head. It carries no labels, commitments, revoked credentials or
 revocation history; a client keeps its own device names. Failures are the same
 generic `401`, and `409` when the checkpoint is not available on this node.
 
+Read the signed transitions the requesting key may verify with:
+
+```http
+GET /identity-devices/{percent-encoded identityId}/transitions?after=<revision>
+```
+
+Authentication matches the checkpoint read (the stable identity signing key
+must match the requested identity and exactly one complete device or recovery
+proof is required) with one difference: the device credential does not have to
+be authorized at the head. A device that was just removed proves possession of
+its key and reads the transitions up to its removal, so it can verify the
+removal itself instead of trusting a node's `401`. Authentication runs before
+the query is parsed, and every authentication failure is the same generic
+`401` (`401020`).
+
+The response is `{ concurrentRecoveries, identityId, recoveries, transitions }`.
+Every entry is a stored transition in exactly the primitives
+`POST /identity-devices/transitions` accepted, including `proofOfPossession`
+and `signature`; the node never re-signs or rewrites one and serves only
+records its replay accepted. `recoveries` is the recovery lineage of the
+replay base (oldest first, empty before the first recovery),
+`concurrentRecoveries` holds the recoveries that lost that checkpoint, and
+`transitions` is the accepted history from that base in replay order. The
+recovery authority reads all three lists. A device authorized in some replayed
+state reads both recovery lists and the transitions whose `previousRevision` is
+at most the revision of the last state that authorizes it, so a revoked device
+sees the group that removed it and nothing signed afterwards. Any other device
+reads the two recovery lists only. No head revision, epoch, network id or
+device list is returned; the client derives them by replaying what it verifies
+from the genesis.
+
+`after` (optional, default `0`) keeps only entries whose `revision` is greater
+than it. It must be a non-negative decimal safe integer without leading zeros;
+anything else returns `400` (`400050`). It is outside the signed canonical
+payload and can only narrow the response, so it serves incremental sync only.
+A client deciding whether it was removed fetches without `after`, verifies
+every entry with the shared replay rules and wipes only on positive signed
+evidence: a recovery in its own epoch targeting another credential, or a
+replayed revision group above its verified revision that removes its
+credential. Absence, a `401`, a `409`, a timeout or a suspended document is
+never evidence of removal. `409` means the checkpoint is not available on this
+node. Byte-exact served bodies and removal verdicts are in
+[`tests/fixtures/device-authorization-transition-log-vectors.json`](../tests/fixtures/device-authorization-transition-log-vectors.json),
+checked by the `DeviceAuthorizationTransitionLogVectors` unit spec. The design
+and its single-node threat model are in
+[`docs/design/device-authorization-transition-log.md`](design/device-authorization-transition-log.md).
+
 Submit an enrollment, revocation or recovery operation to:
 
 ```http

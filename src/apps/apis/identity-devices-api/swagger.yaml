@@ -82,6 +82,66 @@ paths:
           description: The signature is missing or invalid, the signer does not own the requested identity, or the supplied proof is not valid.
         '409':
           description: The authorization checkpoint is unavailable on this node.
+  /identity-devices/{identityId}/transitions:
+    get:
+      tags:
+        - identity-devices
+      summary: Read the signed transitions the requesting device or recovery authority may verify
+      description: |
+        Owner-only. The path identity must equal the signing identity and
+        exactly one complete device or recovery proof is required, checked
+        before the query is parsed. Unlike the checkpoint read, the device
+        credential does not have to be authorized at the head: a removed device
+        reads the transitions up to its removal so it can verify that removal
+        itself.
+
+        Every entry is the stored signed transition, byte-for-byte the
+        primitives POST /identity-devices/transitions accepted, never re-signed
+        or rewritten and never carrying sealedSecrets. Records the replay
+        rejected are never served. The recovery authority reads every list. A
+        device authorized in some replayed state reads recoveries,
+        concurrentRecoveries and the transitions whose previousRevision is at
+        most the revision of the last state that authorizes it. Any other
+        device reads recoveries and concurrentRecoveries only.
+
+        No head revision, epoch, network id or authorized-device list is
+        returned; clients derive them by replaying what they verify. A client
+        deciding whether it was removed fetches without after and wipes only on
+        positive signed evidence, never on absence.
+      parameters:
+        - in: path
+          name: identityId
+          required: true
+          schema:
+            type: string
+          description: Percent-encoded identity id. It must equal X-Identity-Id.
+        - in: query
+          name: after
+          required: false
+          schema:
+            type: string
+            pattern: '^(0|[1-9][0-9]*)$'
+            default: '0'
+          description: Keep only entries whose revision is greater than this non-negative safe integer, without leading zeros. It is outside the signed canonical payload and can only narrow the response. Incremental sync only; never the basis of a wipe.
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/XDeviceCredential'
+        - $ref: '#/components/parameters/XDeviceSignature'
+        - $ref: '#/components/parameters/XRecoverySignature'
+      responses:
+        '200':
+          description: The signed transitions disclosed to the requesting key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceAuthorizationTransitionLog'
+        '400':
+          description: after is not a non-negative decimal safe integer without leading zeros (code 400050).
+        '401':
+          description: The signature is missing or invalid, the signer does not own the requested identity, or the supplied proof is not exactly one valid device or recovery proof (code 401020).
+        '409':
+          description: The authorization checkpoint is unavailable on this node.
   /identity-devices/{identityId}/sealed-secrets:
     put:
       tags:
@@ -366,6 +426,32 @@ components:
         revision:
           type: integer
           minimum: 0
+    DeviceAuthorizationTransitionLog:
+      type: object
+      additionalProperties: false
+      required:
+        - concurrentRecoveries
+        - identityId
+        - recoveries
+        - transitions
+      properties:
+        concurrentRecoveries:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeviceAuthorizationTransition'
+          description: Recoveries at the checkpoint's predecessor that lost the checkpoint. Their carried caps still hold; they never count as removal evidence.
+        identityId:
+          type: string
+        recoveries:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeviceAuthorizationTransition'
+          description: Recovery lineage of the replay base, oldest first. Empty before the first recovery.
+        transitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeviceAuthorizationTransition'
+          description: Transitions the replay accepted from that base, revision groups ascending, each group in the shared tie-break order.
     DeviceCompromisedCredential:
       type: object
       additionalProperties: false
