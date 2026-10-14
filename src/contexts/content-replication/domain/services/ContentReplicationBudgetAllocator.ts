@@ -7,9 +7,11 @@ import { ContentReplicationBudgetClaim } from './ContentReplicationBudgetClaim';
 /**
  * Shares one network's replication budget among owners, max-min fairly: each
  * owner's registrations are taken smallest first, and the next registration
- * served is always one whose owner holds the fewest bytes so far. Owning more
- * identities still buys more shares, but no owner can starve one that holds
- * less than the fair share. Deterministic: the input order is irrelevant.
+ * served is always the one leaving its owner with the fewest bytes held. A
+ * large registration therefore waits for every smaller owner's whole set, so
+ * owning more identities still buys more shares, but no owner can starve one
+ * that holds less than the fair share. Deterministic: the input order is
+ * irrelevant.
  */
 export default class ContentReplicationBudgetAllocator {
   private static byOwner(
@@ -35,6 +37,14 @@ export default class ContentReplicationBudgetAllocator {
     );
   }
 
+  private static compareOrdinal(left: string, right: string): number {
+    if (left < right) {
+      return -1;
+    }
+
+    return left > right ? 1 : 0;
+  }
+
   private static compareReplications(
     left: ContentReplication,
     right: ContentReplication,
@@ -47,18 +57,21 @@ export default class ContentReplicationBudgetAllocator {
       return 1;
     }
 
-    return left.getCid().valueOf().localeCompare(right.getCid().valueOf());
+    return ContentReplicationBudgetAllocator.compareOrdinal(
+      left.getCid().valueOf(),
+      right.getCid().valueOf(),
+    );
   }
 
   private static compareClaims(
     left: ContentReplicationBudgetClaim,
     right: ContentReplicationBudgetClaim,
   ): number {
-    if (left.ownerHeldBytes.isLessThan(right.ownerHeldBytes)) {
+    if (left.ownerTotalBytes.isLessThan(right.ownerTotalBytes)) {
       return -1;
     }
 
-    if (left.ownerHeldBytes.isGreaterThan(right.ownerHeldBytes)) {
+    if (left.ownerTotalBytes.isGreaterThan(right.ownerTotalBytes)) {
       return 1;
     }
 
@@ -71,25 +84,23 @@ export default class ContentReplicationBudgetAllocator {
       return bySize;
     }
 
-    return left.replication
-      .getOwnerIdentityId()
-      .valueOf()
-      .localeCompare(right.replication.getOwnerIdentityId().valueOf());
+    return ContentReplicationBudgetAllocator.compareOrdinal(
+      left.replication.getOwnerIdentityId().valueOf(),
+      right.replication.getOwnerIdentityId().valueOf(),
+    );
   }
 
   private static claimsOf(
     owned: ContentReplication[],
   ): ContentReplicationBudgetClaim[] {
-    let ownerHeldBytes = new Integer(0);
+    let ownerTotalBytes = new Integer(0);
 
     return owned.map((replication) => {
-      const claim = { ownerHeldBytes, replication };
-
-      ownerHeldBytes = new Integer(
-        ownerHeldBytes.add(replication.getSizeBytes()),
+      ownerTotalBytes = new Integer(
+        ownerTotalBytes.add(replication.getSizeBytes()),
       );
 
-      return claim;
+      return { ownerTotalBytes, replication };
     });
   }
 

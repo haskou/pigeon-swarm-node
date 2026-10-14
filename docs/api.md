@@ -1668,12 +1668,15 @@ scopeType: "content_replication", sizeBytes }`, with `scopeType` exactly
   (`CONTENT_REPLICATION_NETWORK_BUDGET_BYTES`). This is local policy: it never
   changes which records are valid nor which nodes are responsible. The budget
   is shared max-min fairly by owner: each owner's records are taken smallest
-  first (then by CID), always serving next the owner holding the fewest bytes,
-  so many identities flooding a network cannot starve an owner that holds less
-  than the fair share. A CID registered by several owners is charged to each
-  and held when any of their shares covers it. Responsible records beyond the
-  budget are deferred, not fetched, and reported by the maintenance log as
-  `deferred`; bytes already fetched are never removed
+  first (then by CID), always serving next the record that leaves its owner
+  holding the fewest bytes, so a large record waits for every smaller owner's
+  whole set and many identities flooding a network cannot starve an owner that
+  holds less than the fair share. A CID registered by several owners is
+  charged to each and held when any of their shares covers it. Responsible
+  records beyond the budget are deferred: neither fetched nor provided by this
+  node, and reported by the maintenance log as `deferred`. The selection is
+  recomputed every maintenance run, so new registrations can defer a CID held
+  before; its bytes already fetched are never removed
 
 Byte-exact vectors (ids, digests and signing content) are in
 `tests/fixtures/content-replication-vectors.json`.
