@@ -202,7 +202,7 @@ Recipient caps. Without `subjectId` a stranger can fill a recipient's pending
 invitations, and one inviter's quota (10 000) is far above any per-recipient bound. A
 letter is pending while the recipient has signed no `accepted` or `declined` state record
 for it (`PATCH /notifications/{notificationId}`). Of the pending group invitation letters
-addressed to one recipient, the node keeps and lists at most:
+addressed to one recipient, the node lists at most:
 
 - 4 per (inviter, recipient) pair
   (`NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_PAIR`), enough for two invitations in
@@ -212,19 +212,39 @@ addressed to one recipient, the node keeps and lists at most:
 
 Both caps take the pending letters in ascending record id order, the order admission
 already uses (`GenuineRecordQuota`), first per pair and then per recipient. A letter
-beyond either cap is evicted: the node does not list it and drops it on compaction. The
-kept set is a function of the letters and state records a node holds, not of their
-arrival time, so every node that holds the same records keeps the same letters. A
-state record frees its letter's slot on every node, and the next letter by record id
-takes it. Admission itself is unchanged: signature check and per-inviter quota. The
-client keeps its own list and drops letters it already handled.
+beyond either cap is held back: the node keeps it like any admitted letter but does not
+list it. The caps never delete a letter, and compaction does not treat held-back letters
+differently from listed ones. Storage stays bounded by admission, which is unchanged:
+signature check and per-inviter quota (10 000 retained letters per inviter). The listed
+set is a function of the letters and state records a node holds, not of their arrival
+time or of when a node compacts, so every node that holds the same records lists the
+same letters. A state record ends its letter's pending state on every node, and the
+next held-back letter by record id is listed in its place. An inviter whose letter is
+held back is not told; it sees no answer, as for a recipient that ignores an invitation.
+
+Handled letters. The client signs an `accepted` or `declined` state record for every
+group invitation letter it handles, so that handled letters never occupy a slot:
+
+- `accepted` for a key package request it answers, by the user or by the contact
+  auto-answer below, and for a `{welcome, k}` or key package response letter it
+  consumes;
+- `declined` for a request the user declines, a letter whose welcome fails the checks
+  above, and a letter it drops as a duplicate (letter dedupe below).
+
+Without this rule an honest inviter with letters in flight to the same recipient would
+fill its own 4 slots with letters the recipient already handled and hold back its next
+letter.
 
 Residual (suppression): one inviter holds at most 4 of the 100 slots, so filling a
 recipient's slots needs at least 25 identities. Record ids are content-bound sha256
-values that the sender can grind by re-sealing, so such a set can also place its letters
-ahead of letters from honest inviters and keep new honest letters evicted. The recipient
-frees slots by declining; invitations from contacts over 1:1 conversations and
-community invitations are not affected.
+values that the sender can grind by re-sealing, so such a set can place its letters
+ahead of letters from honest inviters. Declining does not end the attack: each attacker
+identity may hold up to 10 000 admitted letters, and after every decline a further
+letter, ground to sort low, takes the freed slot. The suppression lasts as long as the
+attackers keep sending. While it lasts the recipient can neither see nor recover the
+honest letters held back behind theirs; the node keeps them, and they are listed only
+once the attackers' letters are handled and no new ones sort ahead. Invitations from
+contacts over 1:1 conversations and community invitations are not affected.
 
 Letter dedupe. The client deduplicates by the sealed content: after opening a letter it
 keys it by `(sender identity, conversationId, letter kind, key package reference or
@@ -256,7 +276,7 @@ accept, as a community invitation does today.
 | --- | --- |
 | Node-enforced add and remove authorisation: the node refuses an op that breaks a rule before anyone sees it | each member judges each commit by the roster agreed in the MLS transcript, default deny on the roster diff, committer verified through the device chain. A malicious member can post rejected commits into inboxes; honest members drop them, and the post rate is bounded by the inbox append limit |
 | Node-side order of roster ops (the op log decides who acted first) | the same-epoch priority rule (removals first, then the creator, then the lowest commit id). Residual: an offline member can adopt a stale branch on reconnect |
-| Server-side membership checks on list, frontier, drafts, control letters, polls, calls, typing and presence | list, polls and typing move inside the MLS group; drafts use opaque keys; calls use a capability bound to the epoch; control letters keep the signature and per-inviter quota, add per-pair and per-recipient pending caps kept by record id, and, for non-contacts, ask the recipient first; presence stops flowing through groups |
+| Server-side membership checks on list, frontier, drafts, control letters, polls, calls, typing and presence | list, polls and typing move inside the MLS group; drafts use opaque keys; calls use a capability bound to the epoch; control letters keep the signature and per-inviter quota, add per-pair and per-recipient caps on listed pending letters (by record id, held-back letters kept), and, for non-contacts, ask the recipient first; presence stops flowing through groups |
 | Plaintext `subjectId` on letters, used to group and dedupe them | dedupe by the sealed key `(sender, conversationId, kind, key package reference or welcome epoch)` after opening |
 | Delivery fan-out by participant id (typing relay, call events, identity updates) | fan-out to inboxes whose ids derive from `gen_k` (already the case for messages and commits); call events reach capability holders |
 | Abuse controls and quotas per group: `MAX_GROUP_PARTICIPANTS`, per-author op limits, the roster gate on letters | members enforce the size cap in the roster check and the joiner checks it on the welcome; inbox append limits and mailbox capacity bound traffic per inbox; the letter quota is per inviter and the pending caps per (inviter, recipient) and per recipient; the node no longer stores group ops, so group creation costs it nothing |
@@ -278,8 +298,8 @@ accept, as a community invitation does today.
 | Members disagree on the roster | possible across fetch times (frontier race, removal gap) | not possible within an epoch; across branches only as the residual above |
 | Removed admin welcomes a new member into a stale fork | refused: the joiner checks the node roster | possible, contained: the fork stays unconfirmed because only the verified creator or a pinned contact other than the welcomer confirms, never a sybil added with J; an unconfirmed group emits no MLS output at all. Residual: J sees a "not yet verified" group |
 | Contact auto-answers a key package request into a fork | not applicable | the answer yields a pending, unconfirmed membership only |
-| Stranger sends sealed letters | anyone who first adds the recipient to a group, which needs no consent | anyone, within the per-inviter quota; at most 4 pending letters per (inviter, recipient) and 100 per recipient, kept by record id on every node; non-contacts need the recipient's acceptance before a key package goes out |
-| Strangers suppress a recipient's group invitations | not possible: no per-recipient cap | residual: 25 or more identities, grinding record ids, can keep a recipient's 100 pending slots full and honest letters evicted until the recipient declines theirs |
+| Stranger sends sealed letters | anyone who first adds the recipient to a group, which needs no consent | anyone, within the per-inviter quota; at most 4 pending letters per (inviter, recipient) and 100 per recipient are listed, by record id on every node, and the rest are held back, not deleted; non-contacts need the recipient's acceptance before a key package goes out |
+| Strangers suppress a recipient's group invitations | not possible: no per-recipient cap | residual: 25 or more identities, grinding record ids, can keep a recipient's 100 listed slots full for as long as they keep sending; declining does not stop it, because a new ground letter refills each freed slot. The recipient can neither see nor recover the honest letters held back meanwhile |
 | Spam into a group | bounded by the roster gate and inbox limits | bounded by inbox limits; inbox ids are unknown to non-members |
 | Removed member that was offline past retention | sees the roster op | sees a group that stays quiet. Residual: the UI marks a group without a new generation for longer than the retention window as stale; that is a hint, not a proof |
 
@@ -307,7 +327,8 @@ and merges when `real-node-e2e` is green.
    commit id derivation, stated), the welcome checks, the confirmation rule with the
    no-output rule for unconfirmed groups and the "not yet verified" UI state, local
    group list, roster-free control letters with the per-pair and per-recipient pending
-   caps and sealed-key dedupe; the node deletes group conversations (group branch of
+   caps (held back, not deleted), a signed state record for every handled letter, and
+   sealed-key dedupe; the node deletes group conversations (group branch of
    `POST /conversations`, group rows in the list, member and admin routes, group
    frontier and drafts, group ops in `conversationOperations`, the participant check on
    `group_conversation_invitation`).
