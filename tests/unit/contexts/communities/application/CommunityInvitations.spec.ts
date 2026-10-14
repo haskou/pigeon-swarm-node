@@ -10,6 +10,7 @@ import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
 import { CommunityMembershipRequest } from '@app/contexts/communities/domain/entities/membership/CommunityMembershipRequest';
 import { CommunityModerationTarget } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationTarget';
+import { CommunityInviteExpiredError } from '@app/contexts/communities/domain/errors/CommunityInviteExpiredError';
 import { CommunityInviteNotFoundError } from '@app/contexts/communities/domain/errors/CommunityInviteNotFoundError';
 import { CommunityOperationApplier } from '@app/contexts/communities/domain/operations/CommunityOperationApplier';
 import CommunityInviteRepository from '@app/contexts/communities/domain/repositories/CommunityInviteRepository';
@@ -22,6 +23,7 @@ import { CommunityModerationAction } from '@app/contexts/communities/domain/valu
 import { CommunityOperationAction } from '@app/contexts/communities/domain/value-objects/CommunityOperationAction';
 import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
+import { Timestamp } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { createHash } from 'node:crypto';
 
@@ -124,6 +126,9 @@ describe('Community invitation use cases', () => {
       new CommunityInviteUses(0),
       message.usedAt,
     );
+    expect(invite.assertRedeemableAt).toHaveBeenCalledWith(
+      new Timestamp(operation.createdAt),
+    );
     expect(inviteRepository.recordUse).toHaveBeenCalledWith(
       invite,
       message.actorIdentityId,
@@ -146,6 +151,39 @@ describe('Community invitation use cases', () => {
     expect(result).toBe(created);
     expect(result.isMember(message.actorIdentityId)).toBe(true);
     expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a join signed at or after the invite expiry before recording any use', async () => {
+    const created = CommunityOperationApplier.create(genesis());
+    const invite = mock<CommunityInvite>();
+    invite.getCommunityId.mockReturnValue(created.getId());
+    invite.getToken.mockReturnValue(new CommunityInviteToken(INVITE_TOKEN));
+    invite.assertRedeemableAt.mockImplementation(() => {
+      throw new CommunityInviteExpiredError();
+    });
+    inviteRepository.requireByToken.mockResolvedValue(invite);
+    inviteRepository.countUses.mockResolvedValue(new CommunityInviteUses(0));
+    communityFinder.findById.mockResolvedValue(created);
+
+    await expect(
+      new CommunityInviteAccepter(
+        communityFinder,
+        communityRepository,
+        inviteRepository,
+        eventPublisher,
+      ).accept(
+        new CommunityInviteAcceptMessage(
+          INVITE_TOKEN,
+          ACTOR_ID,
+          at,
+          proof,
+          operation,
+        ),
+      ),
+    ).rejects.toBeInstanceOf(CommunityInviteExpiredError);
+
+    expect(inviteRepository.recordUse).not.toHaveBeenCalled();
+    expect(communityRepository.save).not.toHaveBeenCalled();
   });
 
   it('rejects an unknown invite token without mutating a community', async () => {

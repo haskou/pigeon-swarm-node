@@ -26,8 +26,13 @@ const REFERENCE = createHash('sha256')
   .digest('base64url');
 const invite = {
   communityId: communityId.valueOf(),
+  createdAt: 1,
+  creatorIdentityId: owner.valueOf(),
   id: TOKEN,
+  maxUses: 1,
+  nonce: 'nonce-0123456789abcdef',
   scopeType: 'community_invite',
+  token: TOKEN,
 };
 const use = {
   communityId: communityId.valueOf(),
@@ -230,6 +235,7 @@ describe('CommunityOperationMutationPolicy', () => {
       function approvedJoin(
         method: string,
         reference?: string,
+        createdAt = 1,
       ): [CommunityOperation, CommunityOperation] {
         const created = genesis();
 
@@ -244,6 +250,7 @@ describe('CommunityOperationMutationPolicy', () => {
               ...(reference === undefined ? {} : { reference }),
             },
             [created],
+            createdAt,
           ),
         ];
       }
@@ -334,6 +341,22 @@ describe('CommunityOperationMutationPolicy', () => {
         ]);
 
         await expect(admit(viaLink)).rejects.toThrow();
+      });
+
+      it('refuses an invite link joined at or after the invite expiry', async () => {
+        const expiring = { ...invite, expiresAt: 10 };
+        const [created, beforeExpiry] = approvedJoin(
+          'invite_link',
+          REFERENCE,
+          9,
+        );
+        const [, atExpiry] = approvedJoin('invite_link', REFERENCE, 10);
+
+        await admit(created);
+        registry.queryDocuments.mockResolvedValue([expiring, use]);
+
+        await expect(admit(beforeExpiry)).resolves.toBeUndefined();
+        await expect(admit(atExpiry)).rejects.toThrow();
       });
 
       it('refuses a join that skips the reference its method requires', async () => {

@@ -70,6 +70,8 @@ interface Vectors {
   inviteToken: {
     communityId: string;
     creatorIdentityId: string;
+    expiresAt: number;
+    maxUses: number;
     nonce: string;
     reference: string;
     token: string;
@@ -136,21 +138,38 @@ describe('Community operation vectors', () => {
     }
   });
 
-  it('derives the invite token and the invite reference an invite_link signs', () => {
-    const { communityId, creatorIdentityId, nonce, reference, token } =
-      vectors.inviteToken;
+  it('derives the invite token from its limits and the reference an invite_link signs', () => {
+    const {
+      communityId,
+      creatorIdentityId,
+      expiresAt,
+      maxUses,
+      nonce,
+      reference,
+      token,
+    } = vectors.inviteToken;
     const joined = vectors.cases.find(
       ({ name }) => name === 'member_joined_invite_link',
     );
 
     expect(
-      digestOfText(JSON.stringify([communityId, creatorIdentityId, nonce])),
+      digestOfText(
+        JSON.stringify([
+          communityId,
+          creatorIdentityId,
+          nonce,
+          maxUses,
+          expiresAt,
+        ]),
+      ),
     ).toBe(token);
     expect(
       CommunityInviteToken.derive(
         communityId,
         creatorIdentityId,
         nonce,
+        maxUses,
+        expiresAt,
       ).valueOf(),
     ).toBe(token);
     expect(digestOfText(`pigeon:community-invite-reference:v1\n${token}`)).toBe(
@@ -158,7 +177,26 @@ describe('Community operation vectors', () => {
     );
     expect(new CommunityInviteToken(token).toReference()).toBe(reference);
     expect(joined?.input.args.reference).toBe(reference);
+    expect(joined!.input.createdAt).toBeLessThan(expiresAt);
     expect(JSON.stringify(joined)).not.toContain(token);
+  });
+
+  it('derives an invite token without expiry from a null expiresAt', () => {
+    const { communityId, creatorIdentityId, maxUses, nonce } =
+      vectors.inviteToken;
+
+    expect(
+      CommunityInviteToken.derive(
+        communityId,
+        creatorIdentityId,
+        nonce,
+        maxUses,
+      ).valueOf(),
+    ).toBe(
+      digestOfText(
+        JSON.stringify([communityId, creatorIdentityId, nonce, maxUses, null]),
+      ),
+    );
   });
 
   it('chains the parents of each member_joined to the earlier digests', () => {

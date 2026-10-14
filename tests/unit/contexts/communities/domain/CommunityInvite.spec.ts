@@ -16,12 +16,14 @@ describe('CommunityInvite', () => {
   const createdAt = new Timestamp(1770000000000);
   const nonce = new CommunityInviteNonce('nonce-0123456789abcdef');
 
-  it('derives its token from community, creator and nonce', () => {
+  it('derives its token from community, creator, nonce and its limits', () => {
     const invite = CommunityInvite.create(
       communityId,
       creatorIdentityId,
       nonce,
       createdAt,
+      new Timestamp(1770000005000),
+      new CommunityInviteMaxUses(3),
     );
 
     expect(invite.getToken().valueOf()).toBe(
@@ -29,7 +31,50 @@ describe('CommunityInvite', () => {
         communityId.valueOf(),
         creatorIdentityId.valueOf(),
         nonce.valueOf(),
+        3,
+        1770000005000,
       ).valueOf(),
+    );
+  });
+
+  it('commits its token to maxUses and expiresAt, so neither can be rewritten', () => {
+    const tokenOf = (expiresAt?: Timestamp, maxUses = 1): string =>
+      CommunityInvite.create(
+        communityId,
+        creatorIdentityId,
+        nonce,
+        createdAt,
+        expiresAt,
+        new CommunityInviteMaxUses(maxUses),
+      )
+        .getToken()
+        .valueOf();
+    const tokens = [
+      tokenOf(),
+      tokenOf(undefined, 2),
+      tokenOf(new Timestamp(1770000005000)),
+      tokenOf(new Timestamp(1770000006000)),
+    ];
+
+    expect(new Set(tokens).size).toBe(tokens.length);
+  });
+
+  it('is redeemable only strictly before it expires', () => {
+    const expiresAt = 1770000005000;
+    const invite = CommunityInvite.create(
+      communityId,
+      creatorIdentityId,
+      nonce,
+      createdAt,
+      new Timestamp(expiresAt),
+      new CommunityInviteMaxUses(1),
+    );
+
+    expect(() =>
+      invite.assertRedeemableAt(new Timestamp(expiresAt - 1)),
+    ).not.toThrow();
+    expect(() => invite.assertRedeemableAt(new Timestamp(expiresAt))).toThrow(
+      'Community invite has expired',
     );
   });
 

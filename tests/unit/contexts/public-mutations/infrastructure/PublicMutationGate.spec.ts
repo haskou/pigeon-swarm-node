@@ -681,6 +681,7 @@ describe('PublicMutationGate over community invites and requests', () => {
     communityId,
     creator,
     nonce,
+    1,
   ).valueOf();
   const requestId = CommunityRequestId.derive(
     communityId,
@@ -802,6 +803,17 @@ describe('PublicMutationGate over community invites and requests', () => {
     ).resolves.toBe(false);
   });
 
+  it('rejects an invite whose limits differ from those its token commits to', async () => {
+    for (const rewritten of [
+      { ...invite, maxUses: 9999 },
+      { ...invite, expiresAt: createdAt + 60_000 },
+    ]) {
+      await expect(
+        gate.accepts('requests', await sign(rewritten, creator)),
+      ).resolves.toBe(false);
+    }
+  });
+
   it('rejects an invite signed by someone other than its creator', async () => {
     await expect(
       gate.accepts('requests', await sign(invite, invitee)),
@@ -821,6 +833,39 @@ describe('PublicMutationGate over community invites and requests', () => {
 
     await expect(
       gate.accepts('requests', await sign(use, invitee)),
+    ).resolves.toBe(false);
+  });
+
+  it('rejects a use recorded at or after the expiry of the invite', async () => {
+    const expiresAt = createdAt + 60_000;
+    const expiring = CommunityInviteToken.derive(
+      communityId,
+      creator,
+      nonce,
+      1,
+      expiresAt,
+    ).valueOf();
+
+    inviteRepository.requireByToken.mockResolvedValue(
+      CommunityInvite.fromPrimitives({
+        ...invite,
+        expiresAt,
+        id: expiring,
+        token: expiring,
+      } as never),
+    );
+    const useAt = (usedAt: number) => ({
+      ...use,
+      id: `invite-use:${expiring}:${invitee}`,
+      token: expiring,
+      usedAt,
+    });
+
+    await expect(
+      gate.accepts('requests', await sign(useAt(expiresAt - 1), invitee)),
+    ).resolves.toBe(true);
+    await expect(
+      gate.accepts('requests', await sign(useAt(expiresAt), invitee)),
     ).resolves.toBe(false);
   });
 
