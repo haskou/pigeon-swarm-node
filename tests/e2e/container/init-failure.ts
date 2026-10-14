@@ -8,9 +8,9 @@ import path from 'node:path';
  * Boots the compiled entry point with an initialization failure and asserts
  * that the process exits with status 1 instead of 0 or serving on. Restart
  * policies (Docker `on-failure`, Kubernetes) only react to the exit status.
- * Covers a failure before any listener opens and a failure after the API has
- * started listening, which must not keep the process alive. Run `yarn build`
- * first.
+ * Covers a failure before any listener opens, an API port already taken by
+ * another process and a failure after the API has started listening, which
+ * must not keep the process alive. Run `yarn build` first.
  */
 
 const REPOSITORY_ROOT = path.resolve(__dirname, '../../..');
@@ -21,6 +21,7 @@ type Scenario = {
   name: string;
   environment: (port: number) => Record<string, string>;
   listensBeforeFailure: boolean;
+  portInUse: boolean;
 };
 
 type ExitResult = {
@@ -35,6 +36,13 @@ const scenarios: Scenario[] = [
     name: 'invalid environment value, before any listener opens',
     environment: () => ({ API_PORT: 'not-a-number' }),
     listensBeforeFailure: false,
+    portInUse: false,
+  },
+  {
+    name: 'API port already in use, before the API starts listening',
+    environment: (port) => ({ API_PORT: String(port) }),
+    listensBeforeFailure: false,
+    portInUse: true,
   },
   {
     name: 'unwritable IPFS storage, after the API starts listening',
@@ -43,6 +51,7 @@ const scenarios: Scenario[] = [
       IPFS_STORAGE_PATH: '/dev/null/ipfs',
     }),
     listensBeforeFailure: true,
+    portInUse: false,
   },
 ];
 
@@ -63,6 +72,19 @@ async function freePort(): Promise<number> {
   }
 
   return address.port;
+}
+
+// Listens without a host, on the same wildcard address the API server binds,
+// so the node's own listen fails with EADDRINUSE on every platform.
+async function occupyPort(port: number): Promise<net.Server> {
+  const server = net.createServer();
+  const listening = Promise.withResolvers<void>();
+
+  server.once('error', listening.reject);
+  server.listen(port, listening.resolve);
+  await listening.promise;
+
+  return server;
 }
 
 function runUntilExit(
@@ -106,7 +128,10 @@ function runUntilExit(
 
 async function runScenario(scenario: Scenario): Promise<void> {
   const port = await freePort();
-  const result = await runUntilExit(scenario.environment(port));
+  const occupant = scenario.portInUse ? await occupyPort(port) : undefined;
+  const result = await runUntilExit(scenario.environment(port)).finally(() =>
+    occupant?.close(),
+  );
   const context = `signal ${result.signal}; output:\n${result.output}`;
 
   assert.equal(
@@ -116,6 +141,14 @@ async function runScenario(scenario: Scenario): Promise<void> {
   );
   assert.equal(result.code, 1, `expected exit status 1; ${context}`);
   assert.match(result.output, /Application error/, context);
+
+  if (scenario.portInUse) {
+    assert.match(
+      result.output,
+      new RegExp(`API server could not listen on port ${port}`),
+      context,
+    );
+  }
 
   if (scenario.listensBeforeFailure) {
     const listening = result.output.indexOf('Run server:');
