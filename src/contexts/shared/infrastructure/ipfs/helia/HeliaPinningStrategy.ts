@@ -25,8 +25,12 @@ export default class HeliaPinningStrategy {
     return cid.toString();
   }
 
-  private errorMessage(error: unknown): string {
-    return String(error);
+  /**
+   * Error messages from Helia can embed content identifiers, so only the
+   * error class name reaches the log.
+   */
+  private errorName(error: unknown): string {
+    return error instanceof Error ? error.name : typeof error;
   }
 
   private async ensurePinnedNow(
@@ -52,11 +56,10 @@ export default class HeliaPinningStrategy {
       );
 
       this.locallyPinnedCids.add(cacheKey);
-      this.debug(`Pinned IPFS content for local availability: ${cid}`);
+      this.debug('Pinned IPFS content for local availability');
     } catch (error) {
       this.debug(
-        `Skipped IPFS content pinning for local availability: ${cid}` +
-          ` error=${this.errorMessage(error)}`,
+        `Skipped IPFS content pinning for local availability: error=${this.errorName(error)}`,
       );
 
       throw error;
@@ -107,11 +110,10 @@ export default class HeliaPinningStrategy {
       await this.consumePinOperation(heliaCore.pins.rm(cid, { signal }));
 
       this.locallyPinnedCids.delete(cacheKey);
-      this.debug(`Unpinned IPFS content before local removal: ${cid}`);
+      this.debug('Unpinned IPFS content before local removal');
     } catch (error) {
       this.debug(
-        `Skipped IPFS content unpinning before local removal: ${cid}` +
-          ` error=${this.errorMessage(error)}`,
+        `Skipped IPFS content unpinning before local removal: error=${this.errorName(error)}`,
       );
     }
   }

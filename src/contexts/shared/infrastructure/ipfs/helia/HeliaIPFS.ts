@@ -905,7 +905,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
         await this.heliaCore.blockstore.delete(cid, { signal });
       }
     } catch {
-      Kernel.logger.debug?.(`Skipped IPFS block deletion: ${cid.toString()}`);
+      Kernel.logger.debug?.('Skipped IPFS block deletion');
     }
   }
 
