@@ -62,22 +62,25 @@ export class OrbitDBPendingRecordReadmission {
   }
 
   /**
-   * Offers the record unless an offer is already running, and waits for
-   * the running offer at most `offerWaitMs`: an offer that never resolves
-   * neither stalls the caller nor holds the record past its last delay.
+   * Offers the record unless it is settled or an offer is already running,
+   * and waits for the offer it started at most `offerWaitMs`: an offer that
+   * never resolves neither stalls the caller nor holds the record past its
+   * last delay, and later callers do not wait on it again.
    */
   public offer(): Promise<void> {
-    if (this.settled) return Promise.resolve();
+    if (this.settled || this.inFlight) return Promise.resolve();
 
-    this.inFlight ??= this.attemptOffer().finally(() => {
+    const inFlight = this.attemptOffer().finally(() => {
       this.inFlight = undefined;
     });
+
+    this.inFlight = inFlight;
 
     const { promise, resolve } = Promise.withResolvers<void>();
     const deadline = setTimeout(resolve, this.offerWaitMs);
 
     deadline.unref();
-    void this.inFlight.finally(() => {
+    void inFlight.finally(() => {
       clearTimeout(deadline);
       resolve();
     });

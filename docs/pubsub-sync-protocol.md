@@ -707,8 +707,9 @@ its join, and the head would otherwise stay demoted until the 60 s retry.
   from any peer, waits beside it and never takes the place of the pending one.
 - A wake offers the pending records one after the other, and at most one wake
   runs at a time; one offer per record runs at a time. Neither a wake nor the
-  backoff waits more than 5 s for one offer, so an offer that never resolves
-  stalls neither the later wakes nor the retirement of its record.
+  backoff waits more than 5 s for an offer it started, nor at all for one
+  already running, so an offer that never resolves stalls neither the later
+  wakes nor the retirement of its record.
 - New state never extends the wait: wake offers fall inside the same window of
   72 s (at most 87 s when offers stall), after the 60 s attempt the rejection is
   final, and a record of a store or network that is no longer registered is

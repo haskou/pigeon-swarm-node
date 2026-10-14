@@ -136,9 +136,7 @@ describe('OrbitDBRecordReadmission', () => {
     await jest.advanceTimersByTimeAsync(2_500);
     readmission.wake();
     await jest.advanceTimersByTimeAsync(
-      OrbitDBRecordReadmission.WAKE_DELAY_MS +
-        OrbitDBRecordReadmission.OFFER_WAIT_MS +
-        100,
+      OrbitDBRecordReadmission.WAKE_DELAY_MS + 100,
     );
 
     expect(stalled).toHaveBeenCalledTimes(1);
