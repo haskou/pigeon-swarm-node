@@ -122,7 +122,7 @@ export default class CommunityOperationMutationPolicy extends PublicMutationPoli
         record.identityId === member &&
         typeof record.token === 'string' &&
         record.id === `invite-use:${record.token}:${member}` &&
-        new CommunityInviteToken(record.token).toJoinReference() === reference,
+        new CommunityInviteToken(record.token).toReference() === reference,
     );
 
     assert(

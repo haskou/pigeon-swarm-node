@@ -652,7 +652,7 @@ export default class Definitions {
               communityId,
               actorIdentityId,
               text.nonce,
-            ).valueOf(),
+            ).toReference(),
             type: 'invite',
           },
         }),
@@ -2773,6 +2773,14 @@ export default class Definitions {
     });
   }
 
+  @given('I set a community member manager role body')
+  public iSetACommunityMemberManagerRoleBody(): void {
+    this.body = JSON.stringify({
+      name: 'member manager',
+      permissions: ['manage_members'],
+    });
+  }
+
   @given('I set community member roles body with the current role')
   public iSetCommunityMemberRolesBodyWithTheCurrentRole(): void {
     if (!this.communityRoleId) {
@@ -3168,6 +3176,24 @@ export default class Definitions {
     await this.signCurrentRequest(
       'GET',
       `/communities/${this.communityId}/moderation-logs`,
+    );
+  }
+
+  @given('the community member signs the current community moderation logs request')
+  public async theCommunityMemberSignsTheCurrentCommunityModerationLogsRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/moderation-logs`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
     );
   }
 

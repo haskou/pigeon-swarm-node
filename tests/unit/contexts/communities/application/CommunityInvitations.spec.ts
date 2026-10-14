@@ -216,6 +216,9 @@ describe('Community invitation use cases', () => {
         maxUses: 5,
       },
     );
+    expect(
+      moderationLogRecorder.record.mock.calls[0][3].toPrimitives(),
+    ).toEqual({ id: INVITE_REFERENCE, type: 'invite' });
     expect(result).toBe(invite);
   });
 

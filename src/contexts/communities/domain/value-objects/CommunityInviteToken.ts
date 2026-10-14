@@ -3,7 +3,7 @@ import { createHash } from 'crypto';
 
 export class CommunityInviteToken extends StringValueObject {
   private static readonly MAX_LENGTH = 128;
-  private static readonly JOIN_REFERENCE_CONTEXT =
+  private static readonly REFERENCE_CONTEXT =
     'pigeon:community-invite-reference:v1\n';
 
   /** base64url(sha256(JSON([communityId, creatorIdentityId, nonce]))). */
@@ -24,13 +24,15 @@ export class CommunityInviteToken extends StringValueObject {
   }
 
   /**
-   * The `reference` a signed `invite_link` join carries instead of the token:
-   * base64url(sha256("pigeon:community-invite-reference:v1\n" + token)). Every
-   * member reads the operation log, so it must not hand out a usable invite.
+   * The public handle of an invite, never redeemable:
+   * base64url(sha256("pigeon:community-invite-reference:v1\n" + token)). The
+   * signed `invite_link` join and the `invite_link_created` moderation log
+   * entry carry it instead of the token, because roles without CREATE_INVITES
+   * read both.
    */
-  public toJoinReference(): string {
+  public toReference(): string {
     return createHash('sha256')
-      .update(`${CommunityInviteToken.JOIN_REFERENCE_CONTEXT}${this.valueOf()}`)
+      .update(`${CommunityInviteToken.REFERENCE_CONTEXT}${this.valueOf()}`)
       .digest('base64url');
   }
 }
