@@ -86,6 +86,49 @@ describe('ContentReplicationBudgetAllocator', () => {
     );
   });
 
+  it('does not let sybils sized to fill the budget starve a small owner', () => {
+    const sybils = [
+      record(10, 'bafy-sybil-a', 98),
+      record(11, 'bafy-sybil-b', 98),
+      record(12, 'bafy-sybil-c', 99),
+    ];
+    const honest = [
+      record(200, 'bafy-avatar', 5),
+      record(200, 'bafy-photo', 5),
+      record(200, 'bafy-file', 5),
+    ];
+
+    expect(
+      cidsOf(
+        allocator.select(
+          [...sybils, ...honest],
+          new ContentReplicationNetworkBudget(300),
+        ),
+      ),
+    ).toEqual([
+      'bafy-avatar',
+      'bafy-file',
+      'bafy-photo',
+      'bafy-sybil-a',
+      'bafy-sybil-b',
+    ]);
+  });
+
+  it('serves a single large record only after smaller owners whole sets', () => {
+    const records = [
+      record(1, 'bafy-large', 50),
+      record(2, 'bafy-small-a', 10),
+      record(2, 'bafy-small-b', 10),
+      record(2, 'bafy-small-c', 10),
+    ];
+
+    expect(
+      cidsOf(
+        allocator.select(records, new ContentReplicationNetworkBudget(60)),
+      ),
+    ).toEqual(['bafy-small-a', 'bafy-small-b', 'bafy-small-c']);
+  });
+
   it('charges a CID registered by several owners to each of them', () => {
     const shared = [record(1, 'bafy-shared', 60), record(2, 'bafy-shared', 60)];
 
