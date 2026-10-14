@@ -2147,7 +2147,7 @@ components:
           type: string
     PostCommunityInviteBody:
       type: object
-      description: The mutation signs a community_invite document in store requests whose id and token are base64url(sha256(JSON.stringify([communityId, creatorIdentityId, nonce]))). Signer is the creator.
+      description: The mutation signs a community_invite document in store requests whose id and token are base64url(sha256(JSON.stringify([communityId, creatorIdentityId, nonce, maxUses, expiresAt ?? null]))), so the token commits to the invite limits and no replica can rewrite them. Signer is the creator. maxUses is enforced only by the accepting node's API; replicas never cap uses or joins, so partitioned accepts, a malicious node or a backdated usedAt/createdAt can exceed maxUses or expiresAt unrefuted until joins prove token possession (#550). Invites cannot be revoked; tokens derived without their limits no longer validate, so communities with such invite_link joins must be recreated.
       required:
         - nonce
         - createdAt
@@ -2174,7 +2174,7 @@ components:
           default: 1
     PostCommunityInviteAcceptBody:
       type: object
-      description: "The mutation signs a community_invite_use document {communityId, id 'invite-use:<token>:<identityId>', identityId, token, usedAt} in store requests. Signer is the acceptor. Uses are counted as signed use records, so maxUses can be exceeded under network partitions. operation signs member_joined with args identityId = acceptor, method = invite_link, reference = base64url(sha256(utf8(\"pigeon:community-invite-reference:v1\\n\" + inviteToken))), never the token itself, because every member reads the operation; it is only admitted by a node that also holds the signed invite and the use record of a token with that reference."
+      description: "The mutation signs a community_invite_use document {communityId, id 'invite-use:<token>:<identityId>', identityId, token, usedAt} in store requests, admitted only while the invite has not expired at usedAt. Signer is the acceptor. operation signs member_joined with args identityId = acceptor, method = invite_link, reference = base64url(sha256(utf8(\"pigeon:community-invite-reference:v1\\n\" + inviteToken))), never the token itself, because every member reads the operation; it is only admitted by a node that also holds the signed invite and the use record of a token with that reference, while the invite has not expired at the operation's createdAt. Expiry is judged at the signer-chosen usedAt and createdAt, so a backdated signature passes it. This node refuses the accept once the invite has maxUses recorded uses; replicas never cap maxUses."
       required:
         - operation
         - usedAt

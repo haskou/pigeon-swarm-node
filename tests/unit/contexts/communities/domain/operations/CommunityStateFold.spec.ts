@@ -408,4 +408,30 @@ describe('CommunityStateFold', () => {
       [first.getHash(), second.getHash()].sort(),
     );
   });
+
+  it('never skips a concurrent invite link join, so no token holder can evict a member', () => {
+    const viaLink = (member: typeof alice, parents: CommunityOperation[]) =>
+      operation(
+        CommunityOperationAction.MEMBER_JOINED,
+        member,
+        {
+          identityId: member.valueOf(),
+          method: 'invite_link',
+          reference: 'invite-reference-0000000000000000000000000',
+        },
+        parents,
+      );
+    const created = genesis();
+    const aliceJoin = viaLink(alice, [created]);
+    const malloryJoin = viaLink(mallory, [created]);
+    const operations = [created, aliceJoin, malloryJoin];
+    const expected = stateOf(operations);
+
+    expect(expected.community!.memberIds).toEqual(
+      expect.arrayContaining([alice.valueOf(), mallory.valueOf()]),
+    );
+    expect(expected.skipped).toEqual([]);
+    for (let seed = 1; seed <= 20; seed++)
+      expect(stateOf(shuffled(operations, seed))).toEqual(expected);
+  });
 });

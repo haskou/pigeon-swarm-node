@@ -2653,11 +2653,14 @@ the invite reference
 `base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken)))`,
 never the token itself, so the operation log does not hand out a usable invite.
 A node admits it only when it holds the signed invite and the member's
-`community_invite_use` record of a token with that reference. `approval`
-needs `approve_members`, `added` needs `manage_members`, `automatic` needs
-`autoJoinEnabled`, and the other methods are signed by the joining identity.
-A node that has not replicated the referenced records yet admits the operation
-later.
+`community_invite_use` record of a token with that reference, and, for
+`invite_link`, the invite has not expired at the operation's signer-chosen
+`createdAt`. Replicas do not cap `maxUses`: the joins have no single order, so a
+cap in the fold would let a join backdated by any token holder evict an honest
+member. `approval` needs `approve_members`,
+`added` needs `manage_members`, `automatic` needs `autoJoinEnabled`, and the
+other methods are signed by the joining identity. A node that has not
+replicated the referenced records yet admits the operation later.
 
 Channel and role ids are not chosen: `channelId` and `roleId` are the first 24 hex
 characters of `sha256(JSON.stringify(["channel" | "role", communityId,
@@ -3181,8 +3184,25 @@ Implemented:
 
 - require signed request auth from the community owner or a member with
   `create_invites`
-- create a bearer invite token for the community
+- create a bearer invite token for the community; the token commits to the
+  invite limits:
+  `base64url(sha256(JSON.stringify([communityId, creatorIdentityId, nonce, maxUses, expiresAt ?? null])))`,
+  so no replica can rewrite `maxUses` or `expiresAt` under the same token
 - default `maxUses` to `1`
+- invites cannot be revoked yet (deferred); a link stays redeemable until it
+  expires or reaches `maxUses`
+- `maxUses` is enforced only by the accepting node's API: an honest node refuses
+  an accept once the invite has `maxUses` recorded uses. Replicas never cap the
+  replicated uses or joins. Concurrent accepts on partitioned nodes, a malicious
+  node, or a signer that backdates `usedAt` and the operation `createdAt` can
+  exceed `maxUses` or join after `expiresAt`, and no replica can refute it:
+  every member can read the token from the replicated `community_invite`
+  record, so a token holder is indistinguishable from an invitee. That remains
+  until tokens are hidden and joins prove possession of the token instead of
+  revealing it (#550)
+- breaking: tokens derived without their limits no longer validate, so existing
+  invites and the `invite_link` joins they admitted are refused. Communities
+  with such joins must be recreated, or the network reset (pre-release)
 - carry no key material: group encryption keys are negotiated by members over
   MLS (`/communities/{communityId}/mls/records`), never through the invite
 
@@ -3227,16 +3247,20 @@ POST /communities/invites/{inviteToken}/accept
 
 Request body: `{ "usedAt", "mutation", "operation" }`. `mutation` signs a
 `community_invite_use` document with id `invite-use:<token>:<identityId>`,
-signed by the acceptor. The invite token is
-`base64url(sha256(JSON.stringify([communityId, creatorIdentityId, nonce])))`.
-Uses are counted as signed use records, so `maxUses` can be exceeded when
-nodes are partitioned. `operation` signs `member_joined` with `args`
+signed by the acceptor; a node only admits it while the invite has not expired
+at `usedAt`. The invite token is
+`base64url(sha256(JSON.stringify([communityId, creatorIdentityId, nonce, maxUses, expiresAt ?? null])))`.
+`operation` signs `member_joined` with `args`
 `{identityId: <acceptor>, method: "invite_link", reference: <invite reference>}`,
 where the invite reference is
 `base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken)))`:
 every member reads the operation, so it never carries the token. The operation
 is only admitted by a node that also holds the signed invite and the acceptor's
-`invite-use:<token>:<identityId>` record of a token with that reference.
+`invite-use:<token>:<identityId>` record of a token with that reference, while
+the invite has not expired at the operation's `createdAt`. Expiry is judged at
+the signer-chosen `usedAt` and operation `createdAt`, so a backdated signature
+passes it. `maxUses` is checked only here, against the uses this node holds;
+replicas never cap it (see "Create community invite link token").
 
 Implemented:
 

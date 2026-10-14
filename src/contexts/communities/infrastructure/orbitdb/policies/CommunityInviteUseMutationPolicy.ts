@@ -5,6 +5,7 @@ import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/serv
 import { PublicMutationExpectation } from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 import { ShortLivedLookup } from '@app/contexts/public-mutations/infrastructure/ShortLivedLookup';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { Timestamp } from '@haskou/value-objects';
 
 import { Community } from '../../../domain/Community';
 import { CommunityInviteNotFoundError } from '../../../domain/errors/CommunityInviteNotFoundError';
@@ -93,7 +94,10 @@ export default class CommunityInviteUseMutationPolicy extends PublicMutationPoli
         throw error;
       });
 
-    if (invite.getCommunityId().valueOf() !== record.communityId) {
+    if (
+      invite.getCommunityId().valueOf() !== record.communityId ||
+      invite.isExpired(new Timestamp(record.usedAt as number))
+    ) {
       throw new InvalidPublicMutationError();
     }
 

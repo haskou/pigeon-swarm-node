@@ -652,6 +652,8 @@ export default class Definitions {
               communityId,
               actorIdentityId,
               text.nonce,
+              (body.maxUses as number | undefined) ?? 1,
+              body.expiresAt as number | undefined,
             ).toReference(),
             type: 'invite',
           },
@@ -2705,6 +2707,8 @@ export default class Definitions {
       this.communityId,
       creatorIdentityId,
       nonce,
+      body.maxUses,
+      body.expiresAt,
     ).valueOf();
     const payload = {
       communityId: this.communityId,
