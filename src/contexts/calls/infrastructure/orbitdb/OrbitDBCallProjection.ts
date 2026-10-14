@@ -274,24 +274,35 @@ export default class OrbitDBCallProjection {
     ).some((candidate) => this.startedAfter(candidate, folded));
   }
 
+  /** The live latest-of-creator start of a community channel with the lowest digest. */
+  private channelWinner(channelKey: string): FoldedCall | undefined {
+    return this.liveCalls(this.communityChannelCallIds.get(channelKey))
+      .filter((candidate) => this.isLatestOfCreator(candidate))
+      .reduce<FoldedCall | undefined>(
+        (winner, candidate) =>
+          !winner || candidate.digest < winner.digest ? candidate : winner,
+        undefined,
+      );
+  }
+
   /**
    * One live call per creator and scope (the latest start) and, in a community
    * channel, the live start with the lowest digest. Every other start of that
-   * scope is a loser that reads as ended on every node alike.
+   * scope is a loser that reads as ended on every node alike. Returns undefined
+   * for a call that is not superseded; a community channel loser names the
+   * winner its participants move to.
    */
-  private isSuperseded(folded: FoldedCall): boolean {
-    if (!this.isLatestOfCreator(folded)) return true;
-
+  private supersession(
+    folded: FoldedCall,
+  ): { winnerId: string | undefined } | undefined {
     const channelKey = this.communityChannelKey(folded.primitives);
+    const winner = channelKey ? this.channelWinner(channelKey) : undefined;
 
-    if (!channelKey) return false;
+    if (this.isLatestOfCreator(folded) && (!winner || winner === folded)) {
+      return undefined;
+    }
 
-    return this.liveCalls(this.communityChannelCallIds.get(channelKey)).some(
-      (candidate) =>
-        candidate.primitives.id !== folded.primitives.id &&
-        this.isLatestOfCreator(candidate) &&
-        candidate.digest < folded.digest,
-    );
+    return { winnerId: winner?.primitives.id };
   }
 
   private resolve(callId: string): CallPrimitives | undefined {
@@ -300,12 +311,17 @@ export default class OrbitDBCallProjection {
     if (!folded) return undefined;
 
     const primitives = this.withinDuration(folded);
+    const supersession =
+      primitives.status === 'active' ? this.supersession(folded) : undefined;
 
-    if (primitives.status === 'active' && this.isSuperseded(folded)) {
+    if (supersession) {
       return {
         ...primitives,
         endedAt: Math.max(primitives.createdAt, Timestamp.now().valueOf()),
         status: 'ended',
+        ...(supersession.winnerId
+          ? { supersededByCallId: supersession.winnerId }
+          : {}),
       };
     }
 

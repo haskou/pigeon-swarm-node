@@ -36,7 +36,8 @@ paths:
         (the client then signs a join with `POST /calls/{callId}/participants`);
         otherwise the signed start (with `sessionEpoch`) is stored. The node
         enforces one live call per channel: concurrent starts resolve to the one
-        with the lowest start payload digest on every node.
+        with the lowest start payload digest on every node. The losing call reads
+        as ended with `supersededByCallId` naming the winner.
       requestBody:
         required: true
         content:
@@ -378,6 +379,12 @@ components:
         endedAt:
           type: number
           nullable: true
+        supersededByCallId:
+          type: string
+          description: >-
+            Present only on an ended community voice channel call that lost a
+            concurrent start; the id of the winning call of the same channel,
+            which its participants join.
     CallsResource:
       type: object
       required:

@@ -609,8 +609,8 @@ about the author's own actions. No node-chosen `updatedAt`/`receivedAt`.
   record set derive the same status; timing-based `missed` is local and never
   replicated, so node disagreement is harmless.
 - Concurrent community channel starts: the call with the lowest
-  `(payloadDigest)` among active starts in that channel wins; losers' joiners
-  follow the winner. A member can grind a lower digest but can only affect
+  `(payloadDigest)` among active starts in that channel wins; a loser reads as
+  ended with `supersededByCallId` naming the winner, and its joiners follow it. A member can grind a lower digest but can only affect
   channels they already have access to.
 - Dependency ordering (call before its participant records, conversation record
   before the call): same rejected-until-dependency loop as slice 1.

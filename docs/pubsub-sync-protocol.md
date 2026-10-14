@@ -199,6 +199,9 @@ replicated. `CallTimeoutScheduler` writes nothing replicated.
 
 Concurrent community starts for one voice channel are all admitted; every node keeps
 the one with the lowest start `payloadDigest` and treats the others as superseded.
+A superseded call reads as ended and names the winning call in `supersededByCallId`,
+derived on every node from the same admitted starts and exposed in the browser
+`liveCall` snapshot so its participants join the winner.
 A community start carries a `sessionEpoch` that may exceed the highest epoch already
 admitted for the channel by one at most, so a forged huge epoch is refused.
 
@@ -992,6 +995,7 @@ hide participation from an actively logging node.
 
 Community call starts carry a positive signed `sessionEpoch`. Concurrent starts for the
 same channel are all admitted and resolved by the lowest start `payloadDigest` on every
-node; the superseded start is inert. The epoch is bounded at one above the highest
+node; the superseded start is inert and its browser snapshot names the winner in
+`supersededByCallId`. The epoch is bounded at one above the highest
 epoch already admitted for the channel. The epoch stays in node-to-node records and is
 not added to the browser live contract.

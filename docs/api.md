@@ -523,7 +523,9 @@ and `participants` contain only authorized connected participants and current
 ringing invitees. Departed/expired participants, join/leave timestamps, heartbeat
 timestamps and remote transport diagnostics are omitted. Community snapshots omit `creatorIdentityId`,
 `createdAt`, `endedAt` and `endedByIdentityId`; conversation snapshots retain the
-caller and lifecycle times needed for incoming-call and ended-call UI.
+caller and lifecycle times needed for incoming-call and ended-call UI. An ended
+community snapshot whose call lost a concurrent start carries `supersededByCallId`,
+the id of the winning call of the same channel.
 A community member with current channel access can inspect its live snapshot
 without having joined. Conversation reads additionally require call participation.
 
@@ -972,7 +974,10 @@ Implemented:
   caller's behalf
 - if two nodes start a call in the same community channel concurrently, both
   starts are admitted and every node keeps the one with the lowest start
-  `payloadDigest`; the other is superseded and its creator joins the winner
+  `payloadDigest`. The other call reads as `ended` and its snapshot carries
+  `supersededByCallId` = the winning call id; its client signs a join for that
+  call (`POST /calls/{callId}/participants`). Community calls that end for any
+  other reason carry no `supersededByCallId`
 - a start never ends or blocks on a call that no admitted record supports
 - caller must be a conversation participant or community member
 - start emits `calls.v1.call.started` to the current call participants, from
