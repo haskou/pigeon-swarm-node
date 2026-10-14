@@ -12,13 +12,19 @@ describe('ContentReplicationMaintainer', () => {
   let storage: MockProxy<ReplicatedContentStorage>;
   let maintainer: ContentReplicationMaintainer;
 
-  const statusOf = (sizeBytes: number, localResponsible: boolean): never =>
+  const statusOf = (
+    sizeBytes: number,
+    localResponsible: boolean,
+    withinLocalBudget = localResponsible,
+  ): never =>
     ({
       contents: [
         {
           cid: 'bafkreiacontent',
           context: 'ipfs_public_upload',
-          networks: [{ localResponsible, networkId: NETWORK }],
+          networks: [
+            { localResponsible, networkId: NETWORK, withinLocalBudget },
+          ],
           sizeBytes,
         },
       ],
@@ -34,6 +40,7 @@ describe('ContentReplicationMaintainer', () => {
     finder.find.mockResolvedValue(statusOf(2048, true));
 
     await expect(maintainer.maintain()).resolves.toEqual({
+      deferredReplicas: 0,
       failedReplicas: 0,
       maintainedReplicas: 1,
     });
@@ -64,6 +71,7 @@ describe('ContentReplicationMaintainer', () => {
     );
 
     await expect(maintainer.maintain()).resolves.toEqual({
+      deferredReplicas: 0,
       failedReplicas: 1,
       maintainedReplicas: 0,
     });
@@ -76,5 +84,17 @@ describe('ContentReplicationMaintainer', () => {
     await maintainer.maintain();
 
     expect(storage.findBytesInNetwork).not.toHaveBeenCalled();
+  });
+
+  it('defers a responsible replica beyond this node budget for its network', async () => {
+    finder.find.mockResolvedValue(statusOf(10, true, false));
+
+    await expect(maintainer.maintain()).resolves.toEqual({
+      deferredReplicas: 1,
+      failedReplicas: 0,
+      maintainedReplicas: 0,
+    });
+    expect(storage.findBytesInNetwork).not.toHaveBeenCalled();
+    expect(storage.provideInNetwork).not.toHaveBeenCalled();
   });
 });

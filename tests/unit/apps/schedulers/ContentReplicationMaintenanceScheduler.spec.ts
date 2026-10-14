@@ -12,6 +12,7 @@ describe('ContentReplicationMaintenanceScheduler', () => {
   const result = (
     partial: Partial<ContentReplicationMaintenanceResult> = {},
   ): ContentReplicationMaintenanceResult => ({
+    deferredReplicas: 0,
     failedReplicas: 0,
     maintainedReplicas: 0,
     ...partial,
@@ -29,7 +30,7 @@ describe('ContentReplicationMaintenanceScheduler', () => {
     await new ContentReplicationMaintenanceScheduler(maintainer).execute();
 
     expect(logger.debug).toHaveBeenCalledWith(
-      'Maintained content replication: maintained=0, failed=0',
+      'Maintained content replication: maintained=0, failed=0, deferred=0',
     );
     expect(logger.info).not.toHaveBeenCalled();
     expect(logger.warn).not.toHaveBeenCalled();
@@ -41,7 +42,7 @@ describe('ContentReplicationMaintenanceScheduler', () => {
     await new ContentReplicationMaintenanceScheduler(maintainer).execute();
 
     expect(logger.debug).toHaveBeenCalledWith(
-      'Maintained content replication: maintained=1, failed=0',
+      'Maintained content replication: maintained=1, failed=0, deferred=0',
     );
     expect(logger.warn).not.toHaveBeenCalled();
   });
@@ -52,8 +53,18 @@ describe('ContentReplicationMaintenanceScheduler', () => {
     await new ContentReplicationMaintenanceScheduler(maintainer).execute();
 
     expect(logger.warn).toHaveBeenCalledWith(
-      'Maintained content replication: maintained=0, failed=1',
+      'Maintained content replication: maintained=0, failed=1, deferred=0',
     );
     expect(logger.info).not.toHaveBeenCalled();
+  });
+
+  it('logs replicas deferred by the network budget at warn level', async () => {
+    maintainer.maintain.mockResolvedValue(result({ deferredReplicas: 2 }));
+
+    await new ContentReplicationMaintenanceScheduler(maintainer).execute();
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      'Maintained content replication: maintained=0, failed=0, deferred=2',
+    );
   });
 });
