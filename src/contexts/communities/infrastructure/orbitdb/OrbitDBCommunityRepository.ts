@@ -254,6 +254,20 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     return (await this.findState(id))?.frontier ?? [];
   }
 
+  /** Admitted operations sorted by code unit order of their digests. */
+  public async findOperations(
+    id: CommunityId,
+    after: string | undefined,
+    limit: number,
+  ): Promise<CommunityOperation[]> {
+    const records = await this.operationIndex.findRecords(this.headKey(id));
+
+    return this.operationsOf(id.valueOf(), records)
+      .filter((operation) => after === undefined || operation.getHash() > after)
+      .sort((left, right) => (left.getHash() < right.getHash() ? -1 : 1))
+      .slice(0, limit);
+  }
+
   /**
    * The frontier of every community of `networkId` cached on this node,
    * deleted ones included, sorted by community id.

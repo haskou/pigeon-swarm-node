@@ -121,6 +121,7 @@ async function actor(): Promise<CommunityOperationSigner> {
     deviceCredential,
     deviceKeyPair,
     id: new IdentityId(deviceCredential).valueOf(),
+    identityKeyPair: deviceKeyPair,
   };
 
   authorized.add(`${signer.id}|${signer.deviceCredential}`);

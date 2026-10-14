@@ -6,6 +6,9 @@ export class CommunityOperationBody {
   @Min(0)
   public readonly createdAt: number;
 
+  @IsString()
+  public readonly identitySignature: string;
+
   @IsString({ each: true })
   @IsArray()
   public readonly parents: string[];

@@ -26,6 +26,17 @@ export default abstract class CommunityRepository {
   /** The operations nobody built on yet: the parents of the next operation. */
   public abstract findFrontier(id: CommunityId): Promise<string[]>;
   /**
+   * Every admitted operation of the community, the ones the fold skipped
+   * included, sorted by digest: at most `limit` of them after the `after`
+   * digest (exclusive). A community without a replicated log has none.
+   */
+  public abstract findOperations(
+    id: CommunityId,
+    after: string | undefined,
+    limit: number,
+  ): Promise<CommunityOperation[]>;
+
+  /**
    * The frontier of every community of one network held on this node, deleted
    * ones included: equal results on two nodes mean equal community state.
    */

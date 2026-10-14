@@ -7,6 +7,7 @@ export type CommunityOperationPrimitives = {
   communityId: string;
   createdAt: number;
   id: string;
+  identitySignature: string;
   networkId: string;
   parents: string[];
   scopeType: 'community_operation';

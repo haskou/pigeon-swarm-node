@@ -123,6 +123,21 @@ export default class CommunityRepositoryRouter extends CommunityRepository {
     );
   }
 
+  /** A protected community has no replicated operation log to serve. */
+  public findOperations(
+    id: CommunityId,
+    after: string | undefined,
+    limit: number,
+  ): Promise<CommunityOperation[]> {
+    return this.storageCoordinator.exclusively(
+      id.valueOf(),
+      async (): Promise<CommunityOperation[]> =>
+        (await this.isProtected(id))
+          ? []
+          : this.publicRepository.findOperations(id, after, limit),
+    );
+  }
+
   /** Measures the replicated public store: what peers of the network compare. */
   public findFrontiersByNetwork(
     networkId: string,

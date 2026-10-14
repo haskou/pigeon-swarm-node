@@ -765,6 +765,12 @@ services:
       - '@contexts/communities/application/find-community/CommunityFinder'
       - >-
         @contexts/communities/domain/repositories/CommunityModerationLogRepository
+  contexts/communities/application/find-operations/CommunityOperationsFinder:
+    class: >-
+      /contexts/communities/application/find-operations/CommunityOperationsFinder
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
   contexts/communities/application/invite-member/CommunityMemberInviter:
     class: /contexts/communities/application/invite-member/CommunityMemberInviter
     arguments:

@@ -181,6 +181,41 @@ paths:
                 $ref: '#/components/schemas/CommunityFrontierResource'
         '409':
           description: The community is unknown to the node.
+  /communities/{communityId}/operations:
+    get:
+      tags:
+        - communities
+      summary: List the signed operations of a community
+      description: Members only, like GET /communities/{communityId}. Returns every stored community operation that passed verification, including the ones the fold skipped, verbatim and sorted by digest ascending (code-unit order). Each carries the identitySignature of its author, so a member replays roles and memberships back to the creator and verifies every author itself (it authorizes community MLS commits and welcomes). Read the next page with after = the digest of the last operation while a page holds limit operations.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: query
+          name: after
+          schema:
+            type: string
+            pattern: '^[A-Za-z0-9_-]{43}$'
+          description: Exclusive operation digest to page after.
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 500
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: One page of community operations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityOperationsResource'
+        '400':
+          description: limit is not an integer from 1 to 500, or after is not a 43-char base64url digest (code 400060).
+        '409':
+          description: The community is unknown to the node (CommunityNotFoundError) or the authenticated identity is not a member (CommunityMemberNotFoundError).
   /communities/{communityId}/moderation-logs:
     get:
       tags:
@@ -2222,9 +2257,10 @@ components:
           $ref: '#/components/schemas/CommunityModerationLogBody'
     CommunityOperationBody:
       type: object
-      description: "Client-signed community operation. The community is the deterministic fold of the operations its members signed, so peers cannot forge roles, bans, memberships, settings or deletion. The mutation signs {id 'community:<communityId>:op:<digest>', scopeType 'community_operation', communityId, networkId, authorIdentityId, action, args, parents, createdAt} in store communityOperations, kind put, sequence 0, predecessor null, signer = the authenticated identity. digest is base64url(sha256(canonicalize(payload without id))). authorIdentityId and args.identityId are the base64 public key without PEM headers. The node rebuilds the payload from the path, the actor, the endpoint action, the args derived from the other body fields, createdAt and parents, so the signature only verifies if the client signed exactly that. parents are the sorted frontier read from GET /communities/{communityId} immediately before signing (empty for the genesis). An operation whose author lacks the permission in the history named by parents, or that names an unknown parent, is rejected. Limits (409 CommunityOperationLimitExceededError): args is at most 4096 bytes of JSON and an identity signs at most 1000 operations per community; later operations of an author are skipped by every node."
+      description: "Client-signed community operation. The community is the deterministic fold of the operations its members signed, so peers cannot forge roles, bans, memberships, settings or deletion. The mutation signs {id 'community:<communityId>:op:<digest>', scopeType 'community_operation', communityId, networkId, authorIdentityId, action, args, parents, createdAt, identitySignature} in store communityOperations, kind put, sequence 0, predecessor null, signer = the authenticated identity. digest is base64url(sha256(canonicalize(payload without id and without identitySignature))). authorIdentityId and args.identityId are the base64 public key without PEM headers. The node rebuilds the payload from the path, the actor, the endpoint action, the args derived from the other body fields, createdAt, parents and identitySignature, so the signature only verifies if the client signed exactly that. parents are the sorted frontier read from GET /communities/{communityId} immediately before signing (empty for the genesis). An operation whose author lacks the permission in the history named by parents, or that names an unknown parent, is rejected. Limits (409 CommunityOperationLimitExceededError): args is at most 4096 bytes of JSON and an identity signs at most 1000 operations per community; later operations of an author are skipped by every node."
       required:
         - createdAt
+        - identitySignature
         - parents
         - mutation
       properties:
@@ -2232,6 +2268,9 @@ components:
           type: integer
           minimum: 0
           description: Also feeds the derived channel and role ids.
+        identitySignature:
+          type: string
+          description: "Standard base64 ed25519 signature (88 chars) by the author's identity key (authorIdentityId, the same root MLS leaf credentials use) over utf8('pigeon:community-operation:v1\\n' + id). Verified on admission and on every replicated record; an operation without a valid one is refused."
         parents:
           type: array
           maxItems: 64
@@ -2254,6 +2293,63 @@ components:
         networkId:
           type: string
           description: Network the community lives in. The operation payload names it, and a non-member cannot read it from GET /communities/{communityId}.
+    CommunityOperationRecord:
+      type: object
+      description: Stored signed community operation, verbatim (see CommunityOperationBody).
+      required:
+        - action
+        - args
+        - authorIdentityId
+        - communityId
+        - createdAt
+        - id
+        - identitySignature
+        - networkId
+        - parents
+        - scopeType
+      properties:
+        action:
+          type: string
+        args:
+          type: object
+          additionalProperties: true
+        authorIdentityId:
+          type: string
+        communityId:
+          type: string
+        createdAt:
+          type: integer
+        id:
+          type: string
+          description: community:<communityId>:op:<digest>
+        identitySignature:
+          type: string
+        networkId:
+          type: string
+        parents:
+          type: array
+          items:
+            type: string
+        scopeType:
+          type: string
+          enum:
+            - community_operation
+    CommunityOperationsResource:
+      type: object
+      required:
+        - communityId
+        - networkId
+        - operations
+      properties:
+        communityId:
+          type: string
+        networkId:
+          type: string
+        operations:
+          type: array
+          description: Sorted by digest ascending.
+          items:
+            $ref: '#/components/schemas/CommunityOperationRecord'
     CommunityModerationLogBody:
       type: object
       description: Client-signed moderation log entry, kept as the audit trail beside the signed community operation (separate signature, separate store). The mutation signs {action, actorIdentityId, communityId, createdAt, details, id, scopeType 'community_moderation_log', target {id, type}} in store moderationLogs, recordId = id, sequence 0, signer = the acting moderator. id is the first 24 hex chars of sha256(JSON.stringify([communityId, actorIdentityId, action, target.type, target.id, createdAt])). For channel and role creation target.id is the channel/role id derived from the operation createdAt, not from this createdAt.
