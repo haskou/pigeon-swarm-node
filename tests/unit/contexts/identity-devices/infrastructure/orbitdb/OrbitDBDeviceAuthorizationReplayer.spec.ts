@@ -9,6 +9,7 @@ import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/doma
 import { PairingAuthorization } from '@app/contexts/identity-devices/domain/value-objects/PairingAuthorization';
 import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
 import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/PairingId';
+import { OrbitDBDeviceAuthorizationDocument } from '@app/contexts/identity-devices/infrastructure/orbitdb/documents/OrbitDBDeviceAuthorizationDocument';
 import { OrbitDBDeviceAuthorizationTransitionRecord } from '@app/contexts/identity-devices/infrastructure/orbitdb/documents/OrbitDBDeviceAuthorizationTransitionRecord';
 import OrbitDBDeviceAuthorizationCanonicalizer from '@app/contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationCanonicalizer';
 import OrbitDBDeviceAuthorizationReplayer from '@app/contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationReplayer';
@@ -58,6 +59,7 @@ describe(OrbitDBDeviceAuthorizationReplayer.name, () => {
     operationId: string,
     pairingId: string,
     previousRevision = DeviceAuthorizationRevision.initial(),
+    epoch = DeviceAuthorizationEpoch.genesis(),
   ): DeviceAuthorizationTransition {
     const unsigned = DeviceAuthorizationTransition.enrollment(
       identityId,
@@ -70,7 +72,7 @@ describe(OrbitDBDeviceAuthorizationReplayer.name, () => {
         new PairingExpiration(now.valueOf() + 60_000),
         now,
       ),
-      DeviceAuthorizationEpoch.genesis(),
+      epoch,
     );
     const proven = unsigned.provePossession(
       target.sign(unsigned.getProofOfPossessionPayload()),
@@ -322,5 +324,178 @@ describe(OrbitDBDeviceAuthorizationReplayer.name, () => {
     expect(forward.history).toEqual(reversed.history);
     expect(forward.history.length).toBe(2);
     expect(forward.authorization.getCredentials().length).toBe(3);
+  });
+
+  describe('transitionLogOf', () => {
+    function documentOf(
+      genesis: DeviceAuthorization,
+      history: OrbitDBDeviceAuthorizationTransitionRecord[],
+      checkpoint?: OrbitDBDeviceAuthorizationDocument['checkpoint'],
+    ): OrbitDBDeviceAuthorizationDocument {
+      return {
+        authorization: genesis.toPrimitives(),
+        ...(checkpoint ? { checkpoint } : {}),
+        genesis: genesis.toPrimitives(),
+        history,
+        id: `device-authorization:${genesis.getIdentityId().valueOf()}`,
+        identityId: genesis.getIdentityId().valueOf(),
+        kind: 'device_authorization',
+      };
+    }
+
+    async function retiredPhone() {
+      const { genesis, identityId, owner } = await fixture();
+      const phone = await KeyPair.generate();
+      const laptop = await KeyPair.generate();
+      const attacker = await KeyPair.generate();
+      const enrolled = record(
+        enrollment(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000041',
+          '10000000-0000-4000-8000-000000000041',
+        ),
+      );
+      const retired = record(
+        revocation(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000042',
+          new DeviceAuthorizationRevision(1),
+        ),
+      );
+      const forged = record(
+        revocation(
+          identityId,
+          attacker,
+          owner,
+          '00000000-0000-4000-8000-000000000043',
+          new DeviceAuthorizationRevision(1),
+        ),
+      );
+      const replaced = record(
+        enrollment(
+          identityId,
+          owner,
+          laptop,
+          '00000000-0000-4000-8000-000000000044',
+          '10000000-0000-4000-8000-000000000044',
+          new DeviceAuthorizationRevision(2),
+        ),
+      );
+
+      return {
+        document: documentOf(genesis, [replaced, forged, retired, enrolled]),
+        genesis,
+        history: [enrolled, retired, replaced],
+        phone,
+      };
+    }
+
+    it('serves the accepted history in replay order without rejected records', async () => {
+      const { document, genesis, history, phone } = await retiredPhone();
+
+      const log = replayer.transitionLogOf(genesis, document);
+      const full = log.disclosedTo(genesis.getRecoveryAuthority());
+
+      expect(full.getRecoveries()).toEqual([]);
+      expect(full.getConcurrentRecoveries()).toEqual([]);
+      expect(
+        full.getTransitions().map((transition) => transition.toPrimitives()),
+      ).toEqual(history.map(({ transition }) => transition));
+      expect(
+        log
+          .disclosedTo(
+            DeviceCredential.fromString(phone.toPrimitives().publicKey),
+          )
+          .getTransitions()
+          .map((transition) => transition.toPrimitives()),
+      ).toEqual(history.slice(0, 2).map(({ transition }) => transition));
+    });
+
+    it('serves the frontier of an overflowed document', async () => {
+      const { document, genesis, history } = await retiredPhone();
+
+      const log = replayer.transitionLogOf(genesis, {
+        ...documentOf(genesis, []),
+        overflow: { frontier: document, sources: [] },
+      });
+
+      expect(
+        log
+          .disclosedTo(genesis.getRecoveryAuthority())
+          .getTransitions()
+          .map((transition) => transition.toPrimitives()),
+      ).toEqual(history.map(({ transition }) => transition));
+    });
+
+    it('serves the recovery lineage and the concurrent recoveries of the checkpoint', async () => {
+      const {
+        genesis,
+        identityId,
+        owner,
+        recovery: recoveryKey,
+      } = await fixture();
+      const recovered = await KeyPair.generate();
+      const sibling = await KeyPair.generate();
+      const laptop = await KeyPair.generate();
+      const winner = recovery(
+        identityId,
+        recoveryKey,
+        recovered,
+        '00000000-0000-4000-8000-000000000051',
+        DeviceAuthorizationRevision.initial(),
+      );
+      const loser = recovery(
+        identityId,
+        recoveryKey,
+        sibling,
+        '00000000-0000-4000-8000-000000000052',
+        DeviceAuthorizationRevision.initial(),
+      );
+      const reenrolled = record(
+        enrollment(
+          identityId,
+          recovered,
+          laptop,
+          '00000000-0000-4000-8000-000000000053',
+          '10000000-0000-4000-8000-000000000053',
+          new DeviceAuthorizationRevision(1),
+          DeviceAuthorizationEpoch.fromRecovery(winner.getOperationId()),
+        ),
+      );
+      const document = documentOf(genesis, [reenrolled], {
+        authorization: policy
+          .replayRecoveryLineage(genesis, [winner], [loser])
+          .authorization.toPrimitives(),
+        concurrent: [record(loser)],
+        lineage: [],
+        transition: record(winner),
+      });
+
+      const log = replayer.transitionLogOf(genesis, document);
+      const full = log.disclosedTo(genesis.getRecoveryAuthority());
+      const owned = log.disclosedTo(
+        DeviceCredential.fromString(owner.toPrimitives().publicKey),
+      );
+
+      expect(
+        full.getRecoveries().map((transition) => transition.toPrimitives()),
+      ).toEqual([winner.toPrimitives()]);
+      expect(
+        full
+          .getConcurrentRecoveries()
+          .map((transition) => transition.toPrimitives()),
+      ).toEqual([loser.toPrimitives()]);
+      expect(
+        full.getTransitions().map((transition) => transition.toPrimitives()),
+      ).toEqual([reenrolled.transition]);
+      expect(owned.getTransitions()).toEqual([]);
+      expect(
+        owned.getRecoveries().map((transition) => transition.toPrimitives()),
+      ).toEqual([winner.toPrimitives()]);
+    });
   });
 });

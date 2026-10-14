@@ -1,9 +1,5 @@
 import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
 import IdentityAdmissionSourceRateLimiter from '@app/apps/apis/identities-api/IdentityAdmissionSourceRateLimiter';
-import {
-  signNotificationInvitation,
-  signNotificationState,
-} from '../../support/signNotification';
 import { PrivateAuthorizationRequestBodyLimit } from '@app/apps/apis/private-authorization-api/routes/PrivateAuthorizationRequestBodyLimit';
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import PigeonApplication from '@app/apps/PigeonApplication';
@@ -71,6 +67,7 @@ import {
 import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import FormData from 'form-data';
 
+import { mineAdmissionNonce } from '../../support/mineAdmissionNonce';
 import {
   CallParticipantState,
   CallSigner,
@@ -82,10 +79,13 @@ import {
 } from '../../support/signCall';
 import { signCommunityOperation } from '../../support/signCommunityOperation';
 import { signConversationOperation } from '../../support/signConversationOperation';
+import {
+  signNotificationInvitation,
+  signNotificationState,
+} from '../../support/signNotification';
 import IPFSDefinition from './IPFSDefinition';
 import RestClient from './RestClient';
 import { RestResponse } from './RestResponse';
-import { mineAdmissionNonce } from '../../support/mineAdmissionNonce';
 
 chai.use(chaiSubset);
 
@@ -134,6 +134,7 @@ export default class Definitions {
   private identityDeviceOwnerKeyPair: KeyPair | undefined;
   private identityRecoveryKeyPair: KeyPair | undefined;
   private identityDeviceTargetKeyPair: KeyPair | undefined;
+  private signedDeviceAuthorizationTransitions: string[] = [];
 
   private signedConversationRequest:
     { method: string; path: string } | undefined;
@@ -153,6 +154,7 @@ export default class Definitions {
   private ownerIdentityId: IdentityId | undefined;
   private privateBlob:
     { blobId: string; downloadToken: string; uploadToken: string } | undefined;
+
   private response: RestResponse = null;
   private restClient: RestClient = new RestClient();
   private readonly ipfsDefinition: IPFSDefinition = new IPFSDefinition();
@@ -1283,6 +1285,7 @@ export default class Definitions {
       });
 
       this.callProofs.set(recordId, signed.proof);
+
       if (state === 'joined') this.callJoined.add(recordId);
       this.body = JSON.stringify({ at, mutation: mutationOf(signed.proof) });
 
@@ -1887,6 +1890,7 @@ export default class Definitions {
     this.body = JSON.stringify(
       proven.authorize(owner.sign(proven.getSigningPayload())).toPrimitives(),
     );
+    this.signedDeviceAuthorizationTransitions.push(this.body);
   }
 
   @given(
@@ -1911,6 +1915,7 @@ export default class Definitions {
         .authorize(target.sign(unsigned.getSigningPayload()))
         .toPrimitives(),
     );
+    this.signedDeviceAuthorizationTransitions.push(this.body);
   }
 
   @given(
@@ -1968,7 +1973,8 @@ export default class Definitions {
 
   @given('I sign the current device authorization checkpoint request')
   public async iSignTheCurrentDeviceAuthorizationCheckpointRequest(): Promise<void> {
-    await this.signDeviceAuthorizationCheckpointRequest(
+    await this.signDeviceAuthorizationRequest(
+      '',
       await this.ensureIdentityDeviceOwnerKeyPair(),
     );
   }
@@ -1977,7 +1983,8 @@ export default class Definitions {
     'the enrolled device signs the current device authorization checkpoint request',
   )
   public async theEnrolledDeviceSignsTheCurrentDeviceAuthorizationCheckpointRequest(): Promise<void> {
-    await this.signDeviceAuthorizationCheckpointRequest(
+    await this.signDeviceAuthorizationRequest(
+      '',
       this.identityDeviceTargetKeyPair as KeyPair,
     );
   }
@@ -2020,12 +2027,13 @@ export default class Definitions {
     this.headers['content-type'] = 'application/json';
   }
 
-  private async signDeviceAuthorizationCheckpointRequest(
+  private async signDeviceAuthorizationRequest(
+    suffix: string,
     device: KeyPair,
   ): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;
     this.body = undefined;
-    const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}`;
+    const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}${suffix}`;
     await this.signCurrentRequest('GET', path);
     const timestamp = this.headers['x-timestamp'] as string;
     const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
@@ -2040,6 +2048,78 @@ export default class Definitions {
     this.headers['x-device-signature'] = device
       .sign(JSON.stringify(payload))
       .valueOf();
+  }
+
+  private async signDeviceAuthorizationRecoveryRequest(
+    suffix: string,
+  ): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.body = undefined;
+    const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}${suffix}`;
+    await this.signCurrentRequest('GET', path);
+    const timestamp = this.headers['x-timestamp'] as string;
+    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
+      'GET',
+      path,
+      timestamp,
+      this.getCurrentRequestBody(),
+    );
+    const recoveryAuthority = await this.ensureIdentityRecoveryKeyPair();
+    this.headers['x-recovery-signature'] = recoveryAuthority
+      .sign(JSON.stringify(payload))
+      .valueOf();
+  }
+
+  @given('I sign the current device transition log request')
+  public async iSignTheCurrentDeviceTransitionLogRequest(): Promise<void> {
+    await this.signDeviceAuthorizationRequest(
+      '/transitions',
+      await this.ensureIdentityDeviceOwnerKeyPair(),
+    );
+  }
+
+  @given('the enrolled device signs the current device transition log request')
+  public async theEnrolledDeviceSignsTheCurrentDeviceTransitionLogRequest(): Promise<void> {
+    await this.signDeviceAuthorizationRequest(
+      '/transitions',
+      this.identityDeviceTargetKeyPair as KeyPair,
+    );
+  }
+
+  @given('I sign the current device transition log recovery request')
+  public async iSignTheCurrentDeviceTransitionLogRecoveryRequest(): Promise<void> {
+    await this.signDeviceAuthorizationRecoveryRequest('/transitions');
+  }
+
+  @given('another identity signs the current device transition log request')
+  public async anotherIdentitySignsTheCurrentDeviceTransitionLogRequest(): Promise<void> {
+    const targetIdentityId = this.ownerIdentityId as IdentityId;
+    const signer = await this.ensureOtherIdentityKeyPair();
+    const signerIdentityId = this.otherIdentityId as IdentityId;
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/identity-devices/${encodeURIComponent(targetIdentityId.valueOf())}/transitions`,
+      String(Date.now()),
+      signer,
+      signerIdentityId,
+    );
+  }
+
+  @then(
+    'response serves the signed device authorization transitions after revision {int}',
+  )
+  public responseServesTheSignedDeviceAuthorizationTransitionsAfterRevision(
+    after: number,
+  ): void {
+    expect(this.response?.data).to.deep.equal({
+      concurrentRecoveries: [],
+      identityId: this.ownerIdentityId?.valueOf(),
+      recoveries: [],
+      transitions: this.signedDeviceAuthorizationTransitions
+        .map((body) => JSON.parse(body) as { revision: number })
+        .filter(({ revision }) => revision > after),
+    });
   }
 
   @given('I sign the current device list request')
@@ -2175,21 +2255,7 @@ export default class Definitions {
 
   @given('I sign the current device authorization checkpoint recovery request')
   public async iSignTheCurrentDeviceAuthorizationCheckpointRecoveryRequest(): Promise<void> {
-    const identityId = this.ownerIdentityId as IdentityId;
-    this.body = undefined;
-    const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}`;
-    await this.signCurrentRequest('GET', path);
-    const timestamp = this.headers['x-timestamp'] as string;
-    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
-      'GET',
-      path,
-      timestamp,
-      this.getCurrentRequestBody(),
-    );
-    const recoveryAuthority = await this.ensureIdentityRecoveryKeyPair();
-    this.headers['x-recovery-signature'] = recoveryAuthority
-      .sign(JSON.stringify(payload))
-      .valueOf();
+    await this.signDeviceAuthorizationRecoveryRequest('');
   }
 
   @given(
@@ -6866,6 +6932,26 @@ export default class Definitions {
     const identityId = this.ownerIdentityId as IdentityId;
     this.response = await this.restClient.get(
       `/identity-devices/${encodeURIComponent(identityId.valueOf())}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the current device transition log')
+  public async iGetTheCurrentDeviceTransitionLog(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.response = await this.restClient.get(
+      `/identity-devices/${encodeURIComponent(identityId.valueOf())}/transitions`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the current device transition log after revision {string}')
+  public async iGetTheCurrentDeviceTransitionLogAfterRevision(
+    after: string,
+  ): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.response = await this.restClient.get(
+      `/identity-devices/${encodeURIComponent(identityId.valueOf())}/transitions?after=${encodeURIComponent(after)}`,
       this.headers,
     );
   }

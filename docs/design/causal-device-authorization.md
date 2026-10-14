@@ -265,6 +265,14 @@ is derived from the identity, which already records its own creation, and
 verification rebuilds it. Replay discards the intermediate states it rebuilds, so
 only the events of the applied transition reach the caller.
 
+## Removal proof (#513)
+
+`GET /identity-devices/{identityId}/transitions` serves the signed transitions
+behind the timeline (the recovery lineage, the concurrent recoveries and the
+accepted history) so a device can verify its own removal before it erases
+local secrets. A revoked device reads up to the group that removed it. See
+`device-authorization-transition-log.md`.
+
 ## Residuals
 
 - **Backdating a scoped record's frontier.** Non-operation community and
