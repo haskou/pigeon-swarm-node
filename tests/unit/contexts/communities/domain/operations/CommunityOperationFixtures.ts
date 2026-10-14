@@ -7,8 +7,11 @@ import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
 
 const identityKeys = new Map<string, PrivateKey>();
 
-function identity(): IdentityId {
-  const key = PrivateKey.generate();
+/** Fixed keys keep digests, and so the fold's total order, stable across runs. */
+function identity(privateKey: string): IdentityId {
+  const key = PrivateKey.fromPEM(
+    `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----\n`,
+  );
   const identityId = new IdentityId(key.getPublicKey().toString());
 
   identityKeys.set(identityId.valueOf(), key);
@@ -16,9 +19,15 @@ function identity(): IdentityId {
   return identityId;
 }
 
-export const owner = identity();
-export const alice = identity();
-export const mallory = identity();
+export const owner = identity(
+  'MC4CAQAwBQYDK2VwBCIEIDIImzhDl2dxpc8sBEBMfgC0+uf+4utMsT5+/RVYec3h',
+);
+export const alice = identity(
+  'MC4CAQAwBQYDK2VwBCIEIF9cDZsclQzu6BGMlKg+dN1sHTrS13KTPWYY0361oXRt',
+);
+export const mallory = identity(
+  'MC4CAQAwBQYDK2VwBCIEICnuu9V2LeqLwzcMTZQ+dYb9xsWLWISe3XwTPFQMT5R2',
+);
 export const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440000');
 export const nonce = 'genesis-nonce';
 export const communityId = CommunityId.derive(

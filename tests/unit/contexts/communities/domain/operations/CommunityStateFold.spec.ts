@@ -248,7 +248,20 @@ describe('CommunityStateFold', () => {
       [created],
     );
     const afterwards = join([left], alice);
-    const concurrent = join([created], mallory);
+    // A concurrent join the total order places after the leave (higher digest).
+    const concurrent = [2, 3, 4, 5, 6, 7, 8]
+      .map((createdAt) =>
+        operation(
+          CommunityOperationAction.MEMBER_JOINED,
+          owner,
+          { identityId: mallory.valueOf(), method: 'added' },
+          [created],
+          createdAt,
+        ),
+      )
+      .find((candidate) => candidate.getHash() > left.getHash());
+
+    if (!concurrent) throw new Error('No concurrent join ordered after leave');
 
     const state = CommunityStateFold.fold([
       created,
