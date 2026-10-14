@@ -14,9 +14,10 @@ export default class ContentReplicationMaintenanceScheduler extends Scheduler {
     const message = [
       `Maintained content replication: maintained=${result.maintainedReplicas}`,
       `failed=${result.failedReplicas}`,
+      `deferred=${result.deferredReplicas}`,
     ].join(', ');
 
-    if (result.failedReplicas > 0) {
+    if (result.failedReplicas > 0 || result.deferredReplicas > 0) {
       Kernel.logger.warn(message);
 
       return;

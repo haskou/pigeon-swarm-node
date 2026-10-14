@@ -11,8 +11,9 @@ import { ContentReplicationMaintenanceResult } from './ContentReplicationMainten
 
 /**
  * Fetches and advertises the signed registrations this node is responsible
- * for. It never removes a replica's bytes: no other node's statement can make
- * this node drop them.
+ * for, within this node's budget for each network; the rest are deferred. It
+ * never removes a replica's bytes: no other node's statement can make this
+ * node drop them.
  */
 export default class ContentReplicationMaintainer {
   constructor(
@@ -44,6 +45,7 @@ export default class ContentReplicationMaintainer {
   public async maintain(): Promise<ContentReplicationMaintenanceResult> {
     const status = await this.finder.find();
     const result: ContentReplicationMaintenanceResult = {
+      deferredReplicas: 0,
       failedReplicas: 0,
       maintainedReplicas: 0,
     };
@@ -52,6 +54,11 @@ export default class ContentReplicationMaintainer {
       for (const network of content.networks.filter(
         (candidate) => candidate.localResponsible,
       )) {
+        if (!network.withinLocalBudget) {
+          result.deferredReplicas++;
+          continue;
+        }
+
         try {
           await this.maintainResponsibleReplica(content, network);
           result.maintainedReplicas++;

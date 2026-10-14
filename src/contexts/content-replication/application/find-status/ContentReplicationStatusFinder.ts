@@ -5,8 +5,10 @@ import { Timestamp } from '@haskou/value-objects';
 import { createHash } from 'crypto';
 
 import { ContentReplication } from '../../domain/ContentReplication';
+import { ContentReplicationNetworkBudget } from '../../domain/ContentReplicationNetworkBudget';
 import ContentReplicationPolicy from '../../domain/ContentReplicationPolicy';
 import ContentReplicationRepository from '../../domain/repositories/ContentReplicationRepository';
+import ContentReplicationBudgetAllocator from '../../domain/services/ContentReplicationBudgetAllocator';
 import { ContentReplicationStatus } from './ContentReplicationStatus';
 import { ReplicatedContentStatus } from './ReplicatedContentStatus';
 
@@ -18,6 +20,8 @@ export default class ContentReplicationStatusFinder {
     private readonly nodeRepository: NodeRepository,
     private readonly nodePeerRepository: NodePeerRepository,
     private readonly policy: ContentReplicationPolicy,
+    private readonly budget: ContentReplicationNetworkBudget,
+    private readonly allocator: ContentReplicationBudgetAllocator,
   ) {}
 
   private async localNodeId(): Promise<string> {
@@ -79,17 +83,12 @@ export default class ContentReplicationStatusFinder {
 
   private buildContentStatus(
     content: ContentReplication,
+    activeNodeIds: string[],
+    responsibleNodeIds: string[],
     localNodeId: string,
-    activeNodeIdsByNetwork: Map<string, string[]>,
+    withinLocalBudget: boolean,
   ): ReplicatedContentStatus {
     const primitives = content.toPrimitives();
-    const activeNodeIds = activeNodeIdsByNetwork.get(primitives.networkId) ?? [
-      localNodeId,
-    ];
-    const responsibleNodeIds = this.selectResponsibleNodeIds(
-      content,
-      activeNodeIds,
-    );
 
     return {
       cid: primitives.cid,
@@ -101,6 +100,7 @@ export default class ContentReplicationStatusFinder {
           localResponsible: responsibleNodeIds.includes(localNodeId),
           networkId: primitives.networkId,
           responsibleNodeIds,
+          withinLocalBudget,
         },
       ],
       sizeBytes: primitives.sizeBytes,
@@ -116,8 +116,39 @@ export default class ContentReplicationStatusFinder {
     ];
   }
 
+  /**
+   * Ids of the responsible registrations each network's budget covers. Every
+   * owner's registration of a CID competes within that owner's share, so a
+   * CID is held when any of its owners' shares covers it.
+   */
+  private heldWithinBudget(responsible: ContentReplication[]): Set<string> {
+    const byNetwork = new Map<string, ContentReplication[]>();
+
+    responsible.forEach((registration) => {
+      const networkId = registration.getNetworkId().valueOf();
+      const registrations = byNetwork.get(networkId);
+
+      if (registrations) {
+        registrations.push(registration);
+
+        return;
+      }
+
+      byNetwork.set(networkId, [registration]);
+    });
+
+    return new Set(
+      [...byNetwork.values()].flatMap((registrations) =>
+        this.allocator
+          .select(registrations, this.budget)
+          .map((registration) => registration.getId()),
+      ),
+    );
+  }
+
   public async find(): Promise<ContentReplicationStatus> {
-    const contents = this.distinct(await this.contentRepository.findAll());
+    const registrations = await this.contentRepository.findAll();
+    const contents = this.distinct(registrations);
     const [localNodeId, activePeers] = await Promise.all([
       this.localNodeId(),
       this.nodePeerRepository.findActive(
@@ -131,10 +162,43 @@ export default class ContentReplicationStatusFinder {
       localNodeId,
       activePeers,
     );
+    const placements = contents.map((content) => {
+      const activeNodeIds = activeNodeIdsByNetwork.get(
+        content.getNetworkId().valueOf(),
+      ) ?? [localNodeId];
+
+      return {
+        activeNodeIds,
+        content,
+        responsibleNodeIds: this.selectResponsibleNodeIds(
+          content,
+          activeNodeIds,
+        ),
+      };
+    });
+    const localResponsibleIds = new Set(
+      placements
+        .filter(({ responsibleNodeIds }) =>
+          responsibleNodeIds.includes(localNodeId),
+        )
+        .map(({ content }) => content.getId()),
+    );
+    const held = this.heldWithinBudget(
+      registrations.filter((registration) =>
+        localResponsibleIds.has(registration.getId()),
+      ),
+    );
 
     return {
-      contents: contents.map((content) =>
-        this.buildContentStatus(content, localNodeId, activeNodeIdsByNetwork),
+      contents: placements.map(
+        ({ activeNodeIds, content, responsibleNodeIds }) =>
+          this.buildContentStatus(
+            content,
+            activeNodeIds,
+            responsibleNodeIds,
+            localNodeId,
+            held.has(content.getId()),
+          ),
       ),
       localNodeId,
     };

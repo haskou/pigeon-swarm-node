@@ -459,6 +459,12 @@ claims: a responsible node fetches (bounded) and provides; nobody releases a
 replica because of another node's statement. With `<= 5` active nodes everyone
 holds everything as today. The uploader always keeps its own copy. Storage on
 non-responsible uploaders is the price; it is bounded by the per-identity quota.
+Each node also caps what it fetches per network across all owners
+(`CONTENT_REPLICATION_NETWORK_BUDGET_BYTES`, 32 GiB), shared max-min fairly by
+owner, so minting identities multiplies the per-identity quota only up to that
+bound. It is local policy: validity and responsibility do not depend on it, so
+convergence is unchanged; a responsible node over budget simply defers the
+fetch, and other responsible nodes with room still hold the replica.
 
 ### UI/API contract changes
 

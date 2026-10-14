@@ -1664,6 +1664,16 @@ scopeType: "content_replication", sizeBytes }`, with `scopeType` exactly
   deterministic: records sort by id and the first ones that fit are admitted
 - only a record that passes the gate is ever fetched or provided, and the fetch
   is capped at the declared `sizeBytes`
+- each node fetches and provides at most 32 GiB per network across every owner
+  (`CONTENT_REPLICATION_NETWORK_BUDGET_BYTES`). This is local policy: it never
+  changes which records are valid nor which nodes are responsible. The budget
+  is shared max-min fairly by owner: each owner's records are taken smallest
+  first (then by CID), always serving next the owner holding the fewest bytes,
+  so many identities flooding a network cannot starve an owner that holds less
+  than the fair share. A CID registered by several owners is charged to each
+  and held when any of their shares covers it. Responsible records beyond the
+  budget are deferred, not fetched, and reported by the maintenance log as
+  `deferred`; bytes already fetched are never removed
 
 Byte-exact vectors (ids, digests and signing content) are in
 `tests/fixtures/content-replication-vectors.json`.
