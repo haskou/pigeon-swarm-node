@@ -11,7 +11,6 @@ import {
   genesis,
   join,
   mallory,
-  networkId,
   operation,
   owner,
 } from './CommunityOperationFixtures';
@@ -152,9 +151,10 @@ describe('CommunityStateFold', () => {
 
   it('rejects a genesis whose community id is not derived from owner and nonce', () => {
     expect(() =>
-      CommunityOperation.create({
-        action: CommunityOperationAction.COMMUNITY_CREATED,
-        args: {
+      operation(
+        CommunityOperationAction.COMMUNITY_CREATED,
+        owner,
+        {
           autoJoinEnabled: false,
           description: 'A community',
           discoverable: true,
@@ -162,12 +162,8 @@ describe('CommunityStateFold', () => {
           nonce: 'another-nonce',
           visibility: 'public',
         },
-        authorIdentityId: owner,
-        communityId,
-        createdAt: 1,
-        networkId,
-        parents: [],
-      }),
+        [],
+      ),
     ).toThrow();
   });
 
@@ -252,7 +248,20 @@ describe('CommunityStateFold', () => {
       [created],
     );
     const afterwards = join([left], alice);
-    const concurrent = join([created], mallory);
+    // A concurrent join the total order places after the leave (higher digest).
+    const concurrent = [2, 3, 4, 5, 6, 7, 8]
+      .map((createdAt) =>
+        operation(
+          CommunityOperationAction.MEMBER_JOINED,
+          owner,
+          { identityId: mallory.valueOf(), method: 'added' },
+          [created],
+          createdAt,
+        ),
+      )
+      .find((candidate) => candidate.getHash() > left.getHash());
+
+    if (!concurrent) throw new Error('No concurrent join ordered after leave');
 
     const state = CommunityStateFold.fold([
       created,

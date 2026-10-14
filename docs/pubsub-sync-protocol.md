@@ -353,11 +353,16 @@ unsigned or snapshot fallback. This change does not introduce a second transport
 public discovery topic, or a new recipient set.
 
 An operation is an immutable record `{ id, scopeType: "community_operation",
-communityId, networkId, authorIdentityId, action, args, parents, createdAt }`.
-Its id is `community:<communityId>:op:<digest>`, where the digest is the base64url
-SHA-256 of the canonical payload without `id`. It carries a create-only
-`PublicMutationProof` (`put`, sequence 0, no predecessor) signed by the device of
-the author. `parents` are the sorted digests of the operations the author had seen
+communityId, networkId, authorIdentityId, action, args, parents, createdAt,
+identitySignature }`. Its id is `community:<communityId>:op:<digest>`, where the
+digest is the base64url SHA-256 of the canonical payload without `id` and without
+`identitySignature`. `identitySignature` is the ed25519 signature of the author's
+identity key (the root MLS leaf credentials use) over
+`"pigeon:community-operation:v1\n" + id`, so any member verifies the author of
+every operation without trusting a node (`GET /communities/{id}/operations` serves
+them verbatim). It carries a create-only `PublicMutationProof` (`put`, sequence 0,
+no predecessor) signed by the device of the author over the whole record. `parents`
+are the sorted digests of the operations the author had seen
 (the `frontier` of `GET /communities/{id}/frontier`, at most 64): a non-genesis operation
 names at least one parent and the genesis `community_created` none. The genesis
 carries the `nonce` from which `communityId = CommunityId.derive(networkId, owner,
@@ -373,7 +378,9 @@ Admission: every node checks an operation on write, on replicated read and on he
 hydration. `PublicMutationVerifier` checks the signature, the device in the
 identity's device authorization chain at the revision the proof claims (see
 [Causal device authorization](#causal-device-authorization)), and the binding of id, scope and
-author to the payload digest. `CommunityOperationMutationPolicy` then applies the
+author to the payload digest. `CommunityOperationMutationPolicy` verifies the
+`identitySignature` (an operation without a valid one is refused, with no unsigned
+fallback), then applies the
 operation to the state of its causal past in a per-community ledger and refuses it
 when the author lacked the permission at that point of history. A
 `member_joined` needs evidence: `added` requires manage-members, `approval`

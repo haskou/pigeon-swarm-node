@@ -2563,6 +2563,7 @@ fallback. A route that changes a community takes an `operation` body field:
 {
   "operation": {
     "createdAt": 1773848829055,
+    "identitySignature": "<base64 ed25519 signature by the author identity key>",
     "parents": ["<digest from GET /communities/{id}/frontier>"],
     "mutation": { "...": "SignedPublicMutation" }
   }
@@ -2582,13 +2583,31 @@ fallback. A route that changes a community takes an `operation` body field:
   "action": "channel_created",
   "args": { "channelId": "<id>", "name": "general", "type": "text" },
   "parents": ["<digest>"],
-  "createdAt": 1773848829055
+  "createdAt": 1773848829055,
+  "identitySignature": "<base64 ed25519 signature>"
 }
 ```
 
-`<digest>` is the base64url sha256 of the canonical payload without `id`, and the
-record id and `payloadDigest` bind it. Identity ids in `authorIdentityId` and
-`args.identityId` are the base64 public key without PEM headers. The client reads
+`<digest>` is the base64url sha256 of the canonical payload without `id` and
+without `identitySignature`, and the record id and `payloadDigest` (which covers
+the whole record, `id` and `identitySignature` included) bind it. Identity ids in
+`authorIdentityId` and `args.identityId` are the base64 public key without PEM
+headers.
+
+`identitySignature` is the standard base64 ed25519 signature (88 characters) by the
+author's identity key — the key whose PEM-less base64 public key is
+`authorIdentityId`, the same root MLS leaf credentials use — over the UTF-8 bytes
+of `"pigeon:community-operation:v1\n" + id`. The device `mutation` alone only
+proves the authority of the author's devices to the node; the identity signature
+lets any member verify who authored each operation from the operation itself
+(see _Get community operations_). The node verifies it on admission and on every
+replicated record and has no unsigned fallback: a route refuses an operation whose
+`identitySignature` is missing (`400`), malformed
+(`InvalidCommunityOperationError`) or not the author's signature of that `id`
+(`InvalidPublicMutationError`), and a replicated record without a valid one is
+dropped.
+
+The client reads
 `frontier` from `GET /communities/{communityId}/frontier` immediately before signing and
 sends it as the sorted `parents` (the genesis has none). The node rebuilds the
 operation from the path community, the authenticated actor, the action of the
@@ -2645,7 +2664,8 @@ Fixed, reproducible vectors for the genesis and `member_joined` operations live 
 Per case they give the inputs (`networkId`, community nonce, owner, `createdAt`,
 `parents`, `args`, a deterministic ed25519 test key) and every derived value:
 `communityId`, the canonical payload and its `digest`, the `recordId`,
-`payloadDigest`, the signing content, the signature and the request `operation`.
+`payloadDigest`, the identity signing content and `identitySignature`, the signing
+content, the signature and the request `operation`.
 A unit spec recomputes all of them with the domain code and with plain
 `canonicalize` and `sha256`, so a client can use the file as its conformance test.
 A client that is not a member yet reads the `networkId` it needs for the
@@ -2777,6 +2797,7 @@ Request:
   "visibility": "private",
   "operation": {
     "createdAt": 1773848829055,
+    "identitySignature": "<identity signature>",
     "parents": [],
     "mutation": { "...": "SignedPublicMutation" }
   }
@@ -2842,6 +2863,53 @@ Implemented:
   of immutable records already replicated to every peer of the network, so they
   disclose nothing else.
 
+### Get community operations
+
+```http
+GET /communities/{communityId}/operations?after=<digest>&limit=<n>
+```
+
+Implemented:
+
+- require signed request auth
+- allow only members, like `GET /communities/{communityId}`
+  (`CommunityMemberNotFoundError` otherwise)
+- fail with `CommunityNotFoundError` when the community is unknown to the node
+- `limit` is an integer from 1 to 500 (default 500); `after` is an exclusive
+  operation digest (43 base64url characters). Any other value answers `400` with
+  code `400060` (`Invalid community operations query.`)
+- return every stored operation of the community that passed verification,
+  including the ones the fold skipped, verbatim and sorted by digest ascending
+  (code-unit order), the first `limit` after `after`:
+
+```json
+{
+  "communityId": "<communityId>",
+  "networkId": "<networkId>",
+  "operations": [
+    {
+      "action": "community_created",
+      "args": { "...": "..." },
+      "authorIdentityId": "<identityId>",
+      "communityId": "<communityId>",
+      "createdAt": 1773848829055,
+      "id": "community:<communityId>:op:<digest>",
+      "identitySignature": "<identity signature>",
+      "networkId": "<networkId>",
+      "parents": [],
+      "scopeType": "community_operation"
+    }
+  ]
+}
+```
+
+A client reads the next page with `after` = the digest of the last operation while
+a page holds `limit` operations. Each operation carries its author's
+`identitySignature` (see _Signed community operations_), so a member replays the
+roles and memberships back to the creator and verifies every author itself
+instead of trusting the node: it is what authorizes community MLS commits and
+welcomes.
+
 ### Update community profile
 
 ```http
@@ -2860,6 +2928,7 @@ Request:
   "autoJoinEnabled": true,
   "operation": {
     "createdAt": 1773848829055,
+    "identitySignature": "<identity signature>",
     "parents": ["<frontier>"],
     "mutation": { "...": "SignedPublicMutation" }
   }
@@ -3001,6 +3070,7 @@ Request:
   },
   "operation": {
     "createdAt": 1780000000000,
+    "identitySignature": "<identity signature>",
     "parents": ["<frontier>"],
     "mutation": { "...": "SignedPublicMutation" }
   }
@@ -3028,8 +3098,8 @@ Implemented:
 DELETE /communities/{communityId}/members/me
 ```
 
-Body: `{ "operation": { "createdAt", "parents", "mutation" } }`, signing
-`member_left` with `args` `{identityId: <actor>}`.
+Body: `{ "operation": { "createdAt", "identitySignature", "parents", "mutation" } }`,
+signing `member_left` with `args` `{identityId: <actor>}`.
 
 Implemented:
 
@@ -3046,8 +3116,9 @@ DELETE /communities/{communityId}/members/{identityId}/kick
 ```
 
 Body: `{ "moderationLog": { "createdAt", "mutation" }, "operation": {
-"createdAt", "parents", "mutation" } }`, the operation signing `member_kicked`
-with `args` `{identityId: <target>}` (see "Signed moderation log entries").
+"createdAt", "identitySignature", "parents", "mutation" } }`, the operation
+signing `member_kicked` with `args` `{identityId: <target>}` (see "Signed
+moderation log entries").
 
 Implemented:
 
@@ -3179,6 +3250,7 @@ Ban request:
   },
   "operation": {
     "createdAt": 1773848829055,
+    "identitySignature": "<identity signature>",
     "parents": ["<frontier>"],
     "mutation": { "...": "SignedPublicMutation" }
   }
@@ -3450,6 +3522,7 @@ Role body:
   },
   "operation": {
     "createdAt": 1773848829055,
+    "identitySignature": "<identity signature>",
     "parents": ["<frontier>"],
     "mutation": { "...": "SignedPublicMutation" }
   }
@@ -3467,6 +3540,7 @@ Member role replacement body:
   },
   "operation": {
     "createdAt": 1773848829055,
+    "identitySignature": "<identity signature>",
     "parents": ["<frontier>"],
     "mutation": { "...": "SignedPublicMutation" }
   }
@@ -3503,6 +3577,7 @@ Request:
   },
   "operation": {
     "createdAt": 1773848829055,
+    "identitySignature": "<identity signature>",
     "parents": ["<frontier>"],
     "mutation": { "...": "SignedPublicMutation" }
   }
@@ -3532,6 +3607,7 @@ Request:
   },
   "operation": {
     "createdAt": 1773848829055,
+    "identitySignature": "<identity signature>",
     "parents": ["<frontier>"],
     "mutation": { "...": "SignedPublicMutation" }
   }
@@ -3563,6 +3639,7 @@ Request:
   },
   "operation": {
     "createdAt": 1773848829055,
+    "identitySignature": "<identity signature>",
     "parents": ["<frontier>"],
     "mutation": { "...": "SignedPublicMutation" }
   }
@@ -3592,6 +3669,7 @@ Request:
   },
   "operation": {
     "createdAt": 1773848829055,
+    "identitySignature": "<identity signature>",
     "parents": ["<frontier>"],
     "mutation": { "...": "SignedPublicMutation" }
   }
@@ -3614,7 +3692,7 @@ DELETE /communities/{communityId}/channels/{channelId}
 ```
 
 Body: `{ "moderationLog": { "createdAt", "mutation" }, "operation": { "createdAt",
-"parents", "mutation" } }`, signing `channel_deleted`.
+"identitySignature", "parents", "mutation" } }`, signing `channel_deleted`.
 
 Response:
 

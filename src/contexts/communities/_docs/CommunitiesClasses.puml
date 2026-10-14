@@ -127,6 +127,10 @@ package "communities/application" {
     + find(message): CommunityModerationLogsPage
   }
 
+  class CommunityOperationsFinder {
+    + find(message): CommunityOperationsPage
+  }
+
   class CommunitiesFinder {
     + find(message): Community[]
   }
@@ -186,6 +190,7 @@ package "communities/application" {
   CommunityInviteDetailsFinder ..> CommunityInviteRepository
   CommunityMembershipRequestsFinder ..> CommunityMembershipRequestRepository
   CommunityModerationLogsFinder ..> CommunityModerationLogRepository
+  CommunityOperationsFinder ..> CommunityRepository
   CommunitiesFinder ..> CommunityRepository
   CommunitiesDiscoverer ..> CommunityRepository
   CommunitiesDiscoverer ..> CommunityMembershipRequestRepository
@@ -479,9 +484,13 @@ package "communities/domain" {
     - args: CommunityOperationArguments
     - parents: string[]
     - createdAt: Timestamp
-    + create(attributes): CommunityOperation
+    - identitySignature: Signature
+    + create(attributes, identitySignature): CommunityOperation
     + fromPrimitives(primitives): CommunityOperation
     + recordIdOf(communityId, hash): string
+    + recordIdFor(attributes): string
+    + identitySigningContentOf(id): string
+    + assertIdentitySigned(): void
     + isGenesis(): boolean
   }
 

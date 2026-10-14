@@ -12,17 +12,21 @@ import { CommunityOperationMutationPrimitives } from './CommunityOperationMutati
 
 /**
  * The client-signed `communityOperations` put that carries a community change:
- * the signed proof plus the metadata the signature covers. The server rebuilds
- * the operation from the request, so the signature only verifies when the
- * client signed exactly the change this endpoint performs.
+ * the signed proof, the author's identity signature over the operation id and
+ * the metadata both signatures cover. The server rebuilds the operation from
+ * the request, so the signatures only verify when the client signed exactly
+ * the change this endpoint performs; the public mutation gate verifies both
+ * before the operation is stored.
  */
 export class CommunityOperationMutation {
   public readonly createdAt: number;
+  public readonly identitySignature: string;
   public readonly parents: string[];
   public readonly proof: PublicMutationProof;
 
   constructor(primitives: CommunityOperationMutationPrimitives) {
     this.createdAt = primitives.createdAt;
+    this.identitySignature = primitives.identitySignature;
     this.parents = primitives.parents;
     this.proof = PublicMutationProof.fromPrimitives(primitives.mutation);
   }
@@ -41,6 +45,7 @@ export class CommunityOperationMutation {
       authorIdentityId: attributes.author,
       communityId: attributes.communityId,
       createdAt: this.createdAt,
+      identitySignature: this.identitySignature,
       networkId: attributes.networkId,
       parents: this.parents,
     });

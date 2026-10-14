@@ -36,6 +36,7 @@ import {
   mallory,
   operation,
   owner,
+  unverifiedIdentitySignature,
 } from '../domain/operations/CommunityOperationFixtures';
 
 const OPERATION_CREATED_AT = 1780000000001;
@@ -49,6 +50,7 @@ describe('Community role and moderation use cases', () => {
   let moderationLog: { createdAt: number; mutation: unknown };
   let signedOperation: {
     createdAt: number;
+    identitySignature: string;
     mutation: unknown;
     parents: string[];
   };
@@ -103,6 +105,7 @@ describe('Community role and moderation use cases', () => {
           store: 'communityOperations',
         })
       ).toPrimitives(),
+      identitySignature: unverifiedIdentitySignature,
       parents: [genesis().getHash()],
     };
   });

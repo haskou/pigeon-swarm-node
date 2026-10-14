@@ -30,6 +30,7 @@ import { GetCommunityMembershipRequestsRoute } from '@app/apps/apis/communities-
 import { GetCommunityMembersRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMembersRoute';
 import { GetCommunityMessageSearchRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMessageSearchRoute';
 import { GetCommunityModerationLogsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityModerationLogsRoute';
+import { GetCommunityOperationsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityOperationsRoute';
 import { GetCommunityRolesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityRolesRoute';
 import { GetCommunityRoute } from '@app/apps/apis/communities-api/routes/GetCommunityRoute';
 import { GetMLSRecordsRoute } from '@app/apps/apis/communities-api/routes/GetMLSRecordsRoute';
@@ -240,6 +241,7 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PostCommunityRoute,
   GetCommunityRoute,
   GetCommunityFrontierRoute,
+  GetCommunityOperationsRoute,
   PatchCommunityRoute,
   GetCommunityMembersRoute,
   GetCommunityModerationLogsRoute,

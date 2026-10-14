@@ -7,6 +7,7 @@ import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projec
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
 import CallParticipantLeaseExpirationRegistrar from '@app/contexts/calls/application/expire-participant-leases/CallParticipantLeaseExpirationRegistrar';
 import CommunityFinder from '@app/contexts/communities/application/find-community/CommunityFinder';
+import { CommunityOperation } from '@app/contexts/communities/domain/operations/CommunityOperation';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
@@ -1047,6 +1048,7 @@ export default class Definitions {
         deviceCredential: keyPair.toPrimitives().publicKey,
         deviceKeyPair: keyPair,
         id: ownerIdentityId,
+        identityKeyPair: keyPair,
       },
     });
 
@@ -1101,6 +1103,7 @@ export default class Definitions {
         deviceCredential: keyPair.toPrimitives().publicKey,
         deviceKeyPair: keyPair,
         id: actorIdentityId,
+        identityKeyPair: keyPair,
       },
     });
 
@@ -2996,6 +2999,24 @@ export default class Definitions {
     );
   }
 
+  @given('the community member signs the current community operations request')
+  public async theCommunityMemberSignsTheCurrentCommunityOperationsRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/operations`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
   @given('the community member signs the current community leave request')
   public async theCommunityMemberSignsTheCurrentCommunityLeaveRequest(): Promise<void> {
     if (!this.communityId) {
@@ -3145,6 +3166,19 @@ export default class Definitions {
     await this.signCurrentRequest(
       'GET',
       `/communities/${this.communityId}/moderation-logs`,
+    );
+  }
+
+  @given('I sign the current community operations request')
+  public async iSignTheCurrentCommunityOperationsRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/operations`,
     );
   }
 
@@ -6245,6 +6279,20 @@ export default class Definitions {
     );
   }
 
+  @when('I GET the current community operations with query {string}')
+  public async iGETTheCurrentCommunityOperationsWithQuery(
+    query: string,
+  ): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/operations${query}`,
+      this.headers,
+    );
+  }
+
   @when('I GET moderation logs from the current community')
   public async iGETModerationLogsFromTheCurrentCommunity(): Promise<void> {
     if (!this.communityId) {
@@ -6601,6 +6649,34 @@ export default class Definitions {
     expect(JSON.stringify(this.response.data)).to.contain(
       `"networkId":"${this.currentNetworkId}"`,
       JSON.stringify(this.response.data),
+    );
+  }
+
+  @then(
+    'response lists {int} community operations by digest, each signed by its author identity',
+  )
+  public responseListsCommunityOperationsSignedByTheirAuthors(
+    count: number,
+  ): void {
+    const { communityId, networkId, operations } = this.response.data as {
+      communityId: string;
+      networkId: string;
+      operations: Parameters<typeof CommunityOperation.fromPrimitives>[0][];
+    };
+    const verified = operations.map((primitives) =>
+      CommunityOperation.fromPrimitives(primitives),
+    );
+    const digests = verified.map((operation) => operation.getHash());
+
+    expect(communityId).to.equal(this.communityId);
+    expect(networkId).to.equal(String(this.currentNetworkId));
+    expect(operations).to.have.length(count);
+    expect(digests).to.deep.equal(
+      [...digests].sort((left, right) => (left < right ? -1 : 1)),
+    );
+    for (const operation of verified) operation.assertIdentitySigned();
+    expect(verified.map((operation) => operation.toPrimitives())).to.deep.equal(
+      operations,
     );
   }
 

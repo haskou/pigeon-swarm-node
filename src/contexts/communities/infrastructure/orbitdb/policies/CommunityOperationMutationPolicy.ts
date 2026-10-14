@@ -13,15 +13,23 @@ import { CommunityJoinMethod } from '../../../domain/value-objects/CommunityJoin
 import { CommunityOperationAction } from '../../../domain/value-objects/CommunityOperationAction';
 
 /**
- * Admits a signed community operation only when its author was permitted to
- * perform it in the history the operation builds on. Every admitted operation
- * is remembered here, so the parents of a replicated batch are found whatever
- * the order it arrives in; an operation whose parents (or whose join
- * reference) have not replicated yet is refused and retried by the registry.
+ * Admits a signed community operation only when its author's identity key
+ * signed it and the author was permitted to perform it in the history the
+ * operation builds on. Every admitted operation is remembered here, so the
+ * parents of a replicated batch are found whatever the order it arrives in; an
+ * operation whose parents (or whose join reference) have not replicated yet is
+ * refused and retried by the registry.
  */
 export default class CommunityOperationMutationPolicy extends PublicMutationPolicy {
   private readonly shape = new PublicMutationRecordShape(
-    ['action', 'authorIdentityId', 'communityId', 'id', 'networkId'],
+    [
+      'action',
+      'authorIdentityId',
+      'communityId',
+      'id',
+      'identitySignature',
+      'networkId',
+    ],
     ['createdAt'],
     'community_operation',
     { arrays: ['parents'], objects: ['args'] },
@@ -40,6 +48,14 @@ export default class CommunityOperationMutationPolicy extends PublicMutationPoli
   private toOperation(record: Record<string, unknown>): CommunityOperation {
     try {
       return CommunityOperation.fromPrimitives(record);
+    } catch {
+      throw new InvalidPublicMutationError();
+    }
+  }
+
+  private assertIdentitySigned(operation: CommunityOperation): void {
+    try {
+      operation.assertIdentitySigned();
     } catch {
       throw new InvalidPublicMutationError();
     }
@@ -162,6 +178,8 @@ export default class CommunityOperationMutationPolicy extends PublicMutationPoli
     if (record.removed !== undefined) throw new InvalidPublicMutationError();
 
     const operation = this.toOperation(record);
+
+    this.assertIdentitySigned(operation);
 
     return {
       authorIdentityId: operation.getAuthorIdentityId().valueOf(),

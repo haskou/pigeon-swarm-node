@@ -11,6 +11,7 @@ import {
   ban,
   communityId,
   genesis,
+  identitySignatureOf,
   join,
   mallory,
   networkId,
@@ -95,6 +96,37 @@ describe('CommunityOperationMutationPolicy', () => {
       };
 
       expect(() => policy.expectationOf(forged)).toThrow();
+    });
+
+    it('rejects an operation without the author identity signature', () => {
+      const unsigned: Record<string, unknown> = { ...record(genesis()) };
+
+      delete unsigned.identitySignature;
+
+      expect(() => policy.expectationOf(unsigned)).toThrow(
+        InvalidPublicMutationError,
+      );
+    });
+
+    it.each([
+      ['a malformed signature', () => 'not-a-signature'],
+      [
+        'a signature by another identity',
+        () => identitySignatureOf(mallory, genesis().getId()),
+      ],
+      [
+        'a signature over another operation id',
+        () => identitySignatureOf(owner, join([genesis()], alice).getId()),
+      ],
+    ])('rejects an operation with %s', (_name, signatureOf) => {
+      const forged = {
+        ...record(genesis()),
+        identitySignature: signatureOf(),
+      };
+
+      expect(() => policy.expectationOf(forged)).toThrow(
+        InvalidPublicMutationError,
+      );
     });
   });
 

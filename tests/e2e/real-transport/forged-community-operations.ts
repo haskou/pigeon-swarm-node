@@ -90,6 +90,7 @@ async function actor(): Promise<CommunityOperationSigner> {
     deviceCredential,
     deviceKeyPair,
     id: new IdentityId(deviceCredential).valueOf(),
+    identityKeyPair: deviceKeyPair,
   };
 
   authorized.add(`${signer.id}|${signer.deviceCredential}`);
@@ -471,6 +472,11 @@ async function main(): Promise<void> {
     'MEMBER_BANNED',
     { identityId: alice.id },
   );
+  const wrongIdentitySignature = forgedOperation(
+    { ...owner, identityKeyPair: mallory.identityKeyPair },
+    'MEMBER_BANNED',
+    { identityId: alice.id },
+  );
   const copiedScope = {
     ...record(ledger[1]),
     communityId: CommunityId.derive(networkId, mallory.id, 'other').valueOf(),
@@ -500,7 +506,13 @@ async function main(): Promise<void> {
     communityId.valueOf(),
     PublicMutationProof.digestOf(oversizedContent),
   );
-  const oversizedPayload = { ...oversizedContent, id: oversizedId };
+  const oversizedPayload = {
+    ...oversizedContent,
+    id: oversizedId,
+    identitySignature: owner.identityKeyPair
+      .sign(CommunityOperation.identitySigningContentOf(oversizedId))
+      .toString(),
+  };
   const oversizedUpdate = PublicMutationRecord.withProof(
     oversizedPayload,
     signCommunityOperationRecord(oversizedPayload, owner),
@@ -509,6 +521,7 @@ async function main(): Promise<void> {
     tombstone,
     ...unauthorized.map(record),
     record(wrongSignature),
+    record(wrongIdentitySignature),
     copiedScope,
     swappedProof,
     replayed,

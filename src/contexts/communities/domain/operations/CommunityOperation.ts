@@ -1,6 +1,7 @@
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
 
 import { InvalidCommunityOperationError } from '../errors/InvalidCommunityOperationError';
 import { CommunityId } from '../value-objects/CommunityId';
@@ -9,14 +10,33 @@ import { CommunityOperationArguments } from './CommunityOperationArguments';
 import { CommunityOperationLimits } from './CommunityOperationLimits';
 import { CommunityOperationPrimitives } from './CommunityOperationPrimitives';
 
+type CommunityOperationContent = Omit<
+  CommunityOperationPrimitives,
+  'id' | 'identitySignature'
+>;
+
+interface CommunityOperationAttributes {
+  action: CommunityOperationAction;
+  args: CommunityOperationArguments;
+  authorIdentityId: IdentityId;
+  communityId: CommunityId;
+  createdAt: number;
+  networkId: NetworkId;
+  parents: string[];
+}
+
 /**
  * One immutable, content-addressed change of a community. The community state
  * is never replicated: every node folds the verified operations that reach it,
- * so authority comes from the signed operation and its causal past only.
+ * so authority comes from the signed operation and its causal past only. The
+ * author's identity key signs the operation id, so any member can replay the
+ * operations back to the creator without trusting the author's devices.
  */
 export class CommunityOperation {
   private static readonly DIGEST = /^[A-Za-z0-9_-]{43}$/;
   private static readonly MAX_PARENTS = 64;
+  private static readonly IDENTITY_SIGNING_CONTEXT =
+    'pigeon:community-operation:v1\n';
 
   public static readonly SCOPE_TYPE = 'community_operation';
 
@@ -30,6 +50,7 @@ export class CommunityOperation {
       'communityId',
       'createdAt',
       'id',
+      'identitySignature',
       'networkId',
       'parents',
       'scopeType',
@@ -92,25 +113,9 @@ export class CommunityOperation {
   }
 
   private static contentOf(
-    primitives: Omit<CommunityOperationPrimitives, 'id'>,
-  ): Record<string, unknown> {
-    return { ...primitives };
-  }
-
-  public static recordIdOf(communityId: string, hash: string): string {
-    return `community:${communityId}:op:${hash}`;
-  }
-
-  public static create(attributes: {
-    action: CommunityOperationAction;
-    args: CommunityOperationArguments;
-    authorIdentityId: IdentityId;
-    communityId: CommunityId;
-    createdAt: number;
-    networkId: NetworkId;
-    parents: string[];
-  }): CommunityOperation {
-    const content: Omit<CommunityOperationPrimitives, 'id'> = {
+    attributes: CommunityOperationAttributes,
+  ): CommunityOperationContent {
+    return {
       action: attributes.action.valueOf(),
       args: attributes.args,
       authorIdentityId: attributes.authorIdentityId.valueOf(),
@@ -120,13 +125,34 @@ export class CommunityOperation {
       parents: [...attributes.parents].sort(),
       scopeType: CommunityOperation.SCOPE_TYPE,
     };
+  }
 
+  public static recordIdOf(communityId: string, hash: string): string {
+    return `community:${communityId}:op:${hash}`;
+  }
+
+  /** The id the author's identity key signs, before the operation exists. */
+  public static recordIdFor(attributes: CommunityOperationAttributes): string {
+    const content = CommunityOperation.contentOf(attributes);
+
+    return CommunityOperation.recordIdOf(
+      content.communityId,
+      PublicMutationProof.digestOf(content),
+    );
+  }
+
+  /** The utf8 text the author's identity key signs for the operation `id`. */
+  public static identitySigningContentOf(id: string): string {
+    return `${CommunityOperation.IDENTITY_SIGNING_CONTEXT}${id}`;
+  }
+
+  public static create(
+    attributes: CommunityOperationAttributes & { identitySignature: string },
+  ): CommunityOperation {
     return CommunityOperation.fromPrimitives({
-      ...content,
-      id: CommunityOperation.recordIdOf(
-        content.communityId,
-        PublicMutationProof.digestOf(CommunityOperation.contentOf(content)),
-      ),
+      ...CommunityOperation.contentOf(attributes),
+      id: CommunityOperation.recordIdFor(attributes),
+      identitySignature: attributes.identitySignature,
     });
   }
 
@@ -139,6 +165,7 @@ export class CommunityOperation {
       communityId: CommunityOperation.text(record.communityId),
       createdAt: record.createdAt as number,
       id: CommunityOperation.text(record.id),
+      identitySignature: CommunityOperation.text(record.identitySignature),
       networkId: CommunityOperation.text(record.networkId),
       parents: CommunityOperation.parents(record.parents),
       scopeType: record.scopeType as 'community_operation',
@@ -159,6 +186,7 @@ export class CommunityOperation {
         new IdentityId(primitives.authorIdentityId),
         new CommunityId(primitives.communityId),
         new NetworkId(primitives.networkId),
+        new Signature(primitives.identitySignature),
       );
     } catch {
       throw new InvalidCommunityOperationError();
@@ -171,15 +199,24 @@ export class CommunityOperation {
     private readonly authorIdentityId: IdentityId,
     private readonly communityId: CommunityId,
     private readonly networkId: NetworkId,
+    private readonly identitySignature: Signature,
   ) {
-    const { id, ...content } = primitives;
+    const content: CommunityOperationContent = {
+      action: primitives.action,
+      args: primitives.args,
+      authorIdentityId: primitives.authorIdentityId,
+      communityId: primitives.communityId,
+      createdAt: primitives.createdAt,
+      networkId: primitives.networkId,
+      parents: primitives.parents,
+      scopeType: primitives.scopeType,
+    };
 
-    this.hash = PublicMutationProof.digestOf(
-      CommunityOperation.contentOf(content),
-    );
+    this.hash = PublicMutationProof.digestOf(content);
 
     if (
-      id !== CommunityOperation.recordIdOf(primitives.communityId, this.hash) ||
+      primitives.id !==
+        CommunityOperation.recordIdOf(primitives.communityId, this.hash) ||
       action.isGenesis() !== (primitives.parents.length === 0) ||
       (action.isGenesis() &&
         (typeof primitives.args.nonce !== 'string' ||
@@ -189,6 +226,22 @@ export class CommunityOperation {
               authorIdentityId.valueOf(),
               primitives.args.nonce,
             ).valueOf()))
+    ) {
+      throw new InvalidCommunityOperationError();
+    }
+  }
+
+  /**
+   * Throws unless the author's identity key signed this operation id. Only
+   * admission verifies it: stored operations were admitted, and re-verifying
+   * every one on each fold would cost a signature check per operation.
+   */
+  public assertIdentitySigned(): void {
+    if (
+      !this.authorIdentityId.isValidSignature(
+        CommunityOperation.identitySigningContentOf(this.primitives.id),
+        this.identitySignature,
+      )
     ) {
       throw new InvalidCommunityOperationError();
     }

@@ -17,6 +17,7 @@ import {
   genesis,
   mallory,
   owner,
+  unverifiedIdentitySignature,
 } from '../../domain/operations/CommunityOperationFixtures';
 
 describe('CommunityProfileUpdater', () => {
@@ -51,6 +52,7 @@ describe('CommunityProfileUpdater', () => {
       name: 'Updated community',
       operation: {
         createdAt: 1780000000000,
+        identitySignature: unverifiedIdentitySignature,
         mutation: await mutation('op-1', 'communityOperations'),
         parents: [genesis().getHash()],
       },

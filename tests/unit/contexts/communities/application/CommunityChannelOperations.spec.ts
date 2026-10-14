@@ -26,6 +26,7 @@ import {
   genesis,
   mallory,
   owner,
+  unverifiedIdentitySignature,
 } from '../domain/operations/CommunityOperationFixtures';
 
 const CREATED_AT = 1780000000000;
@@ -39,6 +40,7 @@ describe('Community channel use cases', () => {
   let moderationLog: { createdAt: number; mutation: unknown };
   let operation: {
     createdAt: number;
+    identitySignature: string;
     mutation: unknown;
     parents: string[];
   };
@@ -62,6 +64,7 @@ describe('Community channel use cases', () => {
       },
       {
         createdAt: CREATED_AT,
+        identitySignature: unverifiedIdentitySignature,
         mutation: await proof('op-1', 'communityOperations'),
         parents: [genesis().getHash()],
       },
