@@ -195,7 +195,7 @@ Feature: Device authorization route
   Scenario: Reject a malformed transition log revision
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
-    And I set a client-signed identity body with name "transition log strict" and handle "transition-log-strict"
+    And I set a client-signed identity body with name "log strict" and handle "transition-strict"
     When I POST to "/identities/"
     Then response code is equal to 200
     Given I sign the current device transition log request
@@ -206,7 +206,7 @@ Feature: Device authorization route
   Scenario: Reject an unauthenticated transition log read
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
-    And I set a client-signed identity body with name "transition log private" and handle "transition-log-private"
+    And I set a client-signed identity body with name "log private" and handle "transition-private"
     When I POST to "/identities/"
     Then response code is equal to 200
     When I GET the current device transition log
@@ -215,7 +215,7 @@ Feature: Device authorization route
   Scenario: Reject another identity reading the transition log
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
-    And I set a client-signed identity body with name "transition log isolated" and handle "transition-log-isolated"
+    And I set a client-signed identity body with name "log isolated" and handle "transition-isolated"
     When I POST to "/identities/"
     Then response code is equal to 200
     Given another identity signs the current device transition log request
