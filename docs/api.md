@@ -3403,13 +3403,15 @@ of these routes also takes (see "Signed community operations"). The `DELETE`
 routes for channel, role, ban and member kick take
 `{ "moderationLog": { "createdAt", "mutation" }, "operation": { ... } }`.
 
-An `invite_link_created` target never carries the invite token: `target.id` is
-the invite reference
-`base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken)))`,
+An `invite_link_created` target names the invite by its reference: `target.id`
+is `base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken)))`,
 the same value an `invite_link` `member_joined` signs as `reference`. Reading
 the log needs `manage_members`, not `create_invites`, so a token there would let
 a member manager hand out working invite links. The node rebuilds the entry
-with the reference, so a client that signs the token is refused.
+with the reference, so a client that signs the token is refused. Entries are
+immutable and not migrated: `invite_link_created` entries recorded before this
+rule still carry the raw token as `target.id`, and those invites stay
+redeemable until they expire or run out of uses.
 
 Permissions checked against the signed actor: channel actions need
 `manage_channels`, role and member-role actions `manage_roles`, bans

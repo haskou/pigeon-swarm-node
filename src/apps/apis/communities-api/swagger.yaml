@@ -221,7 +221,7 @@ paths:
       tags:
         - communities
       summary: List community moderation log entries
-      description: 'Requires manage_members. Returns OrbitDB replicated audit entries for administrative actions such as role changes, channel changes, invitations, membership decisions, bans, and moderated message deletes. An invite_link_created entry names the invite by its reference base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken))), never by the token, because manage_members does not grant create_invites.'
+      description: 'Requires manage_members. Returns OrbitDB replicated audit entries for administrative actions such as role changes, channel changes, invitations, membership decisions, bans, and moderated message deletes. An invite_link_created entry names the invite by its reference base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken))), never by the token, because manage_members does not grant create_invites. Entries are immutable and not migrated, so invite_link_created entries recorded before this rule still carry the raw token.'
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: query
