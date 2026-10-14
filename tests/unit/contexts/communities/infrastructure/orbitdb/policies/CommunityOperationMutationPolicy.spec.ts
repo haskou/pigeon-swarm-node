@@ -5,6 +5,7 @@ import CommunityOperationMutationPolicy from '@app/contexts/communities/infrastr
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { mock } from 'jest-mock-extended';
+import { createHash } from 'node:crypto';
 
 import {
   alice,
@@ -280,29 +281,61 @@ describe('CommunityOperationMutationPolicy', () => {
         await expect(admit(invitation)).resolves.toBeUndefined();
       });
 
-      it('admits an invite link only when the invite and its use are both signed', async () => {
-        const [created, viaLink] = approvedJoin('invite_link', 'token-1');
+      describe('invite links', () => {
+        const TOKEN = 'token-1';
+        const REFERENCE = createHash('sha256')
+          .update(`pigeon:community-invite-reference:v1\n${TOKEN}`)
+          .digest('base64url');
         const invite = {
           communityId: communityId.valueOf(),
-          id: 'token-1',
+          id: TOKEN,
           scopeType: 'community_invite',
         };
         const use = {
           communityId: communityId.valueOf(),
-          id: `invite-use:token-1:${alice.valueOf()}`,
+          id: `invite-use:${TOKEN}:${alice.valueOf()}`,
           identityId: alice.valueOf(),
           scopeType: 'community_invite_use',
-          token: 'token-1',
+          token: TOKEN,
         };
 
-        await admit(created);
-        registry.queryDocuments.mockResolvedValue([invite]);
+        it('admits an invite link only when the invite and its use are both signed', async () => {
+          const [created, viaLink] = approvedJoin('invite_link', REFERENCE);
 
-        await expect(admit(viaLink)).rejects.toThrow();
+          await admit(created);
+          registry.queryDocuments.mockResolvedValue([invite]);
 
-        registry.queryDocuments.mockResolvedValue([invite, use]);
+          await expect(admit(viaLink)).rejects.toThrow();
 
-        await expect(admit(viaLink)).resolves.toBeUndefined();
+          registry.queryDocuments.mockResolvedValue([invite, use]);
+
+          await expect(admit(viaLink)).resolves.toBeUndefined();
+        });
+
+        it('refuses an invite link that signs the invite token itself', async () => {
+          const [created, viaLink] = approvedJoin('invite_link', TOKEN);
+
+          await admit(created);
+          registry.queryDocuments.mockResolvedValue([invite, use]);
+
+          await expect(admit(viaLink)).rejects.toThrow();
+        });
+
+        it("refuses an invite link redeemed by another member's use", async () => {
+          const [created, viaLink] = approvedJoin('invite_link', REFERENCE);
+
+          await admit(created);
+          registry.queryDocuments.mockResolvedValue([
+            invite,
+            {
+              ...use,
+              id: `invite-use:${TOKEN}:${mallory.valueOf()}`,
+              identityId: mallory.valueOf(),
+            },
+          ]);
+
+          await expect(admit(viaLink)).rejects.toThrow();
+        });
       });
 
       it('refuses a join that skips the reference its method requires', async () => {

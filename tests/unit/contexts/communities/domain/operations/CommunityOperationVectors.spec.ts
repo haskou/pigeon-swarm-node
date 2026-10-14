@@ -71,6 +71,7 @@ interface Vectors {
     communityId: string;
     creatorIdentityId: string;
     nonce: string;
+    reference: string;
     token: string;
   };
   keys: Record<string, VectorKey>;
@@ -135,9 +136,12 @@ describe('Community operation vectors', () => {
     }
   });
 
-  it('derives the invite token used as the invite_link reference', () => {
-    const { communityId, creatorIdentityId, nonce, token } =
+  it('derives the invite token and the invite reference an invite_link signs', () => {
+    const { communityId, creatorIdentityId, nonce, reference, token } =
       vectors.inviteToken;
+    const joined = vectors.cases.find(
+      ({ name }) => name === 'member_joined_invite_link',
+    );
 
     expect(
       digestOfText(JSON.stringify([communityId, creatorIdentityId, nonce])),
@@ -149,10 +153,12 @@ describe('Community operation vectors', () => {
         nonce,
       ).valueOf(),
     ).toBe(token);
-    expect(
-      vectors.cases.find(({ name }) => name === 'member_joined_invite_link')
-        ?.input.args.reference,
-    ).toBe(token);
+    expect(digestOfText(`pigeon:community-invite-reference:v1\n${token}`)).toBe(
+      reference,
+    );
+    expect(new CommunityInviteToken(token).toJoinReference()).toBe(reference);
+    expect(joined?.input.args.reference).toBe(reference);
+    expect(JSON.stringify(joined)).not.toContain(token);
   });
 
   it('chains the parents of each member_joined to the earlier digests', () => {
