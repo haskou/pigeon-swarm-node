@@ -445,6 +445,10 @@ Conflict rules:
   the current entries minus the ones the author removed plus the ones the author
   added. Concurrent changes to different fields or entries therefore all survive,
   and the rebased operation is still authorized against the state it applies to.
+  An empty visible role list opens a channel to everyone, so a rebase never empties
+  it: when concurrent restrictions would remove every role (`[R1, R2]` restricted
+  to `[R1]` and to `[R2]`), the operation applies as signed and the one ordered
+  last wins, as for a single value.
 - Concurrent changes to the same single value apply in the total order, so the
   same operation wins on every replica.
 - A ban, kick or leave ordered before a concurrent operation of the removed member

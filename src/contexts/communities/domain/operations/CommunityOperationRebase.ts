@@ -130,6 +130,7 @@ export class CommunityOperationRebase {
           ? { channelId, visibleRoleIds: channel.permissions.visibleRoleIds }
           : undefined;
       },
+      openWhenEmpty: ['visibleRoleIds'],
     };
   }
 
@@ -205,9 +206,10 @@ export class CommunityOperationRebase {
 
   /**
    * The arguments `operation` means for `current`, given that its author
-   * built it on `base`. Unchanged when the action carries no whole value or
-   * either state lacks what it targets: the aggregate then decides on the
-   * arguments as they were signed.
+   * built it on `base`. Unchanged when the action carries no whole value,
+   * either state lacks what it targets, or the rebase would empty a set that
+   * opens the target to everyone: the aggregate then decides on the arguments
+   * as they were signed.
    */
   public static argumentsOf(
     operation: CommunityOperation,
@@ -225,7 +227,7 @@ export class CommunityOperationRebase {
 
     if (!before || !now) return operation.getArguments();
 
-    return Object.fromEntries(
+    const rebased = Object.fromEntries(
       Object.entries(target.intended)
         .map(([key, value]): [string, CommunityOperationSnapshot[string]] => [
           key,
@@ -233,5 +235,12 @@ export class CommunityOperationRebase {
         ])
         .filter(([, value]) => value !== undefined),
     );
+    const opens = (target.openWhenEmpty ?? []).some((key) => {
+      const entries = rebased[key];
+
+      return Array.isArray(entries) && entries.length === 0;
+    });
+
+    return opens ? operation.getArguments() : rebased;
   }
 }

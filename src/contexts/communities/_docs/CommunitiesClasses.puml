@@ -498,6 +498,7 @@ package "communities/domain" {
   interface CommunityOperationRebaseTarget {
     + intended: CommunityOperationSnapshot
     + of(community): CommunityOperationSnapshot?
+    + openWhenEmpty?: string[]
   }
 
   class CommunityOperationSnapshot
