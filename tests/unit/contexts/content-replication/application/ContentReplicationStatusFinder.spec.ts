@@ -121,4 +121,34 @@ describe('ContentReplicationStatusFinder', () => {
       [`${NETWORK}:bafy-shared`]: true,
     });
   });
+
+  it('reports the size of the registration the budget charged, not a larger one of the same CID', async () => {
+    contentRepository.findAll.mockResolvedValue([
+      record(1, 'bafy-shared', 1),
+      record(2, 'bafy-shared', 100),
+    ]);
+
+    const status = await finderWithBudget(50).find();
+
+    expect(status.contents).toEqual([
+      expect.objectContaining({
+        cid: 'bafy-shared',
+        networks: [expect.objectContaining({ withinLocalBudget: true })],
+        sizeBytes: 1,
+      }),
+    ]);
+  });
+
+  it('reports the largest charged size when several registrations of a CID fit', async () => {
+    contentRepository.findAll.mockResolvedValue([
+      record(1, 'bafy-shared', 30),
+      record(2, 'bafy-shared', 10),
+    ]);
+
+    const status = await finderWithBudget(100).find();
+
+    expect(status.contents).toEqual([
+      expect.objectContaining({ cid: 'bafy-shared', sizeBytes: 30 }),
+    ]);
+  });
 });
