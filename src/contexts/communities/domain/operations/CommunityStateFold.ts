@@ -5,6 +5,7 @@ import { InvalidCommunityOperationError } from '../errors/InvalidCommunityOperat
 import { CommunityOperation } from './CommunityOperation';
 import { CommunityOperationApplier } from './CommunityOperationApplier';
 import { CommunityOperationLimits } from './CommunityOperationLimits';
+import { CommunityOperationRebase } from './CommunityOperationRebase';
 import { CommunityState } from './CommunityState';
 
 /**
@@ -13,6 +14,11 @@ import { CommunityState } from './CommunityState';
  * lowest digest first among concurrent ones), and each one is authorized again
  * against the state it applies to, so concurrent conflicting operations
  * converge on every node without any wall clock.
+ *
+ * An operation carrying a whole value (a profile, the roles of a member, ...)
+ * that is concurrent with operations ordered before it is rebased on the
+ * state it applies to (see `CommunityOperationRebase`), so it changes only
+ * what its author changed and concurrent changes to the rest are kept.
  *
  * An identity other than the founder (the genesis author) signs a bounded number of operations per
  * community: the ones ordered after its quota are skipped, whether or not they
@@ -68,6 +74,122 @@ export class CommunityStateFold {
         !!founder?.isEqual(author) ||
         !CommunityOperationLimits.isAuthorQuotaReached(count)
       );
+    };
+  }
+
+  /**
+   * Moves the heads of the operations taken so far, applied or skipped, past
+   * `operation`; tells whether it is concurrent with any of them.
+   */
+  private static advance(
+    heads: Set<string>,
+    operation: CommunityOperation,
+  ): boolean {
+    const parents = operation.getParents();
+    const concurrent =
+      parents.length !== heads.size ||
+      parents.some((parent) => !heads.has(parent));
+
+    for (const parent of parents) heads.delete(parent);
+    heads.add(operation.getHash());
+
+    return concurrent;
+  }
+
+  /**
+   * The community the author of a concurrent whole value saw when signing it
+   * on top of its parents; none for any other operation, which is built on
+   * the state it applies to or has nothing concurrent to keep. `pasts`
+   * remembers it per set of parents, shared by the operations built on it.
+   */
+  private static baseOf(
+    ordered: CommunityOperation[],
+    operation: CommunityOperation,
+    concurrent: boolean,
+    pasts: Map<string, Community | undefined>,
+  ): Community | undefined {
+    if (!concurrent || !CommunityOperationRebase.rebases(operation)) {
+      return undefined;
+    }
+
+    const parents = operation.getParents();
+    const key = [...parents].sort().join(' ');
+
+    if (!pasts.has(key)) {
+      pasts.set(
+        key,
+        CommunityStateFold.foldOf(
+          CommunityStateFold.closureOf(ordered, parents),
+          pasts,
+        ).community,
+      );
+    }
+
+    return pasts.get(key);
+  }
+
+  /** `community` after `operation`; throws when it is not permitted. */
+  private static next(
+    community: Community | undefined,
+    operation: CommunityOperation,
+    base: Community | undefined,
+  ): Community {
+    if (operation.isGenesis()) {
+      assert(!community, new InvalidCommunityOperationError());
+
+      return CommunityOperationApplier.create(operation);
+    }
+
+    assert(community, new InvalidCommunityOperationError());
+    assert(
+      operation.getCommunityId().isEqual(community.getId()),
+      new InvalidCommunityOperationError(),
+    );
+    // A failed operation must not leave a half applied state behind.
+    const candidate = Community.fromPrimitives(community.toPrimitives());
+
+    CommunityOperationApplier.apply(candidate, operation, base);
+
+    return candidate;
+  }
+
+  private static foldOf(
+    operations: CommunityOperation[],
+    pasts: Map<string, Community | undefined>,
+  ): CommunityState {
+    const ordered = CommunityStateFold.orderOf(operations);
+    const skipped: string[] = [];
+    const withinQuota = CommunityStateFold.quotaOf(ordered);
+    const heads = new Set<string>();
+    let community: Community | undefined;
+    let deleted = false;
+
+    for (const operation of ordered) {
+      const concurrent = CommunityStateFold.advance(heads, operation);
+
+      if (!withinQuota(operation) || deleted) {
+        skipped.push(operation.getHash());
+        continue;
+      }
+
+      try {
+        community = CommunityStateFold.next(
+          community,
+          operation,
+          CommunityStateFold.baseOf(ordered, operation, concurrent, pasts),
+        );
+        community.pullDomainEvents();
+        deleted = !community.hasMembers();
+      } catch {
+        skipped.push(operation.getHash());
+      }
+    }
+
+    return {
+      community,
+      deleted,
+      frontier: CommunityStateFold.frontierOf(ordered),
+      skipped,
     };
   }
 
@@ -156,47 +278,6 @@ export class CommunityStateFold {
 
   /** Folds every operation of one community into its current state. */
   public static fold(operations: CommunityOperation[]): CommunityState {
-    const ordered = CommunityStateFold.orderOf(operations);
-    const skipped: string[] = [];
-    const withinQuota = CommunityStateFold.quotaOf(ordered);
-    let community: Community | undefined;
-    let deleted = false;
-
-    for (const operation of ordered) {
-      if (!withinQuota(operation) || deleted) {
-        skipped.push(operation.getHash());
-        continue;
-      }
-
-      try {
-        if (operation.isGenesis()) {
-          assert(!community, new InvalidCommunityOperationError());
-          community = CommunityOperationApplier.create(operation);
-        } else {
-          assert(community, new InvalidCommunityOperationError());
-          assert(
-            operation.getCommunityId().isEqual(community.getId()),
-            new InvalidCommunityOperationError(),
-          );
-          // A failed operation must not leave a half applied state behind.
-          const candidate = Community.fromPrimitives(community.toPrimitives());
-
-          CommunityOperationApplier.apply(candidate, operation);
-          community = candidate;
-        }
-
-        community.pullDomainEvents();
-        deleted = !community.hasMembers();
-      } catch {
-        skipped.push(operation.getHash());
-      }
-    }
-
-    return {
-      community,
-      deleted,
-      frontier: CommunityStateFold.frontierOf(ordered),
-      skipped,
-    };
+    return CommunityStateFold.foldOf(operations, new Map());
   }
 }
