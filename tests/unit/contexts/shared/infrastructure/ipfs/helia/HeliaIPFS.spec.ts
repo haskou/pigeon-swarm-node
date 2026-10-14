@@ -80,6 +80,87 @@ describe('HeliaIPFS', () => {
     expect(log).toHaveBeenCalledTimes(1);
   });
 
+  describe('content retrieval diagnostics', () => {
+    function retrievingIpfs(onProgressSeen: (seen: boolean) => void) {
+      const heliaCore = {
+        libp2p: {
+          addEventListener: jest.fn(),
+          getPeers: jest.fn().mockReturnValue([]),
+          services: {},
+        },
+      } as unknown as HeliaInstance;
+
+      jest
+        .spyOn(heliaRuntimeAdapter, 'parseCid')
+        .mockResolvedValue({ code: 0x0129 } as never);
+      jest.spyOn(heliaRuntimeAdapter, 'createJSONClient').mockResolvedValue({
+        get: jest.fn(
+          async (
+            _cid: unknown,
+            options: {
+              onProgress?: (event: unknown) => void;
+            },
+          ) => {
+            onProgressSeen(options.onProgress !== undefined);
+            options.onProgress?.({
+              type: 'bitswap:found-provider',
+              detail: {
+                provider: {
+                  id: { toString: () => 'PRIVATE-PROVIDER' },
+                  routing: 'dht',
+                },
+                sender: { toString: () => 'PRIVATE-SENDER' },
+              },
+            });
+
+            return {};
+          },
+        ),
+      } as never);
+
+      return new (class extends HeliaIPFS {})(heliaCore, {
+        storageLocation: 'memory',
+      });
+    }
+
+    it('sends redacted retrieval progress to the open diagnostics session instead of the log', async () => {
+      const debug = jest.fn();
+      const trace = {
+        isRecording: jest.fn().mockResolvedValue(true),
+        record: jest.fn().mockResolvedValue(undefined),
+      };
+      jest
+        .spyOn(Kernel, 'logger', 'get')
+        .mockReturnValue({ debug } as unknown as typeof Kernel.logger);
+      HeliaIPFS.traceDiagnosticsTo(trace);
+
+      await retrievingIpfs(() => undefined).getJSON(new IPFSId('PRIVATE-CID'));
+
+      expect(trace.record).toHaveBeenCalledTimes(1);
+      expect(trace.record.mock.calls[0][0]).toContain(
+        'event="bitswap:found-provider"',
+      );
+      expect(JSON.stringify(trace.record.mock.calls)).not.toContain('PRIVATE-');
+      expect(debug).not.toHaveBeenCalled();
+    });
+
+    it('does not observe retrieval progress without an open diagnostics session', async () => {
+      const trace = {
+        isRecording: jest.fn().mockResolvedValue(false),
+        record: jest.fn().mockResolvedValue(undefined),
+      };
+      let observed: boolean | undefined;
+      HeliaIPFS.traceDiagnosticsTo(trace);
+
+      await retrievingIpfs((seen) => {
+        observed = seen;
+      }).getJSON(new IPFSId('PRIVATE-CID'));
+
+      expect(observed).toBe(false);
+      expect(trace.record).not.toHaveBeenCalled();
+    });
+  });
+
   it('does not log the content identifier when a local block cannot be deleted', async () => {
     const parsedCid = { code: 0x55, toString: () => 'PRIVATE-CID' };
     const heliaCore = {
