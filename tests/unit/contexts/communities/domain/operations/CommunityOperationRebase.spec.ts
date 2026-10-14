@@ -213,6 +213,51 @@ describe('CommunityOperationRebase', () => {
   );
 
   it.each(orders)(
+    'never opens a channel to everyone when two concurrent restrictions empty it with %s',
+    (_, last) => {
+      const history = rolesHistory();
+      const channel = operation(
+        CommunityOperationAction.CHANNEL_CREATED,
+        owner,
+        { channelId, name: 'general', type: 'text' },
+        [history.at(-1) as CommunityOperation],
+        5,
+      );
+      const visibility = (
+        visibleRoleIds: string[],
+        parents: CommunityOperation[],
+        createdAt: number,
+      ) =>
+        operation(
+          CommunityOperationAction.CHANNEL_PERMISSIONS_UPDATED,
+          owner,
+          { channelId, visibleRoleIds },
+          parents,
+          createdAt,
+        );
+      const both = visibility([helper, reviewer], [channel], 6);
+      const helpersOnly = visibility([helper], [both], 10);
+      const reviewersOnly = sortedAgainst(
+        (createdAt) => visibility([reviewer], [both], createdAt),
+        helpersOnly,
+        last,
+      );
+
+      const textChannel = CommunityStateFold.fold([
+        ...history,
+        channel,
+        both,
+        helpersOnly,
+        reviewersOnly,
+      ]).community?.toPrimitives().textChannels[0];
+
+      expect(textChannel?.permissions.visibleRoleIds).toEqual(
+        last ? [reviewer] : [helper],
+      );
+    },
+  );
+
+  it.each(orders)(
     'keeps a role rename and a concurrent permission change with %s',
     (_, last) => {
       const history = rolesHistory();
