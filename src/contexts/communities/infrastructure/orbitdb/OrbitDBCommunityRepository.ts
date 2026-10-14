@@ -254,18 +254,38 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     return (await this.findState(id))?.frontier ?? [];
   }
 
-  /** Admitted operations sorted by code unit order of their digests. */
+  /**
+   * Admitted operations sorted by code unit order of their digests. The page
+   * is chosen by record id (`community:<id>:op:<digest>`) so only the records
+   * it serves are decoded and hashed; the head is still read whole.
+   */
   public async findOperations(
     id: CommunityId,
     after: string | undefined,
     limit: number,
   ): Promise<CommunityOperation[]> {
-    const records = await this.operationIndex.findRecords(this.headKey(id));
+    const prefix = CommunityOperation.recordIdOf(id.valueOf(), '');
+    const candidates = (await this.operationIndex.findRecords(this.headKey(id)))
+      .filter(
+        (record) =>
+          typeof record.id === 'string' &&
+          record.id.startsWith(prefix) &&
+          (after === undefined || record.id.slice(prefix.length) > after),
+      )
+      .sort((left, right) => (String(left.id) < String(right.id) ? -1 : 1));
+    const page: CommunityOperation[] = [];
 
-    return this.operationsOf(id.valueOf(), records)
-      .filter((operation) => after === undefined || operation.getHash() > after)
-      .sort((left, right) => (left.getHash() < right.getHash() ? -1 : 1))
-      .slice(0, limit);
+    for (const record of candidates) {
+      if (page.length === limit) break;
+
+      page.push(
+        ...this.operationsOf(id.valueOf(), [record]).filter(
+          (operation) => operation.getId() === record.id,
+        ),
+      );
+    }
+
+    return page;
   }
 
   /**

@@ -958,7 +958,9 @@ export default class Definitions {
           args: {
             identityId: actorIdentityId,
             method: 'invite_link',
-            reference: decoded(match),
+            reference: createHash('sha256')
+              .update(`pigeon:community-invite-reference:v1\n${decoded(match)}`)
+              .digest('base64url'),
           },
         }),
       ],
@@ -6764,6 +6766,17 @@ export default class Definitions {
 
     expect(JSON.stringify(this.response.data)).to.not.contain(
       this.otherIdentityId.valueOf(),
+    );
+  }
+
+  @then('response body should not contain the current community invite token')
+  public responseBodyShouldNotContainTheCurrentCommunityInviteToken(): void {
+    if (!this.communityInviteToken) {
+      throw new Error('Community invite must be created first.');
+    }
+
+    expect(JSON.stringify(this.response.data)).to.not.contain(
+      this.communityInviteToken,
     );
   }
 

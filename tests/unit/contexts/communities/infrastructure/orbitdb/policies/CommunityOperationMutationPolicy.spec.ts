@@ -5,6 +5,7 @@ import CommunityOperationMutationPolicy from '@app/contexts/communities/infrastr
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { mock } from 'jest-mock-extended';
+import { createHash } from 'node:crypto';
 
 import {
   alice,
@@ -18,6 +19,23 @@ import {
   operation,
   owner,
 } from '../../../domain/operations/CommunityOperationFixtures';
+
+const TOKEN = 'token-1';
+const REFERENCE = createHash('sha256')
+  .update(`pigeon:community-invite-reference:v1\n${TOKEN}`)
+  .digest('base64url');
+const invite = {
+  communityId: communityId.valueOf(),
+  id: TOKEN,
+  scopeType: 'community_invite',
+};
+const use = {
+  communityId: communityId.valueOf(),
+  id: `invite-use:${TOKEN}:${alice.valueOf()}`,
+  identityId: alice.valueOf(),
+  scopeType: 'community_invite_use',
+  token: TOKEN,
+};
 
 describe('CommunityOperationMutationPolicy', () => {
   let registry: ReturnType<typeof mock<OrbitDBReplicatedStateRegistry>>;
@@ -281,19 +299,7 @@ describe('CommunityOperationMutationPolicy', () => {
       });
 
       it('admits an invite link only when the invite and its use are both signed', async () => {
-        const [created, viaLink] = approvedJoin('invite_link', 'token-1');
-        const invite = {
-          communityId: communityId.valueOf(),
-          id: 'token-1',
-          scopeType: 'community_invite',
-        };
-        const use = {
-          communityId: communityId.valueOf(),
-          id: `invite-use:token-1:${alice.valueOf()}`,
-          identityId: alice.valueOf(),
-          scopeType: 'community_invite_use',
-          token: 'token-1',
-        };
+        const [created, viaLink] = approvedJoin('invite_link', REFERENCE);
 
         await admit(created);
         registry.queryDocuments.mockResolvedValue([invite]);
@@ -303,6 +309,31 @@ describe('CommunityOperationMutationPolicy', () => {
         registry.queryDocuments.mockResolvedValue([invite, use]);
 
         await expect(admit(viaLink)).resolves.toBeUndefined();
+      });
+
+      it('refuses an invite link that signs the invite token itself', async () => {
+        const [created, viaLink] = approvedJoin('invite_link', TOKEN);
+
+        await admit(created);
+        registry.queryDocuments.mockResolvedValue([invite, use]);
+
+        await expect(admit(viaLink)).rejects.toThrow();
+      });
+
+      it("refuses an invite link redeemed by another member's use", async () => {
+        const [created, viaLink] = approvedJoin('invite_link', REFERENCE);
+
+        await admit(created);
+        registry.queryDocuments.mockResolvedValue([
+          invite,
+          {
+            ...use,
+            id: `invite-use:${TOKEN}:${mallory.valueOf()}`,
+            identityId: mallory.valueOf(),
+          },
+        ]);
+
+        await expect(admit(viaLink)).rejects.toThrow();
       });
 
       it('refuses a join that skips the reference its method requires', async () => {

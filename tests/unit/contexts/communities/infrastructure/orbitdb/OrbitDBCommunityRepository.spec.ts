@@ -148,6 +148,33 @@ describe('OrbitDBCommunityRepository', () => {
       await expect(page(digests[2], 500)).resolves.toEqual([]);
     });
 
+    it('decodes only the operations of the page it serves', async () => {
+      const created = genesis();
+      const operations = [
+        created,
+        join([created], alice),
+        join([created], mallory),
+      ];
+      const digests = operations.map((stored) => stored.getHash()).sort();
+
+      for (const stored of operations) await save(stored);
+      await flushBackgroundTasks();
+      const decode = jest.spyOn(CommunityOperation, 'fromPrimitives');
+
+      try {
+        const page = await repository.findOperations(
+          communityId,
+          digests[0],
+          1,
+        );
+
+        expect(page.map((found) => found.getHash())).toEqual([digests[1]]);
+        expect(decode).toHaveBeenCalledTimes(1);
+      } finally {
+        decode.mockRestore();
+      }
+    });
+
     it('serves nothing for an unknown community', async () => {
       await expect(
         repository.findOperations(communityId, undefined, 500),
