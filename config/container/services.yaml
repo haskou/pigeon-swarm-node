@@ -195,11 +195,6 @@ services:
     arguments:
       - '@shared/infrastructure/messageBus/DomainEventConsumer'
       - '@contexts/nodes/application/register-peer/NodePeerRegistrar'
-  apps/consumers/pubsub/presence/RegisterIdentityPresenceWhenUpdated:
-    class: /apps/consumers/pubsub/presence/RegisterIdentityPresenceWhenUpdated
-    arguments:
-      - '@shared/infrastructure/messageBus/DomainEventConsumer'
-      - '@contexts/presence/domain/repositories/IdentityPresenceRepository'
   apps/consumers/pubsub/push/SendPushNotificationWhenCallStarted:
     class: /apps/consumers/pubsub/push/SendPushNotificationWhenCallStarted
     arguments:
@@ -220,6 +215,10 @@ services:
       - '@shared/infrastructure/messageBus/DomainEventConsumer'
       - '@contexts/push-notifications/application/send/PushNotificationDispatcher'
     parent: apps/consumers/pubsub/push/SendPushNotificationWhenEventReceived
+  apps/initializers/diagnostics/DiagnosticsTraceInitializer:
+    class: /apps/initializers/diagnostics/DiagnosticsTraceInitializer
+    arguments:
+      - '@contexts/diagnostics/application/record/DiagnosticsEntryRecorder'
   apps/initializers/identities/IdentityMutationGateInitializer:
     class: /apps/initializers/identities/IdentityMutationGateInitializer
     arguments:
@@ -1317,14 +1316,33 @@ services:
       /contexts/conversations/infrastructure/orbitdb/policies/ConversationOperationMutationPolicy
     arguments: []
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
+  contexts/diagnostics/application/close/DiagnosticsSessionCloser:
+    class: /contexts/diagnostics/application/close/DiagnosticsSessionCloser
+    arguments:
+      - '@contexts/diagnostics/domain/repositories/DiagnosticsSessionRepository'
+  contexts/diagnostics/application/export/DiagnosticsSessionExporter:
+    class: /contexts/diagnostics/application/export/DiagnosticsSessionExporter
+    arguments:
+      - '@contexts/diagnostics/domain/repositories/DiagnosticsSessionRepository'
+  contexts/diagnostics/application/open/DiagnosticsSessionOpener:
+    class: /contexts/diagnostics/application/open/DiagnosticsSessionOpener
+    arguments:
+      - '@contexts/diagnostics/domain/repositories/DiagnosticsSessionRepository'
+  contexts/diagnostics/application/record/DiagnosticsEntryRecorder:
+    class: /contexts/diagnostics/application/record/DiagnosticsEntryRecorder
+    arguments:
+      - '@contexts/diagnostics/domain/repositories/DiagnosticsSessionRepository'
+  contexts/diagnostics/domain/repositories/DiagnosticsSessionRepository: >-
+    @contexts/diagnostics/infrastructure/memory/InMemoryDiagnosticsSessionRepository
+  contexts/diagnostics/infrastructure/memory/InMemoryDiagnosticsSessionRepository:
+    class: >-
+      /contexts/diagnostics/infrastructure/memory/InMemoryDiagnosticsSessionRepository
+    arguments: []
+    parent: contexts/diagnostics/domain/repositories/DiagnosticsSessionRepository
   contexts/identities/application/find/IdentityFinder:
     class: /contexts/identities/application/find/IdentityFinder
     arguments:
       - '@contexts/identities/domain/services/IdentityFinderService'
-  contexts/identities/application/find-networks/IdentityNetworksFinder:
-    class: /contexts/identities/application/find-networks/IdentityNetworksFinder
-    arguments:
-      - '@contexts/identities/domain/repositories/IdentityNetworkRepository'
   contexts/identities/application/observe-admission/IdentityAdmissionObserver:
     class: >-
       /contexts/identities/application/observe-admission/IdentityAdmissionObserver
@@ -2023,10 +2041,7 @@ services:
     class: /contexts/presence/application/expire/IdentityPresenceExpirationRegistrar
     arguments:
       - '@contexts/presence/domain/repositories/IdentityPresenceRepository'
-      - >-
-        @contexts/presence/application/resolve-network/IdentityPresenceNetworkResolver
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-      - '@contexts/nodes/domain/repositories/NodeRepository'
+      - '@shared/infrastructure/websocket/LocalRealtimeEventPublisher'
   contexts/presence/application/find/IdentityPresenceFinder:
     class: /contexts/presence/application/find/IdentityPresenceFinder
     arguments:
@@ -2036,23 +2051,12 @@ services:
       /contexts/presence/application/record-heartbeat/IdentityPresenceHeartbeatRecorder
     arguments:
       - '@contexts/presence/domain/repositories/IdentityPresenceRepository'
-      - >-
-        @contexts/presence/application/resolve-network/IdentityPresenceNetworkResolver
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-      - '@contexts/nodes/domain/repositories/NodeRepository'
-  contexts/presence/application/resolve-network/IdentityPresenceNetworkResolver:
-    class: >-
-      /contexts/presence/application/resolve-network/IdentityPresenceNetworkResolver
-    arguments:
-      - '@contexts/identities/application/find-networks/IdentityNetworksFinder'
+      - '@shared/infrastructure/websocket/LocalRealtimeEventPublisher'
   contexts/presence/application/update/IdentityPresenceUpdater:
     class: /contexts/presence/application/update/IdentityPresenceUpdater
     arguments:
       - '@contexts/presence/domain/repositories/IdentityPresenceRepository'
-      - >-
-        @contexts/presence/application/resolve-network/IdentityPresenceNetworkResolver
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-      - '@contexts/nodes/domain/repositories/NodeRepository'
+      - '@shared/infrastructure/websocket/LocalRealtimeEventPublisher'
   contexts/presence/domain/repositories/IdentityPresenceRepository: '@contexts/presence/infrastructure/memory/InMemoryIdentityPresenceRepository'
   contexts/presence/infrastructure/memory/InMemoryIdentityPresenceRepository:
     class: >-

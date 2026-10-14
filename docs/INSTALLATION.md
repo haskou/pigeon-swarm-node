@@ -65,8 +65,16 @@ routes resolve to the bundled frontend.
 | --- | --- | --- | --- |
 | `LOG_LEVEL` | App internal default | No | Log level (`error`, `warn`, `info`, etc.). |
 | `LOG_URL` | `logs` | No | Log folder under the project root; file is `<SERVICE_NAME or service>.log`. |
-| `DIAGNOSTICS_WINDOW_MINUTES` | `0` | No | Opens a diagnostics window for content retrieval for the given number of minutes (max 60) after the node starts. `0` keeps diagnostics off, which is the default. The window closes on its own and only a restart opens a new one. Lines are written at debug level, so `LOG_LEVEL=debug` is also required. CIDs, provider and sender IDs are replaced by digests keyed with a secret generated at process start, so the log never holds raw identifiers and the digests change on restart; the log can be shared in that form. |
 | `SERVICE_NAME` | unset | Recommended | Service name used in logs and message bus metadata. |
+
+Content-retrieval diagnostics are not configured through the environment. The
+node owner opens a diagnostics session with explicit consent through
+`PUT /node/diagnostics` (see [API](api.md)). The session records for 1 to 60
+minutes, keeps at most 1000 redacted lines in memory only, and is discarded 60
+minutes after it closes, on `DELETE /node/diagnostics`, or on restart. Lines are
+never written to the log file. CIDs, provider and sender IDs are replaced by
+digests keyed with a secret generated at process start, so the export holds no
+raw identifiers and can be shared.
 
 ## Message Bus Variables
 

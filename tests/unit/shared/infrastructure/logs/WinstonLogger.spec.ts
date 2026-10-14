@@ -10,7 +10,7 @@ import winston from 'winston';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
 
 describe('HTTP log privacy', () => {
-  it('logs status without request headers, URLs, identities or response content', async () => {
+  it('logs status without client addresses, request headers, URLs, identities or response content', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'pigeon-http-log-'));
     const previous = {
       LOG_LEVEL: process.env.LOG_LEVEL,
@@ -59,6 +59,8 @@ describe('HTTP log privacy', () => {
             cookie: 'session=PRIVATE-COOKIE',
             referer: 'https://example.test/PRIVATE-RELATIONSHIP',
             'content-type': 'application/json',
+            'x-forwarded-for': 'PRIVATE-CLIENT-ADDRESS',
+            'x-real-ip': 'PRIVATE-REAL-IP',
           },
           body: JSON.stringify({ message: 'PRIVATE-TEXT' }),
         },
@@ -80,6 +82,8 @@ describe('HTTP log privacy', () => {
       expect(JSON.stringify(captured)).toContain('HTTP POST 404');
       expect(file).not.toContain('PRIVATE-');
       expect(JSON.stringify(captured)).not.toContain('PRIVATE-');
+      expect(file).not.toContain('127.0.0.1');
+      expect(JSON.stringify(captured)).not.toContain('127.0.0.1');
     } finally {
       await new Promise<void>((resolve) =>
         server ? server.close(() => resolve()) : resolve(),

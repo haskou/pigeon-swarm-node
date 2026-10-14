@@ -1,6 +1,6 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DiagnosticIdentifierRedactor } from '@app/shared/infrastructure/logs/DiagnosticIdentifierRedactor';
-import { DiagnosticsWindow } from '@app/shared/infrastructure/logs/DiagnosticsWindow';
+import { DiagnosticsTrace } from '@app/shared/infrastructure/logs/DiagnosticsTrace';
 import { PublicRelayRecordPrimitives } from '@app/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
 import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
 import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
@@ -54,6 +54,11 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
   private static readonly contentRetrievalProgressLines =
     new ContentRetrievalProgressLogLine(new DiagnosticIdentifierRedactor());
+
+  private static diagnosticsTrace: DiagnosticsTrace = {
+    isRecording: () => Promise.resolve(false),
+    record: () => Promise.resolve(),
+  };
 
   private static readonly publicRelayRecordRegistry =
     new PublicRelayRecordRegistry();
@@ -193,6 +198,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
         }
       }),
     );
+  }
+
+  public static traceDiagnosticsTo(trace: DiagnosticsTrace): void {
+    HeliaIPFS.diagnosticsTrace = trace;
   }
 
   public static async createPublicHeliaCore(
@@ -424,7 +433,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     signal?: AbortSignal,
   ): Promise<ContentRetrievalOptions> {
     const providers = await this.contentRetrievalProviders();
-    const onProgress = this.contentRetrievalProgressLogger(cid);
+    const onProgress = await this.contentRetrievalProgressTracer(cid);
 
     if (providers.length === 0) {
       return onProgress ? { onProgress, signal } : { signal };
@@ -444,31 +453,27 @@ export abstract class HeliaIPFS implements IPFSConnection {
     return options;
   }
 
-  private contentRetrievalProgressLogger(
+  private async contentRetrievalProgressTracer(
     cid: IPFSId,
-  ): ContentRetrievalOptions['onProgress'] | undefined {
-    if (!DiagnosticsWindow.forProcess().isOpen()) {
+  ): Promise<ContentRetrievalOptions['onProgress'] | undefined> {
+    if (!(await HeliaIPFS.diagnosticsTrace.isRecording())) {
       return undefined;
     }
 
-    return (event) => this.logContentRetrievalProgress(cid, event);
+    return (event) => this.traceContentRetrievalProgress(cid, event);
   }
 
-  private logContentRetrievalProgress(
+  private traceContentRetrievalProgress(
     cid: IPFSId,
     event: ContentRetrievalProgressEvent,
   ): void {
-    if (!DiagnosticsWindow.forProcess().isOpen()) {
-      return;
-    }
-
     const line = HeliaIPFS.contentRetrievalProgressLines.format(
       cid.valueOf(),
       event,
     );
 
     if (line !== undefined) {
-      Kernel.logger.debug(line);
+      void HeliaIPFS.diagnosticsTrace.record(line).catch((): void => undefined);
     }
   }
 
@@ -905,7 +910,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
         await this.heliaCore.blockstore.delete(cid, { signal });
       }
     } catch {
-      Kernel.logger.debug?.(`Skipped IPFS block deletion: ${cid.toString()}`);
+      Kernel.logger.debug?.('Skipped IPFS block deletion');
     }
   }
 

@@ -5,8 +5,6 @@ export class IdentityPresenceWasUpdatedAttributes {
   public readonly identityId!: string;
   public readonly lastActivityAt?: number;
   public readonly lastHeartbeatAt?: number;
-  public readonly networkIds!: string[];
-  public readonly ownerNodeId!: string;
   public readonly preferenceUpdatedAt!: number;
   public readonly selectedStatus!: string;
   public readonly status!: string;

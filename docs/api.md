@@ -298,9 +298,9 @@ client since the previous heartbeat. Heartbeats are not individually signed
 because the WebSocket upgrade already authenticated the identity. Backend marks
 the identity `disconnected` after roughly 20 seconds without heartbeat and
 derives `away` after 5 minutes without activity while heartbeat is still active.
-Presence is runtime state kept in node memory and replicated to peers through
-domain events. It is not written to OrbitDB/IPFS and resets when the node
-restarts.
+Presence is runtime state kept in the serving node's memory. It is never
+gossiped to other nodes, is not written to OrbitDB/IPFS, and resets when the
+node restarts.
 
 Heartbeat acknowledgement:
 
@@ -1242,6 +1242,73 @@ Implemented:
   relay multiaddrs and discovery settings take effect
 - reload the public relay runtime when owner-owned relay settings change
 
+### Open a diagnostics session
+
+```http
+PUT /node/diagnostics
+X-Identity-Id: <ownerIdentityId>
+X-Timestamp: <millisecondsSinceEpoch>
+X-Signature: <signature>
+```
+
+Request:
+
+```json
+{
+  "consent": true,
+  "minutes": 15
+}
+```
+
+Response:
+
+```json
+{
+  "openedAt": 1760000000000,
+  "closesAt": 1760000900000,
+  "discardsAt": 1760004500000,
+  "entries": []
+}
+```
+
+Implemented:
+
+- require signed request auth from the current node owner; unowned nodes reject
+  the request with 403 because nobody can consent
+- require `consent: true` and `minutes` between 1 and 60; otherwise 409
+- replace any previous session with a fresh, empty one
+- record content-retrieval progress lines only while the session is open. Lines
+  are redacted before they are stored: CIDs, provider and sender IDs become
+  digests keyed with a secret generated at process start
+- keep at most 1000 lines in memory only. Lines are never written to the log
+  file, IPFS or OrbitDB
+- discard the session 60 minutes after it closes (`discardsAt`) or on restart
+
+### Export the diagnostics session
+
+```http
+GET /node/diagnostics
+X-Identity-Id: <ownerIdentityId>
+X-Timestamp: <millisecondsSinceEpoch>
+X-Signature: <signature>
+```
+
+Returns the same resource as `PUT /node/diagnostics` with the redacted lines
+recorded so far. Returns 409 when no session exists or it has been discarded,
+and 403 for non-owner requests.
+
+### Discard the diagnostics session
+
+```http
+DELETE /node/diagnostics
+X-Identity-Id: <ownerIdentityId>
+X-Timestamp: <millisecondsSinceEpoch>
+X-Signature: <signature>
+```
+
+Stops recording and discards every recorded line immediately. Returns 204, or
+403 for non-owner requests.
+
 ### Get local node networks
 
 ```http
@@ -1741,11 +1808,12 @@ Implemented security rules:
 
 ## Identity Presence HTTP API
 
-Presence is runtime state kept in node memory. Each node maintains an independent
-lease for every identity connected through it. Heartbeats renew that node's
-lease through domain events; another node may expire its local copy but never
-broadcast an expiration on behalf of the lease owner. Leases are aggregated for
-reads, are not written to OrbitDB/IPFS, and reset when the node restarts.
+Presence is runtime state kept in the memory of the node serving the
+identity's authenticated WebSocket. That node keeps one lease per identity,
+renewed by heartbeats. The lease is never gossiped, never carries a node id or
+network id, is not written to OrbitDB/IPFS, and resets when the node restarts.
+No other node receives it, so a node unrelated to an identity never learns its
+status, custom message or heartbeat timing.
 
 Who can see presence:
 
@@ -1757,18 +1825,11 @@ Who can see presence:
   with `invisible` status reads the same way to everyone except itself.
 - Over WebSocket, presence events are delivered only to the connections of the
   identity they describe. Related identities do not receive them.
-- Presence gossip reaches a wider audience than HTTP visibility. Each update,
-  including the custom message, is published to each of the identity's networks
-  that this node is configured with (every configured network when the identity
-  has none). Every node subscribed to those networks stores the update, including
-  nodes that share no conversation or community with the identity, so unrelated
-  nodes receive it. Those nodes apply the HTTP rules above when they serve it.
-  Do not put private text in a custom message.
-- Narrowing gossip to related identities would need per-scope gossip topics.
-  Gossipsub subscriptions are not authenticated, so such a topic limits only
-  honest nodes, and nodes would have to subscribe and unsubscribe as membership
-  changes. That design depends on haskou/pigeon-swarm#30; see
-  `docs/privacy/ADR-001-private-data.md` in that repository.
+- An identity connected through another node reads as `disconnected` here,
+  because this node holds no lease for it. Presence between contacts on
+  different nodes is exchanged by the clients, encrypted end to end over their
+  private channels.
+- `busy` suppresses push notifications only on the node holding the lease.
 
 Statuses:
 
@@ -1855,8 +1916,8 @@ Returns the updated presence resource.
 
 ### WebSocket presence events
 
-When a presence preference changes or an ephemeral heartbeat snapshot is
-refreshed, backend emits:
+When the identity's presence preference or derived status changes, the serving
+node emits to that identity's own connections:
 
 ```json
 {
@@ -1870,11 +1931,9 @@ refreshed, backend emits:
       "customMessage": "Back soon",
       "lastHeartbeatAt": 1770000000000,
       "lastActivityAt": 1770000000000,
-      "ownerNodeId": "550e8400-e29b-41d4-a716-446655440001",
       "preferenceUpdatedAt": 1770000000000,
       "selectedStatus": "away",
-      "updatedAt": 1770000000000,
-      "networkIds": ["<networkId>"]
+      "updatedAt": 1770000000000
     }
   }
 }

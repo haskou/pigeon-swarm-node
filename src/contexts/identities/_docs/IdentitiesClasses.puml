@@ -165,10 +165,6 @@ package "identities.application" {
     +register(message: RegisterIdentityCandidateMessage): Promise<void>
   }
 
-  class IdentityNetworksFinder {
-    +find(identityId: IdentityId): Promise<NetworkId[]>
-  }
-
   class IdentityAdmissionObserver {
     +observe(message: IdentityAdmissionObservationMessage): Promise<void>
   }
@@ -179,7 +175,6 @@ package "identities.application" {
   IdentityAdmissionObserver --> IdentityAdmissionPricingDomainService
   IdentityFinder --> IdentityFinderService
   IdentityCandidateRegistrar --> IdentityRepository
-  IdentityNetworksFinder --> IdentityNetworkRepository
 }
 
 package "identities.infrastructure" {

@@ -3183,7 +3183,9 @@ export default class Definitions {
     );
   }
 
-  @given('the community member signs the current community moderation logs request')
+  @given(
+    'the community member signs the current community moderation logs request',
+  )
   public async theCommunityMemberSignsTheCurrentCommunityModerationLogsRequest(): Promise<void> {
     if (!this.communityId) {
       throw new Error('Community must be created first.');
@@ -4684,6 +4686,32 @@ export default class Definitions {
     await this.signCurrentRequest(
       'PUT',
       '/node/relay-configuration/',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I sign the current node diagnostics {string} request')
+  public async iSignTheCurrentNodeDiagnosticsRequest(
+    method: string,
+  ): Promise<void> {
+    if (method !== 'PUT') {
+      this.body = undefined;
+    }
+
+    await this.signCurrentRequest(method, '/node/diagnostics/');
+  }
+
+  @given('another identity signs the current node diagnostics {string} request')
+  public async anotherIdentitySignsTheCurrentNodeDiagnosticsRequest(
+    method: string,
+  ): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      method,
+      '/node/diagnostics/',
       String(Date.now()),
       keyPair,
       this.otherIdentityId,

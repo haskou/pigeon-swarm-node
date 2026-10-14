@@ -20,18 +20,6 @@ describe('IdentityPresencePreference', () => {
     expect(preference.selected().isBusy()).toBe(true);
   });
 
-  it('does not let an older replicated preference replace a newer selection', () => {
-    const preference = IdentityPresencePreference.fromPrimitives('busy', 300);
-    const stalePreference = IdentityPresencePreference.fromPrimitives(
-      'available',
-      200,
-    );
-
-    preference.mergeFrom(stalePreference);
-
-    expect(preference.selected().isBusy()).toBe(true);
-  });
-
   it('rejects disconnected as a user-selected status', () => {
     const preference = IdentityPresencePreference.fromPrimitives(
       'available',

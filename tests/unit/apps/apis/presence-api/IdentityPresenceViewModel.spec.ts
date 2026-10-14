@@ -8,11 +8,10 @@ describe('IdentityPresenceViewModel', () => {
   async function presenceOf(owner: KeyPair): Promise<IdentityPresence> {
     return IdentityPresence.fromPrimitives({
       identityId: new IdentityId(owner.toPrimitives().publicKey).valueOf(),
-      ownerNodeId: '550e8400-e29b-41d4-a716-446655440002',
-      preferenceUpdatedAt: 1770000000000,
-      selectedStatus: 'available',
       lastActivityAt: 1770000000000,
       lastHeartbeatAt: 1770000000000,
+      preferenceUpdatedAt: 1770000000000,
+      selectedStatus: 'available',
       status: 'available',
       updatedAt: 1770000000000,
     });

@@ -75,61 +75,19 @@ The response starts with a four-byte unsigned big-endian body length, followed b
 
 ## Identity presence leases
 
-`presence.v1.identity_presence.was_updated` replicates ephemeral presence over
-the domain-event pub/sub transport. It is never persisted in OrbitDB or IPFS.
+Identity presence never travels over node gossip. There is no presence topic,
+no `presence.v1.identity_presence.was_updated` announcement and no consumer for
+one: a node does not learn which identities are connected to other nodes, and a
+node unrelated to an identity never receives its status, custom message or
+heartbeat timing.
 
-Each update is published once per target network on
-`pigeon-swarm.networks.<networkId>.presence.v1.announcements`. The default
-prefix is `pigeon-swarm`; `PUBSUB_TOPIC_PREFIX` overrides it. The targets are
-the networks named in `networkIds` that the publishing node is configured with.
-An empty `networkIds` targets every configured network. Every node subscribed to
-a target topic receives the event and keeps the lease, whether or not it shares
-a conversation or community with the identity. Receivers do not filter by
-relationship, and nodes do not republish received presence events. HTTP reads
-apply the visibility rules in `docs/api.md`.
-
-Public-network envelopes carry the event as plain JSON. Private-network
-envelopes encrypt it with AES-256-GCM under a key derived from the network key,
-so any node admitted to that private network can decrypt it.
-
-Each event identifies the lease owner with `ownerNodeId`. Nodes keep leases by
-`(identityId, ownerNodeId)`, ignore an older snapshot only within that same
-pair, and select the newest connected lease when serving presence reads.
-Every authenticated client heartbeat publishes a fresh snapshot, even when the
-derived status has not changed.
-
-Only the owner node may publish the transition of its lease to `disconnected`.
-Other nodes derive that transition in their local in-memory copy after the
-heartbeat timeout. This prevents one node from expiring a still-active lease
-owned by another node.
-
-Selected status and custom message use `preferenceUpdatedAt`, which changes only
-when the user updates those preferences. Reads merge the newest preference into
-the selected live lease. A later heartbeat with an older preference therefore
-cannot override `busy`, `invisible`, or a custom message selected on another
-node.
-
-The event attributes are:
-
-```json
-{
-  "identityId": "<identityId>",
-  "ownerNodeId": "550e8400-e29b-41d4-a716-446655440001",
-  "preferenceUpdatedAt": 1770000000000,
-  "selectedStatus": "available",
-  "status": "available",
-  "customMessage": "Building the swarm",
-  "lastHeartbeatAt": 1770000000000,
-  "lastActivityAt": 1770000000000,
-  "updatedAt": 1770000000000,
-  "networkIds": ["<networkId>"]
-}
-```
-
-`customMessage`, `lastHeartbeatAt`, and `lastActivityAt` may be absent.
-`identityId`, `networkIds`, `ownerNodeId`, `preferenceUpdatedAt`,
-`selectedStatus`, `status`, and `updatedAt` are always present. `networkIds`
-may be empty, which targets every configured network (see above).
+The node serving an identity's authenticated WebSocket keeps one in-memory
+lease for it, derived from that connection's heartbeats. The lease is never
+persisted in OrbitDB or IPFS, carries no node id or network id, and is exposed
+only through that node's HTTP presence reads and to that identity's own
+WebSocket connections (see `docs/api.md`). Presence for contacts served by
+other nodes is the client's job: clients exchange it encrypted end to end over
+their private channels, so nodes only relay ciphertext.
 
 ## Conversation messages
 
@@ -274,8 +232,7 @@ Members of a network can observe:
 - Signal acknowledgements (`calls.v1.signal.acknowledged`): the signal id and
   both identity ids.
 
-Envelopes follow the rule in [Identity presence leases](#identity-presence-leases):
-public-network events are plain JSON. Private-network events are encrypted with
+Public-network events are plain JSON. Private-network events are encrypted with
 a key derived from the network key, so every admitted node can read them.
 
 Local WebSocket clients receive a call event only when this node's authorization
@@ -731,18 +688,18 @@ append to any store**. Replicated content is trusted only after a node-side
 admission policy accepts it. The audit lists the writer, the policy that
 protects the collection and what a malicious peer can still do.
 
-| Store                                                                                                                        | Writer                                                                 | Policy                                                                                                                                                                                 | Status                                                                      |
-| ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `communityOperations`                                                                                                        | `OrbitDBCommunityRepository`                                           | `CommunityOperationGate`, see [Community signed operations](#community-signed-operations)                                                                                              | Signed (#316)                                                               |
-| `messages`, `mlsRecords`, `pins`, `reactions`, `requests`, `polls`, `stickerPacks`, `stickerUserLibraries`, `moderationLogs` | the community, poll, sticker and moderation repositories               | `PublicMutationGate`, see [Other signed public mutations](#other-signed-public-mutations)                                                                                              | Signed                                                                      |
-| `notificationSettings`                                                                                                       | `OrbitDBNotificationScopeSettingsRepository`                           | `PublicMutationGate` (`notification_settings`, #349)                                                                                                                                   | Signed                                                                      |
-| `keychains`                                                                                                                  | `OrbitDBKeychainMetadataIndex`                                         | `OrbitDBKeychainMutationGate`, see [Keychains](#keychains)                                                                                                                             | Self-authenticating (this change)                                           |
-| `identities` (identity metadata)                                                                                             | `OrbitDBIdentityMetadataIndex`                                         | identity-key signature plus canonical CID, see [Identities](#identities-and-device-authorization)                                                                                      | Self-authenticating (#361), see [design](design/identity-authentication.md) |
-| `identities` (device authorization)                                                                                          | `OrbitDBDeviceAuthorizationRepository`                                 | history replayed from the pinned genesis, see [Identity device authorization convergence](#identity-device-authorization-convergence)                                                  | Replay-validated from a self-certified genesis (#361)                       |
-| `calls`                                                                                                                      | `OrbitDBCallRepository`                                                | `CallStartMutationPolicy`, `CallParticipantMutationPolicy` and `CallEndMutationPolicy` through `PublicMutationGate` (#373)                                                             | Signed                                                                      |
-| `contentReplication`                                                                                                         | `OrbitDBContentReplicationRepository`                                  | `ContentReplicationMutationPolicy` through `PublicMutationGate`; owner-signed per `(networkId, cid)`, 1 GiB and 10000 records per identity per network (#372)                          | Signed                                                                      |
-| `notifications`                                                                                                              | `OrbitDBNotificationRepository`                                        | `NotificationInvitationMutationPolicy` and `NotificationStateMutationPolicy` through `PublicMutationGate`, plus `OrbitDBNotificationHeadMutationGate` for `notification:` heads (#371) | Signed                                                                      |
-| `conversationOperations`                                                                                                     | `OrbitDBConversationRepository`                                        | `ConversationOperationMutationPolicy` through `PublicMutationGate`; roster folded from the signed operations (#370)                                                                    | Signed                                                                      |
+| Store                                                                                                                        | Writer                                                   | Policy                                                                                                                                                                                 | Status                                                                      |
+| ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `communityOperations`                                                                                                        | `OrbitDBCommunityRepository`                             | `CommunityOperationGate`, see [Community signed operations](#community-signed-operations)                                                                                              | Signed (#316)                                                               |
+| `messages`, `mlsRecords`, `pins`, `reactions`, `requests`, `polls`, `stickerPacks`, `stickerUserLibraries`, `moderationLogs` | the community, poll, sticker and moderation repositories | `PublicMutationGate`, see [Other signed public mutations](#other-signed-public-mutations)                                                                                              | Signed                                                                      |
+| `notificationSettings`                                                                                                       | `OrbitDBNotificationScopeSettingsRepository`             | `PublicMutationGate` (`notification_settings`, #349)                                                                                                                                   | Signed                                                                      |
+| `keychains`                                                                                                                  | `OrbitDBKeychainMetadataIndex`                           | `OrbitDBKeychainMutationGate`, see [Keychains](#keychains)                                                                                                                             | Self-authenticating (this change)                                           |
+| `identities` (identity metadata)                                                                                             | `OrbitDBIdentityMetadataIndex`                           | identity-key signature plus canonical CID, see [Identities](#identities-and-device-authorization)                                                                                      | Self-authenticating (#361), see [design](design/identity-authentication.md) |
+| `identities` (device authorization)                                                                                          | `OrbitDBDeviceAuthorizationRepository`                   | history replayed from the pinned genesis, see [Identity device authorization convergence](#identity-device-authorization-convergence)                                                  | Replay-validated from a self-certified genesis (#361)                       |
+| `calls`                                                                                                                      | `OrbitDBCallRepository`                                  | `CallStartMutationPolicy`, `CallParticipantMutationPolicy` and `CallEndMutationPolicy` through `PublicMutationGate` (#373)                                                             | Signed                                                                      |
+| `contentReplication`                                                                                                         | `OrbitDBContentReplicationRepository`                    | `ContentReplicationMutationPolicy` through `PublicMutationGate`; owner-signed per `(networkId, cid)`, 1 GiB and 10000 records per identity per network (#372)                          | Signed                                                                      |
+| `notifications`                                                                                                              | `OrbitDBNotificationRepository`                          | `NotificationInvitationMutationPolicy` and `NotificationStateMutationPolicy` through `PublicMutationGate`, plus `OrbitDBNotificationHeadMutationGate` for `notification:` heads (#371) | Signed                                                                      |
+| `conversationOperations`                                                                                                     | `OrbitDBConversationRepository`                          | `ConversationOperationMutationPolicy` through `PublicMutationGate`; roster folded from the signed operations (#370)                                                                    | Signed                                                                      |
 
 #### Keychains
 

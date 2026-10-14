@@ -1,0 +1,75 @@
+@startuml DiagnosticsClasses
+
+skinparam classAttributeIconSize 0
+
+package "diagnostics/domain" {
+  class DiagnosticsSession {
+    + MAX_ENTRIES: 1000
+    + RETENTION_MINUTES: 60
+    - openedAt: Timestamp
+    - closesAt: Timestamp
+    - entries: DiagnosticsEntry[]
+    + {static} open(duration, consent, openedAt)
+    + append(entry, at)
+    + isRecordingAt(at)
+    + isDiscardedAt(at)
+    + getDiscardsAt()
+  }
+
+  class DiagnosticsConsent {
+    + isGiven()
+  }
+
+  class DiagnosticsDuration {
+    + MIN_MINUTES: 1
+    + MAX_MINUTES: 60
+  }
+
+  class DiagnosticsEntry {
+    + MAX_LENGTH: 2000
+  }
+
+  abstract class DiagnosticsSessionRepository {
+    + find()
+    + save(session)
+    + delete()
+  }
+}
+
+package "diagnostics/application" {
+  class DiagnosticsSessionOpener
+  class DiagnosticsSessionExporter
+  class DiagnosticsSessionCloser
+  class DiagnosticsEntryRecorder
+}
+
+package "diagnostics/infrastructure" {
+  class InMemoryDiagnosticsSessionRepository
+}
+
+package "shared/infrastructure/ipfs/helia" {
+  class HeliaIPFS
+}
+
+package "apps/initializers/diagnostics" {
+  class DiagnosticsTraceInitializer
+}
+
+DiagnosticsSession --> DiagnosticsEntry
+DiagnosticsSession ..> DiagnosticsConsent : open requires
+DiagnosticsSession ..> DiagnosticsDuration
+DiagnosticsSessionOpener --> DiagnosticsSessionRepository
+DiagnosticsSessionExporter --> DiagnosticsSessionRepository
+DiagnosticsSessionCloser --> DiagnosticsSessionRepository
+DiagnosticsEntryRecorder --> DiagnosticsSessionRepository
+InMemoryDiagnosticsSessionRepository --|> DiagnosticsSessionRepository
+DiagnosticsTraceInitializer --> DiagnosticsEntryRecorder
+DiagnosticsTraceInitializer ..> HeliaIPFS : traceDiagnosticsTo
+HeliaIPFS ..> DiagnosticsEntryRecorder : redacted lines only
+
+note right of InMemoryDiagnosticsSessionRepository
+  Memory only. Discarded at discardsAt,
+  on DELETE, or on restart.
+end note
+
+@enduml

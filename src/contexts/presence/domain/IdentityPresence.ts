@@ -1,7 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
-import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
+import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { IdentityPresenceWasUpdatedEvent } from './events/IdentityPresenceWasUpdatedEvent';
 import { IdentityPresencePreference } from './IdentityPresencePreference';
@@ -12,23 +11,9 @@ export class IdentityPresence extends AggregateRoot {
   private static readonly HEARTBEAT_TIMEOUT_MS = 20_000;
   private static readonly IDLE_TIMEOUT_MS = 300_000;
 
-  public static disconnected(
-    identityId: IdentityId,
-    ownerNodeId: NodeId,
-  ): IdentityPresence {
+  public static disconnected(identityId: IdentityId): IdentityPresence {
     return new IdentityPresence(
       identityId,
-      ownerNodeId,
-      new IdentityPresencePreference(PresenceStatus.AVAILABLE, Timestamp.now()),
-      PresenceStatus.DISCONNECTED,
-      Timestamp.now(),
-    );
-  }
-
-  public static unobserved(identityId: IdentityId): IdentityPresence {
-    return new IdentityPresence(
-      identityId,
-      undefined,
       new IdentityPresencePreference(PresenceStatus.AVAILABLE, Timestamp.now()),
       PresenceStatus.DISCONNECTED,
       Timestamp.now(),
@@ -40,7 +25,6 @@ export class IdentityPresence extends AggregateRoot {
   ): IdentityPresence {
     return new IdentityPresence(
       new IdentityId(primitives.identityId),
-      primitives.ownerNodeId ? new NodeId(primitives.ownerNodeId) : undefined,
       IdentityPresencePreference.fromPrimitives(
         primitives.selectedStatus,
         primitives.preferenceUpdatedAt,
@@ -59,7 +43,6 @@ export class IdentityPresence extends AggregateRoot {
 
   constructor(
     private readonly identityId: IdentityId,
-    private readonly ownerNodeId: NodeId | undefined,
     private readonly preference: IdentityPresencePreference,
     private status: PresenceStatus,
     private updatedAt: Timestamp,
@@ -93,11 +76,7 @@ export class IdentityPresence extends AggregateRoot {
     return new Timestamp(now.valueOf() - IdentityPresence.IDLE_TIMEOUT_MS);
   }
 
-  private recordUpdated(networkIds: string[]): void {
-    assert(
-      this.ownerNodeId,
-      new Error('Presence lease requires an owner node'),
-    );
+  private recordUpdated(): void {
     const primitives = this.toPrimitives();
     const preference = this.preference.toPrimitives();
 
@@ -107,8 +86,6 @@ export class IdentityPresence extends AggregateRoot {
         identityId: primitives.identityId,
         lastActivityAt: primitives.lastActivityAt,
         lastHeartbeatAt: primitives.lastHeartbeatAt,
-        networkIds,
-        ownerNodeId: this.ownerNodeId.valueOf(),
         preferenceUpdatedAt: preference.updatedAt,
         selectedStatus: preference.selectedStatus,
         status: primitives.status,
@@ -121,11 +98,11 @@ export class IdentityPresence extends AggregateRoot {
     return new Timestamp(now.valueOf() - IdentityPresence.HEARTBEAT_TIMEOUT_MS);
   }
 
-  public clearCustomMessage(networkIds: string[]): void {
+  public clearCustomMessage(): void {
     this.updatedAt = Timestamp.now();
 
     if (this.preference.clearCustomMessage(this.updatedAt)) {
-      this.recordUpdated(networkIds);
+      this.recordUpdated();
     }
   }
 
@@ -133,17 +110,8 @@ export class IdentityPresence extends AggregateRoot {
     return this.identityId;
   }
 
-  public belongsToNode(nodeId: NodeId): boolean {
-    return this.ownerNodeId?.isEqual(nodeId) === true;
-  }
-
   public isConnected(): boolean {
     return !this.status.isDisconnected();
-  }
-
-  public mergePreferenceFrom(presence: IdentityPresence): void {
-    this.preference.mergeFrom(presence.preference);
-    this.status = this.derivedStatus(this.updatedAt);
   }
 
   public isVisibleTo(
@@ -162,9 +130,10 @@ export class IdentityPresence extends AggregateRoot {
 
   public recordHeartbeat(
     activityDetected: boolean,
-    networkIds: string[],
     now: Timestamp = Timestamp.now(),
   ): void {
+    const previous = this.status;
+
     this.lastHeartbeatAt = now;
 
     if (activityDetected) {
@@ -174,13 +143,12 @@ export class IdentityPresence extends AggregateRoot {
     this.status = this.derivedStatus(now);
     this.updatedAt = now;
 
-    this.recordUpdated(networkIds);
+    if (this.changedFrom(previous)) {
+      this.recordUpdated();
+    }
   }
 
-  public refreshDerivedStatus(
-    networkIds: string[],
-    now: Timestamp = Timestamp.now(),
-  ): boolean {
+  public refreshDerivedStatus(now: Timestamp = Timestamp.now()): boolean {
     const previous = this.status;
 
     this.status = this.derivedStatus(now);
@@ -190,7 +158,7 @@ export class IdentityPresence extends AggregateRoot {
     }
 
     this.updatedAt = now;
-    this.recordUpdated(networkIds);
+    this.recordUpdated();
 
     return true;
   }
@@ -199,7 +167,6 @@ export class IdentityPresence extends AggregateRoot {
     status: PresenceStatus | undefined,
     customMessage: PresenceCustomMessage | undefined,
     customMessageWasProvided: boolean,
-    networkIds: string[],
     now: Timestamp = Timestamp.now(),
   ): void {
     const previous = this.status;
@@ -216,7 +183,7 @@ export class IdentityPresence extends AggregateRoot {
     this.updatedAt = now;
 
     if (this.changedFrom(previous) || preferenceChanged) {
-      this.recordUpdated(networkIds);
+      this.recordUpdated();
     }
   }
 
@@ -225,7 +192,6 @@ export class IdentityPresence extends AggregateRoot {
 
     return {
       identityId: this.identityId.valueOf(),
-      ...(this.ownerNodeId ? { ownerNodeId: this.ownerNodeId.valueOf() } : {}),
       preferenceUpdatedAt: preference.updatedAt,
       selectedStatus: preference.selectedStatus,
       ...(preference.customMessage

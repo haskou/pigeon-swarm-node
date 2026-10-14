@@ -1,50 +1,53 @@
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
 describe('IdentityPresence', () => {
-  it('keeps presence online when one heartbeat is skipped', async () => {
-    const keyPair = await KeyPair.generate();
-    const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
-    const presence = IdentityPresence.fromPrimitives({
+  const identityId = new IdentityId(
+    'MCowBQYDK2VwAyEAq3hAwZS8E8LE8Z+qoSHj8U5RF9Ky+fKDgT/spDURDkc=',
+  );
+
+  const connectedPresence = (): IdentityPresence =>
+    IdentityPresence.fromPrimitives({
       identityId: identityId.valueOf(),
-      ownerNodeId: '550e8400-e29b-41d4-a716-446655440002',
-      preferenceUpdatedAt: 1770000000000,
-      selectedStatus: 'available',
       lastActivityAt: 1770000000000,
       lastHeartbeatAt: 1770000000000,
+      preferenceUpdatedAt: 1770000000000,
+      selectedStatus: 'available',
       status: 'available',
       updatedAt: 1770000000000,
     });
 
-    presence.refreshDerivedStatus(
-      ['network-id'],
-      new Timestamp(1770000020000),
-    );
+  it('keeps presence online when one heartbeat is skipped', () => {
+    const presence = connectedPresence();
+
+    presence.refreshDerivedStatus(new Timestamp(1770000020000));
 
     expect(presence.toPrimitives().status).toBe('available');
   });
 
-  it('marks presence as disconnected after more than 20 seconds without heartbeat', async () => {
-    const keyPair = await KeyPair.generate();
-    const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
-    const presence = IdentityPresence.fromPrimitives({
-      identityId: identityId.valueOf(),
-      ownerNodeId: '550e8400-e29b-41d4-a716-446655440002',
-      preferenceUpdatedAt: 1770000000000,
-      selectedStatus: 'available',
-      lastActivityAt: 1770000000000,
-      lastHeartbeatAt: 1770000000000,
-      status: 'available',
-      updatedAt: 1770000000000,
-    });
+  it('marks presence as disconnected after more than 20 seconds without heartbeat', () => {
+    const presence = connectedPresence();
 
-    presence.refreshDerivedStatus(
-      ['network-id'],
-      new Timestamp(1770000020001),
-    );
+    presence.refreshDerivedStatus(new Timestamp(1770000020001));
 
     expect(presence.toPrimitives().status).toBe('disconnected');
+  });
+
+  it('records presence changes without naming a node or a network', () => {
+    const presence = IdentityPresence.disconnected(identityId);
+
+    presence.recordHeartbeat(true, new Timestamp(1770000000000));
+
+    const [event] = presence.pullDomainEvents();
+
+    expect(event.attributes).not.toHaveProperty('ownerNodeId');
+    expect(event.attributes).not.toHaveProperty('networkIds');
+    expect(event.attributes).toEqual(
+      expect.objectContaining({
+        identityId: identityId.valueOf(),
+        status: 'available',
+      }),
+    );
   });
 });

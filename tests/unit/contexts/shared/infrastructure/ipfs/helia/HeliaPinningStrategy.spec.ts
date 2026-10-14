@@ -47,7 +47,7 @@ describe('HeliaPinningStrategy', () => {
       signal: undefined,
     });
     expect(Kernel.logger.debug).toHaveBeenCalledWith(
-      'Pinned IPFS content for local availability: bafymockcid',
+      'Pinned IPFS content for local availability',
     );
   });
 
@@ -86,7 +86,7 @@ describe('HeliaPinningStrategy', () => {
       'pin failed',
     );
     expect(Kernel.logger.debug).toHaveBeenCalledWith(
-      'Skipped IPFS content pinning for local availability: bafymockcid error=Error: pin failed',
+      'Skipped IPFS content pinning for local availability: error=Error',
     );
   });
 
@@ -134,7 +134,7 @@ describe('HeliaPinningStrategy', () => {
       signal: undefined,
     });
     expect(Kernel.logger.debug).toHaveBeenCalledWith(
-      'Unpinned IPFS content before local removal: bafymockcid',
+      'Unpinned IPFS content before local removal',
     );
   });
 
@@ -154,7 +154,28 @@ describe('HeliaPinningStrategy', () => {
       undefined,
     );
     expect(Kernel.logger.debug).toHaveBeenCalledWith(
-      'Skipped IPFS content unpinning before local removal: bafymockcid error=Error: unpin failed',
+      'Skipped IPFS content unpinning before local removal: error=Error',
     );
+  });
+
+  it('never writes content identifiers to the log, even inside errors', async () => {
+    jest.mocked(heliaCore.pins.add).mockImplementation(() => {
+      throw new Error('cannot pin bafymockcid');
+    });
+    jest.mocked(heliaCore.pins.isPinned).mockResolvedValueOnce(false);
+
+    await expect(strategy.ensurePinned(heliaCore, cid)).rejects.toThrow();
+    jest.mocked(heliaCore.pins.isPinned).mockResolvedValue(true);
+    jest.mocked(heliaCore.pins.rm).mockImplementation(() => {
+      throw new Error('cannot unpin bafymockcid');
+    });
+    await strategy.ensureUnpinned(heliaCore, cid);
+
+    const logged = jest
+      .mocked(Kernel.logger.debug)
+      .mock.calls.map(([line]) => String(line));
+
+    expect(logged).toHaveLength(2);
+    expect(logged.join('\n')).not.toContain('bafymockcid');
   });
 });
