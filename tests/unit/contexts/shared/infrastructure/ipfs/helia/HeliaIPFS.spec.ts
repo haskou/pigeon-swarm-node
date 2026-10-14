@@ -5,6 +5,7 @@ import {
   HeliaInstance,
 } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
 import { HeliaIPFS } from '@app/contexts/shared/infrastructure/ipfs/helia/HeliaIPFS';
+import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
 
 describe('HeliaIPFS', () => {
@@ -77,6 +78,33 @@ describe('HeliaIPFS', () => {
     await new Promise((resolve) => setImmediate(resolve));
     expect(handler).toHaveBeenCalledTimes(2);
     expect(log).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not log the content identifier when a local block cannot be deleted', async () => {
+    const parsedCid = { code: 0x55, toString: () => 'PRIVATE-CID' };
+    const heliaCore = {
+      blockstore: {
+        delete: jest.fn().mockRejectedValue(new Error('PRIVATE-CID busy')),
+        has: jest.fn().mockResolvedValue(true),
+      },
+      libp2p: { addEventListener: jest.fn(), services: {} },
+      pins: { isPinned: jest.fn().mockResolvedValue(false) },
+    } as unknown as HeliaInstance;
+    const ipfs = new (class extends HeliaIPFS {})(heliaCore, {
+      storageLocation: 'memory',
+    });
+    const debug = jest.fn();
+    jest
+      .spyOn(Kernel, 'logger', 'get')
+      .mockReturnValue({ debug } as unknown as typeof Kernel.logger);
+    jest
+      .spyOn(heliaRuntimeAdapter, 'parseCid')
+      .mockResolvedValue(parsedCid as never);
+
+    await ipfs.removeJSON(new IPFSId('PRIVATE-CID'));
+
+    expect(debug).toHaveBeenCalledWith('Skipped IPFS block deletion');
+    expect(JSON.stringify(debug.mock.calls)).not.toContain('PRIVATE-');
   });
 
   it.each([
