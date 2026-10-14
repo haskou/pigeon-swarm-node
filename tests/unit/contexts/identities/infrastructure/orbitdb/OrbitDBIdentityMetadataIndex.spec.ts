@@ -223,6 +223,25 @@ describe('OrbitDBIdentityMetadataIndex', () => {
     expect(records.map(({ version }) => version)).toEqual([2, 1]);
   });
 
+  it('should verify only the requested identity when finding by identity id', async () => {
+    const [requested, other] = await Promise.all([
+      SignedIdentityMother.create(),
+      SignedIdentityMother.create(),
+    ]);
+    const identity = requested.build();
+
+    await index.projectDocument(documentOf(identity));
+    await index.projectDocument(documentOf(other.build()));
+    ipfsManager.calculateJSONId.mockClear();
+
+    await expect(
+      index.findByIdentityId(new IdentityId(requested.id)),
+    ).resolves.toEqual([expect.objectContaining({ cid: cidOf(identity) })]);
+    expect(ipfsManager.calculateJSONId.mock.calls).toEqual([
+      [mapper.toDocument(identity)],
+    ]);
+  });
+
   it('should retain at most the per-identity candidate bound', async () => {
     const signer = await SignedIdentityMother.create();
     const versions = Array.from(
