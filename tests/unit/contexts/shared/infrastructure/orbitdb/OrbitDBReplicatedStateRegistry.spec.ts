@@ -1358,6 +1358,62 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     }
   });
 
+  it('admits a degraded head as soon as the identity its record rests on replicates', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+    try {
+      const gate = mock<OrbitDBMutationGate>();
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const firstNetwork = createStores();
+
+      gate.governs.mockImplementation(
+        (collection) => collection === 'communityOperations',
+      );
+      gate.governsHead.mockReturnValue(false);
+      gate.accepts.mockImplementation(() =>
+        Promise.resolve(
+          registry.findCachedHead('identity:joiner') !== undefined,
+        ),
+      );
+      registry.addMutationGate(gate);
+      await registry.register('network-1', firstNetwork.stores);
+      firstNetwork.heads.emitUpdate({
+        payload: {
+          key: 'community:community-1',
+          value: {
+            communityOperations: [{ id: 'join-1' }],
+            id: 'community-1',
+            updatedAt: 10,
+          },
+        },
+      });
+      await jest.advanceTimersByTimeAsync(2_000 + 10_000);
+
+      await expect(registry.findHead('community:community-1')).resolves.toEqual(
+        expect.not.objectContaining({
+          communityOperations: [{ id: 'join-1' }],
+        }),
+      );
+
+      firstNetwork.heads.emitUpdate({
+        payload: {
+          key: 'identity:joiner',
+          value: { identityId: 'joiner', updatedAt: 20 },
+        },
+      });
+      await jest.advanceTimersByTimeAsync(5_000);
+
+      await expect(registry.findHead('community:community-1')).resolves.toEqual(
+        expect.objectContaining({
+          communityOperations: [{ id: 'join-1' }],
+        }),
+      );
+      registry.clear();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   describe('replicated documents the mutation gate rejected', () => {
     const gateOf = (
       collection: string,
@@ -1440,6 +1496,40 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       registry.clear();
     });
 
+    it('offers a rejected document again as soon as the state it rests on replicates', async () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { heads, identities, stores } = createStores();
+      const projected: unknown[] = [];
+
+      registry.addMutationGate(
+        gateOf(
+          'identities',
+          () => registry.findCachedHead('identity:inviter') !== undefined,
+        ),
+      );
+      await registry.register('network-1', stores);
+      await registry.onDocumentUpdated('identities', (document) => {
+        projected.push(document.id);
+      });
+      identities.emitUpdate({
+        payload: { key: 'identity-1', value: { id: 'identity-1' } },
+      });
+      await jest.advanceTimersByTimeAsync(2_000 + 10_000);
+
+      expect(projected).toEqual([]);
+
+      heads.emitUpdate({
+        payload: {
+          key: 'identity:inviter',
+          value: { identityId: 'inviter', updatedAt: 20 },
+        },
+      });
+      await jest.advanceTimersByTimeAsync(5_000);
+
+      expect(projected).toEqual(['identity-1']);
+      registry.clear();
+    });
+
     it('gives up on a document that stays rejected after the last attempt', async () => {
       const registry = new OrbitDBReplicatedStateRegistry();
       const { identities, stores } = createStores();
@@ -1462,6 +1552,30 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
       expect(gate.accepts).toHaveBeenCalledTimes(4);
       expect(projected).toEqual([]);
+      registry.clear();
+    });
+
+    it('gives up on a rejected document even when new state replicates after the last attempt', async () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { heads, identities, stores } = createStores();
+      const gate = gateOf('identities', () => false);
+
+      registry.addMutationGate(gate);
+      await registry.register('network-1', stores);
+      await registry.onDocumentUpdated('identities', () => undefined);
+      identities.emitUpdate({
+        payload: { key: 'identity-1', value: { id: 'identity-1' } },
+      });
+      await jest.advanceTimersByTimeAsync(2_000 + 10_000 + 60_000);
+      heads.emitUpdate({
+        payload: {
+          key: 'identity:inviter',
+          value: { identityId: 'inviter', updatedAt: 20 },
+        },
+      });
+      await jest.advanceTimersByTimeAsync(600_000);
+
+      expect(gate.accepts).toHaveBeenCalledTimes(4);
       registry.clear();
     });
 
