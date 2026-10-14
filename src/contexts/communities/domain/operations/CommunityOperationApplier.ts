@@ -44,8 +44,9 @@ import { CommunityOperationRebase } from './CommunityOperationRebase';
  * - role_deleted: roleId
  * - member_roles_updated: identityId, roleIds
  * - member_banned, member_unbanned, member_kicked, member_left: identityId
- * - member_joined: identityId, method, reference? (only for `approval`,
- *   `invitation` and `invite_link`: the id of the signed record that allows it)
+ * - member_joined: identityId, method, reference? (only for `approval` and
+ *   `invitation`: the id of the signed record that allows it; for
+ *   `invite_link`: the invite reference of the token, never the token)
  */
 export class CommunityOperationApplier {
   private static readonly HANDLERS: Record<

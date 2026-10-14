@@ -186,7 +186,7 @@ paths:
       tags:
         - communities
       summary: List the signed operations of a community
-      description: Members only, like GET /communities/{communityId}. Returns every stored community operation that passed verification, including the ones the fold skipped, verbatim and sorted by digest ascending (code-unit order). Each carries the identitySignature of its author, so a member replays roles and memberships back to the creator and verifies every author itself (it authorizes community MLS commits and welcomes). Read the next page with after = the digest of the last operation while a page holds limit operations.
+      description: Members only, like GET /communities/{communityId}. Returns every stored community operation that passed verification, including the ones the fold skipped, verbatim and sorted by digest ascending (code-unit order). Each carries the identitySignature of its author, so a member replays roles and memberships back to the creator and verifies every author itself (it authorizes community MLS commits and welcomes). Read the next page with after = the digest of the last operation while a page holds limit operations. Every member reads what an operation signs, so member_banned and member_kicked name the moderator as authorIdentityId (hiding it needs a protocol change), and an invite_link member_joined carries the invite reference, never the invite token. A page is selected by record id and only its operations are decoded; selecting it still compares the ids of every stored operation.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: query
@@ -2174,7 +2174,7 @@ components:
           default: 1
     PostCommunityInviteAcceptBody:
       type: object
-      description: The mutation signs a community_invite_use document {communityId, id 'invite-use:<token>:<identityId>', identityId, token, usedAt} in store requests. Signer is the acceptor. Uses are counted as signed use records, so maxUses can be exceeded under network partitions. operation signs member_joined with args identityId = acceptor, method = invite_link, reference = inviteToken; it is only admitted by a node that also holds the signed invite and the use record.
+      description: "The mutation signs a community_invite_use document {communityId, id 'invite-use:<token>:<identityId>', identityId, token, usedAt} in store requests. Signer is the acceptor. Uses are counted as signed use records, so maxUses can be exceeded under network partitions. operation signs member_joined with args identityId = acceptor, method = invite_link, reference = base64url(sha256(utf8(\"pigeon:community-invite-reference:v1\\n\" + inviteToken))), never the token itself, because every member reads the operation; it is only admitted by a node that also holds the signed invite and the use record of a token with that reference."
       required:
         - operation
         - usedAt

@@ -389,6 +389,10 @@ require author == member. Methods `approval`, `invitation` and `invite_link` car
 a `reference` that must resolve to signed `requests` records: an accepted
 `community_membership_request` of the right type for the member, or a
 `community_invite` plus the `community_invite_use` record of the member. An
+`invite_link` reference is the invite reference
+`base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + token)))`,
+never the token, because every member reads the operations; the use record names
+the token whose reference it is. An
 operation with an unknown parent or unreplicated evidence is not stored; its head
 is demoted and re-admitted when the evidence replicates (see
 [readmission](#readmission-of-rejected-records)).

@@ -20,6 +20,23 @@ import {
   owner,
 } from '../../../domain/operations/CommunityOperationFixtures';
 
+const TOKEN = 'token-1';
+const REFERENCE = createHash('sha256')
+  .update(`pigeon:community-invite-reference:v1\n${TOKEN}`)
+  .digest('base64url');
+const invite = {
+  communityId: communityId.valueOf(),
+  id: TOKEN,
+  scopeType: 'community_invite',
+};
+const use = {
+  communityId: communityId.valueOf(),
+  id: `invite-use:${TOKEN}:${alice.valueOf()}`,
+  identityId: alice.valueOf(),
+  scopeType: 'community_invite_use',
+  token: TOKEN,
+};
+
 describe('CommunityOperationMutationPolicy', () => {
   let registry: ReturnType<typeof mock<OrbitDBReplicatedStateRegistry>>;
   let policy: CommunityOperationMutationPolicy;
@@ -281,61 +298,42 @@ describe('CommunityOperationMutationPolicy', () => {
         await expect(admit(invitation)).resolves.toBeUndefined();
       });
 
-      describe('invite links', () => {
-        const TOKEN = 'token-1';
-        const REFERENCE = createHash('sha256')
-          .update(`pigeon:community-invite-reference:v1\n${TOKEN}`)
-          .digest('base64url');
-        const invite = {
-          communityId: communityId.valueOf(),
-          id: TOKEN,
-          scopeType: 'community_invite',
-        };
-        const use = {
-          communityId: communityId.valueOf(),
-          id: `invite-use:${TOKEN}:${alice.valueOf()}`,
-          identityId: alice.valueOf(),
-          scopeType: 'community_invite_use',
-          token: TOKEN,
-        };
+      it('admits an invite link only when the invite and its use are both signed', async () => {
+        const [created, viaLink] = approvedJoin('invite_link', REFERENCE);
 
-        it('admits an invite link only when the invite and its use are both signed', async () => {
-          const [created, viaLink] = approvedJoin('invite_link', REFERENCE);
+        await admit(created);
+        registry.queryDocuments.mockResolvedValue([invite]);
 
-          await admit(created);
-          registry.queryDocuments.mockResolvedValue([invite]);
+        await expect(admit(viaLink)).rejects.toThrow();
 
-          await expect(admit(viaLink)).rejects.toThrow();
+        registry.queryDocuments.mockResolvedValue([invite, use]);
 
-          registry.queryDocuments.mockResolvedValue([invite, use]);
+        await expect(admit(viaLink)).resolves.toBeUndefined();
+      });
 
-          await expect(admit(viaLink)).resolves.toBeUndefined();
-        });
+      it('refuses an invite link that signs the invite token itself', async () => {
+        const [created, viaLink] = approvedJoin('invite_link', TOKEN);
 
-        it('refuses an invite link that signs the invite token itself', async () => {
-          const [created, viaLink] = approvedJoin('invite_link', TOKEN);
+        await admit(created);
+        registry.queryDocuments.mockResolvedValue([invite, use]);
 
-          await admit(created);
-          registry.queryDocuments.mockResolvedValue([invite, use]);
+        await expect(admit(viaLink)).rejects.toThrow();
+      });
 
-          await expect(admit(viaLink)).rejects.toThrow();
-        });
+      it("refuses an invite link redeemed by another member's use", async () => {
+        const [created, viaLink] = approvedJoin('invite_link', REFERENCE);
 
-        it("refuses an invite link redeemed by another member's use", async () => {
-          const [created, viaLink] = approvedJoin('invite_link', REFERENCE);
+        await admit(created);
+        registry.queryDocuments.mockResolvedValue([
+          invite,
+          {
+            ...use,
+            id: `invite-use:${TOKEN}:${mallory.valueOf()}`,
+            identityId: mallory.valueOf(),
+          },
+        ]);
 
-          await admit(created);
-          registry.queryDocuments.mockResolvedValue([
-            invite,
-            {
-              ...use,
-              id: `invite-use:${TOKEN}:${mallory.valueOf()}`,
-              identityId: mallory.valueOf(),
-            },
-          ]);
-
-          await expect(admit(viaLink)).rejects.toThrow();
-        });
+        await expect(admit(viaLink)).rejects.toThrow();
       });
 
       it('refuses a join that skips the reference its method requires', async () => {

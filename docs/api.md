@@ -2648,8 +2648,12 @@ beyond that quota is skipped by the fold on every node without any error.
 `member_joined` carries `method` `added`, `approval`, `invitation`, `invite_link` or
 `automatic`, and `reference` exactly for `approval`, `invitation` and
 `invite_link`: the id of the accepted `community_membership_request` (type
-`request` for `approval`, `invitation` for `invitation`), or the invite token
-(which must also have the member's `community_invite_use` record). `approval`
+`request` for `approval`, `invitation` for `invitation`), or for `invite_link`
+the invite reference
+`base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken)))`,
+never the token itself, so the operation log does not hand out a usable invite.
+A node admits it only when it holds the signed invite and the member's
+`community_invite_use` record of a token with that reference. `approval`
 needs `approve_members`, `added` needs `manage_members`, `automatic` needs
 `autoJoinEnabled`, and the other methods are signed by the joining identity.
 A node that has not replicated the referenced records yet admits the operation
@@ -2909,6 +2913,16 @@ a page holds `limit` operations. Each operation carries its author's
 roles and memberships back to the creator and verifies every author itself
 instead of trusting the node: it is what authorizes community MLS commits and
 welcomes.
+
+Every member reads every operation, so what an operation signs is public to the
+community: `member_banned` and `member_kicked` name the moderator as
+`authorIdentityId`. That is inherent to verifiable history (the author is part of
+the digest the children pin, and the operations replicate to every node of the
+network); hiding it needs a protocol change such as a community moderation key.
+
+A page is selected by record id (`community:<communityId>:op:<digest>`) and only
+the operations it returns are decoded and hashed; selecting it still compares
+and sorts the ids of every stored operation of the community.
 
 ### Update community profile
 
@@ -3217,9 +3231,12 @@ signed by the acceptor. The invite token is
 `base64url(sha256(JSON.stringify([communityId, creatorIdentityId, nonce])))`.
 Uses are counted as signed use records, so `maxUses` can be exceeded when
 nodes are partitioned. `operation` signs `member_joined` with `args`
-`{identityId: <acceptor>, method: "invite_link", reference: <inviteToken>}`; the
-operation is only admitted by a node that also holds the signed invite and the
-acceptor's `invite-use:<token>:<identityId>` record.
+`{identityId: <acceptor>, method: "invite_link", reference: <invite reference>}`,
+where the invite reference is
+`base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken)))`:
+every member reads the operation, so it never carries the token. The operation
+is only admitted by a node that also holds the signed invite and the acceptor's
+`invite-use:<token>:<identityId>` record of a token with that reference.
 
 Implemented:
 

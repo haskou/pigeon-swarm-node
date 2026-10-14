@@ -9,6 +9,7 @@ import { InvalidCommunityOperationError } from '../../../domain/errors/InvalidCo
 import { CommunityOperation } from '../../../domain/operations/CommunityOperation';
 import { CommunityOperationArgumentReader } from '../../../domain/operations/CommunityOperationArgumentReader';
 import { CommunityOperationLedger } from '../../../domain/operations/CommunityOperationLedger';
+import { CommunityInviteToken } from '../../../domain/value-objects/CommunityInviteToken';
 import { CommunityJoinMethod } from '../../../domain/value-objects/CommunityJoinMethod';
 import { CommunityOperationAction } from '../../../domain/value-objects/CommunityOperationAction';
 
@@ -94,28 +95,42 @@ export default class CommunityOperationMutationPolicy extends PublicMutationPoli
     );
   }
 
+  /**
+   * An `invite_link` join signs the invite reference of the token, never the
+   * token: the member's signed invite use names the token whose reference it
+   * is, and that invite must belong to the same community.
+   */
   private async assertInviteRedeemed(
     operation: CommunityOperation,
     member: string,
-    token: string,
+    reference: string,
   ): Promise<void> {
-    const useId = `invite-use:${token}:${member}`;
-    const records = await this.findRequests(operation, [token, useId]);
     const communityId = operation.getCommunityId().valueOf();
+    const records = await this.registry.queryDocuments(
+      'requests',
+      (document) =>
+        document.communityId === communityId &&
+        (document.scopeType === 'community_invite' ||
+          (document.scopeType === 'community_invite_use' &&
+            document.identityId === member)),
+      [operation.getNetworkId().valueOf()],
+    );
+    const use = records.find(
+      (record) =>
+        record.scopeType === 'community_invite_use' &&
+        record.communityId === communityId &&
+        record.identityId === member &&
+        typeof record.token === 'string' &&
+        record.id === `invite-use:${record.token}:${member}` &&
+        new CommunityInviteToken(record.token).toJoinReference() === reference,
+    );
 
     assert(
-      records.some(
-        (record) =>
-          record.scopeType === 'community_invite' &&
-          record.id === token &&
-          record.communityId === communityId,
-      ) &&
+      use !== undefined &&
         records.some(
           (record) =>
-            record.scopeType === 'community_invite_use' &&
-            record.id === useId &&
-            record.token === token &&
-            record.identityId === member &&
+            record.scopeType === 'community_invite' &&
+            record.id === use.token &&
             record.communityId === communityId,
         ),
       new InvalidCommunityOperationError(),
