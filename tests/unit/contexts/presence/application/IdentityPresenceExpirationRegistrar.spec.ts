@@ -1,68 +1,42 @@
 import IdentityPresenceExpirationRegistrar from '@app/contexts/presence/application/expire/IdentityPresenceExpirationRegistrar';
-import IdentityPresenceNetworkResolver from '@app/contexts/presence/application/resolve-network/IdentityPresenceNetworkResolver';
 import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
 import IdentityPresenceRepository from '@app/contexts/presence/domain/repositories/IdentityPresenceRepository';
-import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
-import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
-import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
+import LocalRealtimeEventPublisher from '@app/shared/infrastructure/websocket/LocalRealtimeEventPublisher';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('IdentityPresenceExpirationRegistrar', () => {
-  const localNodeId = new NodeId('550e8400-e29b-41d4-a716-446655440001');
-  const remoteNodeId = new NodeId('550e8400-e29b-41d4-a716-446655440002');
   let repository: MockProxy<IdentityPresenceRepository>;
-  let networkResolver: MockProxy<IdentityPresenceNetworkResolver>;
-  let eventPublisher: MockProxy<DomainEventPublisher>;
-  let nodeRepository: MockProxy<NodeRepository>;
+  let localPublisher: MockProxy<LocalRealtimeEventPublisher>;
   let registrar: IdentityPresenceExpirationRegistrar;
 
   beforeEach(() => {
     repository = mock<IdentityPresenceRepository>();
-    networkResolver = mock<IdentityPresenceNetworkResolver>();
-    eventPublisher = mock<DomainEventPublisher>();
-    nodeRepository = mock<NodeRepository>();
-    nodeRepository.loadLocalNodeId.mockResolvedValue(localNodeId);
-    networkResolver.resolve.mockResolvedValue(['network-id']);
+    localPublisher = mock<LocalRealtimeEventPublisher>();
     registrar = new IdentityPresenceExpirationRegistrar(
       repository,
-      networkResolver,
-      eventPublisher,
-      nodeRepository,
+      localPublisher,
     );
   });
 
-  it('publishes expiration only for a lease owned by the local node', async () => {
+  it('disconnects an expired lease and tells only local realtime clients', async () => {
     repository.findPotentiallyExpired.mockResolvedValue([
-      expiredPresence(localNodeId),
+      IdentityPresence.fromPrimitives({
+        identityId:
+          'MCowBQYDK2VwAyEAq3hAwZS8E8LE8Z+qoSHj8U5RF9Ky+fKDgT/spDURDkc=',
+        lastHeartbeatAt: 1,
+        preferenceUpdatedAt: 1,
+        selectedStatus: 'available',
+        status: 'available',
+        updatedAt: 1,
+      }),
     ]);
 
     await registrar.expire();
 
-    expect(repository.save).toHaveBeenCalledTimes(1);
-    expect(eventPublisher.publish).toHaveBeenCalledTimes(1);
-  });
-
-  it('expires a remote lease locally without broadcasting on its behalf', async () => {
-    repository.findPotentiallyExpired.mockResolvedValue([
-      expiredPresence(remoteNodeId),
-    ]);
-
-    await registrar.expire();
-
-    expect(repository.save).toHaveBeenCalledTimes(1);
-    expect(eventPublisher.publish).not.toHaveBeenCalled();
+    expect(repository.save.mock.calls[0][0].isConnected()).toBe(false);
+    expect(localPublisher.publish).toHaveBeenCalledTimes(1);
+    expect(localPublisher.publish.mock.calls[0][0][0].attributes).toEqual(
+      expect.objectContaining({ status: 'disconnected' }),
+    );
   });
 });
-
-function expiredPresence(ownerNodeId: NodeId): IdentityPresence {
-  return IdentityPresence.fromPrimitives({
-    identityId:
-      'MCowBQYDK2VwAyEAq3hAwZS8E8LE8Z+qoSHj8U5RF9Ky+fKDgT/spDURDkc=',
-    lastHeartbeatAt: 1,
-    ownerNodeId: ownerNodeId.valueOf(),
-    preferenceUpdatedAt: 1,
-    selectedStatus: 'available',
-    status: 'available',
-    updatedAt: 1,
-  });
-}
