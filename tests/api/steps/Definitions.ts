@@ -172,6 +172,11 @@ export default class Definitions {
   private rememberedCallJoinRequest:
     { body: string | undefined; headers: Record<string, string> } | undefined;
 
+  private rememberedDiagnosticsRequest:
+    { body: string | undefined; headers: Record<string, string> } | undefined;
+
+  private rememberedDiagnosticsOpenedAt: number | undefined;
+
   private ownerIdentityId: IdentityId | undefined;
   private privateBlob:
     { blobId: string; downloadToken: string; uploadToken: string } | undefined;
@@ -4715,6 +4720,51 @@ export default class Definitions {
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
+    );
+  }
+
+  @given('I remember the current node diagnostics request')
+  public iRememberTheCurrentNodeDiagnosticsRequest(): void {
+    this.rememberedDiagnosticsRequest = {
+      body: this.body,
+      headers: { ...this.headers },
+    };
+  }
+
+  @when('I replay the remembered node diagnostics PUT')
+  public async iReplayTheRememberedNodeDiagnosticsPUT(): Promise<void> {
+    if (!this.rememberedDiagnosticsRequest) {
+      throw new Error('Node diagnostics request must be remembered first.');
+    }
+
+    // A replay accepted later than the original would open at a later instant.
+    const { promise: later, resolve } = Promise.withResolvers<void>();
+
+    setTimeout(resolve, 5);
+    await later;
+
+    this.response = await this.restClient.put(
+      '/node/diagnostics/',
+      this.rememberedDiagnosticsRequest.body &&
+        JSON.parse(this.rememberedDiagnosticsRequest.body),
+      { headers: this.rememberedDiagnosticsRequest.headers },
+    );
+  }
+
+  @given('I remember the opened node diagnostics session')
+  public iRememberTheOpenedNodeDiagnosticsSession(): void {
+    if (typeof this.response?.data?.openedAt !== 'number') {
+      throw new Error('Node diagnostics session response openedAt not found.');
+    }
+
+    this.rememberedDiagnosticsOpenedAt = this.response.data.openedAt;
+  }
+
+  @then('the node diagnostics session is the remembered one')
+  public theNodeDiagnosticsSessionIsTheRememberedOne(): void {
+    expect(this.rememberedDiagnosticsOpenedAt).to.be.a('number');
+    expect(this.response?.data?.openedAt).to.equal(
+      this.rememberedDiagnosticsOpenedAt,
     );
   }
 

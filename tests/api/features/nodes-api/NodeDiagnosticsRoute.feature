@@ -87,3 +87,30 @@ Feature: Node diagnostics session
     And I sign the current node diagnostics "PUT" request
     When I PUT "/node/diagnostics/"
     Then response code is equal to 403
+
+  Scenario: Refuse a replayed owner-signed request to open a diagnostics session
+    Given the local node has no owner and no networks
+    And I sign the current node owner request
+    When I PUT "/node/owner/"
+    Then response code is equal to 200
+
+    Given I set json body
+      """
+      {
+        "consent": true,
+        "minutes": 15
+      }
+      """
+    And I sign the current node diagnostics "PUT" request
+    And I remember the current node diagnostics request
+    When I PUT "/node/diagnostics/"
+    Then response code is equal to 200
+    And I remember the opened node diagnostics session
+
+    When I replay the remembered node diagnostics PUT
+    Then response code is equal to 401
+
+    Given I sign the current node diagnostics "GET" request
+    When I GET "/node/diagnostics/"
+    Then response code is equal to 200
+    And the node diagnostics session is the remembered one
