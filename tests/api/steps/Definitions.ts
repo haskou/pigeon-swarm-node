@@ -89,7 +89,29 @@ chai.use(chaiSubset);
 
 setDefaultTimeout(20_000);
 
-let application: PigeonApplication | null = null;
+// Every scenario awaits the same startup, so a failed startup (for example
+// API_PORT held by another run) fails each scenario with its cause instead of
+// later scenarios sending requests to whatever process owns the port.
+let application: Promise<PigeonApplication> | null = null;
+
+async function startApplication(
+  ipfsDefinition: IPFSDefinition,
+): Promise<PigeonApplication> {
+  const started = new PigeonApplication();
+
+  started.loadEnvironmentVariables('test');
+  ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
+
+  await started.dependencyInjection();
+  await started.runServer();
+  started.logs();
+  await started.runRuntimes(
+    OrbitDBReplicatedStateRuntime,
+    OrbitDBCallProjectionRuntime,
+  );
+
+  return started;
+}
 
 type StickerPackDocument = Record<string, unknown> & {
   stickers: Record<string, unknown>[];
@@ -1461,19 +1483,8 @@ export default class Definitions {
 
   @before()
   public async startKernel(): Promise<void> {
-    if (!application) {
-      application = new PigeonApplication();
-      application.loadEnvironmentVariables('test');
-      this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
-
-      await application.dependencyInjection();
-      await application.runServer();
-      application.logs();
-      await application.runRuntimes(
-        OrbitDBReplicatedStateRuntime,
-        OrbitDBCallProjectionRuntime,
-      );
-    }
+    application ??= startApplication(this.ipfsDefinition);
+    await application;
   }
 
   @before()
