@@ -832,6 +832,846 @@
           }
         }
       ]
+    },
+    {
+      "name": "recoveries lost at earlier revisions",
+      "stored": {
+        "concurrentRecoveries": [
+          {
+            "epoch": "genesis",
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "operation": "recover",
+            "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+            "previousRevision": 1,
+            "proofOfPossession": "iTjUSs5oIxqkZYVzdMDxTmac5z3YXB9Z/RRc4m4DCWfJVoxtJs0f21gOO7WLGfP1C4eIbNnmRtTcP1DYGz2cAg==",
+            "revision": 2,
+            "signature": "vKvAWEMKeaV2bfMMRn0i4v19sJl1/4mnuHFoVMnBqLaoDrZ4dIsJoOZ8NzXBXFwLnBRZ9dwjRbn6eGPKCFfTCQ==",
+            "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+            "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+          },
+          {
+            "compromisedCredentials": [
+              {
+                "compromisedSince": 2,
+                "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n"
+              }
+            ],
+            "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "operation": "recover",
+            "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a62",
+            "previousRevision": 2,
+            "proofOfPossession": "Ek6aLgE91HD2CHMwoyW+pLbsMNOIFaFIRb09CUm4LS/c8w6yO41kFbULpvqTJlVw/grDBkzZ8ntF0g+iiet1CA==",
+            "revision": 3,
+            "signature": "aNjAXhPxPc6zyYzGQun7QfeiqTzaRveJjABsQnRnL+5U2sos1wfUqHBW0D9B8ePSQYbaVsLXDUW/p97WVFAACg==",
+            "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+            "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c"
+          }
+        ],
+        "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+        "recoveries": [
+          {
+            "epoch": "genesis",
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "operation": "recover",
+            "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+            "previousRevision": 3,
+            "proofOfPossession": "7SAXQKjMb/BsfCCfahMlVnIUxfWrNKpztjdrmnZd853u1YTKVlPoHjUPc86EuMLUId3eXmYxZjDi4BsbdK87AQ==",
+            "revision": 4,
+            "signature": "8QCBYCDoO0f52sF3QTGBH7F7dMsoSwrKQj19hYr1Hi7/X8VFurCeayL5s/FUT8evf9MRdRLtBGwkH2cJfOtlCQ==",
+            "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+            "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba"
+          }
+        ],
+        "transitions": [
+          {
+            "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+            "authorizedAt": 1760001800000,
+            "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "operation": "enroll",
+            "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a64",
+            "pairingExpiration": 1760002100000,
+            "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e64",
+            "previousRevision": 4,
+            "proofOfPossession": "ZY9Xiqdvidnv2h3HuQJLSn3/cUM1JZ2zueaPiUsczs4bk8M2MtO4trDauWfB2fT6OjELbvDvhDWJmAAf3opODA==",
+            "revision": 5,
+            "signature": "rvv+2kmq7HiweAIIZdb77kAWQz5Ofej5tXM4uV11Dr4+OYg+t/d7x3o8RM7JFDX54FdYNpqw+BYDV+3ztko0CA==",
+            "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+            "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+          },
+          {
+            "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+            "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "operation": "revoke",
+            "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a65",
+            "previousRevision": 5,
+            "revision": 6,
+            "signature": "Yd3LEQh291vkwVF9qBbxnlC93ux6XOXHayQ2Ylnx2hfkSxBSnr6BXNkYpc3+qitGfHYu/OtpaF1kLMg1lyJODg==",
+            "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+            "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+          }
+        ]
+      },
+      "head": {
+        "credentials": [
+          "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n"
+        ],
+        "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+        "revision": 6
+      },
+      "reads": [
+        {
+          "name": "the recovery authority reads the lost recoveries with the lineage",
+          "reader": "recoveryAuthority",
+          "after": 0,
+          "expected": {
+            "concurrentRecoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "previousRevision": 1,
+                "proofOfPossession": "iTjUSs5oIxqkZYVzdMDxTmac5z3YXB9Z/RRc4m4DCWfJVoxtJs0f21gOO7WLGfP1C4eIbNnmRtTcP1DYGz2cAg==",
+                "revision": 2,
+                "signature": "vKvAWEMKeaV2bfMMRn0i4v19sJl1/4mnuHFoVMnBqLaoDrZ4dIsJoOZ8NzXBXFwLnBRZ9dwjRbn6eGPKCFfTCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              },
+              {
+                "compromisedCredentials": [
+                  {
+                    "compromisedSince": 2,
+                    "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n"
+                  }
+                ],
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a62",
+                "previousRevision": 2,
+                "proofOfPossession": "Ek6aLgE91HD2CHMwoyW+pLbsMNOIFaFIRb09CUm4LS/c8w6yO41kFbULpvqTJlVw/grDBkzZ8ntF0g+iiet1CA==",
+                "revision": 3,
+                "signature": "aNjAXhPxPc6zyYzGQun7QfeiqTzaRveJjABsQnRnL+5U2sos1wfUqHBW0D9B8ePSQYbaVsLXDUW/p97WVFAACg==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c"
+              }
+            ],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "previousRevision": 3,
+                "proofOfPossession": "7SAXQKjMb/BsfCCfahMlVnIUxfWrNKpztjdrmnZd853u1YTKVlPoHjUPc86EuMLUId3eXmYxZjDi4BsbdK87AQ==",
+                "revision": 4,
+                "signature": "8QCBYCDoO0f52sF3QTGBH7F7dMsoSwrKQj19hYr1Hi7/X8VFurCeayL5s/FUT8evf9MRdRLtBGwkH2cJfOtlCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba"
+              }
+            ],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760001800000,
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a64",
+                "pairingExpiration": 1760002100000,
+                "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e64",
+                "previousRevision": 4,
+                "proofOfPossession": "ZY9Xiqdvidnv2h3HuQJLSn3/cUM1JZ2zueaPiUsczs4bk8M2MtO4trDauWfB2fT6OjELbvDvhDWJmAAf3opODA==",
+                "revision": 5,
+                "signature": "rvv+2kmq7HiweAIIZdb77kAWQz5Ofej5tXM4uV11Dr4+OYg+t/d7x3o8RM7JFDX54FdYNpqw+BYDV+3ztko0CA==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              },
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "revoke",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a65",
+                "previousRevision": 5,
+                "revision": 6,
+                "signature": "Yd3LEQh291vkwVF9qBbxnlC93ux6XOXHayQ2Ylnx2hfkSxBSnr6BXNkYpc3+qitGfHYu/OtpaF1kLMg1lyJODg==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              }
+            ]
+          }
+        },
+        {
+          "name": "a pre-recovery device reads the lost recoveries without the history",
+          "reader": "author",
+          "after": 0,
+          "expected": {
+            "concurrentRecoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "previousRevision": 1,
+                "proofOfPossession": "iTjUSs5oIxqkZYVzdMDxTmac5z3YXB9Z/RRc4m4DCWfJVoxtJs0f21gOO7WLGfP1C4eIbNnmRtTcP1DYGz2cAg==",
+                "revision": 2,
+                "signature": "vKvAWEMKeaV2bfMMRn0i4v19sJl1/4mnuHFoVMnBqLaoDrZ4dIsJoOZ8NzXBXFwLnBRZ9dwjRbn6eGPKCFfTCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              },
+              {
+                "compromisedCredentials": [
+                  {
+                    "compromisedSince": 2,
+                    "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n"
+                  }
+                ],
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a62",
+                "previousRevision": 2,
+                "proofOfPossession": "Ek6aLgE91HD2CHMwoyW+pLbsMNOIFaFIRb09CUm4LS/c8w6yO41kFbULpvqTJlVw/grDBkzZ8ntF0g+iiet1CA==",
+                "revision": 3,
+                "signature": "aNjAXhPxPc6zyYzGQun7QfeiqTzaRveJjABsQnRnL+5U2sos1wfUqHBW0D9B8ePSQYbaVsLXDUW/p97WVFAACg==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c"
+              }
+            ],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "previousRevision": 3,
+                "proofOfPossession": "7SAXQKjMb/BsfCCfahMlVnIUxfWrNKpztjdrmnZd853u1YTKVlPoHjUPc86EuMLUId3eXmYxZjDi4BsbdK87AQ==",
+                "revision": 4,
+                "signature": "8QCBYCDoO0f52sF3QTGBH7F7dMsoSwrKQj19hYr1Hi7/X8VFurCeayL5s/FUT8evf9MRdRLtBGwkH2cJfOtlCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba"
+              }
+            ],
+            "transitions": []
+          }
+        },
+        {
+          "name": "a device revoked after the winning recovery reads up to its removal",
+          "reader": "laptop",
+          "after": 0,
+          "expected": {
+            "concurrentRecoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "previousRevision": 1,
+                "proofOfPossession": "iTjUSs5oIxqkZYVzdMDxTmac5z3YXB9Z/RRc4m4DCWfJVoxtJs0f21gOO7WLGfP1C4eIbNnmRtTcP1DYGz2cAg==",
+                "revision": 2,
+                "signature": "vKvAWEMKeaV2bfMMRn0i4v19sJl1/4mnuHFoVMnBqLaoDrZ4dIsJoOZ8NzXBXFwLnBRZ9dwjRbn6eGPKCFfTCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              },
+              {
+                "compromisedCredentials": [
+                  {
+                    "compromisedSince": 2,
+                    "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n"
+                  }
+                ],
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a62",
+                "previousRevision": 2,
+                "proofOfPossession": "Ek6aLgE91HD2CHMwoyW+pLbsMNOIFaFIRb09CUm4LS/c8w6yO41kFbULpvqTJlVw/grDBkzZ8ntF0g+iiet1CA==",
+                "revision": 3,
+                "signature": "aNjAXhPxPc6zyYzGQun7QfeiqTzaRveJjABsQnRnL+5U2sos1wfUqHBW0D9B8ePSQYbaVsLXDUW/p97WVFAACg==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c"
+              }
+            ],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "previousRevision": 3,
+                "proofOfPossession": "7SAXQKjMb/BsfCCfahMlVnIUxfWrNKpztjdrmnZd853u1YTKVlPoHjUPc86EuMLUId3eXmYxZjDi4BsbdK87AQ==",
+                "revision": 4,
+                "signature": "8QCBYCDoO0f52sF3QTGBH7F7dMsoSwrKQj19hYr1Hi7/X8VFurCeayL5s/FUT8evf9MRdRLtBGwkH2cJfOtlCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba"
+              }
+            ],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760001800000,
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a64",
+                "pairingExpiration": 1760002100000,
+                "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e64",
+                "previousRevision": 4,
+                "proofOfPossession": "ZY9Xiqdvidnv2h3HuQJLSn3/cUM1JZ2zueaPiUsczs4bk8M2MtO4trDauWfB2fT6OjELbvDvhDWJmAAf3opODA==",
+                "revision": 5,
+                "signature": "rvv+2kmq7HiweAIIZdb77kAWQz5Ofej5tXM4uV11Dr4+OYg+t/d7x3o8RM7JFDX54FdYNpqw+BYDV+3ztko0CA==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              },
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "revoke",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a65",
+                "previousRevision": 5,
+                "revision": 6,
+                "signature": "Yd3LEQh291vkwVF9qBbxnlC93ux6XOXHayQ2Ylnx2hfkSxBSnr6BXNkYpc3+qitGfHYu/OtpaF1kLMg1lyJODg==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              }
+            ]
+          }
+        }
+      ],
+      "verdicts": [
+        {
+          "name": "a pre-recovery device proves the winning recovery removed it",
+          "reader": "author",
+          "local": {
+            "epoch": "genesis",
+            "revision": 3
+          },
+          "removedBy": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+          "served": {
+            "concurrentRecoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "previousRevision": 1,
+                "proofOfPossession": "iTjUSs5oIxqkZYVzdMDxTmac5z3YXB9Z/RRc4m4DCWfJVoxtJs0f21gOO7WLGfP1C4eIbNnmRtTcP1DYGz2cAg==",
+                "revision": 2,
+                "signature": "vKvAWEMKeaV2bfMMRn0i4v19sJl1/4mnuHFoVMnBqLaoDrZ4dIsJoOZ8NzXBXFwLnBRZ9dwjRbn6eGPKCFfTCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              },
+              {
+                "compromisedCredentials": [
+                  {
+                    "compromisedSince": 2,
+                    "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n"
+                  }
+                ],
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a62",
+                "previousRevision": 2,
+                "proofOfPossession": "Ek6aLgE91HD2CHMwoyW+pLbsMNOIFaFIRb09CUm4LS/c8w6yO41kFbULpvqTJlVw/grDBkzZ8ntF0g+iiet1CA==",
+                "revision": 3,
+                "signature": "aNjAXhPxPc6zyYzGQun7QfeiqTzaRveJjABsQnRnL+5U2sos1wfUqHBW0D9B8ePSQYbaVsLXDUW/p97WVFAACg==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c"
+              }
+            ],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "previousRevision": 3,
+                "proofOfPossession": "7SAXQKjMb/BsfCCfahMlVnIUxfWrNKpztjdrmnZd853u1YTKVlPoHjUPc86EuMLUId3eXmYxZjDi4BsbdK87AQ==",
+                "revision": 4,
+                "signature": "8QCBYCDoO0f52sF3QTGBH7F7dMsoSwrKQj19hYr1Hi7/X8VFurCeayL5s/FUT8evf9MRdRLtBGwkH2cJfOtlCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba"
+              }
+            ],
+            "transitions": []
+          }
+        },
+        {
+          "name": "a device revoked after the winning recovery proves its removal",
+          "reader": "laptop",
+          "local": {
+            "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+            "revision": 5
+          },
+          "removedBy": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a65",
+          "served": {
+            "concurrentRecoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "previousRevision": 1,
+                "proofOfPossession": "iTjUSs5oIxqkZYVzdMDxTmac5z3YXB9Z/RRc4m4DCWfJVoxtJs0f21gOO7WLGfP1C4eIbNnmRtTcP1DYGz2cAg==",
+                "revision": 2,
+                "signature": "vKvAWEMKeaV2bfMMRn0i4v19sJl1/4mnuHFoVMnBqLaoDrZ4dIsJoOZ8NzXBXFwLnBRZ9dwjRbn6eGPKCFfTCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              },
+              {
+                "compromisedCredentials": [
+                  {
+                    "compromisedSince": 2,
+                    "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n"
+                  }
+                ],
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a62",
+                "previousRevision": 2,
+                "proofOfPossession": "Ek6aLgE91HD2CHMwoyW+pLbsMNOIFaFIRb09CUm4LS/c8w6yO41kFbULpvqTJlVw/grDBkzZ8ntF0g+iiet1CA==",
+                "revision": 3,
+                "signature": "aNjAXhPxPc6zyYzGQun7QfeiqTzaRveJjABsQnRnL+5U2sos1wfUqHBW0D9B8ePSQYbaVsLXDUW/p97WVFAACg==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c"
+              }
+            ],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "previousRevision": 3,
+                "proofOfPossession": "7SAXQKjMb/BsfCCfahMlVnIUxfWrNKpztjdrmnZd853u1YTKVlPoHjUPc86EuMLUId3eXmYxZjDi4BsbdK87AQ==",
+                "revision": 4,
+                "signature": "8QCBYCDoO0f52sF3QTGBH7F7dMsoSwrKQj19hYr1Hi7/X8VFurCeayL5s/FUT8evf9MRdRLtBGwkH2cJfOtlCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba"
+              }
+            ],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760001800000,
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a64",
+                "pairingExpiration": 1760002100000,
+                "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e64",
+                "previousRevision": 4,
+                "proofOfPossession": "ZY9Xiqdvidnv2h3HuQJLSn3/cUM1JZ2zueaPiUsczs4bk8M2MtO4trDauWfB2fT6OjELbvDvhDWJmAAf3opODA==",
+                "revision": 5,
+                "signature": "rvv+2kmq7HiweAIIZdb77kAWQz5Ofej5tXM4uV11Dr4+OYg+t/d7x3o8RM7JFDX54FdYNpqw+BYDV+3ztko0CA==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              },
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "revoke",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a65",
+                "previousRevision": 5,
+                "revision": 6,
+                "signature": "Yd3LEQh291vkwVF9qBbxnlC93ux6XOXHayQ2Ylnx2hfkSxBSnr6BXNkYpc3+qitGfHYu/OtpaF1kLMg1lyJODg==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              }
+            ]
+          }
+        },
+        {
+          "name": "the winning device is not removed by the lost recoveries",
+          "reader": "recovered",
+          "local": {
+            "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+            "revision": 6
+          },
+          "removedBy": null,
+          "served": {
+            "concurrentRecoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "previousRevision": 1,
+                "proofOfPossession": "iTjUSs5oIxqkZYVzdMDxTmac5z3YXB9Z/RRc4m4DCWfJVoxtJs0f21gOO7WLGfP1C4eIbNnmRtTcP1DYGz2cAg==",
+                "revision": 2,
+                "signature": "vKvAWEMKeaV2bfMMRn0i4v19sJl1/4mnuHFoVMnBqLaoDrZ4dIsJoOZ8NzXBXFwLnBRZ9dwjRbn6eGPKCFfTCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              },
+              {
+                "compromisedCredentials": [
+                  {
+                    "compromisedSince": 2,
+                    "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n"
+                  }
+                ],
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a62",
+                "previousRevision": 2,
+                "proofOfPossession": "Ek6aLgE91HD2CHMwoyW+pLbsMNOIFaFIRb09CUm4LS/c8w6yO41kFbULpvqTJlVw/grDBkzZ8ntF0g+iiet1CA==",
+                "revision": 3,
+                "signature": "aNjAXhPxPc6zyYzGQun7QfeiqTzaRveJjABsQnRnL+5U2sos1wfUqHBW0D9B8ePSQYbaVsLXDUW/p97WVFAACg==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c"
+              }
+            ],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "previousRevision": 3,
+                "proofOfPossession": "7SAXQKjMb/BsfCCfahMlVnIUxfWrNKpztjdrmnZd853u1YTKVlPoHjUPc86EuMLUId3eXmYxZjDi4BsbdK87AQ==",
+                "revision": 4,
+                "signature": "8QCBYCDoO0f52sF3QTGBH7F7dMsoSwrKQj19hYr1Hi7/X8VFurCeayL5s/FUT8evf9MRdRLtBGwkH2cJfOtlCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba"
+              }
+            ],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760001800000,
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a64",
+                "pairingExpiration": 1760002100000,
+                "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e64",
+                "previousRevision": 4,
+                "proofOfPossession": "ZY9Xiqdvidnv2h3HuQJLSn3/cUM1JZ2zueaPiUsczs4bk8M2MtO4trDauWfB2fT6OjELbvDvhDWJmAAf3opODA==",
+                "revision": 5,
+                "signature": "rvv+2kmq7HiweAIIZdb77kAWQz5Ofej5tXM4uV11Dr4+OYg+t/d7x3o8RM7JFDX54FdYNpqw+BYDV+3ztko0CA==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              },
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "revoke",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a65",
+                "previousRevision": 5,
+                "revision": 6,
+                "signature": "Yd3LEQh291vkwVF9qBbxnlC93ux6XOXHayQ2Ylnx2hfkSxBSnr6BXNkYpc3+qitGfHYu/OtpaF1kLMg1lyJODg==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              }
+            ]
+          }
+        },
+        {
+          "name": "a lost recovery never proves a removal",
+          "reader": "target",
+          "local": {
+            "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+            "revision": 3
+          },
+          "removedBy": null,
+          "served": {
+            "concurrentRecoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "previousRevision": 1,
+                "proofOfPossession": "iTjUSs5oIxqkZYVzdMDxTmac5z3YXB9Z/RRc4m4DCWfJVoxtJs0f21gOO7WLGfP1C4eIbNnmRtTcP1DYGz2cAg==",
+                "revision": 2,
+                "signature": "vKvAWEMKeaV2bfMMRn0i4v19sJl1/4mnuHFoVMnBqLaoDrZ4dIsJoOZ8NzXBXFwLnBRZ9dwjRbn6eGPKCFfTCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              },
+              {
+                "compromisedCredentials": [
+                  {
+                    "compromisedSince": 2,
+                    "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n"
+                  }
+                ],
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a62",
+                "previousRevision": 2,
+                "proofOfPossession": "Ek6aLgE91HD2CHMwoyW+pLbsMNOIFaFIRb09CUm4LS/c8w6yO41kFbULpvqTJlVw/grDBkzZ8ntF0g+iiet1CA==",
+                "revision": 3,
+                "signature": "aNjAXhPxPc6zyYzGQun7QfeiqTzaRveJjABsQnRnL+5U2sos1wfUqHBW0D9B8ePSQYbaVsLXDUW/p97WVFAACg==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c"
+              }
+            ],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "previousRevision": 3,
+                "proofOfPossession": "7SAXQKjMb/BsfCCfahMlVnIUxfWrNKpztjdrmnZd853u1YTKVlPoHjUPc86EuMLUId3eXmYxZjDi4BsbdK87AQ==",
+                "revision": 4,
+                "signature": "8QCBYCDoO0f52sF3QTGBH7F7dMsoSwrKQj19hYr1Hi7/X8VFurCeayL5s/FUT8evf9MRdRLtBGwkH2cJfOtlCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba"
+              }
+            ],
+            "transitions": []
+          }
+        },
+        {
+          "name": "a lost recovery above the last recovery revision proves nothing",
+          "reader": "author",
+          "local": {
+            "epoch": "genesis",
+            "revision": 1
+          },
+          "removedBy": null,
+          "served": {
+            "concurrentRecoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "previousRevision": 3,
+                "proofOfPossession": "7SAXQKjMb/BsfCCfahMlVnIUxfWrNKpztjdrmnZd853u1YTKVlPoHjUPc86EuMLUId3eXmYxZjDi4BsbdK87AQ==",
+                "revision": 4,
+                "signature": "8QCBYCDoO0f52sF3QTGBH7F7dMsoSwrKQj19hYr1Hi7/X8VFurCeayL5s/FUT8evf9MRdRLtBGwkH2cJfOtlCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba"
+              }
+            ],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "previousRevision": 1,
+                "proofOfPossession": "iTjUSs5oIxqkZYVzdMDxTmac5z3YXB9Z/RRc4m4DCWfJVoxtJs0f21gOO7WLGfP1C4eIbNnmRtTcP1DYGz2cAg==",
+                "revision": 2,
+                "signature": "vKvAWEMKeaV2bfMMRn0i4v19sJl1/4mnuHFoVMnBqLaoDrZ4dIsJoOZ8NzXBXFwLnBRZ9dwjRbn6eGPKCFfTCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              }
+            ],
+            "transitions": []
+          }
+        },
+        {
+          "name": "a lost recovery whose base is withheld proves nothing",
+          "reader": "author",
+          "local": {
+            "epoch": "genesis",
+            "revision": 3
+          },
+          "removedBy": null,
+          "served": {
+            "concurrentRecoveries": [
+              {
+                "compromisedCredentials": [
+                  {
+                    "compromisedSince": 2,
+                    "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n"
+                  }
+                ],
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a62",
+                "previousRevision": 2,
+                "proofOfPossession": "Ek6aLgE91HD2CHMwoyW+pLbsMNOIFaFIRb09CUm4LS/c8w6yO41kFbULpvqTJlVw/grDBkzZ8ntF0g+iiet1CA==",
+                "revision": 3,
+                "signature": "aNjAXhPxPc6zyYzGQun7QfeiqTzaRveJjABsQnRnL+5U2sos1wfUqHBW0D9B8ePSQYbaVsLXDUW/p97WVFAACg==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c"
+              }
+            ],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "previousRevision": 3,
+                "proofOfPossession": "7SAXQKjMb/BsfCCfahMlVnIUxfWrNKpztjdrmnZd853u1YTKVlPoHjUPc86EuMLUId3eXmYxZjDi4BsbdK87AQ==",
+                "revision": 4,
+                "signature": "8QCBYCDoO0f52sF3QTGBH7F7dMsoSwrKQj19hYr1Hi7/X8VFurCeayL5s/FUT8evf9MRdRLtBGwkH2cJfOtlCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba"
+              }
+            ],
+            "transitions": []
+          }
+        },
+        {
+          "name": "a lost recovery replayed twice proves nothing",
+          "reader": "author",
+          "local": {
+            "epoch": "genesis",
+            "revision": 3
+          },
+          "removedBy": null,
+          "served": {
+            "concurrentRecoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "previousRevision": 1,
+                "proofOfPossession": "iTjUSs5oIxqkZYVzdMDxTmac5z3YXB9Z/RRc4m4DCWfJVoxtJs0f21gOO7WLGfP1C4eIbNnmRtTcP1DYGz2cAg==",
+                "revision": 2,
+                "signature": "vKvAWEMKeaV2bfMMRn0i4v19sJl1/4mnuHFoVMnBqLaoDrZ4dIsJoOZ8NzXBXFwLnBRZ9dwjRbn6eGPKCFfTCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              },
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "previousRevision": 1,
+                "proofOfPossession": "iTjUSs5oIxqkZYVzdMDxTmac5z3YXB9Z/RRc4m4DCWfJVoxtJs0f21gOO7WLGfP1C4eIbNnmRtTcP1DYGz2cAg==",
+                "revision": 2,
+                "signature": "vKvAWEMKeaV2bfMMRn0i4v19sJl1/4mnuHFoVMnBqLaoDrZ4dIsJoOZ8NzXBXFwLnBRZ9dwjRbn6eGPKCFfTCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              },
+              {
+                "compromisedCredentials": [
+                  {
+                    "compromisedSince": 2,
+                    "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n"
+                  }
+                ],
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a62",
+                "previousRevision": 2,
+                "proofOfPossession": "Ek6aLgE91HD2CHMwoyW+pLbsMNOIFaFIRb09CUm4LS/c8w6yO41kFbULpvqTJlVw/grDBkzZ8ntF0g+iiet1CA==",
+                "revision": 3,
+                "signature": "aNjAXhPxPc6zyYzGQun7QfeiqTzaRveJjABsQnRnL+5U2sos1wfUqHBW0D9B8ePSQYbaVsLXDUW/p97WVFAACg==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c"
+              }
+            ],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "previousRevision": 3,
+                "proofOfPossession": "7SAXQKjMb/BsfCCfahMlVnIUxfWrNKpztjdrmnZd853u1YTKVlPoHjUPc86EuMLUId3eXmYxZjDi4BsbdK87AQ==",
+                "revision": 4,
+                "signature": "8QCBYCDoO0f52sF3QTGBH7F7dMsoSwrKQj19hYr1Hi7/X8VFurCeayL5s/FUT8evf9MRdRLtBGwkH2cJfOtlCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba"
+              }
+            ],
+            "transitions": []
+          }
+        },
+        {
+          "name": "the winning recovery replayed as lost proves nothing",
+          "reader": "author",
+          "local": {
+            "epoch": "genesis",
+            "revision": 3
+          },
+          "removedBy": null,
+          "served": {
+            "concurrentRecoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "previousRevision": 1,
+                "proofOfPossession": "iTjUSs5oIxqkZYVzdMDxTmac5z3YXB9Z/RRc4m4DCWfJVoxtJs0f21gOO7WLGfP1C4eIbNnmRtTcP1DYGz2cAg==",
+                "revision": 2,
+                "signature": "vKvAWEMKeaV2bfMMRn0i4v19sJl1/4mnuHFoVMnBqLaoDrZ4dIsJoOZ8NzXBXFwLnBRZ9dwjRbn6eGPKCFfTCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265"
+              },
+              {
+                "compromisedCredentials": [
+                  {
+                    "compromisedSince": 2,
+                    "credential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n"
+                  }
+                ],
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a61",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a62",
+                "previousRevision": 2,
+                "proofOfPossession": "Ek6aLgE91HD2CHMwoyW+pLbsMNOIFaFIRb09CUm4LS/c8w6yO41kFbULpvqTJlVw/grDBkzZ8ntF0g+iiet1CA==",
+                "revision": 3,
+                "signature": "aNjAXhPxPc6zyYzGQun7QfeiqTzaRveJjABsQnRnL+5U2sos1wfUqHBW0D9B8ePSQYbaVsLXDUW/p97WVFAACg==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c"
+              },
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "previousRevision": 3,
+                "proofOfPossession": "7SAXQKjMb/BsfCCfahMlVnIUxfWrNKpztjdrmnZd853u1YTKVlPoHjUPc86EuMLUId3eXmYxZjDi4BsbdK87AQ==",
+                "revision": 4,
+                "signature": "8QCBYCDoO0f52sF3QTGBH7F7dMsoSwrKQj19hYr1Hi7/X8VFurCeayL5s/FUT8evf9MRdRLtBGwkH2cJfOtlCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba"
+              }
+            ],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a63",
+                "previousRevision": 3,
+                "proofOfPossession": "7SAXQKjMb/BsfCCfahMlVnIUxfWrNKpztjdrmnZd853u1YTKVlPoHjUPc86EuMLUId3eXmYxZjDi4BsbdK87AQ==",
+                "revision": 4,
+                "signature": "8QCBYCDoO0f52sF3QTGBH7F7dMsoSwrKQj19hYr1Hi7/X8VFurCeayL5s/FUT8evf9MRdRLtBGwkH2cJfOtlCQ==",
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba"
+              }
+            ],
+            "transitions": []
+          }
+        }
+      ]
     }
   ]
 }
