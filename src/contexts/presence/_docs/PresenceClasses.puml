@@ -5,16 +5,15 @@ skinparam classAttributeIconSize 0
 package "presence/domain" {
   class IdentityPresence {
     - identityId: IdentityId
-    - ownerNodeId: NodeId
     - preference: IdentityPresencePreference
     - status: PresenceStatus
     - lastHeartbeatAt: Timestamp
     - lastActivityAt: Timestamp
     - updatedAt: Timestamp
-    + recordHeartbeat(activityDetected, networkIds)
-    + update(status, customMessage, networkIds)
-    + clearCustomMessage(networkIds)
-    + refreshDerivedStatus(networkIds)
+    + recordHeartbeat(activityDetected)
+    + update(status, customMessage)
+    + clearCustomMessage()
+    + refreshDerivedStatus()
   }
 
   class IdentityPresencePreference {
@@ -49,12 +48,8 @@ package "presence/application" {
   class IdentityPresenceExpirationRegistrar
 }
 
-package "presence/application/resolve-network" {
-  class IdentityPresenceNetworkResolver
-}
-
-package "identities/application" {
-  class IdentityNetworksFinder
+package "shared/infrastructure/websocket" {
+  class LocalRealtimeEventPublisher
 }
 
 package "presence/infrastructure" {
@@ -68,11 +63,15 @@ IdentityPresencePreference --> PresenceCustomMessage
 IdentityPresence --> IdentityPresenceWasUpdatedEvent
 IdentityPresenceFinder --> InMemoryIdentityPresenceRepository
 IdentityPresenceUpdater --> InMemoryIdentityPresenceRepository
-IdentityPresenceUpdater --> IdentityPresenceNetworkResolver
+IdentityPresenceUpdater --> LocalRealtimeEventPublisher
 IdentityPresenceHeartbeatRecorder --> InMemoryIdentityPresenceRepository
-IdentityPresenceHeartbeatRecorder --> IdentityPresenceNetworkResolver
+IdentityPresenceHeartbeatRecorder --> LocalRealtimeEventPublisher
 IdentityPresenceExpirationRegistrar --> InMemoryIdentityPresenceRepository
-IdentityPresenceExpirationRegistrar --> IdentityPresenceNetworkResolver
-IdentityPresenceNetworkResolver --> IdentityNetworksFinder
+IdentityPresenceExpirationRegistrar --> LocalRealtimeEventPublisher
+
+note bottom of LocalRealtimeEventPublisher
+  Presence leases never leave the serving node:
+  no gossip topic, no node id, no network ids.
+end note
 
 @enduml

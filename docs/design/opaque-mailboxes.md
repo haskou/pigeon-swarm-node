@@ -45,7 +45,7 @@ Non-goals (stated so nobody claims them):
 
 ## Model
 
-A **mailbox** is a queue owned by one receiving *relationship direction*:
+A **mailbox** is a queue owned by one receiving _relationship direction_:
 `A → B` and `B → A` are different mailboxes. For groups, each member has one
 mailbox per group; the sender fans out one envelope per member mailbox. There is
 no mailbox per group, so no table maps a conversation to its members.
@@ -78,16 +78,16 @@ All requests are unsigned by identities. Authorization is the capability alone,
 carried in an `Authorization: Bearer` header, never in the URL, so it stays out
 of access logs.
 
-| Operation | Capability | Effect |
-| --- | --- | --- |
-| `PUT /mailboxes/{mailboxId}` | recipient supplies `postTokenHash`, `readTokenHash`, `creationNonce` | creates the queue with its first reader; `creationNonce` is a proof of work bound to the id and both hashes, 16 leading zero bits rising to 20 as the node fills (see Limits); idempotent for identical hashes and nonce; further readers join through the readers endpoints |
-| `POST /mailboxes/{mailboxId}/envelopes` | `postToken` | appends an envelope, returns its server cursor |
-| `GET /mailboxes/{mailboxId}/envelopes?after=<cursor>&limit=N` | `readToken` | pages pending envelopes in cursor order |
-| `POST /mailboxes/{mailboxId}/ack` | `readToken` | body `{ upTo: cursor }`; records this reader's cursor and deletes envelopes every reader has passed |
-| `GET /mailboxes/{mailboxId}/readers` | `readToken` | `{ maxReaders, readers: [{ readTokenHash, ackedCursor }] }`; hashes only, never tokens |
-| `POST /mailboxes/{mailboxId}/readers` | `readToken` | body `{ readTokenHash }`; adds a device reader (`201`), `200` if already a reader, `409` at `MAILBOX_MAX_READERS` |
-| `DELETE /mailboxes/{mailboxId}/readers/{readTokenHash}` | `readToken` | revokes one reader (`204`); the last reader cannot be revoked (`409`) |
-| `DELETE /mailboxes/{mailboxId}` | `readToken` | deletes queue and envelopes |
+| Operation                                                     | Capability                                                           | Effect                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PUT /mailboxes/{mailboxId}`                                  | recipient supplies `postTokenHash`, `readTokenHash`, `creationNonce` | creates the queue with its first reader; `creationNonce` is a proof of work bound to the id and both hashes, 16 leading zero bits rising to 20 as the node fills (see Limits); idempotent for identical hashes and nonce; further readers join through the readers endpoints |
+| `POST /mailboxes/{mailboxId}/envelopes`                       | `postToken`                                                          | appends an envelope, returns its server cursor                                                                                                                                                                                                                               |
+| `GET /mailboxes/{mailboxId}/envelopes?after=<cursor>&limit=N` | `readToken`                                                          | pages pending envelopes in cursor order                                                                                                                                                                                                                                      |
+| `POST /mailboxes/{mailboxId}/ack`                             | `readToken`                                                          | body `{ upTo: cursor }`; records this reader's cursor and deletes envelopes every reader has passed                                                                                                                                                                          |
+| `GET /mailboxes/{mailboxId}/readers`                          | `readToken`                                                          | `{ maxReaders, readers: [{ readTokenHash, ackedCursor }] }`; hashes only, never tokens                                                                                                                                                                                       |
+| `POST /mailboxes/{mailboxId}/readers`                         | `readToken`                                                          | body `{ readTokenHash }`; adds a device reader (`201`), `200` if already a reader, `409` at `MAILBOX_MAX_READERS`                                                                                                                                                            |
+| `DELETE /mailboxes/{mailboxId}/readers/{readTokenHash}`       | `readToken`                                                          | revokes one reader (`204`); the last reader cannot be revoked (`409`)                                                                                                                                                                                                        |
+| `DELETE /mailboxes/{mailboxId}`                               | `readToken`                                                          | deletes queue and envelopes                                                                                                                                                                                                                                                  |
 
 Realtime: a connected recipient subscribes with the `readToken` over the
 existing WebSocket and receives `mailbox_envelope` hints that contain only the
@@ -142,7 +142,7 @@ are outside the node's control and are documented as such.
 ## Availability replication
 
 By default a mailbox lives on the recipient's home node only. A recipient may
-name additional *availability servers* explicitly; the `PUT` is then repeated on
+name additional _availability servers_ explicitly; the `PUT` is then repeated on
 each, with the same hashes. Senders append to every listed server and the
 recipient reads from all, deduplicating by `envelopeId`. Nothing is replicated to
 servers the recipient did not choose, and there is no gossip of mailbox state.
@@ -252,7 +252,8 @@ Network-level protection (Tor, mixnets, relays) is out of scope.
 - #290 private blobs reuse the same capability pattern and quota model; the blob
   descriptor (CID-free locator, key, name) travels inside an envelope.
 - #291: presence, signalling and receipts must also stop using identity-addressed
-  fan-out; ephemeral state stays in memory and never enters mailboxes.
+  fan-out; ephemeral state stays in memory and never enters mailboxes. Identity
+  presence is no longer gossiped: it stays on the serving node.
 
 ## Implementation
 

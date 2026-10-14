@@ -38,16 +38,6 @@ export class IdentityPresencePreference {
     return true;
   }
 
-  public mergeFrom(preference: IdentityPresencePreference): void {
-    if (preference.updatedAt.isBefore(this.updatedAt)) {
-      return;
-    }
-
-    this.selectedStatus = preference.selectedStatus;
-    this.customMessage = preference.customMessage;
-    this.updatedAt = preference.updatedAt;
-  }
-
   public selected(): PresenceStatus {
     return this.selectedStatus;
   }

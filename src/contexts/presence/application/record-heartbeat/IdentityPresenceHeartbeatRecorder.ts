@@ -1,39 +1,30 @@
-import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
-import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
+import LocalRealtimeEventPublisher from '@app/shared/infrastructure/websocket/LocalRealtimeEventPublisher';
 
 import { IdentityPresence } from '../../domain/IdentityPresence';
 import IdentityPresenceRepository from '../../domain/repositories/IdentityPresenceRepository';
-import IdentityPresenceNetworkResolver from '../resolve-network/IdentityPresenceNetworkResolver';
 import { IdentityPresenceHeartbeatMessage } from './messages/IdentityPresenceHeartbeatMessage';
 
 export default class IdentityPresenceHeartbeatRecorder {
   constructor(
     private readonly repository: IdentityPresenceRepository,
-    private readonly networkResolver: IdentityPresenceNetworkResolver,
-    private readonly eventPublisher: DomainEventPublisher,
-    private readonly nodeRepository: NodeRepository,
+    private readonly localPublisher: LocalRealtimeEventPublisher,
   ) {}
 
   public async record(
     message: IdentityPresenceHeartbeatMessage,
   ): Promise<IdentityPresence> {
     const identityId = message.getIdentityId();
-    const nodeId = await this.nodeRepository.loadLocalNodeId();
-    const hasPresence = await this.repository.hasByIdentityIdAndNodeId(
-      identityId,
-      nodeId,
-    );
+    const hasPresence = await this.repository.hasByIdentityId(identityId);
     const presence = hasPresence
-      ? await this.repository.requireByIdentityIdAndNodeId(identityId, nodeId)
-      : IdentityPresence.disconnected(identityId, nodeId);
-    const networkIds = await this.networkResolver.resolve(identityId);
+      ? await this.repository.requireByIdentityId(identityId)
+      : IdentityPresence.disconnected(identityId);
 
-    presence.recordHeartbeat(message.activityDetected, networkIds);
-    await this.repository.save(presence, networkIds);
+    presence.recordHeartbeat(message.activityDetected);
+    await this.repository.save(presence);
     const events = presence.pullDomainEvents();
 
     if (events.length > 0) {
-      await this.eventPublisher.publish(events);
+      this.localPublisher.publish(events);
     }
 
     return presence;

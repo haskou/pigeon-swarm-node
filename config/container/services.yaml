@@ -195,11 +195,6 @@ services:
     arguments:
       - '@shared/infrastructure/messageBus/DomainEventConsumer'
       - '@contexts/nodes/application/register-peer/NodePeerRegistrar'
-  apps/consumers/pubsub/presence/RegisterIdentityPresenceWhenUpdated:
-    class: /apps/consumers/pubsub/presence/RegisterIdentityPresenceWhenUpdated
-    arguments:
-      - '@shared/infrastructure/messageBus/DomainEventConsumer'
-      - '@contexts/presence/domain/repositories/IdentityPresenceRepository'
   apps/consumers/pubsub/push/SendPushNotificationWhenCallStarted:
     class: /apps/consumers/pubsub/push/SendPushNotificationWhenCallStarted
     arguments:
@@ -953,15 +948,18 @@ services:
         @contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder
   contexts/communities/domain/repositories/CommunityChannelDraftRepository: >-
     @contexts/communities/infrastructure/local-db/LocalCommunityChannelDraftRepository
-  contexts/communities/domain/repositories/CommunityChannelMessagePinRepository: >-
+  contexts/communities/domain/repositories/CommunityChannelMessagePinRepository:
+    >-
     @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessagePinRepository
   contexts/communities/domain/repositories/CommunityChannelMessageRepository: >-
     @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessageRepository
   contexts/communities/domain/repositories/CommunityInviteRepository: >-
     @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInviteRepository
-  contexts/communities/domain/repositories/CommunityMembershipRequestRepository: >-
+  contexts/communities/domain/repositories/CommunityMembershipRequestRepository:
+    >-
     @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityMembershipRequestRepository
-  contexts/communities/domain/repositories/CommunityMessageReactionRepository: >-
+  contexts/communities/domain/repositories/CommunityMessageReactionRepository:
+    >-
     @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityMessageReactionRepository
   contexts/communities/domain/repositories/CommunityModerationLogRepository: >-
     @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityModerationLogRepository
@@ -1219,9 +1217,11 @@ services:
   contexts/content-replication/domain/ContentReplicationPolicy:
     class: /contexts/content-replication/domain/ContentReplicationPolicy
     arguments: []
-  contexts/content-replication/domain/repositories/ContentReplicationRepository: >-
+  contexts/content-replication/domain/repositories/ContentReplicationRepository:
+    >-
     @contexts/content-replication/infrastructure/orbitdb/OrbitDBContentReplicationRepository
-  contexts/content-replication/domain/repositories/ContentReplicationStatusSummaryRepository: >-
+  contexts/content-replication/domain/repositories/ContentReplicationStatusSummaryRepository:
+    >-
     @contexts/content-replication/infrastructure/local-db/LocalContentReplicationStatusSummaryRepository
   contexts/content-replication/infrastructure/ipfs/IpfsContentStorage:
     class: /contexts/content-replication/infrastructure/ipfs/IpfsContentStorage
@@ -1321,10 +1321,6 @@ services:
     class: /contexts/identities/application/find/IdentityFinder
     arguments:
       - '@contexts/identities/domain/services/IdentityFinderService'
-  contexts/identities/application/find-networks/IdentityNetworksFinder:
-    class: /contexts/identities/application/find-networks/IdentityNetworksFinder
-    arguments:
-      - '@contexts/identities/domain/repositories/IdentityNetworkRepository'
   contexts/identities/application/observe-admission/IdentityAdmissionObserver:
     class: >-
       /contexts/identities/application/observe-admission/IdentityAdmissionObserver
@@ -1760,7 +1756,8 @@ services:
     arguments:
       - >-
         @contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor
-  contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor: >-
+  contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor:
+    >-
     @contexts/nodes/infrastructure/network-synchronization/InMemoryNodeNetworkSynchronizationMonitor
   contexts/nodes/application/find-peers/NodePeersFinder:
     class: /contexts/nodes/application/find-peers/NodePeersFinder
@@ -1873,9 +1870,11 @@ services:
       - >-
         @contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
-  contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository: >-
+  contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository:
+    >-
     @contexts/notification-settings/infrastructure/NotificationScopeSettingsRepositoryRouter
-  contexts/notification-settings/domain/services/NotificationScopeAccessAuthorizer: >-
+  contexts/notification-settings/domain/services/NotificationScopeAccessAuthorizer:
+    >-
     @contexts/notification-settings/infrastructure/CommunityNotificationScopeAccessAuthorizer
   contexts/notification-settings/infrastructure/CommunityNotificationScopeAccessAuthorizer:
     class: >-
@@ -2023,10 +2022,7 @@ services:
     class: /contexts/presence/application/expire/IdentityPresenceExpirationRegistrar
     arguments:
       - '@contexts/presence/domain/repositories/IdentityPresenceRepository'
-      - >-
-        @contexts/presence/application/resolve-network/IdentityPresenceNetworkResolver
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-      - '@contexts/nodes/domain/repositories/NodeRepository'
+      - '@shared/infrastructure/websocket/LocalRealtimeEventPublisher'
   contexts/presence/application/find/IdentityPresenceFinder:
     class: /contexts/presence/application/find/IdentityPresenceFinder
     arguments:
@@ -2036,23 +2032,12 @@ services:
       /contexts/presence/application/record-heartbeat/IdentityPresenceHeartbeatRecorder
     arguments:
       - '@contexts/presence/domain/repositories/IdentityPresenceRepository'
-      - >-
-        @contexts/presence/application/resolve-network/IdentityPresenceNetworkResolver
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-      - '@contexts/nodes/domain/repositories/NodeRepository'
-  contexts/presence/application/resolve-network/IdentityPresenceNetworkResolver:
-    class: >-
-      /contexts/presence/application/resolve-network/IdentityPresenceNetworkResolver
-    arguments:
-      - '@contexts/identities/application/find-networks/IdentityNetworksFinder'
+      - '@shared/infrastructure/websocket/LocalRealtimeEventPublisher'
   contexts/presence/application/update/IdentityPresenceUpdater:
     class: /contexts/presence/application/update/IdentityPresenceUpdater
     arguments:
       - '@contexts/presence/domain/repositories/IdentityPresenceRepository'
-      - >-
-        @contexts/presence/application/resolve-network/IdentityPresenceNetworkResolver
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-      - '@contexts/nodes/domain/repositories/NodeRepository'
+      - '@shared/infrastructure/websocket/LocalRealtimeEventPublisher'
   contexts/presence/domain/repositories/IdentityPresenceRepository: '@contexts/presence/infrastructure/memory/InMemoryIdentityPresenceRepository'
   contexts/presence/infrastructure/memory/InMemoryIdentityPresenceRepository:
     class: >-
@@ -2599,30 +2584,40 @@ services:
   shared/infrastructure/messageBus/MessageBusAdapter: '@shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter'
   contexts/public-mutations/domain/services/PublicMutationPolicy: >-
     @contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy
-  contexts/private-authorization/application/accept-operation/PrivateControlMutationAuthorizer: >-
+  contexts/private-authorization/application/accept-operation/PrivateControlMutationAuthorizer:
+    >-
     @contexts/communities/application/apply-private-control/PrivateCommunityControlApplier
-  contexts/private-authorization/application/provision-scope/PrivateGenesisProjectionAuthorizer: >-
+  contexts/private-authorization/application/provision-scope/PrivateGenesisProjectionAuthorizer:
+    >-
     @contexts/communities/application/apply-private-control/PrivateCommunityGenesisAuthorizer
   contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository: >-
     @contexts/identity-devices/infrastructure/local-db/LocalDeviceSealedSecretRepository
-  contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository: >-
+  contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository:
+    >-
     @contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationRepository
-  contexts/private-authorization/application/accept-operation/PrivateOperationDecoder: >-
+  contexts/private-authorization/application/accept-operation/PrivateOperationDecoder:
+    >-
     @contexts/private-authorization/infrastructure/contracts/PrivateControlOperationContract
-  contexts/private-authorization/domain/services/PrivateDeviceCredentialCodec: >-
+  contexts/private-authorization/domain/services/PrivateDeviceCredentialCodec:
+    >-
     @contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec
   contexts/private-authorization/application/provision-scope/PrivateGenesisAuthenticator: '@contexts/private-authorization/infrastructure/crypto/PrivateGenesisVerifier'
-  contexts/private-authorization/application/accept-operation/PrivateOperationAuthenticator: >-
+  contexts/private-authorization/application/accept-operation/PrivateOperationAuthenticator:
+    >-
     @contexts/private-authorization/infrastructure/crypto/PrivateOperationVerifier
-  contexts/private-authorization/application/accept-operation/PrivateControlTransitionProcessor: >-
+  contexts/private-authorization/application/accept-operation/PrivateControlTransitionProcessor:
+    >-
     @contexts/private-authorization/infrastructure/crypto/VerifiedPrivateControlTransitionProcessor
-  contexts/private-authorization/application/accept-operation/PrivateFreshnessGate: >-
+  contexts/private-authorization/application/accept-operation/PrivateFreshnessGate:
+    >-
     @contexts/private-authorization/infrastructure/freshness/InMemoryPrivateFreshnessGate
-  contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository: >-
+  contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository:
+    >-
     @contexts/private-authorization/infrastructure/local-db/LocalPrivateAuthorizationRepository
   contexts/private-authorization/application/PrivateOperationUnitOfWork: >-
     @contexts/private-authorization/infrastructure/local-db/LocalPrivateOperationUnitOfWork
-  contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization: >-
+  contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization:
+    >-
     @contexts/public-mutations/infrastructure/DeviceAuthorizationPublicMutationAuthorization
   contexts/mailboxes/domain/MailboxLimits: '@ddd-kernel.override.factory.MailboxLimits'
   contexts/private-blobs/domain/PrivateBlobLimits: '@ddd-kernel.override.factory.PrivateBlobLimits'

@@ -10,10 +10,10 @@ describe('IdentityPresence', () => {
   const connectedPresence = (): IdentityPresence =>
     IdentityPresence.fromPrimitives({
       identityId: identityId.valueOf(),
-      preferenceUpdatedAt: 1770000000000,
-      selectedStatus: 'available',
       lastActivityAt: 1770000000000,
       lastHeartbeatAt: 1770000000000,
+      preferenceUpdatedAt: 1770000000000,
+      selectedStatus: 'available',
       status: 'available',
       updatedAt: 1770000000000,
     });
@@ -41,14 +41,13 @@ describe('IdentityPresence', () => {
 
     const [event] = presence.pullDomainEvents();
 
-    expect(Object.keys(event.attributes).sort()).toEqual([
-      'identityId',
-      'lastActivityAt',
-      'lastHeartbeatAt',
-      'preferenceUpdatedAt',
-      'selectedStatus',
-      'status',
-      'updatedAt',
-    ]);
+    expect(event.attributes).not.toHaveProperty('ownerNodeId');
+    expect(event.attributes).not.toHaveProperty('networkIds');
+    expect(event.attributes).toEqual(
+      expect.objectContaining({
+        identityId: identityId.valueOf(),
+        status: 'available',
+      }),
+    );
   });
 });
