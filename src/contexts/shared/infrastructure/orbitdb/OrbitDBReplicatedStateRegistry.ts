@@ -3,6 +3,8 @@ import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/Publ
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import Kernel from '@haskou/ddd-kernel';
+import canonicalize from 'canonicalize';
+import { createHash } from 'crypto';
 
 import { CompositeOrbitDBMutationGate } from './CompositeOrbitDBMutationGate';
 import LocalOrbitDBReplicatedHeadCache from './LocalOrbitDBReplicatedHeadCache';
@@ -403,7 +405,10 @@ export default class OrbitDBReplicatedStateRegistry {
   /**
    * Each offer that admits more records than the last one delivers the
    * still demoted head, so the records already proven show up before the
-   * rest; an offer that admits nothing new delivers nothing.
+   * rest; an offer that admits nothing new delivers nothing. A head is keyed
+   * by its value too: a copy received again waits once, and a different
+   * value under the same key (from any peer) never takes the place of the
+   * pending one.
    */
   private scheduleReadmission(
     value: Record<string, unknown>,
@@ -414,7 +419,12 @@ export default class OrbitDBReplicatedStateRegistry {
 
     this.headReadmissions.schedule({
       isCurrent: () => this.storesByNetworkId.has(networkId),
-      key,
+      key:
+        key === undefined
+          ? undefined
+          : `${key}:${createHash('sha256')
+              .update(canonicalize(value) ?? '')
+              .digest('hex')}`,
       offer: async (): Promise<boolean> => {
         const offered = await this.admitGatedCollections(value);
 

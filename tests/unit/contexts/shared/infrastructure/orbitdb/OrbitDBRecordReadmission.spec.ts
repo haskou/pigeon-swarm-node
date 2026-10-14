@@ -102,28 +102,71 @@ describe('OrbitDBRecordReadmission', () => {
     expect(offer).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps one pending offer per key, the newest rejection', async () => {
+  it('schedules a record received again once, keeping its first wait', async () => {
     const readmission = new OrbitDBRecordReadmission();
-    const older = jest.fn(async () => false);
-    const newer = jest.fn(async () => false);
+    const first = jest.fn(async () => false);
+    const again = jest.fn(async () => false);
 
     readmission.schedule({
       isCurrent: current,
       key: 'head',
-      offer: older,
+      offer: first,
       scope: 'network',
     });
     await jest.advanceTimersByTimeAsync(1_000);
     readmission.schedule({
       isCurrent: current,
       key: 'head',
-      offer: newer,
+      offer: again,
+      scope: 'network',
+    });
+    await jest.advanceTimersByTimeAsync(71_000);
+
+    expect(first).toHaveBeenCalledTimes(3);
+    expect(again).not.toHaveBeenCalled();
+  });
+
+  it('keeps waking the other records while one offer never resolves', async () => {
+    const readmission = new OrbitDBRecordReadmission();
+    const stalled = jest.fn(() => Promise.withResolvers<boolean>().promise);
+    const offer = jest.fn(async () => false);
+
+    readmission.schedule({ isCurrent: current, offer: stalled, scope: 'a' });
+    readmission.schedule({ isCurrent: current, offer, scope: 'b' });
+    await jest.advanceTimersByTimeAsync(2_500);
+    readmission.wake();
+    await jest.advanceTimersByTimeAsync(
+      OrbitDBRecordReadmission.WAKE_DELAY_MS +
+        OrbitDBRecordReadmission.OFFER_WAIT_MS +
+        100,
+    );
+
+    expect(stalled).toHaveBeenCalledTimes(1);
+    expect(offer).toHaveBeenCalledTimes(2);
+  });
+
+  it('retires a record whose offer never resolves', async () => {
+    const readmission = new OrbitDBRecordReadmission();
+    const stalled = jest.fn(() => Promise.withResolvers<boolean>().promise);
+    const again = jest.fn(async () => true);
+
+    readmission.schedule({
+      isCurrent: current,
+      key: 'head',
+      offer: stalled,
       scope: 'network',
     });
     await jest.advanceTimersByTimeAsync(100_000);
+    readmission.schedule({
+      isCurrent: current,
+      key: 'head',
+      offer: again,
+      scope: 'network',
+    });
+    await jest.advanceTimersByTimeAsync(2_000);
 
-    expect(older).not.toHaveBeenCalled();
-    expect(newer).toHaveBeenCalledTimes(3);
+    expect(stalled).toHaveBeenCalledTimes(1);
+    expect(again).toHaveBeenCalledTimes(1);
   });
 
   it('does not let the records of one scope take the place of another', async () => {

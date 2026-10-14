@@ -1414,6 +1414,67 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     }
   });
 
+  it('keeps a degraded head pending when another degraded value arrives under its key', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+    try {
+      const gate = mock<OrbitDBMutationGate>();
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const firstNetwork = createStores();
+
+      gate.governs.mockImplementation(
+        (collection) => collection === 'communityOperations',
+      );
+      gate.governsHead.mockReturnValue(false);
+      gate.accepts.mockImplementation((_collection, record) =>
+        Promise.resolve(
+          record.id === 'join-1' &&
+            registry.findCachedHead('identity:joiner') !== undefined,
+        ),
+      );
+      registry.addMutationGate(gate);
+      await registry.register('network-1', firstNetwork.stores);
+      firstNetwork.heads.emitUpdate({
+        payload: {
+          key: 'community:community-1',
+          value: {
+            communityOperations: [{ id: 'join-1' }],
+            id: 'community-1',
+            updatedAt: 10,
+          },
+        },
+      });
+      await jest.advanceTimersByTimeAsync(1_000);
+      firstNetwork.heads.emitUpdate({
+        payload: {
+          key: 'community:community-1',
+          value: {
+            communityOperations: [{ id: 'forged-1' }],
+            id: 'community-1',
+            updatedAt: 11,
+          },
+        },
+      });
+      await jest.advanceTimersByTimeAsync(2_000 + 10_000);
+      firstNetwork.heads.emitUpdate({
+        payload: {
+          key: 'identity:joiner',
+          value: { identityId: 'joiner', updatedAt: 20 },
+        },
+      });
+      await jest.advanceTimersByTimeAsync(5_000);
+
+      await expect(registry.findHead('community:community-1')).resolves.toEqual(
+        expect.objectContaining({
+          communityOperations: [{ id: 'join-1' }],
+        }),
+      );
+      registry.clear();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   describe('replicated documents the mutation gate rejected', () => {
     const gateOf = (
       collection: string,

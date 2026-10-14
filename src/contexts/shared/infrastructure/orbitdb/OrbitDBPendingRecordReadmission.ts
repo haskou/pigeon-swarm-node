@@ -3,13 +3,13 @@ import Kernel from '@haskou/ddd-kernel';
 /**
  * One rejected record waiting to be offered again. It is offered after each
  * backoff delay and whenever it is woken; one offer runs at a time, and the
- * record settles once it is delivered, its store is gone, the last delay
- * passed, or a newer rejection of the same record replaced it.
+ * record settles once it is delivered, its store is gone, or the last delay
+ * passed.
  */
 export class OrbitDBPendingRecordReadmission {
   private attempt = 0;
 
-  private offering = false;
+  private inFlight?: Promise<void>;
 
   private settled = false;
 
@@ -17,6 +17,7 @@ export class OrbitDBPendingRecordReadmission {
 
   constructor(
     private readonly delaysMs: readonly number[],
+    private readonly offerWaitMs: number,
     private readonly offerRecord: () => Promise<boolean>,
     private readonly isCurrent: () => boolean,
     private readonly onSettled: () => void,
@@ -47,26 +48,40 @@ export class OrbitDBPendingRecordReadmission {
     this.onSettled();
   }
 
-  public cancel(): void {
-    this.settle();
+  private async attemptOffer(): Promise<void> {
+    try {
+      if (!this.isCurrent() || (await this.offerRecord())) this.settle();
+    } catch {
+      this.settle();
+      Kernel.logger.warn?.('OrbitDB record re-admission failed');
+    }
   }
 
   public start(): void {
     this.arm();
   }
 
-  public async offer(): Promise<void> {
-    if (this.offering || this.settled) return;
+  /**
+   * Offers the record unless an offer is already running, and waits for
+   * the running offer at most `offerWaitMs`: an offer that never resolves
+   * neither stalls the caller nor holds the record past its last delay.
+   */
+  public offer(): Promise<void> {
+    if (this.settled) return Promise.resolve();
 
-    this.offering = true;
+    this.inFlight ??= this.attemptOffer().finally(() => {
+      this.inFlight = undefined;
+    });
 
-    try {
-      if (!this.isCurrent() || (await this.offerRecord())) this.settle();
-    } catch {
-      this.settle();
-      Kernel.logger.warn?.('OrbitDB record re-admission failed');
-    } finally {
-      this.offering = false;
-    }
+    const { promise, resolve } = Promise.withResolvers<void>();
+    const deadline = setTimeout(resolve, this.offerWaitMs);
+
+    deadline.unref();
+    void this.inFlight.finally(() => {
+      clearTimeout(deadline);
+      resolve();
+    });
+
+    return promise;
   }
 }

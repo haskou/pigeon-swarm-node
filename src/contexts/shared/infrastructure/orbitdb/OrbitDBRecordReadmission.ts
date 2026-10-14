@@ -22,6 +22,14 @@ export class OrbitDBRecordReadmission {
    */
   public static readonly WAKE_DELAY_MS = 2_000;
 
+  /**
+   * Neither a wake nor the backoff waits longer than this for one offer, so
+   * a lookup that never resolves stalls neither the later wakes nor the
+   * retirement of its record. The offer itself keeps running and is not
+   * started twice.
+   */
+  public static readonly OFFER_WAIT_MS = 5_000;
+
   private readonly pendingByScope = new Map<
     string | object,
     Map<unknown, OrbitDBPendingRecordReadmission>
@@ -56,10 +64,10 @@ export class OrbitDBRecordReadmission {
    * The pending offers are bounded per scope (a network or a store), so a
    * flood of rejected records cannot pin them in memory, multiply the work
    * of a wake, or take the place of the records of another scope; past the
-   * bound a rejection is final. A record with a key replaces the pending
-   * record of the same key: it is the newer rejection, and gets the full
-   * wait. `offer` admits and delivers the record, and resolves whether it is
-   * settled.
+   * bound a rejection is final. A record whose key is already pending is
+   * not scheduled again, so a record received many times waits once and
+   * keeps its first wait. `offer` admits and delivers the record, and
+   * resolves whether it is settled.
    */
   public schedule({
     isCurrent,
@@ -77,15 +85,15 @@ export class OrbitDBRecordReadmission {
       new Map<unknown, OrbitDBPendingRecordReadmission>();
     const entryKey = key ?? Symbol('record');
 
-    pending.get(entryKey)?.cancel();
+    if (pending.has(entryKey)) return;
 
     if (pending.size >= OrbitDBRecordReadmission.MAX_PENDING_PER_SCOPE) return;
     const readmission = new OrbitDBPendingRecordReadmission(
       OrbitDBRecordReadmission.DELAYS_MS,
+      OrbitDBRecordReadmission.OFFER_WAIT_MS,
       offer,
       isCurrent,
       () => {
-        if (pending.get(entryKey) !== readmission) return;
         pending.delete(entryKey);
 
         if (pending.size === 0) this.pendingByScope.delete(scope);

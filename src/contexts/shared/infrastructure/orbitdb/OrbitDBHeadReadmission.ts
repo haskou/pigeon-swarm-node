@@ -1,7 +1,7 @@
 /**
  * Where a demoted head is delivered once readmitted. `key` names the head
- * and its delivery path: a newer demoted value of the same key replaces the
- * pending one.
+ * and its delivery path; with the head value it identifies a pending
+ * readmission, so a copy received again is not scheduled twice.
  */
 export type OrbitDBHeadReadmission = {
   key?: string;

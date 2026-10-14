@@ -702,13 +702,17 @@ its join, and the head would otherwise stay demoted until the 60 s retry.
   wait at once; past that a rejection of that store or network is final. A flood
   in one network never takes the place of the records of another; communities
   that share a network (and its stores) share its places.
-- A newer demoted value of the same head replaces the pending one and gets the
-  full wait, so re-gossiping a head occupies one place, not one per copy.
+- A demoted head waits under its key and its value. A copy received again does
+  not wait twice and keeps its first wait; a different value under the same key,
+  from any peer, waits beside it and never takes the place of the pending one.
 - A wake offers the pending records one after the other, and at most one wake
-  runs at a time; one offer per record runs at a time.
-- New state never extends the wait: wake offers fall inside the same 72 s, after
-  the 60 s attempt the rejection is final, and a record of a store or network
-  that is no longer registered is dropped.
+  runs at a time; one offer per record runs at a time. Neither a wake nor the
+  backoff waits more than 5 s for one offer, so an offer that never resolves
+  stalls neither the later wakes nor the retirement of its record.
+- New state never extends the wait: wake offers fall inside the same window of
+  72 s (at most 87 s when offers stall), after the 60 s attempt the rejection is
+  final, and a record of a store or network that is no longer registered is
+  dropped.
 - A wake is not scoped to the network or store that admitted the state: the
   state a record rests on often lives elsewhere (a community operation rests on
   an identity and a device authorization).
