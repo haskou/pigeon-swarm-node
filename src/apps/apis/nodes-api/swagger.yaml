@@ -82,6 +82,67 @@ paths:
           description: The authenticated identity is not the node owner.
         '409':
           description: The relay configuration is invalid.
+  /node/diagnostics/:
+    put:
+      tags:
+        - nodes
+      summary: Open a consented diagnostics session
+      description: Starts recording redacted content-retrieval diagnostics for 1 to 60 minutes and replaces any previous session. Requires explicit consent and a signed request from the current node owner. Lines are kept in memory only, at most 1000, never written to logs, and discarded 60 minutes after the session closes or on restart.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutNodeDiagnosticsBody'
+      responses:
+        '200':
+          description: Diagnostics session opened.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeDiagnosticsResource'
+        '403':
+          description: The authenticated identity is not the node owner, or the node has no owner.
+        '409':
+          description: Consent is missing or the duration is outside 1 to 60 minutes.
+    get:
+      tags:
+        - nodes
+      summary: Export the diagnostics session
+      description: Returns the redacted lines recorded so far. Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Diagnostics session export.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeDiagnosticsResource'
+        '403':
+          description: The authenticated identity is not the node owner, or the node has no owner.
+        '409':
+          description: No diagnostics session exists or it has been discarded.
+    delete:
+      tags:
+        - nodes
+      summary: Discard the diagnostics session
+      description: Stops recording and discards every recorded line immediately. Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '204':
+          description: Diagnostics session discarded.
+        '403':
+          description: The authenticated identity is not the node owner, or the node has no owner.
   /node/networks/:
     get:
       tags:
@@ -329,6 +390,43 @@ components:
         port:
           type: number
           description: Public libp2p TCP port announced with publicHost when enabled.
+    PutNodeDiagnosticsBody:
+      type: object
+      required:
+        - consent
+        - minutes
+      properties:
+        consent:
+          type: boolean
+          description: Must be true. The owner consents to recording redacted diagnostics.
+        minutes:
+          type: integer
+          minimum: 1
+          maximum: 60
+    NodeDiagnosticsResource:
+      type: object
+      required:
+        - openedAt
+        - closesAt
+        - discardsAt
+        - entries
+      properties:
+        openedAt:
+          type: integer
+          description: Milliseconds since epoch.
+        closesAt:
+          type: integer
+          description: Recording stops at this time, in milliseconds since epoch.
+        discardsAt:
+          type: integer
+          description: The session and its lines are discarded at this time, in milliseconds since epoch.
+        entries:
+          type: array
+          maxItems: 1000
+          items:
+            type: string
+            maxLength: 2000
+          description: Redacted content-retrieval lines. CIDs, provider and sender IDs are keyed digests.
     NodeRelayConfigurationResource:
       type: object
       required:

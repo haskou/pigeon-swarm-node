@@ -23,6 +23,8 @@ import CommunityRepository from '../contexts/communities/domain/repositories/Com
 import CommunityRepositoryRouter from '../contexts/communities/infrastructure/CommunityRepositoryRouter';
 import { ContentReplicationLimits } from '../contexts/content-replication/domain/ContentReplicationLimits';
 import { ContentReplicationLimitsFromEnvironment } from '../contexts/content-replication/infrastructure/environment/ContentReplicationLimitsFromEnvironment';
+import DiagnosticsSessionRepository from '../contexts/diagnostics/domain/repositories/DiagnosticsSessionRepository';
+import InMemoryDiagnosticsSessionRepository from '../contexts/diagnostics/infrastructure/memory/InMemoryDiagnosticsSessionRepository';
 import { DeviceAuthorizationRepository } from '../contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
 import { DeviceSealedSecretRepository } from '../contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository';
 import LocalDeviceSealedSecretRepository from '../contexts/identity-devices/infrastructure/local-db/LocalDeviceSealedSecretRepository';
@@ -248,6 +250,10 @@ export default class PigeonApplication {
         {
           token: CallParticipantLeaseRepository,
           useClass: InMemoryCallParticipantLeaseRepository,
+        },
+        {
+          token: DiagnosticsSessionRepository,
+          useClass: InMemoryDiagnosticsSessionRepository,
         },
         {
           token: IdentityPresenceRepository,

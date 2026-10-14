@@ -87,14 +87,17 @@ import { PostMailboxAckRoute } from '@app/apps/apis/mailboxes-api/routes/PostMai
 import { PostMailboxEnvelopeRoute } from '@app/apps/apis/mailboxes-api/routes/PostMailboxEnvelopeRoute';
 import { PostMailboxReaderRoute } from '@app/apps/apis/mailboxes-api/routes/PostMailboxReaderRoute';
 import { PutMailboxRoute } from '@app/apps/apis/mailboxes-api/routes/PutMailboxRoute';
+import { DeleteNodeDiagnosticsRoute } from '@app/apps/apis/nodes-api/routes/DeleteNodeDiagnosticsRoute';
 import { DeleteNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/DeleteNodeNetworkRoute';
 import { GetClientContractRoute } from '@app/apps/apis/nodes-api/routes/GetClientContractRoute';
+import { GetNodeDiagnosticsRoute } from '@app/apps/apis/nodes-api/routes/GetNodeDiagnosticsRoute';
 import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNetworksRoute';
 import { GetNodeRelayConfigurationRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRelayConfigurationRoute';
 import { GetNodeRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRoute';
 import { GetPeersRoute } from '@app/apps/apis/nodes-api/routes/GetPeersRoute';
 import { PostNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodeNetworkRoute';
 import { PostNodePublicNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodePublicNetworkRoute';
+import { PutNodeDiagnosticsRoute } from '@app/apps/apis/nodes-api/routes/PutNodeDiagnosticsRoute';
 import { PutNodeOwnerRoute } from '@app/apps/apis/nodes-api/routes/PutNodeOwnerRoute';
 import { PutNodeRelayConfigurationRoute } from '@app/apps/apis/nodes-api/routes/PutNodeRelayConfigurationRoute';
 import { DeleteNotificationScopeSettingsRoute } from '@app/apps/apis/notification-settings-api/routes/DeleteNotificationScopeSettingsRoute';
@@ -201,6 +204,9 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PutNodeOwnerRoute,
   GetNodeRelayConfigurationRoute,
   PutNodeRelayConfigurationRoute,
+  PutNodeDiagnosticsRoute,
+  GetNodeDiagnosticsRoute,
+  DeleteNodeDiagnosticsRoute,
   GetPeersRoute,
   GetNotificationsRoute,
   PostNotificationRoute,

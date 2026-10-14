@@ -1,6 +1,6 @@
+import { DiagnosticsSession } from '@app/contexts/diagnostics/domain/DiagnosticsSession';
 import { DiagnosticsConsentRequiredError } from '@app/contexts/diagnostics/domain/errors/DiagnosticsConsentRequiredError';
 import { InvalidDiagnosticsDurationError } from '@app/contexts/diagnostics/domain/errors/InvalidDiagnosticsDurationError';
-import { DiagnosticsSession } from '@app/contexts/diagnostics/domain/DiagnosticsSession';
 import { DiagnosticsConsent } from '@app/contexts/diagnostics/domain/value-objects/DiagnosticsConsent';
 import { DiagnosticsDuration } from '@app/contexts/diagnostics/domain/value-objects/DiagnosticsDuration';
 import { DiagnosticsEntry } from '@app/contexts/diagnostics/domain/value-objects/DiagnosticsEntry';
@@ -52,8 +52,8 @@ describe('DiagnosticsSession', () => {
   it('records entries only while recording', () => {
     const session = openFor(1);
 
-    session.record(new DiagnosticsEntry('inside'), openedAt.addSeconds(30));
-    session.record(new DiagnosticsEntry('outside'), openedAt.addMinutes(1));
+    session.append(new DiagnosticsEntry('inside'), openedAt.addSeconds(30));
+    session.append(new DiagnosticsEntry('outside'), openedAt.addMinutes(1));
 
     expect(session.toPrimitives().entries).toEqual(['inside']);
   });
@@ -62,7 +62,7 @@ describe('DiagnosticsSession', () => {
     const session = openFor(60);
 
     for (let index = 0; index <= DiagnosticsSession.MAX_ENTRIES; index += 1) {
-      session.record(new DiagnosticsEntry(`line ${index}`), openedAt);
+      session.append(new DiagnosticsEntry(`line ${index}`), openedAt);
     }
 
     const entries = session.toPrimitives().entries;
@@ -74,7 +74,7 @@ describe('DiagnosticsSession', () => {
   it('exports its window and entries', () => {
     const session = openFor(15);
 
-    session.record(new DiagnosticsEntry('redacted line'), openedAt);
+    session.append(new DiagnosticsEntry('redacted line'), openedAt);
 
     expect(session.toPrimitives()).toEqual({
       closesAt: openedAt.addMinutes(15).valueOf(),

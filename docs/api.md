@@ -1242,6 +1242,73 @@ Implemented:
   relay multiaddrs and discovery settings take effect
 - reload the public relay runtime when owner-owned relay settings change
 
+### Open a diagnostics session
+
+```http
+PUT /node/diagnostics
+X-Identity-Id: <ownerIdentityId>
+X-Timestamp: <millisecondsSinceEpoch>
+X-Signature: <signature>
+```
+
+Request:
+
+```json
+{
+  "consent": true,
+  "minutes": 15
+}
+```
+
+Response:
+
+```json
+{
+  "openedAt": 1760000000000,
+  "closesAt": 1760000900000,
+  "discardsAt": 1760004500000,
+  "entries": []
+}
+```
+
+Implemented:
+
+- require signed request auth from the current node owner; unowned nodes reject
+  the request with 403 because nobody can consent
+- require `consent: true` and `minutes` between 1 and 60; otherwise 409
+- replace any previous session with a fresh, empty one
+- record content-retrieval progress lines only while the session is open. Lines
+  are redacted before they are stored: CIDs, provider and sender IDs become
+  digests keyed with a secret generated at process start
+- keep at most 1000 lines in memory only. Lines are never written to the log
+  file, IPFS or OrbitDB
+- discard the session 60 minutes after it closes (`discardsAt`) or on restart
+
+### Export the diagnostics session
+
+```http
+GET /node/diagnostics
+X-Identity-Id: <ownerIdentityId>
+X-Timestamp: <millisecondsSinceEpoch>
+X-Signature: <signature>
+```
+
+Returns the same resource as `PUT /node/diagnostics` with the redacted lines
+recorded so far. Returns 409 when no session exists or it has been discarded,
+and 403 for non-owner requests.
+
+### Discard the diagnostics session
+
+```http
+DELETE /node/diagnostics
+X-Identity-Id: <ownerIdentityId>
+X-Timestamp: <millisecondsSinceEpoch>
+X-Signature: <signature>
+```
+
+Stops recording and discards every recorded line immediately. Returns 204, or
+403 for non-owner requests.
+
 ### Get local node networks
 
 ```http
