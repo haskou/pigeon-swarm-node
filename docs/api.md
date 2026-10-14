@@ -1682,7 +1682,8 @@ scopeType: "content_replication", sizeBytes }`, with `scopeType` exactly
   selection is recomputed every maintenance run, so new registrations can
   defer a CID held before, and withdrawing then re-registering frees budget
   while bytes already fetched are never removed. `GET /ipfs/{cid}` still
-  fetches any CID on demand, deferred ones included
+  fetches any CID on demand, deferred ones included, without authentication
+  and without a size cap
 
 Byte-exact vectors (ids, digests and signing content) are in
 `tests/fixtures/content-replication-vectors.json`.
