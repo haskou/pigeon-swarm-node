@@ -270,6 +270,24 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
+  /**
+   * Any peer of a network can write to its stores, so a signed record naming
+   * another network could be planted there to dodge the per-identity quotas
+   * that network counts in its own store. A gated record that names a network
+   * is only read from that network's store.
+   */
+  private isOfStoreNetwork(
+    collection: string,
+    record: Record<string, unknown>,
+    storeNetworkId: string | undefined,
+  ): boolean {
+    return (
+      typeof record.networkId !== 'string' ||
+      record.networkId === storeNetworkId ||
+      this.mutationGate?.governs(collection) !== true
+    );
+  }
+
   private async assertAdmitted(
     storeName: OrbitDBReplicatedDocumentStoreName,
     cleanDocument: Record<string, unknown>,
@@ -485,8 +503,13 @@ export default class OrbitDBReplicatedStateRegistry {
     const admitted: Array<{ key?: string; value: Record<string, unknown> }> =
       [];
 
+    const networkId = this.networkIdOfStore(storeName, store);
+
     for (const record of await this.allRecords(store)) {
-      if (await this.admitRecord(storeName, record.value))
+      if (
+        this.isOfStoreNetwork(storeName, record.value, networkId) &&
+        (await this.admitRecord(storeName, record.value))
+      )
         admitted.push(record);
     }
 
@@ -546,15 +569,15 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
-  private isRegisteredStore(
+  private networkIdOfStore(
     storeName: OrbitDBReplicatedDocumentStoreName,
     store: OrbitDBDatabase,
-  ): boolean {
-    for (const stores of this.storesByNetworkId.values()) {
-      if (this.getStore(stores, storeName) === store) return true;
+  ): string | undefined {
+    for (const [networkId, stores] of this.storesByNetworkId) {
+      if (this.getStore(stores, storeName) === store) return networkId;
     }
 
-    return false;
+    return undefined;
   }
 
   private async offerDocument(
@@ -563,6 +586,15 @@ export default class OrbitDBReplicatedStateRegistry {
     document: Record<string, unknown>,
     deliver: () => void | Promise<void>,
   ): Promise<void> {
+    if (
+      !this.isOfStoreNetwork(
+        storeName,
+        document,
+        this.networkIdOfStore(storeName, store),
+      )
+    )
+      return;
+
     if (await this.admitRecord(storeName, document)) {
       await deliver();
       this.wakeReadmissions();
@@ -571,7 +603,7 @@ export default class OrbitDBReplicatedStateRegistry {
     }
 
     this.readmissions.schedule({
-      isCurrent: () => this.isRegisteredStore(storeName, store),
+      isCurrent: () => this.networkIdOfStore(storeName, store) !== undefined,
       offer: async (): Promise<boolean> => {
         if (!(await this.admitRecord(storeName, document))) return false;
         await deliver();
@@ -2295,7 +2327,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
     const results = await Promise.all(
       this.networkStoreEntriesForNetworkIds(networkIds).map(
-        async ({ stores }) => {
+        async ({ networkId, stores }) => {
           const store = this.getStore(stores, storeName);
 
           if (!store) {
@@ -2308,7 +2340,12 @@ export default class OrbitDBReplicatedStateRegistry {
                 .map((record) => record.value)
                 .filter(matcher);
 
-          return this.admittedRecords(storeName, matched);
+          return this.admittedRecords(
+            storeName,
+            matched.filter((record) =>
+              this.isOfStoreNetwork(storeName, record, networkId),
+            ),
+          );
         },
       ),
     );
