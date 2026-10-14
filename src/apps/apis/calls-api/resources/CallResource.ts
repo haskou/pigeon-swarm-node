@@ -23,4 +23,6 @@ export interface CallResource {
     type: string;
   };
   status: string;
+  /** On a superseded community channel call: the call that won the channel. */
+  supersededByCallId?: string;
 }

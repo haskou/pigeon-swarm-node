@@ -78,6 +78,9 @@ export class Call extends AggregateRoot {
         new Timestamp(primitives.createdAt),
         primitives.endedAt ? new Timestamp(primitives.endedAt) : undefined,
         primitives.endedByIdentityId,
+        primitives.supersededByCallId === undefined
+          ? undefined
+          : new CallId(primitives.supersededByCallId),
       ),
       primitives.sessionEpoch === undefined
         ? undefined
@@ -439,6 +442,7 @@ export class Call extends AggregateRoot {
     const participants = this.participants.map((participant) =>
       participant.toPrimitives(),
     );
+    const supersededByCallId = this.lifecycle.getSupersededByCallId();
 
     return {
       createdAt: this.lifecycle.getCreatedAt().valueOf(),
@@ -454,6 +458,9 @@ export class Call extends AggregateRoot {
       status: this.lifecycle.getStatus().valueOf(),
       ...(this.sessionEpoch
         ? { sessionEpoch: this.sessionEpoch.valueOf() }
+        : {}),
+      ...(supersededByCallId
+        ? { supersededByCallId: supersededByCallId.valueOf() }
         : {}),
     };
   }

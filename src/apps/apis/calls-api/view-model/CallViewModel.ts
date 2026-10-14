@@ -58,6 +58,9 @@ export class CallViewModel {
               : {}),
           }
         : {}),
+      ...(primitives.supersededByCallId
+        ? { supersededByCallId: primitives.supersededByCallId }
+        : {}),
       participantIds: participants.map((participant) => participant.identityId),
       participants,
     };

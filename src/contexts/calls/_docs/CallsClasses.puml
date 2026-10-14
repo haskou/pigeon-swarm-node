@@ -93,6 +93,7 @@ package "calls" {
       -status: CallStatus
       -createdAt: Timestamp
       -endedAt?: Timestamp
+      -supersededByCallId?: CallId
       +end(): void
       +miss(): void
     }
