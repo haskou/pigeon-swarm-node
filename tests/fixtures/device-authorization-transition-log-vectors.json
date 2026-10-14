@@ -1,0 +1,837 @@
+{
+  "description": "Device-authorization transition log served by GET /identity-devices/{identityId}/transitions (#513). Each log is what one node stores for the identity: the recovery lineage of its replay base, the recoveries that lost that checkpoint and the accepted history in replay order, every entry in the exact primitives of device-authorization-transition-vectors.json. The genesis is DeviceAuthorization.genesis(identityId, networkIds, keys.author, keys.recoveryAuthority), which a client derives from identity version 1. reads pin the body the node serves to an authenticated reader (a device key name for a device proof, recoveryAuthority for a recovery proof) for an after revision. verdicts pin the client decision on a served body: removedBy is the operationId of the signed transition that removed the reader after its local verified epoch and revision, or null when the body proves no removal (absence, truncation, a stale or forged removal never count).",
+  "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+  "networkIds": ["550e8400-e29b-41d4-a716-446655440000"],
+  "keys": {
+    "author": {
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEILhM/Og/YsJDrQ5bHC68xC4Z6PHTzt7K6x8uI7mgkbmo\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n"
+    },
+    "laptop": {
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIEN3duzZ+m3oi5iEEqv79XQdGhzyx/K8zaOJx1XVBdnD\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n"
+    },
+    "recovered": {
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIMQyQ883JQGY7Puik4rc3Nc++xSvdh6xAmT9TE1jQjGA\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n"
+    },
+    "recoveryAuthority": {
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIPM5FrW9m58V9r7jeT6PYmGgjBRWQEnFTVjDWAqBwJ1O\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAg7qnu9yqeICSVqQgPNAPTrN6XJ/UCNYX6GVh5/zZRBg=\n-----END PUBLIC KEY-----\n"
+    },
+    "target": {
+      "privateKeyPem": "-----BEGIN PRIVATE KEY-----\nMC4CAQAwBQYDK2VwBCIEIBrm6anqlxeYpC25u/o3VTbPTqM8KgA9XIqju/coazQJ\n-----END PRIVATE KEY-----\n",
+      "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n"
+    }
+  },
+  "logs": [
+    {
+      "name": "a retired device followed by a later enrollment",
+      "stored": {
+        "concurrentRecoveries": [],
+        "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+        "recoveries": [],
+        "transitions": [
+          {
+            "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+            "authorizedAt": 1760000000000,
+            "epoch": "genesis",
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "operation": "enroll",
+            "operationId": "3f1d2c4b-8a7e-4f60-9b12-5c3d4e6f7a80",
+            "pairingExpiration": 1760000300000,
+            "pairingId": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+            "previousRevision": 0,
+            "revision": 1,
+            "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+            "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+            "proofOfPossession": "aOcJKfwT3xT604gMOyneoaHPkg+OUTU7aYarncadI8RqI+P+lc+wx29+WqNFwsPLPewxeFplNFkGcqpBtNNkDw==",
+            "signature": "O6gyL4A/pms3EmEqMYmwoMsvtdWdWczgIm2tw4LEXzNqK66KM3g/ZBmdKenhXvB6Kl1CnQIVuXDisqK25mBDDQ=="
+          },
+          {
+            "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+            "epoch": "genesis",
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "operation": "revoke",
+            "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a51",
+            "previousRevision": 1,
+            "revision": 2,
+            "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+            "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+            "signature": "3c2Y41LreGIG7ofC/q6GJMaz7F4r1+AY+mvspqxaLaT0J8u+lRqDlR5NIs1ItShddwKg831qc3U/IEyggIlxCA=="
+          },
+          {
+            "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+            "authorizedAt": 1760000600000,
+            "epoch": "genesis",
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "operation": "enroll",
+            "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a52",
+            "pairingExpiration": 1760000900000,
+            "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e52",
+            "previousRevision": 2,
+            "revision": 3,
+            "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+            "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265",
+            "proofOfPossession": "1mcF2GoGOLMNahJ80WjsaDr3C8n5YDEAMOIniV4mT6E8daYS7el3n7BOn8EF8ys5Q0EuDf6ybJmLctkzYLt/BA==",
+            "signature": "tihJKpjN7SvKv5zXVBEVTtqhlamJyWCI88bLzsHKlHqjhOx2qiumj0MWKF+g0f28b1w/JEiLHNK4YTKIDuf7Ag=="
+          }
+        ]
+      },
+      "head": {
+        "credentials": [
+          "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+          "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n"
+        ],
+        "epoch": "genesis",
+        "revision": 3
+      },
+      "reads": [
+        {
+          "after": 0,
+          "expected": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760000000000,
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "3f1d2c4b-8a7e-4f60-9b12-5c3d4e6f7a80",
+                "pairingExpiration": 1760000300000,
+                "pairingId": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+                "previousRevision": 0,
+                "revision": 1,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "proofOfPossession": "aOcJKfwT3xT604gMOyneoaHPkg+OUTU7aYarncadI8RqI+P+lc+wx29+WqNFwsPLPewxeFplNFkGcqpBtNNkDw==",
+                "signature": "O6gyL4A/pms3EmEqMYmwoMsvtdWdWczgIm2tw4LEXzNqK66KM3g/ZBmdKenhXvB6Kl1CnQIVuXDisqK25mBDDQ=="
+              },
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "revoke",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a51",
+                "previousRevision": 1,
+                "revision": 2,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "signature": "3c2Y41LreGIG7ofC/q6GJMaz7F4r1+AY+mvspqxaLaT0J8u+lRqDlR5NIs1ItShddwKg831qc3U/IEyggIlxCA=="
+              },
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760000600000,
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a52",
+                "pairingExpiration": 1760000900000,
+                "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e52",
+                "previousRevision": 2,
+                "revision": 3,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265",
+                "proofOfPossession": "1mcF2GoGOLMNahJ80WjsaDr3C8n5YDEAMOIniV4mT6E8daYS7el3n7BOn8EF8ys5Q0EuDf6ybJmLctkzYLt/BA==",
+                "signature": "tihJKpjN7SvKv5zXVBEVTtqhlamJyWCI88bLzsHKlHqjhOx2qiumj0MWKF+g0f28b1w/JEiLHNK4YTKIDuf7Ag=="
+              }
+            ]
+          },
+          "name": "the recovery authority reads the whole log",
+          "reader": "recoveryAuthority"
+        },
+        {
+          "after": 0,
+          "expected": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760000000000,
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "3f1d2c4b-8a7e-4f60-9b12-5c3d4e6f7a80",
+                "pairingExpiration": 1760000300000,
+                "pairingId": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+                "previousRevision": 0,
+                "revision": 1,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "proofOfPossession": "aOcJKfwT3xT604gMOyneoaHPkg+OUTU7aYarncadI8RqI+P+lc+wx29+WqNFwsPLPewxeFplNFkGcqpBtNNkDw==",
+                "signature": "O6gyL4A/pms3EmEqMYmwoMsvtdWdWczgIm2tw4LEXzNqK66KM3g/ZBmdKenhXvB6Kl1CnQIVuXDisqK25mBDDQ=="
+              },
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "revoke",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a51",
+                "previousRevision": 1,
+                "revision": 2,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "signature": "3c2Y41LreGIG7ofC/q6GJMaz7F4r1+AY+mvspqxaLaT0J8u+lRqDlR5NIs1ItShddwKg831qc3U/IEyggIlxCA=="
+              },
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760000600000,
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a52",
+                "pairingExpiration": 1760000900000,
+                "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e52",
+                "previousRevision": 2,
+                "revision": 3,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265",
+                "proofOfPossession": "1mcF2GoGOLMNahJ80WjsaDr3C8n5YDEAMOIniV4mT6E8daYS7el3n7BOn8EF8ys5Q0EuDf6ybJmLctkzYLt/BA==",
+                "signature": "tihJKpjN7SvKv5zXVBEVTtqhlamJyWCI88bLzsHKlHqjhOx2qiumj0MWKF+g0f28b1w/JEiLHNK4YTKIDuf7Ag=="
+              }
+            ]
+          },
+          "name": "a device authorized at the head reads the whole log",
+          "reader": "author"
+        },
+        {
+          "after": 0,
+          "expected": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760000000000,
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "3f1d2c4b-8a7e-4f60-9b12-5c3d4e6f7a80",
+                "pairingExpiration": 1760000300000,
+                "pairingId": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+                "previousRevision": 0,
+                "revision": 1,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "proofOfPossession": "aOcJKfwT3xT604gMOyneoaHPkg+OUTU7aYarncadI8RqI+P+lc+wx29+WqNFwsPLPewxeFplNFkGcqpBtNNkDw==",
+                "signature": "O6gyL4A/pms3EmEqMYmwoMsvtdWdWczgIm2tw4LEXzNqK66KM3g/ZBmdKenhXvB6Kl1CnQIVuXDisqK25mBDDQ=="
+              },
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "revoke",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a51",
+                "previousRevision": 1,
+                "revision": 2,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "signature": "3c2Y41LreGIG7ofC/q6GJMaz7F4r1+AY+mvspqxaLaT0J8u+lRqDlR5NIs1ItShddwKg831qc3U/IEyggIlxCA=="
+              }
+            ]
+          },
+          "name": "the retired device reads up to its own removal",
+          "reader": "target"
+        },
+        {
+          "after": 1,
+          "expected": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "revoke",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a51",
+                "previousRevision": 1,
+                "revision": 2,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "signature": "3c2Y41LreGIG7ofC/q6GJMaz7F4r1+AY+mvspqxaLaT0J8u+lRqDlR5NIs1ItShddwKg831qc3U/IEyggIlxCA=="
+              }
+            ]
+          },
+          "name": "the retired device reads the transitions after its enrollment",
+          "reader": "target"
+        },
+        {
+          "after": 2,
+          "expected": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760000600000,
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a52",
+                "pairingExpiration": 1760000900000,
+                "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e52",
+                "previousRevision": 2,
+                "revision": 3,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265",
+                "proofOfPossession": "1mcF2GoGOLMNahJ80WjsaDr3C8n5YDEAMOIniV4mT6E8daYS7el3n7BOn8EF8ys5Q0EuDf6ybJmLctkzYLt/BA==",
+                "signature": "tihJKpjN7SvKv5zXVBEVTtqhlamJyWCI88bLzsHKlHqjhOx2qiumj0MWKF+g0f28b1w/JEiLHNK4YTKIDuf7Ag=="
+              }
+            ]
+          },
+          "name": "a device reads only the transitions after a revision",
+          "reader": "laptop"
+        },
+        {
+          "after": 0,
+          "expected": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [],
+            "transitions": []
+          },
+          "name": "a device never authorized here reads nothing",
+          "reader": "recovered"
+        }
+      ],
+      "verdicts": [
+        {
+          "local": {
+            "epoch": "genesis",
+            "revision": 1
+          },
+          "name": "the retired device proves its removal",
+          "reader": "target",
+          "removedBy": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a51",
+          "served": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760000000000,
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "3f1d2c4b-8a7e-4f60-9b12-5c3d4e6f7a80",
+                "pairingExpiration": 1760000300000,
+                "pairingId": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+                "previousRevision": 0,
+                "revision": 1,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "proofOfPossession": "aOcJKfwT3xT604gMOyneoaHPkg+OUTU7aYarncadI8RqI+P+lc+wx29+WqNFwsPLPewxeFplNFkGcqpBtNNkDw==",
+                "signature": "O6gyL4A/pms3EmEqMYmwoMsvtdWdWczgIm2tw4LEXzNqK66KM3g/ZBmdKenhXvB6Kl1CnQIVuXDisqK25mBDDQ=="
+              },
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "revoke",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a51",
+                "previousRevision": 1,
+                "revision": 2,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "signature": "3c2Y41LreGIG7ofC/q6GJMaz7F4r1+AY+mvspqxaLaT0J8u+lRqDlR5NIs1ItShddwKg831qc3U/IEyggIlxCA=="
+              }
+            ]
+          }
+        },
+        {
+          "local": {
+            "epoch": "genesis",
+            "revision": 3
+          },
+          "name": "a device authorized at the head is not removed",
+          "reader": "laptop",
+          "removedBy": null,
+          "served": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760000000000,
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "3f1d2c4b-8a7e-4f60-9b12-5c3d4e6f7a80",
+                "pairingExpiration": 1760000300000,
+                "pairingId": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+                "previousRevision": 0,
+                "revision": 1,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "proofOfPossession": "aOcJKfwT3xT604gMOyneoaHPkg+OUTU7aYarncadI8RqI+P+lc+wx29+WqNFwsPLPewxeFplNFkGcqpBtNNkDw==",
+                "signature": "O6gyL4A/pms3EmEqMYmwoMsvtdWdWczgIm2tw4LEXzNqK66KM3g/ZBmdKenhXvB6Kl1CnQIVuXDisqK25mBDDQ=="
+              },
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "revoke",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a51",
+                "previousRevision": 1,
+                "revision": 2,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "signature": "3c2Y41LreGIG7ofC/q6GJMaz7F4r1+AY+mvspqxaLaT0J8u+lRqDlR5NIs1ItShddwKg831qc3U/IEyggIlxCA=="
+              },
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760000600000,
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a52",
+                "pairingExpiration": 1760000900000,
+                "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e52",
+                "previousRevision": 2,
+                "revision": 3,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265",
+                "proofOfPossession": "1mcF2GoGOLMNahJ80WjsaDr3C8n5YDEAMOIniV4mT6E8daYS7el3n7BOn8EF8ys5Q0EuDf6ybJmLctkzYLt/BA==",
+                "signature": "tihJKpjN7SvKv5zXVBEVTtqhlamJyWCI88bLzsHKlHqjhOx2qiumj0MWKF+g0f28b1w/JEiLHNK4YTKIDuf7Ag=="
+              }
+            ]
+          }
+        },
+        {
+          "local": {
+            "epoch": "genesis",
+            "revision": 1
+          },
+          "name": "a withheld revocation proves nothing",
+          "reader": "target",
+          "removedBy": null,
+          "served": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760000000000,
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "3f1d2c4b-8a7e-4f60-9b12-5c3d4e6f7a80",
+                "pairingExpiration": 1760000300000,
+                "pairingId": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+                "previousRevision": 0,
+                "revision": 1,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "proofOfPossession": "aOcJKfwT3xT604gMOyneoaHPkg+OUTU7aYarncadI8RqI+P+lc+wx29+WqNFwsPLPewxeFplNFkGcqpBtNNkDw==",
+                "signature": "O6gyL4A/pms3EmEqMYmwoMsvtdWdWczgIm2tw4LEXzNqK66KM3g/ZBmdKenhXvB6Kl1CnQIVuXDisqK25mBDDQ=="
+              }
+            ]
+          }
+        },
+        {
+          "local": {
+            "epoch": "genesis",
+            "revision": 4
+          },
+          "name": "a removal at or below the verified revision is stale",
+          "reader": "target",
+          "removedBy": null,
+          "served": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760000000000,
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "3f1d2c4b-8a7e-4f60-9b12-5c3d4e6f7a80",
+                "pairingExpiration": 1760000300000,
+                "pairingId": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+                "previousRevision": 0,
+                "revision": 1,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "proofOfPossession": "aOcJKfwT3xT604gMOyneoaHPkg+OUTU7aYarncadI8RqI+P+lc+wx29+WqNFwsPLPewxeFplNFkGcqpBtNNkDw==",
+                "signature": "O6gyL4A/pms3EmEqMYmwoMsvtdWdWczgIm2tw4LEXzNqK66KM3g/ZBmdKenhXvB6Kl1CnQIVuXDisqK25mBDDQ=="
+              },
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "revoke",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a51",
+                "previousRevision": 1,
+                "revision": 2,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "signature": "3c2Y41LreGIG7ofC/q6GJMaz7F4r1+AY+mvspqxaLaT0J8u+lRqDlR5NIs1ItShddwKg831qc3U/IEyggIlxCA=="
+              }
+            ]
+          }
+        },
+        {
+          "local": {
+            "epoch": "genesis",
+            "revision": 1
+          },
+          "name": "a revocation signed by an unauthorized key proves nothing",
+          "reader": "target",
+          "removedBy": null,
+          "served": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760000000000,
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "3f1d2c4b-8a7e-4f60-9b12-5c3d4e6f7a80",
+                "pairingExpiration": 1760000300000,
+                "pairingId": "c2a4e6f8-1b3d-4f5a-8c7e-9d0b1a2c3e4f",
+                "previousRevision": 0,
+                "revision": 1,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "proofOfPossession": "aOcJKfwT3xT604gMOyneoaHPkg+OUTU7aYarncadI8RqI+P+lc+wx29+WqNFwsPLPewxeFplNFkGcqpBtNNkDw==",
+                "signature": "O6gyL4A/pms3EmEqMYmwoMsvtdWdWczgIm2tw4LEXzNqK66KM3g/ZBmdKenhXvB6Kl1CnQIVuXDisqK25mBDDQ=="
+              },
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAbSYLvc5tKPFracFqt0/5KnisekDH0qi5rDC1uSylkK4=\n-----END PUBLIC KEY-----\n",
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "revoke",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a51",
+                "previousRevision": 1,
+                "revision": 2,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA6DGma+Bp1gc0rX3W/aWaNawhh5XPEMDuOH0qRBlwBbQ=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "fff8e0547bb0bc9087a9db8fbdecd16193ca6f2b4ea1a9295232e8bd16a83d9c",
+                "signature": "GKmP3jg5rH2/8LpLF9bMVYUNjKVuVOF4AkN0Xt+ygqGdOsuMwEu++nPPSWioYqGh4uRhImNNbOtUIWW1NV46Bw=="
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "a recovery after the retirement",
+      "stored": {
+        "concurrentRecoveries": [],
+        "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+        "recoveries": [
+          {
+            "epoch": "genesis",
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "operation": "recover",
+            "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+            "previousRevision": 3,
+            "revision": 4,
+            "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+            "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba",
+            "proofOfPossession": "4k75nKSG3WUYRwlnnZgJG8n5lxKSJeF1WCw2zWFIh2YsMYvrKbVBLmBblqSBKIW3C1x48pTcpo8eVgQlj+csAw==",
+            "signature": "aiUuvcFvLHPOP8/bcB5SHLrSbpPqfXIfshuitztNAATEi3Xsdd1oRn0lOrjmiFjiII5K2OTwUmEanjCZzmLeDQ=="
+          }
+        ],
+        "transitions": [
+          {
+            "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+            "authorizedAt": 1760001200000,
+            "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "operation": "enroll",
+            "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a54",
+            "pairingExpiration": 1760001500000,
+            "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e54",
+            "previousRevision": 4,
+            "revision": 5,
+            "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+            "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265",
+            "proofOfPossession": "6yaAjTelwR4XqWyJc6kabrBefPQ3S5+e+sBTmAzdRbWv9BQluBGutim6eTN4AlK1ZrF4rbV+8Ey9SiiPtZSNDQ==",
+            "signature": "xm5OUta0I9HjmUlrzeF8xCtxbLzkgeTYN/sT5fOjODfRVcNQ3GicA5BmUB47nefr+WdBCTiMZS7uGjvTlQK3Cg=="
+          }
+        ]
+      },
+      "head": {
+        "credentials": [
+          "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+          "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n"
+        ],
+        "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+        "revision": 5
+      },
+      "reads": [
+        {
+          "after": 0,
+          "expected": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+                "previousRevision": 3,
+                "revision": 4,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba",
+                "proofOfPossession": "4k75nKSG3WUYRwlnnZgJG8n5lxKSJeF1WCw2zWFIh2YsMYvrKbVBLmBblqSBKIW3C1x48pTcpo8eVgQlj+csAw==",
+                "signature": "aiUuvcFvLHPOP8/bcB5SHLrSbpPqfXIfshuitztNAATEi3Xsdd1oRn0lOrjmiFjiII5K2OTwUmEanjCZzmLeDQ=="
+              }
+            ],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760001200000,
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a54",
+                "pairingExpiration": 1760001500000,
+                "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e54",
+                "previousRevision": 4,
+                "revision": 5,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265",
+                "proofOfPossession": "6yaAjTelwR4XqWyJc6kabrBefPQ3S5+e+sBTmAzdRbWv9BQluBGutim6eTN4AlK1ZrF4rbV+8Ey9SiiPtZSNDQ==",
+                "signature": "xm5OUta0I9HjmUlrzeF8xCtxbLzkgeTYN/sT5fOjODfRVcNQ3GicA5BmUB47nefr+WdBCTiMZS7uGjvTlQK3Cg=="
+              }
+            ]
+          },
+          "name": "the recovery authority reads the whole log",
+          "reader": "recoveryAuthority"
+        },
+        {
+          "after": 4,
+          "expected": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760001200000,
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a54",
+                "pairingExpiration": 1760001500000,
+                "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e54",
+                "previousRevision": 4,
+                "revision": 5,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265",
+                "proofOfPossession": "6yaAjTelwR4XqWyJc6kabrBefPQ3S5+e+sBTmAzdRbWv9BQluBGutim6eTN4AlK1ZrF4rbV+8Ey9SiiPtZSNDQ==",
+                "signature": "xm5OUta0I9HjmUlrzeF8xCtxbLzkgeTYN/sT5fOjODfRVcNQ3GicA5BmUB47nefr+WdBCTiMZS7uGjvTlQK3Cg=="
+              }
+            ]
+          },
+          "name": "the recovery authority reads only the transitions after the checkpoint",
+          "reader": "recoveryAuthority"
+        },
+        {
+          "after": 0,
+          "expected": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+                "previousRevision": 3,
+                "revision": 4,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba",
+                "proofOfPossession": "4k75nKSG3WUYRwlnnZgJG8n5lxKSJeF1WCw2zWFIh2YsMYvrKbVBLmBblqSBKIW3C1x48pTcpo8eVgQlj+csAw==",
+                "signature": "aiUuvcFvLHPOP8/bcB5SHLrSbpPqfXIfshuitztNAATEi3Xsdd1oRn0lOrjmiFjiII5K2OTwUmEanjCZzmLeDQ=="
+              }
+            ],
+            "transitions": []
+          },
+          "name": "a pre-recovery device reads only the recovery that ended its epoch",
+          "reader": "author"
+        },
+        {
+          "after": 0,
+          "expected": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+                "previousRevision": 3,
+                "revision": 4,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba",
+                "proofOfPossession": "4k75nKSG3WUYRwlnnZgJG8n5lxKSJeF1WCw2zWFIh2YsMYvrKbVBLmBblqSBKIW3C1x48pTcpo8eVgQlj+csAw==",
+                "signature": "aiUuvcFvLHPOP8/bcB5SHLrSbpPqfXIfshuitztNAATEi3Xsdd1oRn0lOrjmiFjiII5K2OTwUmEanjCZzmLeDQ=="
+              }
+            ],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760001200000,
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a54",
+                "pairingExpiration": 1760001500000,
+                "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e54",
+                "previousRevision": 4,
+                "revision": 5,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265",
+                "proofOfPossession": "6yaAjTelwR4XqWyJc6kabrBefPQ3S5+e+sBTmAzdRbWv9BQluBGutim6eTN4AlK1ZrF4rbV+8Ey9SiiPtZSNDQ==",
+                "signature": "xm5OUta0I9HjmUlrzeF8xCtxbLzkgeTYN/sT5fOjODfRVcNQ3GicA5BmUB47nefr+WdBCTiMZS7uGjvTlQK3Cg=="
+              }
+            ]
+          },
+          "name": "a device enrolled after the recovery reads the whole log",
+          "reader": "laptop"
+        }
+      ],
+      "verdicts": [
+        {
+          "local": {
+            "epoch": "genesis",
+            "revision": 3
+          },
+          "name": "a pre-recovery device proves the recovery removed it",
+          "reader": "author",
+          "removedBy": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+          "served": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+                "previousRevision": 3,
+                "revision": 4,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba",
+                "proofOfPossession": "4k75nKSG3WUYRwlnnZgJG8n5lxKSJeF1WCw2zWFIh2YsMYvrKbVBLmBblqSBKIW3C1x48pTcpo8eVgQlj+csAw==",
+                "signature": "aiUuvcFvLHPOP8/bcB5SHLrSbpPqfXIfshuitztNAATEi3Xsdd1oRn0lOrjmiFjiII5K2OTwUmEanjCZzmLeDQ=="
+              }
+            ],
+            "transitions": []
+          }
+        },
+        {
+          "local": {
+            "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+            "revision": 4
+          },
+          "name": "the recovered device is not removed by its own recovery",
+          "reader": "recovered",
+          "removedBy": null,
+          "served": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+                "previousRevision": 3,
+                "revision": 4,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba",
+                "proofOfPossession": "4k75nKSG3WUYRwlnnZgJG8n5lxKSJeF1WCw2zWFIh2YsMYvrKbVBLmBblqSBKIW3C1x48pTcpo8eVgQlj+csAw==",
+                "signature": "aiUuvcFvLHPOP8/bcB5SHLrSbpPqfXIfshuitztNAATEi3Xsdd1oRn0lOrjmiFjiII5K2OTwUmEanjCZzmLeDQ=="
+              }
+            ],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760001200000,
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a54",
+                "pairingExpiration": 1760001500000,
+                "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e54",
+                "previousRevision": 4,
+                "revision": 5,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265",
+                "proofOfPossession": "6yaAjTelwR4XqWyJc6kabrBefPQ3S5+e+sBTmAzdRbWv9BQluBGutim6eTN4AlK1ZrF4rbV+8Ey9SiiPtZSNDQ==",
+                "signature": "xm5OUta0I9HjmUlrzeF8xCtxbLzkgeTYN/sT5fOjODfRVcNQ3GicA5BmUB47nefr+WdBCTiMZS7uGjvTlQK3Cg=="
+              }
+            ]
+          }
+        },
+        {
+          "local": {
+            "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+            "revision": 5
+          },
+          "name": "a device enrolled after the recovery is not removed by it",
+          "reader": "laptop",
+          "removedBy": null,
+          "served": {
+            "concurrentRecoveries": [],
+            "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+            "recoveries": [
+              {
+                "epoch": "genesis",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "recover",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+                "previousRevision": 3,
+                "revision": 4,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "b78d528d226ad0218c5f1e49cccf123c65d755087cfc0fd2dc51dcf3924e11ba",
+                "proofOfPossession": "4k75nKSG3WUYRwlnnZgJG8n5lxKSJeF1WCw2zWFIh2YsMYvrKbVBLmBblqSBKIW3C1x48pTcpo8eVgQlj+csAw==",
+                "signature": "aiUuvcFvLHPOP8/bcB5SHLrSbpPqfXIfshuitztNAATEi3Xsdd1oRn0lOrjmiFjiII5K2OTwUmEanjCZzmLeDQ=="
+              }
+            ],
+            "transitions": [
+              {
+                "authorCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAMVNNeaJcAMXvxSw3VPfvVQyzGLYBDk+TuGO4EjZL9ls=\n-----END PUBLIC KEY-----\n",
+                "authorizedAt": 1760001200000,
+                "epoch": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a53",
+                "identityId": "MCowBQYDK2VwAyEAbf7sh2onBnLEJSZfE78Q59YJ9qLbtfq1Jvngb3NO8bU=",
+                "operation": "enroll",
+                "operationId": "5b8e2f1a-3c4d-4e6f-8a9b-0c1d2e3f4a54",
+                "pairingExpiration": 1760001500000,
+                "pairingId": "7c9d1e2f-4a5b-4c6d-8e7f-9a0b1c2d3e54",
+                "previousRevision": 4,
+                "revision": 5,
+                "targetCredential": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAWQvuoJm5R0T+nYJjW/OjTVJ4DaTSLoYLoqMXt3gTNGI=\n-----END PUBLIC KEY-----\n",
+                "targetCredentialCommitment": "04db9cde31e120bf4992c55f0d47544fe7082bab5747d17c24f00f5b5ef83265",
+                "proofOfPossession": "6yaAjTelwR4XqWyJc6kabrBefPQ3S5+e+sBTmAzdRbWv9BQluBGutim6eTN4AlK1ZrF4rbV+8Ey9SiiPtZSNDQ==",
+                "signature": "xm5OUta0I9HjmUlrzeF8xCtxbLzkgeTYN/sT5fOjODfRVcNQ3GicA5BmUB47nefr+WdBCTiMZS7uGjvTlQK3Cg=="
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

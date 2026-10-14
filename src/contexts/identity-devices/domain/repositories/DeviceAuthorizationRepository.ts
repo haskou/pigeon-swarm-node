@@ -5,6 +5,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { DeviceAuthorization } from '../DeviceAuthorization';
 import { DeviceAuthorizationTimeline } from '../DeviceAuthorizationTimeline';
 import { DeviceAuthorizationTransition } from '../DeviceAuthorizationTransition';
+import { DeviceAuthorizationTransitionLog } from '../DeviceAuthorizationTransitionLog';
 import { DeviceCompromiseCaps } from '../DeviceCompromiseCaps';
 
 export abstract class DeviceAuthorizationRepository {
@@ -24,6 +25,15 @@ export abstract class DeviceAuthorizationRepository {
   public abstract requireTimeline(
     identityId: IdentityId,
   ): Promise<DeviceAuthorizationTimeline>;
+
+  /**
+   * Every signed transition the identity's authorization replays, exactly as
+   * recorded. Rejects with DeviceAuthorizationNotFoundError when none is
+   * provisioned.
+   */
+  public abstract requireTransitionLog(
+    identityId: IdentityId,
+  ): Promise<DeviceAuthorizationTransitionLog>;
 
   /** The caps in effect at the head. */
   public abstract findCompromisedSince(

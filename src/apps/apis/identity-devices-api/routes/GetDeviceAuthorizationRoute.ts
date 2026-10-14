@@ -8,9 +8,18 @@ import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { assert } from '@haskou/value-objects';
 import { Request, Response } from 'express';
-import { Get, JsonController, Param, Req, Res } from 'routing-controllers';
+import {
+  Get,
+  JsonController,
+  Param,
+  QueryParam,
+  Req,
+  Res,
+} from 'routing-controllers';
 
 import { DeviceAuthorizationRequestAuthenticator } from '../DeviceAuthorizationRequestAuthenticator';
+import { GetDeviceAuthorizationTransitionLogRequest } from '../requests/GetDeviceAuthorizationTransitionLogRequest';
+import { DeviceAuthorizationTransitionLogViewModel } from '../view-model/DeviceAuthorizationTransitionLogViewModel';
 import { DeviceAuthorizationViewModel } from '../view-model/DeviceAuthorizationViewModel';
 import { DeviceCatalogViewModel } from '../view-model/DeviceCatalogViewModel';
 
@@ -27,7 +36,8 @@ export class GetDeviceAuthorizationRoute extends Route {
     DeviceAuthorizationFinder,
   );
 
-  private async findForOwner(
+  /** The authorization of the identity that signed the request for itself. */
+  private async findForRequester(
     identityId: string,
     request: Request,
   ): Promise<DeviceAuthorization> {
@@ -39,9 +49,16 @@ export class GetDeviceAuthorizationRoute extends Route {
       new InvalidSignedRequestError(),
     );
 
-    const authorization = await this.finder.find(
+    return this.finder.find(
       new DeviceAuthorizationFindMessage(targetIdentityId),
     );
+  }
+
+  private async findForOwner(
+    identityId: string,
+    request: Request,
+  ): Promise<DeviceAuthorization> {
+    const authorization = await this.findForRequester(identityId, request);
     this.deviceAuthenticator.authenticate(request, authorization);
 
     return authorization;
@@ -79,5 +96,37 @@ export class GetDeviceAuthorizationRoute extends Route {
     return response
       .status(HttpRouteStatusEnum.OK)
       .send(new DeviceCatalogViewModel(authorization).toResource());
+  }
+
+  /**
+   * The signed transitions the requesting device or recovery authority may
+   * verify. A device the head no longer authorizes still reads the transitions
+   * up to its removal, so it can verify that removal itself.
+   */
+  @Get('/:identityId/transitions')
+  public async findTransitions(
+    @Param('identityId') identityId: string,
+    @QueryParam('after') after: string | undefined,
+    @Req() request: Request,
+    @Res() response: Response,
+  ): Promise<Response> {
+    const authorization = await this.findForRequester(identityId, request);
+    const reader = this.deviceAuthenticator.authenticateReader(
+      request,
+      authorization,
+    );
+    const disclosure = await this.finder.findTransitionLog(
+      new GetDeviceAuthorizationTransitionLogRequest(
+        authorization.getIdentityId(),
+        reader,
+        after,
+      ).getMessage(),
+    );
+
+    return response
+      .status(HttpRouteStatusEnum.OK)
+      .send(
+        new DeviceAuthorizationTransitionLogViewModel(disclosure).toResource(),
+      );
   }
 }

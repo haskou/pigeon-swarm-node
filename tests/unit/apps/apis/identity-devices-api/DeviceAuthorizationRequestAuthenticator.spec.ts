@@ -68,9 +68,7 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
       DeviceCredential.fromString(
         (await KeyPair.generate()).toPrimitives().publicKey,
       ),
-      RecoveryAuthority.fromString(
-        recoveryAuthority.toPrimitives().publicKey,
-      ),
+      RecoveryAuthority.fromString(recoveryAuthority.toPrimitives().publicKey),
     );
     source.headers['x-device-credential'] = undefined;
     source.headers['x-device-signature'] = undefined;
@@ -151,5 +149,131 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
         authorization,
       ),
     ).toThrow('Invalid signed request.');
+  });
+
+  describe('authenticateReader', () => {
+    async function recoveryReader() {
+      const recoveryAuthority = await KeyPair.generate();
+      const source = await fixture();
+      const authorization = DeviceAuthorization.genesis(
+        source.authorization.getIdentityId(),
+        source.authorization.getNetworkIds(),
+        source.authorization.getCredentials()[0],
+        RecoveryAuthority.fromString(
+          recoveryAuthority.toPrimitives().publicKey,
+        ),
+      );
+      const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
+        source.request.method,
+        source.request.path,
+        source.headers['x-timestamp'] as string,
+        source.request.body,
+      );
+      source.headers['x-device-credential'] = undefined;
+      source.headers['x-device-signature'] = undefined;
+      source.headers['x-recovery-signature'] = recoveryAuthority
+        .sign(JSON.stringify(payload))
+        .valueOf();
+
+      return { ...source, authorization };
+    }
+
+    it('identifies a signing device the head no longer authorizes', async () => {
+      const removed = await KeyPair.generate();
+      const authorized = await fixture();
+      const reader = await fixture(removed);
+
+      const credential =
+        new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+          reader.request,
+          authorized.authorization,
+        );
+
+      expect(credential).toBeInstanceOf(DeviceCredential);
+      expect(
+        (credential as DeviceCredential).isEqual(
+          DeviceCredential.fromString(removed.toPrimitives().publicKey),
+        ),
+      ).toBe(true);
+    });
+
+    it('identifies the recovery authority of the identity', async () => {
+      const { authorization, request } = await recoveryReader();
+
+      const reader =
+        new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+          request,
+          authorization,
+        );
+
+      expect(reader).toBeInstanceOf(RecoveryAuthority);
+      expect(
+        (reader as RecoveryAuthority).isEqual(
+          authorization.getRecoveryAuthority(),
+        ),
+      ).toBe(true);
+    });
+
+    it('rejects a recovery signature from another authority', async () => {
+      const { request } = await recoveryReader();
+      const other = await fixture();
+
+      expect(() =>
+        new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+          request,
+          other.authorization,
+        ),
+      ).toThrow('Invalid signed request.');
+    });
+
+    it('rejects a device signature that does not cover the request', async () => {
+      const { authorization, headers, request } = await fixture();
+      headers['x-timestamp'] = String(Date.now() + 1);
+
+      expect(() =>
+        new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+          request,
+          authorization,
+        ),
+      ).toThrow('Invalid signed request.');
+    });
+
+    it('rejects a request carrying both proofs', async () => {
+      const { authorization, headers, request } = await fixture();
+      headers['x-recovery-signature'] = headers['x-device-signature'];
+
+      expect(() =>
+        new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+          request,
+          authorization,
+        ),
+      ).toThrow('Invalid signed request.');
+    });
+
+    it('rejects a request without any proof', async () => {
+      const { authorization, headers, request } = await fixture();
+      headers['x-device-credential'] = undefined;
+      headers['x-device-signature'] = undefined;
+
+      expect(() =>
+        new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+          request,
+          authorization,
+        ),
+      ).toThrow('Invalid signed request.');
+    });
+
+    it('rejects empty device proof headers', async () => {
+      const { authorization, headers, request } = await fixture();
+      headers['x-device-credential'] = '';
+      headers['x-device-signature'] = '';
+
+      expect(() =>
+        new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+          request,
+          authorization,
+        ),
+      ).toThrow('Invalid signed request.');
+    });
   });
 });

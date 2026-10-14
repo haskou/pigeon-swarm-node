@@ -1553,6 +1553,95 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         timeline?.isAuthorizedAt(credentialOf(recovered), checkedRevision),
       ).toBe(true);
     });
+
+    it('serves the signed transitions a reader may verify', async () => {
+      const { genesis, identityId, owner } = await fixture();
+      const phone = await KeyPair.generate();
+      const laptop = await KeyPair.generate();
+      const { repository } = repositoryFixture();
+      const enrolled = enrollment(
+        identityId,
+        owner,
+        phone,
+        '00000000-0000-4000-8000-000000000061',
+        '10000000-0000-4000-8000-000000000061',
+      );
+      const retired = revocation(
+        identityId,
+        owner,
+        phone,
+        '00000000-0000-4000-8000-000000000062',
+        revisionOf(1),
+      );
+      const replaced = enrollment(
+        identityId,
+        owner,
+        laptop,
+        '00000000-0000-4000-8000-000000000063',
+        '10000000-0000-4000-8000-000000000063',
+        revisionOf(2),
+      );
+      await provisionAuthorization(repository, genesis);
+      await repository.compareAndApply(enrolled);
+      await repository.compareAndApply(retired);
+      await repository.compareAndApply(replaced);
+
+      const log = await repository.requireTransitionLog(identityId);
+
+      expect(
+        log
+          .disclosedTo(genesis.getRecoveryAuthority())
+          .getTransitions()
+          .map((transition) => transition.toPrimitives()),
+      ).toEqual(
+        [enrolled, retired, replaced].map((transition) =>
+          transition.toPrimitives(),
+        ),
+      );
+      expect(
+        log
+          .disclosedTo(credentialOf(phone))
+          .getTransitions()
+          .map((transition) => transition.toPrimitives()),
+      ).toEqual([enrolled.toPrimitives(), retired.toPrimitives()]);
+    });
+
+    it('serves the recovery that replaced the history below its checkpoint', async () => {
+      const { genesis, identityId, owner, recovery } = await fixture();
+      const phone = await KeyPair.generate();
+      const recovered = await KeyPair.generate();
+      const { repository } = repositoryFixture();
+      const recovering = recoveryOf(
+        identityId,
+        recovery,
+        recovered,
+        '00000000-0000-4000-8000-000000000065',
+        revisionOf(1),
+      );
+      await provisionAuthorization(repository, genesis);
+      await repository.compareAndApply(
+        enrollment(
+          identityId,
+          owner,
+          phone,
+          '00000000-0000-4000-8000-000000000064',
+          '10000000-0000-4000-8000-000000000064',
+        ),
+      );
+      await repository.compareAndApply(recovering);
+
+      const disclosure = (
+        await repository.requireTransitionLog(identityId)
+      ).disclosedTo(credentialOf(phone));
+
+      expect(
+        disclosure
+          .getRecoveries()
+          .map((transition) => transition.toPrimitives()),
+      ).toEqual([recovering.toPrimitives()]);
+      expect(disclosure.getConcurrentRecoveries()).toEqual([]);
+      expect(disclosure.getTransitions()).toEqual([]);
+    });
   });
 
   it('converges at the sibling limit and drops stale branches after recovery', async () => {
@@ -3050,6 +3139,9 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       DeviceAuthorizationNotFoundError,
     );
     await expect(repository.requireTimeline(identityId)).rejects.toThrow(
+      DeviceAuthorizationNotFoundError,
+    );
+    await expect(repository.requireTransitionLog(identityId)).rejects.toThrow(
       DeviceAuthorizationNotFoundError,
     );
   });

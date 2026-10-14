@@ -1,8 +1,10 @@
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationCandidate } from '@app/contexts/identity-devices/domain/DeviceAuthorizationCandidate';
 import { DeviceAuthorizationRecoveryState } from '@app/contexts/identity-devices/domain/DeviceAuthorizationRecoveryState';
+import { DeviceAuthorizationReplayResult } from '@app/contexts/identity-devices/domain/DeviceAuthorizationReplayResult';
 import { DeviceAuthorizationTimeline } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTimeline';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
+import { DeviceAuthorizationTransitionLog } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionLog';
 import { DeviceCompromiseCaps } from '@app/contexts/identity-devices/domain/DeviceCompromiseCaps';
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
@@ -97,6 +99,34 @@ export default class OrbitDBDeviceAuthorizationReplayer {
   }
 
   /**
+   * The replay of a history from its base: the genesis, or the recovery
+   * checkpoint, whose whole lineage must replay.
+   */
+  private replayFrom(
+    genesis: DeviceAuthorization,
+    checkpoint: OrbitDBDeviceAuthorizationDocument['checkpoint'],
+    history: OrbitDBDeviceAuthorizationTransitionRecord[],
+  ): {
+    base: DeviceAuthorizationRecoveryState;
+    replay: DeviceAuthorizationReplayResult<OrbitDBDeviceAuthorizationTransitionRecord>;
+  } {
+    const base = checkpoint
+      ? this.checkpointState(genesis, checkpoint)
+      : {
+          authorization: genesis,
+          compromiseCaps: DeviceCompromiseCaps.none(),
+        };
+
+    return {
+      base,
+      replay: this.policy.replay(
+        base.authorization,
+        this.candidatesOf(history),
+      ),
+    };
+  }
+
+  /**
    * Every state from the replay base (the genesis, or the recovery checkpoint)
    * to the head, in ascending revision order, plus the compromise caps in
    * effect at the head. The checkpoint's carried caps merge with every
@@ -110,16 +140,7 @@ export default class OrbitDBDeviceAuthorizationReplayer {
     compromiseCaps: DeviceCompromiseCaps;
     states: DeviceAuthorization[];
   } {
-    const base = checkpoint
-      ? this.checkpointState(genesis, checkpoint)
-      : {
-          authorization: genesis,
-          compromiseCaps: DeviceCompromiseCaps.none(),
-        };
-    const replay = this.policy.replay(
-      base.authorization,
-      this.candidatesOf(history),
-    );
+    const { base, replay } = this.replayFrom(genesis, checkpoint, history);
 
     return {
       compromiseCaps: replay.accepted.reduce(
@@ -209,6 +230,34 @@ export default class OrbitDBDeviceAuthorizationReplayer {
     );
 
     return new DeviceAuthorizationTimeline(states, compromiseCaps);
+  }
+
+  /**
+   * Every signed transition a document replays, exactly as recorded: the
+   * recovery lineage and the concurrent recoveries of its checkpoint, and its
+   * accepted history in replay order, with every state from the base to the
+   * head. An overflowed document serves its frontier, the last state every
+   * source replays to before the overflow suspended it.
+   */
+  public transitionLogOf(
+    genesis: DeviceAuthorization,
+    document: OrbitDBDeviceAuthorizationDocument,
+  ): DeviceAuthorizationTransitionLog {
+    const { checkpoint, history } = document.overflow?.frontier ?? document;
+    const { base, replay } = this.replayFrom(genesis, checkpoint, history);
+    const [recoveries, concurrentRecoveries] = [
+      checkpoint ? [...checkpoint.lineage, checkpoint.transition] : [],
+      checkpoint?.concurrent ?? [],
+    ].map((records) =>
+      records.map((record) => this.requireTransitionFromRecord(record)),
+    );
+
+    return new DeviceAuthorizationTransitionLog(
+      recoveries,
+      concurrentRecoveries,
+      replay.accepted.map(({ transition }) => transition),
+      [base.authorization, ...replay.checkpoints],
+    );
   }
 
   /**

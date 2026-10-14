@@ -139,3 +139,86 @@ Feature: Device authorization route
     Given another identity signs the current device list request
     When I GET the current device list
     Then response code is equal to 401
+
+  Scenario: Serve the signed device authorization transitions to the owner
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "transition log owner" and handle "transition-log-owner"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I set a signed device enrollment transition body
+    When I POST to "/identity-devices/transitions"
+    Then response code is equal to 200
+    Given I set a signed self-retirement transition body for the enrolled device
+    When I POST to "/identity-devices/transitions"
+    Then response code is equal to 200
+    Given I sign the current device transition log request
+    When I GET the current device transition log
+    Then response code is equal to 200
+    And response serves the signed device authorization transitions after revision 0
+    Given I sign the current device transition log request
+    When I GET the current device transition log after revision "1"
+    Then response code is equal to 200
+    And response serves the signed device authorization transitions after revision 1
+
+  Scenario: Serve a retired device the signed transition that removed it
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "retired log owner" and handle "retired-log-owner"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I set a signed device enrollment transition body
+    When I POST to "/identity-devices/transitions"
+    Then response code is equal to 200
+    Given I set a signed self-retirement transition body for the enrolled device
+    When I POST to "/identity-devices/transitions"
+    Then response code is equal to 200
+    Given the enrolled device signs the current device transition log request
+    When I GET the current device transition log
+    Then response code is equal to 200
+    And response serves the signed device authorization transitions after revision 0
+
+  Scenario: Serve the signed device authorization transitions during total device recovery
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-recovery-network"
+    And I set a client-signed identity body with name "recovery log owner" and handle "recovery-log-owner"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I set a signed device enrollment transition body
+    When I POST to "/identity-devices/transitions"
+    Then response code is equal to 200
+    Given I sign the current device transition log recovery request
+    When I GET the current device transition log
+    Then response code is equal to 200
+    And response serves the signed device authorization transitions after revision 0
+
+  Scenario: Reject a malformed transition log revision
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "log strict" and handle "transition-strict"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I sign the current device transition log request
+    When I GET the current device transition log after revision "01"
+    Then response code is equal to 400
+    And response body should contain "400050"
+
+  Scenario: Reject an unauthenticated transition log read
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "log private" and handle "transition-private"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    When I GET the current device transition log
+    Then response code is equal to 401
+
+  Scenario: Reject another identity reading the transition log
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "log isolated" and handle "transition-isolated"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given another identity signs the current device transition log request
+    When I GET the current device transition log
+    Then response code is equal to 401
+    And response body should contain "401020"

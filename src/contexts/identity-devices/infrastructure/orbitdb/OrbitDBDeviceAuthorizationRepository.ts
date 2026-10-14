@@ -4,6 +4,7 @@ import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/I
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationTimeline } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTimeline';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
+import { DeviceAuthorizationTransitionLog } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionLog';
 import { DeviceCompromiseCaps } from '@app/contexts/identity-devices/domain/DeviceCompromiseCaps';
 import { DeviceAuthorizationNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceAuthorizationNotFoundError';
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
@@ -279,6 +280,21 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       assert(document, new DeviceAuthorizationNotFoundError());
 
       return this.replayer.timelineOf(
+        DeviceAuthorization.fromPrimitives(document.genesis),
+        document,
+      );
+    });
+  }
+
+  public requireTransitionLog(
+    identityId: IdentityId,
+  ): Promise<DeviceAuthorizationTransitionLog> {
+    return this.lock.run(identityId, async () => {
+      const document = await this.resolveDocument(identityId);
+
+      assert(document, new DeviceAuthorizationNotFoundError());
+
+      return this.replayer.transitionLogOf(
         DeviceAuthorization.fromPrimitives(document.genesis),
         document,
       );
