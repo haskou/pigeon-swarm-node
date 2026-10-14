@@ -44,9 +44,10 @@ Goals:
 
 Non-goals (stated so nobody claims them):
 
-- Hiding the group roster from the node. The roster stays in the signed conversation
-  operation log and is plaintext there. This does not meet the
-  no-plaintext-participant-list goal for groups (D15).
+- Hiding the group roster from the node in this design. The roster stays in the signed
+  conversation operation log and is plaintext there, so the
+  no-plaintext-participant-list goal is not met for groups yet. The owner decided to
+  remove it (D15); the design is [`group-roster-in-mls.md`](group-roster-in-mls.md).
 - Hiding IP addresses, connection timing or the shape of fan-out bursts.
 - Giving a joiner history from before it joined. MLS gives no past epoch secrets to
   a joiner.
@@ -343,7 +344,8 @@ and the group path inherits it. The UI router falls back to the local node
 
 The design removes message-level metadata: conversation id, sender, type, and per-message
 participants. Group-level metadata stays. The roster is the largest remaining leak. It
-is the reason the no-plaintext-participant-list goal is not met for groups.
+is the reason the no-plaintext-participant-list goal is not met for groups;
+[`group-roster-in-mls.md`](group-roster-in-mls.md) removes it.
 
 ## Decisions
 
@@ -363,7 +365,7 @@ is the reason the no-plaintext-participant-list goal is not met for groups.
 | D12 | Removed-member spam | accepted; bounded by 120 per minute and the 1000-envelope cap; MLS rejects unknown senders on read | node-side writer sets: see D3 |
 | D13 | Joiner history | none before join | sealed export from a member: later, as part of the pairing export |
 | D14 | Existing groups | groups run only on mailboxes; the node keeps no group message log and the client does not migrate older group data; such groups are re-created | per-group flag: rejected (one delivery path) |
-| D15 | Roster | stays plaintext in the signed conversation operation log; the goal is not met for groups | encrypt roster ops, or remove the roster from the node. Needs an owner decision |
+| D15 | Roster | owner decision: remove the roster from the node and keep it in the MLS GroupContext ([`group-roster-in-mls.md`](group-roster-in-mls.md)). Until its final slice lands, the roster stays plaintext in the signed conversation operation log | encrypt roster ops on the node: the node still has to check them, so it would need the plaintext |
 | D16 | Group size cap | 256 on the mailbox path (`MAX_GROUP_PARTICIPANTS`) | raise: upload grows linearly with N |
 | D17 | Message rate | 120 per minute per group, the inbox append limit | raise the limit: needs a node change; measure first |
 | D18 | Large payloads | private blobs (#290); the envelope carries a reference only | envelopes up to 65504 bytes: N x cost per copy |
