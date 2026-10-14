@@ -46,4 +46,19 @@ describe('PollScope', () => {
       type: 'group_conversation',
     });
   });
+
+  it('rejects a conversation-only scope', () => {
+    expect(() =>
+      PollScope.fromPrimitives({
+        conversationId: 'group:conversation-1',
+        type: 'group_conversation',
+      } as never),
+    ).toThrow();
+    expect(() =>
+      PollScope.fromPrimitives({
+        conversationId: 'group:conversation-1',
+        type: 'community_channel',
+      } as never),
+    ).toThrow();
+  });
 });

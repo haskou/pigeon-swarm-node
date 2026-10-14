@@ -22,14 +22,14 @@ const failingProperties = async (
   );
 
 describe('PostPollBody', () => {
-  it('accepts a group conversation poll without a timeline mutation', async () => {
+  it('rejects a group conversation poll scope', async () => {
     expect(
       await failingProperties({
         ...basePoll,
         conversationId: 'group:conversation-1',
         scopeType: 'group_conversation',
       }),
-    ).toEqual([]);
+    ).toContain('scopeType');
   });
 
   it('requires a timeline mutation for a community channel poll', async () => {

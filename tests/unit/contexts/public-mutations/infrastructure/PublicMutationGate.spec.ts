@@ -1096,7 +1096,7 @@ describe('PublicMutationGate over polls', () => {
     ).resolves.toBe(true);
   });
 
-  it('admits group conversation polls only for participants of a group', async () => {
+  it('rejects a conversation-scoped poll even from a group participant', async () => {
     const conversation = mock<Conversation>();
     const groupPoll = {
       allowsMultipleVotes: false,
@@ -1116,14 +1116,6 @@ describe('PublicMutationGate over polls', () => {
     conversation.hasParticipant.mockReturnValue(true);
     await expect(
       gate.accepts('polls', await sign(groupPoll, creator)),
-    ).resolves.toBe(true);
-
-    conversation.hasParticipant.mockReturnValue(false);
-    await expect(
-      gate.accepts(
-        'polls',
-        await sign({ ...groupPoll, id: 'poll-3' }, creator),
-      ),
     ).resolves.toBe(false);
   });
 
