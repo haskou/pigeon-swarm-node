@@ -2,8 +2,10 @@ import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/Devic
 import { DeviceAuthorizationCheckpointCandidate } from '@app/contexts/identity-devices/domain/DeviceAuthorizationCheckpointCandidate';
 import { DeviceAuthorizationOverflowBound } from '@app/contexts/identity-devices/domain/DeviceAuthorizationOverflowBound';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
+import { DeviceCompromisedCredential } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionState';
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
+import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperationId';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { PairingAuthorization } from '@app/contexts/identity-devices/domain/value-objects/PairingAuthorization';
@@ -174,6 +176,175 @@ describe(DeviceAuthorizationPolicy.name, () => {
 
     it('has no frontier without sources', () => {
       expect(() => policy.preferFrontier([])).toThrow(
+        InvalidDeviceAuthorizationTransitionError,
+      );
+    });
+  });
+
+  describe('recovery lineage', () => {
+    let authority: KeyPair;
+    let genesis: DeviceAuthorization;
+    const ownerCap = (): DeviceCompromisedCredential[] => [
+      {
+        compromisedSince: DeviceAuthorizationRevision.initial(),
+        credential: owner,
+      },
+    ];
+    const epochAfter = (operationId: string): DeviceAuthorizationEpoch =>
+      DeviceAuthorizationEpoch.fromRecovery(
+        new DeviceAuthorizationOperationId(operationId),
+      );
+
+    beforeAll(async () => {
+      authority = await KeyPair.generate();
+      genesis = DeviceAuthorization.genesis(
+        identityId,
+        [new NetworkId('550e8400-e29b-41d4-a716-446655440000')],
+        owner,
+        RecoveryAuthority.fromString(authority.toPrimitives().publicKey),
+      );
+    });
+
+    async function signedRecovery(
+      operationId: string,
+      previousRevision: number,
+      epoch = DeviceAuthorizationEpoch.genesis(),
+      compromisedCredentials?: DeviceCompromisedCredential[],
+    ): Promise<DeviceAuthorizationTransition> {
+      const target = await KeyPair.generate();
+      const unsigned = DeviceAuthorizationTransition.recovery(
+        identityId,
+        new DeviceAuthorizationOperationId(operationId),
+        new DeviceAuthorizationRevision(previousRevision),
+        DeviceCredential.fromString(target.toPrimitives().publicKey),
+        epoch,
+        compromisedCredentials,
+      );
+      const proven = unsigned.provePossession(
+        target.sign(unsigned.getProofOfPossessionPayload()),
+      );
+
+      return proven.authorizeRecovery(
+        authority.sign(proven.getSigningPayload()),
+      );
+    }
+
+    it('keeps the caps of a recovery lost to a later one on its lineage', async () => {
+      const first = await signedRecovery(
+        '00000000-0000-4000-8000-000000000001',
+        0,
+      );
+      const second = await signedRecovery(
+        '00000000-0000-4000-8000-000000000002',
+        1,
+        epochAfter('00000000-0000-4000-8000-000000000001'),
+      );
+      const lost = await signedRecovery(
+        '00000000-0000-4000-8000-000000000003',
+        0,
+        DeviceAuthorizationEpoch.genesis(),
+        ownerCap(),
+      );
+
+      const state = policy.replayRecoveryLineage(
+        genesis,
+        [first, second],
+        [lost],
+      );
+
+      expect(state.authorization.getRevision().valueOf()).toBe(2);
+      expect(
+        state.compromiseCaps.isCompromisedAt(
+          owner,
+          new DeviceAuthorizationRevision(2),
+        ),
+      ).toBe(true);
+    });
+
+    it('keeps the caps of a lost recovery that recovers from another lost one', async () => {
+      const won = await signedRecovery(
+        '00000000-0000-4000-8000-000000000001',
+        3,
+      );
+      const lost = await signedRecovery(
+        '00000000-0000-4000-8000-000000000002',
+        0,
+      );
+      const chained = await signedRecovery(
+        '00000000-0000-4000-8000-000000000003',
+        1,
+        epochAfter('00000000-0000-4000-8000-000000000002'),
+        ownerCap(),
+      );
+
+      const state = policy.replayRecoveryLineage(
+        genesis,
+        [won],
+        [chained, lost],
+      );
+
+      expect(state.authorization.getRevision().valueOf()).toBe(4);
+      expect(
+        state.compromiseCaps.isCompromisedAt(
+          owner,
+          new DeviceAuthorizationRevision(4),
+        ),
+      ).toBe(true);
+    });
+
+    it('refuses a lost recovery past the recovery that won', async () => {
+      const won = await signedRecovery(
+        '00000000-0000-4000-8000-000000000001',
+        0,
+      );
+      const later = await signedRecovery(
+        '00000000-0000-4000-8000-000000000002',
+        2,
+      );
+
+      expect(() =>
+        policy.replayRecoveryLineage(genesis, [won], [later]),
+      ).toThrow(InvalidDeviceAuthorizationTransitionError);
+    });
+
+    it('refuses a lost recovery from no state it could have recovered', async () => {
+      const won = await signedRecovery(
+        '00000000-0000-4000-8000-000000000001',
+        1,
+      );
+      const orphan = await signedRecovery(
+        '00000000-0000-4000-8000-000000000002',
+        0,
+        epochAfter('00000000-0000-4000-8000-000000000009'),
+      );
+
+      expect(() =>
+        policy.replayRecoveryLineage(genesis, [won], [orphan]),
+      ).toThrow(InvalidDeviceAuthorizationTransitionError);
+    });
+
+    it('refuses a lost recovery reusing an operation of the lineage', async () => {
+      const won = await signedRecovery(
+        '00000000-0000-4000-8000-000000000001',
+        0,
+      );
+      const reused = await signedRecovery(
+        '00000000-0000-4000-8000-000000000001',
+        0,
+      );
+
+      expect(() =>
+        policy.replayRecoveryLineage(genesis, [won], [reused]),
+      ).toThrow(InvalidDeviceAuthorizationTransitionError);
+    });
+
+    it('refuses lost recoveries without a recovery that won', async () => {
+      const lost = await signedRecovery(
+        '00000000-0000-4000-8000-000000000001',
+        0,
+      );
+
+      expect(() => policy.replayRecoveryLineage(genesis, [], [lost])).toThrow(
         InvalidDeviceAuthorizationTransitionError,
       );
     });
