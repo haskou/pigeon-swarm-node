@@ -321,12 +321,6 @@ local secrets. A revoked device reads up to the group that removed it. See
 - **At most 128 held lost recoveries.** A heal that would hold more yields a
   checkpoint the document shape check refuses. Only the recovery authority can
   cause it, by signing that many capped recoveries that lose.
-- **The browser client proves only lost recoveries at the winner's
-  predecessor.** `pigeon-swarm-ui` still requires every entry of
-  `concurrentRecoveries` to share the last recovery's predecessor. A log that
-  holds a recovery lost at an earlier revision, or on another lost recovery,
-  reads as unproven there: the client does not wipe, but cannot prove a
-  genuine removal from that log either.
 - **More than 32 capped credentials fails closed.** A recovery that would carry
   more is refused, and nothing is trimmed.
 - **The caps are read in two steps.** The checkpoint and the caps come from

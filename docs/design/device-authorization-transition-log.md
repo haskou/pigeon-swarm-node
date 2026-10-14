@@ -220,11 +220,6 @@ In every case a wipe needs a signature from a key that had the power to remove
   the disclosure is computed from one consistent log.
 - A single node can suppress the auto-wipe indefinitely; liveness needs more
   than one node, which the client controls.
-- `pigeon-swarm-ui` still applies the older step 2 rule (every concurrent
-  recovery shares the last recovery's predecessor). A body holding a recovery
-  lost at an earlier revision, or on another lost recovery, reads as unproven
-  there and never wipes, so a removed device behind such a heal keeps its data
-  until the client adopts the rule above.
 
 ## Verification
 
