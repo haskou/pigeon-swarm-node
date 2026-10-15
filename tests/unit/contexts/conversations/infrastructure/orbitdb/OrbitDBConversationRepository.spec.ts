@@ -1,10 +1,12 @@
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import { ConversationOperation } from '@app/contexts/conversations/domain/operations/ConversationOperation';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { ConversationOperationAction } from '@app/contexts/conversations/domain/value-objects/ConversationOperationAction';
 import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
+import { legacyGroupGenesis } from '../../../../../support/legacyGroupGenesis';
 import { ConversationMother } from '../../../../mothers/ConversationMother';
 import { operationProof } from '../../support/operationProof';
 
@@ -104,6 +106,24 @@ describe('OrbitDBConversationRepository', () => {
     expect(found.map((conversation) => conversation.getId())).toEqual([
       oneToOne.getId(),
     ]);
+  });
+
+  it('should neither find nor list a group conversation stored by an older node', async () => {
+    const legacy = legacyGroupGenesis({
+      creatorIdentityId: mother.author.valueOf(),
+      networkId: mother.networkId.valueOf(),
+      participantIds: [mother.author.valueOf(), mother.recipient.valueOf()],
+    });
+
+    await repository.saveOperation(
+      { isGenesis: () => true, toPrimitives: () => legacy } as never,
+      operationProof(legacy.id),
+    );
+
+    expect(
+      await repository.hasById(new ConversationId(legacy.conversationId)),
+    ).toBe(false);
+    expect(await repository.findByParticipant(mother.author, 10)).toEqual([]);
   });
 
   /** Stores the signed creation of a conversation, the only thing that makes it exist. */

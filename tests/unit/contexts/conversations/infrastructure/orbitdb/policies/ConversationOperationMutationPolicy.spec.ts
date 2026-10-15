@@ -2,6 +2,7 @@ import { ConversationOperation } from '@app/contexts/conversations/domain/operat
 import ConversationOperationMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationOperationMutationPolicy';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 
+import { legacyGroupGenesis } from '../../../../../../support/legacyGroupGenesis';
 import {
   add,
   alice,
@@ -80,11 +81,7 @@ describe('ConversationOperationMutationPolicy', () => {
   describe('assertPermitted', () => {
     it('refuses to delete an operation', async () => {
       await expect(
-        policy.assertPermitted(
-          record(groupGenesis()),
-          creator.valueOf(),
-          true,
-        ),
+        policy.assertPermitted(record(groupGenesis()), creator.valueOf(), true),
       ).rejects.toThrow(InvalidPublicMutationError);
     });
 
@@ -158,6 +155,26 @@ describe('ConversationOperationMutationPolicy', () => {
 
       await expect(admit(add([created], bob))).resolves.toBeUndefined();
       await expect(admit(add([other], bob))).rejects.toThrow();
+    });
+  });
+
+  describe('a group conversation replicated by an older node', () => {
+    const legacy = legacyGroupGenesis({
+      creatorIdentityId: creator.valueOf(),
+      networkId: '550e8400-e29b-41d4-a716-446655440000',
+      participantIds: [creator.valueOf(), alice.valueOf()],
+    });
+
+    it('refuses its genesis before checking the proof', () => {
+      expect(() => policy.expectationOf({ ...legacy })).toThrow(
+        InvalidPublicMutationError,
+      );
+    });
+
+    it('refuses to admit its genesis', async () => {
+      await expect(
+        policy.assertPermitted({ ...legacy }, creator.valueOf(), false),
+      ).rejects.toThrow(InvalidPublicMutationError);
     });
   });
 });

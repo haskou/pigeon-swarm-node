@@ -70,6 +70,7 @@ import {
 import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import FormData from 'form-data';
 
+import { legacyGroupGenesis } from '../../support/legacyGroupGenesis';
 import { mineAdmissionNonce } from '../../support/mineAdmissionNonce';
 import {
   CallParticipantState,
@@ -81,7 +82,10 @@ import {
   signCallStart,
 } from '../../support/signCall';
 import { signCommunityOperation } from '../../support/signCommunityOperation';
-import { signConversationOperation } from '../../support/signConversationOperation';
+import {
+  signConversationOperation,
+  signConversationOperationRecord,
+} from '../../support/signConversationOperation';
 import {
   signNotificationInvitation,
   signNotificationState,
@@ -3815,6 +3819,38 @@ export default class Definitions {
 
   @given('I sign the current one-to-one conversation request')
   public async iSignTheCurrentOneToOneConversationRequest(): Promise<void> {
+    await this.signCurrentRequest('POST', '/conversations/');
+  }
+
+  /** Signs the group genesis an older client sent, a shape nodes now refuse. */
+  @given('I sign the current group conversation request as an older client did')
+  public async iSignTheCurrentGroupConversationRequestAsAnOlderClientDid(): Promise<void> {
+    const body = JSON.parse(this.body ?? '{}');
+    const keyPair = await this.resolveSignerKeyPair(undefined);
+    const identityId = new IdentityId(
+      keyPair.toPrimitives().publicKey,
+    ).valueOf();
+    const createdAt = Date.now();
+    const nonce = randomUUID();
+    const record = legacyGroupGenesis({
+      createdAt,
+      creatorIdentityId: identityId,
+      name: body.name,
+      networkId: String(body.networkId),
+      nonce,
+      participantIds: [...new Set([identityId, ...body.participantIds])],
+    });
+    const proof = signConversationOperationRecord(record, {
+      deviceCredential: keyPair.toPrimitives().publicKey,
+      deviceKeyPair: keyPair,
+      id: identityId,
+    });
+
+    this.body = JSON.stringify({
+      ...body,
+      nonce,
+      operation: { createdAt, mutation: proof.toPrimitives(), parents: [] },
+    });
     await this.signCurrentRequest('POST', '/conversations/');
   }
 

@@ -149,6 +149,18 @@ describe('Conversation operation vectors', () => {
     ).toBe(conversation.conversationId);
   });
 
+  it.each(['group_genesis', 'group_genesis_unicode'])(
+    'refuses the %s vector, a group genesis older nodes accepted',
+    (name) => {
+      const vector = vectors.cases.find((item) => item.name === name);
+
+      expect(vector).toBeDefined();
+      expect(() =>
+        ConversationOperation.fromPrimitives(vector!.derived.payload),
+      ).toThrow();
+    },
+  );
+
   it('folds the signed group operations to the expected roster', () => {
     const { group } = vectors.conversations;
     const operations = vectors.cases
