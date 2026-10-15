@@ -33,6 +33,24 @@ SERVICE_NAME=pigeon-swarm
 
 If initialization fails (for example an invalid environment value, an `API_PORT` already in use by another process, which logs `API server could not listen on port <port>`, or an unwritable `IPFS_STORAGE_PATH`), the node logs `Application error`, stops the services it already started on a best-effort basis (at most 10 seconds), and exits with status `1`. Container restart policies such as Docker `on-failure` act on that status. Fix the reported error before starting the node again.
 
+## Resetting the Node Owner
+
+The node owner is the identity that claimed the node with `PUT /node/owner`. If its key is lost, no one can sign as the owner again, so the node operator clears the owner on the host:
+
+1. Stop the node. The command opens the local database at `PIGEON_LOCAL_DB_PATH`, which a running node keeps locked; while the node runs it prints `Owner reset failed: The local database at <path> is in use by another process, such as a running node.`, changes nothing and exits with status `1`.
+2. From a checkout, run `yarn build` once, then `yarn node:reset-owner` with the same `PIGEON_LOCAL_DB_PATH` as the node. In a container built from the `final` target, run `yarn node:reset-owner` in a one-off container with the node's volumes and environment. With the bundled `docker-compose.yml`, stop the backend and run `docker compose run --rm backend sh -c "yarn build && yarn node:reset-owner"`.
+3. Start the node. The next `PUT /node/owner` works as on an unclaimed node, so the first identity to claim it becomes the owner: claim it before anyone else can reach the API.
+
+The command clears only the owner settings and prints each one it cleared:
+
+- the node owner;
+- the registration mode, back to `open`, and every registration code;
+- the node's own block list.
+
+It keeps the node id, networks, relay configuration, identities, content and keys. It needs no confirmation flag and prints `Nothing to clear` when there is no owner setting.
+
+To start over instead, stop the node and delete the `PIGEON_LOCAL_DB_PATH` folder. The node then starts with a new node id and no owner, networks, relay configuration or other local data, while the IPFS peer key under `IPFS_STORAGE_PATH` survives.
+
 ## Frontend Static Assets
 
 The backend can serve static files from the root `public/` directory. This is

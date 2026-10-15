@@ -1543,6 +1543,9 @@ Implemented:
 - change the owner only when the request is signed by the current owner
 - persist owner state in the local embedded database
 - load persisted node state when the API process starts
+- after the node operator ran `yarn node:reset-owner` on the stopped node
+  (see [Resetting the Node Owner](INSTALLATION.md#resetting-the-node-owner)),
+  the node is unowned again and the next claim succeeds
 
 ### Put local node registration mode
 
