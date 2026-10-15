@@ -73,6 +73,25 @@ export default class LocalConversationDraftRepository extends ConversationDraftR
     );
   }
 
+  public async deleteUnkeyed(): Promise<void> {
+    await this.database.deleteMany(
+      LocalConversationDraftRepository.NAMESPACE,
+      (document) => typeof document.draftKey !== 'string',
+    );
+  }
+
+  public async exists(
+    identityId: IdentityId,
+    draftKey: ConversationDraftKey,
+  ): Promise<boolean> {
+    const document = await this.database.findOne(
+      LocalConversationDraftRepository.NAMESPACE,
+      this.draftId(identityId, draftKey),
+    );
+
+    return document !== undefined;
+  }
+
   public async findByIdentity(
     identityId: IdentityId,
   ): Promise<ConversationDraft[]> {

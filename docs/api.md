@@ -2616,9 +2616,14 @@ Implemented:
 - the node never learns which conversation a draft belongs to and checks no
   conversation roster; the client seals the conversation id inside
   `encryptedPayload` and drops a draft whose key does not match it
-- the backend treats `encryptedPayload` as opaque client-encrypted data
-- each identity keeps its 100 most recently updated drafts; saving another
-  drops the oldest
+- the backend treats `encryptedPayload` as opaque client-encrypted data of at
+  most 65 536 characters; a longer one answers `400`
+- `updatedAt` defaults to the node's time when omitted
+- each identity keeps its 100 most recently updated drafts; saving under a new
+  key drops the oldest others, never the draft just saved; updating an existing
+  key evicts nothing
+- at startup the node deletes drafts stored before opaque keys, which named
+  their conversation and no route can reach
 
 ### Conversation messages
 

@@ -75,7 +75,13 @@ package "conversations.domain" {
     +saveOperation(operation: ConversationOperation, proof: PublicMutationProof): Promise<void>
   }
 
-  interface ConversationDraftRepository
+  interface ConversationDraftRepository {
+    +delete(identityId, draftKey): Promise<void>
+    +deleteUnkeyed(): Promise<void>
+    +exists(identityId, draftKey): Promise<boolean>
+    +findByIdentity(identityId): Promise<ConversationDraft[]>
+    +save(identityId, draftKey, encryptedPayload, updatedAt): Promise<void>
+  }
 
   note right of ConversationRepository
     Conversations are metadata only. Messages,
@@ -127,6 +133,9 @@ package "conversations.application" {
   }
   class ConversationDraftDeleter
   class ConversationDraftsFinder
+  class UnkeyedConversationDraftsPurger {
+    +purge(): Promise<void>
+  }
 
   ConversationCreator --> ConversationRepository
   ConversationMemberChanger --> ConversationRepository
@@ -135,6 +144,7 @@ package "conversations.application" {
   ConversationDraftSaver --> ConversationDraftRepository
   ConversationDraftDeleter --> ConversationDraftRepository
   ConversationDraftsFinder --> ConversationDraftRepository
+  UnkeyedConversationDraftsPurger --> ConversationDraftRepository
 }
 
 package "conversations.infrastructure" {
@@ -154,5 +164,11 @@ package "conversations.infrastructure" {
   OrbitDBConversationRepository ..> ConversationStateFold
   LocalConversationDraftRepository ..|> ConversationDraftRepository
 }
+
+package "apps/initializers/conversations" {
+  class ConversationDraftsPurgeInitializer
+}
+
+ConversationDraftsPurgeInitializer --> UnkeyedConversationDraftsPurger : at startup
 
 @enduml

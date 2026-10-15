@@ -19,6 +19,7 @@ export class ConversationDraftSaveMessage {
     this.identityId = new IdentityId(identityId);
     this.draftKey = new ConversationDraftKey(draftKey);
     this.encryptedPayload = new EncryptedMessagePayload(encryptedPayload);
-    this.updatedAt = updatedAt ? new Timestamp(updatedAt) : Timestamp.now();
+    this.updatedAt =
+      updatedAt === undefined ? Timestamp.now() : new Timestamp(updatedAt);
   }
 }

@@ -218,7 +218,7 @@ paths:
       tags:
         - conversations
       summary: Save authenticated identity draft under an opaque key
-      description: The client derives draftKey as base64url(HMAC-SHA256(owner draft key, utf8(conversationId))), so the node checks no conversation roster. Each identity keeps its 100 most recently updated drafts; saving one more drops the oldest.
+      description: The client derives draftKey as base64url(HMAC-SHA256(owner draft key, utf8(conversationId))), so the node checks no conversation roster. Each identity keeps its 100 most recently updated drafts; saving under a new key drops the oldest others, never the draft just saved.
       parameters:
         - $ref: '#/components/parameters/DraftKey'
         - $ref: '#/components/parameters/XIdentityId'
@@ -237,6 +237,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConversationDraftResource'
+        '400':
+          description: encryptedPayload is missing or longer than 65536 characters.
         '409':
           description: InvalidConversationDraftKeyError.
     delete:
@@ -499,9 +501,11 @@ components:
       properties:
         encryptedPayload:
           type: string
+          maxLength: 65536
           description: Opaque encrypted draft payload owned by the authenticated identity.
         updatedAt:
           type: integer
+          description: Client time in milliseconds; the node's time when omitted.
     ConversationDraftResource:
       type: object
       required:
