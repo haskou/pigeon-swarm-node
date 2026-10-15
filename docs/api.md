@@ -1579,10 +1579,12 @@ Implemented:
 - `codes`: creating an identity through this node needs a registration code
 - `closed`: nobody can create an identity through this node, the owner
   included; switch to `codes` to invite someone
-- the mode only gates **creation** through this node: a genesis
-  `POST /identities` for an identity this node does not hold yet. Updates,
-  republishing an identity this node already holds, login and every other
-  route are never gated
+- the mode only gates **creation** through this node: a `POST /identities`
+  for an identity this node does not hold yet, whatever its version. Updates
+  and republishing of an identity this node already holds, login and every
+  other route are never gated
+- changing the mode is local: it is neither gossiped nor pushed to WebSocket
+  clients; `GET /node` reads it
 - the proof of work and its pricing apply unchanged in every mode
 - persist the mode in local node metadata; it is not replicated
 
@@ -1666,7 +1668,8 @@ Implemented:
 
 - require signed request auth from the current node owner (`403010` otherwise)
 - never return the code itself
-- expired and used-up codes are dropped and not listed
+- expired codes are dropped; used-up codes are not listed but kept until they
+  expire, so a use given back by a failed creation is not lost
 
 ### Revoke a registration code
 
@@ -2400,9 +2403,10 @@ POST /identities
 X-Registration-Code: <code>
 ```
 
-Registration control applies only when the body is a genesis (no previous
-version) for an identity this node does not hold yet. A genesis that already
-replicated here is a republish and is never gated, nor are updates and login.
+Registration control applies only when the body is an identity this node does
+not hold yet, whatever its version: a later version whose genesis lives
+elsewhere still brings a new identity here. An identity that already
+replicated here is a republish or an update and is never gated, nor is login.
 The check runs after the per-address limiter and before the per-identity and
 per-network counters, so refused attempts never spend those limits. One use of
 the code is reserved before publishing and released if publishing fails, so a

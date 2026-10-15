@@ -314,7 +314,7 @@ paths:
       tags:
         - nodes
       summary: List registration codes
-      description: Lists the live registration codes without the codes themselves. Expired and used-up codes are dropped. Requires a signed request from the current node owner.
+      description: Lists the usable registration codes without the codes themselves. Expired codes are dropped; used-up codes are hidden and kept until they expire, so a use given back by a failed creation is not lost. Requires a signed request from the current node owner.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
