@@ -22,9 +22,11 @@ export class PostCallRoute extends CallRouteSupport {
       new CallStartMessage(
         creatorIdentityId.valueOf(),
         {
+          capabilityHash: body.capabilityHash,
           channelId: body.channelId,
           communityId: body.communityId,
           conversationId: body.conversationId,
+          networkId: body.networkId,
           type: body.scopeType,
         },
         body.mutation,

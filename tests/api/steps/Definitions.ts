@@ -118,6 +118,9 @@ type StickerPackDocument = Record<string, unknown> & {
   stickers: Record<string, unknown>[];
 };
 
+/** What group members would derive from the MLS exporter of the group epoch. */
+const GROUP_CALL_CAPABILITY = 'Zm9yLXRoZS1ncm91cC1jYWxsLW9ubHktMzItYnl0ZXM';
+
 @binding()
 export default class Definitions {
   private admissionProofBits: number | undefined;
@@ -1339,6 +1342,28 @@ export default class Definitions {
     const nonce = `api-call-${randomUUID().replace(/-/g, '')}`;
     const startedAt = Date.now();
     const networkId = String(this.currentNetworkId);
+
+    if (body.scopeType === 'group_capability') {
+      const signed = signCallStart({
+        networkId,
+        nonce,
+        scope: {
+          capabilityHash: String(body.capabilityHash),
+          type: 'group_capability',
+        },
+        signer,
+        startedAt,
+      });
+
+      this.body = JSON.stringify({
+        ...body,
+        mutation: mutationOf(signed.proof),
+        nonce,
+        startedAt,
+      });
+
+      return;
+    }
 
     if (body.scopeType === 'conversation') {
       const conversationId = new ConversationId(String(body.conversationId));
@@ -3834,6 +3859,32 @@ export default class Definitions {
       ],
       scopeType: 'community_channel',
     });
+  }
+
+  @given('I set a group capability call body')
+  public iSetAGroupCapabilityCallBody(): void {
+    this.body = JSON.stringify({
+      capabilityHash: createHash('sha256')
+        .update(GROUP_CALL_CAPABILITY)
+        .digest('hex'),
+      networkId: this.currentNetworkId,
+      scopeType: 'group_capability',
+    });
+  }
+
+  @given('I present the group call capability')
+  public iPresentTheGroupCallCapability(): void {
+    this.headers.authorization = `Bearer ${GROUP_CALL_CAPABILITY}`;
+  }
+
+  @given('I present another group call capability')
+  public iPresentAnotherGroupCallCapability(): void {
+    this.headers.authorization = `Bearer ${GROUP_CALL_CAPABILITY.split('').reverse().join('')}`;
+  }
+
+  @given('I present no group call capability')
+  public iPresentNoGroupCallCapability(): void {
+    delete this.headers.authorization;
   }
 
   @given('call requests are sent without a mutation')

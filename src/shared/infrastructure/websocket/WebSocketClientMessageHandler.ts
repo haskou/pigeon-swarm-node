@@ -64,7 +64,7 @@ export default class WebSocketClientMessageHandler {
 
     const participantsWithClients = candidates.filter(
       (identityId) =>
-        call.getScope().isCommunityChannel() ||
+        call.getScope().isLeaseRostered() ||
         call.hasParticipant(new IdentityId(identityId)),
     );
     const visibility = await Promise.all(

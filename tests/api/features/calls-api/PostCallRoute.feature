@@ -14,16 +14,27 @@ Feature: Start calls
       | status     | active       |
       | scope.type | conversation |
 
-  Scenario: Start a group conversation call
+  Scenario: Start a group call that names none of its members
     Given I register a test IPFS network "api-calls-group-network"
     And I have created a group conversation
-    And I set a conversation call body
+    And I set a group capability call body
     And I sign the current call start request
     When I POST to "/calls/"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
-      | status     | active       |
-      | scope.type | conversation |
+      | status     | active           |
+      | scope.type | group_capability |
+    And response body should not contain the other identity id
+    And response body should not contain "conversationId"
+
+  Scenario: Refuse a conversation call that would name a group's members
+    Given I register a test IPFS network "api-calls-group-conversation-network"
+    And I have created a group conversation
+    And I set a conversation call body
+    And I sign the current call start request
+    When I POST to "/calls/"
+    Then response code is equal to 409
+    And response body should contain "InvalidCallScopeError"
 
   Scenario: Start a community channel call
     Given I register a test IPFS network "api-calls-community-network"

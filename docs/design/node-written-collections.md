@@ -546,8 +546,8 @@ events (no replicated mutable state).
 - Call start: `scopeType: call_start`, one record per call, author == caller.
 - Participant events: `scopeType: call_participant`, one record per
   `(callId, identityId)` with a `sequence` chain whose payload `state` is
-  `joined | left | declined`. Conversation calls only: community joins and
-  leaves are verified and not stored.
+  `joined | left | declined`. Conversation calls only: community and group
+  joins and leaves are verified and not stored.
 - Call end: `scopeType: call_end`, one record per call, signed by the creator
   (or, for conversation calls, derivable: all participants left or declined).
 - **Derived (never replicated):** `status`, `endedAt` for the derived end,
@@ -561,6 +561,10 @@ Community voice calls store no participants; the start record carries the
 check (`CallAccessAuthorizer` against the signed community state), not a
 participant list.
 
+Group calls (`group_capability`, #555) store no participants and name no
+group: the start carries the SHA-256 `capabilityHash` of a capability derived
+from the MLS exporter of the group epoch, and joins present the capability.
+
 ### Record shape and canonical signing
 
 ```jsonc
@@ -568,7 +572,8 @@ participant list.
 { "id": "call:<hash>", "callId": "<same>", "nonce": "<base64url>",
   "creatorIdentityId": "<identityId>", "networkId": "<networkId>",
   "scope": { "type": "conversation", "conversationId": "<id>" }
-          | { "type": "community_channel", "communityId": "<id>", "channelId": "<id>" },
+          | { "type": "community_channel", "communityId": "<id>", "channelId": "<id>" }
+          | { "type": "group_capability", "capabilityHash": "<64 hex>" },
   "participantIds": ["<identityId>", "..."],      // conversation scope only
   "sessionEpoch": 1,                               // community channel only
   "startedAt": 1770000000000,                      // creator-claimed
@@ -589,14 +594,17 @@ about the author's own actions. No node-chosen `updatedAt`/`receivedAt`.
 ### Admission policy
 
 - `call_start`: id recomputes; author == creator; conversation scope requires an
-  admitted conversation record (slice 1) where the creator is a participant and
-  `participantIds` equals the record's `participantIds` (one-to-one: exactly the
-  two); community scope requires channel access of the creator and no
+  admitted one-to-one conversation record (slice 1) where the creator is a
+  participant and `participantIds` equals the record's two `participantIds`;
+  community scope requires channel access of the creator and no
   `participantIds`; `sessionEpoch` bounded to `known max + 1`; at most one
   active call per community channel, resolved deterministically (lowest
-  `payloadDigest` among active starts, see below).
+  `payloadDigest` among active starts, see below); group capability scope
+  requires a creator on the record's network and no `participantIds`.
 - `call_participant`: the call exists; author == `identityId`; `identityId` in
-  `participantIds` (conversation) or has channel access (community); state
+  `participantIds` (conversation), has channel access (community) or is an
+  identity of the start's network and presents the capability (group, the
+  capability checked on the receiving node only); state
   transitions are monotone per identity (a declined or left stays so unless
   `sequence` increases with a rejoin where the call is still active).
 - `call_end`: author is the creator, or any participant of a conversation call;

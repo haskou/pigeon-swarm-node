@@ -5,6 +5,9 @@ import { CallNonce } from '@app/contexts/calls/domain/value-objects/CallNonce';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
+import { CallCapabilityHash } from '@app/contexts/calls/domain/value-objects/CallCapabilityHash';
+import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
+import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import InMemoryCallParticipantLeaseRepository from '@app/contexts/calls/infrastructure/memory/InMemoryCallParticipantLeaseRepository';
 import OrbitDBCallProjection from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallProjection';
 import OrbitDBCallRepository from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository';
@@ -410,6 +413,100 @@ describe('OrbitDBCallRepository', () => {
         state: 'joined',
       }),
     );
+  });
+
+  describe('a group-capability call', () => {
+    const capabilityHash = 'b'.repeat(64);
+    const groupStart = (startedAt = now()) =>
+      signCallStart({
+        networkId,
+        nonce: nonce(),
+        scope: { capabilityHash, type: 'group_capability' },
+        signer: creator,
+        startedAt,
+      });
+    const leaseFor = (callId: string, signer: CallSigner) =>
+      CallParticipantLease.connect(
+        new CallId(callId),
+        new IdentityId(signer.id),
+        new NodeId('550e8400-e29b-41d4-a716-446655440012'),
+        new NetworkId(networkId),
+        [],
+      );
+
+    it('stores a start naming only the capability hash and no participant', async () => {
+      const { payload, proof } = groupStart();
+      const call = Call.start(
+        new IdentityId(creator.id),
+        new NetworkId(networkId),
+        CallScope.groupCapability(new CallCapabilityHash(capabilityHash)),
+        [],
+        new CallNonce(payload.nonce as string),
+        new Timestamp(payload.startedAt as number),
+      );
+
+      await repository.saveStart(call, proof);
+
+      expect(calls.put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          participantIds: [],
+          scope: { capabilityHash, type: 'group_capability' },
+          scopeType: 'call_start',
+        }),
+      );
+    });
+
+    it('takes its roster from the participation leases', async () => {
+      const start = groupStart();
+      await replicate(start.payload, start.proof);
+      await leases.save(leaseFor(start.callId, peer));
+
+      const call = await repository.requireById(new CallId(start.callId));
+
+      expect(call.getJoinedParticipantIds().map((id) => id.valueOf())).toEqual(
+        [peer.id],
+      );
+      const active = await repository.findActiveByParticipant(
+        new IdentityId(peer.id),
+      );
+      expect(active.map((found) => found.getId().valueOf())).toEqual([
+        start.callId,
+      ]);
+    });
+
+    it('expires once nobody has held a lease past the grace period', async () => {
+      const start = groupStart(now() - 120_000);
+      await replicate(start.payload, start.proof);
+
+      const call = await repository.requireById(new CallId(start.callId));
+
+      expect(call.isActive()).toBe(false);
+    });
+
+    it('verifies but does not store a participant record', async () => {
+      const start = groupStart();
+      await replicate(start.payload, start.proof);
+      const call = await repository.requireById(new CallId(start.callId));
+      const at = now() + 1;
+      const joined = signCallParticipant({
+        at,
+        callId: start.callId,
+        signer: peer,
+        state: 'joined',
+      });
+      call.joinOrAdd(new IdentityId(peer.id), new Timestamp(at));
+
+      await repository.saveParticipant(
+        call,
+        new IdentityId(peer.id),
+        new Timestamp(at),
+        joined.proof,
+      );
+
+      expect(calls.put).not.toHaveBeenCalledWith(
+        expect.objectContaining({ scopeType: 'call_participant' }),
+      );
+    });
   });
 
   describe('on a restarted node holding call records it cannot admit yet', () => {

@@ -13,6 +13,7 @@ export class CallParticipantHeartbeatRecordMessage {
     callId: string,
     participantIdentityId: string,
     mediaConnections: PrimitiveOf<CallParticipantMediaConnection>[],
+    public readonly capability?: string,
   ) {
     this.callId = new CallId(callId);
     this.participantIdentityId = new IdentityId(participantIdentityId);

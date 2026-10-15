@@ -2,6 +2,7 @@ import { callStartArgs } from '../../../../support/signCall';
 import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
+import { CallCapabilityHash } from '@app/contexts/calls/domain/value-objects/CallCapabilityHash';
 import { CallNotFoundError } from '@app/contexts/calls/domain/errors/CallNotFoundError';
 import { Community } from '@app/contexts/communities/domain/Community';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
@@ -76,5 +77,47 @@ describe('CallAccessAuthorizer', () => {
     await expect(
       authorizer.assertAccess(call, identity),
     ).rejects.toBeInstanceOf(CallNotFoundError);
+  });
+
+  describe('a group-capability call', () => {
+    const capability = 'Zm9yLXRoZS1ncm91cC1jYWxsLW9ubHktMzItYnl0ZXM';
+    const outsider = new IdentityId(
+      'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=',
+    );
+    const groupCall = () =>
+      Call.start(
+        identity,
+        network,
+        CallScope.groupCapability(CallCapabilityHash.of(capability)),
+        [],
+        ...callStartArgs(),
+      );
+
+    beforeEach(() => jest.clearAllMocks());
+
+    it('admits whoever presents the capability, without reading any roster', async () => {
+      await expect(
+        authorizer.assertAccess(groupCall(), outsider, capability),
+      ).resolves.toBeUndefined();
+      expect(conversations.hasById).not.toHaveBeenCalled();
+      expect(communities.hasById).not.toHaveBeenCalled();
+    });
+
+    it('hides the call from a wrong capability, even for a joined participant', async () => {
+      await expect(
+        authorizer.assertAccess(groupCall(), identity, `${capability}x`),
+      ).rejects.toBeInstanceOf(CallNotFoundError);
+    });
+
+    it('without a capability admits only a joined participant', async () => {
+      const call = groupCall();
+
+      await expect(
+        authorizer.assertAccess(call, identity),
+      ).resolves.toBeUndefined();
+      await expect(
+        authorizer.assertAccess(call, outsider),
+      ).rejects.toBeInstanceOf(CallNotFoundError);
+    });
   });
 });

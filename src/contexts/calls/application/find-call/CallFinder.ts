@@ -20,7 +20,11 @@ export default class CallFinder {
       throw new CallNotFoundError();
     }
 
-    await this.accessAuthorizer.assertAccess(call, message.requesterIdentityId);
+    await this.accessAuthorizer.assertAccess(
+      call,
+      message.requesterIdentityId,
+      message.capability,
+    );
 
     return call;
   }

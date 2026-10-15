@@ -135,11 +135,19 @@ ancestors fail initialization instead of presenting partial call state as ready.
 Failed replays discard only their own staged changes and restore the previous
 traversal frontier so a retry can read the same entries again.
 
-Community calls persist no participant records. A signed join or leave of a
-community call is verified against the admission rules and then discarded: it
-is neither written to OrbitDB nor replicated. Its freshness rests on the signed
-request and the record clock bound, not on a stored sequence. Community
-participation is runtime lease state, and the roster is the lease set.
+Community and group calls persist no participant records. A signed join or
+leave of such a call is verified against the admission rules and then
+discarded: it is neither written to OrbitDB nor replicated. Its freshness rests
+on the signed request and the record clock bound, not on a stored sequence.
+Their participation is runtime lease state, and the roster is the lease set.
+
+A group call (`group_capability` scope) names no member anywhere in the `calls`
+store. Its `call_start` carries an empty `participantIds` and only the SHA-256
+`capabilityHash` of a capability the members derive from the MLS exporter of
+the group epoch; nodes admit it when its creator belongs to the record's
+network. A node admits a join from whoever presents the capability over HTTP,
+so no node learns the group's roster from a call record. Only the creator's
+`call_end` ends it.
 
 Heads for `call:`, `call-participant:` and `call-end:` records are not replicated:
 records reach other nodes through the gated `calls` store and its history replay
@@ -156,9 +164,10 @@ node.
 Every heartbeat publishes a connected snapshot. After the timeout, all nodes
 remove their stale local copy, but only the owner publishes the disconnected
 snapshot. Conversation documents retain lifecycle and participant history;
-community documents retain lifecycle only. Neither stores heartbeat timestamps.
+community and group documents retain lifecycle only. Neither stores heartbeat
+timestamps.
 
-Community participation expires sixty seconds after the last real join or
+Community and group participation expires sixty seconds after the last real join or
 heartbeat (`lastRenewedAt`), independent of timeout transition timestamps.
 An explicit departure sets `leftAt` and invalidates that owner's participation
 immediately. A heartbeat cannot undo a departure, even when another node still
@@ -220,16 +229,18 @@ participation, and nodes do not republish call events.
 Members of a network can observe:
 
 - `call_start` records: call id, creator, nonce, network id, `startedAt`, the
-  scope (a conversation id, or a community id, channel id and `sessionEpoch`)
-  and, for conversation calls, the participant identity ids.
+  scope (a conversation id; a community id, channel id and `sessionEpoch`; or a
+  group call's `capabilityHash`) and, for conversation calls, the participant
+  identity ids. A group call start names no member and no group.
 - `call_participant` records of conversation calls: the participant identity
-  id, state and signed time. Community joins and leaves are verified and not
-  stored or replicated.
+  id, state and signed time. Community and group joins and leaves are verified
+  and not stored or replicated.
 - `call_end` records: the call id and the identity that ended the call.
-- Lease events (`calls.v1.participant_lease.was_updated`) for conversation and
-  community calls: the connected roster in `participantIds` and
+- Lease events (`calls.v1.participant_lease.was_updated`) for conversation,
+  community and group calls: the connected roster in `participantIds` and
   `participantIdentityId`, heartbeat timestamps, and the relay URL and candidate
-  types of each media connection. Leases are not stored.
+  types of each media connection. Leases are not stored. For a group call this
+  reveals who is connected to a call id, not which group it belongs to.
 - Signal events (`calls.v1.signal.sent`): sender and recipient identity ids,
   `signalType` and `payload`. The node treats `payload` as opaque and does not
   encrypt it, so network members can read it.

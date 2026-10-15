@@ -15,8 +15,7 @@ import { CallSignalType } from '@app/contexts/calls/domain/value-objects/CallSig
 import { CallSignalId } from '@app/contexts/calls/domain/value-objects/CallSignalId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { GroupConversation } from '@app/contexts/conversations/domain/GroupConversation';
-import { GroupConversationName } from '@app/contexts/conversations/domain/value-objects/GroupConversationName';
+import { CallCapabilityHash } from '@app/contexts/calls/domain/value-objects/CallCapabilityHash';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -298,54 +297,102 @@ describe('Call', () => {
     expect(() => call.joinOrAdd(creator)).not.toThrow();
   });
 
-  it('ends a two-participant group call when one participant leaves', () => {
-    const conversation = new GroupConversation(
-      ConversationId.deriveGroup(
-        networkId.valueOf(),
-        creator.valueOf(),
-        'nonce',
-      ),
-      networkId,
-      new GroupConversationName('Two-member group'),
-      [creator, recipient],
-      creator,
-    );
-    const call = Call.start(
-      creator,
-      networkId,
-      CallScope.conversation(conversation.getId()),
-      [recipient],
-      ...callStartArgs(),
-    );
-    call.join(recipient);
-    call.pullDomainEvents();
-
-    call.leave(recipient);
-
-    expect(call.getJoinedParticipantIds()).toEqual([creator]);
-    expect(call.isActive()).toBe(false);
-    expect(call.pullDomainEvents()).toEqual([
-      expect.any(CallParticipantLeftEvent),
-      expect.any(CallEndedEvent),
-    ]);
-  });
-
-  it('keeps a group conversation active when other participants remain', () => {
+  describe('a group-capability call', () => {
     const third = new IdentityId(
       'MCowBQYDK2VwAyEAoZUOXZj5HZm3Tb5CEojEXtNLxBIHkE2s28l/FsBICaU=',
     );
+    const groupScope = CallScope.groupCapability(
+      CallCapabilityHash.of('group-call-capability-token'),
+    );
+    const startGroup = () => {
+      const call = Call.start(
+        creator,
+        networkId,
+        groupScope,
+        [],
+        ...callStartArgs(),
+      );
+      call.pullDomainEvents();
+
+      return call;
+    };
+
+    it('rings nobody: the node cannot know the group roster', () => {
+      const call = Call.start(
+        creator,
+        networkId,
+        groupScope,
+        [],
+        ...callStartArgs(),
+      );
+
+      expect(call.toPrimitives().participants).toEqual([
+        expect.objectContaining({
+          identityId: creator.valueOf(),
+          status: 'joined',
+        }),
+      ]);
+      expect(call.shouldRecordMissedCall()).toBe(false);
+    });
+
+    it('names no participant in its events', () => {
+      const call = startGroup();
+      call.joinOrAdd(recipient);
+
+      expect(call.pullDomainEvents()[0].attributes).toMatchObject({
+        participantIds: [],
+        participants: [],
+        scope: {
+          capabilityHash: CallCapabilityHash.of(
+            'group-call-capability-token',
+          ).valueOf(),
+          type: 'group_capability',
+        },
+      });
+    });
+
+    it('stays active when participants leave, like a community session', () => {
+      const call = startGroup();
+      call.joinOrAdd(recipient);
+      call.joinOrAdd(third);
+
+      call.leave(recipient);
+      call.leave(creator);
+
+      expect(call.isActive()).toBe(true);
+      expect(call.getJoinedParticipantIds()).toEqual([third]);
+    });
+
+    it('lets only its creator end it', () => {
+      const call = startGroup();
+      call.joinOrAdd(recipient);
+
+      expect(() => call.end(recipient)).toThrow(CallParticipantNotFoundError);
+      call.end(creator);
+      expect(call.isActive()).toBe(false);
+    });
+
+    it('takes its roster from the participation leases', () => {
+      const call = startGroup();
+
+      call.restoreLeaseRosteredParticipants([recipient, third]);
+
+      expect(call.getJoinedParticipantIds()).toEqual([recipient, third]);
+    });
+  });
+
+  it('keeps its own roster for a conversation call', () => {
     const call = Call.start(
       creator,
       networkId,
       scope,
-      [recipient, third],
+      [recipient],
       ...callStartArgs(),
     );
-    call.join(recipient);
-    call.join(third);
-    call.leave(recipient);
-    expect(call.isActive()).toBe(true);
-    expect(call.getJoinedParticipantIds()).toHaveLength(2);
+
+    call.restoreLeaseRosteredParticipants([lateParticipant]);
+
+    expect(call.getParticipantIds()).toEqual([creator, recipient]);
   });
 
   it('clears a previous departure when a community participant rejoins', () => {
@@ -367,6 +414,7 @@ describe('Call', () => {
         },
       ],
       scope: {
+        capabilityHash: undefined,
         channelId: 'voice-channel',
         communityId: 'community',
         conversationId: undefined,
@@ -411,37 +459,5 @@ describe('Call', () => {
     });
     expect(events[0]).toBeInstanceOf(CallParticipantMissedEvent);
     expect(events[1]).toBeInstanceOf(CallMissedEvent);
-  });
-
-  it('should keep an active group call alive when only ringing invitees timeout', () => {
-    const call = Call.start(
-      creator,
-      networkId,
-      scope,
-      [recipient, lateParticipant],
-      ...callStartArgs(),
-    );
-
-    call.pullDomainEvents();
-    call.join(recipient);
-    call.pullDomainEvents();
-    const missedParticipants = call.markTimedOut(new Timestamp(1770000000000));
-    const events = call.pullDomainEvents();
-
-    expect(missedParticipants).toEqual([lateParticipant]);
-    expect(call.toPrimitives()).toMatchObject({
-      status: 'active',
-      participants: [
-        { identityId: creator.valueOf(), status: 'joined' },
-        { identityId: recipient.valueOf(), status: 'joined' },
-        {
-          identityId: lateParticipant.valueOf(),
-          missedAt: 1770000000000,
-          status: 'missed',
-        },
-      ],
-    });
-    expect(events).toHaveLength(1);
-    expect(events[0]).toBeInstanceOf(CallParticipantMissedEvent);
   });
 });

@@ -15,6 +15,7 @@ import {
 const NETWORK = '550e8400-e29b-41d4-a716-446655440002';
 const CONVERSATION = 'one-to-one:policy-spec';
 const NONCE = 'policy-spec-nonce-0001';
+const CAPABILITY_HASH = 'a'.repeat(64);
 
 describe('call mutation policies', () => {
   let alice: string;
@@ -24,6 +25,7 @@ describe('call mutation policies', () => {
   let registry: OrbitDBReplicatedStateRegistry;
   let conversation: Record<string, unknown>;
   let voiceAllowed: boolean;
+  let identityNetworks: Record<string, string[]>;
   let startPolicy: CallStartMutationPolicy;
   let participantPolicy: CallParticipantMutationPolicy;
   let endPolicy: CallEndMutationPolicy;
@@ -43,6 +45,7 @@ describe('call mutation policies', () => {
   beforeEach(() => {
     docs = [];
     voiceAllowed = true;
+    identityNetworks = { [alice]: [NETWORK], [bob]: [NETWORK] };
     conversation = {
       getNetworkId: () => ({ valueOf: () => NETWORK }),
       getParticipantIds: () =>
@@ -64,21 +67,37 @@ describe('call mutation policies', () => {
       getNetworkId: () => ({ valueOf: () => NETWORK }),
     };
 
+    const identities = {
+      findById: jest.fn(async (id: { valueOf: () => string }) => {
+        const networks = identityNetworks[id.valueOf()];
+
+        if (!networks) throw new Error('unknown identity');
+
+        return {
+          getNetworkIds: () =>
+            networks.map((network) => ({ valueOf: () => network })),
+        };
+      }),
+    } as never;
+    const communities = {
+      hasById: jest.fn(async () => true),
+      requireById: jest.fn(async () => community),
+    } as never;
+
     startPolicy = new CallStartMutationPolicy(
       registry,
       {
         hasById: jest.fn(async () => true),
         requireMetadataById: jest.fn(async () => conversation),
       } as never,
-      {
-        hasById: jest.fn(async () => true),
-        requireById: jest.fn(async () => community),
-      } as never,
+      communities,
+      identities,
     );
-    participantPolicy = new CallParticipantMutationPolicy(registry, {
-      hasById: jest.fn(async () => true),
-      requireById: jest.fn(async () => community),
-    } as never);
+    participantPolicy = new CallParticipantMutationPolicy(
+      registry,
+      communities,
+      identities,
+    );
     endPolicy = new CallEndMutationPolicy(registry);
   });
 
@@ -107,6 +126,18 @@ describe('call mutation policies', () => {
         },
         sessionEpoch,
         signer: { id: alice } as never,
+        startedAt: now(),
+      }),
+      extra,
+    );
+
+  const groupStart = (extra: object = {}, creator = alice) =>
+    clone(
+      startPayload({
+        networkId: NETWORK,
+        nonce: NONCE,
+        scope: { capabilityHash: CAPABILITY_HASH, type: 'group_capability' },
+        signer: { id: creator } as never,
         startedAt: now(),
       }),
       extra,
@@ -210,16 +241,81 @@ describe('call mutation policies', () => {
       ).rejects.toBeInstanceOf(InvalidPublicMutationError);
     });
 
-    it('rejects a one-to-one start of a three-member conversation', async () => {
-      conversation.getParticipantIds = () =>
-        [alice, bob, carol].map((id) => ({ valueOf: () => id }));
+    it('rejects a conversation start of a group conversation, whose calls are group-capability calls', async () => {
+      conversation.isGroup = () => true;
+
+      await expect(
+        startPolicy.assertPermitted(conversationStart(), alice, false),
+      ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+    });
+
+    it('expects the creator as author of a group-capability start', () => {
+      const record = groupStart();
+
+      expect(startPolicy.expectationOf(record)).toEqual({
+        authorIdentityId: alice,
+        recordId: record.id,
+        store: 'calls',
+      });
+    });
+
+    it.each([
+      [
+        'an uppercase capability hash',
+        {
+          scope: {
+            capabilityHash: 'A'.repeat(64),
+            type: 'group_capability',
+          },
+        },
+      ],
+      [
+        'a short capability hash',
+        { scope: { capabilityHash: 'a'.repeat(63), type: 'group_capability' } },
+      ],
+      ['no capability hash', { scope: { type: 'group_capability' } }],
+      [
+        'an extra scope key',
+        {
+          scope: {
+            capabilityHash: CAPABILITY_HASH,
+            conversationId: CONVERSATION,
+            type: 'group_capability',
+          },
+        },
+      ],
+      ['non-empty participants', { participantIds: [alice, bob] }],
+      ['a sessionEpoch', { sessionEpoch: 1 }],
+    ])('rejects a group-capability start with %s', (_name, extra) => {
+      expect(() => startPolicy.expectationOf(groupStart(extra))).toThrow(
+        InvalidPublicMutationError,
+      );
+    });
+
+    it('admits a group-capability start on a network of its creator', async () => {
+      await expect(
+        startPolicy.assertPermitted(groupStart(), alice, false),
+      ).resolves.toBeUndefined();
+    });
+
+    it.each([
+      ['another network', () => groupStart({ networkId: 'other-network' })],
+      ['an unknown creator', () => groupStart({}, carol)],
+    ])('rejects a group-capability start on %s', async (_name, record) => {
+      const start = record();
 
       await expect(
         startPolicy.assertPermitted(
-          conversationStart({ participantIds: [alice, bob, carol] }),
-          alice,
+          start,
+          start.creatorIdentityId as string,
           false,
         ),
+      ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+    });
+
+    it('rejects a group-capability start authored by someone else', async () => {
+      await expect(
+        startPolicy.assertPermitted(groupStart(), bob, false),
       ).rejects.toBeInstanceOf(InvalidPublicMutationError);
     });
 
@@ -357,6 +453,47 @@ describe('call mutation policies', () => {
         participantPolicy.assertPermitted(record, carol, false),
       ).rejects.toBeInstanceOf(InvalidPublicMutationError);
     });
+
+    const groupJoin = (identity: string) => {
+      const group = groupStart();
+      docs.push(group);
+
+      return clone(
+        participantPayload({
+          at: now(),
+          callId: group.callId as string,
+          identityId: identity,
+          state: 'joined',
+        }),
+      );
+    };
+
+    it('admits an identity of the network joining a group-capability call, whose roster the node cannot know', async () => {
+      await expect(
+        participantPolicy.assertPermitted(groupJoin(bob), bob, false),
+      ).resolves.toBeUndefined();
+    });
+
+    it.each([
+      ['an unknown identity', () => carol],
+      [
+        'an identity of another network',
+        () => {
+          identityNetworks[carol] = ['other-network'];
+
+          return carol;
+        },
+      ],
+    ])(
+      'rejects %s joining a group-capability call',
+      async (_name, identity) => {
+        const id = identity();
+
+        await expect(
+          participantPolicy.assertPermitted(groupJoin(id), id, false),
+        ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+      },
+    );
   });
 
   describe('CallEndMutationPolicy', () => {
@@ -437,6 +574,22 @@ describe('call mutation policies', () => {
 
     it('lets only the creator end a community call', async () => {
       const start = communityStart(1);
+      docs.push(start);
+
+      await expect(
+        endPolicy.assertPermitted(
+          end(alice, start.callId as string),
+          alice,
+          false,
+        ),
+      ).resolves.toBeUndefined();
+      await expect(
+        endPolicy.assertPermitted(end(bob, start.callId as string), bob, false),
+      ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+    });
+
+    it('lets only the creator end a group-capability call', async () => {
+      const start = groupStart();
       docs.push(start);
 
       await expect(

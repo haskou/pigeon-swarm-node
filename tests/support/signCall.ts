@@ -17,7 +17,8 @@ export type CallRecordPayload = { id: string } & Record<string, unknown>;
 
 export type CallScopeInput =
   | { conversationId: string; type: 'conversation' }
-  | { channelId: string; communityId: string; type: 'community_channel' };
+  | { channelId: string; communityId: string; type: 'community_channel' }
+  | { capabilityHash: string; type: 'group_capability' };
 
 export interface CallStartInput {
   networkId: string;

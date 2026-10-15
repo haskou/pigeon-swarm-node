@@ -18,7 +18,11 @@ export class GetCallRoute extends CallRouteSupport {
   ): Promise<Response> {
     const requesterIdentityId = await this.authenticate(request);
     const call = await this.finder.find(
-      new CallFindMessage(callId, requesterIdentityId.valueOf()),
+      new CallFindMessage(
+        callId,
+        requesterIdentityId.valueOf(),
+        this.capability(request),
+      ),
     );
 
     return response

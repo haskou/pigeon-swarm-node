@@ -33,6 +33,7 @@ export class PostCallParticipantHeartbeatRoute extends CallRouteSupport {
         callId,
         participantIdentityId.valueOf(),
         body.mediaConnections,
+        this.capability(request),
       ),
     );
 

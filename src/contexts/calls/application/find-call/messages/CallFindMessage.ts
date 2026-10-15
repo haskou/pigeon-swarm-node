@@ -6,7 +6,11 @@ export class CallFindMessage {
   public readonly callId: CallId;
   public readonly requesterIdentityId: IdentityId;
 
-  constructor(callId: string, requesterIdentityId: string) {
+  constructor(
+    callId: string,
+    requesterIdentityId: string,
+    public readonly capability?: string,
+  ) {
     this.callId = new CallId(callId);
     this.requesterIdentityId = new IdentityId(requesterIdentityId);
   }

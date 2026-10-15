@@ -15,6 +15,7 @@ export class CallJoinMessage {
     participantIdentityId: string,
     mutation: unknown,
     at: number,
+    public readonly capability?: string,
   ) {
     this.at = new Timestamp(at);
     this.callId = new CallId(callId);

@@ -4,6 +4,8 @@ import {
   IsNotEmpty,
   IsObject,
   IsString,
+  IsUUID,
+  Matches,
   Min,
   ValidateIf,
 } from 'class-validator';
@@ -11,6 +13,7 @@ import {
 enum PostCallScopeType {
   COMMUNITY_CHANNEL = 'community_channel',
   CONVERSATION = 'conversation',
+  GROUP_CAPABILITY = 'group_capability',
 }
 
 export class PostCallBody {
@@ -33,6 +36,15 @@ export class PostCallBody {
   @IsInt()
   @Min(1)
   public readonly sessionEpoch?: number;
+
+  /** SHA-256 of the MLS-derived capability; the capability never reaches the node at start. */
+  @ValidateIf((body: PostCallBody) => body.scopeType === 'group_capability')
+  @Matches(/^[0-9a-f]{64}$/)
+  public readonly capabilityHash?: string;
+
+  @ValidateIf((body: PostCallBody) => body.scopeType === 'group_capability')
+  @IsUUID()
+  public readonly networkId?: string;
 
   @IsString()
   @IsNotEmpty()

@@ -539,6 +539,7 @@ services:
     arguments:
       - '@contexts/conversations/domain/repositories/ConversationRepository'
       - '@contexts/communities/domain/repositories/CommunityRepository'
+      - '@contexts/identities/domain/repositories/IdentityRepository'
   contexts/calls/application/start-call/CallStarter:
     class: /contexts/calls/application/start-call/CallStarter
     arguments:
@@ -591,6 +592,7 @@ services:
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
+      - '@contexts/identities/domain/repositories/IdentityRepository'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/calls/infrastructure/orbitdb/policies/CallStartMutationPolicy:
     class: /contexts/calls/infrastructure/orbitdb/policies/CallStartMutationPolicy
@@ -598,6 +600,7 @@ services:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - '@contexts/conversations/domain/repositories/ConversationRepository'
       - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
+      - '@contexts/identities/domain/repositories/IdentityRepository'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/communities/application/accept-invite/CommunityInviteAccepter:
     class: /contexts/communities/application/accept-invite/CommunityInviteAccepter

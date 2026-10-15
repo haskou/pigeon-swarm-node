@@ -17,6 +17,7 @@ export interface CallResource {
     status: string;
   }>;
   scope: {
+    capabilityHash?: string;
     channelId?: string;
     communityId?: string;
     conversationId?: string;
