@@ -12,9 +12,6 @@ export class IdentityPresenceViewModel {
   public toResource(): object {
     const primitives = this.presence.toPrimitives();
     const resource = {
-      ...(primitives.customMessage
-        ? { customMessage: primitives.customMessage }
-        : {}),
       identityId: primitives.identityId,
       ...(primitives.lastActivityAt
         ? { lastActivityAt: primitives.lastActivityAt }

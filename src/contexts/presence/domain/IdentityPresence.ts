@@ -4,7 +4,6 @@ import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { IdentityPresenceWasUpdatedEvent } from './events/IdentityPresenceWasUpdatedEvent';
 import { IdentityPresencePreference } from './IdentityPresencePreference';
-import { PresenceCustomMessage } from './value-objects/PresenceCustomMessage';
 import { PresenceStatus } from './value-objects/PresenceStatus';
 
 export class IdentityPresence extends AggregateRoot {
@@ -28,7 +27,6 @@ export class IdentityPresence extends AggregateRoot {
       IdentityPresencePreference.fromPrimitives(
         primitives.selectedStatus,
         primitives.preferenceUpdatedAt,
-        primitives.customMessage,
       ),
       new PresenceStatus(primitives.status),
       new Timestamp(primitives.updatedAt),
@@ -82,7 +80,6 @@ export class IdentityPresence extends AggregateRoot {
 
     this.record(
       new IdentityPresenceWasUpdatedEvent(primitives.identityId, {
-        customMessage: preference.customMessage,
         identityId: primitives.identityId,
         lastActivityAt: primitives.lastActivityAt,
         lastHeartbeatAt: primitives.lastHeartbeatAt,
@@ -96,14 +93,6 @@ export class IdentityPresence extends AggregateRoot {
 
   private timeoutThreshold(now: Timestamp): Timestamp {
     return new Timestamp(now.valueOf() - IdentityPresence.HEARTBEAT_TIMEOUT_MS);
-  }
-
-  public clearCustomMessage(): void {
-    this.updatedAt = Timestamp.now();
-
-    if (this.preference.clearCustomMessage(this.updatedAt)) {
-      this.recordUpdated();
-    }
   }
 
   public getIdentityId(): IdentityId {
@@ -165,17 +154,10 @@ export class IdentityPresence extends AggregateRoot {
 
   public update(
     status: PresenceStatus | undefined,
-    customMessage: PresenceCustomMessage | undefined,
-    customMessageWasProvided: boolean,
     now: Timestamp = Timestamp.now(),
   ): void {
     const previous = this.status;
-    const preferenceChanged = this.preference.update(
-      status,
-      customMessage,
-      customMessageWasProvided,
-      now,
-    );
+    const preferenceChanged = this.preference.update(status, now);
 
     this.lastHeartbeatAt = now;
     this.lastActivityAt = now;
@@ -194,9 +176,6 @@ export class IdentityPresence extends AggregateRoot {
       identityId: this.identityId.valueOf(),
       preferenceUpdatedAt: preference.updatedAt,
       selectedStatus: preference.selectedStatus,
-      ...(preference.customMessage
-        ? { customMessage: preference.customMessage }
-        : {}),
       ...(this.lastActivityAt
         ? { lastActivityAt: this.lastActivityAt.valueOf() }
         : {}),

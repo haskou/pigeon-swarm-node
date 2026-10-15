@@ -14,7 +14,7 @@ paths:
       description: |
         Returns presence for the requested identity ids. Identities the
         authenticated viewer does not share a conversation or community with read
-        as `disconnected` without a custom message. Invisible identities are
+        as `disconnected` without heartbeat timing. Invisible identities are
         exposed as `disconnected` unless the authenticated viewer is asking for
         their own identity. Presence state is kept in memory and replicated
         through domain events; it is not persisted in OrbitDB/IPFS.
@@ -75,10 +75,11 @@ paths:
         - presence
       summary: Update authenticated identity presence preferences
       description: |
-        Sets the authenticated identity selected status and optional custom
-        message. `disconnected` cannot be selected; it is derived by heartbeat
-        timeout. `available`/`away` are normal online states, while `busy`,
-        `custom` and `invisible` override automatic away/available derivation.
+        Sets the authenticated identity selected status. Presence carries no
+        custom message; unknown body fields are rejected. `disconnected`
+        cannot be selected; it is derived by heartbeat timeout.
+        `available`/`away` are normal online states, while `busy`, `custom`
+        and `invisible` override automatic away/available derivation.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -96,22 +97,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IdentityPresenceResource'
-  /presence/me/custom-message:
-    delete:
-      tags:
-        - presence
-      summary: Clear authenticated identity custom status message
-      parameters:
-        - $ref: '#/components/parameters/XIdentityId'
-        - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XSignature'
-      responses:
-        '200':
-          description: Custom message removed.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/IdentityPresenceResource'
+        '400':
+          description: Invalid status or unknown body field.
 components:
   parameters:
     XIdentityId:
@@ -151,9 +138,6 @@ components:
             - custom
             - disconnected
             - invisible
-        customMessage:
-          type: string
-          maxLength: 50
         lastHeartbeatAt:
           type: integer
         lastActivityAt:
@@ -171,6 +155,4 @@ components:
             - busy
             - custom
             - invisible
-        customMessage:
-          type: string
-          maxLength: 50
+      additionalProperties: false

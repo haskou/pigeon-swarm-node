@@ -111,7 +111,6 @@ import { GetPollRoute } from '@app/apps/apis/polls-api/routes/GetPollRoute';
 import { PostPollCloseRoute } from '@app/apps/apis/polls-api/routes/PostPollCloseRoute';
 import { PostPollRoute } from '@app/apps/apis/polls-api/routes/PostPollRoute';
 import { PostPollVoteRoute } from '@app/apps/apis/polls-api/routes/PostPollVoteRoute';
-import { DeletePresenceCustomMessageRoute } from '@app/apps/apis/presence-api/routes/DeletePresenceCustomMessageRoute';
 import { GetPresenceRoute } from '@app/apps/apis/presence-api/routes/GetPresenceRoute';
 import { PutPresenceRoute } from '@app/apps/apis/presence-api/routes/PutPresenceRoute';
 import { PostPrivateAuthorizationChallengeRoute } from '@app/apps/apis/private-authorization-api/routes/PostPrivateAuthorizationChallengeRoute';
@@ -216,7 +215,6 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   DeleteNotificationScopeSettingsRoute,
   GetPresenceRoute,
   PutPresenceRoute,
-  DeletePresenceCustomMessageRoute,
   PostPollRoute,
   GetPollRoute,
   PostPollVoteRoute,
