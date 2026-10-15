@@ -14,4 +14,4 @@ Feature: Post link preview route
     And I sign the current link preview request
     When I POST to "/link-previews"
     Then response code is equal to 400
-    And response body should contain "Localhost URLs cannot be previewed"
+    And response body should contain "Localhost URLs are not allowed"

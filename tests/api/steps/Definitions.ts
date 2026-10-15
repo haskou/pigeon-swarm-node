@@ -34,8 +34,13 @@ import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNe
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
 import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
 import NodeOwnerSettingsResetter from '@app/contexts/nodes/application/reset-owner-settings/NodeOwnerSettingsResetter';
+import { NodeBlockList } from '@app/contexts/nodes/domain/NodeBlockList';
+import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
+import NodeBlockListRepository from '@app/contexts/nodes/domain/repositories/NodeBlockListRepository';
+import NodeBlockSourceRepository from '@app/contexts/nodes/domain/repositories/NodeBlockSourceRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
+import { NodeBlockSourceOrigin } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceOrigin';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import Ed25519PrivateDeviceCredentialCodec from '@app/contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec';
@@ -188,6 +193,7 @@ export default class Definitions {
   private otherIdentityKeyPair: KeyPair | undefined;
   private publishedGenesisExternalIdentifier: string | undefined;
   private readonly replayAnswers: { data: unknown; status: number }[] = [];
+  private blockSourcePublisherKeyPair: KeyPair | undefined;
   private rememberedCallJoinRequest:
     { body: string | undefined; headers: Record<string, string> } | undefined;
 
@@ -1388,6 +1394,60 @@ export default class Definitions {
       .valueOf();
   }
 
+  private async ensureBlockSourcePublisherKeyPair(): Promise<KeyPair> {
+    this.blockSourcePublisherKeyPair =
+      this.blockSourcePublisherKeyPair ?? (await KeyPair.generate());
+
+    return this.blockSourcePublisherKeyPair;
+  }
+
+  private async blockSourcePath(suffix: string): Promise<string> {
+    const publisher = await this.ensureBlockSourcePublisherKeyPair();
+
+    return `/node/block-sources/${encodeURIComponent(
+      publisher.toPrimitives().publicKey,
+    )}${suffix}`;
+  }
+
+  private async followBlockSource(
+    version: number,
+    autoApply: boolean,
+  ): Promise<void> {
+    const publisher = await this.ensureBlockSourcePublisherKeyPair();
+    const other = await this.ensureOtherIdentityKeyPair();
+    const unsigned = {
+      blockedIdentityIds: [
+        new IdentityId(other.toPrimitives().publicKey).valueOf(),
+      ],
+      blockedNodePeerIds: [] as string[],
+      issuedAt: Date.now(),
+      ownerIdentityId: new IdentityId(
+        publisher.toPrimitives().publicKey,
+      ).valueOf(),
+      type: 'pigeon-node-block-list',
+      version,
+    };
+    const source = NodeBlockSource.adopt(
+      new IdentityId(unsigned.ownerIdentityId),
+      new NodeBlockSourceOrigin('https://publisher.example'),
+      autoApply,
+    );
+
+    source.receive(
+      NodeBlockList.fromPrimitives({
+        ...unsigned,
+        identitySignature: publisher
+          .sign(`pigeon:node-block-list:v1\n${canonicalize(unsigned)}`)
+          .valueOf(),
+      }),
+      Timestamp.now(),
+    );
+    await Kernel.di
+      .getService<NodeBlockSourceRepository>(NodeBlockSourceRepository)
+      .save(source);
+    await Kernel.di.getService<NodeBlockPolicy>(NodeBlockPolicy).load();
+  }
+
   private async setNodeBlockListBody(
     version: number,
     blocked: string,
@@ -1479,6 +1539,7 @@ export default class Definitions {
     this.keychainExternalIdentifier = undefined;
     this.messageId = undefined;
     this.notificationId = undefined;
+    this.blockSourcePublisherKeyPair = undefined;
     this.otherIdentityId = undefined;
     this.otherIdentityKeyPair = undefined;
     this.ownerIdentityId = undefined;
@@ -4874,6 +4935,104 @@ export default class Definitions {
   @given('the node block list byte limit is {int}')
   public theNodeBlockListByteLimitIs(bytes: number): void {
     process.env.NODE_BLOCK_LIST_MAX_BYTES = String(bytes);
+  }
+
+  /** Stands in for a refresher fetch: the stored source got a signed list from its publisher. */
+  @given(
+    'the node follows a block source whose version {int} blocks the other identity',
+  )
+  public async theNodeFollowsABlockSource(version: number): Promise<void> {
+    await this.followBlockSource(version, false);
+  }
+
+  @given(
+    'the node follows an auto-applied block source whose version {int} blocks the other identity',
+  )
+  public async theNodeFollowsAnAutoAppliedBlockSource(
+    version: number,
+  ): Promise<void> {
+    await this.followBlockSource(version, true);
+  }
+
+  @given(
+    'I set a block approval body for version {int} choosing the other identity',
+  )
+  public async iSetABlockApprovalBodyChoosingTheOtherIdentity(
+    version: number,
+  ): Promise<void> {
+    await this.ensureOtherIdentityKeyPair();
+    this.body = JSON.stringify({
+      all: false,
+      blockedIdentityIds: [this.otherIdentityId?.valueOf()],
+      version,
+    });
+  }
+
+  @given('I set a block exceptions body excepting the other identity')
+  public async iSetABlockExceptionsBodyExceptingTheOtherIdentity(): Promise<void> {
+    await this.ensureOtherIdentityKeyPair();
+    this.body = JSON.stringify({
+      identityIds: [this.otherIdentityId?.valueOf()],
+      nodePeerIds: [],
+    });
+  }
+
+  /** `{publisher}` in the suffix-free path is the followed source's owner identity. */
+  @given('I sign a {word} request to the block source path {string}')
+  public async iSignARequestToTheBlockSourcePath(
+    method: string,
+    suffix: string,
+  ): Promise<void> {
+    await this.iSignARequestTo(method, await this.blockSourcePath(suffix));
+  }
+
+  @given(
+    'another identity signs a {word} request to the block source path {string}',
+  )
+  public async anotherIdentitySignsARequestToTheBlockSourcePath(
+    method: string,
+    suffix: string,
+  ): Promise<void> {
+    await this.anotherIdentitySignsARequestTo(
+      method,
+      await this.blockSourcePath(suffix),
+    );
+  }
+
+  @when('I send the {word} to the block source path {string}')
+  public async iSendToTheBlockSourcePath(
+    method: string,
+    suffix: string,
+  ): Promise<void> {
+    const path = await this.blockSourcePath(suffix);
+    const send: Record<string, (target: string) => Promise<void>> = {
+      DELETE: (target) => this.iDELETE(target),
+      GET: (target) => this.iGET(target),
+      POST: (target) => this.iPOSTTo(target),
+      PUT: (target) => this.iPUT(target),
+    };
+
+    await send[method](path);
+  }
+
+  @then('response body should contain the block source publisher id')
+  public async responseBodyShouldContainTheBlockSourcePublisherId(): Promise<void> {
+    const publisher = await this.ensureBlockSourcePublisherKeyPair();
+
+    expect(JSON.stringify(this.response.data)).to.contain(
+      JSON.stringify(
+        new IdentityId(publisher.toPrimitives().publicKey).valueOf(),
+      ).slice(1, -1),
+    );
+  }
+
+  @then('the response is the stored node block list verbatim')
+  public async theResponseIsTheStoredNodeBlockListVerbatim(): Promise<void> {
+    const stored = await Kernel.di
+      .getService<NodeBlockListRepository>(NodeBlockListRepository)
+      .findLocal();
+
+    expect(this.response.data).to.deep.equal(stored.toPrimitives());
   }
 
   @given(

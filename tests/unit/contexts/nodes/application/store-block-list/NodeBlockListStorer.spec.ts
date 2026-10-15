@@ -34,6 +34,7 @@ describe('NodeBlockListStorer', () => {
     loader = mock<NodeLoaderService>();
     repository = mock<NodeBlockListRepository>();
     policy = mock<NodeBlockPolicy>();
+    policy.change.mockImplementation((mutation) => mutation());
     storer = new NodeBlockListStorer(loader, repository, policy);
     node = new NodeMother()
       .withOwner(new IdentityId(owner.toPrimitives().publicKey))
@@ -48,7 +49,7 @@ describe('NodeBlockListStorer', () => {
     );
 
     expect(repository.saveLocal).toHaveBeenCalledWith(stored);
-    expect(policy.replace).toHaveBeenCalledWith(stored, node);
+    expect(policy.change).toHaveBeenCalledTimes(1);
   });
 
   it('should refuse a list signed by someone who is not the current owner', async () => {
@@ -77,26 +78,27 @@ describe('NodeBlockListStorer', () => {
     await expect(
       storer.store(message(new NodeBlockListMother(owner).withVersion(5))),
     ).rejects.toThrow(NodeBlockListVersionIsNotNewerError);
-    expect(policy.replace).not.toHaveBeenCalled();
+    expect(repository.saveLocal).not.toHaveBeenCalled();
   });
 
-  it('should store concurrent lists one at a time', async () => {
-    const saved: number[] = [];
+  it('should store through the policy, so stores and source updates run one at a time', async () => {
+    const earlierChange = Promise.withResolvers<void>();
 
-    repository.saveLocal.mockImplementation(async (list) => {
-      saved.push(list.toPrimitives().version);
-      repository.findLocal.mockResolvedValue(list);
+    policy.change.mockImplementation(async (mutation) => {
+      await earlierChange.promise;
+
+      return mutation();
     });
 
-    const results = await Promise.allSettled([
-      storer.store(message(new NodeBlockListMother(owner).withVersion(2))),
-      storer.store(message(new NodeBlockListMother(owner).withVersion(2))),
-    ]);
+    const storing = storer.store(
+      message(new NodeBlockListMother(owner).withVersion(2)),
+    );
 
-    expect(results.map((result) => result.status)).toEqual([
-      'fulfilled',
-      'rejected',
-    ]);
-    expect(saved).toEqual([2]);
+    await Promise.resolve();
+    expect(repository.saveLocal).not.toHaveBeenCalled();
+
+    earlierChange.resolve();
+    await storing;
+    expect(repository.saveLocal).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,20 +1,30 @@
+import { NodeBlockEntries } from '@app/contexts/nodes/domain/NodeBlockEntries';
+import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
 import { NoNodeBlocks } from '@app/contexts/nodes/domain/NoNodeBlocks';
+import NodeBlockExceptionsRepository from '@app/contexts/nodes/domain/repositories/NodeBlockExceptionsRepository';
 import NodeBlockListRepository from '@app/contexts/nodes/domain/repositories/NodeBlockListRepository';
+import NodeBlockSourceRepository from '@app/contexts/nodes/domain/repositories/NodeBlockSourceRepository';
 import NodeBlockEnforcer from '@app/contexts/nodes/domain/services/NodeBlockEnforcer';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
+import { NodeBlockSourceOrigin } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceOrigin';
+import { NodePeerId } from '@app/contexts/nodes/domain/value-objects/NodePeerId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import {
   NODE_PEER_ID_A,
+  NODE_PEER_ID_B,
   NodeBlockListMother,
 } from '../../../../mothers/NodeBlockListMother';
 import { NodeMother } from '../../../../mothers/NodeMother';
 
 describe('NodeBlockPolicy', () => {
   let repository: MockProxy<NodeBlockListRepository>;
+  let sources: MockProxy<NodeBlockSourceRepository>;
+  let exceptions: MockProxy<NodeBlockExceptionsRepository>;
   let loader: MockProxy<NodeLoaderService>;
   let enforcer: MockProxy<NodeBlockEnforcer>;
   let policy: NodeBlockPolicy;
@@ -24,6 +34,25 @@ describe('NodeBlockPolicy', () => {
 
   const ids = (identityIds: IdentityId[]): string[] =>
     identityIds.map((identityId) => identityId.valueOf());
+
+  const adoptedSource = async (
+    publisher: KeyPair,
+    identityIds: IdentityId[],
+    nodePeerIds: string[],
+  ): Promise<NodeBlockSource> => {
+    const mother = new NodeBlockListMother(publisher)
+      .blockingIdentities(identityIds)
+      .blockingNodePeers(nodePeerIds);
+    const source = NodeBlockSource.adopt(
+      mother.ownerIdentityId(),
+      new NodeBlockSourceOrigin('https://publisher.example'),
+      true,
+    );
+
+    source.receive(mother.build(), Timestamp.now());
+
+    return source;
+  };
 
   beforeAll(async () => {
     owner = await KeyPair.generate();
@@ -35,7 +64,17 @@ describe('NodeBlockPolicy', () => {
     repository = mock<NodeBlockListRepository>();
     loader = mock<NodeLoaderService>();
     enforcer = mock<NodeBlockEnforcer>();
-    policy = new NodeBlockPolicy(repository, loader, enforcer);
+    sources = mock<NodeBlockSourceRepository>();
+    exceptions = mock<NodeBlockExceptionsRepository>();
+    policy = new NodeBlockPolicy(
+      repository,
+      sources,
+      exceptions,
+      loader,
+      enforcer,
+    );
+    sources.findAll.mockResolvedValue([]);
+    exceptions.find.mockResolvedValue(NodeBlockEntries.none());
     repository.findLocal.mockResolvedValue(
       new NodeBlockListMother(owner)
         .blockingIdentities([blocked, ownerId])
@@ -106,20 +145,119 @@ describe('NodeBlockPolicy', () => {
     expect(repository.findLocal).toHaveBeenCalledTimes(1);
   });
 
-  it('should answer from a replaced list and enforce it', async () => {
-    const node = new NodeMother().withOwner(ownerId).build();
-
-    loader.loadNode.mockResolvedValue(node);
-    repository.findLocal.mockResolvedValue(new NoNodeBlocks());
-
-    await policy.replace(
-      new NodeBlockListMother(owner).blockingIdentities([blocked]).build(),
-      node,
+  it('should apply a change and enforce the reloaded entries', async () => {
+    loader.loadNode.mockResolvedValue(
+      new NodeMother().withOwner(ownerId).build(),
     );
+    repository.findLocal.mockResolvedValue(new NoNodeBlocks());
+    await expect(policy.isIdentityBlocked(blocked)).resolves.toBe(false);
+
+    await expect(
+      policy.change(async () => {
+        repository.findLocal.mockResolvedValue(
+          new NodeBlockListMother(owner).blockingIdentities([blocked]).build(),
+        );
+
+        return 'stored';
+      }),
+    ).resolves.toBe('stored');
 
     await expect(policy.isIdentityBlocked(blocked)).resolves.toBe(true);
-    expect(repository.findLocal).not.toHaveBeenCalled();
     expect(ids(enforcer.enforce.mock.calls[0][0])).toEqual([blocked.valueOf()]);
+  });
+
+  it('should run changes one at a time', async () => {
+    loader.loadNode.mockResolvedValue(
+      new NodeMother().withOwner(ownerId).build(),
+    );
+    const first = Promise.withResolvers<void>();
+    const order: string[] = [];
+
+    const firstChange = policy.change(async () => {
+      await first.promise;
+      order.push('first');
+    });
+    const secondChange = policy.change(async () => {
+      order.push('second');
+    });
+
+    await Promise.resolve();
+    first.resolve();
+    await Promise.all([firstChange, secondChange]);
+
+    expect(order).toEqual(['first', 'second']);
+  });
+
+  it('should keep running changes after one fails', async () => {
+    loader.loadNode.mockResolvedValue(
+      new NodeMother().withOwner(ownerId).build(),
+    );
+
+    await expect(
+      policy.change(() => Promise.reject(new Error('refused'))),
+    ).rejects.toThrow('refused');
+    await expect(policy.change(async () => 'next')).resolves.toBe('next');
+  });
+
+  it('should block what adopted sources apply on top of the own list', async () => {
+    const adopted = await NodeBlockListMother.identityId();
+
+    loader.loadNode.mockResolvedValue(
+      new NodeMother().withOwner(ownerId).build(),
+    );
+    sources.findAll.mockResolvedValue([
+      await adoptedSource(
+        await KeyPair.generate(),
+        [adopted],
+        [NODE_PEER_ID_B],
+      ),
+    ]);
+
+    await policy.load();
+
+    const [identityIds, peerIds] = enforcer.enforce.mock.calls[0];
+
+    expect(ids(identityIds).sort()).toEqual(
+      [adopted.valueOf(), blocked.valueOf()].sort(),
+    );
+    expect(peerIds.map((peerId) => peerId.valueOf()).sort()).toEqual(
+      [NODE_PEER_ID_A, NODE_PEER_ID_B].sort(),
+    );
+    await expect(policy.isIdentityBlocked(adopted)).resolves.toBe(true);
+  });
+
+  it('should never let adopted sources block local exceptions or the owner', async () => {
+    const excepted = await NodeBlockListMother.identityId();
+
+    loader.loadNode.mockResolvedValue(
+      new NodeMother().withOwner(ownerId).build(),
+    );
+    repository.findLocal.mockResolvedValue(new NoNodeBlocks());
+    sources.findAll.mockResolvedValue([
+      await adoptedSource(
+        await KeyPair.generate(),
+        [excepted, ownerId],
+        [NODE_PEER_ID_B],
+      ),
+    ]);
+    exceptions.find.mockResolvedValue(
+      new NodeBlockEntries([excepted], [new NodePeerId(NODE_PEER_ID_B)]),
+    );
+
+    await policy.load();
+
+    expect(enforcer.enforce).toHaveBeenCalledWith([], []);
+    await expect(policy.isIdentityBlocked(excepted)).resolves.toBe(false);
+    await expect(policy.isIdentityBlocked(ownerId)).resolves.toBe(false);
+  });
+
+  it('should keep blocking an exception the owner listed in the own list', async () => {
+    loader.loadNode.mockResolvedValue(
+      new NodeMother().withOwner(ownerId).build(),
+    );
+    exceptions.find.mockResolvedValue(new NodeBlockEntries([blocked], []));
+
+    await expect(policy.isIdentityBlocked(blocked)).resolves.toBe(true);
   });
 
   it('should lift the block of a listed identity that becomes owner', async () => {

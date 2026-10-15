@@ -1,5 +1,5 @@
 import { LinkPreviewHtmlParser } from '@app/apps/apis/link-previews-api/services/LinkPreviewHtmlParser';
-import { LinkPreviewUrlGuard } from '@app/apps/apis/link-previews-api/services/LinkPreviewUrlGuard';
+import PublicUrlGuard from '@app/shared/infrastructure/http/public-url/PublicUrlGuard';
 
 describe('LinkPreviewHtmlParser', () => {
   it('extracts Open Graph metadata and resolves safe relative images', async () => {
@@ -9,7 +9,7 @@ describe('LinkPreviewHtmlParser', () => {
         family: 4,
         url: new URL('https://example.com/image.png'),
       }),
-    } as unknown as LinkPreviewUrlGuard;
+    } as unknown as PublicUrlGuard;
     const html = `
       <html>
         <head>
@@ -41,7 +41,7 @@ describe('LinkPreviewHtmlParser', () => {
   it('drops unsafe preview images', async () => {
     const guard = {
       resolve: jest.fn().mockRejectedValue(new Error('blocked')),
-    } as unknown as LinkPreviewUrlGuard;
+    } as unknown as PublicUrlGuard;
     const html = '<meta property="og:image" content="http://localhost/a.png">';
     const preview = await new LinkPreviewHtmlParser().parse({
       finalUrl: new URL('https://example.com/article'),
