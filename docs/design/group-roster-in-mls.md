@@ -333,10 +333,10 @@ and merges when `real-node-e2e` is green.
    SHA-256 of the capability and the creator's network, and every request that
    addresses the call presents the capability as a bearer token; joins and leaves
    are not stored and the roster is the lease set, as for community calls. The
-   node refuses conversation calls on group conversations, so the order flips as in
-   slice 2: the node merges first, and the UI, pinned to the node merge commit,
-   merges when `real-node-e2e` is green. Group calls fail on UI main between the
-   two merges.
+   node refuses conversation calls on group conversations. No client offers group
+   calls (the UI hides the call action for groups and ends any group call it
+   sees), so nothing breaks in between: the node merges first and the UI then
+   accepts the scope, pinned to the node merge commit.
 6. Final cutover: the roster extension and GCE roster ops with default deny and the
    device-chain committer check, the same-epoch priority rule (and the group inbox
    commit id derivation, stated), the welcome checks, the confirmation rule with the

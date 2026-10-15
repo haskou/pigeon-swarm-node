@@ -592,6 +592,7 @@ services:
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
+      - '@contexts/identities/domain/repositories/IdentityRepository'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/calls/infrastructure/orbitdb/policies/CallStartMutationPolicy:
     class: /contexts/calls/infrastructure/orbitdb/policies/CallStartMutationPolicy

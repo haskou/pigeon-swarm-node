@@ -946,11 +946,11 @@ End (`call_end`):
   an empty `participantIds`, no `sessionEpoch` and a creator whose signed
   identity belongs to the record's `networkId`.
 - `call_participant`: the identity is the proof author; the admitted start
-  exists; the identity takes part in the signed conversation, or may connect to
-  the community voice channel. A community record passes this check and is then
-  discarded, not stored. A group call record is never stored: the node that
-  receives the request verifies it against the presented capability and keeps
-  only a lease.
+  exists; the identity takes part in the signed conversation, may connect to
+  the community voice channel, or, for a group call, belongs to the start's
+  `networkId`. A community record passes this check and is then discarded, not
+  stored. A group call record is never stored either: the node that receives the
+  request also verifies the presented capability and keeps only a lease.
 - `call_end`: the author is the creator, or any participant of a conversation
   call. Community and group calls are ended by their creator only; everybody
   else leaves.

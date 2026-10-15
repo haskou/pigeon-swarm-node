@@ -602,8 +602,9 @@ about the author's own actions. No node-chosen `updatedAt`/`receivedAt`.
   `payloadDigest` among active starts, see below); group capability scope
   requires a creator on the record's network and no `participantIds`.
 - `call_participant`: the call exists; author == `identityId`; `identityId` in
-  `participantIds` (conversation), has channel access (community) or presents
-  the capability (group, checked on the receiving node only); state
+  `participantIds` (conversation), has channel access (community) or is an
+  identity of the start's network and presents the capability (group, the
+  capability checked on the receiving node only); state
   transitions are monotone per identity (a declined or left stays so unless
   `sequence` increases with a rejoin where the call is still active).
 - `call_end`: author is the creator, or any participant of a conversation call;

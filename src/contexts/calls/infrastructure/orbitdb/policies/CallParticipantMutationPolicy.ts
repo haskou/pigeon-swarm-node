@@ -2,6 +2,7 @@ import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain/PublicMutationRecordShape';
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
@@ -18,8 +19,9 @@ import { CallRecordClock } from './CallRecordClock';
  * itself, one record per call and identity that later sequences supersede. It
  * is admitted only when the admitted start exists and the identity takes part
  * in that conversation or may connect to that community channel. A
- * group-capability call admits any identity: its roster is the MLS group the
- * node cannot see, and the capability gates the call routes instead.
+ * group-capability call admits any identity of the call's network: its
+ * roster is the MLS group the node cannot see, and the capability gates the
+ * call routes instead.
  */
 export default class CallParticipantMutationPolicy extends PublicMutationPolicy {
   public static readonly STATES = ['joined', 'left', 'declined'];
@@ -40,6 +42,7 @@ export default class CallParticipantMutationPolicy extends PublicMutationPolicy 
     private readonly registry: OrbitDBReplicatedStateRegistry,
     /** Reads the public store directly: the policy runs inside the community storage lock. */
     private readonly communityRepository: OrbitDBCommunityRepository,
+    private readonly identityRepository: IdentityRepository,
   ) {
     super();
   }
@@ -66,6 +69,23 @@ export default class CallParticipantMutationPolicy extends PublicMutationPolicy 
       new IdentityId(identityId),
       new CommunityChannelId(scope.channelId),
     );
+  }
+
+  private async assertNetworkIdentity(
+    start: Record<string, unknown>,
+    identityId: string,
+  ): Promise<void> {
+    const identity = await this.identityRepository.findById(
+      new IdentityId(identityId),
+    );
+
+    if (
+      !identity
+        .getNetworkIds()
+        .some((networkId) => networkId.valueOf() === start.networkId)
+    ) {
+      throw new InvalidPublicMutationError();
+    }
   }
 
   public expectationOf(
@@ -124,7 +144,9 @@ export default class CallParticipantMutationPolicy extends PublicMutationPolicy 
         if (!(start.participantIds as string[]).includes(authorIdentityId)) {
           throw new InvalidPublicMutationError();
         }
-      } else if (type !== 'group_capability') {
+      } else if (type === 'group_capability') {
+        await this.assertNetworkIdentity(start, authorIdentityId);
+      } else {
         await this.assertCommunityAccess(start, authorIdentityId);
       }
     } catch {
