@@ -20,8 +20,8 @@ import { CallPrimitives } from './CallPrimitives';
 import OrbitDBCallProjection from './OrbitDBCallProjection';
 
 export default class OrbitDBCallRepository extends CallRepository {
-  /** A community call nobody holds a participation lease on is hidden after this. */
-  private static readonly COMMUNITY_LEASE_GRACE_MS = 60_000;
+  /** A lease-rostered call nobody holds a participation lease on is hidden after this. */
+  private static readonly LEASE_ROSTER_GRACE_MS = 60_000;
 
   constructor(
     private readonly registry: OrbitDBReplicatedStateRegistry,
@@ -35,7 +35,7 @@ export default class OrbitDBCallRepository extends CallRepository {
   private async hydrate(document: CallPrimitives): Promise<Call> {
     const call = Call.fromPrimitives(document);
 
-    if (call.getScope().isCommunityChannel()) {
+    if (call.getScope().isLeaseRostered()) {
       const leases = call.isActive()
         ? await this.leases.findByCallIds([call.getId()])
         : [];
@@ -46,13 +46,13 @@ export default class OrbitDBCallRepository extends CallRepository {
         const id = lease.getParticipantIdentityId();
         ids.set(id.valueOf(), id);
       }
-      call.restoreCommunityParticipants([...ids.values()]);
+      call.restoreLeaseRosteredParticipants([...ids.values()]);
 
       if (
         call.isActive() &&
         ids.size === 0 &&
         Date.now() - call.toPrimitives().createdAt >
-          OrbitDBCallRepository.COMMUNITY_LEASE_GRACE_MS
+          OrbitDBCallRepository.LEASE_ROSTER_GRACE_MS
       ) {
         call.expire(Timestamp.now());
       }
@@ -133,9 +133,24 @@ export default class OrbitDBCallRepository extends CallRepository {
     };
   }
 
+  private scopeRecord(call: Call): Record<string, unknown> {
+    const scope = call.getScope().toPrimitives();
+
+    if (call.getScope().isCommunityChannel())
+      return {
+        channelId: scope.channelId,
+        communityId: scope.communityId,
+        type: scope.type,
+      };
+
+    if (call.getScope().isGroupCapability())
+      return { capabilityHash: scope.capabilityHash, type: scope.type };
+
+    return { conversationId: scope.conversationId, type: scope.type };
+  }
+
   private startRecord(call: Call): Record<string, unknown> {
     const primitives = call.toPrimitives();
-    const scope = primitives.scope;
 
     return {
       callId: primitives.id,
@@ -143,16 +158,10 @@ export default class OrbitDBCallRepository extends CallRepository {
       id: CallRecordIds.start(primitives.id),
       networkId: primitives.networkId,
       nonce: primitives.nonce,
-      participantIds: call.getScope().isCommunityChannel()
+      participantIds: call.getScope().isLeaseRostered()
         ? []
         : [...primitives.participantIds].sort(),
-      scope: call.getScope().isCommunityChannel()
-        ? {
-            channelId: scope.channelId,
-            communityId: scope.communityId,
-            type: scope.type,
-          }
-        : { conversationId: scope.conversationId, type: scope.type },
+      scope: this.scopeRecord(call),
       scopeType: 'call_start',
       ...(primitives.sessionEpoch === undefined
         ? {}
@@ -298,13 +307,13 @@ export default class OrbitDBCallRepository extends CallRepository {
   public async findActiveByParticipant(
     participantId: IdentityId,
   ): Promise<Call[]> {
-    const [conversations, communities] = await Promise.all([
+    const [conversations, leaseRostered] = await Promise.all([
       this.callProjection.findActiveByParticipant(participantId),
-      this.callProjection.findActiveCommunityCalls(),
+      this.callProjection.findActiveLeaseRosteredCalls(),
     ]);
     const calls = await this.hydratePublicList([
       ...conversations,
-      ...communities,
+      ...leaseRostered,
     ]);
 
     return calls.filter(
@@ -400,7 +409,7 @@ export default class OrbitDBCallRepository extends CallRepository {
   ): Promise<void> {
     const payload = this.participantRecord(call, identityId, at);
 
-    if (call.getScope().isCommunityChannel()) {
+    if (call.getScope().isLeaseRostered()) {
       return this.admit(call, payload, proof);
     }
 

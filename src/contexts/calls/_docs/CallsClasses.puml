@@ -103,6 +103,8 @@ package "calls" {
       -conversationId?: ConversationId
       -communityId?: CommunityId
       -channelId?: CommunityChannelId
+      -capabilityHash?: CallCapabilityHash
+      +isLeaseRostered(): boolean
     }
 
     class CallSignalDelivery <AggregateRoot> {

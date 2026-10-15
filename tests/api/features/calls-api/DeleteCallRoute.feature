@@ -3,10 +3,10 @@ Feature: End call
   I want to end calls
   So that clients can close active media sessions
 
-  Scenario: End a group conversation call
+  Scenario: End a group call
     Given I register a test IPFS network "api-calls-end-network"
     And I have created a group conversation
-    And I set a conversation call body
+    And I set a group capability call body
     And I sign the current call start request
     When I POST to "/calls/"
     Then response code is equal to 200

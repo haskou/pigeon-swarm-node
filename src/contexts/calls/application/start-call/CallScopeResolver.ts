@@ -1,5 +1,6 @@
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 
 import { CallScope } from '../../domain/CallScope';
 import { InvalidCallScopeError } from '../../domain/errors/InvalidCallScopeError';
@@ -10,6 +11,7 @@ export default class CallScopeResolver {
   constructor(
     private readonly conversationRepository: ConversationRepository,
     private readonly communityRepository: CommunityRepository,
+    private readonly identityRepository: IdentityRepository,
   ) {}
 
   private async resolveCommunityChannel(
@@ -32,6 +34,10 @@ export default class CallScopeResolver {
     );
   }
 
+  /**
+   * Group calls carry an MLS capability instead: the node must not learn a
+   * group's roster from a call, so a group conversation is no call scope.
+   */
   private async resolveConversation(
     message: CallStartMessage,
   ): Promise<ResolvedCallScope> {
@@ -44,7 +50,10 @@ export default class CallScopeResolver {
     const conversation =
       await this.conversationRepository.requireMetadataById(conversationId);
 
-    if (!conversation.hasParticipant(message.requesterIdentityId)) {
+    if (
+      conversation.isGroup() ||
+      !conversation.hasParticipant(message.requesterIdentityId)
+    ) {
       throw new InvalidCallScopeError();
     }
 
@@ -55,9 +64,38 @@ export default class CallScopeResolver {
     );
   }
 
+  /**
+   * The node knows nothing of the group: it only keeps the call on a network
+   * its creator belongs to, as every node of that network replicates it.
+   */
+  private async resolveGroupCapability(
+    message: CallStartMessage,
+  ): Promise<ResolvedCallScope> {
+    const networkId = message.getNetworkId();
+    const creator = await this.identityRepository.findById(
+      message.requesterIdentityId,
+    );
+
+    if (
+      !creator.getNetworkIds().some((candidate) => candidate.isEqual(networkId))
+    ) {
+      throw new InvalidCallScopeError();
+    }
+
+    return new ResolvedCallScope(
+      networkId,
+      [message.requesterIdentityId],
+      CallScope.groupCapability(message.getCapabilityHash()),
+    );
+  }
+
   public async resolve(message: CallStartMessage): Promise<ResolvedCallScope> {
     if (message.scopeType.isConversation()) {
       return this.resolveConversation(message);
+    }
+
+    if (message.scopeType.isGroupCapability()) {
+      return this.resolveGroupCapability(message);
     }
 
     return this.resolveCommunityChannel(message);

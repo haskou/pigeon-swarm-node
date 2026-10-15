@@ -5,6 +5,7 @@ import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain/PublicMutationRecordShape';
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
@@ -20,10 +21,11 @@ import { CallRecordClock } from './CallRecordClock';
 
 /**
  * A call start is admitted only when its creator signed it, its id derives
- * from the creator and the nonce, and the signed conversation or community
- * state lets the creator call there. Conversation starts carry exactly the
- * participants of the admitted conversation; community starts carry a session
- * epoch that may exceed the known maximum of the channel by one at most.
+ * from the creator and the nonce, and the signed state lets the creator call
+ * there. One-to-one starts carry exactly the two participants of the admitted
+ * conversation; community starts carry a session epoch that may exceed the
+ * known maximum of the channel by one at most; group-capability starts carry
+ * only the capability hash, on a network of their creator.
  */
 export default class CallStartMutationPolicy extends PublicMutationPolicy {
   private readonly shape = new PublicMutationRecordShape(
@@ -52,6 +54,7 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
     private readonly conversationRepository: ConversationRepository,
     /** Reads the public store directly: the policy runs inside the community storage lock. */
     private readonly communityRepository: OrbitDBCommunityRepository,
+    private readonly identityRepository: IdentityRepository,
   ) {
     super();
   }
@@ -63,15 +66,18 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
   private assertScopeShape(record: Record<string, unknown>): void {
     const scope = this.scopeOf(record);
     const keys = Object.keys(scope).sort();
-    const expected =
-      scope.type === 'conversation'
-        ? ['conversationId', 'type']
-        : ['channelId', 'communityId', 'type'];
+    const expected = {
+      community_channel: ['channelId', 'communityId', 'type'],
+      conversation: ['conversationId', 'type'],
+      group_capability: ['capabilityHash', 'type'],
+    }[scope.type as string];
 
     if (
-      (scope.type !== 'conversation' && scope.type !== 'community_channel') ||
+      !expected ||
       keys.join() !== expected.join() ||
-      keys.some((key) => typeof scope[key] !== 'string')
+      keys.some((key) => typeof scope[key] !== 'string') ||
+      (scope.type === 'group_capability' &&
+        !/^[0-9a-f]{64}$/.test(scope.capabilityHash as string))
     ) {
       throw new InvalidPublicMutationError();
     }
@@ -93,11 +99,16 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
     );
   }
 
-  private assertCommunityFields(record: Record<string, unknown>): void {
+  /** Community and group-capability starts name no participant: leases do. */
+  private assertLeaseRosteredFields(record: Record<string, unknown>): void {
+    const groupCapability = this.scopeOf(record).type === 'group_capability';
+
     if (
       (record.participantIds as unknown[]).length !== 0 ||
-      !Number.isSafeInteger(record.sessionEpoch) ||
-      (record.sessionEpoch as number) < 1
+      (groupCapability
+        ? record.sessionEpoch !== undefined
+        : !Number.isSafeInteger(record.sessionEpoch) ||
+          (record.sessionEpoch as number) < 1)
     ) {
       throw new InvalidPublicMutationError();
     }
@@ -128,11 +139,33 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
     const claimed = [...(record.participantIds as string[])].sort();
 
     if (
+      conversation.isGroup() ||
       !admitted.includes(authorIdentityId) ||
       conversation.getNetworkId().valueOf() !== record.networkId ||
+      admitted.length !== 2 ||
       admitted.length !== claimed.length ||
-      admitted.some((participant, index) => participant !== claimed[index]) ||
-      (!conversation.isGroup() && admitted.length !== 2)
+      admitted.some((participant, index) => participant !== claimed[index])
+    ) {
+      throw new InvalidPublicMutationError();
+    }
+  }
+
+  /**
+   * The node cannot know the group behind the capability: it only replicates
+   * the call on a network its creator belongs to.
+   */
+  private async assertGroupCapability(
+    record: Record<string, unknown>,
+    authorIdentityId: string,
+  ): Promise<void> {
+    const creator = await this.identityRepository.findById(
+      new IdentityId(authorIdentityId),
+    );
+
+    if (
+      !creator
+        .getNetworkIds()
+        .some((networkId) => networkId.valueOf() === record.networkId)
     ) {
       throw new InvalidPublicMutationError();
     }
@@ -215,7 +248,7 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
       if (this.scopeOf(record).type === 'conversation') {
         this.assertConversationFields(record);
       } else {
-        this.assertCommunityFields(record);
+        this.assertLeaseRosteredFields(record);
       }
 
       CallRecordClock.assertNotInFuture(record.startedAt);
@@ -240,8 +273,12 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
     }
 
     try {
-      if (this.scopeOf(record).type === 'conversation') {
+      const type = this.scopeOf(record).type;
+
+      if (type === 'conversation') {
         await this.assertConversation(record, authorIdentityId);
+      } else if (type === 'group_capability') {
+        await this.assertGroupCapability(record, authorIdentityId);
       } else {
         await this.assertCommunity(record, authorIdentityId);
       }

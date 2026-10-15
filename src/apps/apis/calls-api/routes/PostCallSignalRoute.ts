@@ -40,6 +40,7 @@ export class PostCallSignalRoute extends CallRouteSupport {
         body.recipientIdentityId,
         body.signalType,
         body.payload,
+        this.capability(request),
       ),
       async () => {
         await this.rateLimiter.consume(new CallId(callId), senderIdentityId);

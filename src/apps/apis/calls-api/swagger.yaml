@@ -38,6 +38,16 @@ paths:
         enforces one live call per channel: concurrent starts resolve to the one
         with the lowest start payload digest on every node. The losing call reads
         as ended with `supersededByCallId` naming the winner.
+
+        A group conversation has no conversation call: its members start a
+        `group_capability` call that names nobody. The signed start carries only
+        the SHA-256 `capabilityHash` of a capability the members derive from the
+        MLS exporter of the group epoch, and the `networkId` the creator belongs
+        to. Joining, reading, signalling, heartbeats and leaving present the
+        capability as `Authorization: Bearer <capability>`; the roster is the
+        lease set, joins and leaves are verified but not stored, leaving never
+        ends the call and only the creator ends it. Such calls never ring, push
+        or enter call history.
       requestBody:
         required: true
         content:
@@ -63,6 +73,7 @@ paths:
       description: Current conversation membership or voice-channel access is checked on every request. Past call participation alone does not grant access. Currently authorized community members may read a live snapshot without joining. Community snapshots omit creator and session timestamps; departed and disconnected participants are omitted.
       parameters:
         - $ref: '#/components/parameters/CallId'
+        - $ref: '#/components/parameters/CallCapability'
       responses:
         '200':
           description: Call found for the currently authorized identity.
@@ -78,9 +89,10 @@ paths:
       tags:
         - calls
       summary: End a call
-      description: The ender signs a `call_end` record (`call-end:<callId>`). A conversation call may be ended by any participant; a community call only by its creator.
+      description: The ender signs a `call_end` record (`call-end:<callId>`). A conversation call may be ended by any participant; a community or group call only by its creator.
       parameters:
         - $ref: '#/components/parameters/CallId'
+        - $ref: '#/components/parameters/CallCapability'
       requestBody:
         required: true
         content:
@@ -129,9 +141,10 @@ paths:
       tags:
         - calls
       summary: Join an active call
-      description: The participant signs a `call_participant` record with state `joined` (`call-participant:<callId>:<identityId>`). Joining the live call of a community channel is how a caller who received the active call from `POST /calls` takes part. A community channel join is verified but not stored; its roster is the lease set.
+      description: The participant signs a `call_participant` record with state `joined` (`call-participant:<callId>:<identityId>`). Joining the live call of a community channel is how a caller who received the active call from `POST /calls` takes part. A community channel or group call join is verified but not stored; its roster is the lease set. A group call join requires the capability.
       parameters:
         - $ref: '#/components/parameters/CallId'
+        - $ref: '#/components/parameters/CallCapability'
       requestBody:
         required: true
         content:
@@ -154,9 +167,10 @@ paths:
       tags:
         - calls
       summary: Leave an active call
-      description: The participant signs a `call_participant` record with state `left`, or `declined` while still ringing (the record state follows the participant's current state on the node). Leaving a one-to-one call ends it for everybody. A community channel leave is verified but not stored.
+      description: The participant signs a `call_participant` record with state `left`, or `declined` while still ringing (the record state follows the participant's current state on the node). Leaving a one-to-one call ends it for everybody. A community channel or group call leave is verified but not stored and never ends the call.
       parameters:
         - $ref: '#/components/parameters/CallId'
+        - $ref: '#/components/parameters/CallCapability'
       requestBody:
         required: true
         content:
@@ -182,6 +196,7 @@ paths:
       description: Joined participants renew their lease while media is active. Current scope access is rechecked. Community calls require an unexpired participation grant on this node; explicit leave or lost runtime state requires an explicit join. Returns no roster or diagnostics; runtime heartbeat state is not persisted in OrbitDB.
       parameters:
         - $ref: '#/components/parameters/CallId'
+        - $ref: '#/components/parameters/CallCapability'
       requestBody:
         required: true
         content:
@@ -202,6 +217,7 @@ paths:
       summary: Send WebRTC signalling data to another call participant
       parameters:
         - $ref: '#/components/parameters/CallId'
+        - $ref: '#/components/parameters/CallCapability'
       requestBody:
         required: true
         content:
@@ -230,6 +246,14 @@ components:
       schema:
         type: string
         format: uuid
+    CallCapability:
+      in: header
+      name: Authorization
+      required: false
+      description: "`Bearer <capability>` for a `group_capability` call, the capability (base64url, 20 to 128 characters) whose SHA-256 is the call's `capabilityHash`. A joined participant may omit it. A missing, malformed or wrong capability reads as call not found."
+      schema:
+        type: string
+        pattern: '^Bearer [A-Za-z0-9_-]{20,128}$'
   schemas:
     PostCallParticipantHeartbeatBody:
       type: object
@@ -290,9 +314,18 @@ components:
           enum:
             - conversation
             - community_channel
+            - group_capability
         conversationId:
           type: string
-          description: Required when scopeType is conversation. Supports one-to-one and group conversations.
+          description: Required when scopeType is conversation. One-to-one conversations only; a group conversation is refused (409 InvalidCallScopeError).
+        capabilityHash:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
+          description: Required when scopeType is group_capability. Lowercase hex SHA-256 of the MLS-derived capability; the capability itself never reaches the node at start.
+        networkId:
+          type: string
+          format: uuid
+          description: Required when scopeType is group_capability. A network the creator belongs to; every node of it replicates the call.
         communityId:
           type: string
           format: uuid
@@ -469,8 +502,12 @@ components:
           enum:
             - conversation
             - community_channel
+            - group_capability
         conversationId:
           type: string
+        capabilityHash:
+          type: string
+          pattern: '^[0-9a-f]{64}$'
         communityId:
           type: string
           format: uuid

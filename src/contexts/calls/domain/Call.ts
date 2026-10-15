@@ -120,12 +120,10 @@ export class Call extends AggregateRoot {
       endedAt: primitives.endedAt,
       endedByIdentityId: primitives.endedByIdentityId,
       networkId: primitives.networkId,
-      participantIds: this.scope.isCommunityChannel()
+      participantIds: this.scope.isLeaseRostered()
         ? []
         : primitives.participantIds,
-      participants: this.scope.isCommunityChannel()
-        ? []
-        : primitives.participants,
+      participants: this.scope.isLeaseRostered() ? [] : primitives.participants,
       scope: primitives.scope,
       status: primitives.status,
       ...(primitives.sessionEpoch === undefined
@@ -260,7 +258,7 @@ export class Call extends AggregateRoot {
     const participant = this.findParticipant(identityId);
 
     assert(
-      this.scope.isCommunityChannel()
+      this.scope.isLeaseRostered()
         ? this.origin.getCreatorIdentityId().isEqual(identityId)
         : participant?.isJoined(),
       new CallParticipantNotFoundError(),
@@ -322,8 +320,9 @@ export class Call extends AggregateRoot {
     );
   }
 
-  public restoreCommunityParticipants(identityIds: IdentityId[]): void {
-    if (!this.scope.isCommunityChannel()) return;
+  /** A lease-rostered call's roster is the set of identities holding a lease. */
+  public restoreLeaseRosteredParticipants(identityIds: IdentityId[]): void {
+    if (!this.scope.isLeaseRostered()) return;
 
     this.participants.splice(
       0,

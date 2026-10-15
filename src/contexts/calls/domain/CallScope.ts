@@ -3,6 +3,7 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { PrimitiveOf } from '@haskou/value-objects';
 
+import { CallCapabilityHash } from './value-objects/CallCapabilityHash';
 import {
   CallScopeType,
   CallScopeTypeEnum,
@@ -28,6 +29,20 @@ export class CallScope {
     );
   }
 
+  /**
+   * A group conversation call. The node never learns the group: it knows only
+   * the hash of a join capability that members derive from the MLS epoch.
+   */
+  public static groupCapability(capabilityHash: CallCapabilityHash): CallScope {
+    return new CallScope(
+      new CallScopeType(CallScopeTypeEnum.GROUP_CAPABILITY),
+      undefined,
+      undefined,
+      undefined,
+      capabilityHash,
+    );
+  }
+
   public static fromPrimitives(primitives: PrimitiveOf<CallScope>): CallScope {
     return new CallScope(
       new CallScopeType(primitives.type),
@@ -40,6 +55,9 @@ export class CallScope {
       primitives.channelId
         ? new CommunityChannelId(primitives.channelId)
         : undefined,
+      primitives.capabilityHash
+        ? new CallCapabilityHash(primitives.capabilityHash)
+        : undefined,
     );
   }
 
@@ -48,6 +66,7 @@ export class CallScope {
     private readonly conversationId?: ConversationId,
     private readonly communityId?: CommunityId,
     private readonly channelId?: CommunityChannelId,
+    private readonly capabilityHash?: CallCapabilityHash,
   ) {}
 
   public isConversation(): boolean {
@@ -56,6 +75,18 @@ export class CallScope {
 
   public isCommunityChannel(): boolean {
     return this.type.isCommunityChannel();
+  }
+
+  public isGroupCapability(): boolean {
+    return this.type.isGroupCapability();
+  }
+
+  /**
+   * Whether the roster is the runtime lease set rather than persisted
+   * participant records: community channel and group capability calls.
+   */
+  public isLeaseRostered(): boolean {
+    return !this.isConversation();
   }
 
   public getConversationId(): ConversationId | undefined {
@@ -70,6 +101,10 @@ export class CallScope {
     return this.channelId;
   }
 
+  public getCapabilityHash(): CallCapabilityHash | undefined {
+    return this.capabilityHash;
+  }
+
   public isEqual(scope: CallScope): boolean {
     const candidate = scope.toPrimitives();
     const current = this.toPrimitives();
@@ -78,12 +113,14 @@ export class CallScope {
       current.type === candidate.type &&
       current.communityId === candidate.communityId &&
       current.channelId === candidate.channelId &&
-      current.conversationId === candidate.conversationId
+      current.conversationId === candidate.conversationId &&
+      current.capabilityHash === candidate.capabilityHash
     );
   }
 
   public toPrimitives() {
     return {
+      capabilityHash: this.capabilityHash?.valueOf(),
       channelId: this.channelId?.valueOf(),
       communityId: this.communityId?.valueOf(),
       conversationId: this.conversationId?.valueOf(),

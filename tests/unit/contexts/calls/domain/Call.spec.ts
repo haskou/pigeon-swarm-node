@@ -414,6 +414,7 @@ describe('Call', () => {
         },
       ],
       scope: {
+        capabilityHash: undefined,
         channelId: 'voice-channel',
         communityId: 'community',
         conversationId: undefined,

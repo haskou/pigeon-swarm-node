@@ -28,10 +28,11 @@ export default class CallParticipantHeartbeatRecorder {
     await this.accessAuthorizer.assertAccess(
       call,
       message.participantIdentityId,
+      message.capability,
     );
 
     if (
-      call.getScope().isCommunityChannel() &&
+      call.getScope().isLeaseRostered() &&
       !call.hasJoinedParticipant(message.participantIdentityId)
     ) {
       throw new CallNotFoundError();
@@ -47,7 +48,7 @@ export default class CallParticipantHeartbeatRecorder {
       }
       throw error;
     }
-    const lease = call.getScope().isCommunityChannel()
+    const lease = call.getScope().isLeaseRostered()
       ? await this.leaseRenewer.renewExisting(
           call,
           message.participantIdentityId,

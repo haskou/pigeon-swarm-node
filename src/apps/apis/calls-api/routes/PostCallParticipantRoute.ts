@@ -32,6 +32,7 @@ export class PostCallParticipantRoute extends CallRouteSupport {
         participantIdentityId.valueOf(),
         body.mutation,
         body.at,
+        this.capability(request),
       ),
       this.chargeRecordTo(participantIdentityId),
     );

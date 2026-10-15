@@ -26,6 +26,7 @@ export default class CallEnder {
     await this.accessAuthorizer.assertAccess(
       call,
       message.participantIdentityId,
+      message.capability,
     );
 
     try {

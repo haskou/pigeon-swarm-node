@@ -11,8 +11,30 @@ export default class CallAccessAuthorizer {
     private readonly communityRepository: CommunityRepository,
   ) {}
 
-  public async assertAccess(call: Call, identityId: IdentityId): Promise<void> {
+  /**
+   * A group-capability call admits whoever presents its capability. Without
+   * one, only an identity already holding a place in its lease roster passes:
+   * that is how its realtime audience and signal recipients are authorized.
+   */
+  public async assertAccess(
+    call: Call,
+    identityId: IdentityId,
+    capability?: string,
+  ): Promise<void> {
     const scope = call.getScope();
+    const capabilityHash = scope.getCapabilityHash();
+
+    if (capabilityHash) {
+      const admitted =
+        capability === undefined
+          ? call.hasJoinedParticipant(identityId)
+          : capabilityHash.matches(capability);
+
+      if (admitted) return;
+
+      throw new CallNotFoundError();
+    }
+
     const conversationId = scope.getConversationId();
 
     if (conversationId) {

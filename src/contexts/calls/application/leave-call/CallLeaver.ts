@@ -27,6 +27,7 @@ export default class CallLeaver {
     await this.accessAuthorizer.assertAccess(
       call,
       message.participantIdentityId,
+      message.capability,
     );
 
     call.leave(message.participantIdentityId, message.at);

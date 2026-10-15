@@ -16,6 +16,7 @@ export class CallSignalSendMessage {
     recipientIdentityId: string,
     signalType: string,
     payload: unknown,
+    public readonly capability?: string,
   ) {
     this.callId = new CallId(callId);
     this.senderIdentityId = new IdentityId(senderIdentityId);

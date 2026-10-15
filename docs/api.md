@@ -747,11 +747,11 @@ Byte-exact vectors live in
 [`tests/fixtures/call-event-vectors.json`](../tests/fixtures/call-event-vectors.json)
 and are checked by the `CallEventVectors` unit spec.
 
-| Record             | id                                       | Author          | Written by                                                                                                                         |
-| ------------------ | ---------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `call_start`       | `call:<callId>`                          | the creator     | `POST /calls`                                                                                                                      |
-| `call_participant` | `call-participant:<callId>:<identityId>` | the participant | `POST /calls/{callId}/participants`, `DELETE /calls/{callId}/participants/me`; community calls verify the record and store nothing |
-| `call_end`         | `call-end:<callId>`                      | the ender       | `DELETE /calls/{callId}`                                                                                                           |
+| Record             | id                                       | Author          | Written by                                                                                                                                   |
+| ------------------ | ---------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `call_start`       | `call:<callId>`                          | the creator     | `POST /calls`                                                                                                                                |
+| `call_participant` | `call-participant:<callId>:<identityId>` | the participant | `POST /calls/{callId}/participants`, `DELETE /calls/{callId}/participants/me`; community and group calls verify the record and store nothing |
+| `call_end`         | `call-end:<callId>`                      | the ender       | `DELETE /calls/{callId}`                                                                                                                     |
 
 **Call id.** The id is derived, never chosen: the first 16 bytes of
 `sha256(utf8(creatorIdentityId + ":" + nonce))`, with byte 6 replaced by
@@ -764,8 +764,9 @@ creator.
 `canonicalize`) JSON of exactly these fields; an extra or missing field is
 refused.
 
-`call_start`, conversation scope. `participantIds` are exactly the participants
-of the admitted conversation, sorted ascending:
+`call_start`, conversation scope (one-to-one conversations only; a group
+conversation is refused). `participantIds` are exactly the participants of the
+admitted conversation, sorted ascending:
 
 ```json
 {
@@ -804,7 +805,26 @@ is a positive integer:
 }
 ```
 
-`call_participant` of a conversation call, `state` is `joined`, `left` or `declined`. Community joins and leaves are not stored:
+`call_start`, group call scope (`group_capability`). `participantIds` is the
+empty array and no `sessionEpoch` is signed. `capabilityHash` is the lowercase
+hex SHA-256 of the call capability, which the group members derive from the MLS
+exporter of the group epoch; the record names neither the group nor its members:
+
+```json
+{
+  "callId": "<callId>",
+  "creatorIdentityId": "<identityId>",
+  "id": "call:<callId>",
+  "networkId": "<networkId>",
+  "nonce": "<nonce>",
+  "participantIds": [],
+  "scope": { "capabilityHash": "<64 hex>", "type": "group_capability" },
+  "scopeType": "call_start",
+  "startedAt": 1770000000000
+}
+```
+
+`call_participant` of a conversation call, `state` is `joined`, `left` or `declined`. Community and group joins and leaves are not stored:
 
 ```json
 {
@@ -917,18 +937,23 @@ End (`call_end`):
 
 - `call_start`: the creator is the proof author; the id derives from creator and
   nonce; `startedAt` is not more than 10 minutes in the future. A conversation
-  start must carry exactly the participants of the signed conversation state,
-  the creator among them, and for a one-to-one conversation exactly two. A
+  start must name a one-to-one conversation and carry exactly its two signed
+  participants, the creator among them; a group conversation is refused. A
   community start needs a current signed permission to connect to that voice
   channel and a `sessionEpoch` of at most one above the highest epoch of the
   starts already admitted for that channel, so an attacker cannot poison the
-  channel with a huge epoch.
+  channel with a huge epoch. A group call start needs a 64-hex `capabilityHash`,
+  an empty `participantIds`, no `sessionEpoch` and a creator whose signed
+  identity belongs to the record's `networkId`.
 - `call_participant`: the identity is the proof author; the admitted start
   exists; the identity takes part in the signed conversation, or may connect to
   the community voice channel. A community record passes this check and is then
-  discarded, not stored.
+  discarded, not stored. A group call record is never stored: the node that
+  receives the request verifies it against the presented capability and keeps
+  only a lease.
 - `call_end`: the author is the creator, or any participant of a conversation
-  call. A community call is ended by its creator only; everybody else leaves.
+  call. Community and group calls are ended by their creator only; everybody
+  else leaves.
 - A record whose claimed time (`startedAt`, `at`) lies more than 10 minutes
   ahead of the node clock is refused.
 - Rate cap: at most `CALLS_RECORD_RATE_LIMIT_PER_MINUTE` (default 30) call records
@@ -994,10 +1019,38 @@ from the authenticated identity and the signed conversation or community state).
 `invitedParticipantIds` no longer exists: conversation calls ring exactly the
 participants of the signed conversation.
 
+Group call request. `capabilityHash` is the lowercase hex SHA-256 of the
+capability and `networkId` a network the creator belongs to; it becomes the
+record's `networkId`:
+
+```json
+{
+  "scopeType": "group_capability",
+  "capabilityHash": "<64 hex>",
+  "networkId": "<networkId>",
+  "nonce": "<random 16-128 chars>",
+  "startedAt": 1770000000000,
+  "mutation": { "...": "SignedPublicMutation (call_start)" }
+}
+```
+
+**Group call capability.** The capability is a base64url string of 20 to 128
+characters that group members derive from the MLS exporter of the current group
+epoch and share with the call id in the group mailbox. The node never sees it at
+start and stores only its hash. Every request that addresses a group call by id
+(read, join, leave, heartbeat, signal, end) presents it as
+`Authorization: Bearer <capability>`; the node compares its SHA-256 with the
+start's `capabilityHash` in constant time. A joined participant may omit it. A
+missing, malformed or wrong capability answers 409 `CallNotFoundError`, exactly
+as an unknown call.
+
 Implemented:
 
 - one-to-one calls use an existing one-to-one conversation id
-- group calls use an existing group conversation id
+- group conversations have no conversation call (409 `InvalidCallScopeError`):
+  their members start a `group_capability` call, which never rings, never
+  pushes, creates no chat timeline `call_event` item or call history entry, and
+  whose events and snapshots carry no roster but the lease set
 - community channel calls use an existing community voice channel id
 - community channel call start is idempotent by `(communityId, channelId)`: when
   a live call already exists for that voice channel, `POST /calls` returns that
@@ -1048,9 +1101,9 @@ is `joined` for a join and `left` for a leave; a leave while the participant is
 still `ringing` must be signed as `declined`, which is the state the node derives
 for that request. The signed `at` is the `at` of the request.
 
-A conversation call with two or fewer participants ends when one of them leaves
-(the fold derives the end from the signed leave); a larger group call stays
-active until its last joined participant leaves or the creator ends it.
+A conversation call ends when one of its two participants leaves (the fold
+derives the end from the signed leave). A group call stays active until its
+creator ends it or no participant has held a lease for sixty seconds.
 
 Implemented:
 
@@ -1082,9 +1135,9 @@ Implemented:
 - OrbitDB call projection changes notify clients after projection, so lease-before-document delivery cannot leave a stale roster
 - community membership/permission changes refresh live snapshots for remaining authorized recipients; every delivery rechecks scope access
 - leaving removes the authenticated identity from the active snapshot
-- leaving a one-to-one conversation ends its call; leaving a group (including a two-member group) or community call does not terminate other participants
+- leaving a one-to-one conversation ends its call; leaving a group or community call does not terminate other participants
 - explicit community call termination retires its call ID
-- community joins and leaves are verified and never stored, so no persisted
+- community and group joins and leaves are verified and never stored, so no persisted
   roster exists. Runtime participation expires and cannot be restored from
   storage after a restart. The start record keeps its creator and the end record
   its ender, as signed. Existing immutable history is not erased; see

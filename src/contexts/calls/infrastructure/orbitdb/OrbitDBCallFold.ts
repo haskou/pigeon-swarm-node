@@ -108,7 +108,7 @@ export class OrbitDBCallFold {
       return {
         digest:
           PublicMutationRecord.proofOf(start)?.getBody().payloadDigest ?? '',
-        primitives: scope.isCommunityChannel()
+        primitives: scope.isLeaseRostered()
           ? { ...primitives, participantIds: [], participants: [] }
           : primitives,
       };

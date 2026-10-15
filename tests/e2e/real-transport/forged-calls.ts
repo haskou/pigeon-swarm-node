@@ -5,6 +5,7 @@ import OrbitDBConversationRepository from '@app/contexts/conversations/infrastru
 import ConversationOperationMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationOperationMutationPolicy';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
+import { CallCapabilityHash } from '@app/contexts/calls/domain/value-objects/CallCapabilityHash';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { CallNonce } from '@app/contexts/calls/domain/value-objects/CallNonce';
 import InMemoryCallParticipantLeaseRepository from '@app/contexts/calls/infrastructure/memory/InMemoryCallParticipantLeaseRepository';
@@ -75,6 +76,14 @@ const noCommunities = {
   hasById: () => Promise.resolve(false),
 } as never;
 const networkId = randomUUID();
+/** Identities known to be on the network; any other is unknown to the node. */
+const networkMembers = new Set<string>();
+const identities = {
+  findById: (identityId: IdentityId) =>
+    networkMembers.has(identityId.valueOf())
+      ? Promise.resolve({ getNetworkIds: () => [new NetworkId(networkId)] })
+      : Promise.reject(new Error('Unknown identity')),
+} as never;
 const nodes: Replica[] = [];
 const authorized = new Set<string>();
 const authorization: PublicMutationAuthorAuthorization = {
@@ -150,7 +159,12 @@ async function open(replica: Replica): Promise<void> {
     registry.addMutationGate(
       new PublicMutationGate(new PublicMutationVerifier(authorization), [
         new ConversationOperationMutationPolicy(),
-        new CallStartMutationPolicy(registry, conversations, noCommunities),
+        new CallStartMutationPolicy(
+          registry,
+          conversations,
+          noCommunities,
+          identities,
+        ),
         new CallParticipantMutationPolicy(registry, noCommunities),
         new CallEndMutationPolicy(registry),
       ]),
@@ -276,9 +290,10 @@ async function main(): Promise<void> {
   process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED = 'false';
   await startNodes();
   const [honest, malicious, control] = nodes;
-  const [owner, alice, bob, mallory, outsider] = await Promise.all(
-    Array.from({ length: 5 }, () => actor()),
+  const [owner, alice, bob, mallory] = await Promise.all(
+    Array.from({ length: 4 }, () => actor()),
   );
+  for (const member of [owner, alice, bob]) networkMembers.add(member.id);
 
   await connect();
   await synchronization(true);
@@ -309,18 +324,26 @@ async function main(): Promise<void> {
     return true;
   });
 
-  stage = 'signed call start and join replicate';
-  const scope = {
+  stage = 'a group conversation cannot start a call that names its members';
+  const conversationScope = {
     conversationId: group.valueOf(),
     type: 'conversation',
   } as const;
   const participantIds = [owner.id, alice.id, bob.id].sort();
+
+  stage = 'signed group-capability call start replicates';
+  const scope = {
+    capabilityHash: CallCapabilityHash.of(
+      'Zm9yLXRoZS1ncm91cC1jYWxsLW9ubHktMzItYnl0ZXM',
+    ).valueOf(),
+    type: 'group_capability',
+  } as const;
   const startedAt = Date.now();
   const call = Call.start(
     new IdentityId(owner.id),
     new NetworkId(networkId),
-    CallScope.conversation(group),
-    participantIds.map((id) => new IdentityId(id)),
+    CallScope.groupCapability(new CallCapabilityHash(scope.capabilityHash)),
+    [new IdentityId(owner.id)],
     new CallNonce(NONCE(1)),
     new Timestamp(startedAt),
   );
@@ -328,7 +351,6 @@ async function main(): Promise<void> {
   const start = signCallStart({
     networkId,
     nonce: NONCE(1),
-    participantIds,
     scope,
     signer: owner,
     startedAt,
@@ -347,6 +369,17 @@ async function main(): Promise<void> {
 
     return true;
   });
+  for (const replica of nodes) {
+    const [stored] = await replica.stores!.calls.query!(
+      (value) => value.id === start.payload.id,
+    );
+
+    assert.deepEqual(
+      stored.participantIds,
+      [],
+      'A group-capability start must name no participant',
+    );
+  }
   const joined = signCallParticipant({
     at: startedAt + 1000,
     callId: start.callId,
@@ -354,33 +387,27 @@ async function main(): Promise<void> {
     state: 'joined',
   });
 
-  call.join(new IdentityId(alice.id), new Timestamp(startedAt + 1000));
-  await control.repository!.saveParticipant(
+  call.joinOrAdd(new IdentityId(alice.id), new Timestamp(startedAt + 1000));
+  await honest.repository!.saveParticipant(
     call,
     new IdentityId(alice.id),
     new Timestamp(startedAt + 1000),
     joined.proof,
   );
-  await until('join reached every node', async () => {
-    for (const replica of nodes) {
-      if (!(await replica.repository!.hasById(callId))) return false;
-
-      const found = await replica.repository!.requireById(callId);
-
-      if (
-        !found
-          .toPrimitives()
-          .participants.some(
-            (value) =>
-              value.identityId === alice.id && value.status === 'joined',
-          )
-      )
-        return false;
-    }
-
-    return true;
-  });
-  console.log('PASS signed call start and join replicated to three nodes');
+  await pause(3000);
+  for (const replica of nodes)
+    assert.equal(
+      (
+        await replica.stores!.calls.query!(
+          (value) => value.id === joined.payload.id,
+        )
+      ).length,
+      0,
+      'A group-capability join must leave no record naming the member',
+    );
+  console.log(
+    'PASS signed group-capability start replicated to three nodes naming nobody, and its join replicated nothing',
+  );
 
   stage = 'forged call records are ignored';
   const forgedIds: string[] = [];
@@ -397,20 +424,21 @@ async function main(): Promise<void> {
     signer: CallSigner,
     n: number,
     inScope: typeof scope | Record<string, unknown> = scope,
-    ids: string[] = participantIds,
+    ids: string[] = [],
     at = Date.now(),
+    network = networkId,
   ) =>
     signCallStart({
-      networkId,
+      networkId: network,
       nonce: NONCE(n),
       participantIds: ids,
       scope: inScope as never,
       signer,
       startedAt: at,
     });
-  const ringing = forgedStart(mallory, 2);
+  // A member ringing the group through a start that names its members.
+  const ringing = forgedStart(owner, 2, conversationScope, participantIds);
 
-  // A ringing call in a group the author does not belong to.
   await plant(ringing.payload, ringing.proof);
   // A ringing call in a conversation nobody knows.
   const unknown = forgedStart(
@@ -421,20 +449,25 @@ async function main(): Promise<void> {
   );
 
   await plant(unknown.payload, unknown.proof);
-  // A start that invites someone outside the conversation.
-  const invitesOutsider = forgedStart(owner, 4, scope, [owner.id, outsider.id]);
+  // A group-capability start by an identity the node does not know.
+  const unknownCreator = forgedStart(mallory, 4);
 
-  await plant(invitesOutsider.payload, invitesOutsider.proof);
+  await plant(unknownCreator.payload, unknownCreator.proof);
   // A start dated far in the future.
-  const future = forgedStart(
-    owner,
-    5,
-    scope,
-    participantIds,
-    Date.now() + 10 ** 9,
-  );
+  const future = forgedStart(owner, 5, scope, [], Date.now() + 10 ** 9);
 
   await plant(future.payload, future.proof);
+  // A group-capability start on a network its creator is not on.
+  const otherNetwork = forgedStart(
+    alice,
+    7,
+    scope,
+    [],
+    Date.now(),
+    randomUUID(),
+  );
+
+  await plant(otherNetwork.payload, otherNetwork.proof);
   // A community channel call with an invented session epoch.
   const community = signCallStart({
     networkId,
@@ -450,7 +483,7 @@ async function main(): Promise<void> {
   });
 
   await plant(community.payload, community.proof);
-  // A join by someone outside the conversation for the real call.
+  // A join by an identity that never presented the capability.
   const outsiderJoin = signCallParticipant({
     at: Date.now(),
     callId: start.callId,
@@ -468,11 +501,11 @@ async function main(): Promise<void> {
   });
 
   await plant(orphan.payload, orphan.proof);
-  // An end of the real call by someone outside the conversation.
+  // An end of the real call by a member who did not start it.
   const forgedEnd = signCallEnd({
     at: Date.now(),
     callId: start.callId,
-    signer: mallory,
+    signer: alice,
   });
 
   await plant(forgedEnd.payload, forgedEnd.proof);
@@ -498,25 +531,29 @@ async function main(): Promise<void> {
   });
   await pause(3000);
 
-  for (const forged of [ringing, unknown, invitesOutsider, future, community])
+  for (const forged of [
+    ringing,
+    unknown,
+    unknownCreator,
+    future,
+    otherNetwork,
+    community,
+  ])
     assert.equal(
       await honest.repository!.hasById(new CallId(forged.callId)),
       false,
       `call ${forged.callId} must not be admitted`,
     );
-  assert.deepEqual(
-    await honest.repository!.findActiveByParticipant(new IdentityId(alice.id)),
-    (await honest.repository!.hasById(callId))
-      ? [await honest.repository!.requireById(callId)]
-      : [],
-    'Only the signed call may be active for a participant',
-  );
   const real = (await honest.repository!.requireById(callId)).toPrimitives();
 
-  assert.equal(real.status, 'active', 'A forged end must not end the call');
+  assert.equal(
+    real.status,
+    'active',
+    'An end by a member who did not start the call must not end it',
+  );
   assert.ok(
     !real.participants.some((value) => value.identityId === mallory.id),
-    'A forged join must not add a participant',
+    'A participant record must not add anyone to a group-capability call',
   );
   assert.deepEqual(
     await honest.repository!.findActiveByParticipant(
@@ -534,7 +571,7 @@ async function main(): Promise<void> {
     'The ungated control node must hold the forged start, otherwise the test proves nothing',
   );
   console.log(
-    'PASS forged ringing call, unknown conversation, outsider invitee, future start, invented community sessionEpoch, outsider join, orphan join, outsider end and a flood of starts rejected',
+    'PASS group start naming its members, unknown conversation, unknown creator, future start, foreign network, invented community sessionEpoch, outsider join, orphan join, non-creator end and a flood of starts rejected',
   );
 }
 

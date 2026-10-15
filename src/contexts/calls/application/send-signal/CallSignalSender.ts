@@ -24,7 +24,11 @@ export default class CallSignalSender {
   ): Promise<CallSignalDelivery> {
     const call = await this.repository.requireById(message.callId);
 
-    await this.accessAuthorizer.assertAccess(call, message.senderIdentityId);
+    await this.accessAuthorizer.assertAccess(
+      call,
+      message.senderIdentityId,
+      message.capability,
+    );
 
     await this.accessAuthorizer.assertAccess(call, message.recipientIdentityId);
 

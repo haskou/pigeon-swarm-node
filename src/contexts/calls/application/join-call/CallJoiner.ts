@@ -27,9 +27,10 @@ export default class CallJoiner {
     await this.accessAuthorizer.assertAccess(
       call,
       message.participantIdentityId,
+      message.capability,
     );
 
-    if (call.getScope().isCommunityChannel()) {
+    if (call.getScope().isLeaseRostered()) {
       call.joinOrAdd(message.participantIdentityId, message.at);
     } else {
       call.join(message.participantIdentityId, message.at);

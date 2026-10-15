@@ -329,7 +329,14 @@ and merges when `real-node-e2e` is green.
    `identities.v1.identity.was_updated` fan-out, and a member announces its own
    identity update to its groups as an MLS record over the group mailbox. The UI
    merges first, so no group misses an identity update in between.
-5. Group calls use the capability scope.
+5. Group calls use the capability scope: the start names no member, carries the
+   SHA-256 of the capability and the creator's network, and every request that
+   addresses the call presents the capability as a bearer token; joins and leaves
+   are not stored and the roster is the lease set, as for community calls. The
+   node refuses conversation calls on group conversations, so the order flips as in
+   slice 2: the node merges first, and the UI, pinned to the node merge commit,
+   merges when `real-node-e2e` is green. Group calls fail on UI main between the
+   two merges.
 6. Final cutover: the roster extension and GCE roster ops with default deny and the
    device-chain committer check, the same-epoch priority rule (and the group inbox
    commit id derivation, stated), the welcome checks, the confirmation rule with the

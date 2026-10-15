@@ -17,7 +17,9 @@ import { CallRecordClock } from './CallRecordClock';
  * A participant state (joined, left, declined) is signed by the participant
  * itself, one record per call and identity that later sequences supersede. It
  * is admitted only when the admitted start exists and the identity takes part
- * in that conversation or may connect to that community channel.
+ * in that conversation or may connect to that community channel. A
+ * group-capability call admits any identity: its roster is the MLS group the
+ * node cannot see, and the capability gates the call routes instead.
  */
 export default class CallParticipantMutationPolicy extends PublicMutationPolicy {
   public static readonly STATES = ['joined', 'left', 'declined'];
@@ -116,11 +118,13 @@ export default class CallParticipantMutationPolicy extends PublicMutationPolicy 
     if (!start) throw new InvalidPublicMutationError();
 
     try {
-      if ((start.scope as Record<string, unknown>).type === 'conversation') {
+      const type = (start.scope as Record<string, unknown>).type;
+
+      if (type === 'conversation') {
         if (!(start.participantIds as string[]).includes(authorIdentityId)) {
           throw new InvalidPublicMutationError();
         }
-      } else {
+      } else if (type !== 'group_capability') {
         await this.assertCommunityAccess(start, authorIdentityId);
       }
     } catch {

@@ -40,6 +40,8 @@ export default class OrbitDBCallProjection {
 
   private readonly communityChannelCallIds = new Map<string, Set<string>>();
 
+  private readonly groupCapabilityCallIds = new Map<string, Set<string>>();
+
   private readonly creatorScopeCallIds = new Map<string, Set<string>>();
 
   private readonly waiters = new Map<string, Set<() => void>>();
@@ -137,9 +139,10 @@ export default class OrbitDBCallProjection {
   }
 
   private creatorScopeKey(primitives: CallPrimitives): string {
-    const { channelId, communityId, conversationId } = primitives.scope;
+    const { capabilityHash, channelId, communityId, conversationId } =
+      primitives.scope;
 
-    return `${primitives.creatorIdentityId}:${conversationId ?? `${communityId}:${channelId}`}`;
+    return `${primitives.creatorIdentityId}:${conversationId ?? capabilityHash ?? `${communityId}:${channelId}`}`;
   }
 
   private applyIndexes(
@@ -160,6 +163,11 @@ export default class OrbitDBCallProjection {
       primitives.id,
     );
     action(this.communityCallIds, primitives.scope.communityId, primitives.id);
+    action(
+      this.groupCapabilityCallIds,
+      primitives.scope.capabilityHash,
+      primitives.id,
+    );
     action(
       this.communityChannelCallIds,
       this.communityChannelKey(primitives),
@@ -420,12 +428,16 @@ export default class OrbitDBCallProjection {
     );
   }
 
-  public findActiveCommunityCalls(): Promise<CallPrimitives[]> {
+  /** Active calls whose roster is their participation leases, not their records. */
+  public findActiveLeaseRosteredCalls(): Promise<CallPrimitives[]> {
     this.assertReady();
 
     return Promise.resolve(
       this.resolveAll(
-        [...this.communityCallIds.values()].flatMap((ids) => [...ids]),
+        [
+          ...this.communityCallIds.values(),
+          ...this.groupCapabilityCallIds.values(),
+        ].flatMap((ids) => [...ids]),
       ).filter((primitives) => primitives.status === 'active'),
     );
   }
