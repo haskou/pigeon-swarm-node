@@ -171,6 +171,51 @@ describe('Node', () => {
     });
   });
 
+  describe('resetOwner', () => {
+    it('should clear the owner and open registration but keep the rest', () => {
+      const owner = new IdentityMother().id;
+      const claimed = new NodeMother()
+        .withNetwork(networkMother.id, networkMother.build())
+        .withOwner(owner)
+        .withRegistrationMode(NodeRegistrationMode.CODES)
+        .build();
+      const before = claimed.toPrimitives();
+
+      claimed.resetOwner();
+
+      expect(claimed.hasOwner()).toBe(false);
+      expect(claimed.isOpenForRegistration()).toBe(true);
+      expect(claimed.toPrimitives()).toEqual({
+        ...before,
+        owner: undefined,
+        registrationMode: 'open',
+      });
+    });
+
+    it('should record no replicated event, the reset is local to the host', () => {
+      const claimed = new NodeMother()
+        .withOwner(new IdentityMother().id)
+        .withRegistrationMode(NodeRegistrationMode.CLOSED)
+        .build();
+
+      claimed.resetOwner();
+
+      expect(claimed.pullDomainEvents()).toEqual([]);
+    });
+
+    it('should let any identity claim the node again after the reset', () => {
+      const owner = new IdentityMother().id;
+      const nextOwner = generateIdentityId();
+
+      node.assignOwner(owner, owner);
+      node.resetOwner();
+      node.assignOwner(nextOwner, nextOwner);
+
+      expect(node.isOwnedBy(nextOwner)).toBe(true);
+      expect(node.isOwnedBy(owner)).toBe(false);
+    });
+  });
+
   describe('updateRelayConfiguration', () => {
     it('should update relay configuration and record a domain event', () => {
       const relayConfiguration = NodeRelayConfiguration.fromPrimitives({

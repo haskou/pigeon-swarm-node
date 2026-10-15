@@ -1,7 +1,9 @@
 import EmbeddedLocalDatabase, {
   EmbeddedLocalDatabaseOperation,
 } from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import LocalDatabaseIsLockedError from '@app/shared/infrastructure/local-db/LocalDatabaseIsLockedError';
 import * as fs from 'fs/promises';
+import { Level } from 'level';
 import os from 'os';
 import path from 'path';
 
@@ -127,5 +129,58 @@ describe('EmbeddedLocalDatabase', () => {
     await expect(
       secondDatabase.findOne('records', 'invalid'),
     ).resolves.toBeUndefined();
+  });
+
+  describe('when another process holds the database', () => {
+    let lockedPath: string;
+    let runningNode: Level<string, Record<string, unknown>>;
+    let lockedDatabase: EmbeddedLocalDatabase;
+
+    beforeEach(async () => {
+      lockedPath = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'pigeon-locked-local-db-'),
+      );
+      runningNode = new Level(lockedPath, { valueEncoding: 'json' });
+      await runningNode.open();
+      await runningNode.put('nodes:node-1', { name: 'Node 1' });
+      process.env.PIGEON_LOCAL_DB_PATH = lockedPath;
+      lockedDatabase = new EmbeddedLocalDatabase();
+    });
+
+    afterEach(async () => {
+      await lockedDatabase.close();
+      await runningNode.close();
+      await fs.rm(lockedPath, { force: true, recursive: true });
+    });
+
+    it('should explain that the database is in use instead of failing obscurely', async () => {
+      const failure = lockedDatabase.findOne('nodes', 'node-1');
+
+      await expect(failure).rejects.toBeInstanceOf(LocalDatabaseIsLockedError);
+      await expect(failure).rejects.toThrow(
+        `The local database at ${lockedPath} is in use by another process, such as a running node.`,
+      );
+    });
+
+    it('should fail every attempt while the lock is held', async () => {
+      await expect(lockedDatabase.findOne('nodes', 'node-1')).rejects.toThrow(
+        LocalDatabaseIsLockedError,
+      );
+      await expect(
+        lockedDatabase.save('nodes', 'node-2', { name: 'Node 2' }),
+      ).rejects.toThrow(LocalDatabaseIsLockedError);
+    });
+
+    it('should open once the other process has released the database', async () => {
+      await expect(lockedDatabase.findOne('nodes', 'node-1')).rejects.toThrow(
+        LocalDatabaseIsLockedError,
+      );
+
+      await runningNode.close();
+
+      await expect(lockedDatabase.findOne('nodes', 'node-1')).resolves.toEqual(
+        { name: 'Node 1' },
+      );
+    });
   });
 });

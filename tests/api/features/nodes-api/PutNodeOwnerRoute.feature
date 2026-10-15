@@ -20,3 +20,19 @@ Feature: Put node owner
     And another identity signs the current node owner request
     When I PUT "/node/owner/"
     Then response code is equal to 409
+
+  Scenario: Another identity claims the node after the operator reset the owner
+    Given the local node has no owner and no networks
+    And I sign the current node owner request
+    When I PUT "/node/owner/"
+    Then response code is equal to 200
+
+    Given the node operator reset the node owner while the node was stopped
+    And I set json body
+      """
+      {}
+      """
+    And another identity signs the current node owner request
+    When I PUT "/node/owner/"
+    Then response code is equal to 200
+    And the local node is owned by the other identity
