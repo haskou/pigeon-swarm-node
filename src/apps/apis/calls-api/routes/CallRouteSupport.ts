@@ -3,8 +3,8 @@ import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call
 import CallParticipantLeaseFinder from '@app/contexts/calls/application/find-participant-leases/CallParticipantLeaseFinder';
 import { CallParticipantLeasesFindMessage } from '@app/contexts/calls/application/find-participant-leases/messages/CallParticipantLeasesFindMessage';
 import { Call } from '@app/contexts/calls/domain/Call';
-import { CallNotFoundError } from '@app/contexts/calls/domain/errors/CallNotFoundError';
 import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
+import { CallNotFoundError } from '@app/contexts/calls/domain/errors/CallNotFoundError';
 import CallParticipantLeaseWarmUp from '@app/contexts/calls/infrastructure/memory/CallParticipantLeaseWarmUp';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';

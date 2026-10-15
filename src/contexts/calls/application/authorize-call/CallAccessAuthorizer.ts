@@ -1,9 +1,13 @@
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Call } from '../../domain/Call';
 import { CallNotFoundError } from '../../domain/errors/CallNotFoundError';
+import { CallCapabilityHash } from '../../domain/value-objects/CallCapabilityHash';
 
 export default class CallAccessAuthorizer {
   constructor(
@@ -16,43 +20,41 @@ export default class CallAccessAuthorizer {
    * one, only an identity already holding a place in its lease roster passes:
    * that is how its realtime audience and signal recipients are authorized.
    */
-  public async assertAccess(
+  private assertCapabilityAccess(
     call: Call,
+    capabilityHash: CallCapabilityHash,
     identityId: IdentityId,
     capability?: string,
+  ): void {
+    const admitted =
+      capability === undefined
+        ? call.hasJoinedParticipant(identityId)
+        : capabilityHash.matches(capability);
+
+    if (!admitted) throw new CallNotFoundError();
+  }
+
+  private async assertConversationAccess(
+    conversationId: ConversationId,
+    identityId: IdentityId,
   ): Promise<void> {
-    const scope = call.getScope();
-    const capabilityHash = scope.getCapabilityHash();
-
-    if (capabilityHash) {
-      const admitted =
-        capability === undefined
-          ? call.hasJoinedParticipant(identityId)
-          : capabilityHash.matches(capability);
-
-      if (admitted) return;
-
+    if (!(await this.conversationRepository.hasById(conversationId))) {
       throw new CallNotFoundError();
     }
 
-    const conversationId = scope.getConversationId();
+    const conversation =
+      await this.conversationRepository.requireMetadataById(conversationId);
 
-    if (conversationId) {
-      if (!(await this.conversationRepository.hasById(conversationId))) {
-        throw new CallNotFoundError();
-      }
-
-      const conversation =
-        await this.conversationRepository.requireMetadataById(conversationId);
-
-      if (conversation.hasParticipant(identityId)) return;
-
+    if (!conversation.hasParticipant(identityId)) {
       throw new CallNotFoundError();
     }
+  }
 
-    const communityId = scope.getCommunityId();
-    const channelId = scope.getCommunityChannelId();
-
+  private async assertCommunityAccess(
+    identityId: IdentityId,
+    communityId?: CommunityId,
+    channelId?: CommunityChannelId,
+  ): Promise<void> {
     if (
       !communityId ||
       !channelId ||
@@ -68,6 +70,35 @@ export default class CallAccessAuthorizer {
     } catch {
       throw new CallNotFoundError();
     }
+  }
+
+  public async assertAccess(
+    call: Call,
+    identityId: IdentityId,
+    capability?: string,
+  ): Promise<void> {
+    const scope = call.getScope();
+    const capabilityHash = scope.getCapabilityHash();
+
+    if (capabilityHash) {
+      this.assertCapabilityAccess(call, capabilityHash, identityId, capability);
+
+      return;
+    }
+
+    const conversationId = scope.getConversationId();
+
+    if (conversationId) {
+      await this.assertConversationAccess(conversationId, identityId);
+
+      return;
+    }
+
+    await this.assertCommunityAccess(
+      identityId,
+      scope.getCommunityId(),
+      scope.getCommunityChannelId(),
+    );
   }
 
   public async authorizedParticipants(call: Call): Promise<IdentityId[]> {
