@@ -136,6 +136,50 @@ export default class PublicUrlGuard {
     return mappedAddress !== undefined && this.isBlockedIpv4(mappedAddress);
   }
 
+  private ipv6GroupHextets(group: string): number[] {
+    if (group === '') {
+      return [];
+    }
+
+    return group.split(':').flatMap((hextet) => {
+      if (net.isIP(hextet) !== 4) {
+        return [parseInt(hextet, 16)];
+      }
+
+      const ipv4 = this.ipv4ToNumber(hextet);
+
+      return [Math.floor(ipv4 / 65536), ipv4 % 65536];
+    });
+  }
+
+  /** The eight hextets of a valid IPv6 address, with `::` expanded. */
+  private ipv6Hextets(address: string): number[] {
+    const [head, tail] = address.split('::');
+    const headHextets = this.ipv6GroupHextets(head);
+    const tailHextets = this.ipv6GroupHextets(tail ?? '');
+    const zeros = new Array<number>(
+      8 - headHextets.length - tailHextets.length,
+    ).fill(0);
+
+    return [...headHextets, ...zeros, ...tailHextets];
+  }
+
+  /**
+   * NAT64 (64:ff9b::/32, well-known and local-use), 6to4 (2002::/16) and
+   * Teredo (2001::/32) embed or route to IPv4 space; site-local (fec0::/10)
+   * is private.
+   */
+  private isTunnelledOrSiteLocalIpv6(address: string): boolean {
+    const [first, second] = this.ipv6Hextets(address);
+
+    return (
+      (first === 0x64 && second === 0xff9b) ||
+      first === 0x2002 ||
+      (first === 0x2001 && second === 0) ||
+      (first >= 0xfec0 && first <= 0xfeff)
+    );
+  }
+
   private isBlockedIpv6(address: string): boolean {
     const normalized = this.normalizedAddress(address);
 
@@ -145,7 +189,8 @@ export default class PublicUrlGuard {
       normalized.startsWith('ff') ||
       this.isUniqueLocalIpv6(normalized) ||
       this.isLinkLocalIpv6(normalized) ||
-      this.isBlockedMappedIpv4(normalized)
+      this.isBlockedMappedIpv4(normalized) ||
+      this.isTunnelledOrSiteLocalIpv6(normalized)
     );
   }
 
