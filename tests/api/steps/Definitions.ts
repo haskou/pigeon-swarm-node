@@ -175,6 +175,7 @@ export default class Definitions {
   private privateAuthorizationScopeId: string | undefined;
   private otherIdentityId: IdentityId | undefined;
   private otherIdentityKeyPair: KeyPair | undefined;
+  private publishedGenesisExternalIdentifier: string | undefined;
   private readonly replayAnswers: { data: unknown; status: number }[] = [];
   private rememberedCallJoinRequest:
     { body: string | undefined; headers: Record<string, string> } | undefined;
@@ -4845,6 +4846,18 @@ export default class Definitions {
   @given('my identity is published on this node')
   public async myIdentityIsPublishedOnThisNode(): Promise<void> {
     await this.ensureAuthenticatedIdentityIsPublished();
+    this.publishedGenesisExternalIdentifier =
+      await this.findCreatedIdentityExternalIdentifier();
+  }
+
+  @given('I set a fork of my identity at version {int}')
+  public async iSetAForkOfMyIdentityAtVersion(version: number): Promise<void> {
+    await this.buildClientSignedIdentityBody(
+      'Forked Identity',
+      'forked-identity',
+      version,
+      version === 1 ? undefined : this.publishedGenesisExternalIdentifier,
+    );
   }
 
   @when('a stranger replays my public identity record')

@@ -174,3 +174,25 @@ Feature: Put node blocks
     Then response code is equal to 200
     When a stranger replays my public identity record
     Then both replays get the same answer
+
+  Scenario Outline: A blocked identity cannot publish a fork of its held record
+    Given I hand the node over to the other identity
+    And the current node has a test network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
+    And my identity is published on this node
+    And I set a client-signed identity update body with name "Updated Identity", handle "updated-identity" and password "Unused-password1!"
+    And I sign the current identity update request
+    When I PUT the created identity
+    Then response code is equal to 200
+    Given I set a node block list body version 1 blocking "owner" owned by the other identity and signed by the other identity
+    And another identity signs a PUT request to "/node/blocks/"
+    When I PUT "/node/blocks/"
+    Then response code is equal to 200
+    Given I set a fork of my identity at version <version>
+    When I POST to "/identities/"
+    Then response code is equal to 403
+    And response body should contain "403012"
+
+    Examples:
+      | version |
+      | 1       |
+      | 2       |

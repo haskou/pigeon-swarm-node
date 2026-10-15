@@ -2,6 +2,7 @@ import IdentityCreationDetector from '@app/contexts/identities/application/detec
 import { IdentityCreationDetectorMessage } from '@app/contexts/identities/application/detect-creation/messages/IdentityCreationDetectorMessage';
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -59,38 +60,26 @@ describe('IdentityCreationDetector', () => {
     ).resolves.toBe(false);
   });
 
-  it('should treat a publication this node does not hold as changing it', async () => {
-    repository.holds.mockResolvedValue(false);
+  it.each([true, false])(
+    'should tell whether this node holds exactly the record (held: %s)',
+    async (held) => {
+      const publication = identity(true);
+      const externalIdentifier = new IdentityExternalIdentifier('bagaaiera');
 
-    await expect(
-      detector.isCreationOrNewerVersion(
-        new IdentityCreationDetectorMessage(identity(true)),
-      ),
-    ).resolves.toBe(true);
-    expect(repository.findById).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    [true, true],
-    [false, false],
-  ])(
-    'should compare a held identity with the stored version (newer: %s)',
-    async (newer, expected) => {
-      const stored = mock<Identity>();
-      const publication = mock<Identity>();
-
-      publication.getId.mockReturnValue(id);
-
-      repository.holds.mockResolvedValue(true);
-      repository.findById.mockResolvedValue(stored);
-      publication.isNewerThan.mockReturnValue(newer);
+      repository.calculateExternalIdentifier.mockResolvedValue(
+        externalIdentifier,
+      );
+      repository.hasByExternalIdentifier.mockResolvedValue(held);
 
       await expect(
-        detector.isCreationOrNewerVersion(
-          new IdentityCreationDetectorMessage(publication),
-        ),
-      ).resolves.toBe(expected);
-      expect(publication.isNewerThan).toHaveBeenCalledWith(stored);
+        detector.holdsRecord(new IdentityCreationDetectorMessage(publication)),
+      ).resolves.toBe(held);
+      expect(repository.calculateExternalIdentifier).toHaveBeenCalledWith(
+        publication,
+      );
+      expect(repository.hasByExternalIdentifier).toHaveBeenCalledWith(
+        externalIdentifier,
+      );
     },
   );
 });
