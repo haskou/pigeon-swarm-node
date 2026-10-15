@@ -169,6 +169,7 @@ export default class Definitions {
   private keychainExternalIdentifier: string | undefined;
   private messageId: string | undefined;
   private notificationId: string | undefined;
+  private createdNotificationIds: string[] = [];
   private privateAuthorizationScopeId: string | undefined;
   private otherIdentityId: IdentityId | undefined;
   private otherIdentityKeyPair: KeyPair | undefined;
@@ -5473,6 +5474,73 @@ export default class Definitions {
     }
 
     this.notificationId = this.response.data.id;
+  }
+
+  @given('I have created {int} group conversation invitation notifications')
+  public async iHaveCreatedGroupConversationInvitationNotifications(
+    count: number,
+  ): Promise<void> {
+    this.createdNotificationIds = [];
+
+    for (let index = 0; index < count; index++) {
+      await this.iSetAGroupConversationInvitationNotificationBody();
+      await this.iSignTheCurrentNotificationCreationRequest();
+
+      this.response = await this.restClient.post(
+        '/notifications/',
+        JSON.parse(this.body || '{}'),
+        { headers: this.headers },
+      );
+
+      if (this.response.status !== 200) {
+        throw new Error(
+          `Could not create notification: ${JSON.stringify(this.response.data)}`,
+        );
+      }
+
+      this.createdNotificationIds.push(this.response.data.id);
+    }
+  }
+
+  @given('the current notification is the {word} created notification')
+  public theCurrentNotificationIsTheCreatedNotification(
+    position: string,
+  ): void {
+    const ascending = this.ascendingCreatedNotificationIds();
+
+    if (position !== 'lowest' && position !== 'highest') {
+      throw new Error(`Unknown created notification position: ${position}`);
+    }
+
+    this.notificationId =
+      position === 'lowest' ? ascending[0] : ascending[ascending.length - 1];
+  }
+
+  @then('response body lists the {int} lowest created notification ids')
+  public responseBodyListsTheLowestCreatedNotificationIds(count: number): void {
+    const results: unknown = this.response.data.results;
+
+    if (!Array.isArray(results)) {
+      throw new Error('Response body has no results array.');
+    }
+
+    const listed = results
+      .map((notification: unknown) =>
+        notification && typeof notification === 'object' && 'id' in notification
+          ? String(notification.id)
+          : '',
+      )
+      .sort();
+
+    expect(listed).to.deep.equal(
+      this.ascendingCreatedNotificationIds().slice(0, count),
+    );
+  }
+
+  private ascendingCreatedNotificationIds(): string[] {
+    return [...this.createdNotificationIds].sort((left, right) =>
+      left < right ? -1 : left > right ? 1 : 0,
+    );
   }
 
   @given('I set a notification accepted body')
