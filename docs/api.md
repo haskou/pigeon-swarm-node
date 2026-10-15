@@ -2576,9 +2576,14 @@ Implemented:
 
 ```http
 GET /conversations/me/drafts
-PUT /conversations/{conversationId}/draft
-DELETE /conversations/{conversationId}/draft
+PUT /conversations/me/drafts/{draftKey}
+DELETE /conversations/me/drafts/{draftKey}
 ```
+
+`draftKey` is opaque: the client derives it as
+`base64url(HMAC-SHA256(K_draft, utf8(conversationId)))`, where `K_draft` is a
+key only the owner's devices hold. It is 43 base64url characters; anything
+else answers `409 InvalidConversationDraftKeyError`.
 
 Save request:
 
@@ -2595,7 +2600,7 @@ List response:
 {
   "drafts": [
     {
-      "conversationId": "one-to-one:<deterministic-id>",
+      "draftKey": "<base64url HMAC-SHA256>",
       "encryptedPayload": "<encryptedDraftPayload>",
       "updatedAt": 1773848829055
     }
@@ -2606,9 +2611,14 @@ List response:
 Implemented:
 
 - require signed request auth
-- drafts are local embedded DB state scoped to the authenticated identity
+- drafts are local embedded DB state scoped to the authenticated identity:
+  listing, saving and deleting only ever touch the caller's own drafts
+- the node never learns which conversation a draft belongs to and checks no
+  conversation roster; the client seals the conversation id inside
+  `encryptedPayload` and drops a draft whose key does not match it
 - the backend treats `encryptedPayload` as opaque client-encrypted data
-- saving or deleting a draft requires conversation participation
+- each identity keeps its 100 most recently updated drafts; saving another
+  drops the oldest
 
 ### Conversation messages
 

@@ -201,7 +201,7 @@ paths:
       tags:
         - conversations
       summary: List authenticated identity conversation drafts
-      description: Drafts are local embedded DB opaque encrypted payloads owned by the authenticated identity.
+      description: Owner-only. Each draft is an opaque client-encrypted payload stored in the local embedded DB under an opaque client-derived key, newest first. The node never learns which conversation a draft belongs to.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -213,13 +213,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConversationDraftsResource'
-  /conversations/{conversationId}/draft:
+  /conversations/me/drafts/{draftKey}:
     put:
       tags:
         - conversations
-      summary: Save authenticated identity draft for a conversation
+      summary: Save authenticated identity draft under an opaque key
+      description: The client derives draftKey as base64url(HMAC-SHA256(owner draft key, utf8(conversationId))), so the node checks no conversation roster. Each identity keeps its 100 most recently updated drafts; saving one more drops the oldest.
       parameters:
-        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/DraftKey'
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
@@ -236,18 +237,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConversationDraftResource'
+        '409':
+          description: InvalidConversationDraftKeyError.
     delete:
       tags:
         - conversations
-      summary: Delete authenticated identity draft for a conversation
+      summary: Delete authenticated identity draft under an opaque key
+      description: Deletes only the authenticated identity's draft. An unknown key succeeds.
       parameters:
-        - $ref: '#/components/parameters/ConversationId'
+        - $ref: '#/components/parameters/DraftKey'
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
       responses:
         '200':
           description: Draft deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - draftKey
+                properties:
+                  draftKey:
+                    type: string
+        '409':
+          description: InvalidConversationDraftKeyError.
 components:
   parameters:
     ConversationId:
@@ -256,6 +271,14 @@ components:
       required: true
       schema:
         type: string
+    DraftKey:
+      in: path
+      name: draftKey
+      required: true
+      description: base64url(HMAC-SHA256(owner draft key, utf8(conversationId))), derived by the client.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9_-]{43}$'
     TargetIdentityId:
       in: path
       name: identityId
@@ -482,12 +505,13 @@ components:
     ConversationDraftResource:
       type: object
       required:
-        - conversationId
+        - draftKey
         - encryptedPayload
         - updatedAt
       properties:
-        conversationId:
+        draftKey:
           type: string
+          pattern: '^[A-Za-z0-9_-]{43}$'
         encryptedPayload:
           type: string
         updatedAt:

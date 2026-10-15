@@ -6,6 +6,8 @@ import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Get, JsonController, Req, Res } from 'routing-controllers';
 
+import { ConversationDraftsResource } from '../resources/ConversationDraftsResource';
+
 @JsonController('/conversations')
 export class GetConversationDraftsRoute extends Route {
   private readonly authenticator = this.get<SignedHttpRequestAuthenticator>(
@@ -26,12 +28,14 @@ export class GetConversationDraftsRoute extends Route {
       new ConversationDraftsFindMessage(identityId.valueOf()),
     );
 
-    return response.status(HttpRouteStatusEnum.OK).send({
+    const resource: ConversationDraftsResource = {
       drafts: drafts.map((draft) => ({
-        conversationId: draft.getConversationId().valueOf(),
+        draftKey: draft.getDraftKey().valueOf(),
         encryptedPayload: draft.getEncryptedPayload().valueOf(),
         updatedAt: draft.getUpdatedAt().valueOf(),
       })),
-    });
+    };
+
+    return response.status(HttpRouteStatusEnum.OK).send(resource);
   }
 }

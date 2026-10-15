@@ -28,11 +28,18 @@ package "conversations.domain" {
   }
 
   class ConversationDraft {
-    -conversationId: ConversationId
+    -draftKey: ConversationDraftKey
     -encryptedPayload: EncryptedMessagePayload
     -updatedAt: Timestamp
   }
+  class ConversationDraftKey <<ValueObject>>
   class EncryptedMessagePayload <<ValueObject>>
+
+  note right of ConversationDraft
+    Owner-only. The key is the client's
+    HMAC(owner draft key, conversation id),
+    so the node never learns the conversation.
+  end note
 
   class ConversationOperation <<ValueObject>> {
     +id: conversation:<conversationId>:op:<digest>
@@ -83,7 +90,7 @@ package "conversations.domain" {
   Conversation --> GroupConversationName
   Conversation --> ConversationAdmins
   Conversation o--> IdentityId
-  ConversationDraft --> ConversationId
+  ConversationDraft --> ConversationDraftKey
   ConversationDraft --> EncryptedMessagePayload
   ConversationRepository --> Conversation
   ConversationRepository ..> ConversationOperation
@@ -115,21 +122,19 @@ package "conversations.application" {
     +find(query): Promise<Conversation[]>
   }
 
-  class ConversationDraftSaver
+  class ConversationDraftSaver {
+    +MAX_DRAFTS_PER_IDENTITY: 100
+  }
   class ConversationDraftDeleter
   class ConversationDraftsFinder
-  class ConversationDraftAccess
 
   ConversationCreator --> ConversationRepository
   ConversationMemberChanger --> ConversationRepository
   ConversationFrontierFinder --> ConversationRepository
   ConversationsFinder --> ConversationRepository
   ConversationDraftSaver --> ConversationDraftRepository
-  ConversationDraftSaver ..> ConversationDraftAccess
   ConversationDraftDeleter --> ConversationDraftRepository
-  ConversationDraftDeleter ..> ConversationDraftAccess
   ConversationDraftsFinder --> ConversationDraftRepository
-  ConversationDraftAccess --> ConversationRepository
 }
 
 package "conversations.infrastructure" {

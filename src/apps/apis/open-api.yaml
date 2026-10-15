@@ -238,6 +238,8 @@ paths:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations'
   /conversations/me/drafts:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1me~1drafts'
+  /conversations/me/drafts/{draftKey}:
+    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1me~1drafts~1{draftKey}'
   /conversations/{conversationId}/frontier:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1frontier'
   /conversations/{conversationId}/members:
@@ -248,8 +250,6 @@ paths:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1members~1{identityId}'
   /conversations/{conversationId}/admins/{identityId}:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1admins~1{identityId}'
-  /conversations/{conversationId}/draft:
-    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1{conversationId}~1draft'
   /identities/:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1'
   /identities/{reference}:
