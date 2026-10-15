@@ -655,20 +655,34 @@ async function main(): Promise<void> {
   );
   await pause(3000);
   // The decoder itself refuses these shapes, so even the ungated node keeps
-  // them out of its fold.
+  // them out of its fold. The control node still holds the earlier forgeries
+  // it adopted without the gate, so only the honest node must hold nothing
+  // but the ledger; both must hold none of these changes.
+  const changeIds = new Set(
+    [...oneToOneChanges, ...groupChanges].map((change) => change.id as string),
+  );
+
+  await assertNoForgedOperation('1:1 after genesis', oneToOneId, honest);
   for (const replica of [honest, control]) {
-    await assertNoForgedOperation('1:1 after genesis', oneToOneId, replica);
+    assert.deepEqual(
+      (await replica.repository!.findOperations(oneToOneId))
+        .map((operation) => operation.getId())
+        .filter((operationId) => changeIds.has(operationId)),
+      [],
+      `${replica.name} must not admit a legacy member or admin change`,
+    );
     assert.equal(
       await replica.repository!.hasById(legacyId),
       false,
       `${replica.name} must not fold legacy group changes into a conversation`,
     );
+    assert.deepEqual(
+      (await replica.repository!.requireMetadataById(oneToOneId)).toPrimitives()
+        .participantIds,
+      [owner.id, erin.id].sort(),
+      `${replica.name} must keep the 1:1 participants`,
+    );
   }
-  assert.deepEqual(
-    (await honest.repository!.requireMetadataById(oneToOneId)).toPrimitives()
-      .participantIds,
-    [owner.id, erin.id].sort(),
-  );
   console.log(
     'PASS really signed member and admin changes replicated to the raw stores and changed no conversation on the gated or the ungated node',
   );
