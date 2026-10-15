@@ -66,7 +66,8 @@ The backend is organized around bounded contexts:
 
 * `identities`: public identity documents, profiles and network membership.
 * `keychains`: encrypted client keychain publications.
-* `conversations`: one-to-one and group chat state.
+* `conversations`: one-to-one conversation state and encrypted drafts; group
+  rosters live in MLS on the clients.
 * `communities`: public/private communities, members, roles, channels and
   channel messages.
 * `notifications`: invitation notifications and recipient actions.

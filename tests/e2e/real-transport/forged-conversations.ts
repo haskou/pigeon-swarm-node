@@ -1,6 +1,5 @@
 import 'reflect-metadata';
 import { ConversationOperation } from '@app/contexts/conversations/domain/operations/ConversationOperation';
-import { ConversationOperationLimits } from '@app/contexts/conversations/domain/operations/ConversationOperationLimits';
 import { ConversationStateFold } from '@app/contexts/conversations/domain/operations/ConversationStateFold';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { ConversationOperationAction } from '@app/contexts/conversations/domain/value-objects/ConversationOperationAction';
@@ -31,6 +30,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 
+import { legacyGroupGenesis } from '../../support/legacyGroupGenesis';
 import {
   ConversationOperationSigner,
   signConversationOperation,
@@ -62,9 +62,6 @@ type Hand = {
   content: Record<string, unknown>;
   signer: ConversationOperationSigner;
 };
-
-/** The protocol limit is 1000 operations per author; a smaller one keeps the replicated head within one block. */
-const QUOTA = 30;
 
 const act = (name: keyof typeof ConversationOperationAction & string): string =>
   (
@@ -300,29 +297,6 @@ async function converged(
   }
 }
 
-async function submit(
-  replica: Replica,
-  id: ConversationId,
-  signer: ConversationOperationSigner,
-  name: Parameters<typeof act>[0],
-  args: Record<string, unknown>,
-): Promise<SignedConversationOperation> {
-  const signed = signConversationOperation({
-    action: act(name),
-    args,
-    conversationId: id.valueOf(),
-    createdAt: clock++,
-    networkId,
-    parents: await replica.repository!.findFrontier(id),
-    signer,
-  });
-
-  await replica.repository!.saveOperation(signed.operation, signed.proof);
-  ledger.push(signed);
-
-  return signed;
-}
-
 function record(signed: SignedConversationOperation): Record<string, unknown> {
   return PublicMutationRecord.withProof(
     { ...signed.operation.toPrimitives() },
@@ -360,25 +334,6 @@ const content = (
   parents,
   scopeType: 'conversation_operation',
 });
-
-const groupGenesis = (
-  creator: ConversationOperationSigner,
-  members: ConversationOperationSigner[],
-  name: string,
-): { id: ConversationId; nonce: string; args: Record<string, unknown> } => {
-  const nonce = randomUUID();
-
-  return {
-    args: {
-      name,
-      nonce,
-      participantIds: [creator, ...members].map((member) => member.id).sort(),
-      type: 'group',
-    },
-    id: ConversationId.deriveGroup(networkId, creator.id, nonce),
-    nonce,
-  };
-};
 
 /**
  * The malicious node writes straight into the replicated stores: the records
@@ -510,38 +465,16 @@ async function main(): Promise<void> {
   root = await mkdtemp(path.join(tmpdir(), 'pigeon-forged-conversations-'));
   process.env.NODE_ENV = 'test';
   process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED = 'false';
-  (
-    ConversationOperationLimits as unknown as {
-      MAX_OPERATIONS_PER_AUTHOR: number;
-    }
-  ).MAX_OPERATIONS_PER_AUTHOR = QUOTA;
   await startNodes();
   const [honest, malicious, control] = nodes;
-  const [owner, alice, bob, carol, dave, erin, gina, mallory, frank, extra] =
-    await Promise.all(Array.from({ length: 10 }, () => actor()));
+  const [owner, alice, erin, mallory, frank] = await Promise.all(
+    Array.from({ length: 5 }, () => actor()),
+  );
 
   await connect();
   await synchronization(true);
 
-  stage = 'signed group creation replicates';
-  const group = groupGenesis(
-    owner,
-    [alice, bob, carol, dave],
-    'Forgery target',
-  );
-  const genesis = signConversationOperation({
-    action: act('CONVERSATION_CREATED'),
-    args: group.args,
-    conversationId: group.id.valueOf(),
-    createdAt: clock++,
-    networkId,
-    parents: [],
-    signer: owner,
-  });
-
-  await honest.repository!.saveOperation(genesis.operation, genesis.proof);
-  ledger.push(genesis);
-  await converged('group genesis reached every node', group.id);
+  stage = 'signed 1:1 creation replicates';
   const oneToOneId = ConversationId.deterministic(owner.id, erin.id, networkId);
   const oneToOne = signConversationOperation({
     action: act('CONVERSATION_CREATED'),
@@ -559,205 +492,114 @@ async function main(): Promise<void> {
   await control.repository!.saveOperation(oneToOne.operation, oneToOne.proof);
   ledger.push(oneToOne);
   await converged('1:1 genesis reached every node', oneToOneId);
-  console.log('PASS signed group and 1:1 creation replicated to three nodes');
+  console.log('PASS signed 1:1 creation replicated to three nodes');
 
-  stage = 'signed roster changes converge';
-  await submit(honest, group.id, owner, 'ADMIN_PROMOTED', {
-    identityId: alice.id,
+  stage = 'a group genesis an older node signed is refused';
+  const legacy = legacyGroupGenesis({
+    createdAt: clock++,
+    creatorIdentityId: owner.id,
+    networkId,
+    participantIds: [owner.id, alice.id],
   });
-  await converged('promotion reached every node', group.id);
-  await submit(control, group.id, owner, 'ADMIN_PROMOTED', {
-    identityId: carol.id,
-  });
-  await converged('second promotion reached every node', group.id);
-  await submit(malicious, group.id, alice, 'MEMBER_ADDED', {
-    identityId: erin.id,
-  });
-  await converged('admin add reached every node', group.id);
-  await submit(honest, group.id, carol, 'MEMBER_ADDED', {
-    identityId: gina.id,
-  });
-  await converged('second add reached every node', group.id);
-  await submit(control, group.id, alice, 'MEMBER_REMOVED', {
-    identityId: dave.id,
-  });
-  await converged('removal reached every node', group.id);
-  await submit(honest, group.id, bob, 'MEMBER_LEFT', {});
-  await converged('leave reached every node', group.id);
-  await submit(malicious, group.id, owner, 'ADMIN_DEMOTED', {
-    identityId: carol.id,
-  });
-  await converged('demotion reached every node', group.id);
-  await submit(honest, group.id, owner, 'ADMIN_PROMOTED', {
-    identityId: carol.id,
-  });
-  await converged('re-promotion reached every node', group.id);
-  assert.deepEqual(expectedView(group.id), {
-    admins: [alice.id, carol.id].sort(),
-    creator: owner.id,
-    members: [owner.id, alice.id, carol.id, erin.id, gina.id].sort(),
-    name: 'Forgery target',
-  });
+  const legacyId = new ConversationId(legacy.conversationId);
+  const legacyRecord = PublicMutationRecord.withProof(
+    legacy,
+    signConversationOperationRecord(legacy, owner),
+  );
+
+  await plant(malicious, legacyId, [legacyRecord], []);
+  await reachedRawStores(
+    'legacy group genesis',
+    [honest, control],
+    [legacyRecord],
+  );
+  await pause(3000);
+  for (const replica of [honest, control])
+    assert.equal(
+      await replica.repository!.hasById(legacyId),
+      false,
+      `${replica.name} must not fold a group genesis into a conversation`,
+    );
   console.log(
-    'PASS signed add, remove, leave, promote and demote converged on every node',
+    'PASS a really signed group genesis replicated to the raw stores and created no conversation on the gated or the ungated node',
   );
 
   stage = 'forged conversation operations are ignored';
-  const frontier = await malicious.repository!.findFrontier(group.id);
-  const forgedOp = (
-    signer: ConversationOperationSigner,
-    name: Parameters<typeof act>[0],
-    args: Record<string, unknown>,
-    parents = frontier,
-  ): Record<string, unknown> =>
-    handmade({
-      content: content(signer, name, group.id, args, parents),
-      signer,
-    });
+  const ownerFrankId = ConversationId.deterministic(
+    owner.id,
+    frank.id,
+    networkId,
+  );
   const wrongSignature = signConversationOperation({
-    action: act('MEMBER_ADDED'),
-    args: { identityId: mallory.id },
-    conversationId: group.id.valueOf(),
+    action: act('CONVERSATION_CREATED'),
+    args: {
+      participantIds: [owner.id, frank.id].sort(),
+      type: 'one-to-one',
+    },
+    conversationId: ownerFrankId.valueOf(),
     createdAt: clock++,
     networkId,
-    parents: frontier,
+    parents: [],
     signer: { ...owner, deviceKeyPair: mallory.deviceKeyPair },
   });
-  const spoofedGroup = groupGenesis(mallory, [alice], 'Spoofed');
-  const hijackNonce = group.nonce;
+  // A genesis claiming the deterministic id of the 1:1 of two other identities.
+  const hijack = handmade({
+    content: content(
+      mallory,
+      'CONVERSATION_CREATED',
+      oneToOneId,
+      { participantIds: [owner.id, erin.id].sort(), type: 'one-to-one' },
+      [],
+    ),
+    signer: mallory,
+  });
   const forgeries: Record<string, unknown>[] = [
-    // The author is not the identity whose device signed.
-    record(wrongSignature),
-    // A non member changes the roster.
-    forgedOp(mallory, 'MEMBER_ADDED', { identityId: mallory.id }),
-    // A plain member adds, removes, promotes.
-    forgedOp(erin, 'MEMBER_ADDED', { identityId: frank.id }),
-    forgedOp(erin, 'MEMBER_REMOVED', { identityId: gina.id }),
-    forgedOp(erin, 'ADMIN_PROMOTED', { identityId: erin.id }),
-    forgedOp(gina, 'ADMIN_PROMOTED', { identityId: gina.id }),
-    // An admin cannot promote or demote, only the creator can.
-    forgedOp(alice, 'ADMIN_PROMOTED', { identityId: gina.id }),
-    forgedOp(alice, 'ADMIN_DEMOTED', { identityId: carol.id }),
-    // Nobody removes themselves, nobody removes the creator, an admin does not remove an admin.
-    forgedOp(gina, 'MEMBER_REMOVED', { identityId: gina.id }),
-    forgedOp(alice, 'MEMBER_REMOVED', { identityId: alice.id }),
-    forgedOp(alice, 'MEMBER_REMOVED', { identityId: owner.id }),
-    forgedOp(carol, 'MEMBER_REMOVED', { identityId: owner.id }),
-    forgedOp(alice, 'MEMBER_REMOVED', { identityId: carol.id }),
-    // The creator cannot leave.
-    forgedOp(owner, 'MEMBER_LEFT', {}),
-    // Members that left or were removed cannot come back by themselves.
-    forgedOp(bob, 'MEMBER_ADDED', { identityId: bob.id }),
-    forgedOp(dave, 'MEMBER_ADDED', { identityId: dave.id }),
-    // The creator signs an operation whose parents nobody has.
-    forgedOp(owner, 'MEMBER_ADDED', { identityId: frank.id }, [
-      PublicMutationProof.digestOf({ parent: 'nobody has this operation' }),
-    ]),
-    // Arguments above the size limit, really signed by the creator.
-    forgedOp(owner, 'MEMBER_ADDED', {
-      identityId: frank.id,
-      padding: 'x'.repeat(5000),
-    }),
-    // A genesis claiming the id of the group by someone who did not derive it.
-    handmade({
-      content: content(
-        mallory,
-        'CONVERSATION_CREATED',
-        group.id,
-        {
-          name: 'Hijack',
-          nonce: hijackNonce,
-          participantIds: [mallory.id, alice.id].sort(),
-          type: 'group',
-        },
-        [],
-      ),
-      signer: mallory,
-    }),
-    // A genesis whose author is not among its participants.
-    handmade({
-      content: content(
-        mallory,
-        'CONVERSATION_CREATED',
-        spoofedGroup.id,
-        { ...spoofedGroup.args, participantIds: [alice.id, bob.id].sort() },
-        [],
-      ),
-      signer: mallory,
-    }),
-    // A genesis claiming the deterministic id of the 1:1 of two other identities.
-    handmade({
-      content: content(
-        mallory,
-        'CONVERSATION_CREATED',
-        oneToOneId,
-        { participantIds: [owner.id, erin.id].sort(), type: 'one-to-one' },
-        [],
-      ),
-      signer: mallory,
-    }),
+    hijack,
     // A tombstone and a replay of an honest operation under another scope.
     {
-      conversationId: group.id.valueOf(),
+      conversationId: oneToOneId.valueOf(),
       deleted: true,
-      id: `conversation:${group.id.valueOf()}:forged:tombstone`,
+      id: `conversation:${oneToOneId.valueOf()}:forged:tombstone`,
       networkId,
       removed: true,
       updatedAt: Date.now() + 10 ** 12,
     },
     {
-      ...record(ledger[2]),
-      conversationId: ConversationId.deriveGroup(
-        networkId,
+      ...record(oneToOne),
+      conversationId: ConversationId.deterministic(
         mallory.id,
-        'elsewhere',
+        alice.id,
+        networkId,
       ).valueOf(),
     },
   ];
-  const forgedIds = forgeries.map((forgery) => forgery.id as string);
-  const stored = (await honest.repository!.findOperations(group.id)).length;
+  // The author is not the identity whose device signed.
+  const wronglySigned = record(wrongSignature);
 
-  await plant(malicious, group.id, forgeries);
-  // The spoofed genesis and the 1:1 hijack are also offered in their own heads.
-  await plant(malicious, oneToOneId, [forgeries[forgeries.length - 3]]);
-  await reachedRawStores('forged operations', [honest, control], forgeries);
+  await plant(malicious, oneToOneId, forgeries);
+  await plant(malicious, ownerFrankId, [wronglySigned], []);
+  await reachedRawStores(
+    'forged operations',
+    [honest, control],
+    [...forgeries, wronglySigned],
+  );
   await pause(3000);
-  await assertControlHoldsForged(group.id, control, forgedIds);
-  await assertNoForgedOperation('group', group.id, honest);
+  await assertControlHoldsForged(oneToOneId, control, [hijack.id as string]);
   await assertNoForgedOperation('1:1', oneToOneId, honest);
   assert.equal(
-    (await honest.repository!.findOperations(group.id)).length,
-    stored,
-    'The honest node must hold exactly the honest operations',
-  );
-  assert.equal(
-    await honest.repository!.hasById(
-      ConversationId.deriveGroup(networkId, mallory.id, spoofedGroup.nonce),
-    ),
+    await honest.repository!.hasById(ownerFrankId),
     false,
-    'A spoofed genesis must not create a conversation',
+    'A genesis signed by another identity device must not create a conversation',
   );
   // Without the gate nothing checks signatures, so the control node adopts the
-  // member added with a wrong signature: the attack is real and only the gate stops it.
-  assert.ok(
-    (await observedView(control, group.id)) &&
-      JSON.stringify(await observedView(control, group.id)).includes(
-        mallory.id,
-      ),
-    'The ungated control node must adopt the wrongly signed member',
-  );
-  const honestIds = idsOf(group.id);
-
-  assert.deepEqual(
-    (await control.repository!.findOperations(group.id))
-      .map((operation) => operation.getId())
-      .filter((operationId) => honestIds.has(operationId))
-      .sort(),
-    [...honestIds].sort(),
-    'The honest operations are a subset of what the control node holds',
+  // wrongly signed genesis: the attack is real and only the gate stops it.
+  assert.equal(
+    await control.repository!.hasById(ownerFrankId),
+    true,
+    'The ungated control node must adopt the wrongly signed genesis',
   );
   console.log(
-    'PASS forged signatures, non-member and plain-member changes, self removal, creator removal, admin removal, creator leave, rejoin, unknown parents, oversized arguments, spoofed genesis, tombstone and cross-scope replay rejected by the gated node while the ungated node replicated them',
+    'PASS forged signature, 1:1 hijack, tombstone and cross-scope replay rejected by the gated node while the ungated node replicated them',
   );
 
   stage = 'one-to-one is immutable';
@@ -809,97 +651,6 @@ async function main(): Promise<void> {
     [owner.id, erin.id].sort(),
   );
   console.log('PASS operations on a 1:1 after its genesis rejected');
-
-  stage = 'author quota';
-  const crowded = groupGenesis(owner, [alice], 'Crowded');
-  const crowdedGenesis = signConversationOperation({
-    action: act('CONVERSATION_CREATED'),
-    args: crowded.args,
-    conversationId: crowded.id.valueOf(),
-    createdAt: clock++,
-    networkId,
-    parents: [],
-    signer: owner,
-  });
-
-  await honest.repository!.saveOperation(
-    crowdedGenesis.operation,
-    crowdedGenesis.proof,
-  );
-  ledger.push(crowdedGenesis);
-  await converged('crowded genesis reached every node', crowded.id);
-  await submit(honest, crowded.id, owner, 'ADMIN_PROMOTED', {
-    identityId: alice.id,
-  });
-  await converged('crowded promotion reached every node', crowded.id);
-  // The 31st operation of a non creator is the one over the quota.
-  let parents = await malicious.repository!.findFrontier(crowded.id);
-  const quotaOperations: SignedConversationOperation[] = [];
-
-  for (let index = 0; index <= QUOTA; index++) {
-    const signed = signConversationOperation({
-      action: act(index % 2 === 0 ? 'MEMBER_ADDED' : 'MEMBER_REMOVED'),
-      args: { identityId: extra.id },
-      conversationId: crowded.id.valueOf(),
-      createdAt: clock++,
-      networkId,
-      parents,
-      signer: alice,
-    });
-
-    quotaOperations.push(signed);
-    parents = [signed.operation.getHash()];
-  }
-  const overQuota = quotaOperations[QUOTA];
-  const withinQuota = quotaOperations.slice(0, QUOTA);
-
-  ledger.push(...withinQuota);
-  await plant(
-    malicious,
-    crowded.id,
-    quotaOperations.map(record),
-    ledger
-      .filter((signed) =>
-        signed.operation.getConversationId().isEqual(crowded.id),
-      )
-      .filter((signed) => !quotaOperations.includes(signed))
-      .map(record),
-  );
-  await reachedRawStores(
-    'quota operations',
-    [honest, control],
-    [record(overQuota)],
-  );
-  await converged('quota operations folded by the honest node', crowded.id, [
-    honest,
-  ]);
-  await pause(3000);
-  await assertNoForgedOperation('quota', crowded.id, honest);
-  assert.ok(
-    !(await honest.repository!.findOperations(crowded.id))
-      .map((operation) => operation.getId())
-      .includes(overQuota.operation.getId()),
-  );
-  const controlIds = (await control.repository!.findOperations(crowded.id)).map(
-    (operation) => operation.getId(),
-  );
-
-  assert.ok(
-    controlIds.includes(overQuota.operation.getId()),
-    'The ungated node must hold the operation over the quota',
-  );
-  await assert.rejects(
-    honest.repository!.saveOperation(overQuota.operation, overQuota.proof),
-    'The honest node must refuse to store an operation over the author quota',
-  );
-  assert.deepEqual(
-    await observedView(control, crowded.id),
-    expectedView(crowded.id),
-    'The ungated node skips the operation over the quota in its fold too',
-  );
-  console.log(
-    `PASS the operation over the author quota rejected (quota lowered to ${QUOTA} for the run)`,
-  );
 }
 
 const watchdog = setTimeout(() => {

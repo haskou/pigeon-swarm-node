@@ -5,7 +5,7 @@ Feature: End call
 
   Scenario: End a group call
     Given I register a test IPFS network "api-calls-end-network"
-    And I have created a group conversation
+    And I have published a keychain for the authenticated identity
     And I set a group capability call body
     And I sign the current call start request
     When I POST to "/calls/"

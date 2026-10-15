@@ -100,22 +100,15 @@ export class ConversationOperation {
   }
 
   /**
-   * The only id a genesis may carry: a group id commits to its creator and
-   * nonce, a 1:1 id to its two participants, so an id cannot be claimed by
-   * someone else's genesis.
+   * The only id a genesis may carry: a 1:1 id commits to its two
+   * participants, so an id cannot be claimed by someone else's genesis.
+   * Group conversations live in MLS, so a group genesis an older node
+   * replicates has no id it may carry and is refused.
    */
   private static genesisConversationIdOf(
     primitives: ConversationOperationPrimitives,
   ): string {
     const { args } = primitives;
-
-    if (args.type === 'group' && typeof args.nonce === 'string') {
-      return ConversationId.deriveGroup(
-        primitives.networkId,
-        primitives.authorIdentityId,
-        args.nonce,
-      ).valueOf();
-    }
 
     if (
       args.type === 'one-to-one' &&

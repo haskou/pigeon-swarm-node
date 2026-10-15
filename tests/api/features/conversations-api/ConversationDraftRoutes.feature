@@ -116,7 +116,7 @@ Feature: Conversation drafts live under opaque keys
     Then response code is equal to 400
 
   Scenario Outline: The conversation id draft route does not exist
-    Given I have created a group conversation
+    Given I have created a one-to-one conversation
     And I set json body
       """
       {

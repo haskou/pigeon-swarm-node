@@ -17,7 +17,7 @@ describe('Conversation', () => {
   });
 
   it('should expose only roster metadata, never messages', () => {
-    const primitives = mother.buildGroup().toPrimitives();
+    const primitives = mother.build().toPrimitives();
 
     expect(Object.keys(primitives).sort()).toEqual([
       'adminIds',
@@ -39,10 +39,10 @@ describe('Conversation', () => {
   });
 
   it('should round-trip its primitives', () => {
-    const group = mother.buildGroup();
+    const conversation = mother.build();
 
     expect(
-      Conversation.fromPrimitives(group.toPrimitives()).toPrimitives(),
-    ).toEqual(group.toPrimitives());
+      Conversation.fromPrimitives(conversation.toPrimitives()).toPrimitives(),
+    ).toEqual(conversation.toPrimitives());
   });
 });

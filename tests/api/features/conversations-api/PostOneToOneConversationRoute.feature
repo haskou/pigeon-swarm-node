@@ -15,18 +15,19 @@ Feature: Post one-to-one conversation route
       | type | one-to-one |
     And response body should contain "one-to-one:"
 
-  Scenario: Create group conversation successfully
+  Scenario: Refuse a group conversation genesis signed as older clients did
     Given I am an anonymous user
     And I register a test IPFS network "conversation-api-group-network"
     And I have published a keychain for the authenticated identity
     And I set a group conversation body for new participants
-    And I sign the current one-to-one conversation request
+    And I sign the current group conversation request as an older client did
     When I POST to "/conversations/"
+    Then response code is equal to 409
+    And response body should contain "InvalidConversationOperationError"
+    And I sign the current conversations request
+    When I GET current conversations
     Then response code is equal to 200
-    And response contains a valid resource with the following fields
-      | type | group |
-      | name | api-group |
-    And response body should contain "group:"
+    And response body should not contain "group:"
 
   Scenario: Reject an expired signed request timestamp
     Given I am an anonymous user

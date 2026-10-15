@@ -76,6 +76,11 @@ recommended design does not need it.
 
 ## Slice 1: conversations
 
+> **D15 (group roster in MLS):** group conversations no longer live on the
+> node. Their roster moved into MLS on the clients, and the node refuses the
+> group records older nodes accepted. The group parts of this slice describe
+> what was built and is being removed.
+
 ### Threat today
 
 - `OrbitDBConversationDocument` is `{createdAt, id, lastEventId?,
@@ -137,7 +142,7 @@ reused unchanged: `PublicMutationProof`, `PublicMutationPolicy`,
   "action": "conversation_created | member_added | member_removed | member_left | admin_promoted | admin_demoted",
   "args": { /* per action, see below */ },
   "authorIdentityId": "<identityId>",
-  "conversationId": "group:<hash> | one-to-one:<hash>",
+  "conversationId": "one-to-one:<hash>",
   "createdAt": 1770000000000,          // author-claimed, informational only
   "id": "conversation:<conversationId>:op:<digest>",
   "networkId": "<networkId>",
@@ -153,7 +158,7 @@ Canonicalization, digest and signature are exactly those of
 
 | Action | Args | Authorization (against the folded past) |
 | --- | --- | --- |
-| `conversation_created` | group: `{type: 'group', nonce, name, participantIds}`; 1:1: `{type: 'one-to-one', participantIds}` | genesis, see below |
+| `conversation_created` | `{type: 'one-to-one', participantIds}` | genesis, see below |
 | `member_added` | `{identityId}` | author is creator or admin; target not a member; member cap |
 | `member_removed` | `{identityId}` | author is creator or admin; target is a member and not the creator; removing an admin needs the creator |
 | `member_left` | `{}` | author is a member and not the creator |
@@ -162,18 +167,18 @@ Canonicalization, digest and signature are exactly those of
 
 Genesis id binding (policy recomputes it, rejects on mismatch):
 
-- group: `group:` + base64url(sha256(canonicalize({creatorIdentityId,
-  networkId, nonce}))). The id commits to the creator, so nobody can claim an
-  existing id. The client generates the nonce. Replaces random `ShortId`.
 - one-to-one: `ConversationId.deterministic(a, b, networkId)` over the two
   `participantIds`; the author is `a` or `b`; no nonce, no name.
+- group: none. Group rosters live in MLS (D15), so a group genesis
+  (`{type: 'group', nonce, name, participantIds}` under a `group:` id derived
+  from creator, network and nonce, the shape older nodes accepted) is refused
+  by the gate and folds to no conversation.
 
 ### Admission policy (`assertPermitted`)
 
 1. Shape valid; operation id recomputes; genesis if and only if `parents` is empty.
-2. Genesis: id binding above; `participantIds` sorted, unique and includes the
-   author; group has between 2 and the group member cap, 1:1 exactly 2;
-   `name` bounded by `GroupConversationName`.
+2. Genesis: id binding above; `participantIds` sorted, unique, includes the
+   author and holds exactly 2 identities.
 3. Other operations: every parent is known (else refused and retried by the
    registry), the author is authorized by the state folded from the parents,
    arguments at most 4096 bytes, per-author quota (creator exempt).
@@ -202,7 +207,7 @@ conversation is refused and re-admitted by the registry.
 
 - `POST /conversations` gains a required client-device-signed `mutation` over
   the genesis operation. The node holds no user key, so the client builds the
-  operation (including the group nonce and therefore the id) and signs it.
+  operation (and therefore the id) and signs it.
 - New signed endpoints for group operations (add member, remove member, leave,
   promote admin, demote admin) plus `GET /conversations/:id/frontier`, modelled
   on the community operation endpoints.
@@ -227,7 +232,7 @@ conversation is refused and re-admitted by the registry.
   non-admin, foreign head key planted under a victim head, forged participant
   index, forged pubsub announce. `two-real-node-gossipsub` is updated to the new
   contract. A smoke test runs on a real node.
-- Cucumber: create group/1:1 with and without `mutation`.
+- Cucumber: create a 1:1 with and without `mutation`; a group genesis is refused.
 
 ### Migration
 

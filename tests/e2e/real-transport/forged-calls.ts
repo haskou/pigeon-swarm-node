@@ -1,6 +1,4 @@
 import 'reflect-metadata';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { ConversationOperationAction } from '@app/contexts/conversations/domain/value-objects/ConversationOperationAction';
 import OrbitDBConversationRepository from '@app/contexts/conversations/infrastructure/orbitdb/OrbitDBConversationRepository';
 import ConversationOperationMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationOperationMutationPolicy';
 import { Call } from '@app/contexts/calls/domain/Call';
@@ -41,7 +39,6 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { signConversationOperation } from '../../support/signConversationOperation';
 import {
   CallSigner,
   signCallEnd,
@@ -94,7 +91,6 @@ const authorization: PublicMutationAuthorAuthorization = {
 };
 const pause = (milliseconds: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
-let clock = 1_780_000_000_000;
 let stage = 'setup';
 let root: string;
 
@@ -276,11 +272,6 @@ async function startNodes(): Promise<void> {
   }
 }
 
-const act = (name: keyof typeof ConversationOperationAction & string): string =>
-  (
-    ConversationOperationAction[name] as unknown as { valueOf(): string }
-  ).valueOf();
-
 const NONCE = (n: number): string =>
   `call-e2e-nonce-${String(n).padStart(6, '0')}`;
 
@@ -297,39 +288,6 @@ async function main(): Promise<void> {
 
   await connect();
   await synchronization(true);
-
-  stage = 'signed group creation replicates';
-  const nonce = randomUUID();
-  const group = ConversationId.deriveGroup(networkId, owner.id, nonce);
-  const genesis = signConversationOperation({
-    action: act('CONVERSATION_CREATED'),
-    args: {
-      name: 'Calls',
-      nonce,
-      participantIds: [owner.id, alice.id, bob.id].sort(),
-      type: 'group',
-    },
-    conversationId: group.valueOf(),
-    createdAt: clock++,
-    networkId,
-    parents: [],
-    signer: owner,
-  });
-
-  await honest.conversations!.saveOperation(genesis.operation, genesis.proof);
-  await until('group reached every node', async () => {
-    for (const replica of nodes)
-      if (!(await replica.conversations!.hasById(group))) return false;
-
-    return true;
-  });
-
-  stage = 'a group conversation cannot start a call that names its members';
-  const conversationScope = {
-    conversationId: group.valueOf(),
-    type: 'conversation',
-  } as const;
-  const participantIds = [owner.id, alice.id, bob.id].sort();
 
   stage = 'signed group-capability call start replicates';
   const scope = {
@@ -436,10 +394,6 @@ async function main(): Promise<void> {
       signer,
       startedAt: at,
     });
-  // A member ringing the group through a start that names its members.
-  const ringing = forgedStart(owner, 2, conversationScope, participantIds);
-
-  await plant(ringing.payload, ringing.proof);
   // A ringing call in a conversation nobody knows.
   const unknown = forgedStart(
     mallory,
@@ -495,7 +449,7 @@ async function main(): Promise<void> {
   // A participant record for a call no admitted start backs.
   const orphan = signCallParticipant({
     at: Date.now(),
-    callId: ringing.callId,
+    callId: unknown.callId,
     signer: owner,
     state: 'joined',
   });
@@ -532,7 +486,6 @@ async function main(): Promise<void> {
   await pause(3000);
 
   for (const forged of [
-    ringing,
     unknown,
     unknownCreator,
     future,
@@ -564,14 +517,14 @@ async function main(): Promise<void> {
   assert.equal(
     (
       await control.stores!.calls.query!(
-        (value) => value.id === ringing.payload.id,
+        (value) => value.id === unknown.payload.id,
       )
     ).length,
     1,
     'The ungated control node must hold the forged start, otherwise the test proves nothing',
   );
   console.log(
-    'PASS group start naming its members, unknown conversation, unknown creator, future start, foreign network, invented community sessionEpoch, outsider join, orphan join, non-creator end and a flood of starts rejected',
+    'PASS unknown conversation, unknown creator, future start, foreign network, invented community sessionEpoch, outsider join, orphan join, non-creator end and a flood of starts rejected',
   );
 }
 

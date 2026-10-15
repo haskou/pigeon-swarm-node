@@ -2604,7 +2604,6 @@ user and there is no unsigned fallback.
 
 ```json
 {
-  "type": "one-to-one",
   "participantIds": ["<authenticatedIdentityId>", "<participantIdentityId>"],
   "networkId": "<networkId>",
   "keychainExternalIdentifier": "<externalIdentifier>",
@@ -2616,68 +2615,44 @@ user and there is no unsigned fallback.
 }
 ```
 
-Standalone group request:
-
-```json
-{
-  "type": "group",
-  "name": "Project room",
-  "nonce": "<random client string>",
-  "participantIds": [
-    "<authenticatedIdentityId>",
-    "<participantIdentityId>",
-    "<anotherParticipantIdentityId>"
-  ],
-  "networkId": "<networkId>",
-  "keychainExternalIdentifier": "<externalIdentifier>",
-  "operation": {
-    "createdAt": 1773848829055,
-    "parents": [],
-    "mutation": { "...": "SignedPublicMutation" }
-  }
-}
-```
-
-`name` and `nonce` are required for `group` and ignored for `one-to-one`. The node
-builds the participant list as the authenticated identity plus `participantIds`,
-deduplicated and sorted ascending, and rebuilds the genesis from it: the signature
-only verifies if the client signed exactly that list.
+The node builds the participant list as the authenticated identity plus
+`participantIds`, deduplicated and sorted ascending, and rebuilds the genesis from
+it: the signature only verifies if the client signed exactly that list, which must
+hold exactly two identities. Any other field (such as the `type`, `name` and `nonce`
+older clients sent for groups) is ignored, and a group genesis is refused with `409`
+`InvalidConversationOperationError`.
 
 Response:
 
 ```json
 {
-  "id": "group:<base64url sha256>",
-  "name": "Project room",
+  "id": "one-to-one:<sha256>",
   "networkId": "<networkId>",
   "participantIds": ["<authenticatedIdentityId>", "<participantIdentityId>"],
   "adminIds": [],
   "creatorId": "<authenticatedIdentityId>",
-  "type": "group"
+  "type": "one-to-one"
 }
 ```
 
-`ConversationResource` carries `adminIds` (the admins, never including the creator)
-and `creatorId` (the author of the genesis). `participantIds` is the folded roster.
+`ConversationResource` carries `adminIds` (always empty for a 1:1) and `creatorId`
+(the author of the genesis). `participantIds` is the folded roster.
 
 Implemented:
 
 - create the one-to-one conversation for the participant pair; a 1:1 id is the
   same for both participants, so whoever creates it second receives the existing
   conversation unchanged
-- create standalone group conversations with a client-provided `name`, a client
-  `nonce` and N explicit participants
 - require the conversation network id; messages and sync for this conversation
   are published only through that network
 - validate that the keychain candidate belongs to the authenticated identity
-- validate the roster rules of the genesis before storing anything
+- validate the genesis before storing anything
 - persist the signed `conversation_created` record in the `conversationOperations`
   OrbitDB store; the node announces nothing else, and the local participant index is
   rebuilt from the folded state
 
-Standalone group conversations are different from future community channels:
-groups use explicit `participantIds`, while community channel access will be
-based on community membership/roles.
+Group conversations are not created on the node: their roster lives in MLS on the
+clients.
 
 ### Signed conversation operations
 
@@ -2749,16 +2724,16 @@ canonicalize(body-without-signature)`, the same signing content as every other
 public mutation and as the community operations. Identity ids are the base64
 public key without PEM headers.
 
-**Conversation id.**
+**Conversation id.** `one-to-one:` + hex sha256 of `<first>:<second>:<networkId>`,
+where `first` and `second` are the two identity ids sorted ascending (plain string
+order). It is the same for both participants. The genesis must carry exactly the id
+derived from its own args.
 
-- Group: `group:` + base64url(sha256(canonicalize({ "creatorIdentityId", "networkId",
-  "nonce" }))) with the creator's identity id, the network id and the client `nonce`.
-  The id commits to its creator, so nobody can claim an existing group id.
-- 1:1: `one-to-one:` + hex sha256 of `<first>:<second>:<networkId>`, where `first`
-  and `second` are the two identity ids sorted ascending (plain string order). It is
-  the same for both participants.
-
-The genesis must carry exactly the id derived from its own args.
+Group conversations live in MLS on the clients (D15): the node creates and folds no
+group conversation. A `conversation_created` record with `type: "group"` (the shape
+older nodes accepted, with a `group:` id derived from creator, network and nonce) is
+refused by the replication gate and by the decoder, so it never becomes a
+conversation.
 
 **Frontier.** The client reads `frontier` from `GET /conversations/{conversationId}/frontier`
 immediately before signing and sends it as the sorted `parents`. The genesis has
@@ -2773,8 +2748,7 @@ on every node.
 
 | Route                                             | action                 | `args`                                         |
 | ------------------------------------------------- | ---------------------- | ---------------------------------------------- |
-| `POST /conversations` (group)                     | `conversation_created` | `{type: "group", name, nonce, participantIds}` |
-| `POST /conversations` (1:1)                       | `conversation_created` | `{type: "one-to-one", participantIds}`         |
+| `POST /conversations`                             | `conversation_created` | `{type: "one-to-one", participantIds}`         |
 | `POST /conversations/{id}/members`                | `member_added`         | `{identityId}`                                 |
 | `DELETE /conversations/{id}/members/{identityId}` | `member_removed`       | `{identityId}`                                 |
 | `DELETE /conversations/{id}/members/me`           | `member_left`          | `{}`                                           |
@@ -2782,10 +2756,9 @@ on every node.
 | `DELETE /conversations/{id}/admins/{identityId}`  | `admin_demoted`        | `{identityId}`                                 |
 
 Each `args` accepts exactly the listed keys (an extra or missing key is refused).
-`participantIds` of a genesis is strictly ascending, unique and includes the
-author: a group has 2 to 256 entries, a 1:1 exactly 2. The author of `member_left`
-is the leaving identity, taken from the authenticated headers, so its `args` is
-empty.
+`participantIds` of a genesis is strictly ascending, unique, includes the author and
+has exactly 2 entries. The author of `member_left` is the leaving identity, taken
+from the authenticated headers, so its `args` is empty.
 
 **Roster rules** (applied identically when a route admits an operation and when
 every node folds it):
@@ -2824,7 +2797,7 @@ every route; `operation` is built as above, with `action` and `args` of the row)
 
 ```text
 POST /conversations                                  action conversation_created
-  parents []                                         args {"name":"Project room","nonce":"n-1","participantIds":["<A>","<B>"],"type":"group"}
+  parents []                                         args {"participantIds":["<A>","<B>"],"type":"one-to-one"}
 POST /conversations/{id}/members   {"identityId":"<C>"}   action member_added   args {"identityId":"<C>"}
 DELETE /conversations/{id}/members/<C>                    action member_removed args {"identityId":"<C>"}
 DELETE /conversations/{id}/members/me                     action member_left    args {}
@@ -2832,19 +2805,17 @@ PUT /conversations/{id}/admins/<B>                        action admin_promoted 
 DELETE /conversations/{id}/admins/<B>                     action admin_demoted  args {"identityId":"<B>"}
 ```
 
-For the first line the creator `<A>` signs the record
+For the first line `<A>` signs the record
 
 ```json
 {
   "action": "conversation_created",
   "args": {
-    "name": "Project room",
-    "nonce": "n-1",
     "participantIds": ["<A>", "<B>"],
-    "type": "group"
+    "type": "one-to-one"
   },
   "authorIdentityId": "<A>",
-  "conversationId": "group:<sha256>",
+  "conversationId": "one-to-one:<sha256>",
   "createdAt": 1773848829055,
   "networkId": "<N>",
   "parents": [],
@@ -2853,16 +2824,19 @@ For the first line the creator `<A>` signs the record
 ```
 
 (keys shown in canonical order), computes `digest` of that JSON, adds
-`"id":"conversation:group:<sha256>:op:<digest>"`, builds the proof over the record
-with `id`, and sends `type: "group"`, `name`, `nonce`, `participantIds: ["<B>"]`
-(or both), `networkId`, `keychainExternalIdentifier` and `operation`. A reference
-signer lives in `tests/support/signConversationOperation.ts`.
+`"id":"conversation:one-to-one:<sha256>:op:<digest>"`, builds the proof over the
+record with `id`, and sends `participantIds: ["<B>"]` (or both), `networkId`,
+`keychainExternalIdentifier` and `operation`. A reference signer lives in
+`tests/support/signConversationOperation.ts`.
 
 Fixed, byte-exact test vectors (keys, ids, digests, signing content, signatures for
-every action, including a unicode group name and a two-parent operation) live in
+every action, including a two-parent operation) live in
 [`tests/fixtures/conversation-operation-vectors.json`](../tests/fixtures/conversation-operation-vectors.json);
 a unit spec recomputes every value with the real domain code, so a client signer can
-assert it reproduces them.
+assert it reproduces them. The `group_genesis` and `group_genesis_unicode` cases are
+the group genesis records older nodes accepted; nodes now refuse them, and the spec
+asserts that the decoder refuses them and that the group operations fold to no
+conversation.
 
 ### Conversation members and admins
 

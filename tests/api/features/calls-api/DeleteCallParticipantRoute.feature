@@ -20,7 +20,7 @@ Feature: Leave call participant
 
   Scenario: Keep a group call active when its only other member leaves
     Given I register a test IPFS network "api-calls-group-leave-network"
-    And I have created a two-member group conversation
+    And I have published a keychain for the authenticated identity
     And I set a group capability call body
     And I sign the current call start request
     When I POST to "/calls/"
@@ -47,7 +47,7 @@ Feature: Leave call participant
 
   Scenario: Refuse a group call join without its capability
     Given I register a test IPFS network "api-calls-group-join-capability-network"
-    And I have created a group conversation
+    And I have published a keychain for the authenticated identity
     And I set a group capability call body
     And I sign the current call start request
     When I POST to "/calls/"

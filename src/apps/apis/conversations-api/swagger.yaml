@@ -359,28 +359,17 @@ components:
             type: string
     PostConversationBody:
       type: object
+      description: Creates a one-to-one conversation. Group conversations live in MLS on the clients; a group genesis is refused.
       required:
-        - type
         - participantIds
         - keychainExternalIdentifier
         - networkId
         - operation
       properties:
-        type:
-          type: string
-          enum:
-            - group
-            - one-to-one
-        name:
-          type: string
-          description: Required when type is group. Standalone group conversation name.
-        nonce:
-          type: string
-          description: Required when type is group. The group id is group:<base64url sha256 of canonicalize({creatorIdentityId, networkId, nonce})>.
         participantIds:
           type: array
           minItems: 1
-          description: The node adds the authenticated identity, deduplicates and sorts; the genesis must have been signed with exactly that list (2 to 256 for groups, exactly 2 for one-to-one).
+          description: The node adds the authenticated identity, deduplicates and sorts; the genesis must have been signed with exactly that list, which must hold exactly 2 identities.
           items:
             type: string
         keychainExternalIdentifier:
@@ -410,9 +399,6 @@ components:
         id:
           type: string
           example: one-to-one:3bd1...
-        name:
-          type: string
-          description: Present for standalone group conversations.
         networkId:
           type: string
           format: uuid
@@ -423,7 +409,6 @@ components:
         type:
           type: string
           enum:
-            - group
             - one-to-one
     ConversationsResource:
       type: object

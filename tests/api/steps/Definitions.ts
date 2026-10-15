@@ -70,6 +70,7 @@ import {
 import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import FormData from 'form-data';
 
+import { legacyGroupGenesis } from '../../support/legacyGroupGenesis';
 import { mineAdmissionNonce } from '../../support/mineAdmissionNonce';
 import {
   CallParticipantState,
@@ -81,7 +82,10 @@ import {
   signCallStart,
 } from '../../support/signCall';
 import { signCommunityOperation } from '../../support/signCommunityOperation';
-import { signConversationOperation } from '../../support/signConversationOperation';
+import {
+  signConversationOperation,
+  signConversationOperationRecord,
+} from '../../support/signConversationOperation';
 import {
   signNotificationInvitation,
   signNotificationState,
@@ -1186,7 +1190,6 @@ export default class Definitions {
 
     this.body = JSON.stringify({
       ...body,
-      ...(genesis?.nonce ? { nonce: genesis.nonce } : {}),
       operation: signed.body,
     });
   }
@@ -1194,13 +1197,7 @@ export default class Definitions {
   private conversationGenesis(
     body: Record<string, unknown>,
     actorIdentityId: string,
-  ): {
-    action: string;
-    args: Record<string, unknown>;
-    conversationId: string;
-    nonce?: string;
-  } {
-    const networkId = String(body.networkId);
+  ): { action: string; args: Record<string, unknown>; conversationId: string } {
     const participantIds = [
       ...new Set([
         actorIdentityId,
@@ -1208,29 +1205,14 @@ export default class Definitions {
       ]),
     ].sort();
 
-    if (body.type !== 'group') {
-      return {
-        action: 'conversation_created',
-        args: { participantIds, type: 'one-to-one' },
-        conversationId: ConversationId.deterministic(
-          participantIds[0],
-          participantIds[1] ?? participantIds[0],
-          networkId,
-        ).valueOf(),
-      };
-    }
-
-    const nonce = randomUUID().replace(/-/g, '');
-
     return {
       action: 'conversation_created',
-      args: { name: body.name, nonce, participantIds, type: 'group' },
-      conversationId: ConversationId.deriveGroup(
-        networkId,
-        actorIdentityId,
-        nonce,
+      args: { participantIds, type: 'one-to-one' },
+      conversationId: ConversationId.deterministic(
+        participantIds[0],
+        participantIds[1] ?? participantIds[0],
+        String(body.networkId),
       ).valueOf(),
-      nonce,
     };
   }
 
@@ -3818,6 +3800,38 @@ export default class Definitions {
     await this.signCurrentRequest('POST', '/conversations/');
   }
 
+  /** Signs the group genesis an older client sent, a shape nodes now refuse. */
+  @given('I sign the current group conversation request as an older client did')
+  public async iSignTheCurrentGroupConversationRequestAsAnOlderClientDid(): Promise<void> {
+    const body = JSON.parse(this.body ?? '{}');
+    const keyPair = await this.resolveSignerKeyPair(undefined);
+    const identityId = new IdentityId(
+      keyPair.toPrimitives().publicKey,
+    ).valueOf();
+    const createdAt = Date.now();
+    const nonce = randomUUID();
+    const record = legacyGroupGenesis({
+      createdAt,
+      creatorIdentityId: identityId,
+      name: body.name,
+      networkId: String(body.networkId),
+      nonce,
+      participantIds: [...new Set([identityId, ...body.participantIds])],
+    });
+    const proof = signConversationOperationRecord(record, {
+      deviceCredential: keyPair.toPrimitives().publicKey,
+      deviceKeyPair: keyPair,
+      id: identityId,
+    });
+
+    this.body = JSON.stringify({
+      ...body,
+      nonce,
+      operation: { createdAt, mutation: proof.toPrimitives(), parents: [] },
+    });
+    await this.signCurrentRequest('POST', '/conversations/');
+  }
+
   @given('I have created a one-to-one conversation')
   public async iHaveCreatedAOneToOneConversation(): Promise<void> {
     await this.iHavePublishedAKeychainForTheAuthenticatedIdentity();
@@ -3837,16 +3851,6 @@ export default class Definitions {
     }
 
     this.conversationId = this.response.data.id;
-  }
-
-  @given('I have created a group conversation')
-  public async iHaveCreatedAGroupConversation(): Promise<void> {
-    await this.createGroupConversation(3);
-  }
-
-  @given('I have created a two-member group conversation')
-  public async iHaveCreatedATwoMemberGroupConversation(): Promise<void> {
-    await this.createGroupConversation(2);
   }
 
   @given('I set a conversation member body for a new identity')
@@ -3903,31 +3907,6 @@ export default class Definitions {
       keyPair,
       isOther ? this.otherIdentityId : undefined,
     );
-  }
-
-  private async createGroupConversation(
-    participantCount: number,
-  ): Promise<void> {
-    await this.iHavePublishedAKeychainForTheAuthenticatedIdentity();
-    await this.iSetAGroupConversationBodyForNewParticipants();
-    const body = JSON.parse(this.body || '{}');
-    body.participantIds = body.participantIds.slice(0, participantCount);
-    this.body = JSON.stringify(body);
-    await this.iSignTheCurrentOneToOneConversationRequest();
-
-    this.response = await this.restClient.post(
-      '/conversations/',
-      JSON.parse(this.body || '{}'),
-      { headers: this.headers },
-    );
-
-    if (this.response.status !== 200) {
-      throw new Error(
-        `Could not create group conversation: ${JSON.stringify(this.response.data)}`,
-      );
-    }
-
-    this.conversationId = this.response.data.id;
   }
 
   @given('I set a conversation call body')

@@ -2,11 +2,9 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
-  IsIn,
   IsNotEmpty,
   IsObject,
   IsString,
-  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 
@@ -21,16 +19,6 @@ export class PostConversationBody {
   @IsNotEmpty()
   public readonly networkId: string;
 
-  @ValidateIf((body: PostConversationBody) => body.type === 'group')
-  @IsString()
-  @IsNotEmpty()
-  public readonly name?: string;
-
-  @ValidateIf((body: PostConversationBody) => body.type === 'group')
-  @IsString()
-  @IsNotEmpty()
-  public readonly nonce?: string;
-
   @IsObject()
   @Type(() => ConversationOperationBody)
   @ValidateNested()
@@ -40,8 +28,4 @@ export class PostConversationBody {
   @ArrayMinSize(1)
   @IsString({ each: true })
   public readonly participantIds: string[];
-
-  @IsString()
-  @IsIn(['group', 'one-to-one'])
-  public readonly type: 'group' | 'one-to-one';
 }
