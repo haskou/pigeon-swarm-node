@@ -33,15 +33,13 @@ export abstract class CallRouteSupport extends Route {
     return new CallViewModel(call, leases, participants).toResource();
   }
 
-  /** Authenticates the requester and charges one signed record to its budget. */
-  protected async authenticateRecordAuthor(
-    request: Request,
-  ): Promise<IdentityId> {
-    const identityId = this.authenticate(request);
-
-    await this.recordRateLimiter.consume(identityId);
-
-    return identityId;
+  /**
+   * Charges one signed record to the author's budget. Handed to a use case, it
+   * runs only once the call accepts the record, right before it is stored: a
+   * refused or not yet answerable request stores nothing and costs nothing.
+   */
+  protected chargeRecordTo(identityId: IdentityId): () => Promise<void> {
+    return () => this.recordRateLimiter.consume(identityId);
   }
 
   protected authenticate(request: Request): IdentityId {

@@ -915,7 +915,13 @@ End (`call_end`):
   ahead of the node clock is refused.
 - Rate cap: at most `CALLS_RECORD_RATE_LIMIT_PER_MINUTE` (default 30) call records
   per identity per minute, enforced on the write path (`429`, code `429021`);
-  the replication gate cannot rate-limit deterministically.
+  the replication gate cannot rate-limit deterministically. Only a record the
+  node is about to store is charged: a request the call refuses (`403`, `404`,
+  or `409` from the call's own rules), a `503020` not-ready answer and a
+  community start that returns the live call store nothing and cost nothing,
+  so retrying `503020` as documented never exhausts the budget. A record the
+  store then rejects stays charged: `400` for a proof that does not match, `409`
+  `StalePublicMutationError` for a stale proof.
 
 **Visibility.** Records and call gossip reach every member of the call's
 network, whether or not that member takes part in the call. The observable

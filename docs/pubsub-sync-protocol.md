@@ -859,7 +859,8 @@ active for `started`, be ended for `ended`, and the participant state must match
 missed-call notification, no push and no WebSocket event on a gated node, a forged active
 channel call does not block `CallStarter`, and `calls.v1.signal.sent`, leases and snapshots are
 unchanged. The call write path is capped at `CALLS_RECORD_RATE_LIMIT_PER_MINUTE` (default 30)
-records per identity per minute (`429`, code `429021`).
+records per identity per minute (`429`, code `429021`), charged only for a record about to be
+stored.
 
 Protected and private communities stay on the local repository and never enter
 the public path.

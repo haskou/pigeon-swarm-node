@@ -14,7 +14,14 @@ export default class CallJoiner {
     private readonly accessAuthorizer: CallAccessAuthorizer,
   ) {}
 
-  public async join(message: CallJoinMessage): Promise<Call> {
+  /**
+   * `onRecordAccepted` runs once the call accepts the join, right before it is
+   * stored; a rejection stores nothing.
+   */
+  public async join(
+    message: CallJoinMessage,
+    onRecordAccepted?: () => Promise<void>,
+  ): Promise<Call> {
     const call = await this.repository.requireById(message.callId);
 
     await this.accessAuthorizer.assertAccess(
@@ -28,6 +35,7 @@ export default class CallJoiner {
       call.join(message.participantIdentityId, message.at);
     }
 
+    await onRecordAccepted?.();
     await this.repository.saveParticipant(
       call,
       message.participantIdentityId,

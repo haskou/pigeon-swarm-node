@@ -14,7 +14,14 @@ export default class CallLeaver {
     private readonly accessAuthorizer: CallAccessAuthorizer,
   ) {}
 
-  public async leave(message: CallLeaveMessage): Promise<Call> {
+  /**
+   * `onRecordAccepted` runs once the call accepts the leave, right before it
+   * is stored; a rejection stores nothing.
+   */
+  public async leave(
+    message: CallLeaveMessage,
+    onRecordAccepted?: () => Promise<void>,
+  ): Promise<Call> {
     const call = await this.repository.requireById(message.callId);
 
     await this.accessAuthorizer.assertAccess(
@@ -24,6 +31,7 @@ export default class CallLeaver {
 
     call.leave(message.participantIdentityId, message.at);
 
+    await onRecordAccepted?.();
     await this.repository.saveParticipant(
       call,
       message.participantIdentityId,

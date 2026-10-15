@@ -27,6 +27,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
 import CallParticipantLeaseRepository from '@app/contexts/calls/domain/repositories/CallParticipantLeaseRepository';
 import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { mock } from 'jest-mock-extended';
@@ -169,7 +170,7 @@ describe('Call application use cases', () => {
     ]);
   });
 
-  it('CallEnder persists the transition and publishes its events', async () => {
+  it('CallEnder persists the transition once accepted and publishes its events', async () => {
     const repository = mock<CallRepository>();
     const eventPublisher = mock<DomainEventPublisher>();
     const call = mock<Call>();
@@ -177,6 +178,7 @@ describe('Call application use cases', () => {
       CallScope.conversation(new ConversationId('conversation')),
     );
     const events = [mock<DomainEvent>()];
+    const onRecordAccepted = jest.fn().mockResolvedValue(undefined);
 
     repository.requireById.mockResolvedValue(call);
     call.pullDomainEvents.mockReturnValue(events);
@@ -189,9 +191,14 @@ describe('Call application use cases', () => {
           mutation,
           1_770_000_000_000,
         ),
+        onRecordAccepted,
       ),
     ).resolves.toBe(call);
     expect(call.end).toHaveBeenCalledTimes(1);
+    expect(onRecordAccepted).toHaveBeenCalledTimes(1);
+    expect(onRecordAccepted.mock.invocationCallOrder[0]).toBeLessThan(
+      repository.saveEnd.mock.invocationCallOrder[0],
+    );
     expect(repository.saveEnd).toHaveBeenCalledWith(call, expect.anything());
     expect(eventPublisher.publish).toHaveBeenCalledWith(events);
   });
@@ -233,7 +240,7 @@ describe('Call application use cases', () => {
     },
   );
 
-  it('CallJoiner renews the lease and publishes aggregate events', async () => {
+  it('CallJoiner renews the lease once accepted and publishes aggregate events', async () => {
     const repository = mock<CallRepository>();
     const eventPublisher = mock<DomainEventPublisher>();
     const leaseRenewer = mock<CallParticipantLeaseRenewer>();
@@ -242,6 +249,7 @@ describe('Call application use cases', () => {
       CallScope.conversation(new ConversationId('conversation')),
     );
     const lease = mock<CallParticipantLease>();
+    const onRecordAccepted = jest.fn().mockResolvedValue(undefined);
 
     repository.requireById.mockResolvedValue(call);
     call.pullDomainEvents.mockReturnValue([]);
@@ -256,9 +264,14 @@ describe('Call application use cases', () => {
           mutation,
           1_770_000_000_000,
         ),
+        onRecordAccepted,
       ),
     ).resolves.toBe(call);
     expect(call.join).toHaveBeenCalledTimes(1);
+    expect(onRecordAccepted).toHaveBeenCalledTimes(1);
+    expect(onRecordAccepted.mock.invocationCallOrder[0]).toBeLessThan(
+      repository.saveParticipant.mock.invocationCallOrder[0],
+    );
     expect(repository.saveParticipant).toHaveBeenCalledWith(
       call,
       expect.anything(),
@@ -269,7 +282,7 @@ describe('Call application use cases', () => {
     expect(eventPublisher.publish).toHaveBeenCalledWith([]);
   });
 
-  it('CallLeaver releases every lease and publishes aggregate events', async () => {
+  it('CallLeaver releases every lease once accepted and publishes aggregate events', async () => {
     const repository = mock<CallRepository>();
     const eventPublisher = mock<DomainEventPublisher>();
     const leaseReleaser = mock<CallParticipantLeaseReleaser>();
@@ -278,6 +291,7 @@ describe('Call application use cases', () => {
       CallScope.conversation(new ConversationId('conversation')),
     );
     const lease = mock<CallParticipantLease>();
+    const onRecordAccepted = jest.fn().mockResolvedValue(undefined);
 
     repository.requireById.mockResolvedValue(call);
     call.pullDomainEvents.mockReturnValue([]);
@@ -303,9 +317,14 @@ describe('Call application use cases', () => {
           mutation,
           1_770_000_000_000,
         ),
+        onRecordAccepted,
       ),
     ).resolves.toBe(call);
     expect(call.leave).toHaveBeenCalledTimes(1);
+    expect(onRecordAccepted).toHaveBeenCalledTimes(1);
+    expect(onRecordAccepted.mock.invocationCallOrder[0]).toBeLessThan(
+      repository.saveParticipant.mock.invocationCallOrder[0],
+    );
     expect(repository.saveParticipant).toHaveBeenCalledWith(
       call,
       expect.anything(),
@@ -319,10 +338,18 @@ describe('Call application use cases', () => {
     expect(eventPublisher.publish).toHaveBeenCalledWith([]);
   });
 
-  it.each([
+  const recordUseCases: Array<
+    [
+      string,
+      (
+        repository: CallRepository,
+        onRecordAccepted: () => Promise<void>,
+      ) => Promise<Call>,
+    ]
+  > = [
     [
       'CallEnder',
-      (repository: CallRepository) =>
+      (repository, onRecordAccepted) =>
         new CallEnder(repository, mock<DomainEventPublisher>(), authorizer).end(
           new CallEndMessage(
             callId,
@@ -330,11 +357,12 @@ describe('Call application use cases', () => {
             mutation,
             1_770_000_000_000,
           ),
+          onRecordAccepted,
         ),
     ],
     [
       'CallJoiner',
-      (repository: CallRepository) =>
+      (repository, onRecordAccepted) =>
         new CallJoiner(
           repository,
           mock<DomainEventPublisher>(),
@@ -347,11 +375,12 @@ describe('Call application use cases', () => {
             mutation,
             1_770_000_000_000,
           ),
+          onRecordAccepted,
         ),
     ],
     [
       'CallLeaver',
-      (repository: CallRepository) =>
+      (repository, onRecordAccepted) =>
         new CallLeaver(
           repository,
           mock<DomainEventPublisher>(),
@@ -364,16 +393,63 @@ describe('Call application use cases', () => {
             mutation,
             1_770_000_000_000,
           ),
+          onRecordAccepted,
         ),
     ],
-  ])('%s rejects a missing call', async (_name, run) => {
-    const repository = mock<CallRepository>();
+  ];
 
-    repository.requireById.mockRejectedValue(new CallNotFoundError());
+  it.each(recordUseCases)(
+    '%s rejects a missing call without accepting a record',
+    async (_name, run) => {
+      const repository = mock<CallRepository>();
+      const onRecordAccepted = jest.fn().mockResolvedValue(undefined);
 
-    await expect(run(repository)).rejects.toBeInstanceOf(CallNotFoundError);
-    expect(repository.saveStart).not.toHaveBeenCalled();
-    expect(repository.saveParticipant).not.toHaveBeenCalled();
-    expect(repository.saveEnd).not.toHaveBeenCalled();
-  });
+      repository.requireById.mockRejectedValue(new CallNotFoundError());
+
+      await expect(run(repository, onRecordAccepted)).rejects.toBeInstanceOf(
+        CallNotFoundError,
+      );
+      expect(onRecordAccepted).not.toHaveBeenCalled();
+      expect(repository.saveStart).not.toHaveBeenCalled();
+      expect(repository.saveParticipant).not.toHaveBeenCalled();
+      expect(repository.saveEnd).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(recordUseCases)(
+    '%s accepts no record while the node is not ready to answer',
+    async (_name, run) => {
+      const repository = mock<CallRepository>();
+      const onRecordAccepted = jest.fn().mockResolvedValue(undefined);
+
+      repository.requireById.mockRejectedValue(
+        new ReplicatedStateNotReadyError(),
+      );
+
+      await expect(run(repository, onRecordAccepted)).rejects.toBeInstanceOf(
+        ReplicatedStateNotReadyError,
+      );
+      expect(onRecordAccepted).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(recordUseCases)(
+    '%s stores nothing when the accepted record is refused',
+    async (_name, run) => {
+      const repository = mock<CallRepository>();
+      const call = mock<Call>();
+      const overBudget = new Error('over budget');
+
+      call.getScope.mockReturnValue(
+        CallScope.conversation(new ConversationId('conversation')),
+      );
+      repository.requireById.mockResolvedValue(call);
+
+      await expect(
+        run(repository, jest.fn().mockRejectedValue(overBudget)),
+      ).rejects.toBe(overBudget);
+      expect(repository.saveParticipant).not.toHaveBeenCalled();
+      expect(repository.saveEnd).not.toHaveBeenCalled();
+    },
+  );
 });
