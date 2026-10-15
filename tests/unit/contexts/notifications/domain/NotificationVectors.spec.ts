@@ -71,21 +71,30 @@ describe('Notification vectors', () => {
 
       if (derived.idPreimage) {
         const payload = derived.payload as Record<string, string>;
+        const group = payload.type === 'group_conversation_invitation';
 
+        expect('subjectId' in payload).toBe(!group);
         expect(
           canonicalize({
             inviterIdentityId: payload.inviterIdentityId,
             nonce: payload.nonce,
             recipientIdentityId: payload.recipientIdentityId,
-            subjectId: payload.subjectId,
+            ...(!group && { subjectId: payload.subjectId }),
           }),
         ).toBe(derived.idPreimage);
         expect(
-          NotificationId.invitation(
-            payload.inviterIdentityId,
-            payload.recipientIdentityId,
-            payload.subjectId,
-            payload.nonce,
+          (group
+            ? NotificationId.groupInvitation(
+                payload.inviterIdentityId,
+                payload.recipientIdentityId,
+                payload.nonce,
+              )
+            : NotificationId.invitation(
+                payload.inviterIdentityId,
+                payload.recipientIdentityId,
+                payload.subjectId,
+                payload.nonce,
+              )
           ).valueOf(),
         ).toBe(derived.payload.id);
         expect(derived.payload.id).toBe(

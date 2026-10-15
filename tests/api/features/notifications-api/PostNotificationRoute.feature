@@ -29,6 +29,16 @@ Feature: Post notification route
       | status | unread                        |
       | state  | pending                       |
     And response body should contain "encrypted-group-conversation-key"
+    And response body should not contain "conversationId"
+
+  Scenario: Reject a group conversation invitation that names a conversation
+    Given I am an anonymous user
+    And I set a group conversation invitation notification body naming a conversation
+    And I sign the current notification creation request
+    When I POST to "/notifications/"
+    Then response code is equal to 400
+    And response body should contain "400070"
+    And response body should not contain "group:notification-api-conversation"
 
   Scenario: Reject notifications from an identity that is not the inviter
     Given I am an anonymous user

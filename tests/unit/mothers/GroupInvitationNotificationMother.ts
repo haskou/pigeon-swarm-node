@@ -22,27 +22,31 @@ export class GroupInvitationNotificationMother {
     state = 'pending',
     type = 'group_conversation_invitation',
   ): Notification {
-    const conversationId =
-      type === 'conversation_invitation'
-        ? 'one-to-one:notification-caps'
-        : 'group:notification-caps';
     const nonce = `notification-caps-nonce-${index}`.padEnd(24, '0');
-    const id = NotificationId.invitation(
-      inviter.valueOf(),
-      recipient.valueOf(),
-      conversationId,
+    const letter = {
+      encryptedConversationKey: 'encrypted-group-key',
+      inviterIdentityId: inviter.valueOf(),
       nonce,
-    ).valueOf();
+      recipientIdentityId: recipient.valueOf(),
+    };
+    const oneToOne = type === 'conversation_invitation';
+    const conversationId = 'one-to-one:notification-caps';
 
     return Notification.fromPrimitives({
-      id,
-      payload: {
-        conversationId,
-        encryptedConversationKey: 'encrypted-group-key',
-        inviterIdentityId: inviter.valueOf(),
-        nonce,
-        recipientIdentityId: recipient.valueOf(),
-      },
+      id: (oneToOne
+        ? NotificationId.invitation(
+            inviter.valueOf(),
+            recipient.valueOf(),
+            conversationId,
+            nonce,
+          )
+        : NotificationId.groupInvitation(
+            inviter.valueOf(),
+            recipient.valueOf(),
+            nonce,
+          )
+      ).valueOf(),
+      payload: oneToOne ? { ...letter, conversationId } : letter,
       recipientIdentityId: recipient.valueOf(),
       state,
       status: state === 'pending' ? 'unread' : 'read',

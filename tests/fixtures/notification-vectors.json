@@ -2,7 +2,7 @@
   "algorithms": {
     "canonicalization": "RFC 8785 JSON Canonicalization Scheme (npm package canonicalize)",
     "deviceCredential": "mutation.author.deviceCredential is the base64 SPKI public key of the signing device, here the identity key acting as its first device",
-    "invitationId": "\"invitation:\" + hex(sha256(utf8(canonicalize({inviterIdentityId, nonce, recipientIdentityId, subjectId}))))",
+    "invitationId": "\"invitation:\" + hex(sha256(utf8(canonicalize({inviterIdentityId, nonce, recipientIdentityId, subjectId})))); a group_conversation_invitation names no subject, so its preimage is canonicalize({inviterIdentityId, nonce, recipientIdentityId})",
     "missedCallId": "\"missed-call:\" + callId + \":\" + recipientIdentityId (local, derived, never replicated, never signed)",
     "payloadDigest": "base64url(sha256(utf8(canonicalize(payload))))",
     "signature": "ed25519 over utf8(signingContent), standard base64 with padding (88 characters)",
@@ -102,13 +102,13 @@
           },
           "kind": "put",
           "operationId": "vector-invite-group-0002",
-          "payloadDigest": "XFfMHv9UKSzDRnNz3LuJimGOz4G3CzPoDxSCKdbVYLo",
+          "payloadDigest": "hFcX0SJ9DVIQloHv4RZrgV5TxFqthQndJ_ZdsCOYiJA",
           "predecessor": null,
-          "recordId": "invitation:3ad029ae66d46c1f742063e2739f8b9f1dae93da4a599cac623779e91a96a6ac",
+          "recordId": "invitation:b64b6198beb797e46b1f10465e1d91048d5b47401dc929d57d10cc225446fd5a",
           "sequence": 0,
           "store": "notifications",
           "version": 2,
-          "signature": "toZ9U7YZ0bF92Rje0mXw0gWxyBy4AFB+g1uiaJCtkA6B6g4q+Rqd5qaUatyO5xqMSXiI2KutJF0ujYdtS0uVBQ=="
+          "signature": "+xhXSq0fCxfiq9qgMLAFiE4o0NexP+vSubFMdava4+BG1Ztl9k29epbl3tYGKIIKw7XJdA5c/V4GO+MWH5nPDQ=="
         },
         "mutationBody": {
           "author": {
@@ -118,30 +118,28 @@
           },
           "kind": "put",
           "operationId": "vector-invite-group-0002",
-          "payloadDigest": "XFfMHv9UKSzDRnNz3LuJimGOz4G3CzPoDxSCKdbVYLo",
+          "payloadDigest": "hFcX0SJ9DVIQloHv4RZrgV5TxFqthQndJ_ZdsCOYiJA",
           "predecessor": null,
-          "recordId": "invitation:3ad029ae66d46c1f742063e2739f8b9f1dae93da4a599cac623779e91a96a6ac",
+          "recordId": "invitation:b64b6198beb797e46b1f10465e1d91048d5b47401dc929d57d10cc225446fd5a",
           "sequence": 0,
           "store": "notifications",
           "version": 2
         },
         "payload": {
           "encryptedKey": "encrypted-group-conversation-key",
-          "id": "invitation:3ad029ae66d46c1f742063e2739f8b9f1dae93da4a599cac623779e91a96a6ac",
+          "id": "invitation:b64b6198beb797e46b1f10465e1d91048d5b47401dc929d57d10cc225446fd5a",
           "inviterIdentityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
           "nonce": "vector-nonce-group-conv-0002",
           "recipientIdentityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
           "scopeType": "notification_invitation",
-          "subjectId": "group:vector-group-id",
           "type": "group_conversation_invitation"
         },
-        "payloadCanonical": "{\"encryptedKey\":\"encrypted-group-conversation-key\",\"id\":\"invitation:3ad029ae66d46c1f742063e2739f8b9f1dae93da4a599cac623779e91a96a6ac\",\"inviterIdentityId\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\",\"nonce\":\"vector-nonce-group-conv-0002\",\"recipientIdentityId\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\",\"scopeType\":\"notification_invitation\",\"subjectId\":\"group:vector-group-id\",\"type\":\"group_conversation_invitation\"}",
-        "payloadDigest": "XFfMHv9UKSzDRnNz3LuJimGOz4G3CzPoDxSCKdbVYLo",
-        "signature": "toZ9U7YZ0bF92Rje0mXw0gWxyBy4AFB+g1uiaJCtkA6B6g4q+Rqd5qaUatyO5xqMSXiI2KutJF0ujYdtS0uVBQ==",
-        "signingContent": "pigeon:public-mutation:v2\n{\"author\":{\"authorizationRevision\":0,\"deviceCredential\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\",\"identityId\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\"},\"kind\":\"put\",\"operationId\":\"vector-invite-group-0002\",\"payloadDigest\":\"XFfMHv9UKSzDRnNz3LuJimGOz4G3CzPoDxSCKdbVYLo\",\"predecessor\":null,\"recordId\":\"invitation:3ad029ae66d46c1f742063e2739f8b9f1dae93da4a599cac623779e91a96a6ac\",\"sequence\":0,\"store\":\"notifications\",\"version\":2}",
-        "idPreimage": "{\"inviterIdentityId\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\",\"nonce\":\"vector-nonce-group-conv-0002\",\"recipientIdentityId\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\",\"subjectId\":\"group:vector-group-id\"}",
+        "payloadCanonical": "{\"encryptedKey\":\"encrypted-group-conversation-key\",\"id\":\"invitation:b64b6198beb797e46b1f10465e1d91048d5b47401dc929d57d10cc225446fd5a\",\"inviterIdentityId\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\",\"nonce\":\"vector-nonce-group-conv-0002\",\"recipientIdentityId\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\",\"scopeType\":\"notification_invitation\",\"type\":\"group_conversation_invitation\"}",
+        "payloadDigest": "hFcX0SJ9DVIQloHv4RZrgV5TxFqthQndJ_ZdsCOYiJA",
+        "signature": "+xhXSq0fCxfiq9qgMLAFiE4o0NexP+vSubFMdava4+BG1Ztl9k29epbl3tYGKIIKw7XJdA5c/V4GO+MWH5nPDQ==",
+        "signingContent": "pigeon:public-mutation:v2\n{\"author\":{\"authorizationRevision\":0,\"deviceCredential\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\",\"identityId\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\"},\"kind\":\"put\",\"operationId\":\"vector-invite-group-0002\",\"payloadDigest\":\"hFcX0SJ9DVIQloHv4RZrgV5TxFqthQndJ_ZdsCOYiJA\",\"predecessor\":null,\"recordId\":\"invitation:b64b6198beb797e46b1f10465e1d91048d5b47401dc929d57d10cc225446fd5a\",\"sequence\":0,\"store\":\"notifications\",\"version\":2}",
+        "idPreimage": "{\"inviterIdentityId\":\"MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=\",\"nonce\":\"vector-nonce-group-conv-0002\",\"recipientIdentityId\":\"MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=\"}",
         "requestBody": {
-          "conversationId": "group:vector-group-id",
           "encryptedConversationKey": "encrypted-group-conversation-key",
           "inviterIdentityId": "MCowBQYDK2VwAyEAFbHTtCyhiL2GVIyH4q6Esiz/cMvHdb9xbQ4eXx3SiUY=",
           "mutation": {
@@ -152,13 +150,13 @@
             },
             "kind": "put",
             "operationId": "vector-invite-group-0002",
-            "payloadDigest": "XFfMHv9UKSzDRnNz3LuJimGOz4G3CzPoDxSCKdbVYLo",
+            "payloadDigest": "hFcX0SJ9DVIQloHv4RZrgV5TxFqthQndJ_ZdsCOYiJA",
             "predecessor": null,
-            "recordId": "invitation:3ad029ae66d46c1f742063e2739f8b9f1dae93da4a599cac623779e91a96a6ac",
+            "recordId": "invitation:b64b6198beb797e46b1f10465e1d91048d5b47401dc929d57d10cc225446fd5a",
             "sequence": 0,
             "store": "notifications",
             "version": 2,
-            "signature": "toZ9U7YZ0bF92Rje0mXw0gWxyBy4AFB+g1uiaJCtkA6B6g4q+Rqd5qaUatyO5xqMSXiI2KutJF0ujYdtS0uVBQ=="
+            "signature": "+xhXSq0fCxfiq9qgMLAFiE4o0NexP+vSubFMdava4+BG1Ztl9k29epbl3tYGKIIKw7XJdA5c/V4GO+MWH5nPDQ=="
           },
           "nonce": "vector-nonce-group-conv-0002",
           "recipientIdentityId": "MCowBQYDK2VwAyEAAa+eQRMVBShGDVacrQfFWYaPFoakH7ZfmiStTWcR89U=",
@@ -169,7 +167,6 @@
       "input": {
         "encryptedKey": "encrypted-group-conversation-key",
         "nonce": "vector-nonce-group-conv-0002",
-        "subjectId": "group:vector-group-id",
         "type": "group_conversation_invitation"
       }
     },

@@ -4907,14 +4907,27 @@ export default class Definitions {
   @given('I set a group conversation invitation notification body')
   public async iSetAGroupConversationInvitationNotificationBody(): Promise<void> {
     await this.setInvitationNotificationBody(
-      'group:notification-api-conversation',
+      undefined,
       'encrypted-group-conversation-key',
       'group_conversation_invitation',
     );
   }
 
+  @given(
+    'I set a group conversation invitation notification body naming a conversation',
+  )
+  public async iSetAGroupConversationInvitationNotificationBodyNamingAConversation(): Promise<void> {
+    await this.iSetAGroupConversationInvitationNotificationBody();
+
+    this.body = JSON.stringify({
+      ...JSON.parse(this.body!),
+      conversationId: 'group:notification-api-conversation',
+    });
+  }
+
+  /** A group letter names no subject: its conversation id travels only in the seal. */
   private async setInvitationNotificationBody(
-    subjectId: string,
+    subjectId: string | undefined,
     encryptedKey: string | undefined,
     type:
       | 'community_invitation'
@@ -4941,7 +4954,7 @@ export default class Definitions {
       type === 'community_invitation'
         ? { communityId: subjectId }
         : {
-            conversationId: subjectId,
+            ...(subjectId !== undefined && { conversationId: subjectId }),
             encryptedConversationKey: encryptedKey,
           };
 

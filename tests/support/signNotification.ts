@@ -14,7 +14,8 @@ export interface InvitationInput {
   nonce: string;
   recipientIdentityId: string;
   signer: NotificationSigner;
-  subjectId: string;
+  /** Absent for a group letter: its conversation id travels only in the seal. */
+  subjectId?: string;
   type:
     | 'community_invitation'
     | 'conversation_invitation'
@@ -50,6 +51,10 @@ export function signNotificationRecord(
   );
 }
 
+/**
+ * The record a client signs. A group letter carries no `subjectId`; passing one
+ * builds the record a node must refuse.
+ */
 export function invitationPayload(
   input: InvitationInput,
 ): Record<string, unknown> & { id: string } {
@@ -57,17 +62,24 @@ export function invitationPayload(
     ...(input.encryptedKey !== undefined && {
       encryptedKey: input.encryptedKey,
     }),
-    id: NotificationId.invitation(
-      input.signer.id,
-      input.recipientIdentityId,
-      input.subjectId,
-      input.nonce,
+    id: (input.subjectId === undefined
+      ? NotificationId.groupInvitation(
+          input.signer.id,
+          input.recipientIdentityId,
+          input.nonce,
+        )
+      : NotificationId.invitation(
+          input.signer.id,
+          input.recipientIdentityId,
+          input.subjectId,
+          input.nonce,
+        )
     ).valueOf(),
     inviterIdentityId: input.signer.id,
     nonce: input.nonce,
     recipientIdentityId: input.recipientIdentityId,
     scopeType: 'notification_invitation',
-    subjectId: input.subjectId,
+    ...(input.subjectId !== undefined && { subjectId: input.subjectId }),
     type: input.type,
   };
 }
@@ -88,7 +100,7 @@ export function signNotificationInvitation(input: InvitationInput): {
       mutation: proof.toPrimitives() as unknown as Record<string, unknown>,
       nonce: input.nonce,
       recipientIdentityId: input.recipientIdentityId,
-      subjectId: input.subjectId,
+      ...(input.subjectId !== undefined && { subjectId: input.subjectId }),
       type: input.type,
     },
     payload,

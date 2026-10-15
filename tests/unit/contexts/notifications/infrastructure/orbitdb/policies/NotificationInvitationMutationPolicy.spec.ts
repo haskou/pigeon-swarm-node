@@ -8,7 +8,9 @@ import { PublicMutationProof } from '@app/contexts/public-mutations/domain/Publi
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import canonicalize from 'canonicalize';
 import { mock, MockProxy } from 'jest-mock-extended';
+import { createHash } from 'node:crypto';
 
 import { ConversationMother } from '../../../../../mothers/ConversationMother';
 import { signedMutation } from '../../../../public-mutations/support/signedMutation';
@@ -123,6 +125,172 @@ describe('NotificationInvitationMutationPolicy', () => {
     expect(() => policy.expectationOf(value)).toThrow(
       InvalidPublicMutationError,
     );
+  });
+
+  it.each(['conversation_invitation', 'community_invitation'])(
+    'rejects a %s without a subject',
+    (type) => {
+      const value = record({ type });
+
+      delete value.subjectId;
+      if (type === 'community_invitation') delete value.encryptedKey;
+
+      expect(() => policy.expectationOf(value)).toThrow(
+        InvalidPublicMutationError,
+      );
+    },
+  );
+
+  describe('group conversation invitations', () => {
+    let inviter: string;
+    let recipient: string;
+
+    beforeEach(async () => {
+      inviter = (await ConversationMother.generateIdentityId()).valueOf();
+      recipient = (await ConversationMother.generateIdentityId()).valueOf();
+    });
+
+    function letter(
+      overrides: Record<string, unknown> = {},
+    ): Record<string, unknown> {
+      const base = {
+        encryptedKey: 'sealed-group-letter',
+        inviterIdentityId: inviter,
+        nonce: NONCE,
+        recipientIdentityId: recipient,
+        type: 'group_conversation_invitation',
+        ...overrides,
+      };
+
+      return {
+        id: NotificationId.groupInvitation(
+          base.inviterIdentityId as string,
+          base.recipientIdentityId as string,
+          base.nonce as string,
+        ).valueOf(),
+        scopeType: 'notification_invitation',
+        ...base,
+      };
+    }
+
+    it('derives the id from the inviter, the nonce and the recipient only', () => {
+      const value = letter();
+      const preimage = canonicalize({
+        inviterIdentityId: inviter,
+        nonce: NONCE,
+        recipientIdentityId: recipient,
+      })!;
+
+      expect(value.id).toBe(
+        `invitation:${createHash('sha256').update(preimage).digest('hex')}`,
+      );
+      expect(policy.expectationOf(value)).toEqual({
+        authorIdentityId: inviter,
+        recordId: value.id,
+        store: 'notifications',
+      });
+    });
+
+    it('rejects a group letter that names a conversation', () => {
+      const subjectId = mother.build().getId().valueOf();
+      const named = {
+        ...letter({ subjectId }),
+        id: NotificationId.invitation(
+          inviter,
+          recipient,
+          subjectId,
+          NONCE,
+        ).valueOf(),
+      };
+
+      expect(() => policy.expectationOf(named)).toThrow(
+        InvalidPublicMutationError,
+      );
+      expect(() => policy.expectationOf(letter({ subjectId }))).toThrow(
+        InvalidPublicMutationError,
+      );
+    });
+
+    it('rejects a group letter without a key', () => {
+      const value = letter();
+
+      delete value.encryptedKey;
+
+      expect(() => policy.expectationOf(value)).toThrow(
+        InvalidPublicMutationError,
+      );
+    });
+
+    it('rejects a group letter whose id carries a subject', () => {
+      expect(() =>
+        policy.expectationOf(
+          letter({
+            id: NotificationId.invitation(
+              inviter,
+              recipient,
+              'group:hidden',
+              NONCE,
+            ).valueOf(),
+          }),
+        ),
+      ).toThrow(InvalidPublicMutationError);
+    });
+
+    it('admits a letter between identities that share no conversation without looking one up', async () => {
+      await expect(
+        policy.assertPermitted(letter(), inviter, false),
+      ).resolves.toBeUndefined();
+      expect(conversations.hasById).not.toHaveBeenCalled();
+      expect(conversations.requireMetadataById).not.toHaveBeenCalled();
+    });
+
+    it('rejects deletions', async () => {
+      await expect(
+        policy.assertPermitted(letter(), inviter, true),
+      ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+    });
+
+    it('counts group letters against the inviter quota', async () => {
+      const nonces = [1, 2, 3, 4].map(nonceOf);
+      const documents = (
+        await Promise.all(
+          nonces.map(async (nonce): Promise<Record<string, unknown>> => {
+            const payload = letter({ nonce });
+
+            return {
+              ...payload,
+              proof: (
+                await signedMutation({
+                  identityId: inviter,
+                  kind: 'put',
+                  payload,
+                  recordId: payload.id as string,
+                  sequence: 0,
+                  store: 'notifications',
+                })
+              ).toPrimitives(),
+            };
+          }),
+        )
+      ).sort((left, right) => (String(left.id) < String(right.id) ? -1 : 1));
+
+      storedDocuments = documents;
+
+      await expect(
+        policy.assertPermitted(
+          PublicMutationRecord.payloadOf(documents[2]),
+          inviter,
+          false,
+        ),
+      ).resolves.toBeUndefined();
+      await expect(
+        policy.assertPermitted(
+          PublicMutationRecord.payloadOf(documents[3]),
+          inviter,
+          false,
+        ),
+      ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+    });
   });
 
   it('accepts participants of the signed conversation', async () => {
