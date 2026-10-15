@@ -1532,6 +1532,70 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       registry.clear();
     });
 
+    it('tells which replayed documents wait to be offered again until they are admitted', async () => {
+      let memberReplicated = false;
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { calls, stores } = createStores();
+
+      calls.log = {
+        get: () => Promise.resolve(undefined),
+        heads: jest.fn((): Promise<OrbitDBEntry[]> =>
+          Promise.resolve([
+            {
+              hash: 'first',
+              next: [],
+              payload: { value: { id: 'call:1' } },
+            },
+          ]),
+        ),
+      };
+      registry.addMutationGate(gateOf('calls', () => memberReplicated));
+      await registry.register('network-1', stores);
+      await registry.onDocumentUpdated('calls', () => undefined, {
+        includeHistory: true,
+      });
+
+      expect(registry.isDocumentPendingAdmission('calls', 'call:1')).toBe(true);
+      expect(registry.isDocumentPendingAdmission('calls', 'call:2')).toBe(
+        false,
+      );
+      expect(registry.isDocumentPendingAdmission('identities', 'call:1')).toBe(
+        false,
+      );
+
+      memberReplicated = true;
+      await jest.advanceTimersByTimeAsync(2_000);
+
+      expect(registry.isDocumentPendingAdmission('calls', 'call:1')).toBe(
+        false,
+      );
+      registry.clear();
+    });
+
+    it('stops telling a document waits once its last attempt is over', async () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { identities, stores } = createStores();
+
+      registry.addMutationGate(gateOf('identities', () => false));
+      await registry.register('network-1', stores);
+      await registry.onDocumentUpdated('identities', () => undefined);
+      identities.emitUpdate({
+        payload: { key: 'identity-1', value: { id: 'identity-1' } },
+      });
+      await jest.advanceTimersByTimeAsync(0);
+
+      expect(
+        registry.isDocumentPendingAdmission('identities', 'identity-1'),
+      ).toBe(true);
+
+      await jest.advanceTimersByTimeAsync(2_000 + 10_000 + 60_000);
+
+      expect(
+        registry.isDocumentPendingAdmission('identities', 'identity-1'),
+      ).toBe(false);
+      registry.clear();
+    });
+
     it('offers an updated document again once the authorization it rests on replicates', async () => {
       let memberReplicated = false;
       const registry = new OrbitDBReplicatedStateRegistry();

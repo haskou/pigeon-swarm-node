@@ -259,3 +259,7 @@ jobs:
       - name: Restart with a missing log block proof
         run: yarn test:e2e:real-transport:restart-missing-block
         timeout-minutes: 5
+
+      - name: Call across a node restart proof
+        run: yarn test:e2e:real-transport:call-restart
+        timeout-minutes: 5

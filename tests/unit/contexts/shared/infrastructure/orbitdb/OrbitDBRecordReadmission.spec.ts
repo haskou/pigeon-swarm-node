@@ -181,4 +181,65 @@ describe('OrbitDBRecordReadmission', () => {
     expect(flood).toHaveBeenCalledTimes(256);
     expect(legitimate).toHaveBeenCalledTimes(1);
   });
+
+  it('tells whether a record of a subject waits to be offered again', async () => {
+    const readmission = new OrbitDBRecordReadmission();
+    let admitted = false;
+
+    readmission.schedule({
+      isCurrent: current,
+      offer: () => Promise.resolve(admitted),
+      scope: 'network',
+      subject: 'calls:call:1',
+    });
+
+    expect(readmission.isPending('calls:call:1')).toBe(true);
+    expect(readmission.isPending('calls:call:2')).toBe(false);
+
+    admitted = true;
+    await jest.advanceTimersByTimeAsync(2_000);
+
+    expect(readmission.isPending('calls:call:1')).toBe(false);
+  });
+
+  it('keeps a subject pending while any of its records waits', async () => {
+    const readmission = new OrbitDBRecordReadmission();
+
+    readmission.schedule({
+      isCurrent: current,
+      offer: () => Promise.resolve(true),
+      scope: 'network',
+      subject: 'calls:call:1',
+    });
+    readmission.schedule({
+      isCurrent: current,
+      offer: () => Promise.resolve(false),
+      scope: 'network',
+      subject: 'calls:call:1',
+    });
+    await jest.advanceTimersByTimeAsync(2_000);
+
+    expect(readmission.isPending('calls:call:1')).toBe(true);
+
+    await jest.advanceTimersByTimeAsync(10_000 + 60_000);
+
+    expect(readmission.isPending('calls:call:1')).toBe(false);
+  });
+
+  it('never holds a subject pending for a record past the bound', () => {
+    const readmission = new OrbitDBRecordReadmission();
+    const offer = (): Promise<boolean> => Promise.resolve(false);
+
+    for (let index = 0; index < 256; index++) {
+      readmission.schedule({ isCurrent: current, offer, scope: 'network' });
+    }
+    readmission.schedule({
+      isCurrent: current,
+      offer,
+      scope: 'network',
+      subject: 'calls:call:1',
+    });
+
+    expect(readmission.isPending('calls:call:1')).toBe(false);
+  });
 });

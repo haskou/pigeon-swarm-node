@@ -487,6 +487,14 @@ the authenticated participants.
 Calls can be scoped to a one-to-one conversation, a group conversation or a
 community voice channel. All endpoints require signed request authentication.
 
+An endpoint that addresses a call by id answers HTTP 503
+`ReplicatedStateNotReadyError` (code `503020`) instead of 409
+`CallNotFoundError` when the node holds the start of the call but has not
+admitted it yet. That happens for a few seconds after a node restarts, while
+the authorization the call records rest on still loads from its peers. The call
+is not over: clients keep it up and retry the request. A call the node does not
+hold, or whose start it rejected for good, answers `CallNotFoundError`.
+
 ### List active calls
 
 ```http
@@ -1049,8 +1057,10 @@ Implemented:
 - joins emit `calls.v1.participant.joined`
 - leaves emit `calls.v1.participant.left`
 - declines emit `calls.v1.participant.declined`
-- errors: `CallNotFoundError` for an unknown call, 409 `StalePublicMutationError`
-  for a stale proof, 429 code `429021` when the rate cap is exceeded
+- errors: `CallNotFoundError` for an unknown call, 503 code `503020` for a call
+  the node holds but has not admitted yet (retry), 409
+  `StalePublicMutationError` for a stale proof, 429 code `429021` when the rate
+  cap is exceeded
 
 ### End call
 
