@@ -1959,12 +1959,17 @@ services:
     class: /contexts/notifications/application/find/NotificationsFinder
     arguments:
       - '@contexts/notifications/domain/repositories/NotificationRepository'
+      - '@contexts/notifications/domain/services/PendingGroupInvitationCaps'
   contexts/notifications/application/update/NotificationUpdater:
     class: /contexts/notifications/application/update/NotificationUpdater
     arguments:
       - '@contexts/notifications/domain/repositories/NotificationRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/notifications/domain/repositories/NotificationRepository: '@contexts/notifications/infrastructure/NotificationRepositoryRouter'
+  contexts/notifications/domain/services/PendingGroupInvitationCaps:
+    class: /contexts/notifications/domain/services/PendingGroupInvitationCaps
+    arguments:
+      - '@contexts/notifications/domain/PendingGroupInvitationLimits'
   contexts/notifications/infrastructure/NotificationRepositoryRouter:
     class: /contexts/notifications/infrastructure/NotificationRepositoryRouter
     arguments:
@@ -2612,6 +2617,8 @@ services:
     synthetic: true
   ddd-kernel.override.factory.NotificationReplicationLimits:
     synthetic: true
+  ddd-kernel.override.factory.PendingGroupInvitationLimits:
+    synthetic: true
   shared/infrastructure/lifecycle/Runtime: '@apps/apis/calls-api/CallRelayRuntime'
   shared/infrastructure/http/HttpClient: '@shared/infrastructure/http/FetchHttpClient'
   shared/infrastructure/logs/Log: '@shared/infrastructure/logs/WinstonLogger'
@@ -2651,3 +2658,4 @@ services:
   contexts/content-replication/domain/ContentReplicationLimits: '@ddd-kernel.override.factory.ContentReplicationLimits'
   contexts/content-replication/domain/ContentReplicationNetworkBudget: '@ddd-kernel.override.factory.ContentReplicationNetworkBudget'
   contexts/notifications/domain/NotificationReplicationLimits: '@ddd-kernel.override.factory.NotificationReplicationLimits'
+  contexts/notifications/domain/PendingGroupInvitationLimits: '@ddd-kernel.override.factory.PendingGroupInvitationLimits'

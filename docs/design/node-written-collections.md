@@ -324,6 +324,14 @@ field is redundant with the device-signed proof and is removed from the payload
   stays a write-path control of the local node. A malicious replica can still
   fill each identity's quota, and mint identities freely until identity creation
   is bounded (haskou/pigeon-swarm-node#384).
+- Listing caps: `GET /notifications` holds back pending
+  `group_conversation_invitation` letters (no signed `accepted`/`declined`
+  state) beyond `NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_PAIR` (default
+  4) per (inviter, recipient) and
+  `NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_RECIPIENT` (default 100) per
+  recipient, taken in ascending record id order. Held-back letters are admitted,
+  stored and replicated like any other; only the listing omits them, and it
+  depends only on the stored records. Compaction is unchanged.
 
 ### Order and convergence
 

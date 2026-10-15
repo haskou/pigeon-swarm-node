@@ -61,15 +61,31 @@ package "notifications" {
     class NotificationRepository <interface> {
       +hasById(notificationId: NotificationId): Promise<boolean>
       +requireById(notificationId: NotificationId): Promise<Notification>
-      +findByRecipient(recipientIdentityId: IdentityId, limit: number, beforeNotificationId?: NotificationId): Promise<Notification[]>
+      +findByRecipient(recipientIdentityId: IdentityId): Promise<Notification[]>
       +saveInvitation(notification: Notification, proof: PublicMutationProof): Promise<void>
       +saveState(notification: Notification, proof: PublicMutationProof): Promise<void>
       +saveMissedCall(notification: Notification): Promise<void>
     }
 
+    class PendingGroupInvitationLimits {
+      +perPair: number
+      +perRecipient: number
+    }
+
+    class PendingGroupInvitationCaps {
+      -limits: PendingGroupInvitationLimits
+      +listed(notifications: Notification[]): Notification[]
+    }
+    note right of PendingGroupInvitationCaps
+      Pending group invitations in ascending record id order:
+      at most perPair per (inviter, recipient), then perRecipient
+      per recipient. The rest is held back from the listing, not deleted.
+    end note
+
     Notification *--> ConversationInvitationPayload
     Notification *--> CommunityInvitationPayload
     Notification *--> MissedCallPayload
+    PendingGroupInvitationCaps --> PendingGroupInvitationLimits
     NotificationRepository o--> Notification
   }
 
@@ -81,6 +97,7 @@ package "notifications" {
 
     class NotificationsFinder {
       -repository: NotificationRepository
+      -caps: PendingGroupInvitationCaps
       +find(message: NotificationsFindMessage): Promise<Notification[]>
     }
 
@@ -91,6 +108,7 @@ package "notifications" {
 
     NotificationCreator --> NotificationRepository
     NotificationsFinder --> NotificationRepository
+    NotificationsFinder --> PendingGroupInvitationCaps
     NotificationUpdater --> NotificationRepository
   }
 
@@ -107,7 +125,7 @@ package "notifications" {
     class NotificationRepositoryRouter {
       +hasById(notificationId: NotificationId): Promise<boolean>
       +requireById(notificationId: NotificationId): Promise<Notification>
-      +findByRecipient(recipientIdentityId: IdentityId, limit: number, beforeNotificationId?: NotificationId): Promise<Notification[]>
+      +findByRecipient(recipientIdentityId: IdentityId): Promise<Notification[]>
     }
 
     class NotificationInvitationMutationPolicy

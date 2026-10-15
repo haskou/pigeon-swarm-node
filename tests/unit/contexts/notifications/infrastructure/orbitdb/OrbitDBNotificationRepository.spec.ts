@@ -80,9 +80,35 @@ describe('OrbitDBNotificationRepository', () => {
 
     stored.push(PublicMutationRecord.withProof(state.payload, state.proof));
 
-    const list = await repository.findByRecipient(new IdentityId(recipient.id), 10);
+    const list = await repository.findByRecipient(new IdentityId(recipient.id));
 
     expect(list.map((n) => n.toPrimitives())).toMatchObject([{ id, state: 'accepted', status: 'read' }]);
+  });
+
+  it('returns every admitted letter of the recipient, the ones the caps hold back included', async () => {
+    const inviterKeys = await KeyPair.generate();
+    const inviterId = new IdentityId(inviterKeys.toPrimitives().publicKey).valueOf();
+    const recipientId = new IdentityId((await KeyPair.generate()).toPrimitives().publicKey).valueOf();
+    const inviter = { deviceCredential: inviterId, deviceKeyPair: inviterKeys, id: inviterId };
+    const ids = Array.from({ length: 5 }, (_, index) => {
+      const signed = signNotificationInvitation({
+        encryptedKey: 'encrypted-group-key',
+        nonce: `notification-caps-nonce-${index}`.padEnd(24, '0'),
+        recipientIdentityId: recipientId,
+        signer: inviter,
+        subjectId: 'group:notification-caps',
+        type: 'group_conversation_invitation',
+      });
+
+      stored.push(PublicMutationRecord.withProof(signed.payload, signed.proof));
+
+      return signed.payload.id;
+    });
+
+    const list = await repository.findByRecipient(new IdentityId(recipientId));
+
+    expect(list.map((n) => n.getId().valueOf()).sort()).toEqual([...ids].sort());
+    for (const id of ids) expect(await repository.hasById(new NotificationId(id))).toBe(true);
   });
 
   it('refuses to store missed calls', async () => {

@@ -78,6 +78,14 @@ export const pigeonEnvironmentSchema = {
     defaultValue: 10_000,
     type: 'number',
   },
+  NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_PAIR: {
+    defaultValue: 4,
+    type: 'number',
+  },
+  NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_RECIPIENT: {
+    defaultValue: 100,
+    type: 'number',
+  },
   NOTIFICATIONS_MAX_STATES_PER_IDENTITY: {
     defaultValue: 30_000,
     type: 'number',

@@ -11,10 +11,12 @@ export default abstract class NotificationRepository {
     notificationId: NotificationId,
   ): Promise<Notification>;
 
+  /**
+   * Every notification held for the recipient, unordered and unpaginated: the
+   * listing caps and pagination apply on top of the complete set.
+   */
   public abstract findByRecipient(
     recipientIdentityId: IdentityId,
-    limit: number,
-    beforeNotificationId?: NotificationId,
   ): Promise<Notification[]>;
 
   /** Replicates the inviter-signed invitation record. */

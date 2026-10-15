@@ -76,12 +76,6 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
     });
   }
 
-  private order(notifications: Notification[]): Notification[] {
-    return notifications.sort((left, right) =>
-      right.getId().valueOf().localeCompare(left.getId().valueOf()),
-    );
-  }
-
   private async invitationOf(
     notificationId: NotificationId,
   ): Promise<Record<string, unknown> | undefined> {
@@ -112,8 +106,6 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
 
   public async findByRecipient(
     recipientIdentityId: IdentityId,
-    limit: number,
-    beforeNotificationId?: NotificationId,
   ): Promise<Notification[]> {
     const recipient = recipientIdentityId.valueOf();
     const matches = (document: Record<string, unknown>): boolean =>
@@ -134,21 +126,13 @@ export default class OrbitDBNotificationRepository extends NotificationRepositor
         ],
       ),
     );
-    const ordered = this.order(
-      invitations.map((record) => {
-        const invitation =
-          this.payloadOf<OrbitDBNotificationInvitationDocument>(record);
 
-        return this.mapper.toDomain(invitation, states.get(invitation.id));
-      }),
-    );
-    const start = beforeNotificationId
-      ? ordered.findIndex((notification) =>
-          notification.getId().isEqual(beforeNotificationId),
-        ) + 1
-      : 0;
+    return invitations.map((record) => {
+      const invitation =
+        this.payloadOf<OrbitDBNotificationInvitationDocument>(record);
 
-    return ordered.slice(start, start + limit);
+      return this.mapper.toDomain(invitation, states.get(invitation.id));
+    });
   }
 
   public async saveInvitation(
