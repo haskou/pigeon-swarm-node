@@ -76,9 +76,10 @@ paths:
       summary: Update authenticated identity presence preferences
       description: |
         Sets the authenticated identity selected status. Presence carries no
-        custom message; unknown body fields are rejected. `disconnected` cannot be selected; it is derived by heartbeat
-        timeout. `available`/`away` are normal online states, while `busy`,
-        `custom` and `invisible` override automatic away/available derivation.
+        custom message; unknown body fields are rejected. `disconnected`
+        cannot be selected; it is derived by heartbeat timeout.
+        `available`/`away` are normal online states, while `busy`, `custom`
+        and `invisible` override automatic away/available derivation.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
