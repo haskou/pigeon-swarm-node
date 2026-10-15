@@ -1,5 +1,4 @@
 import { PrivateKey as NetworkPrivateKey } from '@haskou/pigeon-swarm-crypto';
-import * as fsSync from 'fs';
 import { createHash, createPrivateKey } from 'node:crypto';
 
 import {
@@ -9,13 +8,10 @@ import {
   RuntimeDatastore,
 } from './adapters/HeliaRuntimeAdapter';
 import { IPFSOptions } from './IPFSOptions';
-import { ConnectionGater } from './types/ConnectionGater';
+import { nodePeerConnectionGate } from './NodePeerConnectionGate';
 import { ParsedHeliaIPFSOptions } from './types/ParsedHeliaIPFSOptions';
-import { PeerId } from './types/PeerId';
 
 export class HeliaIPFSParser {
-  private static readonly blockedPeers: string[] = [];
-
   private static async parseStorageLocationOptions(
     options: IPFSOptions,
     parserOptions?: {
@@ -94,63 +90,6 @@ export class HeliaIPFSParser {
     );
   }
 
-  private static parseBlockedPeers(options: IPFSOptions): {
-    connectionGater: ConnectionGater;
-  } {
-    if (!HeliaIPFSParser.isInMemoryStorageLocation(options.storageLocation)) {
-      const peersFromStorage = HeliaIPFSParser.readBlockedPeersFromStorage(
-        options.storageLocation,
-      );
-      const existingSet = new Set(HeliaIPFSParser.blockedPeers);
-
-      for (const peerId of peersFromStorage) {
-        if (!existingSet.has(peerId)) {
-          HeliaIPFSParser.registerBlockedPeer(peerId);
-          existingSet.add(peerId);
-        }
-      }
-    }
-
-    return {
-      connectionGater: {
-        denyDialPeer: (peerId: PeerId): Promise<boolean> =>
-          Promise.resolve(
-            HeliaIPFSParser.blockedPeers.includes(peerId.toString()),
-          ),
-        denyInboundEncryptedConnection: (peerId: PeerId): Promise<boolean> =>
-          Promise.resolve(
-            HeliaIPFSParser.blockedPeers.includes(peerId.toString()),
-          ),
-        denyOutboundConnection: (peerId: PeerId): Promise<boolean> =>
-          Promise.resolve(
-            HeliaIPFSParser.blockedPeers.includes(peerId.toString()),
-          ),
-      },
-    };
-  }
-
-  private static readBlockedPeersFromStorage(
-    storageLocation: string,
-  ): string[] {
-    try {
-      const blockedPeersJSON = fsSync.readFileSync(
-        `${storageLocation}/blockedPeers.json`,
-      );
-      const parsed: unknown = JSON.parse(blockedPeersJSON.toString());
-
-      if (
-        Array.isArray(parsed) &&
-        parsed.every((peer) => typeof peer === 'string')
-      ) {
-        return parsed;
-      }
-
-      return [];
-    } catch {
-      return [];
-    }
-  }
-
   private static extractPskSeed(key: NetworkPrivateKey): Uint8Array {
     const keyObject = createPrivateKey(key.valueOf());
     const jwk = keyObject.export({ format: 'jwk' }) as { d: string };
@@ -171,16 +110,6 @@ export class HeliaIPFSParser {
     );
   }
 
-  public static registerBlockedPeer(peerId: string): void {
-    if (!HeliaIPFSParser.blockedPeers.includes(peerId)) {
-      HeliaIPFSParser.blockedPeers.push(peerId);
-    }
-  }
-
-  public static getBlockedPeers(): string[] {
-    return [...HeliaIPFSParser.blockedPeers];
-  }
-
   public static async parseOptions(
     options: IPFSOptions,
     parserOptions?: {
@@ -190,7 +119,6 @@ export class HeliaIPFSParser {
       publicBootstrap?: boolean;
     },
   ): Promise<ParsedHeliaIPFSOptions> {
-    const { connectionGater } = HeliaIPFSParser.parseBlockedPeers(options);
     let libp2pConfig = (await heliaRuntimeAdapter.getLibp2pDefaults({
       distributedHashTableEnabled: options.distributedHashTableEnabled,
       distributedHashTableServerEnabled:
@@ -223,7 +151,7 @@ export class HeliaIPFSParser {
         : {}),
       libp2p: {
         ...libp2pConfig,
-        connectionGater,
+        connectionGater: nodePeerConnectionGate.connectionGater(),
         ...(options.privateKey ? { privateKey: options.privateKey } : {}),
       },
     };

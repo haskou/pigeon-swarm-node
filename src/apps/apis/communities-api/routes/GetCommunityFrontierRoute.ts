@@ -16,7 +16,7 @@ export class GetCommunityFrontierRoute extends CommunityRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    this.authenticate(request);
+    await this.authenticate(request);
     const community = await this.findCommunity(communityId);
 
     return response.status(HttpRouteStatusEnum.OK).send({

@@ -2,6 +2,7 @@ import IdentityCreationDetector from '@app/contexts/identities/application/detec
 import { IdentityCreationDetectorMessage } from '@app/contexts/identities/application/detect-creation/messages/IdentityCreationDetectorMessage';
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import { IdentityExternalIdentifier } from '@app/contexts/identities/domain/value-objects/IdentityExternalIdentifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -58,4 +59,28 @@ describe('IdentityCreationDetector', () => {
       detector.isCreation(new IdentityCreationDetectorMessage(identity(true))),
     ).resolves.toBe(false);
   });
+
+  it.each([true, false])(
+    'should tell whether this node holds exactly the record (held: %s)',
+    async (held) => {
+      const publication = identity(true);
+      const externalIdentifier = new IdentityExternalIdentifier('bagaaiera');
+
+      repository.calculateExternalIdentifier.mockResolvedValue(
+        externalIdentifier,
+      );
+      repository.holdsVersion.mockResolvedValue(held);
+
+      await expect(
+        detector.holdsRecord(new IdentityCreationDetectorMessage(publication)),
+      ).resolves.toBe(held);
+      expect(repository.calculateExternalIdentifier).toHaveBeenCalledWith(
+        publication,
+      );
+      expect(repository.holdsVersion).toHaveBeenCalledWith(
+        id,
+        externalIdentifier,
+      );
+    },
+  );
 });

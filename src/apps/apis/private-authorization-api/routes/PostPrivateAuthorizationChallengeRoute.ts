@@ -21,7 +21,7 @@ export class PostPrivateAuthorizationChallengeRoute extends PrivateAuthorization
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const identityId = this.authenticate(request);
+    const identityId = await this.authenticate(request);
     const challenge = await this.acceptor.challenge(
       new PrivateOperationChallengeMessage(
         identityId.valueOf(),

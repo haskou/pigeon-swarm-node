@@ -18,7 +18,7 @@ export abstract class PollRouteSupport extends Route {
   private readonly scopeAuthorizer =
     this.get<PollScopeAuthorizer>(PollScopeAuthorizer);
 
-  protected authenticate(request: Request): IdentityId {
+  protected async authenticate(request: Request): Promise<IdentityId> {
     return this.signedRequestAuthenticator.authenticate(request);
   }
 

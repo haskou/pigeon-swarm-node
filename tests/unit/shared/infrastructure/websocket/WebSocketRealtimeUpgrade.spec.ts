@@ -5,6 +5,7 @@ import {
   RealtimeTicketStore,
   realtimeTicketStore,
 } from '@app/shared/infrastructure/websocket/RealtimeTicketStore';
+import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import { WebSocketRealtimeServer } from '@app/shared/infrastructure/websocket/WebSocketRealtimeServer';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { createServer, Server } from 'http';
@@ -121,6 +122,24 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
 
     return promise;
   }
+
+  it('refuses a valid ticket of an identity blocked on this node', async () => {
+    const keyPair = await KeyPair.generate();
+    const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
+    const issued = realtimeTicketStore.issue(identityId.valueOf());
+
+    webSocketEventHub.blockIdentities([identityId]);
+
+    try {
+      expect(
+        await connect(ticketPath, {
+          protocols: ticketProtocols(issued?.ticket ?? ''),
+        }),
+      ).toEqual({ status: 403 });
+    } finally {
+      webSocketEventHub.blockIdentities([]);
+    }
+  });
 
   it('never answers an upgrade with a redirect', async () => {
     expect(await connect(ticketPath)).toEqual({ status: 401 });

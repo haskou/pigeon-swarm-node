@@ -39,7 +39,7 @@ export interface IPFSConnection {
     topic: string,
     handler: (payload: string) => Promise<void>,
   ): Promise<void>;
-  blockPeer(peerId: string): Promise<void>;
+  disconnectPeer(peerId: string): Promise<void>;
   getMultiaddrs(): string[];
   getHeliaCore(): HeliaInstance;
   onPeerConnected(listener: (peerId: string) => Promise<void> | void): void;

@@ -1,15 +1,16 @@
-import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
-import { IdentityPresenceNotFoundError } from '@app/contexts/presence/domain/errors/IdentityPresenceNotFoundError';
-import IdentityPresenceRepository from '@app/contexts/presence/domain/repositories/IdentityPresenceRepository';
+import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import NotificationDeliveryPreferenceChecker from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
-import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
 import { NotificationScopeSettingsNotFoundError } from '@app/contexts/notification-settings/domain/errors/NotificationScopeSettingsNotFoundError';
+import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
 import NotificationScopeSettingsRepository from '@app/contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
+import { IdentityPresenceNotFoundError } from '@app/contexts/presence/domain/errors/IdentityPresenceNotFoundError';
+import { IdentityPresence } from '@app/contexts/presence/domain/IdentityPresence';
+import IdentityPresenceRepository from '@app/contexts/presence/domain/repositories/IdentityPresenceRepository';
 import PushNotificationDelivery from '@app/contexts/push-notifications/application/send/PushNotificationDelivery';
 import { PushNotificationDeliveryResult } from '@app/contexts/push-notifications/application/send/PushNotificationDeliveryResult';
-import { PushNotificationPayload } from '@app/contexts/push-notifications/application/send/PushNotificationPayload';
 import PushNotificationDispatcher from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
+import { PushNotificationPayload } from '@app/contexts/push-notifications/application/send/PushNotificationPayload';
 import { PushSubscription } from '@app/contexts/push-notifications/domain/PushSubscription';
 import PushSubscriptionRepository from '@app/contexts/push-notifications/domain/repositories/PushSubscriptionRepository';
 import { PushSubscriptionEndpoint } from '@app/contexts/push-notifications/domain/value-objects/PushSubscriptionEndpoint';
@@ -18,6 +19,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
+import { mock } from 'jest-mock-extended';
 
 class TestDomainEvent extends DomainEvent {
   public eventName(): string {
@@ -144,6 +146,23 @@ describe('PushNotificationDispatcher', () => {
     const event = channelMessageEvent(authorIdentityId, recipientIdentityId);
 
     await dispatcher.dispatch(event);
+
+    expect(delivery.send).not.toHaveBeenCalled();
+  });
+
+  it('sends no push to an identity blocked on this node', async () => {
+    const authorIdentityId = await generateIdentityId();
+    const recipientIdentityId = await generateIdentityId();
+    const delivery = mockDelivery(true);
+    const dispatcher = createDispatcher({
+      blockedIdentityIds: [recipientIdentityId.valueOf()],
+      delivery,
+      subscriptions: [createSubscription(recipientIdentityId)],
+    });
+
+    await dispatcher.dispatch(
+      channelMessageEvent(authorIdentityId, recipientIdentityId),
+    );
 
     expect(delivery.send).not.toHaveBeenCalled();
   });
@@ -389,6 +408,7 @@ function emptySettingsRepository(): NotificationScopeSettingsRepository {
 }
 
 function createDispatcher(options: {
+  blockedIdentityIds?: string[];
   busyIdentityIds?: string[];
   delivery: PushNotificationDelivery;
   presences?: IdentityPresence[];
@@ -403,5 +423,16 @@ function createDispatcher(options: {
     }),
     options.delivery,
     new NotificationDeliveryPreferenceChecker(emptySettingsRepository()),
+    blockPolicyBlocking(options.blockedIdentityIds ?? []),
   );
+}
+
+function blockPolicyBlocking(identityIds: string[]): NodeBlockPolicy {
+  const policy = mock<NodeBlockPolicy>();
+
+  policy.isIdentityBlocked.mockImplementation(async (identityId) =>
+    identityIds.includes(identityId.valueOf()),
+  );
+
+  return policy;
 }

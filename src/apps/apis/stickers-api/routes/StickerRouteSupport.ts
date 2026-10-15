@@ -16,7 +16,7 @@ export abstract class StickerRouteSupport extends Route {
   private readonly packsFinder =
     this.get<StickerPacksFinder>(StickerPacksFinder);
 
-  protected authenticate(request: Request): IdentityId {
+  protected async authenticate(request: Request): Promise<IdentityId> {
     return this.signedRequestAuthenticator.authenticate(request);
   }
 

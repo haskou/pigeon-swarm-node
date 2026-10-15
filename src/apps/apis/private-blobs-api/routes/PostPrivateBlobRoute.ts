@@ -24,7 +24,7 @@ export class PostPrivateBlobRoute extends PrivateBlobRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const identityId = this.authenticator.authenticate(request);
+    const identityId = await this.authenticator.authenticate(request);
 
     try {
       const reservation = await this.reserver.reserve(

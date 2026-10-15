@@ -1,3 +1,5 @@
+import { nodePeerConnectionGate } from '@app/contexts/shared/infrastructure/ipfs/helia/NodePeerConnectionGate';
+
 import { Libp2pPubSubNode } from './Libp2pPubSubNode';
 
 export default class Libp2pGossipsubRuntimeAdapter {
@@ -73,8 +75,12 @@ export default class Libp2pGossipsubRuntimeAdapter {
       heliaLibp2pModule.libp2pDefaults(),
     );
     const configWithServices = libp2pConfig as unknown as {
+      connectionGater?: unknown;
       services: Record<string, unknown>;
     };
+
+    configWithServices.connectionGater =
+      nodePeerConnectionGate.connectionGater();
 
     configWithServices.services = {
       ...(configWithServices.services || {}),
@@ -83,10 +89,30 @@ export default class Libp2pGossipsubRuntimeAdapter {
       }) as unknown,
     };
 
-    return libp2pModule.createLibp2p(
+    const node = (await libp2pModule.createLibp2p(
       libp2pConfig as unknown as Parameters<
         typeof libp2pModule.createLibp2p
       >[0],
-    ) as unknown as Libp2pPubSubNode;
+    )) as unknown as Libp2pPubSubNode;
+
+    const stopListening = nodePeerConnectionGate.onPeersBlocked(
+      async (peerIds) => {
+        const blocked = new Set(peerIds);
+
+        await Promise.all(
+          (node.getPeers?.() ?? [])
+            .filter((peer) => blocked.has(peer.toString()))
+            .map((peer) => node.hangUp?.(peer)),
+        );
+      },
+    );
+    const stop = node.stop?.bind(node);
+
+    node.stop = async () => {
+      stopListening();
+      await stop?.();
+    };
+
+    return node;
   }
 }

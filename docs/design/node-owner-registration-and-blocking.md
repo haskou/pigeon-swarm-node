@@ -1,7 +1,8 @@
 # Node owner registration control and blocking (optional)
 
 Status: design for issue #384, decisions confirmed by the owner. Built:
-registration control (delivery step 1). The price-based
+registration control (delivery step 1) and local blocking (slice 2). The
+price-based
 admission model stays the default, and every node stays open unless its owner
 changes that. A node owner gets two optional, local tools:
 
@@ -202,7 +203,15 @@ While the identity is blocked, this node:
   route can forget it;
 - refuses records it authored that are submitted through this node's API
   without a request signature (`POST /identities` with its id,
-  `POST /identity-devices/transitions`, record-signed conversation routes);
+  `POST /identity-devices/transitions`, record-signed conversation routes).
+  `POST /identities` skips the check only for a record whose content id this
+  node already stores locally for that identity; a copy fetchable from a peer
+  does not count. A replay of the public record from `GET /identities/:id` then
+  gets the usual answer and cannot reveal the block, while any other record,
+  a fork at an equal or older version included, is refused. A creation from an
+  id that is blocked here but not held here does reveal the block; this is
+  accepted, because the id is not served here and its key holder learns
+  nothing about anyone else;
 - closes its open realtime connections when the block takes effect, and refuses
   new realtime tickets;
 - sends no push notifications to its subscriptions;
@@ -279,9 +288,14 @@ signed by the owner identity:
   the current owner and whose version is higher than the stored one.
   `GET /node/blocks` (owner-signed) returns it. Adding or removing one entry is
   a new version written by the client.
-- Size: at most `NODE_BLOCK_LIST_MAX_ENTRIES` entries per document, counting
-  both arrays (default `10000`). The same limit applies to this node's own list
-  and to each adopted list.
+- Size: there is no entry cap on this node's own list; the owner decides how
+  many identities and nodes to block. `NODE_BLOCK_LIST_MAX_BYTES` (default
+  64 MiB, about 500k Ed25519 PEM ids at ~120 B each) bounds the bytes read for
+  one document. It defends a node against a hostile peer exhausting its
+  memory and CPU while parsing, not against database growth. For
+  `PUT /node/blocks` it is the request body limit, and a non-owner
+  `X-Identity-Id` or a stale timestamp is rejected before any body byte is
+  buffered. For adopted lists it is the streamed download limit.
 - The document carries no reasons. A published list must not become a place
   for accusations or personal data; any note stays in the owner's client.
 - The identity id is the public key, so anyone can verify the document from
@@ -300,7 +314,7 @@ signed by the owner identity:
   - the signature verifies against the **pinned** `ownerIdentityId`;
   - the version is higher than the last one kept, so a served old version
     cannot roll blocks back;
-  - it fits `NODE_BLOCK_LIST_MAX_ENTRIES`.
+  - it fits in `NODE_BLOCK_LIST_MAX_BYTES`, enforced while streaming.
 
   An unreachable source or an invalid response keeps the last valid version.
   Outbound requests reuse the private-address guard used for link previews
@@ -328,6 +342,10 @@ signed by the owner identity:
   documents are signed by another identity. Subscribers reject them and keep
   the last valid version until their owner pins the new identity. A new owner
   therefore cannot silently take over other nodes' block decisions.
+- **Local owner change.** This node's stored list survives an owner change: it
+  still blocks what the previous owner blocked, and only the new owner can
+  replace it, with a version higher than the stored one. The current owner is
+  never blocked, even if an old list names them.
 
 ## Interaction with existing limits
 

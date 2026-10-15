@@ -5,9 +5,11 @@ import ConversationDraftsPurgeInitializer from './initializers/conversations/Con
 import DiagnosticsTraceInitializer from './initializers/diagnostics/DiagnosticsTraceInitializer';
 import IdentityMutationGateInitializer from './initializers/identities/IdentityMutationGateInitializer';
 import KeychainMutationGateInitializer from './initializers/keychains/KeychainMutationGateInitializer';
+import NodeBlockPolicyInitializer from './initializers/nodes/NodeBlockPolicyInitializer';
 import PublicMutationGateInitializer from './initializers/public-mutations/PublicMutationGateInitializer';
 
 export const applicationInitializers: ApplicationServiceClass<Initializer>[] = [
+  NodeBlockPolicyInitializer,
   PublicMutationGateInitializer,
   KeychainMutationGateInitializer,
   IdentityMutationGateInitializer,

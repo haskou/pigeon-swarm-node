@@ -152,6 +152,49 @@ package "nodes" {
     NodePeerRepository o--> NodePeer
     NodeLoaderService --> NodeRepository
     NodeSaverService --> NodeRepository
+
+    abstract class NodeBlocks {
+      +acceptsReplacement(list: NodeBlockList): boolean
+      +blocksIdentity(identityId: IdentityId): boolean
+    }
+
+    class NodeBlockList {
+      -ownerIdentityId: IdentityId
+      -version: NodeBlockListVersion
+      -blockedIdentityIds: IdentityId[]
+      -blockedNodePeerIds: NodePeerId[]
+      -identitySignature: Signature
+    }
+
+    class NoNodeBlocks
+
+    class NodeBlockListRepository <abstract> {
+      +findLocal(): Promise<NodeBlocks>
+      +saveLocal(list: NodeBlockList): Promise<void>
+    }
+
+    class NodeBlockEnforcer <abstract> {
+      +enforce(blocks: NodeBlocks, node: Node): Promise<void>
+    }
+
+    class NodeBlockPolicy {
+      +load(): Promise<void>
+      +replace(blocks: NodeBlocks, node: Node): Promise<void>
+      +ownerChanged(node: Node): Promise<void>
+      +isIdentityBlocked(identityId: IdentityId): Promise<boolean>
+    }
+
+    note right of NodeBlockPolicy
+      Caches the owner's list in memory.
+      An unclaimed node blocks nobody;
+      the current owner is never blocked.
+    end note
+
+    NodeBlockList --|> NodeBlocks
+    NoNodeBlocks --|> NodeBlocks
+    NodeBlockList --> NodePeerId
+    NodeBlockPolicy --> NodeBlockListRepository
+    NodeBlockPolicy --> NodeBlockEnforcer
   }
 
   package "application" {
@@ -292,6 +335,18 @@ package "nodes" {
     NodeRegistrationCodeRevoker --> NodeRegistrationCodeRepository
     NodeRegistrationAdmitter --> NodeRepository
     NodeRegistrationAdmitter --> NodeRegistrationCodeRepository
+
+    class NodeBlockListStorer {
+      +store(message: NodeBlockListStorerMessage): Promise<NodeBlockList>
+    }
+
+    class NodeBlockListFinder {
+      +find(): Promise<NodeBlocks>
+    }
+
+    NodeBlockListStorer --> NodeBlockListRepository
+    NodeBlockListStorer --> NodeBlockPolicy
+    NodeBlockListFinder --> NodeBlockListRepository
   }
 
   package "infrastructure" {
@@ -341,6 +396,16 @@ package "nodes" {
     LocalNodeRegistrationCodeRepository ..|> NodeRegistrationCodeRepository
     InMemoryNodeNetworkSynchronizationMonitor ..|> NodeNetworkSynchronizationMonitor
     CommunityRepositoryNodeCommunityStateDigester ..|> NodeCommunityStateDigester
+    class LocalNodeBlockListRepository
+    class RuntimeNodeBlockEnforcer
+
+    note right of RuntimeNodeBlockEnforcer
+      Closes blocked identities' sockets and
+      disconnects and gates blocked node peers.
+    end note
+
+    LocalNodeBlockListRepository ..|> NodeBlockListRepository
+    RuntimeNodeBlockEnforcer ..|> NodeBlockEnforcer
   }
 }
 

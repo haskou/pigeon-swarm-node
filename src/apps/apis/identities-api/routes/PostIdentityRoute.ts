@@ -1,3 +1,4 @@
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import IdentityCreationDetector from '@app/contexts/identities/application/detect-creation/IdentityCreationDetector';
 import { IdentityCreationDetectorMessage } from '@app/contexts/identities/application/detect-creation/messages/IdentityCreationDetectorMessage';
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
@@ -25,6 +26,9 @@ import { InsufficientAdmissionProofViewModel } from '../view-model/InsufficientA
 
 @JsonController('/identities')
 export class PostIdentityRoute extends Route {
+  private readonly signedRequestAuthenticator =
+    this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
+
   private readonly identityPublisher: IdentityPublisher =
     this.get<IdentityPublisher>(IdentityPublisher);
 
@@ -88,8 +92,21 @@ export class PostIdentityRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     this.sourceRateLimiter.consume(httpRequest.ip ?? 'unknown');
-
+    // Building the message verifies the identity's signature.
     const message = new PostIdentityRequest(body).getIdentityPublishMessage();
+
+    // A replay of a record this node holds, public at GET /identities/:id,
+    // gets the usual republish answer, so it cannot reveal the block. Every
+    // other record, forks of an equal or older version included, is checked.
+    if (
+      !(await this.creationDetector.holdsRecord(
+        new IdentityCreationDetectorMessage(message.identity),
+      ))
+    ) {
+      await this.signedRequestAuthenticator.assertIsNotBlocked(
+        new IdentityId(body.id),
+      );
+    }
     const reservation = await this.admitRegistration(message, httpRequest);
 
     try {

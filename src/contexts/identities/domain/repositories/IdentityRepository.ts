@@ -46,4 +46,13 @@ export default abstract class IdentityRepository {
 
   /** Whether this node already stores a version of the identity; local only. */
   public abstract holds(id: IdentityId): Promise<boolean>;
+
+  /**
+   * Whether this node already stores exactly this version of the identity;
+   * local only, never fetched from the network.
+   */
+  public abstract holdsVersion(
+    id: IdentityId,
+    externalIdentifier: IdentityExternalIdentifier,
+  ): Promise<boolean>;
 }

@@ -217,14 +217,12 @@ export default class PrivateNetworkRelayRecordDirectory {
       .catch((): Dirent[] => []);
 
     await Promise.all(
-      entries
-        .filter((entry) => entry.name !== 'blockedPeers.json')
-        .map((entry) =>
-          fs.rm(path.join(storageLocation, entry.name), {
-            force: true,
-            recursive: true,
-          }),
-        ),
+      entries.map((entry) =>
+        fs.rm(path.join(storageLocation, entry.name), {
+          force: true,
+          recursive: true,
+        }),
+      ),
     );
     this.publicConnectionStoragePrepared = true;
   }

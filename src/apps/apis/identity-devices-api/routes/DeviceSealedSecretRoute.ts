@@ -1,4 +1,5 @@
 import { InvalidSignedRequestError } from '@app/apps/apis/shared/errors/InvalidSignedRequestError';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import { signedRequestReplayGuard } from '@app/apps/apis/shared/SignedRequestReplayGuard';
 import DeviceAuthorizationFinder from '@app/contexts/identity-devices/application/find/DeviceAuthorizationFinder';
 import DeviceSealedSecretFinder from '@app/contexts/identity-devices/application/find/DeviceSealedSecretFinder';
@@ -29,6 +30,9 @@ import { PutDeviceSealedSecretBundleRequest } from '../requests/PutDeviceSealedS
 
 @JsonController('/identity-devices')
 export class DeviceSealedSecretRoute extends Route {
+  private readonly signedRequestAuthenticator =
+    this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
+
   private readonly deviceAuthenticator =
     new DeviceAuthorizationRequestAuthenticator();
 
@@ -64,6 +68,7 @@ export class DeviceSealedSecretRoute extends Route {
         request,
         authorization,
       );
+    await this.signedRequestAuthenticator.assertIsNotBlocked(target);
     const signature = request.header('x-device-signature');
 
     if (
@@ -111,6 +116,7 @@ export class DeviceSealedSecretRoute extends Route {
         request,
         authorization,
       );
+    await this.signedRequestAuthenticator.assertIsNotBlocked(target);
 
     try {
       const delivery = await this.finder.find(

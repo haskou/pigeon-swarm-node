@@ -82,6 +82,57 @@ paths:
           description: The authenticated identity is not the node owner.
         '409':
           description: The relay configuration is invalid.
+  /node/blocks/:
+    get:
+      tags:
+        - nodes
+      summary: Get the node block list
+      description: Returns the owner-signed block list, or null when none was stored. Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: The stored block list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeBlocksResource'
+        '403':
+          description: The authenticated identity is not the node owner (code 403010).
+    put:
+      tags:
+        - nodes
+      summary: Replace the node block list
+      description: Stores a block list signed by the current node owner. Blocked identities get 403 with code 403012 on identity-signed requests; blocked node peer ids cannot connect. The owner is never blocked. There is no entry cap; the body is limited to NODE_BLOCK_LIST_MAX_BYTES, and a non-owner or stale request is refused before the body is read.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeBlockList'
+      responses:
+        '200':
+          description: The stored block list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeBlocksResource'
+        '401':
+          description: The signed request is invalid or stale.
+        '403':
+          description: The authenticated identity is not the node owner (code 403010).
+        '409':
+          description: The list is not signed by the current owner, its signature does not verify, or its version is not higher than the stored one.
+        '413':
+          description: The body exceeds NODE_BLOCK_LIST_MAX_BYTES.
+        '429':
+          description: Another block list upload is in progress (code 429060).
   /node/diagnostics/:
     put:
       tags:
@@ -404,6 +455,49 @@ components:
       schema:
         type: string
   schemas:
+    NodeBlockList:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          type,
+          ownerIdentityId,
+          version,
+          issuedAt,
+          blockedIdentityIds,
+          blockedNodePeerIds,
+          identitySignature,
+        ]
+      properties:
+        type:
+          type: string
+          enum: [pigeon-node-block-list]
+        ownerIdentityId:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        issuedAt:
+          type: integer
+        blockedIdentityIds:
+          type: array
+          items:
+            type: string
+        blockedNodePeerIds:
+          type: array
+          items:
+            type: string
+        identitySignature:
+          type: string
+          description: Owner signature over "pigeon:node-block-list:v1\n" plus the RFC 8785 canonical JSON of the document without this field.
+    NodeBlocksResource:
+      type: object
+      required: [blockList]
+      properties:
+        blockList:
+          allOf:
+            - $ref: '#/components/schemas/NodeBlockList'
+          nullable: true
     ClientContractResource:
       type: object
       additionalProperties: false

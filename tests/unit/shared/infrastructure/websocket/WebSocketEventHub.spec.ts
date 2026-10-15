@@ -40,6 +40,45 @@ class TestPresenceEvent extends DomainEvent {
 }
 
 describe('WebSocketEventHub', () => {
+  it('closes open sockets of newly blocked identities and refuses them later', async () => {
+    const hub = new WebSocketEventHub();
+    const blocked = await generateIdentityId();
+    const other = await generateIdentityId();
+    const blockedClient = buildClient();
+    const otherClient = buildClient();
+    const laterClient = buildClient();
+
+    hub.register(blocked, blockedClient);
+    hub.register(other, otherClient);
+    hub.blockIdentities([blocked]);
+    hub.register(blocked, laterClient);
+
+    expect(blockedClient.close).toHaveBeenCalledWith(
+      1008,
+      'Identity is blocked on this node',
+    );
+    expect(laterClient.close).toHaveBeenCalledWith(
+      1008,
+      'Identity is blocked on this node',
+    );
+    expect(otherClient.close).not.toHaveBeenCalled();
+    expect(hub.isIdentityBlocked(blocked)).toBe(true);
+    expect(hub.isIdentityBlocked(other)).toBe(false);
+  });
+
+  it('accepts an identity again once it is unblocked', async () => {
+    const hub = new WebSocketEventHub();
+    const identityId = await generateIdentityId();
+    const client = buildClient();
+
+    hub.blockIdentities([identityId]);
+    hub.blockIdentities([]);
+    hub.register(identityId, client);
+
+    expect(client.close).not.toHaveBeenCalled();
+    expect(hub.getOpenSocketCount()).toBe(1);
+  });
+
   it('closes a socket that floods client messages and counts open sockets', async () => {
     const hub = new WebSocketEventHub();
     const identityId = await generateIdentityId();

@@ -7,7 +7,6 @@ import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Li
 import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEvent';
 import Kernel from '@haskou/ddd-kernel';
 import { PrivateKey as NetworkPrivateKey } from '@haskou/pigeon-swarm-crypto';
-import * as fs from 'fs/promises';
 
 import { IPFSBlockNotFoundOfflineError } from '../errors/IPFSBlockNotFoundOfflineError';
 import { IPFSBlockNotFoundPublicError } from '../errors/IPFSBlockNotFoundPublicError';
@@ -1394,17 +1393,15 @@ export abstract class HeliaIPFS implements IPFSConnection {
     pubsub.addEventListener('message', listener);
   }
 
-  public async blockPeer(peerId: string): Promise<void> {
-    HeliaIPFSParser.registerBlockedPeer(peerId);
+  public async disconnectPeer(peerId: string): Promise<void> {
+    const libp2p = this.heliaCore.libp2p;
 
-    if (
-      !HeliaIPFSParser.isInMemoryStorageLocation(this.options.storageLocation)
-    ) {
-      await fs.writeFile(
-        `${this.options.storageLocation}/blockedPeers.json`,
-        JSON.stringify(HeliaIPFSParser.getBlockedPeers()),
-      );
-    }
+    await Promise.all(
+      libp2p
+        .getPeers()
+        .filter((peer) => peer.toString() === peerId)
+        .map((peer) => libp2p.hangUp(peer)),
+    );
   }
 
   public getPeers(): string[] {

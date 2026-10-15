@@ -24,11 +24,11 @@ export class PostNotificationRoute extends Route {
     NotificationRecordRateLimiter,
   );
 
-  private assertRequesterIsInviter(
+  private async assertRequesterIsInviter(
     message: NotificationCreateMessage,
     request: Request,
-  ): void {
-    const id = this.signedRequestAuthenticator.authenticate(request);
+  ): Promise<void> {
+    const id = await this.signedRequestAuthenticator.authenticate(request);
 
     if (message.getInviterIdentityId().isNotEqual(id)) {
       throw new AuthenticatedIdentityIsNotInviterError();
@@ -43,7 +43,7 @@ export class PostNotificationRoute extends Route {
   ): Promise<Response> {
     const message = new PostNotificationRequest(body).getMessage();
 
-    this.assertRequesterIsInviter(message, request);
+    await this.assertRequesterIsInviter(message, request);
 
     await this.rateLimiter.consume(message.getInviterIdentityId());
 

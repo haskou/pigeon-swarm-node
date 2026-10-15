@@ -46,6 +46,7 @@ const identityAttributeKeys = [
 ];
 
 const MAX_CLIENTS_PER_IDENTITY = 16;
+const BLOCKED_IDENTITY_CLOSE_REASON = 'Identity is blocked on this node';
 const MAX_CLIENT_MESSAGES_PER_WINDOW = 200;
 const CLIENT_MESSAGE_WINDOW_MS = 10_000;
 
@@ -62,6 +63,7 @@ export class WebSocketEventHub {
   private readonly pendingCalls = new Map<string, Promise<void>>();
 
   private readonly clients = new Map<string, Set<WebSocket>>();
+  private blockedIdentityIds: ReadonlySet<string> = new Set();
   private readonly mailboxSubscriptions = new MailboxEnvelopeSubscriptions();
   private readonly messageWindows = new WeakMap<
     WebSocket,
@@ -745,7 +747,20 @@ export class WebSocketEventHub {
 
   public clear(): void {
     this.clients.clear();
+    this.blockedIdentityIds = new Set();
     this.mailboxSubscriptions.clear();
+  }
+
+  /** Replaces the identities blocked on this node, closing their open sockets. */
+  public blockIdentities(identityIds: IdentityId[]): void {
+    this.blockedIdentityIds = new Set(
+      identityIds.map((identityId) => identityId.valueOf()),
+    );
+    this.blockedIdentityIds.forEach((identityId) => {
+      [...(this.clients.get(identityId) ?? [])].forEach((client) =>
+        client.close(1008, BLOCKED_IDENTITY_CLOSE_REASON),
+      );
+    });
   }
 
   public setCallEventAttestor(attestor: CallEventAttestor): void {
@@ -907,8 +922,19 @@ export class WebSocketEventHub {
     return total;
   }
 
+  public isIdentityBlocked(identityId: IdentityId): boolean {
+    return this.blockedIdentityIds.has(identityId.valueOf());
+  }
+
   public register(identityId: IdentityId, client: WebSocket): void {
     const identityIdValue = identityId.valueOf();
+
+    if (this.blockedIdentityIds.has(identityIdValue)) {
+      client.close(1008, BLOCKED_IDENTITY_CLOSE_REASON);
+
+      return;
+    }
+
     const identityClients = this.clients.get(identityIdValue) || new Set();
 
     if (identityClients.size >= MAX_CLIENTS_PER_IDENTITY) {

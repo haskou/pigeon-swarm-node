@@ -25,7 +25,7 @@ export class DeleteCallParticipantRoute extends CallRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const participantIdentityId = this.authenticate(request);
+    const participantIdentityId = await this.authenticate(request);
     const call = await this.leaver.leave(
       new CallLeaveMessage(
         callId,

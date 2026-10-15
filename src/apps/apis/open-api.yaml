@@ -272,6 +272,8 @@ paths:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1'
   /node/relay-configuration/:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1relay-configuration~1'
+  /node/blocks/:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1blocks~1'
   /node/diagnostics/:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1diagnostics~1'
   /node/networks/:

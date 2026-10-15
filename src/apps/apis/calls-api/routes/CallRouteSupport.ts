@@ -53,7 +53,7 @@ export abstract class CallRouteSupport extends Route {
     return () => this.recordRateLimiter.consume(identityId);
   }
 
-  protected authenticate(request: Request): IdentityId {
+  protected async authenticate(request: Request): Promise<IdentityId> {
     return this.signedRequestAuthenticator.authenticate(request);
   }
 

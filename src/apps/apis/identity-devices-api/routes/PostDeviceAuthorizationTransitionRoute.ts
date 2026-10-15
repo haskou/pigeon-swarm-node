@@ -1,9 +1,11 @@
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import DeviceAuthorizationTransitionApplier from '@app/contexts/identity-devices/application/apply-transition/DeviceAuthorizationTransitionApplier';
 import { ApplyDeviceAuthorizationTransitionMessage } from '@app/contexts/identity-devices/application/apply-transition/messages/ApplyDeviceAuthorizationTransitionMessage';
 import DeviceAuthorizationFinder from '@app/contexts/identity-devices/application/find/DeviceAuthorizationFinder';
 import { DeviceAuthorizationFindMessage } from '@app/contexts/identity-devices/application/find/messages/DeviceAuthorizationFindMessage';
 import DeviceSealedSecretHandover from '@app/contexts/identity-devices/application/hand-over/DeviceSealedSecretHandover';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
+import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import { InvalidDeviceSealedSecretBundleError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceSealedSecretBundleError';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
@@ -20,6 +22,9 @@ import { DeviceAuthorizationViewModel } from '../view-model/DeviceAuthorizationV
 
 @JsonController('/identity-devices')
 export class PostDeviceAuthorizationTransitionRoute extends Route {
+  private readonly signedRequestAuthenticator =
+    this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
+
   private readonly applier = this.get<DeviceAuthorizationTransitionApplier>(
     DeviceAuthorizationTransitionApplier,
   );
@@ -36,6 +41,42 @@ export class PostDeviceAuthorizationTransitionRoute extends Route {
   private readonly finder = this.get<DeviceAuthorizationFinder>(
     DeviceAuthorizationFinder,
   );
+
+  /**
+   * Whether the identity's current devices or recovery authority signed the
+   * transition. Only such a caller may learn that the identity is blocked; an
+   * unsigned or forged transition is refused by the applier as usual.
+   */
+  private async isSignedByTheIdentity(
+    transition: DeviceAuthorizationTransition,
+  ): Promise<boolean> {
+    try {
+      const authorization = await this.finder.find(
+        new DeviceAuthorizationFindMessage(transition.getIdentityId()),
+      );
+
+      if (transition.isRecovery()) {
+        return authorization
+          .getRecoveryAuthority()
+          .isValidSignature(
+            transition.getSigningPayload(),
+            transition.getSignature(),
+          );
+      }
+
+      const author = transition.getAuthorCredential();
+
+      return (
+        authorization.isAuthorized(author) &&
+        author.isValidSignature(
+          transition.getSigningPayload(),
+          transition.getSignature(),
+        )
+      );
+    } catch {
+      return false;
+    }
+  }
 
   private async applyTransition(
     request: PostDeviceAuthorizationTransitionRequest,
@@ -85,6 +126,12 @@ export class PostDeviceAuthorizationTransitionRoute extends Route {
     const message = request.getMessage();
 
     this.rateLimiter.consume(message.transition.getIdentityId());
+
+    if (await this.isSignedByTheIdentity(message.transition)) {
+      await this.signedRequestAuthenticator.assertIsNotBlocked(
+        message.transition.getIdentityId(),
+      );
+    }
     const { authorization, sealedSecrets } = await this.applyTransition(
       request,
       message,
