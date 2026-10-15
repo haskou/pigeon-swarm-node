@@ -197,7 +197,7 @@ package "calls/infrastructure" {
   CallEventAttestor --> CallEventAttestation
   OrbitDBCallRepository --> CallParticipantLeaseRepository : hydrates community presence
   InMemoryCallParticipantLeaseRepository ..|> CallParticipantLeaseRepository
-  CallParticipantLeaseWarmUp ..> OrbitDBCallProjection : begins once ready
+  OrbitDBCallProjection ..> CallParticipantLeaseWarmUp : readiness starts
   InMemoryCallSignalDeliveryRepository ..|> CallSignalDeliveryRepository
 }
 
