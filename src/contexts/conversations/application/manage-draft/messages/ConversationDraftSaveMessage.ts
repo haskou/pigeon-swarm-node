@@ -20,6 +20,8 @@ export class ConversationDraftSaveMessage {
     this.draftKey = new ConversationDraftKey(draftKey);
     this.encryptedPayload = new EncryptedMessagePayload(encryptedPayload);
     this.updatedAt =
-      updatedAt === undefined ? Timestamp.now() : new Timestamp(updatedAt);
+      typeof updatedAt === 'number'
+        ? new Timestamp(updatedAt)
+        : Timestamp.now();
   }
 }
