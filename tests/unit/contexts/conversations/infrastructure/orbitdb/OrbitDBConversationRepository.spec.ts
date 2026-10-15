@@ -95,18 +95,32 @@ describe('OrbitDBConversationRepository', () => {
     expect(operationsQuery).not.toHaveBeenCalled();
   });
 
+  it('should find only the one-to-one conversations of a participant', async () => {
+    const oneToOne = await seeded(mother.build());
+    await seeded(mother.buildGroup());
+
+    const found = await repository.findOneToOneByParticipant(mother.author, 10);
+
+    expect(found.map((conversation) => conversation.getId())).toEqual([
+      oneToOne.getId(),
+    ]);
+  });
+
   /** Stores the signed creation of a conversation, the only thing that makes it exist. */
   async function seeded<T extends Conversation>(conversation: T): Promise<T> {
+    const participantIds = conversation
+      .getParticipantIds()
+      .map((participantId) => participantId.valueOf());
     const genesis = ConversationOperation.create({
       action: ConversationOperationAction.CONVERSATION_CREATED,
-      args: {
-        name: 'Mother group',
-        nonce: 'conversation-mother',
-        participantIds: conversation
-          .getParticipantIds()
-          .map((participantId) => participantId.valueOf()),
-        type: 'group',
-      },
+      args: conversation.isGroup()
+        ? {
+            name: 'Mother group',
+            nonce: 'conversation-mother',
+            participantIds,
+            type: 'group',
+          }
+        : { participantIds, type: 'one-to-one' },
       authorIdentityId: conversation.getCreatorId() as IdentityId,
       conversationId: conversation.getId(),
       createdAt: 1780000000000,
