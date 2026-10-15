@@ -2,6 +2,7 @@ import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeReposito
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { CallSignalDelivery } from '../../domain/CallSignalDelivery';
+import { CallParticipantNotFoundError } from '../../domain/errors/CallParticipantNotFoundError';
 import CallRepository from '../../domain/repositories/CallRepository';
 import CallSignalDeliveryRepository from '../../domain/repositories/CallSignalDeliveryRepository';
 import { CallSignalId } from '../../domain/value-objects/CallSignalId';
@@ -29,14 +30,31 @@ export default class CallSignalSender {
 
     await onCallFound?.();
 
-    const delivery = call.sendSignal(
-      CallSignalId.generate(),
-      await this.nodeRepository.loadLocalNodeId(),
-      message.senderIdentityId,
-      message.recipientIdentityId,
-      message.signalType,
-      message.payload,
-    );
+    const localNodeId = await this.nodeRepository.loadLocalNodeId();
+    let delivery: CallSignalDelivery;
+
+    try {
+      delivery = call.sendSignal(
+        CallSignalId.generate(),
+        localNodeId,
+        message.senderIdentityId,
+        message.recipientIdentityId,
+        message.signalType,
+        message.payload,
+      );
+    } catch (error) {
+      if (error instanceof CallParticipantNotFoundError) {
+        await this.repository.assertParticipantSettled(
+          call.getId(),
+          message.senderIdentityId,
+        );
+        await this.repository.assertParticipantSettled(
+          call.getId(),
+          message.recipientIdentityId,
+        );
+      }
+      throw error;
+    }
 
     await this.deliveryRepository.save(delivery);
     await this.eventPublisher.publish(delivery.pullDomainEvents());

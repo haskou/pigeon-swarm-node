@@ -38,6 +38,18 @@ export default abstract class CallRepository {
 
   public abstract hasById(id: CallId): Promise<boolean>;
   public abstract requireById(id: CallId): Promise<Call>;
+
+  /**
+   * Throws not ready while the participant's own record of the call still
+   * awaits admission: what the call shows of that participant is not final
+   * yet. Callers ask only after the call refused the participant, so a record
+   * that waits never holds back a participant the call already accepts.
+   */
+  public abstract assertParticipantSettled(
+    callId: CallId,
+    identityId: IdentityId,
+  ): Promise<void>;
+
   public abstract findByParticipant(participantId: IdentityId): Promise<Call[]>;
 
   public abstract findTimedOutRingingCalls(
