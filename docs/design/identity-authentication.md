@@ -258,9 +258,9 @@ claiming that handle, which is the sybil non-goal below.
 - The signer chooses the timestamp, so the holder of an identity key can
   backdate a claim.
 - Minting many valid identities (sybil) is made costly by the admission proof
-  but not prevented; only an admission authority could do that. An optional
-  per-node mode in which the node owner approves the identities the node serves
-  is designed in `node-owner-admission.md` (not built). The caps bound
+  but not prevented; only an admission authority could do that. Optional
+  per-node registration control and blocking by the node owner are designed in
+  `node-owner-registration-and-blocking.md` (not built). The caps bound
   the cost to honest nodes: replicated content, which each identity may claim
   up to its per-network quota, is bounded on every node by a per-network
   budget shared fairly by owner (`CONTENT_REPLICATION_NETWORK_BUDGET_BYTES`).
