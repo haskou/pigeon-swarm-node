@@ -854,9 +854,13 @@ is no pubsub conversation announce, and the participant index is rebuilt locally
 from the folded state, never replicated.
 
 Notifications are no longer unsigned (#371). An invitation is a `notification_invitation`
-record signed by the inviter, admitted only when the signed conversation or community
-state allows the inviter (and, for conversations, the recipient); its id is derived
-from inviter, recipient, subject and nonce. Accept, decline and read are
+record signed by the inviter. A community or one-to-one conversation invitation is
+admitted only when the signed community or conversation state allows the inviter (and,
+for conversations, the recipient); its id is derived from inviter, recipient, subject
+and nonce. A `group_conversation_invitation` names no subject and gets no participant
+check, because the group roster lives in MLS: its id is derived from inviter, recipient
+and nonce, the conversation id travels only inside the seal, and a group record that
+carries `subjectId` is refused. Accept, decline and read are
 `notification_state` records signed by the recipient, one record per state, with
 terminal states absorbing. Heads are `notification:<recordId>` and must match the
 record id; `notification-recipient-index:<id>` heads are refused and the recipient list

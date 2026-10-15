@@ -8,6 +8,7 @@ import { NotificationAlreadyResolvedError } from './errors/NotificationAlreadyRe
 import { NotificationWasAcceptedEvent } from './events/NotificationWasAcceptedEvent';
 import { NotificationWasCreatedEvent } from './events/NotificationWasCreatedEvent';
 import { NotificationWasDeclinedEvent } from './events/NotificationWasDeclinedEvent';
+import { GroupConversationInvitationPayload } from './GroupConversationInvitationPayload';
 import { MissedCallPayload } from './MissedCallPayload';
 import { NotificationId } from './value-objects/NotificationId';
 import { NotificationState } from './value-objects/NotificationState';
@@ -34,6 +35,7 @@ export class Notification extends AggregateRoot {
   ):
     | CommunityInvitationPayload
     | ConversationInvitationPayload
+    | GroupConversationInvitationPayload
     | MissedCallPayload {
     if ('communityId' in primitives) {
       return CommunityInvitationPayload.fromPrimitives(primitives);
@@ -43,7 +45,11 @@ export class Notification extends AggregateRoot {
       return MissedCallPayload.fromPrimitives(primitives);
     }
 
-    return ConversationInvitationPayload.fromPrimitives(primitives);
+    if ('conversationId' in primitives) {
+      return ConversationInvitationPayload.fromPrimitives(primitives);
+    }
+
+    return GroupConversationInvitationPayload.fromPrimitives(primitives);
   }
 
   public static communityInvitation(
@@ -77,7 +83,7 @@ export class Notification extends AggregateRoot {
   }
 
   public static groupConversationInvitation(
-    payload: ConversationInvitationPayload,
+    payload: GroupConversationInvitationPayload,
   ): Notification {
     const notification = new Notification(
       payload.notificationId(),
@@ -126,6 +132,7 @@ export class Notification extends AggregateRoot {
     private payload:
       | CommunityInvitationPayload
       | ConversationInvitationPayload
+      | GroupConversationInvitationPayload
       | MissedCallPayload,
   ) {
     super();
@@ -186,7 +193,7 @@ export class Notification extends AggregateRoot {
     if (
       !this.type.isEqual(NotificationType.GROUP_CONVERSATION_INVITATION) ||
       !this.state.isEqual(NotificationState.PENDING) ||
-      !(this.payload instanceof ConversationInvitationPayload)
+      !(this.payload instanceof GroupConversationInvitationPayload)
     ) {
       return undefined;
     }
@@ -198,7 +205,20 @@ export class Notification extends AggregateRoot {
     this.status = NotificationStatus.READ;
   }
 
-  public toPrimitives() {
+  // Declared: inferred, TypeScript folds the one-to-one payload into the
+  // group payload it extends.
+  public toPrimitives(): {
+    id: string;
+    payload:
+      | PrimitiveOf<CommunityInvitationPayload>
+      | PrimitiveOf<ConversationInvitationPayload>
+      | PrimitiveOf<GroupConversationInvitationPayload>
+      | PrimitiveOf<MissedCallPayload>;
+    recipientIdentityId: string;
+    state: string;
+    status: string;
+    type: string;
+  } {
     return {
       id: this.id.valueOf(),
       payload: this.payload.toPrimitives(),

@@ -314,10 +314,10 @@ N = group members including the sender. Values are from code unless marked.
 | --- | --- | --- |
 | Identity publication with `mailboxHome` | discovery of home nodes; parsed as the `IdentityMailboxHome` value object (`src/contexts/identities/domain/value-objects/IdentityMailboxHome.ts`: http or https URL, at most 255 characters) | identity id, home node |
 | Roster ops `member_added`, `member_removed` | the roster itself (D15); members check MLS leaves against it | group id, member identity ids, timing |
-| Invitation notifications `group_conversation_invitation` | tells the invitee a conversation exists; also carries sealed control letters (key package request and response, `{welcome, k}`) (D8) | recipient identity, conversation id, type, timing |
+| Invitation notifications `group_conversation_invitation` | tells the invitee a conversation exists; also carries sealed control letters (key package request and response, `{welcome, k}`) (D8) | recipient identity, inviter identity, type, timing; since D15 slice 6 the conversation id travels only inside the seal |
 | Private blobs (#290) | large attachments; retention `max(PRIVATE_BLOB_RETENTION_MS, MAILBOX_RETENTION_MS)` (`own-copy-and-history-backfill.md` L56, #446) | blob ids |
 | Own copy and pairing export | own devices and history | per own-copy document |
-| MLS key packages | not stored on the node for group conversations; exchanged as sealed control letters | sender, recipient, conversation id and timing of the notification |
+| MLS key packages | not stored on the node for group conversations; exchanged as sealed control letters | sender, recipient and timing of the notification |
 
 Discovery: a sender reads each member's `mailboxHome` from its signed identity payload.
 It derives inbox ids from `gen_k` and the slots. No group directory is needed. A member

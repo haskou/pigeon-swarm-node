@@ -4741,10 +4741,28 @@ longer exist. The body carries the invitation fields, a client-chosen `nonce`
 }
 ```
 
-`group_conversation_invitation` has the same shape with a `group:<id>`
-`conversationId`. A community invitation uses `communityId` and carries no key:
-the invitee obtains the group key by joining the community's MLS group, and a
-node rejects a `community_invitation` that includes `encryptedKey`:
+A `group_conversation_invitation` names no conversation: the conversation id
+travels only inside the seal (`encryptedConversationKey`), and the node does
+not learn the group roster. The body carries no `conversationId`; a group
+invitation that sends one is rejected with `400` and code `400070`. In
+`GET /notifications` its payload is
+`{encryptedConversationKey, inviterIdentityId, nonce, recipientIdentityId}`.
+The body:
+
+```json
+{
+  "type": "group_conversation_invitation",
+  "inviterIdentityId": "<aliceIdentityId>",
+  "recipientIdentityId": "<bobIdentityId>",
+  "encryptedConversationKey": "<sealedForBob>",
+  "nonce": "<random 16-128 chars>",
+  "mutation": { "...": "SignedPublicMutation" }
+}
+```
+
+A community invitation uses `communityId` and carries no key: the invitee
+obtains the group key by joining the community's MLS group, and a node rejects
+a `community_invitation` that includes `encryptedKey`:
 
 ```json
 {
@@ -4762,9 +4780,14 @@ Byte-exact contract (vectors in
 checked by `NotificationVectors.spec.ts`):
 
 - notification id: `"invitation:" + hex(sha256(utf8(canonicalize({inviterIdentityId, nonce, recipientIdentityId, subjectId}))))`,
-  where `subjectId` is the conversation id or the community id. The node derives
-  it; a client never sends it.
-- signed payload (RFC 8785 canonical JSON): `{encryptedKey?, id, inviterIdentityId, nonce, recipientIdentityId, scopeType: "notification_invitation", subjectId, type}`.
+  where `subjectId` is the one-to-one conversation id or the community id. A
+  group invitation has no subject: its id is
+  `"invitation:" + hex(sha256(utf8(canonicalize({inviterIdentityId, nonce, recipientIdentityId}))))`.
+  The node derives the id; a client never sends it.
+- signed payload (RFC 8785 canonical JSON): `{encryptedKey?, id, inviterIdentityId, nonce, recipientIdentityId, scopeType: "notification_invitation", subjectId, type}`
+  for conversation and community invitations, and
+  `{encryptedKey, id, inviterIdentityId, nonce, recipientIdentityId, scopeType: "notification_invitation", type}`
+  for group invitations. A group record that carries `subjectId` is refused.
   `encryptedKey` is the value of `encryptedConversationKey`; it is required for
   conversation and group invitations and must be absent for community ones.
 - `mutation`: a `put` proof with `store: "notifications"`, `recordId` = the
@@ -4772,9 +4795,12 @@ checked by `NotificationVectors.spec.ts`):
   `base64url(sha256(utf8(canonicalize(payload))))`, signed with the shared
   `pigeon:public-mutation:v2\n` signing content; the author is the inviter.
 - admission (every node, on replication too): the inviter must be the proof
-  author; for conversation and group invitations both inviter and recipient must
-  be participants in the signed conversation state; for community invitations the
-  inviter must be allowed to create invites in the signed community state.
+  author; for one-to-one conversation invitations both inviter and recipient
+  must be participants in the signed conversation state; for community
+  invitations the inviter must be allowed to create invites in the signed
+  community state. Group invitations get no participant check: the roster lives
+  in MLS (D15). The signature, the invitation quota below, the per-minute rate
+  cap and the pending-letter listing caps still bound them.
 
 Implemented:
 

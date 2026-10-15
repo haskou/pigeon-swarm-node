@@ -278,11 +278,11 @@ Invitation (`collection: notifications`, `scopeType: notification_invitation`):
 
 ```jsonc
 {
-  "id": "invitation:<hash(inviterIdentityId:recipientIdentityId:subjectId:nonce)>",
+  "id": "invitation:<hash(inviterIdentityId:recipientIdentityId[:subjectId]:nonce)>",
   "type": "conversation_invitation | group_conversation_invitation | community_invitation",
   "inviterIdentityId": "<identityId>",
   "recipientIdentityId": "<identityId>",
-  "subjectId": "<conversationId | communityId>",
+  "subjectId": "<conversationId | communityId>  // absent for group_conversation_invitation",
   "encryptedKey": "<encryptedConversationKey>  // absent for community_invitation",
   "nonce": "<base64url>",
   "mutation": { /* PublicMutationProof, author == inviter */ }
@@ -303,8 +303,11 @@ field is redundant with the device-signed proof and is removed from the payload
   invitation requires an admitted conversation record (slice 1) where the
   inviter and the recipient are both in `participantIds`; community invitation
   requires the inviter to hold the invite permission in the community state
-  (existing community authority) for `subjectId`; `encryptedKey` bounded by the
-  existing value object; recipient is a syntactically valid identity id.
+  (existing community authority) for `subjectId`; group conversation invitation
+  carries no `subjectId` (refused if present) and gets no participant check,
+  since the group roster lives in MLS (D15), only the signature and the quotas;
+  `encryptedKey` bounded by the existing value object; recipient is a
+  syntactically valid identity id.
 - State: author == `recipientIdentityId` of the invitation it references; the
   invitation exists and is admitted; `accepted`/`declined` are terminal (no
   transitions out), `read` is monotonic.

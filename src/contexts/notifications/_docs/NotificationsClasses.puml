@@ -10,7 +10,7 @@ package "notifications" {
       -recipientIdentityId: IdentityId
       -status: NotificationStatus
       -state: NotificationState
-      -payload: ConversationInvitationPayload | CommunityInvitationPayload | MissedCallPayload
+      -payload: ConversationInvitationPayload | GroupConversationInvitationPayload | CommunityInvitationPayload | MissedCallPayload
       +accept(): void
       +decline(): void
       +isRecipient(identityId: IdentityId): boolean
@@ -35,6 +35,20 @@ package "notifications" {
       -nonce: InvitationNonce
       +toPrimitives(): object
     }
+
+    class GroupConversationInvitationPayload {
+      -inviterIdentityId: IdentityId
+      -recipientIdentityId: IdentityId
+      -encryptedConversationKey: EncryptedConversationKey
+      -nonce: InvitationNonce
+      +toPrimitives(): object
+    }
+
+    note right of GroupConversationInvitationPayload
+      Names no conversation: the conversation id
+      travels only inside the seal, and the node
+      checks no group roster (D15).
+    end note
 
     class CommunityInvitationPayload {
       -communityId: CommunityId
@@ -83,6 +97,7 @@ package "notifications" {
     end note
 
     Notification *--> ConversationInvitationPayload
+    Notification *--> GroupConversationInvitationPayload
     Notification *--> CommunityInvitationPayload
     Notification *--> MissedCallPayload
     PendingGroupInvitationCaps --> PendingGroupInvitationLimits

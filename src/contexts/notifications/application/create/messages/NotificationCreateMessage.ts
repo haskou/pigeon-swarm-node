@@ -1,5 +1,6 @@
 import { CommunityInvitationPayload } from '@app/contexts/notifications/domain/CommunityInvitationPayload';
 import { ConversationInvitationPayload } from '@app/contexts/notifications/domain/ConversationInvitationPayload';
+import { GroupConversationInvitationPayload } from '@app/contexts/notifications/domain/GroupConversationInvitationPayload';
 import { NotificationType } from '@app/contexts/notifications/domain/value-objects/NotificationType';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -52,8 +53,8 @@ export class NotificationCreateMessage {
     });
   }
 
+  /** A group letter names no conversation: its id travels only in the seal. */
   public static groupConversationInvitation(
-    conversationId: string,
     inviterIdentityId: string,
     recipientIdentityId: string,
     encryptedConversationKey: string,
@@ -64,8 +65,7 @@ export class NotificationCreateMessage {
       inviterIdentityId: new IdentityId(inviterIdentityId),
       kind: 'group_conversation_invitation',
       mutation,
-      payload: ConversationInvitationPayload.fromPrimitives({
-        conversationId,
+      payload: GroupConversationInvitationPayload.fromPrimitives({
         encryptedConversationKey,
         inviterIdentityId,
         nonce,
@@ -110,7 +110,9 @@ export class NotificationCreateMessage {
         }
         break;
       case 'group_conversation_invitation':
-        if (this.payload.payload instanceof ConversationInvitationPayload) {
+        if (
+          this.payload.payload instanceof GroupConversationInvitationPayload
+        ) {
           return handlers.groupConversationInvitation(this.payload.payload);
         }
         break;
