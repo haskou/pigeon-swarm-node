@@ -16,8 +16,11 @@ import { CommunityRequestId } from '@app/contexts/communities/domain/value-objec
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
 import IdentityAdmissionLoadRepository from '@app/contexts/identities/domain/repositories/IdentityAdmissionLoadRepository';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
+import IpfsIdentityMapper from '@app/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import { DeviceSealedSecretBundle } from '@app/contexts/identity-devices/domain/DeviceSealedSecretBundle';
 import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
@@ -4848,6 +4851,20 @@ export default class Definitions {
     await this.ensureAuthenticatedIdentityIsPublished();
     this.publishedGenesisExternalIdentifier =
       await this.findCreatedIdentityExternalIdentifier();
+  }
+
+  @given('the fork is fetchable over IPFS without being held here')
+  public async theForkIsFetchableOverIpfsWithoutBeingHeldHere(): Promise<void> {
+    const fork = Identity.fromPrimitives(
+      JSON.parse(this.body ?? '{}') as IdentityPrimitives,
+    );
+
+    await Kernel.di
+      .getService<IPFS>(IPFS)
+      .addJSON(
+        new IpfsIdentityMapper().toDocument(fork),
+        fork.getNetworkIds()[0].valueOf(),
+      );
   }
 
   @given('I set a fork of my identity at version {int}')

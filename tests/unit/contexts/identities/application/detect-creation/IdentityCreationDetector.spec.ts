@@ -69,7 +69,7 @@ describe('IdentityCreationDetector', () => {
       repository.calculateExternalIdentifier.mockResolvedValue(
         externalIdentifier,
       );
-      repository.hasByExternalIdentifier.mockResolvedValue(held);
+      repository.holdsVersion.mockResolvedValue(held);
 
       await expect(
         detector.holdsRecord(new IdentityCreationDetectorMessage(publication)),
@@ -77,7 +77,8 @@ describe('IdentityCreationDetector', () => {
       expect(repository.calculateExternalIdentifier).toHaveBeenCalledWith(
         publication,
       );
-      expect(repository.hasByExternalIdentifier).toHaveBeenCalledWith(
+      expect(repository.holdsVersion).toHaveBeenCalledWith(
+        id,
         externalIdentifier,
       );
     },

@@ -188,6 +188,7 @@ Feature: Put node blocks
     When I PUT "/node/blocks/"
     Then response code is equal to 200
     Given I set a fork of my identity at version <version>
+    And the fork is fetchable over IPFS without being held here
     When I POST to "/identities/"
     Then response code is equal to 403
     And response body should contain "403012"
