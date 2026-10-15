@@ -17,18 +17,15 @@ export default class IdentityCreationDetector {
   }
 
   /**
-   * Whether the publication would change what this node holds: a creation or
-   * a version newer than the stored one. A replay of a held version does not.
+   * Whether this node already holds exactly this record. Only such a replay
+   * changes nothing here; any other record, even an equal or older version,
+   * can fork what this node serves.
    */
-  public async isCreationOrNewerVersion(
+  public async holdsRecord(
     message: IdentityCreationDetectorMessage,
   ): Promise<boolean> {
-    if (await this.isCreation(message)) {
-      return true;
-    }
-
-    return message.identity.isNewerThan(
-      await this.repository.findById(message.identity.getId()),
+    return await this.repository.hasByExternalIdentifier(
+      await this.repository.calculateExternalIdentifier(message.identity),
     );
   }
 }

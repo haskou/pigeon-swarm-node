@@ -95,12 +95,13 @@ export class PostIdentityRoute extends Route {
     // Building the message verifies the identity's signature.
     const message = new PostIdentityRequest(body).getIdentityPublishMessage();
 
-    // A replay of the held version, public at GET /identities/:id, gets the
-    // usual republish answer, so it cannot reveal whether the id is blocked.
+    // A replay of a record this node holds, public at GET /identities/:id,
+    // gets the usual republish answer, so it cannot reveal the block. Every
+    // other record, forks of an equal or older version included, is checked.
     if (
-      await this.creationDetector.isCreationOrNewerVersion(
+      !(await this.creationDetector.holdsRecord(
         new IdentityCreationDetectorMessage(message.identity),
-      )
+      ))
     ) {
       await this.signedRequestAuthenticator.assertIsNotBlocked(
         new IdentityId(body.id),
