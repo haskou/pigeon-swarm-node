@@ -109,6 +109,12 @@ Feature: Conversation drafts live under opaque keys
       }
       """
 
+  Scenario: A draft payload longer than the limit is rejected
+    Given I set json body with "encryptedPayload" of 65537 characters
+    And I sign a PUT request to "/conversations/me/drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
+    When I PUT "/conversations/me/drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
+    Then response code is equal to 400
+
   Scenario Outline: The conversation id draft route does not exist
     Given I have created a group conversation
     And I set json body

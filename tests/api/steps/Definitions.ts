@@ -1573,6 +1573,14 @@ export default class Definitions {
     this.body = body;
   }
 
+  @given('I set json body with {string} of {int} characters')
+  public iSetJsonBodyWithFieldOfCharacters(
+    field: string,
+    length: number,
+  ): void {
+    this.body = JSON.stringify({ [field]: 'a'.repeat(length) });
+  }
+
   @given('I set header {string} to {string}')
   public iSetHeaderTo(header: string, value: string): void {
     this.headers[header] = value;
