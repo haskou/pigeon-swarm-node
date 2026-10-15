@@ -161,6 +161,30 @@ describe('ConversationOperationMutationPolicy', () => {
     );
   });
 
+  describe('a 1:1 genesis that names parents', () => {
+    const oneToOne = oneToOneGenesis();
+    const withParents = legacyGroupChange({
+      action: ConversationOperationAction.CONVERSATION_CREATED.valueOf(),
+      args: { ...oneToOne.getArguments() },
+      authorIdentityId: creator.valueOf(),
+      conversationId: oneToOne.getConversationId().valueOf(),
+      networkId: networkId.valueOf(),
+      parents: [oneToOne.getHash()],
+    });
+
+    it('refuses it before checking the proof', () => {
+      expect(() => policy.expectationOf({ ...withParents })).toThrow(
+        InvalidPublicMutationError,
+      );
+    });
+
+    it('refuses to admit it', async () => {
+      await expect(
+        policy.assertPermitted({ ...withParents }, creator.valueOf(), false),
+      ).rejects.toThrow(InvalidPublicMutationError);
+    });
+  });
+
   describe('a group conversation replicated by an older node', () => {
     const legacy = legacyGroupGenesis({
       creatorIdentityId: creator.valueOf(),
