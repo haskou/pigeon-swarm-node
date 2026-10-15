@@ -9,10 +9,6 @@ export class PutPresenceRequest {
   ) {}
 
   public getMessage(): IdentityPresenceUpdateMessage {
-    return new IdentityPresenceUpdateMessage(
-      this.identityId,
-      this.body.status,
-      this.body.customMessage,
-    );
+    return new IdentityPresenceUpdateMessage(this.identityId, this.body.status);
   }
 }

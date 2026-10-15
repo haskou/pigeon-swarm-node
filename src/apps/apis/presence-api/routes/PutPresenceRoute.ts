@@ -20,7 +20,8 @@ export class PutPresenceRoute extends Route {
 
   @Put('/me')
   public async putPresence(
-    @Body() body: PutPresenceBody,
+    @Body({ validate: { forbidNonWhitelisted: true, whitelist: true } })
+    body: PutPresenceBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {

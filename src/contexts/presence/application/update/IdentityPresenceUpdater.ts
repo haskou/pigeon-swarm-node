@@ -31,26 +31,12 @@ export default class IdentityPresenceUpdater {
     return presence;
   }
 
-  public async clearCustomMessage(
-    message: IdentityPresenceUpdateMessage,
-  ): Promise<IdentityPresence> {
-    const presence = await this.load(message.getIdentityId());
-
-    presence.clearCustomMessage();
-
-    return this.persist(presence);
-  }
-
   public async update(
     message: IdentityPresenceUpdateMessage,
   ): Promise<IdentityPresence> {
     const presence = await this.load(message.getIdentityId());
 
-    presence.update(
-      message.getStatus(),
-      message.getCustomMessage(),
-      message.hasCustomMessage(),
-    );
+    presence.update(message.getStatus());
 
     return this.persist(presence);
   }

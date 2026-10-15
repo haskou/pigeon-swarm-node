@@ -78,8 +78,8 @@ The response starts with a four-byte unsigned big-endian body length, followed b
 Identity presence never travels over node gossip. There is no presence topic,
 no `presence.v1.identity_presence.was_updated` announcement and no consumer for
 one: a node does not learn which identities are connected to other nodes, and a
-node unrelated to an identity never receives its status, custom message or
-heartbeat timing.
+node unrelated to an identity never receives its status or heartbeat
+timing.
 
 The node serving an identity's authenticated WebSocket keeps one in-memory
 lease for it, derived from that connection's heartbeats. The lease is never

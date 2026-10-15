@@ -9,12 +9,7 @@ describe('IdentityPresencePreference', () => {
       100,
     );
 
-    const changed = preference.update(
-      PresenceStatus.BUSY,
-      undefined,
-      false,
-      new Timestamp(200),
-    );
+    const changed = preference.update(PresenceStatus.BUSY, new Timestamp(200));
 
     expect(changed).toBe(true);
     expect(preference.selected().isBusy()).toBe(true);
@@ -27,12 +22,7 @@ describe('IdentityPresencePreference', () => {
     );
 
     expect(() =>
-      preference.update(
-        PresenceStatus.DISCONNECTED,
-        undefined,
-        false,
-        new Timestamp(200),
-      ),
+      preference.update(PresenceStatus.DISCONNECTED, new Timestamp(200)),
     ).toThrow('Disconnected presence is derived by heartbeat timeout.');
   });
 });

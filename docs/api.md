@@ -1844,7 +1844,7 @@ identity's authenticated WebSocket. That node keeps one lease per identity,
 renewed by heartbeats. The lease is never gossiped, never carries a node id or
 network id, is not written to OrbitDB/IPFS, and resets when the node restarts.
 No other node receives it, so a node unrelated to an identity never learns its
-status, custom message or heartbeat timing.
+status or heartbeat timing.
 
 Who can see presence:
 
@@ -1852,7 +1852,7 @@ Who can see presence:
   when they share a conversation or community with it that this node knows
   about. At most 500 of the viewer's conversations are checked. Otherwise the
   response carries only `identityId`, `status: disconnected` and `updatedAt`,
-  with no custom message, `lastActivityAt` or `lastHeartbeatAt`. An identity
+  with no `lastActivityAt` or `lastHeartbeatAt`. An identity
   with `invisible` status reads the same way to everyone except itself.
 - Over WebSocket, presence events are delivered only to the connections of the
   identity they describe. Related identities do not receive them.
@@ -1872,8 +1872,8 @@ Statuses:
 - `custom`: selected custom connection state.
 - `disconnected`: derived by backend after heartbeat timeout.
 
-The custom status message is separate from connection state, max 50 characters,
-and can be removed.
+Presence carries no custom status message. `PUT /presence/me` rejects unknown
+body fields, including `customMessage`, with `400`.
 
 ### Get identity presence
 
@@ -1891,7 +1891,6 @@ Requires signed HTTP headers. Response:
 {
   "identityId": "<identityId>",
   "status": "available",
-  "customMessage": "Building the swarm",
   "lastHeartbeatAt": 1770000000000,
   "lastActivityAt": 1770000000000,
   "updatedAt": 1770000000000
@@ -1928,22 +1927,13 @@ Request:
 
 ```json
 {
-  "status": "busy",
-  "customMessage": "Recording"
+  "status": "busy"
 }
 ```
 
 Allowed `status` values are `available`, `away`, `busy`, `custom` and
 `invisible`. `disconnected` cannot be selected; it is derived by heartbeat
 timeout.
-
-### Clear my custom message
-
-```http
-DELETE /presence/me/custom-message
-```
-
-Returns the updated presence resource.
 
 ### WebSocket presence events
 
@@ -1959,7 +1949,6 @@ node emits to that identity's own connections:
     "attributes": {
       "identityId": "<identityId>",
       "status": "away",
-      "customMessage": "Back soon",
       "lastHeartbeatAt": 1770000000000,
       "lastActivityAt": 1770000000000,
       "preferenceUpdatedAt": 1770000000000,

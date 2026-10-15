@@ -11,14 +11,12 @@ package "presence/domain" {
     - lastActivityAt: Timestamp
     - updatedAt: Timestamp
     + recordHeartbeat(activityDetected)
-    + update(status, customMessage)
-    + clearCustomMessage()
+    + update(status)
     + refreshDerivedStatus()
   }
 
   class IdentityPresencePreference {
     - selectedStatus: PresenceStatus
-    - customMessage: PresenceCustomMessage
     - updatedAt: Timestamp
   }
 
@@ -30,10 +28,6 @@ package "presence/domain" {
     + disconnected
     + invisible
     + visibleForOthers()
-  }
-
-  class PresenceCustomMessage {
-    + maxLength: 50
   }
 
   class IdentityPresenceWasUpdatedEvent {
@@ -59,7 +53,6 @@ package "presence/infrastructure" {
 IdentityPresence --> PresenceStatus
 IdentityPresence --> IdentityPresencePreference
 IdentityPresencePreference --> PresenceStatus
-IdentityPresencePreference --> PresenceCustomMessage
 IdentityPresence --> IdentityPresenceWasUpdatedEvent
 IdentityPresenceFinder --> InMemoryIdentityPresenceRepository
 IdentityPresenceUpdater --> InMemoryIdentityPresenceRepository
