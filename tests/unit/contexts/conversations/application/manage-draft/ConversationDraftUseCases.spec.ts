@@ -4,6 +4,7 @@ import ConversationDraftsFinder from '@app/contexts/conversations/application/ma
 import { ConversationDraftDeleteMessage } from '@app/contexts/conversations/application/manage-draft/messages/ConversationDraftDeleteMessage';
 import { ConversationDraftSaveMessage } from '@app/contexts/conversations/application/manage-draft/messages/ConversationDraftSaveMessage';
 import { ConversationDraftsFindMessage } from '@app/contexts/conversations/application/manage-draft/messages/ConversationDraftsFindMessage';
+import UnkeyedConversationDraftsPurger from '@app/contexts/conversations/application/purge-unkeyed-drafts/UnkeyedConversationDraftsPurger';
 import LocalConversationDraftRepository from '@app/contexts/conversations/infrastructure/local-db/LocalConversationDraftRepository';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { createHmac } from 'crypto';
@@ -29,6 +30,7 @@ describe('Conversation draft use cases', () => {
   let saver: ConversationDraftSaver;
   let finder: ConversationDraftsFinder;
   let deleter: ConversationDraftDeleter;
+  let purger: UnkeyedConversationDraftsPurger;
 
   beforeEach(async () => {
     previousDatabasePath = process.env.PIGEON_LOCAL_DB_PATH;
@@ -41,6 +43,7 @@ describe('Conversation draft use cases', () => {
     saver = new ConversationDraftSaver(repository);
     finder = new ConversationDraftsFinder(repository);
     deleter = new ConversationDraftDeleter(repository);
+    purger = new UnkeyedConversationDraftsPurger(repository);
   });
 
   afterEach(async () => {
@@ -153,5 +156,90 @@ describe('Conversation draft use cases', () => {
       draftKey('conversation-0'),
     );
     expect(await draftsOf(otherIdentityId)).toHaveLength(1);
+  });
+
+  it('never evicts the draft it has just saved', async () => {
+    const limit = ConversationDraftSaver.MAX_DRAFTS_PER_IDENTITY;
+
+    for (let index = 0; index < limit; index += 1) {
+      await saver.save(
+        new ConversationDraftSaveMessage(
+          ownerIdentityId,
+          draftKey(`conversation-${index}`),
+          `sealed-${index}`,
+          1_000 + index,
+        ),
+      );
+    }
+    await saver.save(
+      new ConversationDraftSaveMessage(
+        ownerIdentityId,
+        draftKey('stale'),
+        'stale',
+        1,
+      ),
+    );
+
+    const keys = (await draftsOf(ownerIdentityId)).map(
+      (draft) => draft.draftKey,
+    );
+
+    expect(keys).toHaveLength(limit);
+    expect(keys).toContain(draftKey('stale'));
+    expect(keys).not.toContain(draftKey('conversation-0'));
+  });
+
+  it('updates a stored draft without listing the identity drafts', async () => {
+    const repository = new LocalConversationDraftRepository(database);
+    const listing = jest.spyOn(repository, 'findByIdentity');
+    const updatingSaver = new ConversationDraftSaver(repository);
+    const key = draftKey('group:conversation');
+
+    await updatingSaver.save(
+      new ConversationDraftSaveMessage(ownerIdentityId, key, 'first', 1_000),
+    );
+    listing.mockClear();
+    await updatingSaver.save(
+      new ConversationDraftSaveMessage(ownerIdentityId, key, 'second', 2_000),
+    );
+
+    expect(listing).not.toHaveBeenCalled();
+  });
+
+  it('keeps an explicit zero update time', async () => {
+    const key = draftKey('group:conversation');
+
+    await saver.save(
+      new ConversationDraftSaveMessage(ownerIdentityId, key, 'sealed', 0),
+    );
+
+    expect(await draftsOf(ownerIdentityId)).toEqual([
+      { draftKey: key, encryptedPayload: 'sealed', updatedAt: 0 },
+    ]);
+  });
+
+  it('purges stored drafts that still name their conversation', async () => {
+    const key = draftKey('group:conversation');
+
+    await database.save(
+      'conversation_drafts',
+      `${ownerIdentityId}:group:conversation`,
+      {
+        conversationId: 'group:conversation',
+        encryptedPayload: 'legacy',
+        identityId: ownerIdentityId,
+        updatedAt: 500,
+      },
+    );
+    await saver.save(
+      new ConversationDraftSaveMessage(ownerIdentityId, key, 'sealed', 1_000),
+    );
+
+    await purger.purge();
+
+    const documents = await database.find('conversation_drafts');
+    expect(documents).toHaveLength(1);
+    expect(documents[0].draftKey).toBe(key);
+    expect(JSON.stringify(documents)).not.toContain('group:conversation');
   });
 });
