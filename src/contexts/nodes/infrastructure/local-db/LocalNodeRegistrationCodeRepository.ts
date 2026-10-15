@@ -140,6 +140,16 @@ export default class LocalNodeRegistrationCodeRepository extends NodeRegistratio
     );
   }
 
+  public async removeExpired(now: Timestamp): Promise<void> {
+    await this.serialized(() =>
+      this.database.deleteMany(
+        LocalNodeRegistrationCodeRepository.NAMESPACE,
+        (document) =>
+          this.isDocument(document) && this.toDomain(document).isExpiredAt(now),
+      ),
+    );
+  }
+
   public async reserveUse(
     hash: NodeRegistrationCodeHash,
     now: Timestamp,

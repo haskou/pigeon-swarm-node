@@ -13,6 +13,12 @@ export default abstract class NodeRegistrationCodeRepository {
   public abstract remove(id: NodeRegistrationCodeId): Promise<void>;
 
   /**
+   * Removes the codes expired at `now`. Used-up codes stay until they expire
+   * so a use reserved meanwhile can still be given back.
+   */
+  public abstract removeExpired(now: Timestamp): Promise<void>;
+
+  /**
    * Atomically spends one use of the code with this hash when it is usable at
    * `now`; resolves undefined otherwise.
    */

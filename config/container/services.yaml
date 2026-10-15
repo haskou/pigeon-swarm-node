@@ -1805,7 +1805,7 @@ services:
     arguments:
       - '@contexts/nodes/domain/services/NodeLoaderService'
       - '@contexts/nodes/domain/services/NodeSaverService'
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
+      - '@shared/infrastructure/messageBus/LocalDomainEventPublisher'
   contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationFinder:
     class: >-
       /contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationFinder

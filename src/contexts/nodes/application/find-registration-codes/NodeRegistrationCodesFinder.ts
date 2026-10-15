@@ -6,21 +6,17 @@ import NodeRegistrationCodeRepository from '../../domain/repositories/NodeRegist
 export default class NodeRegistrationCodesFinder {
   constructor(private readonly repository: NodeRegistrationCodeRepository) {}
 
-  /** Lists the usable codes and drops the expired and used-up ones. */
+  /**
+   * Lists the usable codes and drops the expired ones. Used-up codes are kept
+   * until they expire: a use reserved by a failing creation comes back.
+   */
   public async find(): Promise<NodeRegistrationCode[]> {
     const now = Timestamp.now();
-    const codes = await this.repository.findAll();
-    const usable: NodeRegistrationCode[] = [];
 
-    for (const code of codes) {
-      if (code.isUsableAt(now)) {
-        usable.push(code);
-        continue;
-      }
+    await this.repository.removeExpired(now);
 
-      await this.repository.remove(code.getId());
-    }
-
-    return usable;
+    return (await this.repository.findAll()).filter((code) =>
+      code.isUsableAt(now),
+    );
   }
 }

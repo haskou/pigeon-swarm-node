@@ -1,4 +1,4 @@
-import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
+import { LocalDomainEventPublisher } from '@app/shared/infrastructure/messageBus/LocalDomainEventPublisher';
 
 import { Node } from '../../domain/Node';
 import NodeLoaderService from '../../domain/services/NodeLoaderService';
@@ -9,7 +9,7 @@ export default class NodeRegistrationModeChanger {
   constructor(
     private readonly loader: NodeLoaderService,
     private readonly saver: NodeSaverService,
-    private readonly eventPublisher: DomainEventPublisher,
+    private readonly eventPublisher: LocalDomainEventPublisher,
   ) {}
 
   public async change(
@@ -20,7 +20,8 @@ export default class NodeRegistrationModeChanger {
     node.changeRegistrationMode(message.registrationMode);
 
     await this.saver.saveNode(node);
-    await this.eventPublisher.publish(node.pullDomainEvents());
+    // The mode is local node configuration: never gossiped nor pushed to clients.
+    await this.eventPublisher.publishLocally(node.pullDomainEvents());
 
     return node;
   }

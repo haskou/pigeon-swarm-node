@@ -62,7 +62,11 @@ export class NodeRegistrationCode {
   ) {}
 
   public isUsableAt(now: Timestamp): boolean {
-    return this.usesLeft.isGreaterThan(0) && now.isBefore(this.expiresAt);
+    return this.usesLeft.isGreaterThan(0) && !this.isExpiredAt(now);
+  }
+
+  public isExpiredAt(now: Timestamp): boolean {
+    return !now.isBefore(this.expiresAt);
   }
 
   public reserveUse(now: Timestamp): void {

@@ -33,6 +33,7 @@ package "nodes" {
       -expiresAt: Timestamp
       +{static} issue(secret, maxUses, expiresAt, limits, now): NodeRegistrationCode
       +isUsableAt(now: Timestamp): boolean
+      +isExpiredAt(now: Timestamp): boolean
       +reserveUse(now: Timestamp): void
       +releaseUse(): void
       +toPrimitives(): NodeRegistrationCodePrimitives
@@ -50,6 +51,7 @@ package "nodes" {
       +save(code: NodeRegistrationCode): Promise<void>
       +findAll(): Promise<NodeRegistrationCode[]>
       +remove(id: NodeRegistrationCodeId): Promise<void>
+      +removeExpired(now: Timestamp): Promise<void>
       +reserveUse(hash: NodeRegistrationCodeHash, now: Timestamp): Promise<NodeRegistrationCode | undefined>
       +releaseUse(id: NodeRegistrationCodeId): Promise<void>
     }
