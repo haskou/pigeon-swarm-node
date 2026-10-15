@@ -65,3 +65,45 @@ Feature: GET /presence
     And response body is an array with length of 1
     And response body should contain "\"status\":\"disconnected\""
     And response body should not contain "Ready"
+
+  Scenario: Hide presence status from a group co-member
+    Given I have created a group conversation
+    And I set json body
+      """
+      {
+        "status": "available"
+      }
+      """
+    And I sign the current presence update request
+    When I PUT "/presence/me"
+    Then response code is equal to 200
+    Given another identity signs the current identity presence request
+    When I GET the current identity presence
+    Then response code is equal to 200
+    And response data should match partially
+      """
+      {
+        "status": "disconnected"
+      }
+      """
+
+  Scenario: Show presence status to a one-to-one conversation participant
+    Given I have created a one-to-one conversation
+    And I set json body
+      """
+      {
+        "status": "available"
+      }
+      """
+    And I sign the current presence update request
+    When I PUT "/presence/me"
+    Then response code is equal to 200
+    Given another identity signs the current identity presence request
+    When I GET the current identity presence
+    Then response code is equal to 200
+    And response data should match partially
+      """
+      {
+        "status": "available"
+      }
+      """

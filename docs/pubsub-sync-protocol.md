@@ -85,9 +85,13 @@ The node serving an identity's authenticated WebSocket keeps one in-memory
 lease for it, derived from that connection's heartbeats. The lease is never
 persisted in OrbitDB or IPFS, carries no node id or network id, and is exposed
 only through that node's HTTP presence reads and to that identity's own
-WebSocket connections (see `docs/api.md`). Presence for contacts served by
-other nodes is the client's job: clients exchange it encrypted end to end over
-their private channels, so nodes only relay ciphertext.
+WebSocket connections (see `docs/api.md`). HTTP reads are open in full to
+identities that share a one-to-one conversation or a community with it; group
+co-membership grants nothing, so a group roster never decides who learns an
+identity's presence or receives its `identities.v1.identity.was_updated`
+events. Presence for contacts served by other nodes is the client's job:
+clients exchange it encrypted end to end over their private channels, so nodes
+only relay ciphertext.
 
 ## Conversation messages
 

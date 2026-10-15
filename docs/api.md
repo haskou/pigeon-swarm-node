@@ -418,7 +418,10 @@ Implemented:
 - require a single-use ticket on the `/realtime/v1` WebSocket upgrade
 - accept the ticket in the `Sec-WebSocket-Protocol` header for browser and non-browser clients
 - push domain events after they have been published by the local node
-- deliver identity events only to the matching identity connection
+- deliver identity events to the matching identity connection;
+  `identities.v1.identity.was_updated` also reaches identities that share a
+  one-to-one conversation or a community with it. Sharing a group conversation
+  does not count: group rosters are never a fan-out input
 - deliver keychain events only to the matching keychain owner
 - deliver notification events only to the notification recipient
 - deliver conversation events only to the conversation participants when the
@@ -1881,8 +1884,9 @@ status or heartbeat timing.
 Who can see presence:
 
 - Over HTTP, a signed viewer reads another identity's presence in full only
-  when they share a conversation or community with it that this node knows
-  about. At most 500 of the viewer's conversations are checked. Otherwise the
+  when they share a one-to-one conversation or community with it that this
+  node knows about. Sharing a group conversation does not count. At most 500
+  of the viewer's one-to-one conversations are checked. Otherwise the
   response carries only `identityId`, `status: disconnected` and `updatedAt`,
   with no `lastActivityAt` or `lastHeartbeatAt`. An identity
   with `invisible` status reads the same way to everyone except itself.
