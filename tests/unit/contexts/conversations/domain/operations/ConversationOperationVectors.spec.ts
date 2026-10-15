@@ -1,5 +1,4 @@
 import { ConversationOperation } from '@app/contexts/conversations/domain/operations/ConversationOperation';
-import { ConversationStateFold } from '@app/contexts/conversations/domain/operations/ConversationStateFold';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { ConversationOperationAction } from '@app/contexts/conversations/domain/value-objects/ConversationOperationAction';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
@@ -82,10 +81,12 @@ function digestOfText(text: string): string {
   return createHash('sha256').update(text).digest('base64url');
 }
 
-/** Group genesis vectors older nodes accepted; group rosters now live in MLS. */
-const REFUSED_GENESIS = ['group_genesis', 'group_genesis_unicode'];
+/** Group operations older nodes accepted; group rosters now live in MLS. */
+const refusedCases = vectors.cases.filter(({ input }) =>
+  input.conversationId.startsWith('group:'),
+);
 const acceptedCases = vectors.cases.filter(
-  ({ name }) => !REFUSED_GENESIS.includes(name),
+  (vector) => !refusedCases.includes(vector),
 );
 
 describe('Conversation operation vectors', () => {
@@ -132,29 +133,28 @@ describe('Conversation operation vectors', () => {
     ).toBe(conversation.conversationId);
   });
 
-  it.each(REFUSED_GENESIS)(
-    'refuses the %s vector, a group genesis older nodes accepted',
+  it('keeps every group operation older nodes signed among the vectors', () => {
+    expect(refusedCases.map(({ input }) => input.action).sort()).toEqual([
+      'admin_demoted',
+      'admin_promoted',
+      'conversation_created',
+      'conversation_created',
+      'member_added',
+      'member_left',
+      'member_removed',
+    ]);
+  });
+
+  it.each(refusedCases.map(({ name }) => name))(
+    'refuses the %s vector, a group operation older nodes accepted',
     (name) => {
       const vector = vectors.cases.find((item) => item.name === name);
 
-      expect(vector).toBeDefined();
       expect(() =>
         ConversationOperation.fromPrimitives(vector!.derived.payload),
       ).toThrow();
     },
   );
-
-  it('folds the group operations older nodes signed to no conversation', () => {
-    const { group } = vectors.conversations;
-    const operations = acceptedCases
-      .filter(({ input }) => input.conversationId === group.conversationId)
-      .map(({ derived }) =>
-        ConversationOperation.fromPrimitives(derived.payload),
-      );
-
-    expect(operations).not.toHaveLength(0);
-    expect(ConversationStateFold.fold(operations).roster).toBeUndefined();
-  });
 
   describe.each(vectors.cases)('$name', (vector) => {
     const { derived, input } = vector;
