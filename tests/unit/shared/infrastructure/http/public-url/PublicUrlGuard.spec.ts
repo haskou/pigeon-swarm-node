@@ -61,6 +61,23 @@ describe('PublicUrlGuard', () => {
     },
   );
 
+  it.each([
+    'http://[64:ff9b::7f00:1]/',
+    'http://[64:ff9b:1::a00:1]/',
+    'http://[2002:7f00:1::]/',
+    'http://[2001:0:4136:e378:8000:63bf:3fff:fdd2]/',
+    'http://[fec0::1]/',
+    'http://[feff::1]/',
+  ])('rejects the NAT64, 6to4, Teredo or site-local IPv6 address %s', (url) => {
+    expect(() => new PublicUrlGuard().parse(url)).toThrow(UrlIsNotPublicError);
+  });
+
+  it('accepts a public IPv6 literal', () => {
+    expect(
+      new PublicUrlGuard().parse('https://[2606:4700::1111]/').hostname,
+    ).toBe('[2606:4700::1111]');
+  });
+
   it('rejects schemes other than http and https', () => {
     expect(() => new PublicUrlGuard().parse('file:///etc/passwd')).toThrow(
       'Only http and https URLs are allowed.',
