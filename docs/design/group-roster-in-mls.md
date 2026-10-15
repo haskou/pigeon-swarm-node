@@ -24,7 +24,7 @@ fold in `OrbitDBConversationRepository` (`ConversationRoster.ts`,
 | Polls                         | `group_conversation` scope; `PollScopeAuthorizer.ts:84-102`, `PollMutationScopeAccess.ts:84-93`                                                                                                              | audience and the participant gate. The question, the options and each identity's vote are plaintext on the node |
 | Calls                         | `CallScopeResolver.ts:39-48`, `CallAccessAuthorizer.ts:18-26`, `CallStartMutationPolicy.ts:80-131`, `ConversationCallEventRealtimeMapper.ts`                                                                 | call scope, `participantIds` in call documents and events                                                       |
 | Typing                        | `WebSocketClientMessageHandler.ts:86-110`, `WebSocketEventHub.ts:264-295`; since slice 3 direct conversations only                                                                                           | relay recipients, now none for a group: its typing is an MLS record                                             |
-| Presence and identity updates | `WebSocketClientMessageHandler.ts:161-176`, `GetPresenceRoute.ts:37-95`                                                                                                                                      | who may see whose presence                                                                                      |
+| Presence and identity updates | `WebSocketClientMessageHandler.ts:161-176`, `GetPresenceRoute.ts:37-95`; since slice 4 one-to-one conversations and communities only                                                                         | who may see whose presence, now nothing for a group: co-membership grants no presence                           |
 
 The UI also reads the roster: `GroupConversationRoster` pages `GET /conversations/`, and
 `GroupMailboxRoster` judges MLS commits (`allowsCommit`), welcomes (`mayWelcome`) and
@@ -267,7 +267,7 @@ accept, as a community invitation does today.
 | Drafts                        | group drafts are stored under an opaque key, HMAC(owner draft key, conversation id), with owner-only access and no participant gate                                                                                                                                                                                              |
 | Polls                         | MLS records over the group mailbox, like pins and reactions. Close is creator-only, a vote replaces the voter's earlier vote, and every member checks both on receipt                                                                                                                                                            |
 | Typing                        | an ephemeral MLS record over the group mailbox, sent at most once per 10 seconds per member, counted against the inbox append limit (D17)                                                                                                                                                                                        |
-| Presence and identity updates | group co-membership stops granting presence. Contacts, 1:1 conversations and communities still do                                                                                                                                                                                                                                |
+| Presence and identity updates | group co-membership stops granting presence and identity update fan-out; a member announces its own identity update to its groups as an MLS record over the group mailbox. Contacts, 1:1 conversations and communities still grant both                                                                                          |
 | Calls                         | a group call is scoped by an opaque call id and a join capability. The starter derives the capability from the MLS exporter of the current epoch and posts `{callId, capability}` as an MLS record. The node stores a hash of the capability and admits leases and signals that present it. Calls stop carrying `participantIds` |
 
 ## What is lost and what replaces it
@@ -324,7 +324,11 @@ and merges when `real-node-e2e` is green.
 3. Typing in groups becomes an MLS record; the node stops relaying group typing. Either
    order is safe, as no client sends group typing to the relay once it has the record;
    the UI merges first, so no group loses its typing indicator in between.
-4. Presence and identity updates stop flowing through group co-membership.
+4. Presence and identity updates stop flowing through group co-membership: the node
+   reads only one-to-one conversations and communities for presence reads and
+   `identities.v1.identity.was_updated` fan-out, and a member announces its own
+   identity update to its groups as an MLS record over the group mailbox. The UI
+   merges first, so no group misses an identity update in between.
 5. Group calls use the capability scope.
 6. Final cutover: the roster extension and GCE roster ops with default deny and the
    device-chain committer check, the same-epoch priority rule (and the group inbox

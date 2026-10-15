@@ -70,6 +70,7 @@ package "conversations.domain" {
     +requireMetadataById(id: ConversationId): Promise<Conversation>
     +requireMetadataAtFrontier(id: ConversationId, frontier: string[]): Promise<Conversation>
     +findByParticipant(participantId: IdentityId, limit: number, beforeConversationId?: ConversationId): Promise<Conversation[]>
+    +findOneToOneByParticipant(participantId: IdentityId, limit: number): Promise<Conversation[]>
     +findFrontier(id: ConversationId): Promise<string[]>
     +findOperations(id: ConversationId): Promise<ConversationOperation[]>
     +saveOperation(operation: ConversationOperation, proof: PublicMutationProof): Promise<void>

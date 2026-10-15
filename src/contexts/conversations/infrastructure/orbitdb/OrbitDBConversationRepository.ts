@@ -297,6 +297,22 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     );
   }
 
+  public findOneToOneByParticipant(
+    participantId: IdentityId,
+    limit: number,
+  ): Promise<Conversation[]> {
+    return Promise.resolve(
+      this.cachedConversations()
+        .filter(
+          (found) =>
+            !found.roster.isGroup() &&
+            found.roster.isMember(participantId.valueOf()),
+        )
+        .slice(0, limit)
+        .map((found) => this.conversationOf(found)),
+    );
+  }
+
   public async saveOperation(
     operation: ConversationOperation,
     proof: PublicMutationProof,

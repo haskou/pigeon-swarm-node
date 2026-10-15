@@ -35,8 +35,9 @@ export class GetPresenceRoute extends Route {
   }
 
   /**
-   * Identities that share a conversation or community with the viewer. Only
-   * they may read presence over HTTP, matching realtime identity updates.
+   * Identities that share a one-to-one conversation or community with the
+   * viewer. Only they may read presence over HTTP, matching realtime identity
+   * updates; sharing a group grants nothing.
    */
   private async sharedIdentityIdsOf(
     viewerIdentityId: IdentityId,

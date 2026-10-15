@@ -160,12 +160,17 @@ export default class WebSocketClientMessageHandler {
     }
   }
 
+  /**
+   * Identities that share a one-to-one conversation or a community with
+   * `identityId`. Group co-membership grants nothing: group rosters are not a
+   * fan-out input for presence or identity updates.
+   */
   public async findIdentityUpdateRecipients(
     identityId: string,
   ): Promise<string[]> {
     const actorId = new IdentityId(identityId);
     const [conversations, communities] = await Promise.all([
-      this.conversationRepository.findByParticipant(
+      this.conversationRepository.findOneToOneByParticipant(
         actorId,
         WebSocketClientMessageHandler.IDENTITY_UPDATE_CONVERSATION_LIMIT,
       ),
