@@ -106,26 +106,23 @@ describe('OrbitDBCallFold', () => {
     expect(folded?.primitives.status).toBe('missed');
   });
 
-  it('keeps a group call active when a participant left after joining', async () => {
+  it('folds a group-capability call with no participants and keeps it active when its creator leaves', async () => {
     const alice = await newCallSigner();
-    const bob = await newCallSigner();
-    const carol = await newCallSigner();
     const start = signCallStart({
       networkId: NETWORK,
       nonce: 'fold-spec-nonce-00003',
-      participantIds: [alice.id, bob.id, carol.id],
-      scope: { conversationId: 'group:fold', type: 'conversation' },
+      scope: { capabilityHash: 'a'.repeat(64), type: 'group_capability' },
       signer: alice,
       startedAt: t0,
     });
     const folded = OrbitDBCallFold.fold({
       participants: new Map([
         [
-          bob.id,
+          alice.id,
           participantPayload({
             at: t0 + 100,
             callId: start.callId,
-            identityId: bob.id,
+            identityId: alice.id,
             state: 'left',
           }),
         ],
@@ -133,7 +130,12 @@ describe('OrbitDBCallFold', () => {
       start: start.payload,
     });
 
-    expect(folded?.primitives.status).toBe('active');
+    expect(folded?.primitives).toMatchObject({
+      participantIds: [],
+      participants: [],
+      scope: { capabilityHash: 'a'.repeat(64), type: 'group_capability' },
+      status: 'active',
+    });
   });
 
   it('ignores an event that does not apply to the state reached', async () => {

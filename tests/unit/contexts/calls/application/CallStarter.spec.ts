@@ -7,6 +7,8 @@ import { Call } from '@app/contexts/calls/domain/Call';
 import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
+import { InvalidCallScopeError } from '@app/contexts/calls/domain/errors/InvalidCallScopeError';
+import { CallCapabilityHash } from '@app/contexts/calls/domain/value-objects/CallCapabilityHash';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -14,6 +16,7 @@ import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { ConversationType } from '@app/contexts/conversations/domain/value-objects/ConversationType';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
@@ -21,6 +24,7 @@ import { mock, MockProxy } from 'jest-mock-extended';
 
 import {
   callStartArgs,
+  CallScopeInput,
   CallSigner,
   mutationOf,
   newCallSigner,
@@ -40,12 +44,7 @@ describe('CallStarter', () => {
     caller = new IdentityId(signer.id);
   });
 
-  const startMessage = (
-    scope:
-      | { conversationId: string; type: 'conversation' }
-      | { channelId: string; communityId: string; type: 'community_channel' },
-    sessionEpoch?: number,
-  ) => {
+  const startMessage = (scope: CallScopeInput, sessionEpoch?: number) => {
     const nonce = `starter-nonce-${Math.random().toString(36).slice(2, 12)}`;
     const { proof } = signCallStart({
       networkId: networkId.valueOf(),
@@ -60,12 +59,16 @@ describe('CallStarter', () => {
     return new CallStartMessage(
       signer.id,
       {
+        capabilityHash:
+          scope.type === 'group_capability' ? scope.capabilityHash : undefined,
         channelId:
           scope.type === 'community_channel' ? scope.channelId : undefined,
         communityId:
           scope.type === 'community_channel' ? scope.communityId : undefined,
         conversationId:
           scope.type === 'conversation' ? scope.conversationId : undefined,
+        networkId:
+          scope.type === 'group_capability' ? networkId.valueOf() : undefined,
         type: scope.type,
       },
       mutationOf(proof),
@@ -79,6 +82,7 @@ describe('CallStarter', () => {
     repository: MockProxy<CallRepository>,
     conversationRepository: MockProxy<ConversationRepository> = mock<ConversationRepository>(),
     communityRepository: MockProxy<CommunityRepository> = mock<CommunityRepository>(),
+    identityRepository: MockProxy<IdentityRepository> = mock<IdentityRepository>(),
   ) => {
     const eventPublisher: MockProxy<DomainEventPublisher> =
       mock<DomainEventPublisher>();
@@ -92,7 +96,11 @@ describe('CallStarter', () => {
       leaseRenewer,
       starter: new CallStarter(
         repository,
-        new CallScopeResolver(conversationRepository, communityRepository),
+        new CallScopeResolver(
+          conversationRepository,
+          communityRepository,
+          identityRepository,
+        ),
         eventPublisher,
         leaseRenewer,
         new CommunityChannelCallStartCoordinator(),
@@ -253,6 +261,84 @@ describe('CallStarter', () => {
     ).rejects.toThrow();
     expect(onRecordAccepted).not.toHaveBeenCalled();
     expect(repository.saveStart).not.toHaveBeenCalled();
+  });
+
+  it('refuses a conversation call in a group conversation, whose calls carry an MLS capability', async () => {
+    const conversation = mock<Conversation>();
+    conversation.hasParticipant.mockReturnValue(true);
+    conversation.isGroup.mockReturnValue(true);
+    const repository = mock<CallRepository>();
+    const conversationRepository = mock<ConversationRepository>();
+    conversationRepository.hasById.mockResolvedValue(true);
+    conversationRepository.requireMetadataById.mockResolvedValue(conversation);
+    const { starter } = build(repository, conversationRepository);
+
+    await expect(
+      starter.start(
+        startMessage({ conversationId: 'group:any', type: 'conversation' }),
+      ),
+    ).rejects.toBeInstanceOf(InvalidCallScopeError);
+    expect(repository.saveStart).not.toHaveBeenCalled();
+  });
+
+  describe('a group-capability call', () => {
+    const capabilityHash = CallCapabilityHash.of('group-capability').valueOf();
+    const identityRepositoryOn = (networks: NetworkId[]) => {
+      const identityRepository = mock<IdentityRepository>();
+      identityRepository.findById.mockResolvedValue({
+        getNetworkIds: () => networks,
+      } as never);
+
+      return identityRepository;
+    };
+
+    it('starts on a network of the requester with only the requester joined', async () => {
+      const repository = mock<CallRepository>();
+      const conversationRepository = mock<ConversationRepository>();
+      const { leaseRenewer, starter } = build(
+        repository,
+        conversationRepository,
+        undefined,
+        identityRepositoryOn([networkId]),
+      );
+      const message = startMessage({
+        capabilityHash,
+        type: 'group_capability',
+      });
+
+      const call = await starter.start(message);
+
+      expect(repository.saveStart).toHaveBeenCalledWith(
+        call,
+        message.getProof(),
+      );
+      expect(call.toPrimitives()).toMatchObject({
+        networkId: networkId.valueOf(),
+        participantIds: [caller.valueOf()],
+        scope: { capabilityHash, type: 'group_capability' },
+      });
+      expect(leaseRenewer.renew).toHaveBeenCalledWith(call, caller);
+      expect(conversationRepository.hasById).not.toHaveBeenCalled();
+    });
+
+    it('refuses a network the requester is not on', async () => {
+      const repository = mock<CallRepository>();
+      const { starter } = build(
+        repository,
+        undefined,
+        undefined,
+        identityRepositoryOn([
+          new NetworkId('550e8400-e29b-41d4-a716-446655440009'),
+        ]),
+      );
+
+      await expect(
+        starter.start(
+          startMessage({ capabilityHash, type: 'group_capability' }),
+        ),
+      ).rejects.toBeInstanceOf(InvalidCallScopeError);
+      expect(repository.saveStart).not.toHaveBeenCalled();
+    });
   });
 
   it('stores no start when the accepted record is refused', async () => {

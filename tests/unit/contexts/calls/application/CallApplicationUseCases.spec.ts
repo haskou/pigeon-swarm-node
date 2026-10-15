@@ -23,6 +23,7 @@ import CallParticipantLeaseRenewer from '@app/contexts/calls/application/renew-p
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallNotFoundError } from '@app/contexts/calls/domain/errors/CallNotFoundError';
 import { CallParticipantNotFoundError } from '@app/contexts/calls/domain/errors/CallParticipantNotFoundError';
+import { CallCapabilityHash } from '@app/contexts/calls/domain/value-objects/CallCapabilityHash';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
 import CallParticipantLeaseRepository from '@app/contexts/calls/domain/repositories/CallParticipantLeaseRepository';
@@ -280,6 +281,95 @@ describe('Call application use cases', () => {
     );
     expect(leaseRenewer.renew).toHaveBeenCalledWith(call, expect.any(Object));
     expect(eventPublisher.publish).toHaveBeenCalledWith([]);
+  });
+
+  describe('a group-capability call', () => {
+    const capability = 'Zm9yLXRoZS1ncm91cC1jYWxsLW9ubHktMzItYnl0ZXM';
+    const groupCall = () => {
+      const call = mock<Call>();
+      call.getScope.mockReturnValue(
+        CallScope.groupCapability(CallCapabilityHash.of(capability)),
+      );
+      call.pullDomainEvents.mockReturnValue([]);
+
+      return call;
+    };
+
+    it('CallFinder authorizes the requester by the presented capability', async () => {
+      const repository = mock<CallRepository>();
+      const access = mock<CallAccessAuthorizer>();
+      const call = groupCall();
+      repository.requireById.mockResolvedValue(call);
+
+      await expect(
+        new CallFinder(repository, access).find(
+          new CallFindMessage(callId, participantIdentityId, capability),
+        ),
+      ).resolves.toBe(call);
+      expect(access.assertAccess).toHaveBeenCalledWith(
+        call,
+        new IdentityId(participantIdentityId),
+        capability,
+      );
+      expect(call.hasParticipant).not.toHaveBeenCalled();
+    });
+
+    it('CallJoiner admits a capability holder the call never rang', async () => {
+      const repository = mock<CallRepository>();
+      const access = mock<CallAccessAuthorizer>();
+      const leaseRenewer = mock<CallParticipantLeaseRenewer>();
+      const lease = mock<CallParticipantLease>();
+      const call = groupCall();
+      repository.requireById.mockResolvedValue(call);
+      lease.pullDomainEvents.mockReturnValue([]);
+      leaseRenewer.renew.mockResolvedValue(lease);
+
+      await new CallJoiner(
+        repository,
+        mock<DomainEventPublisher>(),
+        leaseRenewer,
+        access,
+      ).join(
+        new CallJoinMessage(
+          callId,
+          participantIdentityId,
+          mutation,
+          1_770_000_000_000,
+          capability,
+        ),
+      );
+
+      expect(access.assertAccess).toHaveBeenCalledWith(
+        call,
+        new IdentityId(participantIdentityId),
+        capability,
+      );
+      expect(call.joinOrAdd).toHaveBeenCalledTimes(1);
+      expect(call.join).not.toHaveBeenCalled();
+    });
+
+    it('CallEnder authorizes the ender by the presented capability', async () => {
+      const repository = mock<CallRepository>();
+      const access = mock<CallAccessAuthorizer>();
+      const call = groupCall();
+      repository.requireById.mockResolvedValue(call);
+
+      await new CallEnder(repository, mock<DomainEventPublisher>(), access).end(
+        new CallEndMessage(
+          callId,
+          participantIdentityId,
+          mutation,
+          1_770_000_000_000,
+          capability,
+        ),
+      );
+
+      expect(access.assertAccess).toHaveBeenCalledWith(
+        call,
+        new IdentityId(participantIdentityId),
+        capability,
+      );
+    });
   });
 
   it('CallLeaver releases every lease once accepted and publishes aggregate events', async () => {
