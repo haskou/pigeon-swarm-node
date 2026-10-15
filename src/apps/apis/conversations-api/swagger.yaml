@@ -505,7 +505,8 @@ components:
           description: Opaque encrypted draft payload owned by the authenticated identity.
         updatedAt:
           type: integer
-          description: Client time in milliseconds; the node's time when omitted.
+          nullable: true
+          description: Client time in milliseconds; the node uses its current time when null or omitted.
     ConversationDraftResource:
       type: object
       required:

@@ -2593,6 +2593,9 @@ Save request:
 }
 ```
 
+`updatedAt` is the client time in milliseconds. It may be `null` or omitted;
+the node then uses its current time.
+
 List response:
 
 ```json
