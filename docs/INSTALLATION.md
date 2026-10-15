@@ -149,6 +149,8 @@ installed `web-push` module path.
 | `IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE` | `30` | No | Identity publications per minute; excess returns `429` with code `429040`. |
 | `IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE` | `0` | No | Identity admissions per network per minute; excess returns `429` with code `429041`. |
 | `IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE` | `30` | No | Identity admissions per client address per minute on `POST /identities` and `PUT /identities/{identityId}`; excess returns `429` with code `429042`. `0` disables. |
+| `NODE_REGISTRATION_CODE_MAX_USES` | `100` | No | Highest `maxUses` the node owner may give a registration code; a larger one returns `400` with code `400070`. Positive integer, otherwise the default. |
+| `NODE_REGISTRATION_CODE_MAX_TTL_DAYS` | `30` | No | Furthest ahead, in days, a registration code may expire; a later `expiresAt` returns `400` with code `400070`. Positive integer, otherwise the default. |
 | `NOTIFICATIONS_RECORD_RATE_LIMIT_PER_MINUTE` | `30` | No | Notification record writes per minute. |
 | `NOTIFICATIONS_MAX_INVITATIONS_PER_IDENTITY` | `10000` | No | Maximum stored invitations per identity. |
 | `NOTIFICATIONS_MAX_STATES_PER_IDENTITY` | `30000` | No | Maximum stored notification states per identity. |

@@ -1,6 +1,7 @@
 # Node owner registration control and blocking (optional)
 
-Status: design for issue #384, decisions confirmed by the owner. The price-based
+Status: design for issue #384, decisions confirmed by the owner. Built:
+registration control (delivery step 1). The price-based
 admission model stays the default, and every node stays open unless its owner
 changes that. A node owner gets two optional, local tools:
 

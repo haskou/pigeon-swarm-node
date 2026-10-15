@@ -256,6 +256,101 @@ paths:
                 $ref: '#/components/schemas/NodeResource'
         '409':
           description: The current owner did not sign the request.
+  /node/registration/:
+    put:
+      tags:
+        - nodes
+      summary: Put local node registration mode
+      description: Sets whether new identities may be created through this node. `open` (default) lets anyone who pays the admission proof create one, `codes` requires a registration code and `closed` refuses every creation, the owner's included. Only creation through this node is gated; updates, republishing a held identity and login never are. Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PutNodeRegistrationBody'
+      responses:
+        '200':
+          description: Registration mode set.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeRegistrationResource'
+        '400':
+          description: The mode is not `open`, `codes` or `closed`.
+        '403':
+          description: The request is not signed by the node owner or the node has no owner (code `403010`).
+  /node/registration-codes/:
+    post:
+      tags:
+        - nodes
+      summary: Issue a registration code
+      description: Issues a registration code. The code appears only in this response; the node stores its SHA-256, the uses left and the expiry locally and never replicates them. Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostNodeRegistrationCodeBody'
+      responses:
+        '201':
+          description: 'Registration code issued. Sent with `Cache-Control: no-store`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IssuedNodeRegistrationCodeResource'
+        '400':
+          description: '`maxUses` or `expiresAt` is out of range (code `400070`) or the body is invalid.'
+        '403':
+          description: The request is not signed by the node owner or the node has no owner (code `403010`).
+    get:
+      tags:
+        - nodes
+      summary: List registration codes
+      description: Lists the live registration codes without the codes themselves. Expired and used-up codes are dropped. Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Registration codes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeRegistrationCodesResource'
+        '403':
+          description: The request is not signed by the node owner or the node has no owner (code `403010`).
+  /node/registration-codes/{codeId}/:
+    delete:
+      tags:
+        - nodes
+      summary: Revoke a registration code
+      description: Removes a registration code so it can no longer create identities. Revoking an unknown or already dropped code also succeeds. Requires a signed request from the current node owner.
+      parameters:
+        - in: path
+          name: codeId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '204':
+          description: Registration code revoked.
+        '403':
+          description: The request is not signed by the node owner or the node has no owner (code `403010`).
+        '409':
+          description: The code id is not a valid id.
   /peers/:
     get:
       tags:
@@ -324,11 +419,93 @@ components:
       type: object
       required:
         - id
+        - registration
       properties:
         id:
           type: string
         owner:
           type: string
+        registration:
+          $ref: '#/components/schemas/NodeRegistrationResource'
+    NodeRegistrationResource:
+      type: object
+      required:
+        - mode
+      properties:
+        mode:
+          type: string
+          enum:
+            - open
+            - codes
+            - closed
+    PutNodeRegistrationBody:
+      type: object
+      required:
+        - mode
+      properties:
+        mode:
+          type: string
+          enum:
+            - open
+            - codes
+            - closed
+    PostNodeRegistrationCodeBody:
+      type: object
+      required:
+        - expiresAt
+      properties:
+        maxUses:
+          type: integer
+          minimum: 1
+          default: 1
+          description: At most `NODE_REGISTRATION_CODE_MAX_USES` (default 100).
+        expiresAt:
+          type: integer
+          description: Milliseconds since epoch, in the future and at most `NODE_REGISTRATION_CODE_MAX_TTL_DAYS` (default 30) days ahead.
+    IssuedNodeRegistrationCodeResource:
+      type: object
+      required:
+        - id
+        - code
+        - maxUses
+        - expiresAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+          description: 32 random bytes, base64url. Returned only once.
+        maxUses:
+          type: integer
+        expiresAt:
+          type: integer
+    NodeRegistrationCodeResource:
+      type: object
+      required:
+        - id
+        - maxUses
+        - usesLeft
+        - expiresAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        maxUses:
+          type: integer
+        usesLeft:
+          type: integer
+        expiresAt:
+          type: integer
+    NodeRegistrationCodesResource:
+      type: object
+      required:
+        - codes
+      properties:
+        codes:
+          type: array
+          items:
+            $ref: '#/components/schemas/NodeRegistrationCodeResource'
     NetworkResource:
       type: object
       required:
