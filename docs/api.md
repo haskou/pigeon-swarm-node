@@ -1871,6 +1871,167 @@ GET /node/blocks
 Owner-signed. Returns `{ "blockList": <document> }`, or `{ "blockList": null }`
 when the owner never stored one.
 
+### Share block lists
+
+Sharing is opt-in on both sides. A publishing owner serves their signed list;
+another owner adopts that list as a source. Sources are pinned to the
+publisher's identity. The node refreshes them every
+`NODE_BLOCK_SOURCE_FETCH_INTERVAL_MS`. Each download is HTTPS only, goes to
+public addresses only, follows no redirects, and stops reading at
+`NODE_BLOCK_LIST_MAX_BYTES`. The whole fetch must finish within
+`NODE_BLOCK_SOURCE_FETCH_TIMEOUT_MS`. A fetched document is kept only if it is
+signed by the pinned identity and has a higher `version` than the one kept.
+Anything else, including an unreachable source, keeps the last valid version.
+
+The node blocks:
+
+- the owner's own list,
+- plus, from each source, the entries the owner approved that the source
+  still lists, or every entry it lists when `autoApply` is on,
+- minus the local exceptions,
+- and never the owner or this node's own peer id.
+
+Entries a source adds stay pending until the owner approves them. Entries a
+source removes stop applying on the next fetch, in both modes. Removing a
+source removes its effect at once.
+
+Every route below except `GET /node/blocks/published` is owner-signed:
+
+- a non-owner gets `403` with code `403010`;
+- a domain refusal gets `409` with the error class name as `code`.
+
+```http
+PUT /node/blocks/publication
+```
+
+```json
+{ "published": true }
+```
+
+Turns publication of the own list on or off. It is off by default. Returns
+`{ "published": boolean }`. `GET /node/blocks/publication` returns the same
+shape.
+
+```http
+GET /node/blocks/published
+```
+
+Public. Returns the stored own block list document verbatim, so any node can
+verify its `identitySignature`. Returns `404` with code `404040` while
+publication is off or no list is stored.
+
+```http
+PUT /node/block-sources/{ownerIdentityId}
+```
+
+```json
+{ "origin": "https://node.example", "autoApply": false }
+```
+
+Adopts the list that `ownerIdentityId` publishes at
+`{origin}/node/blocks/published`, or changes an adopted source's `origin` or
+`autoApply`. Changing the origin keeps the pin and the last valid version.
+Turning `autoApply` on approves every pending entry. `origin` must be a bare
+`https` origin; anything else gets `409 InvalidNodeBlockSourceOriginError`.
+The source is fetched on the next refresh run.
+
+The response is a source:
+
+```json
+{
+  "ownerIdentityId": "<identityId>",
+  "origin": "https://node.example",
+  "autoApply": false,
+  "version": 3,
+  "appliedCount": 10,
+  "pendingCount": 2,
+  "lastFetchedAt": 1773848829055,
+  "lastFetchOutcome": "accepted"
+}
+```
+
+`version`, `lastFetchedAt` and `lastFetchOutcome` are `null` until the first
+fetch. `lastFetchOutcome` is one of:
+
+| Outcome | Meaning |
+|---|---|
+| `accepted` | The fetched document was kept. |
+| `not-newer` | Its `version` was not higher than the one kept. |
+| `wrong-signer` | It was not owned by the pinned identity. |
+| `invalid-signature` | Its signature did not verify. |
+| `invalid-document` | It could not be parsed. |
+| `too-large` | It was larger than `NODE_BLOCK_LIST_MAX_BYTES`. |
+| `redirected` | The source answered with a redirect. |
+| `refused-address` | The origin resolved to a non-public address. |
+| `unreachable` | The fetch failed or timed out. |
+
+Every outcome except `accepted` keeps the last valid version. Remote addresses
+are not stored.
+
+```http
+GET /node/block-sources
+```
+
+Returns `{ "sources": [<source>] }`.
+
+```http
+DELETE /node/block-sources/{ownerIdentityId}
+```
+
+Stops following the source, and its entries stop applying at once. Returns the
+remaining `{ "sources": [...] }`. Returns
+`409 NodeBlockSourceNotFoundError` when the source is not adopted.
+
+```http
+GET /node/block-sources/{ownerIdentityId}/pending
+```
+
+Returns the entries of the source's latest version that wait for review:
+
+```json
+{
+  "ownerIdentityId": "<identityId>",
+  "version": 3,
+  "blockedIdentityIds": ["<identityId>"],
+  "blockedNodePeerIds": ["<libp2pPeerId>"]
+}
+```
+
+```http
+POST /node/block-sources/{ownerIdentityId}/approvals
+```
+
+```json
+{ "version": 3, "all": true }
+```
+
+```json
+{ "version": 3, "all": false, "blockedIdentityIds": ["<identityId>"], "blockedNodePeerIds": [] }
+```
+
+Approves every pending entry of `version`, or only the named ones. Send either
+`all: true` without named entries, or `all: false` with at least one named
+entry. Returns the source. Refusals answer `409` with one of these codes:
+
+| Code | When |
+|---|---|
+| `NodeBlockSourceVersionHasChangedError` | A newer version was fetched since the review. |
+| `NodeBlockEntriesAreNotListedBySourceError` | A named entry is not in that version. |
+| `InvalidNodeBlockSourceApprovalError` | `all` and the named entries disagree. |
+| `NodeBlockSourceNotFoundError` | The source is not adopted. |
+
+```http
+PUT /node/block-exceptions
+```
+
+```json
+{ "identityIds": ["<identityId>"], "nodePeerIds": ["<libp2pPeerId>"] }
+```
+
+Replaces the local exceptions. Adopted lists never block these identities and
+peer ids; the owner's own list still does. Returns the stored exceptions in
+the same shape. `GET /node/block-exceptions` reads them.
+
 ## IPFS HTTP API
 
 ### Publish public content

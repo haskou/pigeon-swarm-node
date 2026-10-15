@@ -179,7 +179,9 @@ installed `web-push` module path.
 | `CONTENT_REPLICATION_QUOTA_BYTES` | `1073741824` | No | Replicated content byte quota (1 GiB). |
 | `CONTENT_REPLICATION_NETWORK_BUDGET_BYTES` | `34359738368` | No | Content bytes replication maintenance schedules per network across all owners (32 GiB), shared fairly by owner; responsible replicas beyond it are deferred. A value that is not a positive integer, or is above 2⁵³−1, falls back to the default. |
 | `LINK_PREVIEW_RATE_LIMIT_PER_MINUTE` | `30` | No | Link preview requests per minute. |
-| `NODE_BLOCK_LIST_MAX_BYTES` | `67108864` | No | Largest node block list body accepted by `PUT /node/blocks` (64 MiB, about 500k ids); larger returns `413`. Bounds parsing memory and CPU, not stored entries: the owner's list has no entry cap. |
+| `NODE_BLOCK_LIST_MAX_BYTES` | `67108864` | No | Largest node block list body accepted by `PUT /node/blocks` (64 MiB, about 500k ids); larger returns `413`. The same limit applies to each download of an adopted block source, which stops reading as soon as it is exceeded. Bounds parsing memory and CPU, not stored entries: no list has an entry cap. |
+| `NODE_BLOCK_SOURCE_FETCH_INTERVAL_MS` | `3600000` | No | How often each adopted block source is fetched again (1 hour). |
+| `NODE_BLOCK_SOURCE_FETCH_TIMEOUT_MS` | `60000` | No | Total time one block source download may take, from connecting to the last byte (60 seconds). A slower download keeps the last valid version. |
 
 ## IPFS Variables
 

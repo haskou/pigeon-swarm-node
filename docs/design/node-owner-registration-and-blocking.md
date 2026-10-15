@@ -1,8 +1,8 @@
 # Node owner registration control and blocking (optional)
 
 Status: design for issue #384, decisions confirmed by the owner. Built:
-registration control (delivery step 1), local blocking (slice 2) and the host
-owner reset `yarn node:reset-owner` (slice 4). The
+registration control (delivery step 1), local blocking (slice 2), sharing
+(slice 3) and the host owner reset `yarn node:reset-owner` (slice 4). The
 price-based
 admission model stays the default, and every node stays open unless its owner
 changes that. A node owner gets two optional, local tools:
