@@ -155,3 +155,10 @@ Feature: Put node blocks
     And another identity signs a PUT request to "/node/blocks/"
     When I PUT "/node/blocks/"
     Then response code is equal to 200
+
+  Scenario: An unauthenticated caller cannot tell whether an identity is blocked
+    Given I set a node block list body version 1 blocking "other"
+    And I sign a PUT request to "/node/blocks/"
+    When I PUT "/node/blocks/"
+    Then response code is equal to 200
+    And an unauthenticated sealed secrets read of the other identity answers like one of an unblocked identity

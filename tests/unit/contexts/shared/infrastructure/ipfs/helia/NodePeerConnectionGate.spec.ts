@@ -60,3 +60,27 @@ describe('NodePeerConnectionGate', () => {
     ]);
   });
 });
+
+describe('NodePeerConnectionGate listeners', () => {
+  it('should stop notifying a listener once it unsubscribes', async () => {
+    const gate = new NodePeerConnectionGate();
+    const listener = jest.fn().mockResolvedValue(undefined);
+
+    const unsubscribe = gate.onPeersBlocked(listener);
+
+    unsubscribe();
+    await gate.replace([NODE_PEER_ID_A]);
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('should still block when a listener fails', async () => {
+    const gate = new NodePeerConnectionGate();
+
+    gate.onPeersBlocked(jest.fn().mockRejectedValue(new Error('stopped')));
+
+    await expect(gate.replace([NODE_PEER_ID_A])).resolves.toEqual([
+      NODE_PEER_ID_A,
+    ]);
+  });
+});

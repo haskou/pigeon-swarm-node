@@ -4818,6 +4818,29 @@ export default class Definitions {
     expect(this.response.status).to.equal(200);
   }
 
+  @then(
+    'an unauthenticated sealed secrets read of the other identity answers like one of an unblocked identity',
+  )
+  public async anUnauthenticatedSealedSecretsReadAnswersLikeAnUnblockedOne(): Promise<void> {
+    await this.ensureOtherIdentityKeyPair();
+    const unblocked = new IdentityId(
+      (await KeyPair.generate()).toPrimitives().publicKey,
+    );
+    const read = async (identityId: IdentityId) => {
+      const response = await this.restClient.get(
+        `/identity-devices/${encodeURIComponent(identityId.valueOf())}/sealed-secrets`,
+        {},
+      );
+
+      return { code: response.data?.code, status: response.status };
+    };
+
+    const blockedAnswer = await read(this.otherIdentityId);
+
+    expect(blockedAnswer.code).not.to.equal(403012);
+    expect(blockedAnswer).to.deep.equal(await read(unblocked));
+  }
+
   @given('another identity signs the current node owner request')
   public async anotherIdentitySignsTheCurrentNodeOwnerRequest(): Promise<void> {
     const keyPair = await this.ensureOtherIdentityKeyPair();
