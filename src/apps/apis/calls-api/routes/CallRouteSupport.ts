@@ -4,6 +4,7 @@ import CallParticipantLeaseFinder from '@app/contexts/calls/application/find-par
 import { CallParticipantLeasesFindMessage } from '@app/contexts/calls/application/find-participant-leases/messages/CallParticipantLeasesFindMessage';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
+import CallParticipantLeaseWarmUp from '@app/contexts/calls/infrastructure/memory/CallParticipantLeaseWarmUp';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { Request } from 'express';
@@ -26,11 +27,20 @@ export abstract class CallRouteSupport extends Route {
   private readonly callAccess =
     this.get<CallAccessAuthorizer>(CallAccessAuthorizer);
 
+  private readonly leaseWarmUp = this.get<CallParticipantLeaseWarmUp>(
+    CallParticipantLeaseWarmUp,
+  );
+
   protected async presentCall(call: Call): Promise<CallResource> {
     const leases = await this.findParticipantLeases([call]);
     const participants = await this.callAccess.authorizedParticipants(call);
 
-    return new CallViewModel(call, leases, participants).toResource();
+    return new CallViewModel(
+      call,
+      leases,
+      participants,
+      this.leaseWarmUp.isWarmingUp(),
+    ).toResource();
   }
 
   /**

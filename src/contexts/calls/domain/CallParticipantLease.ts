@@ -15,6 +15,10 @@ export class CallParticipantLease extends AggregateRoot {
   public static readonly RETENTION_MS = 60000;
 
   public static readonly CLOCK_SKEW_MS = 5000;
+
+  /** How long a connected lease survives without a heartbeat. */
+  public static readonly HEARTBEAT_TIMEOUT_MS = 5000;
+
   public static connect(
     callId: CallId,
     participantIdentityId: IdentityId,

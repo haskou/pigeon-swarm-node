@@ -3,10 +3,10 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 import LocalRealtimeEventPublisher from '@app/shared/infrastructure/websocket/LocalRealtimeEventPublisher';
 import { Timestamp } from '@haskou/value-objects';
 
+import { CallParticipantLease } from '../../domain/CallParticipantLease';
 import CallParticipantLeaseRepository from '../../domain/repositories/CallParticipantLeaseRepository';
 
 export default class CallParticipantLeaseExpirationRegistrar {
-  private static readonly HEARTBEAT_TIMEOUT_MS = 5_000;
   private static readonly DISCONNECTED_RETENTION_MS = 60_000;
 
   constructor(
@@ -19,8 +19,7 @@ export default class CallParticipantLeaseExpirationRegistrar {
   public async expire(): Promise<void> {
     const now = Timestamp.now();
     const threshold = new Timestamp(
-      now.valueOf() -
-        CallParticipantLeaseExpirationRegistrar.HEARTBEAT_TIMEOUT_MS,
+      now.valueOf() - CallParticipantLease.HEARTBEAT_TIMEOUT_MS,
     );
     const leases = await this.repository.findPotentiallyExpired(threshold);
     const localNodeId = await this.nodeRepository.loadLocalNodeId();
