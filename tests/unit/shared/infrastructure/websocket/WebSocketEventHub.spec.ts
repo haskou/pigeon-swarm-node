@@ -1257,6 +1257,7 @@ function authorizeCallAudience(hub: WebSocketEventHub): void {
       return {
         call,
         leases: [],
+        leasesWarmingUp: false,
         participants: call.getParticipantIds(),
         recipientIds,
       };

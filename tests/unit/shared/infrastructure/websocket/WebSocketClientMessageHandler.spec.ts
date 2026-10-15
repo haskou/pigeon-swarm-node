@@ -3,6 +3,7 @@ import { CallSignalAcknowledgeMessage } from '@app/contexts/calls/application/ac
 import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import CallParticipantLeaseRepository from '@app/contexts/calls/domain/repositories/CallParticipantLeaseRepository';
 import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
+import CallParticipantLeaseWarmUp from '@app/contexts/calls/infrastructure/memory/CallParticipantLeaseWarmUp';
 import { Community } from '@app/contexts/communities/domain/Community';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
@@ -39,6 +40,7 @@ describe('WebSocketClientMessageHandler', () => {
       signalAcknowledger,
       mock<CallRepository>(),
       mock<CallParticipantLeaseRepository>(),
+      mock<CallParticipantLeaseWarmUp>(),
       mock<CallAccessAuthorizer>(),
       mailboxRepository,
     );

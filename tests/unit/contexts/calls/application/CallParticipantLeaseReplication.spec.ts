@@ -1,6 +1,3 @@
-import { callStartArgs } from '../../../../support/signCall';
-import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
-import { Timestamp } from '@haskou/value-objects';
 import { CallViewModel } from '@app/apps/apis/calls-api/view-model/CallViewModel';
 import RegisterCallParticipantLeaseWhenUpdated from '@app/apps/consumers/pubsub/calls/RegisterCallParticipantLeaseWhenUpdated';
 import { Call } from '@app/contexts/calls/domain/Call';
@@ -12,7 +9,11 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
+import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
+import { Timestamp } from '@haskou/value-objects';
 import { mock } from 'jest-mock-extended';
+
+import { callStartArgs } from '../../../../support/signCall';
 
 describe('call participant lease replication', () => {
   const creator = new IdentityId(
@@ -192,6 +193,7 @@ describe('call participant lease replication', () => {
       call,
       firstNodeLeases,
       call.getParticipantIds(),
+      false,
     ).toResource();
 
     expect(resource.participants).toEqual(
