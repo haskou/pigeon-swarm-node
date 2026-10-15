@@ -165,7 +165,7 @@ async function open(replica: Replica): Promise<void> {
           noCommunities,
           identities,
         ),
-        new CallParticipantMutationPolicy(registry, noCommunities),
+        new CallParticipantMutationPolicy(registry, noCommunities, identities),
         new CallEndMutationPolicy(registry),
       ]),
     );

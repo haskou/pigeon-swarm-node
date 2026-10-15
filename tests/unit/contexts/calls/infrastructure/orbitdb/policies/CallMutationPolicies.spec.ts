@@ -67,33 +67,37 @@ describe('call mutation policies', () => {
       getNetworkId: () => ({ valueOf: () => NETWORK }),
     };
 
+    const identities = {
+      findById: jest.fn(async (id: { valueOf: () => string }) => {
+        const networks = identityNetworks[id.valueOf()];
+
+        if (!networks) throw new Error('unknown identity');
+
+        return {
+          getNetworkIds: () =>
+            networks.map((network) => ({ valueOf: () => network })),
+        };
+      }),
+    } as never;
+    const communities = {
+      hasById: jest.fn(async () => true),
+      requireById: jest.fn(async () => community),
+    } as never;
+
     startPolicy = new CallStartMutationPolicy(
       registry,
       {
         hasById: jest.fn(async () => true),
         requireMetadataById: jest.fn(async () => conversation),
       } as never,
-      {
-        hasById: jest.fn(async () => true),
-        requireById: jest.fn(async () => community),
-      } as never,
-      {
-        findById: jest.fn(async (id: { valueOf: () => string }) => {
-          const networks = identityNetworks[id.valueOf()];
-
-          if (!networks) throw new Error('unknown identity');
-
-          return {
-            getNetworkIds: () =>
-              networks.map((network) => ({ valueOf: () => network })),
-          };
-        }),
-      } as never,
+      communities,
+      identities,
     );
-    participantPolicy = new CallParticipantMutationPolicy(registry, {
-      hasById: jest.fn(async () => true),
-      requireById: jest.fn(async () => community),
-    } as never);
+    participantPolicy = new CallParticipantMutationPolicy(
+      registry,
+      communities,
+      identities,
+    );
     endPolicy = new CallEndMutationPolicy(registry);
   });
 
@@ -297,20 +301,17 @@ describe('call mutation policies', () => {
     it.each([
       ['another network', () => groupStart({ networkId: 'other-network' })],
       ['an unknown creator', () => groupStart({}, carol)],
-    ])(
-      'rejects a group-capability start on %s',
-      async (_name, record) => {
-        const start = record();
+    ])('rejects a group-capability start on %s', async (_name, record) => {
+      const start = record();
 
-        await expect(
-          startPolicy.assertPermitted(
-            start,
-            start.creatorIdentityId as string,
-            false,
-          ),
-        ).rejects.toBeInstanceOf(InvalidPublicMutationError);
-      },
-    );
+      await expect(
+        startPolicy.assertPermitted(
+          start,
+          start.creatorIdentityId as string,
+          false,
+        ),
+      ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+    });
 
     it('rejects a group-capability start authored by someone else', async () => {
       await expect(
@@ -453,22 +454,46 @@ describe('call mutation policies', () => {
       ).rejects.toBeInstanceOf(InvalidPublicMutationError);
     });
 
-    it('admits any identity joining a group-capability call, whose roster the node cannot know', async () => {
+    const groupJoin = (identity: string) => {
       const group = groupStart();
       docs.push(group);
-      const record = clone(
+
+      return clone(
         participantPayload({
           at: now(),
           callId: group.callId as string,
-          identityId: carol,
+          identityId: identity,
           state: 'joined',
         }),
       );
+    };
 
+    it('admits an identity of the network joining a group-capability call, whose roster the node cannot know', async () => {
       await expect(
-        participantPolicy.assertPermitted(record, carol, false),
+        participantPolicy.assertPermitted(groupJoin(bob), bob, false),
       ).resolves.toBeUndefined();
     });
+
+    it.each([
+      ['an unknown identity', () => carol],
+      [
+        'an identity of another network',
+        () => {
+          identityNetworks[carol] = ['other-network'];
+
+          return carol;
+        },
+      ],
+    ])(
+      'rejects %s joining a group-capability call',
+      async (_name, identity) => {
+        const id = identity();
+
+        await expect(
+          participantPolicy.assertPermitted(groupJoin(id), id, false),
+        ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+      },
+    );
   });
 
   describe('CallEndMutationPolicy', () => {
