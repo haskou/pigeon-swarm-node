@@ -43,4 +43,7 @@ export default abstract class IdentityRepository {
   ): Promise<Identity>;
 
   public abstract findCandidatesById(id: IdentityId): Promise<Identity[]>;
+
+  /** Whether this node already stores a version of the identity; local only. */
+  public abstract holds(id: IdentityId): Promise<boolean>;
 }

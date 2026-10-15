@@ -89,16 +89,20 @@ import { PostMailboxReaderRoute } from '@app/apps/apis/mailboxes-api/routes/Post
 import { PutMailboxRoute } from '@app/apps/apis/mailboxes-api/routes/PutMailboxRoute';
 import { DeleteNodeDiagnosticsRoute } from '@app/apps/apis/nodes-api/routes/DeleteNodeDiagnosticsRoute';
 import { DeleteNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/DeleteNodeNetworkRoute';
+import { DeleteNodeRegistrationCodeRoute } from '@app/apps/apis/nodes-api/routes/DeleteNodeRegistrationCodeRoute';
 import { GetClientContractRoute } from '@app/apps/apis/nodes-api/routes/GetClientContractRoute';
 import { GetNodeDiagnosticsRoute } from '@app/apps/apis/nodes-api/routes/GetNodeDiagnosticsRoute';
 import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNetworksRoute';
+import { GetNodeRegistrationCodesRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRegistrationCodesRoute';
 import { GetNodeRelayConfigurationRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRelayConfigurationRoute';
 import { GetNodeRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRoute';
 import { GetPeersRoute } from '@app/apps/apis/nodes-api/routes/GetPeersRoute';
 import { PostNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodeNetworkRoute';
 import { PostNodePublicNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodePublicNetworkRoute';
+import { PostNodeRegistrationCodeRoute } from '@app/apps/apis/nodes-api/routes/PostNodeRegistrationCodeRoute';
 import { PutNodeDiagnosticsRoute } from '@app/apps/apis/nodes-api/routes/PutNodeDiagnosticsRoute';
 import { PutNodeOwnerRoute } from '@app/apps/apis/nodes-api/routes/PutNodeOwnerRoute';
+import { PutNodeRegistrationRoute } from '@app/apps/apis/nodes-api/routes/PutNodeRegistrationRoute';
 import { PutNodeRelayConfigurationRoute } from '@app/apps/apis/nodes-api/routes/PutNodeRelayConfigurationRoute';
 import { DeleteNotificationScopeSettingsRoute } from '@app/apps/apis/notification-settings-api/routes/DeleteNotificationScopeSettingsRoute';
 import { GetNotificationSettingsRoute } from '@app/apps/apis/notification-settings-api/routes/GetNotificationSettingsRoute';
@@ -201,6 +205,10 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PostNodeNetworkRoute,
   PostNodePublicNetworkRoute,
   PutNodeOwnerRoute,
+  PutNodeRegistrationRoute,
+  PostNodeRegistrationCodeRoute,
+  GetNodeRegistrationCodesRoute,
+  DeleteNodeRegistrationCodeRoute,
   GetNodeRelayConfigurationRoute,
   PutNodeRelayConfigurationRoute,
   PutNodeDiagnosticsRoute,

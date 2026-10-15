@@ -1,5 +1,6 @@
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
+import { NodeRegistrationMode } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationMode';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 
 import { LocalNodeMetadataDocument } from '../documents/LocalNodeMetadataDocument';
@@ -16,6 +17,7 @@ export default class LocalNodeMetadataMapper {
       networks: primitives.networks,
       nodeId: primitives.id,
       owner: primitives.owner,
+      registrationMode: primitives.registrationMode,
       relayConfiguration: primitives.relayConfiguration,
     };
   }
@@ -25,6 +27,7 @@ export default class LocalNodeMetadataMapper {
       _id: LocalNodeMetadataMapper.LOCAL_NODE_ID,
       networks: {},
       nodeId: NodeId.generate().valueOf(),
+      registrationMode: NodeRegistrationMode.OPEN.valueOf(),
       relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
     };
   }

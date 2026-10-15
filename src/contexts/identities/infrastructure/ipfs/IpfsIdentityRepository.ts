@@ -624,6 +624,10 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     return this.findCandidateReferences(id, true);
   }
 
+  public async holds(id: IdentityId): Promise<boolean> {
+    return (await this.metadataIndex.findByIdentityId(id)).length > 0;
+  }
+
   public async findCandidatesById(id: IdentityId): Promise<Identity[]> {
     const candidates = await this.findCandidateReferencesById(id);
 
