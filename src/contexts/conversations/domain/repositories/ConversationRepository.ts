@@ -19,16 +19,6 @@ export default abstract class ConversationRepository {
   ): Promise<Conversation>;
 
   /**
-   * The conversation folded from the causal past of `frontier`. Rejects with
-   * ConversationNotFoundError when that past does not fold to a roster; throws
-   * when a head is unknown.
-   */
-  public abstract requireMetadataAtFrontier(
-    conversationId: ConversationId,
-    frontier: string[],
-  ): Promise<Conversation>;
-
-  /**
    * The conversations `participantId` belongs to in the folded state, newest
    * first. The participant index is local: it is the fold of the cached logs.
    */
@@ -37,11 +27,6 @@ export default abstract class ConversationRepository {
     limit: number,
     beforeConversationId?: ConversationId,
   ): Promise<Conversation[]>;
-
-  /** The operations nobody built on yet: the parents of the next operation. */
-  public abstract findFrontier(
-    conversationId: ConversationId,
-  ): Promise<string[]>;
 
   /** Every stored operation of the conversation log, in no particular order. */
   public abstract findOperations(

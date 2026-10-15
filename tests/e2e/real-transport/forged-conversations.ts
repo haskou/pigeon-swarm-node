@@ -261,23 +261,11 @@ async function converged(
   id: ConversationId,
   replicas = nodes,
 ): Promise<void> {
-  const expected = expectedOf(id);
-  const observed: string[] = [];
-
   try {
     await until(label, async () => {
-      observed.length = 0;
       for (const replica of replicas) {
-        const frontier = await replica.repository!.findFrontier(id);
-
-        observed.push(`${replica.name}: frontier=${frontier.join(',')}`);
-
         if (
-          !isDeepStrictEqual(
-            await observedView(replica, id),
-            expectedView(id),
-          ) ||
-          !isDeepStrictEqual(frontier, expected.frontier)
+          !isDeepStrictEqual(await observedView(replica, id), expectedView(id))
         )
           return false;
       }
@@ -285,8 +273,7 @@ async function converged(
       return true;
     });
   } catch (error) {
-    console.error(`expected frontier=${expected.frontier.join(',')}`);
-    console.error(observed.join('\n'));
+    console.error(`expected view=${JSON.stringify(expectedView(id))}`);
     throw error;
   }
 }
@@ -394,11 +381,6 @@ async function assertNoForgedOperation(
     await observedView(replica, id),
     expectedView(id),
     `${replica.name} (${label}) must fold only honest operations`,
-  );
-  assert.deepEqual(
-    await replica.repository!.findFrontier(id),
-    expectedOf(id).frontier,
-    `${replica.name} (${label}) frontier`,
   );
 }
 
@@ -596,8 +578,14 @@ async function main(): Promise<void> {
     'PASS forged signature, 1:1 hijack, tombstone and cross-scope replay rejected by the gated node while the ungated node replicated them',
   );
 
-  stage = 'member and admin changes an older node signed are refused';
-  const frontier = await honest.repository!.findFrontier(oneToOneId);
+  stage =
+    'member and admin changes and a parented genesis an older node signed are refused';
+  const oneToOneGenesis = ledger.find(
+    (signed) =>
+      signed.operation.getConversationId().isEqual(oneToOneId) &&
+      signed.operation.isGenesis(),
+  )!.operation;
+  const parents = [oneToOneGenesis.getHash()];
   const legacyChange = (
     signer: ConversationOperationSigner,
     action: string,
@@ -626,15 +614,22 @@ async function main(): Promise<void> {
       'member_added',
       oneToOneId,
       { identityId: frank.id },
-      frontier,
+      parents,
     ),
-    legacyChange(erin, 'member_left', oneToOneId, {}, frontier),
+    legacyChange(erin, 'member_left', oneToOneId, {}, parents),
+    legacyChange(
+      owner,
+      'conversation_created',
+      oneToOneId,
+      { ...oneToOneGenesis.getArguments() },
+      parents,
+    ),
     legacyChange(
       owner,
       'admin_promoted',
       oneToOneId,
       { identityId: erin.id },
-      frontier,
+      parents,
     ),
   ];
   const groupChanges = [
@@ -649,7 +644,7 @@ async function main(): Promise<void> {
   await plant(malicious, oneToOneId, oneToOneChanges);
   await plant(malicious, legacyId, groupChanges, [legacyRecord]);
   await reachedRawStores(
-    'legacy member and admin changes',
+    'legacy member and admin changes and a parented genesis',
     [honest, control],
     [...oneToOneChanges, ...groupChanges],
   );
@@ -684,7 +679,7 @@ async function main(): Promise<void> {
     );
   }
   console.log(
-    'PASS really signed member and admin changes replicated to the raw stores and changed no conversation on the gated or the ungated node',
+    'PASS really signed member and admin changes and a parented genesis replicated to the raw stores and changed no conversation on the gated or the ungated node',
   );
 }
 

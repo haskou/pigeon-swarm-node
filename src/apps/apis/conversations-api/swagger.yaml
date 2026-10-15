@@ -52,23 +52,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConversationsResource'
-  /conversations/{conversationId}/frontier:
-    get:
-      tags:
-        - conversations
-      summary: Get the operation digests to use as parents of the next signed operation (members only)
-      parameters:
-        - $ref: '#/components/parameters/ConversationId'
-        - $ref: '#/components/parameters/XIdentityId'
-        - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XSignature'
-      responses:
-        '200':
-          description: Sorted digests no other operation names as parent.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ConversationFrontierResource'
   /conversations/me/drafts:
     get:
       tags:
@@ -193,20 +176,11 @@ components:
           minimum: 0
         parents:
           type: array
-          description: Digests from GET /conversations/{id}/frontier; empty for the genesis. Sorted ascending, unique, at most 64.
+          description: Always empty. A conversation operation is a 1:1 genesis, which has no parents; a non-empty list is refused.
           items:
             type: string
         mutation:
           $ref: '#/components/schemas/SignedPublicMutation'
-    ConversationFrontierResource:
-      type: object
-      required:
-        - frontier
-      properties:
-        frontier:
-          type: array
-          items:
-            type: string
     PostConversationBody:
       type: object
       description: Creates a one-to-one conversation. Group conversations live in MLS on the clients; a group genesis is refused.
@@ -307,7 +281,7 @@ components:
           items:
             type: string
             pattern: '^[A-Za-z0-9_-]{43}$'
-          description: Digests of the community or conversation operations observed when signing, strictly ascending. Required, and only allowed, on records scoped to a community or conversation (channel messages and their reactions and pins, invites, membership requests, moderation log, MLS records, polls); the record's permission is judged against the scope folded at exactly this frontier. Read it from GET /communities/{id}/frontier or the conversation frontier before signing.
+          description: Digests of the community operations observed when signing, strictly ascending. Required, and only allowed, on records scoped to a community (channel messages and their reactions and pins, invites, membership requests, moderation log, MLS records, polls); the record's permission is judged against the community folded at exactly this frontier. Read it from GET /communities/{id}/frontier before signing.
         predecessor:
           type: string
           nullable: true

@@ -133,8 +133,7 @@ generalising them would churn a security-critical, vector-pinned wire format.
 The invariants are identical and everything that is not community-specific is
 reused unchanged: `PublicMutationProof`, `PublicMutationPolicy`,
 `PublicMutationRecordShape`, `PublicMutationGate`, `OrbitDBHeadIndex`,
-`registerHeadRecordMerger` and the #365 limits (arguments at most 4096 bytes,
-1000 operations per author, creator exempt).
+`registerHeadRecordMerger` and the #365 argument limit (at most 4096 bytes).
 
 ### Record shape and canonical signing
 
@@ -176,7 +175,8 @@ Genesis id binding (policy recomputes it, rejects on mismatch):
 
 ### Admission policy (`assertPermitted`)
 
-1. Shape valid; operation id recomputes; genesis if and only if `parents` is empty.
+1. Shape valid; operation id recomputes; `parents` is empty (an operation with
+   parents is refused).
 2. Genesis: id binding above; `participantIds` sorted, unique, includes the
    author and holds exactly 2 identities.
 3. Other operations: refused. The member and admin actions older nodes accepted
@@ -195,22 +195,22 @@ unsigned `ConversationWasCreatedEvent` announce are removed.
 
 ### Order and convergence
 
-State is the Kahn-ordered fold of the operations (lowest digest first among the
-ready ones), each authorized against the prefix it builds on; an operation that
-its prefix does not authorize is skipped, so every replica folds the same
-membership whatever order operations arrive in. Concurrent add/remove of the
-same member converges by digest order. Poll and call policies read membership
-from this fold (1:1: from the genesis); a record that arrives before its
-conversation is refused and re-admitted by the registry.
+A conversation log holds only geneses, and a genesis has no parents. The fold
+takes them by ascending digest and keeps the first valid one, so every replica
+folds the same roster whatever order the records arrive in. The causal order,
+the frontier and the per-author quota went with the group operations (D15).
+Call policies read the participants from this fold; a record that arrives
+before its conversation is refused and re-admitted by the registry.
 
 ### UI/API contract changes
 
 - `POST /conversations` gains a required client-device-signed `mutation` over
   the genesis operation. The node holds no user key, so the client builds the
   operation (and therefore the id) and signs it.
-- New signed endpoints for group operations (add member, remove member, leave,
-  promote admin, demote admin) plus `GET /conversations/:id/frontier`, modelled
-  on the community operation endpoints.
+- Signed endpoints for group operations (add member, remove member, leave,
+  promote admin, demote admin) and `GET /conversations/:id/frontier` were built
+  and are removed by D15: they answer `404`, because a 1:1 has no operation
+  after its genesis and group rosters live in MLS.
 - `docs/api.md` documents the byte-exact canonical signing input and
   `tests/fixtures/conversation-operation-vectors.json` pins test vectors. Update
   both swagger files and `docs/pubsub-sync-protocol.md` (audit table, new

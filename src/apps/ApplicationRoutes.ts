@@ -57,7 +57,6 @@ import { PutCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/
 import { PutCommunityMemberRolesRoute } from '@app/apps/apis/communities-api/routes/PutCommunityMemberRolesRoute';
 import { DeleteConversationDraftRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationDraftRoute';
 import { GetConversationDraftsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationDraftsRoute';
-import { GetConversationFrontierRoute } from '@app/apps/apis/conversations-api/routes/GetConversationFrontierRoute';
 import { GetConversationsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationsRoute';
 import { PostConversationRoute } from '@app/apps/apis/conversations-api/routes/PostConversationRoute';
 import { PutConversationDraftRoute } from '@app/apps/apis/conversations-api/routes/PutConversationDraftRoute';
@@ -174,7 +173,6 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   GetConversationDraftsRoute,
   PutConversationDraftRoute,
   DeleteConversationDraftRoute,
-  GetConversationFrontierRoute,
   GetContentReplicationStatusRoute,
   PutContentReplicationRoute,
   DeleteMailboxReaderRoute,

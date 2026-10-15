@@ -485,12 +485,12 @@ unverifiable. The recovery carries the compromise caps in effect as
 Threat model, rejected alternatives, the restart behaviour and the open residuals
 of carried caps are in `docs/design/causal-device-authorization.md`.
 
-Residual: community and conversation **operations** are evaluated against the
-state folded from their causal past, but the permissions of channel messages,
-pins, reactions, invites, membership requests and polls are evaluated against
-the community or conversation state folded at admission, not at a causal
-frontier. A later demotion can therefore still make a node refuse such a record
-that another node admitted earlier.
+Residual: community **operations** are evaluated against the state folded from
+their causal past, but the permissions of channel messages, pins, reactions,
+invites, membership requests and polls are evaluated against the community
+state folded at admission, not at a causal frontier. A later demotion can
+therefore still make a node refuse such a record that another node admitted
+earlier.
 
 ### Trust boundaries
 
@@ -855,7 +855,9 @@ from the folded state, never replicated. Only one-to-one conversations live in t
 store: group rosters live in MLS (D15), so a group `conversation_created` record
 or a `member_added`, `member_removed`, `member_left`, `admin_promoted` or
 `admin_demoted` record from an older node is refused by the gate, and a node that
-holds one anyway folds it into no conversation.
+holds one anyway folds it into no conversation. A 1:1 log holds only geneses,
+which have no parents: a record with parents is refused, and the fold keeps the
+genesis with the lowest digest.
 
 Notifications are no longer unsigned (#371). An invitation is a `notification_invitation`
 record signed by the inviter. A community or one-to-one conversation invitation is
