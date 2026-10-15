@@ -508,6 +508,12 @@ a call before such a record, so for those seconds the call shows the
 participant as when the call started. A participant the call accepts is never
 held back by a waiting record.
 
+Both 503 answers also cover the moments after a restart when the node could
+not replay its call history yet because a block it needs was missing locally:
+until that replay succeeds, for at most 60 seconds, a call or participant the
+node cannot find answers `503020` instead of `CallNotFoundError` or
+`CallParticipantNotFoundError`. The list keeps answering 200.
+
 ### List active calls
 
 ```http
@@ -1093,7 +1099,8 @@ Implemented:
   cap is exceeded
 - a heartbeat answers 409 `CallParticipantNotFoundError` for an identity that
   has not joined the call, or 503 code `503020` while that identity's own
-  participant record still waits for admission (retry)
+  participant record still waits for admission or the call history is not
+  replayed yet (retry)
 
 ### End call
 
@@ -1154,7 +1161,8 @@ Implemented:
 - backend does not inspect SDP/ICE payloads
 - a sender that has not joined, or a recipient that cannot receive signals,
   answers 409 `CallParticipantNotFoundError`, or 503 code `503020` while the
-  participant record of either still waits for admission (retry)
+  participant record of either still waits for admission or the call history
+  is not replayed yet (retry)
 - signal request bodies are limited to 64 KiB
 - signalling is rate-limited per `(callId, senderIdentityId)` with
   `CALLS_SIGNAL_RATE_LIMIT_PER_MINUTE` defaulting to `120`; exceeding it returns `429` with code `429010`
