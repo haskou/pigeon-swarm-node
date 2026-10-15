@@ -7,11 +7,10 @@ import {
   add,
   alice,
   bob,
-  carol,
   creator,
-  groupGenesis,
   leave,
   mallory,
+  networkId,
   oneToOneGenesis,
   promote,
   remove,
@@ -38,7 +37,7 @@ describe('ConversationOperationMutationPolicy', () => {
 
   describe('expectationOf', () => {
     it('binds the proof to the operation id, its author and the operations store', () => {
-      const created = groupGenesis();
+      const created = oneToOneGenesis();
 
       expect(policy.expectationOf(record(created))).toEqual({
         authorIdentityId: creator.valueOf(),
@@ -49,14 +48,14 @@ describe('ConversationOperationMutationPolicy', () => {
 
     it('refuses a record with an unexpected field', () => {
       expect(() =>
-        policy.expectationOf({ ...record(groupGenesis()), extra: true }),
+        policy.expectationOf({ ...record(oneToOneGenesis()), extra: true }),
       ).toThrow(InvalidPublicMutationError);
     });
 
     it('refuses a record whose content does not hash to its id', () => {
       expect(() =>
         policy.expectationOf({
-          ...record(groupGenesis()),
+          ...record(oneToOneGenesis()),
           createdAt: 99,
         }),
       ).toThrow(InvalidPublicMutationError);
@@ -65,15 +64,15 @@ describe('ConversationOperationMutationPolicy', () => {
     it('refuses a record whose id was swapped for another operation', () => {
       expect(() =>
         policy.expectationOf({
-          ...record(add([groupGenesis()], bob)),
-          id: groupGenesis().getId(),
+          ...record(add([oneToOneGenesis()], bob)),
+          id: oneToOneGenesis().getId(),
         }),
       ).toThrow(InvalidPublicMutationError);
     });
 
     it('refuses a tombstone', () => {
       expect(() =>
-        policy.expectationOf({ ...record(groupGenesis()), removed: true }),
+        policy.expectationOf({ ...record(oneToOneGenesis()), removed: true }),
       ).toThrow(InvalidPublicMutationError);
     });
   });
@@ -81,60 +80,16 @@ describe('ConversationOperationMutationPolicy', () => {
   describe('assertPermitted', () => {
     it('refuses to delete an operation', async () => {
       await expect(
-        policy.assertPermitted(record(groupGenesis()), creator.valueOf(), true),
+        policy.assertPermitted(
+          record(oneToOneGenesis()),
+          creator.valueOf(),
+          true,
+        ),
       ).rejects.toThrow(InvalidPublicMutationError);
     });
 
-    it('admits what the roster of its causal past allows', async () => {
-      const created = groupGenesis();
-      const promoted = promote([created], alice);
-
-      await admit(created);
-      await admit(promoted);
-      await expect(admit(add([promoted], bob, alice))).resolves.toBeUndefined();
-    });
-
-    it('refuses an operation whose parents were not admitted, then admits it after they arrive', async () => {
-      const created = groupGenesis();
-      const first = add([created], bob);
-      const next = add([first], carol);
-
-      await admit(created);
-      await expect(admit(next)).rejects.toThrow();
-
-      await admit(first);
-
-      await expect(admit(next)).resolves.toBeUndefined();
-    });
-
-    it('refuses a forged add signed by a plain member', async () => {
-      const created = groupGenesis();
-
-      await admit(created);
-
-      await expect(admit(add([created], bob, alice))).rejects.toThrow();
-    });
-
-    it('refuses a forged add signed by somebody who is not in the group', async () => {
-      const created = groupGenesis();
-
-      await admit(created);
-
-      await expect(admit(add([created], mallory, mallory))).rejects.toThrow();
-    });
-
-    it('refuses the removal of the creator', async () => {
-      const created = groupGenesis();
-      const promoted = promote([created], alice);
-
-      await admit(created);
-      await admit(promoted);
-
-      await expect(admit(remove([promoted], creator, alice))).rejects.toThrow();
-    });
-
-    it('refuses a creation that does not list its author', async () => {
-      await expect(admit(groupGenesis([alice, bob]))).rejects.toThrow();
+    it('admits the genesis of a 1:1 conversation', async () => {
+      await expect(admit(oneToOneGenesis())).resolves.toBeUndefined();
     });
 
     it('refuses any change of a 1:1 conversation', async () => {
@@ -144,24 +99,16 @@ describe('ConversationOperationMutationPolicy', () => {
 
       await expect(admit(leave([created], alice))).rejects.toThrow();
       await expect(admit(add([created], bob))).rejects.toThrow();
-    });
-
-    it('keeps the history of two conversations apart', async () => {
-      const created = groupGenesis();
-      const other = oneToOneGenesis();
-
-      await admit(created);
-      await admit(other);
-
-      await expect(admit(add([created], bob))).resolves.toBeUndefined();
-      await expect(admit(add([other], bob))).rejects.toThrow();
+      await expect(admit(remove([created], alice))).rejects.toThrow();
+      await expect(admit(promote([created], alice))).rejects.toThrow();
+      await expect(admit(add([created], mallory, mallory))).rejects.toThrow();
     });
   });
 
   describe('a group conversation replicated by an older node', () => {
     const legacy = legacyGroupGenesis({
       creatorIdentityId: creator.valueOf(),
-      networkId: '550e8400-e29b-41d4-a716-446655440000',
+      networkId: networkId.valueOf(),
       participantIds: [creator.valueOf(), alice.valueOf()],
     });
 

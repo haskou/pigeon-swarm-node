@@ -851,7 +851,10 @@ unsigned UUID and the shared libp2p peer key is not bound to an identity:
 Conversation metadata is no longer unsigned: the roster is the fold of client-signed
 `conversationOperations` (gate policy `ConversationOperationMutationPolicy`), there
 is no pubsub conversation announce, and the participant index is rebuilt locally
-from the folded state, never replicated.
+from the folded state, never replicated. Only one-to-one conversations live in this
+store: group rosters live in MLS (D15), so a group `conversation_created` record
+from an older node is refused by the gate, and a node that holds one anyway folds it
+into no conversation.
 
 Notifications are no longer unsigned (#371). An invitation is a `notification_invitation`
 record signed by the inviter. A community or one-to-one conversation invitation is

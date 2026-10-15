@@ -1190,7 +1190,6 @@ export default class Definitions {
 
     this.body = JSON.stringify({
       ...body,
-      ...(genesis?.nonce ? { nonce: genesis.nonce } : {}),
       operation: signed.body,
     });
   }
@@ -1198,13 +1197,7 @@ export default class Definitions {
   private conversationGenesis(
     body: Record<string, unknown>,
     actorIdentityId: string,
-  ): {
-    action: string;
-    args: Record<string, unknown>;
-    conversationId: string;
-    nonce?: string;
-  } {
-    const networkId = String(body.networkId);
+  ): { action: string; args: Record<string, unknown>; conversationId: string } {
     const participantIds = [
       ...new Set([
         actorIdentityId,
@@ -1212,29 +1205,14 @@ export default class Definitions {
       ]),
     ].sort();
 
-    if (body.type !== 'group') {
-      return {
-        action: 'conversation_created',
-        args: { participantIds, type: 'one-to-one' },
-        conversationId: ConversationId.deterministic(
-          participantIds[0],
-          participantIds[1] ?? participantIds[0],
-          networkId,
-        ).valueOf(),
-      };
-    }
-
-    const nonce = randomUUID().replace(/-/g, '');
-
     return {
       action: 'conversation_created',
-      args: { name: body.name, nonce, participantIds, type: 'group' },
-      conversationId: ConversationId.deriveGroup(
-        networkId,
-        actorIdentityId,
-        nonce,
+      args: { participantIds, type: 'one-to-one' },
+      conversationId: ConversationId.deterministic(
+        participantIds[0],
+        participantIds[1] ?? participantIds[0],
+        String(body.networkId),
       ).valueOf(),
-      nonce,
     };
   }
 
@@ -3875,16 +3853,6 @@ export default class Definitions {
     this.conversationId = this.response.data.id;
   }
 
-  @given('I have created a group conversation')
-  public async iHaveCreatedAGroupConversation(): Promise<void> {
-    await this.createGroupConversation(3);
-  }
-
-  @given('I have created a two-member group conversation')
-  public async iHaveCreatedATwoMemberGroupConversation(): Promise<void> {
-    await this.createGroupConversation(2);
-  }
-
   @given('I set a conversation member body for a new identity')
   public async iSetAConversationMemberBodyForANewIdentity(): Promise<void> {
     const keyPair = await KeyPair.generate();
@@ -3939,31 +3907,6 @@ export default class Definitions {
       keyPair,
       isOther ? this.otherIdentityId : undefined,
     );
-  }
-
-  private async createGroupConversation(
-    participantCount: number,
-  ): Promise<void> {
-    await this.iHavePublishedAKeychainForTheAuthenticatedIdentity();
-    await this.iSetAGroupConversationBodyForNewParticipants();
-    const body = JSON.parse(this.body || '{}');
-    body.participantIds = body.participantIds.slice(0, participantCount);
-    this.body = JSON.stringify(body);
-    await this.iSignTheCurrentOneToOneConversationRequest();
-
-    this.response = await this.restClient.post(
-      '/conversations/',
-      JSON.parse(this.body || '{}'),
-      { headers: this.headers },
-    );
-
-    if (this.response.status !== 200) {
-      throw new Error(
-        `Could not create group conversation: ${JSON.stringify(this.response.data)}`,
-      );
-    }
-
-    this.conversationId = this.response.data.id;
   }
 
   @given('I set a conversation call body')

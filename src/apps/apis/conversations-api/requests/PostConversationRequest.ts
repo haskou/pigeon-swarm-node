@@ -12,12 +12,9 @@ export class PostConversationRequest {
   public getMessage(): ConversationCreateMessage {
     return new ConversationCreateMessage(this.ownerIdentityId.valueOf(), {
       keychainExternalIdentifier: this.body.keychainExternalIdentifier,
-      name: this.body.name,
       networkId: this.body.networkId,
-      nonce: this.body.nonce,
       operation: this.body.operation,
       participantIds: this.body.participantIds,
-      type: this.body.type,
     });
   }
 }

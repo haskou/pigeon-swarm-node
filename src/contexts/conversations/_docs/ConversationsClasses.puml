@@ -160,6 +160,12 @@ package "conversations.infrastructure" {
     ConversationOperationMutationPolicy.
   end note
 
+  note bottom of ConversationOperationMutationPolicy
+    Admits only the signed genesis of a 1:1.
+    Group genesis records of older nodes are
+    refused: group rosters live in MLS.
+  end note
+
   OrbitDBConversationRepository ..|> ConversationRepository
   OrbitDBConversationRepository ..> ConversationOperationMutationPolicy
   OrbitDBConversationRepository ..> ConversationStateFold

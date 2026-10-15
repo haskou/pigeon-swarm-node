@@ -24,11 +24,10 @@ export const mallory = new IdentityId(
   'MCowBQYDK2VwAyEAypOsFwUYcHHWe4PH/w7+gQjo7EUwV113JoeTM9vavnw=',
 );
 export const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440000');
-export const nonce = 'genesis-nonce';
-export const groupId = ConversationId.deriveGroup(
-  networkId.valueOf(),
-  creator.valueOf(),
-  nonce,
+export const oneToOneId = ConversationId.deterministic(
+  creator,
+  alice,
+  networkId,
 );
 
 export function operation(
@@ -37,7 +36,7 @@ export function operation(
   args: Record<string, unknown>,
   parents: ConversationOperation[],
   createdAt = 1,
-  conversationId: ConversationId = groupId,
+  conversationId: ConversationId = oneToOneId,
 ): ConversationOperation {
   return ConversationOperation.create({
     action,
@@ -50,22 +49,6 @@ export function operation(
   });
 }
 
-export function groupGenesis(
-  participants: IdentityId[] = [creator, alice],
-): ConversationOperation {
-  return operation(
-    ConversationOperationAction.CONVERSATION_CREATED,
-    creator,
-    {
-      name: 'Group',
-      nonce,
-      participantIds: participants.map((participant) => participant.valueOf()),
-      type: 'group',
-    },
-    [],
-  );
-}
-
 export function oneToOneGenesis(): ConversationOperation {
   return operation(
     ConversationOperationAction.CONVERSATION_CREATED,
@@ -75,8 +58,6 @@ export function oneToOneGenesis(): ConversationOperation {
       type: 'one-to-one',
     },
     [],
-    1,
-    ConversationId.deterministic(creator, alice, networkId),
   );
 }
 

@@ -9,8 +9,8 @@ import { ConversationOperationMutation } from '../../record-operation/Conversati
 import { ConversationOperationMutationPrimitives } from '../../record-operation/ConversationOperationMutationPrimitives';
 
 /**
- * Creates a conversation from the genesis operation its creator signed. The
- * participants are the creator plus the requested ones, deduplicated and
+ * Creates a 1:1 conversation from the genesis operation its creator signed.
+ * The participants are the creator plus the requested one, deduplicated and
  * sorted, which is the exact list the client must have signed.
  */
 export class ConversationCreateMessage {
@@ -23,12 +23,9 @@ export class ConversationCreateMessage {
     ownerIdentityId: string,
     payload: {
       keychainExternalIdentifier: string;
-      name?: string;
       networkId: string;
-      nonce?: string;
       operation: ConversationOperationMutationPrimitives;
       participantIds: string[];
-      type: 'group' | 'one-to-one';
     },
   ) {
     const network = new NetworkId(payload.networkId);
@@ -43,28 +40,13 @@ export class ConversationCreateMessage {
     this.operation = new ConversationOperationMutation(payload.operation);
     this.genesis = this.operation.build({
       action: ConversationOperationAction.CONVERSATION_CREATED,
-      args:
-        payload.type === 'group'
-          ? {
-              name: payload.name ?? '',
-              nonce: payload.nonce ?? '',
-              participantIds,
-              type: 'group',
-            }
-          : { participantIds, type: 'one-to-one' },
+      args: { participantIds, type: 'one-to-one' },
       author: this.ownerIdentityId,
-      conversationId:
-        payload.type === 'group'
-          ? ConversationId.deriveGroup(
-              network.valueOf(),
-              ownerIdentityId,
-              payload.nonce ?? '',
-            )
-          : ConversationId.deterministic(
-              participantIds[0],
-              participantIds[1] ?? participantIds[0],
-              network,
-            ),
+      conversationId: ConversationId.deterministic(
+        participantIds[0],
+        participantIds[1] ?? participantIds[0],
+        network,
+      ),
       networkId: network,
     });
   }

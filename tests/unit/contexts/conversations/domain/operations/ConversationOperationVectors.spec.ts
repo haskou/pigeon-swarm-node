@@ -82,6 +82,12 @@ function digestOfText(text: string): string {
   return createHash('sha256').update(text).digest('base64url');
 }
 
+/** Group genesis vectors older nodes accepted; group rosters now live in MLS. */
+const REFUSED_GENESIS = ['group_genesis', 'group_genesis_unicode'];
+const acceptedCases = vectors.cases.filter(
+  ({ name }) => !REFUSED_GENESIS.includes(name),
+);
+
 describe('Conversation operation vectors', () => {
   it('derives each seed, key pair and identity id from the fixed label', () => {
     for (const [name, key] of Object.entries(vectors.keys)) {
@@ -101,29 +107,6 @@ describe('Conversation operation vectors', () => {
           .toString(),
       ).toBe(key.publicKeyPem);
       expect(new IdentityId(key.publicKeyPem).valueOf()).toBe(key.identityId);
-    }
-  });
-
-  it('derives every group id from the network, the creator and the nonce', () => {
-    const creator = vectors.keys.creator.identityId;
-
-    for (const name of ['group', 'group_unicode']) {
-      const conversation = vectors.conversations[name];
-      const nonce = conversation.nonce as string;
-
-      expect(
-        canonicalize({
-          creatorIdentityId: creator,
-          networkId: vectors.networkId,
-          nonce,
-        }),
-      ).toBe(conversation.conversationIdPreimage);
-      expect(`group:${digestOfText(conversation.conversationIdPreimage)}`).toBe(
-        conversation.conversationId,
-      );
-      expect(
-        ConversationId.deriveGroup(vectors.networkId, creator, nonce).valueOf(),
-      ).toBe(conversation.conversationId);
     }
   });
 
@@ -149,7 +132,7 @@ describe('Conversation operation vectors', () => {
     ).toBe(conversation.conversationId);
   });
 
-  it.each(['group_genesis', 'group_genesis_unicode'])(
+  it.each(REFUSED_GENESIS)(
     'refuses the %s vector, a group genesis older nodes accepted',
     (name) => {
       const vector = vectors.cases.find((item) => item.name === name);
@@ -161,21 +144,16 @@ describe('Conversation operation vectors', () => {
     },
   );
 
-  it('folds the signed group operations to the expected roster', () => {
+  it('folds the group operations older nodes signed to no conversation', () => {
     const { group } = vectors.conversations;
-    const operations = vectors.cases
+    const operations = acceptedCases
       .filter(({ input }) => input.conversationId === group.conversationId)
       .map(({ derived }) =>
         ConversationOperation.fromPrimitives(derived.payload),
       );
-    const state = ConversationStateFold.fold(operations);
-    const { admin, creator } = vectors.keys;
 
-    expect(state.skipped).toEqual([]);
-    expect(state.roster?.getCreator()).toBe(creator.identityId);
-    expect(state.roster?.getMembers()).toEqual([creator.identityId]);
-    expect(state.roster?.getAdmins()).toEqual([]);
-    expect(state.roster?.isMember(admin.identityId)).toBe(false);
+    expect(operations).not.toHaveLength(0);
+    expect(ConversationStateFold.fold(operations).roster).toBeUndefined();
   });
 
   describe.each(vectors.cases)('$name', (vector) => {
@@ -240,6 +218,10 @@ describe('Conversation operation vectors', () => {
         ),
       ).toBe(true);
     });
+  });
+
+  describe.each(acceptedCases)('$name', ({ derived, input }) => {
+    const signer = vectors.keys[input.signer];
 
     it('is rebuilt byte for byte by the domain code from the inputs', () => {
       const operation = ConversationOperation.create({

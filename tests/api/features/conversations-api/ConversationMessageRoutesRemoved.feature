@@ -16,16 +16,13 @@ Feature: Conversations keep no message log on the node
       | one-to-one | api-one-to-one-no-messages-network   | POST   | /messages                        |
       | one-to-one | api-one-to-one-no-latest-network     | GET    | /messages                        |
       | one-to-one | api-one-to-one-no-read-until-network | PUT    | /messages/read-until             |
-      | group      | api-group-no-messages-network        | POST   | /messages                        |
-      | group      | api-group-no-latest-network          | GET    | /messages                        |
-      | group      | api-group-no-message-network         | GET    | /messages/{message}              |
-      | group      | api-group-no-around-network          | GET    | /messages/{message}/around       |
-      | group      | api-group-no-thread-network          | GET    | /messages/{message}/thread       |
-      | group      | api-group-no-edit-network            | PUT    | /messages/{message}              |
-      | group      | api-group-no-delete-network          | DELETE | /messages/{message}              |
-      | group      | api-group-no-reaction-network        | POST   | /messages/{message}/reactions    |
-      | group      | api-group-no-unreaction-network      | DELETE | /messages/{message}/reactions    |
-      | group      | api-group-no-pins-network            | GET    | /pins                            |
-      | group      | api-group-no-pin-network             | POST   | /messages/{message}/pin          |
-      | group      | api-group-no-unpin-network           | DELETE | /messages/{message}/pin          |
-      | group      | api-group-no-read-until-network      | PUT    | /messages/read-until             |
+      | one-to-one | api-one-to-one-no-message-network    | GET    | /messages/{message}              |
+      | one-to-one | api-one-to-one-no-around-network     | GET    | /messages/{message}/around       |
+      | one-to-one | api-one-to-one-no-thread-network     | GET    | /messages/{message}/thread       |
+      | one-to-one | api-one-to-one-no-edit-network       | PUT    | /messages/{message}              |
+      | one-to-one | api-one-to-one-no-delete-network     | DELETE | /messages/{message}              |
+      | one-to-one | api-one-to-one-no-reaction-network   | POST   | /messages/{message}/reactions    |
+      | one-to-one | api-one-to-one-no-unreaction-network | DELETE | /messages/{message}/reactions    |
+      | one-to-one | api-one-to-one-no-pins-network       | GET    | /pins                            |
+      | one-to-one | api-one-to-one-no-pin-network        | POST   | /messages/{message}/pin          |
+      | one-to-one | api-one-to-one-no-unpin-network      | DELETE | /messages/{message}/pin          |

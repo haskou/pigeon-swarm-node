@@ -49,10 +49,10 @@ export default class ConversationCreator {
   }
 
   /**
-   * Records the signed genesis. A conversation that already exists is returned
-   * as it is: a 1:1 id is the same for both participants, so whoever creates
-   * it second finds the first one, and a group id commits to its creator and
-   * nonce.
+   * Records the signed 1:1 genesis. A conversation that already exists is
+   * returned as it is: a 1:1 id is the same for both participants, so whoever
+   * creates it second finds the first one. Group conversations live in MLS
+   * and are never created here.
    */
   public async create(
     message: ConversationCreateMessage,

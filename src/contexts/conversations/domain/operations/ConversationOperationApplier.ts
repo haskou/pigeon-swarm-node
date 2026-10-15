@@ -3,10 +3,8 @@ import { assert } from '@haskou/value-objects';
 
 import { InvalidConversationOperationError } from '../errors/InvalidConversationOperationError';
 import { ConversationOperationAction } from '../value-objects/ConversationOperationAction';
-import { GroupConversationName } from '../value-objects/GroupConversationName';
 import { ConversationOperation } from './ConversationOperation';
 import { ConversationOperationArgumentReader } from './ConversationOperationArgumentReader';
-import { ConversationOperationLimits } from './ConversationOperationLimits';
 import { ConversationRoster } from './ConversationRoster';
 
 /**
@@ -16,11 +14,9 @@ import { ConversationRoster } from './ConversationRoster';
  * to grants the permission.
  *
  * Arguments per action (every key is required):
- * - conversation_created, group: type 'group', nonce, name, participantIds
- *   (strictly ascending, unique, the author included, 2 to
- *   `MAX_GROUP_PARTICIPANTS`)
- * - conversation_created, 1:1: type 'one-to-one', participantIds (exactly the
- *   two identities, strictly ascending, the author one of them)
+ * - conversation_created: type 'one-to-one', participantIds (exactly the two
+ *   identities, strictly ascending, the author one of them). Group rosters
+ *   live in MLS, so a group genesis is refused before it gets here.
  * - member_added, member_removed, admin_promoted, admin_demoted: identityId
  * - member_left: none
  *
@@ -93,33 +89,6 @@ export class ConversationOperationApplier {
     return participantIds;
   }
 
-  private static createGroup(
-    operation: ConversationOperation,
-    reader: ConversationOperationArgumentReader,
-  ): ConversationRoster {
-    const author = operation.getAuthorIdentityId().valueOf();
-    const participantIds = ConversationOperationApplier.participants(reader);
-
-    reader.string('nonce');
-    assert(
-      participantIds.length >= 2 &&
-        participantIds.length <=
-          ConversationOperationLimits.MAX_GROUP_PARTICIPANTS &&
-        participantIds.includes(author),
-      new InvalidConversationOperationError(),
-    );
-
-    return new ConversationRoster(
-      operation.getConversationId().valueOf(),
-      operation.getNetworkId().valueOf(),
-      'group',
-      author,
-      participantIds,
-      [],
-      new GroupConversationName(reader.string('name')).valueOf(),
-    );
-  }
-
   private static createOneToOne(
     operation: ConversationOperation,
     reader: ConversationOperationArgumentReader,
@@ -145,18 +114,6 @@ export class ConversationOperationApplier {
   public static create(genesis: ConversationOperation): ConversationRoster {
     assert(genesis.isGenesis(), new InvalidConversationOperationError());
     const args = genesis.getArguments();
-
-    if (args.type === 'group') {
-      return ConversationOperationApplier.createGroup(
-        genesis,
-        new ConversationOperationArgumentReader(args, [
-          'name',
-          'nonce',
-          'participantIds',
-          'type',
-        ]),
-      );
-    }
 
     assert(args.type === 'one-to-one', new InvalidConversationOperationError());
 

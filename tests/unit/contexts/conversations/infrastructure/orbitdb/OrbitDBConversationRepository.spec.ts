@@ -65,7 +65,7 @@ describe('OrbitDBConversationRepository', () => {
   });
 
   it('should read a conversation as the fold of its signed operations', async () => {
-    const conversation = await seeded(mother.buildGroup());
+    const conversation = await seeded(mother.build());
 
     const found = await repository.requireMetadataById(conversation.getId());
 
@@ -74,7 +74,7 @@ describe('OrbitDBConversationRepository', () => {
   });
 
   it('should never write conversation messages to the replicated message store', async () => {
-    await seeded(mother.buildGroup());
+    await seeded(mother.build());
 
     expect(messagesPut).not.toHaveBeenCalled();
     expect(
@@ -85,7 +85,7 @@ describe('OrbitDBConversationRepository', () => {
   });
 
   it('should find participant conversations from heads after they are indexed', async () => {
-    await seeded(mother.buildGroup());
+    await seeded(mother.build());
     operationsQuery.mockClear();
 
     const participantConversations = await repository.findByParticipant(
@@ -97,9 +97,8 @@ describe('OrbitDBConversationRepository', () => {
     expect(operationsQuery).not.toHaveBeenCalled();
   });
 
-  it('should find only the one-to-one conversations of a participant', async () => {
+  it('should find the one-to-one conversations of a participant', async () => {
     const oneToOne = await seeded(mother.build());
-    await seeded(mother.buildGroup());
 
     const found = await repository.findOneToOneByParticipant(mother.author, 10);
 
@@ -133,14 +132,7 @@ describe('OrbitDBConversationRepository', () => {
       .map((participantId) => participantId.valueOf());
     const genesis = ConversationOperation.create({
       action: ConversationOperationAction.CONVERSATION_CREATED,
-      args: conversation.isGroup()
-        ? {
-            name: 'Mother group',
-            nonce: 'conversation-mother',
-            participantIds,
-            type: 'group',
-          }
-        : { participantIds, type: 'one-to-one' },
+      args: { participantIds, type: 'one-to-one' },
       authorIdentityId: conversation.getCreatorId() as IdentityId,
       conversationId: conversation.getId(),
       createdAt: 1780000000000,

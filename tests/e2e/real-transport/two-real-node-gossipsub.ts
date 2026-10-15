@@ -292,21 +292,12 @@ async function main(): Promise<void> {
       nodeBIdentity.id,
     );
 
-    const groupId = await runGroupLifecycle(
-      nodeA,
-      nodeB,
-      nodeAIdentity,
-      nodeBIdentity,
-      nodeAKeychain,
-    );
-
     console.info(
       JSON.stringify(
         {
           callId: call.id,
           callSignalId: callSignal.signalId,
           conversationId: conversation.id,
-          groupId,
           nodeAIdentityId: nodeAIdentity.id,
           nodeBIdentityId: nodeBIdentity.id,
           result: 'PASS',
@@ -587,73 +578,6 @@ async function publishKeychain(
   return response.keychainExternalIdentifier;
 }
 
-type GroupResponse = {
-  adminIds?: string[];
-  creatorId?: string;
-  id: string;
-  participantIds: string[];
-};
-
-async function findGroup(
-  node: NodeRuntime,
-  identity: IdentityFixture,
-  groupId: string,
-): Promise<GroupResponse | undefined> {
-  const response = await requestMaybe<ConversationListResponse>(
-    node,
-    'GET',
-    '/conversations/?limit=30',
-    undefined,
-    identity,
-  );
-  const conversations = (response?.conversations ??
-    response?.data ??
-    []) as GroupResponse[];
-
-  return conversations.find((conversation) => conversation.id === groupId);
-}
-
-/** Signs one group change against the signer's own node frontier and submits it. */
-async function changeGroup(
-  node: NodeRuntime,
-  signer: IdentityFixture,
-  groupId: string,
-  method: 'DELETE' | 'POST' | 'PUT',
-  requestPath: string,
-  action: string,
-  args: Record<string, unknown>,
-  body?: Record<string, unknown>,
-): Promise<void> {
-  const { frontier } = await request<{ frontier: string[] }>(
-    node,
-    'GET',
-    `/conversations/${encodeURIComponent(groupId)}/frontier`,
-    undefined,
-    signer,
-  );
-  const signed = signConversationOperation({
-    action,
-    args,
-    conversationId: groupId,
-    createdAt: Date.now(),
-    networkId: NETWORK_ID,
-    parents: frontier,
-    signer,
-  });
-
-  await request(
-    node,
-    method,
-    requestPath,
-    { ...(body ?? {}), operation: signed.body },
-    signer,
-  );
-}
-
-/**
- * Group lifecycle over real HTTP and real gossip: A creates a group with B,
- * promotes B, B leaves from its own node, and both nodes fold the same roster.
- */
 /** An inviter-signed invitation replicates to the recipient, who accepts it with a recipient-signed state record. */
 async function runNotificationLifecycle(
   nodeA: NodeRuntime,
@@ -750,116 +674,6 @@ async function runNotificationLifecycle(
       ),
     'node-b to list the accepted invitation',
   );
-}
-
-/** Creates a two-member group on node A and waits until node B folds its signed genesis. */
-async function createGroupConversation(
-  nodeA: NodeRuntime,
-  nodeB: NodeRuntime,
-  owner: IdentityFixture,
-  other: IdentityFixture,
-  keychainExternalIdentifier: string,
-): Promise<string> {
-  const nonce = randomBytes(16).toString('hex');
-  const participantIds = [owner.id, other.id].sort();
-  const groupId = ConversationId.deriveGroup(
-    NETWORK_ID,
-    owner.id,
-    nonce,
-  ).valueOf();
-  const genesis = signConversationOperation({
-    action: ConversationOperationAction.CONVERSATION_CREATED.valueOf(),
-    args: { name: 'E2E group', nonce, participantIds, type: 'group' },
-    conversationId: groupId,
-    createdAt: Date.now(),
-    networkId: NETWORK_ID,
-    parents: [],
-    signer: owner,
-  });
-  const created = await request<GroupResponse>(
-    nodeA,
-    'POST',
-    '/conversations/',
-    {
-      keychainExternalIdentifier,
-      name: 'E2E group',
-      networkId: NETWORK_ID,
-      nonce,
-      operation: genesis.body,
-      participantIds,
-      type: 'group',
-    },
-    owner,
-  );
-
-  if (created.id !== groupId) {
-    throw new Error(`Group id ${created.id} is not the derived ${groupId}`);
-  }
-
-  await waitFor(async () => {
-    const group = await findGroup(nodeB, other, groupId);
-
-    return group?.creatorId === owner.id && group.participantIds.length === 2;
-  }, 'node-b to fold the signed group genesis');
-
-  return groupId;
-}
-
-async function runGroupLifecycle(
-  nodeA: NodeRuntime,
-  nodeB: NodeRuntime,
-  owner: IdentityFixture,
-  other: IdentityFixture,
-  keychainExternalIdentifier: string,
-): Promise<string> {
-  const groupId = await createGroupConversation(
-    nodeA,
-    nodeB,
-    owner,
-    other,
-    keychainExternalIdentifier,
-  );
-
-  await changeGroup(
-    nodeA,
-    owner,
-    groupId,
-    'PUT',
-    `/conversations/${encodeURIComponent(groupId)}/admins/${encodeURIComponent(other.id)}`,
-    'admin_promoted',
-    { identityId: other.id },
-  );
-  await waitFor(
-    async () =>
-      (await findGroup(nodeB, other, groupId))?.adminIds?.includes(other.id) ??
-      false,
-    'node-b to fold the admin promotion',
-  );
-
-  await changeGroup(
-    nodeB,
-    other,
-    groupId,
-    'DELETE',
-    `/conversations/${encodeURIComponent(groupId)}/members/me`,
-    'member_left',
-    {},
-  );
-  await waitFor(async () => {
-    const group = await findGroup(nodeA, owner, groupId);
-
-    return (
-      group !== undefined &&
-      group.participantIds.length === 1 &&
-      !(group.adminIds ?? []).includes(other.id)
-    );
-  }, 'node-a to fold the departure of node-b');
-
-  if (await findGroup(nodeB, other, groupId)) {
-    throw new Error('A departed member still lists the group');
-  }
-
-  return groupId;
 }
 
 /** Creates the 1:1 the way a client does: one signed `conversation_created` operation, no unsigned announce. */
@@ -1375,7 +1189,6 @@ export {
   request,
   waitFor,
   publishKeychain,
-  createGroupConversation,
   waitForIdentity,
   waitForKeychain,
   waitForConversation,
