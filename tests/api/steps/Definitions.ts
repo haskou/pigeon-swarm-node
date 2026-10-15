@@ -175,6 +175,7 @@ export default class Definitions {
   private privateAuthorizationScopeId: string | undefined;
   private otherIdentityId: IdentityId | undefined;
   private otherIdentityKeyPair: KeyPair | undefined;
+  private readonly replayAnswers: { data: unknown; status: number }[] = [];
   private rememberedCallJoinRequest:
     { body: string | undefined; headers: Record<string, string> } | undefined;
 
@@ -4839,6 +4840,32 @@ export default class Definitions {
 
     expect(blockedAnswer.code).not.to.equal(403012);
     expect(blockedAnswer).to.deep.equal(await read(unblocked));
+  }
+
+  @given('my identity is published on this node')
+  public async myIdentityIsPublishedOnThisNode(): Promise<void> {
+    await this.ensureAuthenticatedIdentityIsPublished();
+  }
+
+  @when('a stranger replays my public identity record')
+  public async aStrangerReplaysMyPublicIdentityRecord(): Promise<void> {
+    const record = await this.restClient.get('/identities/test-identity', {});
+    const publication = { ...(record.data as Record<string, unknown>) };
+
+    delete publication.identityExternalIdentifier;
+    const replay = await this.restClient.post('/identities/', publication, {
+      headers: {},
+    });
+
+    this.replayAnswers.push({ data: replay.data, status: replay.status });
+  }
+
+  @then('both replays get the same answer')
+  public bothReplaysGetTheSameAnswer(): void {
+    const [unblocked, blocked] = this.replayAnswers;
+
+    expect(JSON.stringify(blocked.data)).not.to.contain('403012');
+    expect(blocked).to.deep.equal(unblocked);
   }
 
   @given('another identity signs the current node owner request')

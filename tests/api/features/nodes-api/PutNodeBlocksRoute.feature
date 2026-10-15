@@ -162,3 +162,15 @@ Feature: Put node blocks
     When I PUT "/node/blocks/"
     Then response code is equal to 200
     And an unauthenticated sealed secrets read of the other identity answers like one of an unblocked identity
+
+  Scenario: Replaying a blocked identity's public record does not reveal the block
+    Given I hand the node over to the other identity
+    And the current node has a test network with id "123e4567-e89b-12d3-a456-426614174000" and name "identity-network"
+    And my identity is published on this node
+    When a stranger replays my public identity record
+    Given I set a node block list body version 1 blocking "owner" owned by the other identity and signed by the other identity
+    And another identity signs a PUT request to "/node/blocks/"
+    When I PUT "/node/blocks/"
+    Then response code is equal to 200
+    When a stranger replays my public identity record
+    Then both replays get the same answer

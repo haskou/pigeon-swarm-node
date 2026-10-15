@@ -58,4 +58,39 @@ describe('IdentityCreationDetector', () => {
       detector.isCreation(new IdentityCreationDetectorMessage(identity(true))),
     ).resolves.toBe(false);
   });
+
+  it('should treat a publication this node does not hold as changing it', async () => {
+    repository.holds.mockResolvedValue(false);
+
+    await expect(
+      detector.isCreationOrNewerVersion(
+        new IdentityCreationDetectorMessage(identity(true)),
+      ),
+    ).resolves.toBe(true);
+    expect(repository.findById).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [true, true],
+    [false, false],
+  ])(
+    'should compare a held identity with the stored version (newer: %s)',
+    async (newer, expected) => {
+      const stored = mock<Identity>();
+      const publication = mock<Identity>();
+
+      publication.getId.mockReturnValue(id);
+
+      repository.holds.mockResolvedValue(true);
+      repository.findById.mockResolvedValue(stored);
+      publication.isNewerThan.mockReturnValue(newer);
+
+      await expect(
+        detector.isCreationOrNewerVersion(
+          new IdentityCreationDetectorMessage(publication),
+        ),
+      ).resolves.toBe(expected);
+      expect(publication.isNewerThan).toHaveBeenCalledWith(stored);
+    },
+  );
 });
