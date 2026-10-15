@@ -16,18 +16,22 @@ export class DeleteConversationDraftRoute extends Route {
     ConversationDraftDeleter,
   );
 
-  @Delete('/:conversationId/draft')
+  @Delete('/me/drafts/:draftKey')
   public async deleteDraft(
-    @Param('conversationId') conversationId: string,
+    @Param('draftKey') draftKey: string,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticator.authenticate(request);
-
-    await this.deleter.delete(
-      new ConversationDraftDeleteMessage(identityId.valueOf(), conversationId),
+    const message = new ConversationDraftDeleteMessage(
+      identityId.valueOf(),
+      draftKey,
     );
 
-    return response.status(HttpRouteStatusEnum.OK).send({ conversationId });
+    await this.deleter.delete(message);
+
+    return response
+      .status(HttpRouteStatusEnum.OK)
+      .send({ draftKey: message.draftKey.valueOf() });
   }
 }

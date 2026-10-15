@@ -1,4 +1,4 @@
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { ConversationDraftKey } from '@app/contexts/conversations/domain/value-objects/ConversationDraftKey';
 import { EncryptedMessagePayload } from '@app/contexts/conversations/domain/value-objects/EncryptedMessagePayload';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
@@ -17,9 +17,9 @@ export default class LocalConversationDraftRepository extends ConversationDraftR
 
   private draftId(
     identityId: IdentityId,
-    conversationId: ConversationId,
+    draftKey: ConversationDraftKey,
   ): string {
-    return `${identityId.valueOf()}:${conversationId.valueOf()}`;
+    return `${identityId.valueOf()}:${draftKey.valueOf()}`;
   }
 
   private isDocument(
@@ -27,7 +27,7 @@ export default class LocalConversationDraftRepository extends ConversationDraftR
   ): document is LocalConversationDraftDocument {
     return (
       typeof document._id === 'string' &&
-      typeof document.conversationId === 'string' &&
+      typeof document.draftKey === 'string' &&
       typeof document.encryptedPayload === 'string' &&
       typeof document.identityId === 'string' &&
       typeof document.updatedAt === 'number'
@@ -36,7 +36,7 @@ export default class LocalConversationDraftRepository extends ConversationDraftR
 
   private toDraft(document: LocalConversationDraftDocument): ConversationDraft {
     return new ConversationDraft(
-      new ConversationId(document.conversationId),
+      new ConversationDraftKey(document.draftKey),
       new EncryptedMessagePayload(document.encryptedPayload),
       new Timestamp(document.updatedAt),
     );
@@ -44,13 +44,13 @@ export default class LocalConversationDraftRepository extends ConversationDraftR
 
   public async save(
     identityId: IdentityId,
-    conversationId: ConversationId,
+    draftKey: ConversationDraftKey,
     encryptedPayload: EncryptedMessagePayload,
-    updatedAt: Timestamp = Timestamp.now(),
+    updatedAt: Timestamp,
   ): Promise<void> {
     const document: LocalConversationDraftDocument = {
-      _id: this.draftId(identityId, conversationId),
-      conversationId: conversationId.valueOf(),
+      _id: this.draftId(identityId, draftKey),
+      draftKey: draftKey.valueOf(),
       encryptedPayload: encryptedPayload.valueOf(),
       identityId: identityId.valueOf(),
       updatedAt: updatedAt.valueOf(),
@@ -65,12 +65,31 @@ export default class LocalConversationDraftRepository extends ConversationDraftR
 
   public async delete(
     identityId: IdentityId,
-    conversationId: ConversationId,
+    draftKey: ConversationDraftKey,
   ): Promise<void> {
     await this.database.delete(
       LocalConversationDraftRepository.NAMESPACE,
-      this.draftId(identityId, conversationId),
+      this.draftId(identityId, draftKey),
     );
+  }
+
+  public async deleteUnkeyed(): Promise<void> {
+    await this.database.deleteMany(
+      LocalConversationDraftRepository.NAMESPACE,
+      (document) => typeof document.draftKey !== 'string',
+    );
+  }
+
+  public async exists(
+    identityId: IdentityId,
+    draftKey: ConversationDraftKey,
+  ): Promise<boolean> {
+    const document = await this.database.findOne(
+      LocalConversationDraftRepository.NAMESPACE,
+      this.draftId(identityId, draftKey),
+    );
+
+    return document !== undefined;
   }
 
   public async findByIdentity(

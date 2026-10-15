@@ -4491,6 +4491,31 @@ export default class Definitions {
     await this.signCurrentRequest(method, path);
   }
 
+  /** GET and DELETE drop the body. */
+  @given('I sign a {word} request to {string}')
+  public async iSignARequestTo(method: string, path: string): Promise<void> {
+    this.body = ['GET', 'DELETE'].includes(method) ? undefined : this.body;
+    await this.signCurrentRequest(method, path);
+  }
+
+  /** GET and DELETE drop the body. */
+  @given('another identity signs a {word} request to {string}')
+  public async anotherIdentitySignsARequestTo(
+    method: string,
+    path: string,
+  ): Promise<void> {
+    const signer = await this.ensureOtherIdentityKeyPair();
+
+    this.body = ['GET', 'DELETE'].includes(method) ? undefined : this.body;
+    await this.signCurrentRequest(
+      method,
+      path,
+      String(Date.now()),
+      signer,
+      this.otherIdentityId as IdentityId,
+    );
+  }
+
   @given('I sign the current identity keychain request')
   public async iSignTheCurrentIdentityKeychainRequest(): Promise<void> {
     if (!this.ownerIdentityId) {

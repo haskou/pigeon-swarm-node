@@ -1,6 +1,7 @@
 import { Initializer } from '@app/shared/infrastructure/lifecycle/Initializer';
 
 import { ApplicationServiceClass } from './ApplicationServiceClass';
+import ConversationDraftsPurgeInitializer from './initializers/conversations/ConversationDraftsPurgeInitializer';
 import DiagnosticsTraceInitializer from './initializers/diagnostics/DiagnosticsTraceInitializer';
 import IdentityMutationGateInitializer from './initializers/identities/IdentityMutationGateInitializer';
 import KeychainMutationGateInitializer from './initializers/keychains/KeychainMutationGateInitializer';
@@ -11,4 +12,5 @@ export const applicationInitializers: ApplicationServiceClass<Initializer>[] = [
   KeychainMutationGateInitializer,
   IdentityMutationGateInitializer,
   DiagnosticsTraceInitializer,
+  ConversationDraftsPurgeInitializer,
 ];

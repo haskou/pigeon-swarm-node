@@ -1,17 +1,17 @@
 import { Timestamp } from '@haskou/value-objects';
 
-import { ConversationId } from './value-objects/ConversationId';
+import { ConversationDraftKey } from './value-objects/ConversationDraftKey';
 import { EncryptedMessagePayload } from './value-objects/EncryptedMessagePayload';
 
 export class ConversationDraft {
   constructor(
-    private readonly conversationId: ConversationId,
+    private readonly draftKey: ConversationDraftKey,
     private readonly encryptedPayload: EncryptedMessagePayload,
     private readonly updatedAt: Timestamp,
   ) {}
 
-  public getConversationId(): ConversationId {
-    return this.conversationId;
+  public getDraftKey(): ConversationDraftKey {
+    return this.draftKey;
   }
 
   public getEncryptedPayload(): EncryptedMessagePayload {

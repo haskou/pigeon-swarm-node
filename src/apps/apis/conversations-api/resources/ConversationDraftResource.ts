@@ -1,5 +1,5 @@
 export interface ConversationDraftResource {
-  conversationId: string;
+  draftKey: string;
   encryptedPayload: string;
   updatedAt: number;
 }

@@ -3,7 +3,7 @@ export interface LocalConversationDraftDocument extends Record<
   unknown
 > {
   _id: string;
-  conversationId: string;
+  draftKey: string;
   encryptedPayload: string;
   identityId: string;
   updatedAt: number;

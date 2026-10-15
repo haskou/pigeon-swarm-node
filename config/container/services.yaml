@@ -215,6 +215,11 @@ services:
       - '@shared/infrastructure/messageBus/DomainEventConsumer'
       - '@contexts/push-notifications/application/send/PushNotificationDispatcher'
     parent: apps/consumers/pubsub/push/SendPushNotificationWhenEventReceived
+  apps/initializers/conversations/ConversationDraftsPurgeInitializer:
+    class: /apps/initializers/conversations/ConversationDraftsPurgeInitializer
+    arguments:
+      - >-
+        @contexts/conversations/application/purge-unkeyed-drafts/UnkeyedConversationDraftsPurger
   apps/initializers/diagnostics/DiagnosticsTraceInitializer:
     class: /apps/initializers/diagnostics/DiagnosticsTraceInitializer
     arguments:
@@ -1286,22 +1291,21 @@ services:
       /contexts/conversations/application/find-frontier/ConversationFrontierFinder
     arguments:
       - '@contexts/conversations/domain/repositories/ConversationRepository'
-  contexts/conversations/application/manage-draft/ConversationDraftAccess:
-    class: /contexts/conversations/application/manage-draft/ConversationDraftAccess
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
   contexts/conversations/application/manage-draft/ConversationDraftDeleter:
     class: /contexts/conversations/application/manage-draft/ConversationDraftDeleter
     arguments:
       - '@contexts/conversations/domain/repositories/ConversationDraftRepository'
-      - '@contexts/conversations/application/manage-draft/ConversationDraftAccess'
   contexts/conversations/application/manage-draft/ConversationDraftSaver:
     class: /contexts/conversations/application/manage-draft/ConversationDraftSaver
     arguments:
       - '@contexts/conversations/domain/repositories/ConversationDraftRepository'
-      - '@contexts/conversations/application/manage-draft/ConversationDraftAccess'
   contexts/conversations/application/manage-draft/ConversationDraftsFinder:
     class: /contexts/conversations/application/manage-draft/ConversationDraftsFinder
+    arguments:
+      - '@contexts/conversations/domain/repositories/ConversationDraftRepository'
+  contexts/conversations/application/purge-unkeyed-drafts/UnkeyedConversationDraftsPurger:
+    class: >-
+      /contexts/conversations/application/purge-unkeyed-drafts/UnkeyedConversationDraftsPurger
     arguments:
       - '@contexts/conversations/domain/repositories/ConversationDraftRepository'
   contexts/conversations/domain/repositories/ConversationDraftRepository: >-

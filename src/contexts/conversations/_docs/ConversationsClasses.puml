@@ -28,11 +28,18 @@ package "conversations.domain" {
   }
 
   class ConversationDraft {
-    -conversationId: ConversationId
+    -draftKey: ConversationDraftKey
     -encryptedPayload: EncryptedMessagePayload
     -updatedAt: Timestamp
   }
+  class ConversationDraftKey <<ValueObject>>
   class EncryptedMessagePayload <<ValueObject>>
+
+  note right of ConversationDraft
+    Owner-only. The key is the client's
+    HMAC(owner draft key, conversation id),
+    so the node never learns the conversation.
+  end note
 
   class ConversationOperation <<ValueObject>> {
     +id: conversation:<conversationId>:op:<digest>
@@ -68,7 +75,13 @@ package "conversations.domain" {
     +saveOperation(operation: ConversationOperation, proof: PublicMutationProof): Promise<void>
   }
 
-  interface ConversationDraftRepository
+  interface ConversationDraftRepository {
+    +delete(identityId, draftKey): Promise<void>
+    +deleteUnkeyed(): Promise<void>
+    +exists(identityId, draftKey): Promise<boolean>
+    +findByIdentity(identityId): Promise<ConversationDraft[]>
+    +save(identityId, draftKey, encryptedPayload, updatedAt): Promise<void>
+  }
 
   note right of ConversationRepository
     Conversations are metadata only. Messages,
@@ -83,7 +96,7 @@ package "conversations.domain" {
   Conversation --> GroupConversationName
   Conversation --> ConversationAdmins
   Conversation o--> IdentityId
-  ConversationDraft --> ConversationId
+  ConversationDraft --> ConversationDraftKey
   ConversationDraft --> EncryptedMessagePayload
   ConversationRepository --> Conversation
   ConversationRepository ..> ConversationOperation
@@ -115,21 +128,23 @@ package "conversations.application" {
     +find(query): Promise<Conversation[]>
   }
 
-  class ConversationDraftSaver
+  class ConversationDraftSaver {
+    +MAX_DRAFTS_PER_IDENTITY: 100
+  }
   class ConversationDraftDeleter
   class ConversationDraftsFinder
-  class ConversationDraftAccess
+  class UnkeyedConversationDraftsPurger {
+    +purge(): Promise<void>
+  }
 
   ConversationCreator --> ConversationRepository
   ConversationMemberChanger --> ConversationRepository
   ConversationFrontierFinder --> ConversationRepository
   ConversationsFinder --> ConversationRepository
   ConversationDraftSaver --> ConversationDraftRepository
-  ConversationDraftSaver ..> ConversationDraftAccess
   ConversationDraftDeleter --> ConversationDraftRepository
-  ConversationDraftDeleter ..> ConversationDraftAccess
   ConversationDraftsFinder --> ConversationDraftRepository
-  ConversationDraftAccess --> ConversationRepository
+  UnkeyedConversationDraftsPurger --> ConversationDraftRepository
 }
 
 package "conversations.infrastructure" {
@@ -149,5 +164,11 @@ package "conversations.infrastructure" {
   OrbitDBConversationRepository ..> ConversationStateFold
   LocalConversationDraftRepository ..|> ConversationDraftRepository
 }
+
+package "apps/initializers/conversations" {
+  class ConversationDraftsPurgeInitializer
+}
+
+ConversationDraftsPurgeInitializer --> UnkeyedConversationDraftsPurger : at startup
 
 @enduml

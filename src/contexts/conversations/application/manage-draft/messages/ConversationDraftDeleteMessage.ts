@@ -1,13 +1,13 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
-import { ConversationId } from '../../../domain/value-objects/ConversationId';
+import { ConversationDraftKey } from '../../../domain/value-objects/ConversationDraftKey';
 
 export class ConversationDraftDeleteMessage {
-  public readonly conversationId: ConversationId;
+  public readonly draftKey: ConversationDraftKey;
   public readonly identityId: IdentityId;
 
-  constructor(identityId: string, conversationId: string) {
+  constructor(identityId: string, draftKey: string) {
     this.identityId = new IdentityId(identityId);
-    this.conversationId = new ConversationId(conversationId);
+    this.draftKey = new ConversationDraftKey(draftKey);
   }
 }
