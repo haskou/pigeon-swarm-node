@@ -15,4 +15,20 @@ export default class IdentityCreationDetector {
   ): Promise<boolean> {
     return !(await this.repository.holds(message.identity.getId()));
   }
+
+  /**
+   * Whether the publication would change what this node holds: a creation or
+   * a version newer than the stored one. A replay of a held version does not.
+   */
+  public async isCreationOrNewerVersion(
+    message: IdentityCreationDetectorMessage,
+  ): Promise<boolean> {
+    if (await this.isCreation(message)) {
+      return true;
+    }
+
+    return message.identity.isNewerThan(
+      await this.repository.findById(message.identity.getId()),
+    );
+  }
 }

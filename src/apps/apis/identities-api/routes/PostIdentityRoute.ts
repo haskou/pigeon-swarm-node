@@ -92,12 +92,20 @@ export class PostIdentityRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     this.sourceRateLimiter.consume(httpRequest.ip ?? 'unknown');
-    // Building the message verifies the identity's signature, so only a
-    // signed record learns that its identity is blocked here.
+    // Building the message verifies the identity's signature.
     const message = new PostIdentityRequest(body).getIdentityPublishMessage();
-    await this.signedRequestAuthenticator.assertIsNotBlocked(
-      new IdentityId(body.id),
-    );
+
+    // A replay of the held version, public at GET /identities/:id, gets the
+    // usual republish answer, so it cannot reveal whether the id is blocked.
+    if (
+      await this.creationDetector.isCreationOrNewerVersion(
+        new IdentityCreationDetectorMessage(message.identity),
+      )
+    ) {
+      await this.signedRequestAuthenticator.assertIsNotBlocked(
+        new IdentityId(body.id),
+      );
+    }
     const reservation = await this.admitRegistration(message, httpRequest);
 
     try {
