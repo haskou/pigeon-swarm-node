@@ -1812,6 +1812,55 @@ Implemented:
 - expose live IPFS peer ids separately from node ids because transport peers may not have sent a node heartbeat yet
 - never expose private network keys in peer heartbeat payloads
 
+### Block identities and nodes
+
+The node owner keeps one signed block list. A blocked identity cannot use this
+node: every identity-signed request answers `403` with code `403012`
+("Identity is blocked on this node."), new realtime sockets are refused and
+open ones are closed. A blocked node peer id cannot connect to this node. The
+current owner is never blocked, even if the list names them. Bearer
+capability routes (mailboxes, private blob reads and writes) and public reads
+are not gated.
+
+```http
+PUT /node/blocks
+X-Identity-Id: <owner identityId>
+X-Timestamp: <ms>
+X-Signature: <signature>
+```
+
+```json
+{
+  "type": "pigeon-node-block-list",
+  "ownerIdentityId": "<owner identityId>",
+  "version": 2,
+  "issuedAt": 1773848829055,
+  "blockedIdentityIds": ["<identityId>"],
+  "blockedNodePeerIds": ["<libp2pPeerId>"],
+  "identitySignature": "<signature>"
+}
+```
+
+`identitySignature` is the owner's signature over
+`"pigeon:node-block-list:v1\n"` followed by the RFC 8785 canonical JSON of the
+document without `identitySignature`. Both arrays are sorted and hold no
+duplicates. Each change is a new document with a higher `version`; the whole
+list is replaced. There is no entry cap; the body is limited to
+`NODE_BLOCK_LIST_MAX_BYTES` (`413` when larger). A non-owner or a stale
+timestamp is refused before the body is read.
+
+Responses: `200` with `{ "blockList": <stored document> }`; `401` for an invalid or stale
+signed request; `403` with code `403010` when the caller is not the node
+owner; `409` when the document is not signed by the current owner, its
+signature does not verify, or its version is not higher than the stored one.
+
+```http
+GET /node/blocks
+```
+
+Owner-signed. Returns `{ "blockList": <document> }`, or `{ "blockList": null }`
+when the owner never stored one.
+
 ## IPFS HTTP API
 
 ### Publish public content
