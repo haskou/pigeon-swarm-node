@@ -22,6 +22,10 @@ export class NoNodeBlocks extends NodeBlocks {
     return [];
   }
 
+  public isVersion(): boolean {
+    return false;
+  }
+
   public toPrimitives(): NodeBlockListPrimitives | undefined {
     return undefined;
   }

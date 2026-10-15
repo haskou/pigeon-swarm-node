@@ -138,6 +138,10 @@ export class NodeBlockList extends NodeBlocks {
     );
   }
 
+  public isVersion(version: NodeBlockListVersion): boolean {
+    return this.version.isEqual(version);
+  }
+
   public getOwnerIdentityId(): IdentityId {
     return this.ownerIdentityId;
   }

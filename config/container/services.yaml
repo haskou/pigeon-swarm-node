@@ -417,6 +417,11 @@ services:
     class: /apps/schedulers/MailboxExpirationScheduler
     arguments:
       - '@contexts/mailboxes/application/expire/MailboxExpirer'
+  apps/schedulers/NodeBlockSourcesRefreshScheduler:
+    class: /apps/schedulers/NodeBlockSourcesRefreshScheduler
+    arguments:
+      - >-
+        @contexts/nodes/application/refresh-block-sources/NodeBlockSourcesRefresher
   apps/schedulers/NodeCommunityStateAnnouncementScheduler:
     class: /apps/schedulers/NodeCommunityStateAnnouncementScheduler
     arguments:
@@ -1786,6 +1791,11 @@ services:
     arguments:
       - '@contexts/nodes/domain/repositories/NodeRepository'
       - '@contexts/nodes/domain/repositories/NodeRegistrationCodeRepository'
+  contexts/nodes/application/adopt-block-source/NodeBlockSourceAdopter:
+    class: /contexts/nodes/application/adopt-block-source/NodeBlockSourceAdopter
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeBlockSourceRepository'
+      - '@contexts/nodes/domain/services/NodeBlockPolicy'
   contexts/nodes/application/announce-community-state/NodeCommunityStateAnnouncer:
     class: >-
       /contexts/nodes/application/announce-community-state/NodeCommunityStateAnnouncer
@@ -1794,6 +1804,12 @@ services:
         @contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor
       - '@contexts/nodes/domain/services/NodeCommunityStateDigester'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/nodes/application/approve-block-source-entries/NodeBlockSourceEntriesApprover:
+    class: >-
+      /contexts/nodes/application/approve-block-source-entries/NodeBlockSourceEntriesApprover
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeBlockSourceRepository'
+      - '@contexts/nodes/domain/services/NodeBlockPolicy'
   contexts/nodes/application/assign-owner/NodeOwnerAssigner:
     class: /contexts/nodes/application/assign-owner/NodeOwnerAssigner
     arguments:
@@ -1807,10 +1823,28 @@ services:
       - '@contexts/nodes/domain/services/NodeLoaderService'
       - '@contexts/nodes/domain/services/NodeSaverService'
       - '@shared/infrastructure/messageBus/LocalDomainEventPublisher'
+  contexts/nodes/application/find-block-exceptions/NodeBlockExceptionsFinder:
+    class: >-
+      /contexts/nodes/application/find-block-exceptions/NodeBlockExceptionsFinder
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeBlockExceptionsRepository'
   contexts/nodes/application/find-block-list/NodeBlockListFinder:
     class: /contexts/nodes/application/find-block-list/NodeBlockListFinder
     arguments:
       - '@contexts/nodes/domain/repositories/NodeBlockListRepository'
+  contexts/nodes/application/find-block-list-publication/NodeBlockListPublicationFinder:
+    class: >-
+      /contexts/nodes/application/find-block-list-publication/NodeBlockListPublicationFinder
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeBlockPublicationRepository'
+  contexts/nodes/application/find-block-source/NodeBlockSourceFinder:
+    class: /contexts/nodes/application/find-block-source/NodeBlockSourceFinder
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeBlockSourceRepository'
+  contexts/nodes/application/find-block-sources/NodeBlockSourcesFinder:
+    class: /contexts/nodes/application/find-block-sources/NodeBlockSourcesFinder
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeBlockSourceRepository'
   contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationFinder:
     class: >-
       /contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationFinder
@@ -1824,6 +1858,12 @@ services:
     arguments:
       - '@contexts/nodes/domain/repositories/NodePeerRepository'
       - '@contexts/nodes/domain/repositories/NodeRepository'
+  contexts/nodes/application/find-published-block-list/PublishedNodeBlockListFinder:
+    class: >-
+      /contexts/nodes/application/find-published-block-list/PublishedNodeBlockListFinder
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeBlockPublicationRepository'
+      - '@contexts/nodes/domain/repositories/NodeBlockListRepository'
   contexts/nodes/application/find-registration-codes/NodeRegistrationCodesFinder:
     class: >-
       /contexts/nodes/application/find-registration-codes/NodeRegistrationCodesFinder
@@ -1845,11 +1885,24 @@ services:
     arguments:
       - >-
         @contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor
+  contexts/nodes/application/refresh-block-sources/NodeBlockSourcesRefresher:
+    class: >-
+      /contexts/nodes/application/refresh-block-sources/NodeBlockSourcesRefresher
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeBlockSourceRepository'
+      - '@contexts/nodes/domain/services/NodeBlockListDownloader'
+      - '@contexts/nodes/domain/services/NodeBlockPolicy'
+      - '@contexts/nodes/domain/NodeBlockSourceFetchLimits'
   contexts/nodes/application/register-peer/NodePeerRegistrar:
     class: /contexts/nodes/application/register-peer/NodePeerRegistrar
     arguments:
       - '@contexts/nodes/domain/repositories/NodeRepository'
       - '@contexts/nodes/domain/repositories/NodePeerRepository'
+  contexts/nodes/application/remove-block-source/NodeBlockSourceRemover:
+    class: /contexts/nodes/application/remove-block-source/NodeBlockSourceRemover
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeBlockSourceRepository'
+      - '@contexts/nodes/domain/services/NodeBlockPolicy'
   contexts/nodes/application/remove-network/NodeNetworkRemover:
     class: /contexts/nodes/application/remove-network/NodeNetworkRemover
     arguments:
@@ -1879,6 +1932,17 @@ services:
       - '@contexts/nodes/domain/services/NodeLoaderService'
       - '@contexts/nodes/domain/repositories/NodeBlockListRepository'
       - '@contexts/nodes/domain/services/NodeBlockPolicy'
+  contexts/nodes/application/update-block-exceptions/NodeBlockExceptionsUpdater:
+    class: >-
+      /contexts/nodes/application/update-block-exceptions/NodeBlockExceptionsUpdater
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeBlockExceptionsRepository'
+      - '@contexts/nodes/domain/services/NodeBlockPolicy'
+  contexts/nodes/application/update-block-list-publication/NodeBlockListPublicationUpdater:
+    class: >-
+      /contexts/nodes/application/update-block-list-publication/NodeBlockListPublicationUpdater
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeBlockPublicationRepository'
   contexts/nodes/application/update-relay-configuration/NodeRelayConfigurationUpdater:
     class: >-
       /contexts/nodes/application/update-relay-configuration/NodeRelayConfigurationUpdater
@@ -1886,7 +1950,10 @@ services:
       - '@contexts/nodes/domain/services/NodeLoaderService'
       - '@contexts/nodes/domain/services/NodeSaverService'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/nodes/domain/repositories/NodeBlockExceptionsRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeBlockExceptionsRepository'
   contexts/nodes/domain/repositories/NodeBlockListRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeBlockListRepository'
+  contexts/nodes/domain/repositories/NodeBlockPublicationRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeBlockPublicationRepository'
+  contexts/nodes/domain/repositories/NodeBlockSourceRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeBlockSourceRepository'
   contexts/nodes/domain/repositories/NodeOwnerSettingsReset:
     class: /contexts/nodes/domain/repositories/NodeOwnerSettingsReset
     arguments: []
@@ -1895,10 +1962,13 @@ services:
   contexts/nodes/domain/repositories/NodeRegistrationCodeRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeRegistrationCodeRepository'
   contexts/nodes/domain/repositories/NodeRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeMetadataRepository'
   contexts/nodes/domain/services/NodeBlockEnforcer: '@contexts/nodes/infrastructure/blocking/RuntimeNodeBlockEnforcer'
+  contexts/nodes/domain/services/NodeBlockListDownloader: '@contexts/nodes/infrastructure/block-sources/HttpNodeBlockListDownloader'
   contexts/nodes/domain/services/NodeBlockPolicy:
     class: /contexts/nodes/domain/services/NodeBlockPolicy
     arguments:
       - '@contexts/nodes/domain/repositories/NodeBlockListRepository'
+      - '@contexts/nodes/domain/repositories/NodeBlockSourceRepository'
+      - '@contexts/nodes/domain/repositories/NodeBlockExceptionsRepository'
       - '@contexts/nodes/domain/services/NodeLoaderService'
       - '@contexts/nodes/domain/services/NodeBlockEnforcer'
   contexts/nodes/domain/services/NodeCommunityStateDigester: >-
@@ -1912,16 +1982,38 @@ services:
     class: /contexts/nodes/domain/services/NodeSaverService
     arguments:
       - '@contexts/nodes/domain/repositories/NodeRepository'
+  contexts/nodes/infrastructure/block-sources/HttpNodeBlockListDownloader:
+    class: /contexts/nodes/infrastructure/block-sources/HttpNodeBlockListDownloader
+    arguments:
+      - '@shared/infrastructure/http/public-url/PublicHttpGetter'
+      - '@contexts/nodes/domain/NodeBlockSourceFetchLimits'
+    parent: contexts/nodes/domain/services/NodeBlockListDownloader
   contexts/nodes/infrastructure/blocking/RuntimeNodeBlockEnforcer:
     class: /contexts/nodes/infrastructure/blocking/RuntimeNodeBlockEnforcer
     arguments:
       - '@contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry'
     parent: contexts/nodes/domain/services/NodeBlockEnforcer
+  contexts/nodes/infrastructure/local-db/LocalNodeBlockExceptionsRepository:
+    class: /contexts/nodes/infrastructure/local-db/LocalNodeBlockExceptionsRepository
+    arguments:
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+    parent: contexts/nodes/domain/repositories/NodeBlockExceptionsRepository
   contexts/nodes/infrastructure/local-db/LocalNodeBlockListRepository:
     class: /contexts/nodes/infrastructure/local-db/LocalNodeBlockListRepository
     arguments:
       - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
     parent: contexts/nodes/domain/repositories/NodeBlockListRepository
+  contexts/nodes/infrastructure/local-db/LocalNodeBlockPublicationRepository:
+    class: >-
+      /contexts/nodes/infrastructure/local-db/LocalNodeBlockPublicationRepository
+    arguments:
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+    parent: contexts/nodes/domain/repositories/NodeBlockPublicationRepository
+  contexts/nodes/infrastructure/local-db/LocalNodeBlockSourceRepository:
+    class: /contexts/nodes/infrastructure/local-db/LocalNodeBlockSourceRepository
+    arguments:
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+    parent: contexts/nodes/domain/repositories/NodeBlockSourceRepository
   contexts/nodes/infrastructure/local-db/LocalNodeMetadataRepository:
     class: /contexts/nodes/infrastructure/local-db/LocalNodeMetadataRepository
     arguments:
@@ -2599,6 +2691,13 @@ services:
   shared/infrastructure/http/FetchHttpClient:
     class: /shared/infrastructure/http/FetchHttpClient
     arguments: []
+  shared/infrastructure/http/public-url/PublicHttpGetter:
+    class: /shared/infrastructure/http/public-url/PublicHttpGetter
+    arguments:
+      - '@shared/infrastructure/http/public-url/PublicUrlGuard'
+  shared/infrastructure/http/public-url/PublicUrlGuard:
+    class: /shared/infrastructure/http/public-url/PublicUrlGuard
+    arguments: []
   shared/infrastructure/local-db/EmbeddedLocalDatabase:
     class: /shared/infrastructure/local-db/EmbeddedLocalDatabase
     arguments: []
@@ -2691,6 +2790,8 @@ services:
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
   ddd-kernel.override.factory.MailboxLimits:
     synthetic: true
+  ddd-kernel.override.factory.NodeBlockSourceFetchLimits:
+    synthetic: true
   ddd-kernel.override.factory.PrivateBlobLimits:
     synthetic: true
   ddd-kernel.override.factory.ContentReplicationLimits:
@@ -2738,6 +2839,7 @@ services:
   contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization: >-
     @contexts/public-mutations/infrastructure/DeviceAuthorizationPublicMutationAuthorization
   contexts/mailboxes/domain/MailboxLimits: '@ddd-kernel.override.factory.MailboxLimits'
+  contexts/nodes/domain/NodeBlockSourceFetchLimits: '@ddd-kernel.override.factory.NodeBlockSourceFetchLimits'
   contexts/private-blobs/domain/PrivateBlobLimits: '@ddd-kernel.override.factory.PrivateBlobLimits'
   contexts/content-replication/domain/ContentReplicationLimits: '@ddd-kernel.override.factory.ContentReplicationLimits'
   contexts/content-replication/domain/ContentReplicationNetworkBudget: '@ddd-kernel.override.factory.ContentReplicationNetworkBudget'

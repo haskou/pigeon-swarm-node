@@ -1,19 +1,35 @@
 import { lookup } from 'dns/promises';
 import net from 'net';
 
-import { InvalidLinkPreviewUrlError } from '../errors/InvalidLinkPreviewUrlError';
-import { ResolvedLinkPreviewUrl } from './url-resolution/ResolvedLinkPreviewUrl';
+import { ResolvedPublicUrl } from './ResolvedPublicUrl';
+import { UrlIsNotPublicError } from './UrlIsNotPublicError';
 
-export { ResolvedLinkPreviewUrl } from './url-resolution/ResolvedLinkPreviewUrl';
-
-export class LinkPreviewUrlGuard {
+/**
+ * Refuses URLs that would make this node call itself or its private network:
+ * non-http(s) schemes, localhost names and private, loopback, link-local,
+ * shared, benchmark, multicast or reserved addresses, including every address
+ * a hostname resolves to. Callers connect to the resolved address only, so a
+ * second DNS answer cannot swap in a private one.
+ */
+export default class PublicUrlGuard {
   private static readonly ALLOWED_PROTOCOLS = ['http:', 'https:'];
+  /** Loopback, private, link-local, this-network, shared, IETF, benchmark, multicast and reserved. */
+  private static readonly BLOCKED_IPV4_RANGES: [string, number][] = [
+    ['127.0.0.0', 8],
+    ['10.0.0.0', 8],
+    ['172.16.0.0', 12],
+    ['192.168.0.0', 16],
+    ['169.254.0.0', 16],
+    ['0.0.0.0', 8],
+    ['100.64.0.0', 10],
+    ['192.0.0.0', 24],
+    ['198.18.0.0', 15],
+    ['224.0.0.0', 3],
+  ];
 
   private assertAllowedProtocol(url: URL): void {
-    if (!LinkPreviewUrlGuard.ALLOWED_PROTOCOLS.includes(url.protocol)) {
-      throw new InvalidLinkPreviewUrlError(
-        'Only http and https URLs can be previewed.',
-      );
+    if (!PublicUrlGuard.ALLOWED_PROTOCOLS.includes(url.protocol)) {
+      throw new UrlIsNotPublicError('Only http and https URLs are allowed.');
     }
   }
 
@@ -25,9 +41,7 @@ export class LinkPreviewUrlGuard {
       hostname.endsWith('.localhost') ||
       hostname.length === 0
     ) {
-      throw new InvalidLinkPreviewUrlError(
-        'Localhost URLs cannot be previewed.',
-      );
+      throw new UrlIsNotPublicError('Localhost URLs are not allowed.');
     }
   }
 
@@ -101,13 +115,8 @@ export class LinkPreviewUrlGuard {
   }
 
   private isBlockedIpv4(address: string): boolean {
-    return (
-      this.isIpv4InRange(address, '127.0.0.0', 8) ||
-      this.isIpv4InRange(address, '10.0.0.0', 8) ||
-      this.isIpv4InRange(address, '172.16.0.0', 12) ||
-      this.isIpv4InRange(address, '192.168.0.0', 16) ||
-      this.isIpv4InRange(address, '169.254.0.0', 16) ||
-      this.isIpv4InRange(address, '0.0.0.0', 8)
+    return PublicUrlGuard.BLOCKED_IPV4_RANGES.some(([base, prefixLength]) =>
+      this.isIpv4InRange(address, base, prefixLength),
     );
   }
 
@@ -132,6 +141,8 @@ export class LinkPreviewUrlGuard {
 
     return (
       normalized === '::1' ||
+      normalized === '::' ||
+      normalized.startsWith('ff') ||
       this.isUniqueLocalIpv6(normalized) ||
       this.isLinkLocalIpv6(normalized) ||
       this.isBlockedMappedIpv4(normalized)
@@ -143,15 +154,11 @@ export class LinkPreviewUrlGuard {
     const family = net.isIP(normalized);
 
     if (family === 4 && this.isBlockedIpv4(normalized)) {
-      throw new InvalidLinkPreviewUrlError(
-        'Private IP addresses cannot be previewed.',
-      );
+      throw new UrlIsNotPublicError('Private IP addresses are not allowed.');
     }
 
     if (family === 6 && this.isBlockedIpv6(normalized)) {
-      throw new InvalidLinkPreviewUrlError(
-        'Private IP addresses cannot be previewed.',
-      );
+      throw new UrlIsNotPublicError('Private IP addresses are not allowed.');
     }
   }
 
@@ -161,7 +168,7 @@ export class LinkPreviewUrlGuard {
     try {
       url = new URL(rawUrl);
     } catch {
-      throw new InvalidLinkPreviewUrlError();
+      throw new UrlIsNotPublicError('Invalid URL.');
     }
 
     this.assertAllowedProtocol(url);
@@ -174,7 +181,7 @@ export class LinkPreviewUrlGuard {
     return url;
   }
 
-  public async resolve(rawUrl: string | URL): Promise<ResolvedLinkPreviewUrl> {
+  public async resolve(rawUrl: string | URL): Promise<ResolvedPublicUrl> {
     const url =
       typeof rawUrl === 'string'
         ? this.parse(rawUrl)
@@ -185,9 +192,7 @@ export class LinkPreviewUrlGuard {
     });
 
     if (addresses.length === 0) {
-      throw new InvalidLinkPreviewUrlError(
-        'URL hostname could not be resolved.',
-      );
+      throw new UrlIsNotPublicError('URL hostname could not be resolved.');
     }
 
     addresses.forEach((address) => this.assertAllowedAddress(address.address));

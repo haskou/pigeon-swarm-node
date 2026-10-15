@@ -133,6 +133,264 @@ paths:
           description: The body exceeds NODE_BLOCK_LIST_MAX_BYTES.
         '429':
           description: Another block list upload is in progress (code 429060).
+  /node/blocks/publication/:
+    get:
+      tags:
+        - nodes
+      summary: Get whether the own block list is published
+      description: Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: The publication setting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeBlockPublicationResource'
+        '403':
+          description: The authenticated identity is not the node owner (code 403010).
+    put:
+      tags:
+        - nodes
+      summary: Publish or unpublish the own block list
+      description: Publication is off by default. While on, GET /node/blocks/published/ serves the stored own block list. Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeBlockPublicationResource'
+      responses:
+        '200':
+          description: The stored publication setting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeBlockPublicationResource'
+        '403':
+          description: The authenticated identity is not the node owner (code 403010).
+  /node/blocks/published/:
+    get:
+      tags:
+        - nodes
+      summary: Get the published own block list
+      description: Public. Returns the stored own block list document verbatim so other nodes can verify its signature.
+      responses:
+        '200':
+          description: The stored own block list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeBlockList'
+        '404':
+          description: Publication is off or no list is stored (code 404040).
+  /node/block-sources/:
+    get:
+      tags:
+        - nodes
+      summary: List adopted block sources
+      description: Returns every adopted source with its fetch diagnostics and counts. Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: The adopted sources.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeBlockSourcesResource'
+        '403':
+          description: The authenticated identity is not the node owner (code 403010).
+  /node/block-sources/{ownerIdentityId}:
+    put:
+      tags:
+        - nodes
+      summary: Adopt or reconfigure a block source
+      description: Adopts the list ownerIdentityId publishes at {origin}/node/blocks/published, pinned to that identity, or changes its origin or autoApply. Turning autoApply on approves every pending entry. Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/OwnerIdentityId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [origin, autoApply]
+              properties:
+                origin:
+                  type: string
+                  description: A bare https origin, such as https://node.example.
+                autoApply:
+                  type: boolean
+      responses:
+        '200':
+          description: The adopted source.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeBlockSourceResource'
+        '403':
+          description: The authenticated identity is not the node owner (code 403010).
+        '409':
+          description: The origin is not a bare https origin (code InvalidNodeBlockSourceOriginError).
+    delete:
+      tags:
+        - nodes
+      summary: Stop following a block source
+      description: Its entries stop applying at once. Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/OwnerIdentityId'
+      responses:
+        '200':
+          description: The remaining sources.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeBlockSourcesResource'
+        '403':
+          description: The authenticated identity is not the node owner (code 403010).
+        '409':
+          description: The source is not adopted (code NodeBlockSourceNotFoundError).
+  /node/block-sources/{ownerIdentityId}/pending:
+    get:
+      tags:
+        - nodes
+      summary: List the entries of a source that wait for review
+      description: Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/OwnerIdentityId'
+      responses:
+        '200':
+          description: The pending entries of the latest fetched version.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ownerIdentityId, version, blockedIdentityIds, blockedNodePeerIds]
+                properties:
+                  ownerIdentityId:
+                    type: string
+                  version:
+                    type: integer
+                    nullable: true
+                  blockedIdentityIds:
+                    type: array
+                    items:
+                      type: string
+                  blockedNodePeerIds:
+                    type: array
+                    items:
+                      type: string
+        '403':
+          description: The authenticated identity is not the node owner (code 403010).
+        '409':
+          description: The source is not adopted (code NodeBlockSourceNotFoundError).
+  /node/block-sources/{ownerIdentityId}/approvals:
+    post:
+      tags:
+        - nodes
+      summary: Approve pending entries of a source
+      description: Approves every pending entry of version (all true, no named entries) or only the named ones (all false, at least one named entry). Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/OwnerIdentityId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [version, all]
+              properties:
+                version:
+                  type: integer
+                  minimum: 1
+                all:
+                  type: boolean
+                blockedIdentityIds:
+                  type: array
+                  items:
+                    type: string
+                blockedNodePeerIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: The source after the approval.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeBlockSourceResource'
+        '403':
+          description: The authenticated identity is not the node owner (code 403010).
+        '409':
+          description: A newer version was fetched (NodeBlockSourceVersionHasChangedError), a named entry is not in that version (NodeBlockEntriesAreNotListedBySourceError), all and the named entries disagree (InvalidNodeBlockSourceApprovalError), or the source is not adopted (NodeBlockSourceNotFoundError).
+  /node/block-exceptions/:
+    get:
+      tags:
+        - nodes
+      summary: Get the local block exceptions
+      description: Identities and node peer ids that adopted lists never block. Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: The local exceptions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeBlockExceptionsResource'
+        '403':
+          description: The authenticated identity is not the node owner (code 403010).
+    put:
+      tags:
+        - nodes
+      summary: Replace the local block exceptions
+      description: Adopted lists never block these entries; the owner's own list still does. Requires a signed request from the current node owner.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NodeBlockExceptionsResource'
+      responses:
+        '200':
+          description: The stored exceptions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeBlockExceptionsResource'
+        '403':
+          description: The authenticated identity is not the node owner (code 403010).
   /node/diagnostics/:
     put:
       tags:
@@ -454,6 +712,13 @@ components:
       required: true
       schema:
         type: string
+    OwnerIdentityId:
+      in: path
+      name: ownerIdentityId
+      required: true
+      description: The publisher identity the source is pinned to.
+      schema:
+        type: string
   schemas:
     NodeBlockList:
       type: object
@@ -498,6 +763,80 @@ components:
           allOf:
             - $ref: '#/components/schemas/NodeBlockList'
           nullable: true
+    NodeBlockPublicationResource:
+      type: object
+      additionalProperties: false
+      required: [published]
+      properties:
+        published:
+          type: boolean
+    NodeBlockExceptionsResource:
+      type: object
+      additionalProperties: false
+      required: [identityIds, nodePeerIds]
+      properties:
+        identityIds:
+          type: array
+          items:
+            type: string
+        nodePeerIds:
+          type: array
+          items:
+            type: string
+    NodeBlockSourceResource:
+      type: object
+      required:
+        [
+          ownerIdentityId,
+          origin,
+          autoApply,
+          version,
+          appliedCount,
+          pendingCount,
+          lastFetchedAt,
+          lastFetchOutcome,
+        ]
+      properties:
+        ownerIdentityId:
+          type: string
+        origin:
+          type: string
+        autoApply:
+          type: boolean
+        version:
+          type: integer
+          nullable: true
+        appliedCount:
+          type: integer
+        pendingCount:
+          type: integer
+        lastFetchedAt:
+          type: integer
+          nullable: true
+          description: Milliseconds since the epoch.
+        lastFetchOutcome:
+          type: string
+          nullable: true
+          enum:
+            [
+              accepted,
+              not-newer,
+              wrong-signer,
+              invalid-signature,
+              invalid-document,
+              too-large,
+              redirected,
+              refused-address,
+              unreachable,
+            ]
+    NodeBlockSourcesResource:
+      type: object
+      required: [sources]
+      properties:
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/NodeBlockSourceResource'
     ClientContractResource:
       type: object
       additionalProperties: false

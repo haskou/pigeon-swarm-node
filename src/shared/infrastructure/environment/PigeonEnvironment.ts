@@ -74,6 +74,14 @@ export const pigeonEnvironmentSchema = {
     type: 'number',
   },
   NODE_BLOCK_LIST_MAX_BYTES: { defaultValue: 64 * 1024 * 1024, type: 'number' },
+  NODE_BLOCK_SOURCE_FETCH_INTERVAL_MS: {
+    defaultValue: 60 * 60 * 1000,
+    type: 'number',
+  },
+  NODE_BLOCK_SOURCE_FETCH_TIMEOUT_MS: {
+    defaultValue: 60 * 1000,
+    type: 'number',
+  },
   NODE_ENV: { defaultValue: 'local', type: 'string' },
   NODE_REGISTRATION_CODE_MAX_TTL_DAYS: { defaultValue: 30, type: 'number' },
   NODE_REGISTRATION_CODE_MAX_USES: { defaultValue: 100, type: 'number' },

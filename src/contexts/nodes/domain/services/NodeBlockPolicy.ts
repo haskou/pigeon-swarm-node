@@ -1,41 +1,65 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Node } from '../Node';
-import { NodeBlocks } from '../NodeBlocks';
+import { NodeBlockEntries } from '../NodeBlockEntries';
+import NodeBlockExceptionsRepository from '../repositories/NodeBlockExceptionsRepository';
 import NodeBlockListRepository from '../repositories/NodeBlockListRepository';
+import NodeBlockSourceRepository from '../repositories/NodeBlockSourceRepository';
 import NodeBlockEnforcer from './NodeBlockEnforcer';
 import NodeLoaderService from './NodeLoaderService';
 
 /**
- * The single answer to "does this node block it?". It keeps the stored list
- * in memory. An unclaimed node blocks nobody and the current owner is never
- * blocked, even if listed; this node's own peer id is ignored by the enforcer.
+ * The single answer to "does this node block it?". It keeps the effective
+ * entries in memory: the owner's own list, plus what each adopted source
+ * applies minus the owner's local exceptions. An unclaimed node blocks
+ * nobody and the current owner is never blocked, even if listed; this node's
+ * own peer id is ignored by the enforcer. Every change to those inputs runs
+ * through `change`, one at a time, and is enforced before it resolves.
  */
 export default class NodeBlockPolicy {
-  private blocks?: Promise<NodeBlocks>;
+  private entries?: Promise<NodeBlockEntries>;
+  private changing: Promise<unknown> = Promise.resolve();
 
   constructor(
-    private readonly repository: NodeBlockListRepository,
+    private readonly listRepository: NodeBlockListRepository,
+    private readonly sourceRepository: NodeBlockSourceRepository,
+    private readonly exceptionsRepository: NodeBlockExceptionsRepository,
     private readonly nodeLoader: NodeLoaderService,
     private readonly enforcer: NodeBlockEnforcer,
   ) {}
 
-  private currentBlocks(): Promise<NodeBlocks> {
-    if (!this.blocks) {
-      const loading = this.repository.findLocal();
+  private async loadEntries(): Promise<NodeBlockEntries> {
+    const [own, sources, exceptions] = await Promise.all([
+      this.listRepository.findLocal(),
+      this.sourceRepository.findAll(),
+      this.exceptionsRepository.find(),
+    ]);
+    const adopted = sources
+      .reduce(
+        (entries, source) => entries.union(source.applied()),
+        NodeBlockEntries.none(),
+      )
+      .without(exceptions);
 
-      this.blocks = loading;
+    return NodeBlockEntries.of(own).union(adopted);
+  }
+
+  private currentEntries(): Promise<NodeBlockEntries> {
+    if (!this.entries) {
+      const loading = this.loadEntries();
+
+      this.entries = loading;
       loading.catch(() => {
-        if (this.blocks === loading) {
-          this.blocks = undefined;
+        if (this.entries === loading) {
+          this.entries = undefined;
         }
       });
     }
 
-    return this.blocks;
+    return this.entries;
   }
 
-  private async enforce(blocks: NodeBlocks, node: Node): Promise<void> {
+  private async enforce(entries: NodeBlockEntries, node: Node): Promise<void> {
     if (!node.hasOwner()) {
       await this.enforcer.enforce([], []);
 
@@ -43,39 +67,51 @@ export default class NodeBlockPolicy {
     }
 
     await this.enforcer.enforce(
-      blocks
-        .getBlockedIdentityIds()
+      entries
+        .getIdentityIds()
         .filter((identityId) => !node.isOwnedBy(identityId)),
-      blocks.getBlockedNodePeerIds(),
+      entries.getNodePeerIds(),
     );
   }
 
-  /** Loads the stored list and applies it; run once at startup. */
+  /** Reloads the stored inputs and applies them; run at startup and after every change. */
   public async load(): Promise<void> {
-    this.blocks = undefined;
+    this.entries = undefined;
 
     await this.enforce(
-      await this.currentBlocks(),
+      await this.currentEntries(),
       await this.nodeLoader.loadNode(),
     );
   }
 
-  /** Applies a list that was just stored for `node`. */
-  public async replace(blocks: NodeBlocks, node: Node): Promise<void> {
-    this.blocks = Promise.resolve(blocks);
+  /**
+   * Runs `mutation`, which stores a new own list, source or exception set,
+   * after every earlier change, then applies the result. Serialising here keeps
+   * versions from going back and a slow fetch from undoing a newer decision.
+   */
+  public change<T>(mutation: () => Promise<T>): Promise<T> {
+    const changed = this.changing.then(async () => {
+      const result = await mutation();
 
-    await this.enforce(blocks, node);
+      await this.load();
+
+      return result;
+    });
+
+    this.changing = changed.catch((): void => undefined);
+
+    return changed;
   }
 
-  /** Re-applies the list after the owner changed, so a listed new owner is unblocked. */
+  /** Re-applies the entries after the owner changed, so a listed new owner is unblocked. */
   public async ownerChanged(node: Node): Promise<void> {
-    await this.enforce(await this.currentBlocks(), node);
+    await this.enforce(await this.currentEntries(), node);
   }
 
   public async isIdentityBlocked(identityId: IdentityId): Promise<boolean> {
-    const blocks = await this.currentBlocks();
+    const entries = await this.currentEntries();
 
-    if (!blocks.blocksIdentity(identityId)) {
+    if (!entries.blocksIdentity(identityId)) {
       return false;
     }
 

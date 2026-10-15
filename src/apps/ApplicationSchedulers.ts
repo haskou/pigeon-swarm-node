@@ -3,6 +3,7 @@ import CallTimeoutScheduler from '@app/apps/schedulers/CallTimeoutScheduler';
 import ContentReplicationMaintenanceScheduler from '@app/apps/schedulers/ContentReplicationMaintenanceScheduler';
 import IdentityPresenceExpirationScheduler from '@app/apps/schedulers/IdentityPresenceExpirationScheduler';
 import MailboxExpirationScheduler from '@app/apps/schedulers/MailboxExpirationScheduler';
+import NodeBlockSourcesRefreshScheduler from '@app/apps/schedulers/NodeBlockSourcesRefreshScheduler';
 import NodeCommunityStateAnnouncementScheduler from '@app/apps/schedulers/NodeCommunityStateAnnouncementScheduler';
 import NodeHeartbeatScheduler from '@app/apps/schedulers/NodeHeartbeatScheduler';
 import PrivateBlobExpirationScheduler from '@app/apps/schedulers/PrivateBlobExpirationScheduler';
@@ -19,6 +20,7 @@ export const recurringSchedulers: ApplicationServiceClass<Scheduler>[] = [
   ContentReplicationMaintenanceScheduler,
   PrivateBlobExpirationScheduler,
   MailboxExpirationScheduler,
+  NodeBlockSourcesRefreshScheduler,
 ];
 
 export const startupSchedulers: ApplicationServiceClass<Scheduler>[] = [];

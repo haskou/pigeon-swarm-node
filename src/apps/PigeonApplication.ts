@@ -38,7 +38,9 @@ import LocalMailboxRepository from '../contexts/mailboxes/infrastructure/local-d
 import NodeNetworkSynchronizationMonitor from '../contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
 import { NodeCommunityStateWasAnnounced } from '../contexts/nodes/domain/events/NodeCommunityStateWasAnnounced';
+import { NodeBlockSourceFetchLimits } from '../contexts/nodes/domain/NodeBlockSourceFetchLimits';
 import { NodeRegistrationCodeLimits } from '../contexts/nodes/domain/NodeRegistrationCodeLimits';
+import { NodeBlockSourceFetchLimitsFromEnvironment } from '../contexts/nodes/infrastructure/environment/NodeBlockSourceFetchLimitsFromEnvironment';
 import { NodeRegistrationCodeLimitsFromEnvironment } from '../contexts/nodes/infrastructure/environment/NodeRegistrationCodeLimitsFromEnvironment';
 import NotificationScopeSettingsRepository from '../contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
 import NotificationScopeSettingsRepositoryRouter from '../contexts/notification-settings/infrastructure/NotificationScopeSettingsRepositoryRouter';
@@ -341,6 +343,10 @@ export default class PigeonApplication {
         {
           token: MailboxLimits,
           useFactory: () => MailboxLimitsFromEnvironment.load(),
+        },
+        {
+          token: NodeBlockSourceFetchLimits,
+          useFactory: () => NodeBlockSourceFetchLimitsFromEnvironment.load(),
         },
         {
           token: PrivateBlobLimits,
