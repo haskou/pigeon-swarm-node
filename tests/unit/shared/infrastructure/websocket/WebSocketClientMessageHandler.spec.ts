@@ -82,6 +82,29 @@ describe('WebSocketClientMessageHandler', () => {
     ).resolves.toEqual([]);
   });
 
+  it('should not relay typing in a group conversation, whose typing travels over MLS', async () => {
+    const sender = new IdentityId(
+      'MCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+    );
+    const recipient = new IdentityId(
+      'MCowBQYDK2VwAyEBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=',
+    );
+    const conversation = mock<Conversation>();
+
+    conversation.isGroup.mockReturnValue(true);
+    conversation.hasParticipant.mockReturnValue(true);
+    conversation.getParticipantIds.mockReturnValue([sender, recipient]);
+    conversationRepository.hasById.mockResolvedValue(true);
+    conversationRepository.requireMetadataById.mockResolvedValue(conversation);
+
+    await expect(
+      handler.findConversationTypingRecipients(
+        sender.valueOf(),
+        'conversation-id',
+      ),
+    ).resolves.toEqual([]);
+  });
+
   it('should return community channel typing recipients visible in the channel', async () => {
     const sender = new IdentityId(
       'MCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
