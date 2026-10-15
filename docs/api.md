@@ -2408,9 +2408,10 @@ per-network counters, so refused attempts never spend those limits. One use of
 the code is reserved before publishing and released if publishing fails, so a
 refused proof never burns a use and two concurrent requests cannot both spend
 the last one. Creation is refused with `403`, code `403011`, when the mode is
-`closed`, and in `codes` mode when the code is missing, unknown, expired or
-used up; the response does not say which, so a caller learns nothing about
-which codes exist.
+`closed` ("Identity creation on this node is closed.") and in `codes` mode
+when the code is missing, unknown, expired or used up ("Identity creation on
+this node needs a valid registration code." for all four), so a caller learns
+nothing about which codes exist.
 
 ### Update identity
 
