@@ -110,6 +110,10 @@ jobs:
         run: yarn test:e2e:real-transport:restart-missing-block
         timeout-minutes: 5
 
+      - name: Call across a node restart proof
+        run: yarn test:e2e:real-transport:call-restart
+        timeout-minutes: 5
+
   turn:
     name: Backend credentials against coturn
     needs: changes

@@ -1,5 +1,6 @@
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
+import { CallNotFoundError } from '@app/contexts/calls/domain/errors/CallNotFoundError';
 import { CallNonce } from '@app/contexts/calls/domain/value-objects/CallNonce';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -16,7 +17,9 @@ import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/Publ
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { OrbitDBMutationGate } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { Timestamp } from '@haskou/value-objects';
+import { mock } from 'jest-mock-extended';
 
 import {
   CallSigner,
@@ -407,5 +410,59 @@ describe('OrbitDBCallRepository', () => {
         state: 'joined',
       }),
     );
+  });
+
+  describe('on a restarted node holding call records it cannot admit yet', () => {
+    let authorizationLoaded: boolean;
+
+    beforeEach(() => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+      authorizationLoaded = false;
+      const gate = mock<OrbitDBMutationGate>();
+
+      gate.governs.mockImplementation((collection) => collection === 'calls');
+      gate.governsHead.mockReturnValue(false);
+      gate.accepts.mockImplementation(() =>
+        Promise.resolve(authorizationLoaded),
+      );
+      registry.addMutationGate(gate);
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('answers a call whose start waits to be admitted as not ready, not as missing', async () => {
+      const start = conversationStart();
+
+      await replicate(start.payload, start.proof);
+
+      await expect(
+        repository.requireById(new CallId(start.callId)),
+      ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
+      await expect(
+        repository.requireById(
+          new CallId('550e8400-e29b-41d4-a716-446655440009'),
+        ),
+      ).rejects.toBeInstanceOf(CallNotFoundError);
+
+      authorizationLoaded = true;
+      await jest.advanceTimersByTimeAsync(2_000);
+
+      const call = await repository.requireById(new CallId(start.callId));
+
+      expect(call.isActive()).toBe(true);
+    });
+
+    it('answers a call whose start stays rejected after the last attempt as missing', async () => {
+      const start = conversationStart();
+
+      await replicate(start.payload, start.proof);
+      await jest.advanceTimersByTimeAsync(2_000 + 10_000 + 60_000);
+
+      await expect(
+        repository.requireById(new CallId(start.callId)),
+      ).rejects.toBeInstanceOf(CallNotFoundError);
+    });
   });
 });
