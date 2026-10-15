@@ -83,6 +83,11 @@ export default class WebSocketClientMessageHandler {
     return { call, leases, participants, recipientIds };
   }
 
+  /**
+   * Who hears a conversation typing indicator: the other participants of a
+   * direct conversation. None for a group conversation, whose typing travels
+   * as an MLS record through its group mailboxes.
+   */
   public async findConversationTypingRecipients(
     identityId: string,
     conversationId: string,
@@ -97,7 +102,7 @@ export default class WebSocketClientMessageHandler {
     const conversation =
       await this.conversationRepository.requireMetadataById(id);
 
-    if (!conversation.hasParticipant(actorId)) {
+    if (conversation.isGroup() || !conversation.hasParticipant(actorId)) {
       return [];
     }
 

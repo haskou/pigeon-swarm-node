@@ -133,13 +133,15 @@ paths:
         mailbox (including by retention), ends it at once; the socket stays open.
         A socket holds at most 256 mailbox subscriptions.
 
-        Clients may also send ephemeral typing indicators. Conversation typing:
+        Clients may also send ephemeral typing indicators. Direct conversation typing:
         `{ "type": "typing", "scope": "conversation", "conversationId": "<conversationId>", "active": true }`.
         Community text channel typing:
         `{ "type": "typing", "scope": "community_channel", "communityId": "<communityId>", "channelId": "<channelId>", "active": true }`.
         The server uses the authenticated WebSocket identity, validates access
         to the conversation or text channel, excludes the sender, and relays a
-        `{ "type": "typing", ... }` message to the remaining recipients.
+        `{ "type": "typing", ... }` message to the remaining recipients. Typing
+        in a group conversation is never relayed: it travels as an MLS record
+        through the group mailboxes.
 
         Subsequent messages use:
 

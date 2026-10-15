@@ -23,7 +23,7 @@ fold in `OrbitDBConversationRepository` (`ConversationRoster.ts`,
 | Control letters               | `group_conversation_invitation`; `NotificationInvitationMutationPolicy.ts:63-196`                                                                                                                            | inviter and recipient must both be participants                                                                 |
 | Polls                         | `group_conversation` scope; `PollScopeAuthorizer.ts:84-102`, `PollMutationScopeAccess.ts:84-93`                                                                                                              | audience and the participant gate. The question, the options and each identity's vote are plaintext on the node |
 | Calls                         | `CallScopeResolver.ts:39-48`, `CallAccessAuthorizer.ts:18-26`, `CallStartMutationPolicy.ts:80-131`, `ConversationCallEventRealtimeMapper.ts`                                                                 | call scope, `participantIds` in call documents and events                                                       |
-| Typing                        | `WebSocketClientMessageHandler.ts:86-105`, `WebSocketEventHub.ts:264-295`                                                                                                                                    | relay recipients                                                                                                |
+| Typing                        | `WebSocketClientMessageHandler.ts:86-110`, `WebSocketEventHub.ts:264-295`; since slice 3 direct conversations only                                                                                           | relay recipients, now none for a group: its typing is an MLS record                                             |
 | Presence and identity updates | `WebSocketClientMessageHandler.ts:161-176`, `GetPresenceRoute.ts:37-95`                                                                                                                                      | who may see whose presence                                                                                      |
 
 The UI also reads the roster: `GroupConversationRoster` pages `GET /conversations/`, and
@@ -321,7 +321,9 @@ and merges when `real-node-e2e` is green.
 2. Group drafts move to opaque keys. This slice adds a node surface instead of removing
    one, so the order flips: the node merges first, and the UI, pinned to the node merge
    commit, merges when `real-node-e2e` is green.
-3. Typing in groups becomes an MLS record; the node stops relaying group typing.
+3. Typing in groups becomes an MLS record; the node stops relaying group typing. Either
+   order is safe, as no client sends group typing to the relay once it has the record;
+   the UI merges first, so no group loses its typing indicator in between.
 4. Presence and identity updates stop flowing through group co-membership.
 5. Group calls use the capability scope.
 6. Final cutover: the roster extension and GCE roster ops with default deny and the

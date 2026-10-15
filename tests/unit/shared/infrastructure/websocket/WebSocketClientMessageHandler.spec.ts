@@ -16,6 +16,8 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import WebSocketClientMessageHandler from '@app/shared/infrastructure/websocket/WebSocketClientMessageHandler';
 import { mock, MockProxy } from 'jest-mock-extended';
 
+import { ConversationMother } from '../../../mothers/ConversationMother';
+
 describe('WebSocketClientMessageHandler', () => {
   let conversationRepository: MockProxy<ConversationRepository>;
   let communityRepository: MockProxy<CommunityRepository>;
@@ -78,6 +80,21 @@ describe('WebSocketClientMessageHandler', () => {
       handler.findConversationTypingRecipients(
         sender.valueOf(),
         'conversation-id',
+      ),
+    ).resolves.toEqual([]);
+  });
+
+  it('should not relay typing in a group conversation, whose typing travels over MLS', async () => {
+    const mother = await ConversationMother.create();
+    const group = mother.buildGroup();
+
+    conversationRepository.hasById.mockResolvedValue(true);
+    conversationRepository.requireMetadataById.mockResolvedValue(group);
+
+    await expect(
+      handler.findConversationTypingRecipients(
+        mother.author.valueOf(),
+        group.getId().valueOf(),
       ),
     ).resolves.toEqual([]);
   });
