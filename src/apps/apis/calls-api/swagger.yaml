@@ -54,7 +54,7 @@ paths:
         '400':
           description: The signed start does not match the request, the call id derivation or the signed conversation or community state.
         '429':
-          description: Call record rate limit exceeded (code 429021, CALLS_RECORD_RATE_LIMIT_PER_MINUTE records per identity per minute). Only a record about to be stored is charged; refused requests, 503020 answers and a community start that returns the live call cost nothing.
+          description: Call record rate limit exceeded (code 429021, CALLS_RECORD_RATE_LIMIT_PER_MINUTE records per identity per minute). Only a record about to be stored is charged; requests the call refuses, 503020 answers and a community start that returns the live call cost nothing, while a record the store then rejects (stale or mismatched proof) stays charged.
   /calls/{callId}:
     get:
       tags:
