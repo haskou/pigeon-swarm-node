@@ -495,6 +495,14 @@ the authorization the call records rest on still loads from its peers. The call
 is not over: clients keep it up and retry the request. A call the node does not
 hold, or whose start it rejected for good, answers `CallNotFoundError`.
 
+The same 503 replaces 409 `CallParticipantNotFoundError` on a heartbeat, an
+end or a signal when the call does not show the requester (or the signal
+recipient) as a participant that can act, and that identity's own participant
+record of the call still waits for admission. The node may admit the start of
+a call before such a record, so for those seconds the call shows the
+participant as when the call started. A participant the call accepts is never
+held back by a waiting record.
+
 ### List active calls
 
 ```http
@@ -1061,6 +1069,9 @@ Implemented:
   the node holds but has not admitted yet (retry), 409
   `StalePublicMutationError` for a stale proof, 429 code `429021` when the rate
   cap is exceeded
+- a heartbeat answers 409 `CallParticipantNotFoundError` for an identity that
+  has not joined the call, or 503 code `503020` while that identity's own
+  participant record still waits for admission (retry)
 
 ### End call
 
@@ -1119,6 +1130,9 @@ Implemented:
 - `signalType` is one of `offer`, `answer` or `ice_candidate`
 - sender and recipient must both be current call participants
 - backend does not inspect SDP/ICE payloads
+- a sender that has not joined, or a recipient that cannot receive signals,
+  answers 409 `CallParticipantNotFoundError`, or 503 code `503020` while the
+  participant record of either still waits for admission (retry)
 - signal request bodies are limited to 64 KiB
 - signalling is rate-limited per `(callId, senderIdentityId)` with
   `CALLS_SIGNAL_RATE_LIMIT_PER_MINUTE` defaulting to `120`; exceeding it returns `429` with code `429010`

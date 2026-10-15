@@ -277,6 +277,21 @@ export default class OrbitDBCallRepository extends CallRepository {
     throw new CallNotFoundError();
   }
 
+  public assertParticipantSettled(
+    callId: CallId,
+    identityId: IdentityId,
+  ): Promise<void> {
+    if (
+      this.registry.isDocumentPendingAdmission(
+        'calls',
+        CallRecordIds.participant(callId.valueOf(), identityId.valueOf()),
+      )
+    )
+      return Promise.reject(new ReplicatedStateNotReadyError());
+
+    return Promise.resolve();
+  }
+
   public async findActiveByParticipant(
     participantId: IdentityId,
   ): Promise<Call[]> {

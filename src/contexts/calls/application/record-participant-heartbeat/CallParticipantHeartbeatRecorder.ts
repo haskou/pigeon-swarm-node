@@ -2,6 +2,7 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 
 import { Call } from '../../domain/Call';
 import { CallNotFoundError } from '../../domain/errors/CallNotFoundError';
+import { CallParticipantNotFoundError } from '../../domain/errors/CallParticipantNotFoundError';
 import CallRepository from '../../domain/repositories/CallRepository';
 import CallAccessAuthorizer from '../authorize-call/CallAccessAuthorizer';
 import CallParticipantLeaseRenewer from '../renew-participant-lease/CallParticipantLeaseRenewer';
@@ -35,7 +36,17 @@ export default class CallParticipantHeartbeatRecorder {
     ) {
       throw new CallNotFoundError();
     }
-    call.assertParticipantCanHeartbeat(message.participantIdentityId);
+    try {
+      call.assertParticipantCanHeartbeat(message.participantIdentityId);
+    } catch (error) {
+      if (error instanceof CallParticipantNotFoundError) {
+        await this.callRepository.assertParticipantSettled(
+          call.getId(),
+          message.participantIdentityId,
+        );
+      }
+      throw error;
+    }
     const lease = call.getScope().isCommunityChannel()
       ? await this.leaseRenewer.renewExisting(
           call,

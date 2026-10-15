@@ -244,9 +244,9 @@ describe('OrbitDBCallRepository', () => {
     });
 
     await replicate(joined.payload, joined.proof);
-    await expect(
-      repository.hasById(new CallId(start.callId)),
-    ).resolves.toBe(false);
+    await expect(repository.hasById(new CallId(start.callId))).resolves.toBe(
+      false,
+    );
 
     await replicate(start.payload, start.proof);
     const found = await repository.requireById(new CallId(start.callId));
@@ -414,16 +414,22 @@ describe('OrbitDBCallRepository', () => {
 
   describe('on a restarted node holding call records it cannot admit yet', () => {
     let authorizationLoaded: boolean;
+    let participantAuthorizationLoaded: boolean;
 
     beforeEach(() => {
       jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
       authorizationLoaded = false;
+      participantAuthorizationLoaded = true;
       const gate = mock<OrbitDBMutationGate>();
 
       gate.governs.mockImplementation((collection) => collection === 'calls');
       gate.governsHead.mockReturnValue(false);
-      gate.accepts.mockImplementation(() =>
-        Promise.resolve(authorizationLoaded),
+      gate.accepts.mockImplementation((_collection, record) =>
+        Promise.resolve(
+          authorizationLoaded &&
+            (participantAuthorizationLoaded ||
+              record.scopeType !== 'call_participant'),
+        ),
       );
       registry.addMutationGate(gate);
     });
@@ -463,6 +469,63 @@ describe('OrbitDBCallRepository', () => {
       await expect(
         repository.requireById(new CallId(start.callId)),
       ).rejects.toBeInstanceOf(CallNotFoundError);
+    });
+
+    it('answers a participant whose own record waits to be admitted as not ready', async () => {
+      const start = conversationStart();
+      const joined = signCallParticipant({
+        at: now() + 1,
+        callId: start.callId,
+        signer: peer,
+        state: 'joined',
+      });
+      const callId = new CallId(start.callId);
+      authorizationLoaded = true;
+      participantAuthorizationLoaded = false;
+
+      await replicate(start.payload, start.proof);
+      await replicate(joined.payload, joined.proof);
+
+      const call = await repository.requireById(callId);
+
+      expect(call.hasJoinedParticipant(new IdentityId(peer.id))).toBe(false);
+      await expect(
+        repository.assertParticipantSettled(callId, new IdentityId(peer.id)),
+      ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
+      await expect(
+        repository.assertParticipantSettled(callId, new IdentityId(creator.id)),
+      ).resolves.toBeUndefined();
+
+      participantAuthorizationLoaded = true;
+      await jest.advanceTimersByTimeAsync(2_000);
+
+      const admitted = await repository.requireById(callId);
+
+      expect(admitted.hasJoinedParticipant(new IdentityId(peer.id))).toBe(true);
+      await expect(
+        repository.assertParticipantSettled(callId, new IdentityId(peer.id)),
+      ).resolves.toBeUndefined();
+    });
+
+    it('answers a participant whose record stays rejected after the last attempt as settled', async () => {
+      const start = conversationStart();
+      const joined = signCallParticipant({
+        at: now() + 1,
+        callId: start.callId,
+        signer: peer,
+        state: 'joined',
+      });
+      const callId = new CallId(start.callId);
+      authorizationLoaded = true;
+      participantAuthorizationLoaded = false;
+
+      await replicate(start.payload, start.proof);
+      await replicate(joined.payload, joined.proof);
+      await jest.advanceTimersByTimeAsync(2_000 + 10_000 + 60_000);
+
+      await expect(
+        repository.assertParticipantSettled(callId, new IdentityId(peer.id)),
+      ).resolves.toBeUndefined();
     });
   });
 });
