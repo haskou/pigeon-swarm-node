@@ -40,7 +40,9 @@ export class NodePeerConnectionGate {
     const newlyBlocked = peerIds.filter((peerId) => !previous.has(peerId));
 
     if (newlyBlocked.length > 0) {
-      await Promise.all(
+      // A stopped node failing to hang up must not fail the block: the gate
+      // already refuses the peers' next connections.
+      await Promise.allSettled(
         [...this.blockListeners].map((listener) => listener(newlyBlocked)),
       );
     }

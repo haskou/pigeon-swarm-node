@@ -13,7 +13,9 @@ import { AuthenticatedIdentityIsNotNodeOwnerError } from '../errors/Authenticate
 /**
  * Runs before the block list body is read: only a fresh request claiming to be
  * the current owner may make this node buffer up to
- * `NODE_BLOCK_LIST_MAX_BYTES`. The route still verifies the full signature.
+ * `NODE_BLOCK_LIST_MAX_BYTES`. Once parsed, the body is only validated after
+ * the owner's signature over it verifies; the route then authenticates fully
+ * (replay and block checks).
  */
 export class NodeBlockListUploadPreflight
   extends Route
@@ -55,7 +57,19 @@ export class NodeBlockListUploadPreflight
           // which skips a request whose `_body` flag is set. Express 5's
           // parser does not set it, and the stream is already consumed.
           (request as Request & { _body?: boolean })._body = true;
-          next(error);
+
+          if (error) {
+            next(error);
+
+            return;
+          }
+
+          try {
+            this.verifier.verifySignature(request);
+            next();
+          } catch (signatureError) {
+            next(signatureError);
+          }
         }),
       next,
     );

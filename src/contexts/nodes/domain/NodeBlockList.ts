@@ -107,8 +107,16 @@ export class NodeBlockList extends NodeBlocks {
     return `${NodeBlockList.SIGNING_DOMAIN}${canonical}`;
   }
 
+  /**
+   * A newer version from the same owner, or any list from a new owner: the
+   * storer has already checked that `list` is signed by the current owner, so
+   * a previous owner's high version cannot lock the new owner out.
+   */
   public acceptsReplacement(list: NodeBlockList): boolean {
-    return list.version.isNewerThan(this.version);
+    return (
+      !list.ownerIdentityId.isEqual(this.ownerIdentityId) ||
+      list.version.isNewerThan(this.version)
+    );
   }
 
   public blocksIdentity(identityId: IdentityId): boolean {
