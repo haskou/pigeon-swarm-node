@@ -208,10 +208,10 @@ While the identity is blocked, this node:
   node already stores locally for that identity; a copy fetchable from a peer
   does not count. A replay of the public record from `GET /identities/:id` then
   gets the usual answer and cannot reveal the block, while any other record,
-  a fork at an equal or older version included, is refused. A creation from an
-  id that is blocked here but not held here does reveal the block; this is
-  accepted, because the id is not served here and its key holder learns
-  nothing about anyone else;
+  a fork at an equal or older version included, is refused. For an id that is
+  blocked here but not held here, anyone holding that id's public record (from
+  another node, say) can submit it and learn that this node blocks it; this is
+  accepted, because the id is not served here;
 - closes its open realtime connections when the block takes effect, and refuses
   new realtime tickets;
 - sends no push notifications to its subscriptions;
