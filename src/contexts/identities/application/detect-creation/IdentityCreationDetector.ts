@@ -17,14 +17,16 @@ export default class IdentityCreationDetector {
   }
 
   /**
-   * Whether this node already holds exactly this record. Only such a replay
+   * Whether this node already stores exactly this record, checked locally so
+   * a record fetchable from a peer does not count. Only such a replay
    * changes nothing here; any other record, even an equal or older version,
    * can fork what this node serves.
    */
   public async holdsRecord(
     message: IdentityCreationDetectorMessage,
   ): Promise<boolean> {
-    return await this.repository.hasByExternalIdentifier(
+    return await this.repository.holdsVersion(
+      message.identity.getId(),
       await this.repository.calculateExternalIdentifier(message.identity),
     );
   }

@@ -204,8 +204,9 @@ While the identity is blocked, this node:
 - refuses records it authored that are submitted through this node's API
   without a request signature (`POST /identities` with its id,
   `POST /identity-devices/transitions`, record-signed conversation routes).
-  `POST /identities` skips the check only for a record this node already holds
-  byte for byte. A replay of the public record from `GET /identities/:id` then
+  `POST /identities` skips the check only for a record whose content id this
+  node already stores locally for that identity; a copy fetchable from a peer
+  does not count. A replay of the public record from `GET /identities/:id` then
   gets the usual answer and cannot reveal the block, while any other record,
   a fork at an equal or older version included, is refused. A creation from an
   id that is blocked here but not held here does reveal the block; this is

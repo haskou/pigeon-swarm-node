@@ -628,6 +628,15 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     return (await this.metadataIndex.findByIdentityId(id)).length > 0;
   }
 
+  public async holdsVersion(
+    id: IdentityId,
+    externalIdentifier: IdentityExternalIdentifier,
+  ): Promise<boolean> {
+    return (await this.metadataIndex.findByIdentityId(id)).some(
+      (record) => record.cid === externalIdentifier.valueOf(),
+    );
+  }
+
   public async findCandidatesById(id: IdentityId): Promise<Identity[]> {
     const candidates = await this.findCandidateReferencesById(id);
 
