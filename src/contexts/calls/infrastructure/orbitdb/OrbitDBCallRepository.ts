@@ -258,8 +258,9 @@ export default class OrbitDBCallRepository extends CallRepository {
   /**
    * A node that just restarted replays the call records before the
    * authorization they rest on has loaded from its peers, so it holds the
-   * start of a live call without having admitted it yet. That call is not
-   * missing: the caller is told to retry instead of ending it.
+   * start of a live call without having admitted it yet; or it could not
+   * replay the call history yet because a block was missing locally. That
+   * call is not missing: the caller is told to retry instead of ending it.
    */
   public async requireById(id: CallId): Promise<Call> {
     const call = await this.findCallById(id);
@@ -267,6 +268,7 @@ export default class OrbitDBCallRepository extends CallRepository {
     if (call) return call;
 
     if (
+      this.registry.isSubscriberBootstrapDeferred('calls') ||
       this.registry.isDocumentPendingAdmission(
         'calls',
         CallRecordIds.start(id.valueOf()),
@@ -282,6 +284,7 @@ export default class OrbitDBCallRepository extends CallRepository {
     identityId: IdentityId,
   ): Promise<void> {
     if (
+      this.registry.isSubscriberBootstrapDeferred('calls') ||
       this.registry.isDocumentPendingAdmission(
         'calls',
         CallRecordIds.participant(callId.valueOf(), identityId.valueOf()),

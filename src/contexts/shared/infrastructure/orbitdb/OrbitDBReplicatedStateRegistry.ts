@@ -75,6 +75,13 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private static readonly HYDRATION_BATCH_SIZE = 16;
 
+  /**
+   * How long after a store first deferred a subscriber bootstrap its readers
+   * answer "not ready" instead of "missing". Past it, a store that still cannot
+   * replay answers as before, so a block nobody serves cannot hold reads off.
+   */
+  public static readonly DEFERRED_BOOTSTRAP_NOT_READY_MS = 60_000;
+
   private readonly storesByNetworkId = new Map<
     string,
     OrbitDBPrivateNetworkStores
@@ -137,6 +144,12 @@ export default class OrbitDBReplicatedStateRegistry {
   private readonly pendingSubscriberBootstraps = new WeakMap<
     OrbitDBDatabase,
     Array<() => Promise<void>>
+  >();
+
+  /** When each store first deferred a bootstrap, and how many still wait. */
+  private readonly deferredSubscriberBootstraps = new WeakMap<
+    OrbitDBDatabase,
+    { outstanding: number; since: number }
   >();
 
   private readonly reconciledStoreHeadSignatures = new WeakMap<
@@ -809,16 +822,43 @@ export default class OrbitDBReplicatedStateRegistry {
     } catch (error: unknown) {
       if (!isOrbitDBTransientBlockError(error)) throw error;
 
-      const pending = this.pendingSubscriberBootstraps.get(store) ?? [];
+      const deferred = this.deferredSubscriberBootstraps.get(store) ?? {
+        outstanding: 0,
+        since: Date.now(),
+      };
 
-      pending.push(bootstrap);
-      this.pendingSubscriberBootstraps.set(store, pending);
-      Kernel.logger.warn?.(
-        `OrbitDB document subscriber bootstrap deferred: store=${storeName}` +
-          ` error=${String(error)}` +
-          ' recovery=retry-on-store-head-update',
-      );
+      deferred.outstanding++;
+      this.deferredSubscriberBootstraps.set(store, deferred);
+      this.deferSubscriberBootstrap(storeName, store, bootstrap, error);
     }
+  }
+
+  private deferSubscriberBootstrap(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    store: OrbitDBDatabase,
+    bootstrap: () => Promise<void>,
+    error: unknown,
+  ): void {
+    const pending = this.pendingSubscriberBootstraps.get(store) ?? [];
+
+    pending.push(bootstrap);
+    this.pendingSubscriberBootstraps.set(store, pending);
+    Kernel.logger.warn?.(
+      `OrbitDB document subscriber bootstrap deferred: store=${storeName}` +
+        ` error=${String(error)}` +
+        ' recovery=retry-on-store-head-update',
+    );
+  }
+
+  private settleSubscriberBootstrap(store: OrbitDBDatabase): void {
+    const deferred = this.deferredSubscriberBootstraps.get(store);
+
+    if (!deferred) return;
+
+    deferred.outstanding--;
+
+    if (deferred.outstanding <= 0)
+      this.deferredSubscriberBootstraps.delete(store);
   }
 
   private retryPendingSubscriberBootstraps(
@@ -831,8 +871,16 @@ export default class OrbitDBReplicatedStateRegistry {
 
     this.pendingSubscriberBootstraps.delete(store);
     for (const bootstrap of pending) {
-      void this.bootstrapSubscriber(storeName, store, bootstrap).catch(
+      void bootstrap().then(
+        () => this.settleSubscriberBootstrap(store),
         (error: unknown) => {
+          if (isOrbitDBTransientBlockError(error)) {
+            this.deferSubscriberBootstrap(storeName, store, bootstrap, error);
+
+            return;
+          }
+
+          this.settleSubscriberBootstrap(store);
           Kernel.logger.warn?.(
             `OrbitDB document subscriber bootstrap failed: store=${storeName}` +
               ` error=${String(error)}`,
@@ -2400,6 +2448,30 @@ export default class OrbitDBReplicatedStateRegistry {
     id: string,
   ): boolean {
     return this.readmissions.isPending(`${storeName}:${id}`);
+  }
+
+  /**
+   * Whether a subscriber of the store could not replay its history yet
+   * because a block was missing locally (right after a restart), so a read
+   * cannot tell "missing" from "not replayed yet". The cause is this node's
+   * own block availability, and the answer is bounded in time, so the store
+   * cannot be kept in this state for long.
+   */
+  public isSubscriberBootstrapDeferred(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+  ): boolean {
+    const now = Date.now();
+
+    return [...this.storesByNetworkId.values()].some((stores) => {
+      const store = this.getStore(stores, storeName);
+      const deferred = store && this.deferredSubscriberBootstraps.get(store);
+
+      return (
+        !!deferred &&
+        now - deferred.since <
+          OrbitDBReplicatedStateRegistry.DEFERRED_BOOTSTRAP_NOT_READY_MS
+      );
+    });
   }
 
   public async replicateDocumentInBackground(

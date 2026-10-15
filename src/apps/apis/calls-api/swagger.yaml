@@ -73,7 +73,7 @@ paths:
         '409':
           description: Call not found or not visible to the authenticated identity.
         '503':
-          description: Replicated state not ready (code 503020). The node holds the start of the call but has not admitted it yet, for example right after it restarted. Retry.
+          description: Replicated state not ready (code 503020). The node holds the start of the call but has not admitted it yet, or has not replayed the call history yet (at most 60 s), for example right after it restarted. Retry.
     delete:
       tags:
         - calls
@@ -97,7 +97,7 @@ paths:
         '429':
           description: Call record rate limit exceeded (code 429021). Only an end about to be stored is charged.
         '503':
-          description: Replicated state not ready (code 503020). The node holds the start of the call, or the authenticated identity's own participant record of it, but has not admitted it yet, for example right after it restarted. Retry.
+          description: Replicated state not ready (code 503020). The node holds the start of the call, or the authenticated identity's own participant record of it, but has not admitted it yet, or has not replayed the call history yet (at most 60 s), for example right after it restarted. Retry.
   /calls/ice-servers:
     get:
       tags:
@@ -148,7 +148,7 @@ paths:
         '429':
           description: Call record rate limit exceeded (code 429021). Only a join about to be stored is charged.
         '503':
-          description: Replicated state not ready (code 503020). The node holds the start of the call but has not admitted it yet, for example right after it restarted. Retry.
+          description: Replicated state not ready (code 503020). The node holds the start of the call but has not admitted it yet, or has not replayed the call history yet (at most 60 s), for example right after it restarted. Retry.
   /calls/{callId}/participants/me:
     delete:
       tags:
@@ -173,7 +173,7 @@ paths:
         '429':
           description: Call record rate limit exceeded (code 429021). Only a leave about to be stored is charged.
         '503':
-          description: Replicated state not ready (code 503020). The node holds the start of the call but has not admitted it yet, for example right after it restarted. Retry.
+          description: Replicated state not ready (code 503020). The node holds the start of the call but has not admitted it yet, or has not replayed the call history yet (at most 60 s), for example right after it restarted. Retry.
   /calls/{callId}/participants/me/heartbeat:
     post:
       tags:
@@ -194,7 +194,7 @@ paths:
         '409':
           description: Call is inactive, inaccessible, a media connection targets the sender or a non-participant (for example a participant that just left) or repeats a remote identity, or the community participation grant is missing or expired.
         '503':
-          description: Replicated state not ready (code 503020). The node holds the start of the call, or the authenticated identity's own participant record of it, but has not admitted it yet, for example right after it restarted. Retry; the call is not over.
+          description: Replicated state not ready (code 503020). The node holds the start of the call, or the authenticated identity's own participant record of it, but has not admitted it yet, or has not replayed the call history yet (at most 60 s), for example right after it restarted. Retry; the call is not over.
   /calls/{callId}/signals:
     post:
       tags:
@@ -220,7 +220,7 @@ paths:
         '413':
           description: Signal payload exceeds 64 KiB.
         '503':
-          description: Replicated state not ready (code 503020). The node holds the start of the call, or the sender's or recipient's own participant record of it, but has not admitted it yet, for example right after it restarted. Retry.
+          description: Replicated state not ready (code 503020). The node holds the start of the call, or the sender's or recipient's own participant record of it, but has not admitted it yet, or has not replayed the call history yet (at most 60 s), for example right after it restarted. Retry.
 components:
   parameters:
     CallId:

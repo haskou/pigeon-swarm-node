@@ -549,9 +549,9 @@ describe('OrbitDBCallRepository', () => {
     });
 
     it('answers a call it cannot find yet as not ready, not as missing', async () => {
-      await expect(repository.requireById(unknownCallId)).rejects.toBeInstanceOf(
-        ReplicatedStateNotReadyError,
-      );
+      await expect(
+        repository.requireById(unknownCallId),
+      ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
       await expect(
         repository.assertParticipantSettled(
           unknownCallId,
@@ -565,9 +565,9 @@ describe('OrbitDBCallRepository', () => {
 
       await replicate(start.payload, start.proof);
 
-      await expect(repository.requireById(unknownCallId)).rejects.toBeInstanceOf(
-        CallNotFoundError,
-      );
+      await expect(
+        repository.requireById(unknownCallId),
+      ).rejects.toBeInstanceOf(CallNotFoundError);
       await expect(
         repository.assertParticipantSettled(
           unknownCallId,
@@ -581,9 +581,9 @@ describe('OrbitDBCallRepository', () => {
         OrbitDBReplicatedStateRegistry.DEFERRED_BOOTSTRAP_NOT_READY_MS,
       );
 
-      await expect(repository.requireById(unknownCallId)).rejects.toBeInstanceOf(
-        CallNotFoundError,
-      );
+      await expect(
+        repository.requireById(unknownCallId),
+      ).rejects.toBeInstanceOf(CallNotFoundError);
       await expect(
         repository.assertParticipantSettled(
           unknownCallId,

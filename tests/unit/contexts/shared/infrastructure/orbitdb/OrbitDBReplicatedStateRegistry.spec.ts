@@ -448,6 +448,37 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     registry.clear();
   });
 
+  it('reports a store as deferred until every deferred subscriber replays its history', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { calls, stores } = createStores();
+    const missingBlock = new DOMException(
+      'The operation was aborted due to timeout',
+      'TimeoutError',
+    );
+
+    await registry.register('network-1', stores);
+    calls.all
+      .mockRejectedValueOnce(missingBlock)
+      .mockRejectedValueOnce(missingBlock);
+    await registry.onDocumentUpdated('calls', () => undefined, {
+      includeHistory: true,
+    });
+    const deferred = registry.isSubscriberBootstrapDeferred('calls');
+
+    calls.emitUpdate({ payload: { value: { id: 'call', updatedAt: 1 } } });
+    await flushPromises();
+    const stillDeferred = registry.isSubscriberBootstrapDeferred('calls');
+
+    calls.emitUpdate({ payload: { value: { id: 'call', updatedAt: 2 } } });
+    await flushPromises();
+
+    expect(deferred).toBe(true);
+    expect(stillDeferred).toBe(true);
+    expect(registry.isSubscriberBootstrapDeferred('calls')).toBe(false);
+    expect(registry.isSubscriberBootstrapDeferred('messages')).toBe(false);
+    registry.clear();
+  });
+
   it('fails a subscription whose bootstrap fails for a non-transient reason', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const { calls, stores } = createStores();

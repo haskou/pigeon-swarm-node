@@ -697,6 +697,13 @@ its join, and the head would otherwise stay demoted until the 60 s retry.
   legitimate one waits beside it; at worst it turns `CallNotFoundError` or
   `CallParticipantNotFoundError` into `503020` for that id, within the bound and
   window above.
+- A subscriber whose history replay cannot load a block in time is retried on
+  the store's next head update. Until every such replay of the store succeeds,
+  for at most 60 s after the first one was deferred
+  (`isSubscriberBootstrapDeferred`), a call endpoint answers a call or
+  participant it cannot find as `503020` instead of `CallNotFoundError` or
+  `CallParticipantNotFoundError`. The cause is local block availability, and the
+  bound keeps a block no peer serves from holding reads off.
 
 ### Replicated store audit
 
