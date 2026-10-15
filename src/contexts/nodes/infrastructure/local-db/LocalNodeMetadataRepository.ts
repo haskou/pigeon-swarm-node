@@ -1,6 +1,7 @@
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import { ClearedNodeOwnerSetting } from '@app/contexts/nodes/domain/value-objects/ClearedNodeOwnerSetting';
 import { NodeRegistrationMode } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationMode';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
@@ -66,24 +67,34 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     );
   }
 
-  private async loadOrCreateMetadata(): Promise<LocalNodeMetadataDocument> {
+  private async findMetadata(): Promise<LocalNodeMetadataDocument | undefined> {
     const document = await this.database.findOne(
       LocalNodeMetadataRepository.NAMESPACE,
       LocalNodeMetadataRepository.LOCAL_NODE_ID,
     );
 
-    if (document && this.isDocument(document)) {
-      return {
-        _id: LocalNodeMetadataRepository.LOCAL_NODE_ID,
-        networks: document.networks,
-        nodeId: new NodeId(document.nodeId).valueOf(),
-        owner: document.owner,
-        registrationMode:
-          document.registrationMode ?? NodeRegistrationMode.OPEN.valueOf(),
-        relayConfiguration:
-          document.relayConfiguration ??
-          NodeRelayConfiguration.default().toPrimitives(),
-      };
+    if (!document || !this.isDocument(document)) {
+      return undefined;
+    }
+
+    return {
+      _id: LocalNodeMetadataRepository.LOCAL_NODE_ID,
+      networks: document.networks,
+      nodeId: new NodeId(document.nodeId).valueOf(),
+      owner: document.owner,
+      registrationMode:
+        document.registrationMode ?? NodeRegistrationMode.OPEN.valueOf(),
+      relayConfiguration:
+        document.relayConfiguration ??
+        NodeRelayConfiguration.default().toPrimitives(),
+    };
+  }
+
+  private async loadOrCreateMetadata(): Promise<LocalNodeMetadataDocument> {
+    const storedMetadata = await this.findMetadata();
+
+    if (storedMetadata) {
+      return storedMetadata;
     }
 
     const generatedMetadata = this.metadataMapper.generate();
@@ -220,5 +231,31 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     await this.persistMetadata(metadata);
     this.latestSavedMetadata = metadata;
     this.syncRuntimeNetworksInBackground();
+  }
+
+  /**
+   * Rewrites only the owner and registration mode; the runtime networks are
+   * left alone because the node is stopped and its networks are kept.
+   */
+  public async resetOwnerSettings(): Promise<ClearedNodeOwnerSetting[]> {
+    const storedMetadata = await this.findMetadata();
+
+    if (!storedMetadata) {
+      return [];
+    }
+
+    const node = this.nodeFromMetadata(storedMetadata);
+    const cleared = node.resetOwner();
+
+    if (cleared.length === 0) {
+      return [];
+    }
+
+    const metadata = this.metadataMapper.toDocument(node);
+
+    await this.persistMetadata(metadata);
+    this.latestSavedMetadata = metadata;
+
+    return cleared;
   }
 }

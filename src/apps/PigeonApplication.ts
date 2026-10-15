@@ -98,6 +98,7 @@ import { WebSocketRealtimeServer } from '../shared/infrastructure/websocket/WebS
 import { ApiSwaggerRegistrar } from './apis/ApiSwaggerRegistrar';
 import { applicationRoutes } from './ApplicationRoutes';
 import { ApplicationServiceClass } from './ApplicationServiceClass';
+import NodeOwnerResetCommand from './commands/nodes/NodeOwnerResetCommand';
 
 export default class PigeonApplication {
   private readonly logger = new WinstonLogger();
@@ -476,6 +477,13 @@ export default class PigeonApplication {
     const nodeLoader = this.kernel.di.getService<NodeLoader>(NodeLoader);
 
     await nodeLoader.loadNode();
+  }
+
+  /** Runs `yarn node:reset-owner`; returns the report for the operator. */
+  public async resetNodeOwner(): Promise<string> {
+    return this.kernel.di
+      .getService<NodeOwnerResetCommand>(NodeOwnerResetCommand)
+      .run();
   }
 
   public async shutdown(): Promise<void> {

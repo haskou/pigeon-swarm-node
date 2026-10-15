@@ -1,5 +1,6 @@
 import { NodeRegistrationCode } from '@app/contexts/nodes/domain/NodeRegistrationCode';
 import NodeRegistrationCodeRepository from '@app/contexts/nodes/domain/repositories/NodeRegistrationCodeRepository';
+import { ClearedNodeOwnerSetting } from '@app/contexts/nodes/domain/value-objects/ClearedNodeOwnerSetting';
 import { NodeRegistrationCodeHash } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationCodeHash';
 import { NodeRegistrationCodeId } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationCodeId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
@@ -138,6 +139,25 @@ export default class LocalNodeRegistrationCodeRepository extends NodeRegistratio
         id.valueOf(),
       ),
     );
+  }
+
+  public async resetOwnerSettings(): Promise<ClearedNodeOwnerSetting[]> {
+    return this.serialized(async () => {
+      const { length } = await this.database.find(
+        LocalNodeRegistrationCodeRepository.NAMESPACE,
+      );
+
+      if (length === 0) {
+        return [];
+      }
+
+      await this.database.deleteMany(
+        LocalNodeRegistrationCodeRepository.NAMESPACE,
+        () => true,
+      );
+
+      return [ClearedNodeOwnerSetting.registrationCodes(length)];
+    });
   }
 
   public async removeExpired(now: Timestamp): Promise<void> {

@@ -74,6 +74,12 @@ services:
     class: /apps/apis/shared/SignedHttpRequestAuthenticator
     arguments:
       - '@contexts/nodes/domain/services/NodeBlockPolicy'
+  apps/commands/nodes/NodeOwnerResetCommand:
+    class: /apps/commands/nodes/NodeOwnerResetCommand
+    arguments:
+      - >-
+        @contexts/nodes/application/reset-owner-settings/NodeOwnerSettingsResetter
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
   apps/consumers/private-authorization-consumer/PrivateAuthorizationFrameConsumer:
     class: >-
       /apps/consumers/private-authorization-consumer/PrivateAuthorizationFrameConsumer
@@ -1863,6 +1869,12 @@ services:
       - '@contexts/nodes/domain/services/NodeSaverService'
       - '@contexts/nodes/domain/services/NodeNetworkDataCleaner'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/nodes/application/reset-owner-settings/NodeOwnerSettingsResetter:
+    class: /contexts/nodes/application/reset-owner-settings/NodeOwnerSettingsResetter
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeRepository'
+      - '@contexts/nodes/domain/repositories/NodeRegistrationCodeRepository'
+      - '@contexts/nodes/domain/repositories/NodeBlockListRepository'
   contexts/nodes/application/revoke-registration-code/NodeRegistrationCodeRevoker:
     class: >-
       /contexts/nodes/application/revoke-registration-code/NodeRegistrationCodeRevoker
@@ -1887,6 +1899,10 @@ services:
       - '@contexts/nodes/domain/services/NodeSaverService'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/nodes/domain/repositories/NodeBlockListRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeBlockListRepository'
+  contexts/nodes/domain/repositories/NodeOwnerSettingsReset:
+    class: /contexts/nodes/domain/repositories/NodeOwnerSettingsReset
+    arguments: []
+    abstract: true
   contexts/nodes/domain/repositories/NodePeerRepository: '@contexts/nodes/infrastructure/local-db/LocalNodePeerRepository'
   contexts/nodes/domain/repositories/NodeRegistrationCodeRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeRegistrationCodeRepository'
   contexts/nodes/domain/repositories/NodeRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeMetadataRepository'
@@ -2600,6 +2616,9 @@ services:
     arguments: []
   shared/infrastructure/local-db/FixedWindowCounter:
     class: /shared/infrastructure/local-db/FixedWindowCounter
+    arguments: []
+  shared/infrastructure/local-db/LocalDatabaseIsLockedError:
+    class: /shared/infrastructure/local-db/LocalDatabaseIsLockedError
     arguments: []
   shared/infrastructure/logs/WinstonLogger:
     class: /shared/infrastructure/logs/WinstonLogger

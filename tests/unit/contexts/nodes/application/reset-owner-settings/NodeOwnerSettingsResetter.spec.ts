@@ -147,7 +147,9 @@ describe('NodeOwnerSettingsResetter', () => {
 
     expect(stored?.nodeId).toBe(before.id);
     expect(stored?.networks).toEqual(before.networks);
-    expect(stored?.relayConfiguration).toEqual(relayConfiguration.toPrimitives());
+    expect(stored?.relayConfiguration).toEqual(
+      relayConfiguration.toPrimitives(),
+    );
     await expect(database.findOne('identities', 'someone')).resolves.toEqual({
       _id: 'someone',
       name: 'kept',

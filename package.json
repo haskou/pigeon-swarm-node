@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "build": "ts-patch install && tsc --project tsconfig.build.json",
     "start": "node dist/index.js",
+    "node:reset-owner": "node dist/reset-node-owner.js",
     "local": "nodemon",
     "local:start": "node --inspect=0.0.0.0:9229 -r ts-node/register -r tsconfig-paths/register src/index.ts",
     "postinstall": "node scripts/patch-helia-bitswap-limited-connections.js && node scripts/patch-orbitdb-limited-connections.js && node scripts/patch-libp2p-kad-dht-routing-table.js && node scripts/patch-libp2p-progress-dispatch.js && node scripts/patch-node-dependency-injection-autowire.js",

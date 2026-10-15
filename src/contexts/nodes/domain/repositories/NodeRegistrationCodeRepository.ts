@@ -3,9 +3,10 @@ import { Timestamp } from '@haskou/value-objects';
 import { NodeRegistrationCode } from '../NodeRegistrationCode';
 import { NodeRegistrationCodeHash } from '../value-objects/NodeRegistrationCodeHash';
 import { NodeRegistrationCodeId } from '../value-objects/NodeRegistrationCodeId';
+import NodeOwnerSettingsReset from './NodeOwnerSettingsReset';
 
-/** Local registration codes. Writes are serialized so uses are never double spent. */
-export default abstract class NodeRegistrationCodeRepository {
+/** Local registration codes. Writes are serialized so uses are never double spent. Resetting the owner settings deletes them all. */
+export default abstract class NodeRegistrationCodeRepository extends NodeOwnerSettingsReset {
   public abstract save(code: NodeRegistrationCode): Promise<void>;
 
   public abstract findAll(): Promise<NodeRegistrationCode[]>;

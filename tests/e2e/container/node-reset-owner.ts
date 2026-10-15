@@ -9,13 +9,13 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Integer, Timestamp } from '@haskou/value-objects';
+import { Level } from 'level';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { Level } from 'level';
 
 import { NetworkMother } from '../../unit/mothers/NetworkMother';
 import { NodeBlockListMother } from '../../unit/mothers/NodeBlockListMother';
@@ -106,7 +106,9 @@ function readState(databasePath: string): Promise<StoredState> {
   }));
 }
 
-function runResetCommand(environment: Record<string, string>): Promise<ExitResult> {
+function runResetCommand(
+  environment: Record<string, string>,
+): Promise<ExitResult> {
   const { promise, reject, resolve } = Promise.withResolvers<ExitResult>();
   const child = spawn(process.execPath, [ENTRY_POINT], {
     cwd: REPOSITORY_ROOT,
@@ -165,8 +167,16 @@ async function failsWhileTheNodeRuns(
     ),
     context,
   );
-  assert.match(result.stderr, /Stop the node, then run yarn node:reset-owner again\./, context);
-  assert.doesNotMatch(result.stderr, /^\s+at /m, `stack trace printed; ${context}`);
+  assert.match(
+    result.stderr,
+    /Stop the node, then run yarn node:reset-owner again\./,
+    context,
+  );
+  assert.doesNotMatch(
+    result.stderr,
+    /^\s+at /m,
+    `stack trace printed; ${context}`,
+  );
   assert.doesNotMatch(result.stdout, /Cleared:/, context);
   assert.deepEqual(await readState(databasePath), before, 'database changed');
 }
@@ -194,17 +204,22 @@ async function resetsTheStoppedNode(
     ),
     context,
   );
-  assert.equal(after.metadata?.owner, undefined);
-  assert.equal(after.metadata?.registrationMode, 'open');
-  assert.equal(after.metadata?.nodeId, before.metadata?.nodeId);
-  assert.deepEqual(after.metadata?.networks, before.metadata?.networks);
+  const keptMetadata: Record<string, unknown> = {
+    ...before.metadata,
+    registrationMode: 'open',
+  };
+
+  delete keptMetadata.owner;
   assert.deepEqual(
-    after.metadata?.relayConfiguration,
-    before.metadata?.relayConfiguration,
+    after,
+    {
+      blockList: undefined,
+      codes: 0,
+      identity: before.identity,
+      metadata: keptMetadata,
+    },
+    'expected only the owner settings to be cleared',
   );
-  assert.equal(after.codes, 0);
-  assert.equal(after.blockList, undefined);
-  assert.deepEqual(after.identity, before.identity);
 }
 
 async function main(): Promise<void> {
@@ -212,7 +227,9 @@ async function main(): Promise<void> {
     throw new Error(`${ENTRY_POINT} is missing; run yarn build first`);
   }
 
-  const workspace = await mkdtemp(path.join(os.tmpdir(), 'pigeon-reset-owner-'));
+  const workspace = await mkdtemp(
+    path.join(os.tmpdir(), 'pigeon-reset-owner-'),
+  );
   const databasePath = path.join(workspace, 'local_storage');
   const environment = {
     IPFS_STORAGE_PATH: path.join(workspace, 'ipfs'),
@@ -224,7 +241,9 @@ async function main(): Promise<void> {
     await failsWhileTheNodeRuns(databasePath, environment);
     console.log('PASS node:reset-owner refuses to run while the node runs');
     await resetsTheStoppedNode(databasePath, environment);
-    console.log('PASS node:reset-owner clears the owner settings of a stopped node');
+    console.log(
+      'PASS node:reset-owner clears the owner settings of a stopped node',
+    );
   } finally {
     await rm(workspace, { force: true, recursive: true });
   }

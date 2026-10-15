@@ -13,6 +13,7 @@ import { NodeRegistrationModeWasChanged } from './events/NodeRegistrationModeWas
 import { NodeRelayConfigurationWasUpdated } from './events/NodeRelayConfigurationWasUpdated';
 import { Network } from './Network';
 import { NodeRelayConfiguration } from './NodeRelayConfiguration';
+import { ClearedNodeOwnerSetting } from './value-objects/ClearedNodeOwnerSetting';
 import { NodeRegistrationMode } from './value-objects/NodeRegistrationMode';
 
 export class Node extends AggregateRoot {
@@ -91,6 +92,30 @@ export class Node extends AggregateRoot {
     }
 
     this.owner = owner;
+  }
+
+  /**
+   * Forgets the owner when the owner key is lost and opens registration
+   * again, so the next claim works as on an unclaimed node. The node operator
+   * runs it on the host, so it records no event.
+   */
+  public resetOwner(): ClearedNodeOwnerSetting[] {
+    const cleared: ClearedNodeOwnerSetting[] = [];
+
+    if (this.owner) {
+      cleared.push(ClearedNodeOwnerSetting.owner());
+    }
+
+    if (!this.registrationMode.isOpen()) {
+      cleared.push(
+        ClearedNodeOwnerSetting.registrationMode(this.registrationMode),
+      );
+    }
+
+    this.owner = undefined;
+    this.registrationMode = NodeRegistrationMode.OPEN;
+
+    return cleared;
   }
 
   public updateRelayConfiguration(

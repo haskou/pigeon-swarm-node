@@ -3,6 +3,7 @@ import { NodeBlockListPrimitives } from '@app/contexts/nodes/domain/NodeBlockLis
 import { NodeBlocks } from '@app/contexts/nodes/domain/NodeBlocks';
 import { NoNodeBlocks } from '@app/contexts/nodes/domain/NoNodeBlocks';
 import NodeBlockListRepository from '@app/contexts/nodes/domain/repositories/NodeBlockListRepository';
+import { ClearedNodeOwnerSetting } from '@app/contexts/nodes/domain/value-objects/ClearedNodeOwnerSetting';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 
 import { LocalNodeBlockListDocument } from './documents/LocalNodeBlockListDocument';
@@ -41,5 +42,20 @@ export default class LocalNodeBlockListRepository extends NodeBlockListRepositor
       LocalNodeBlockListRepository.LOCAL_ID,
       document,
     );
+  }
+
+  public async resetOwnerSettings(): Promise<ClearedNodeOwnerSetting[]> {
+    const blocks = await this.findLocal();
+
+    if (!(blocks instanceof NodeBlockList)) {
+      return [];
+    }
+
+    await this.database.delete(
+      LocalNodeBlockListRepository.NAMESPACE,
+      LocalNodeBlockListRepository.LOCAL_ID,
+    );
+
+    return [ClearedNodeOwnerSetting.ownBlockList(blocks)];
   }
 }

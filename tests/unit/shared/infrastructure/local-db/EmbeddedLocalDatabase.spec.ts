@@ -58,18 +58,18 @@ describe('EmbeddedLocalDatabase', () => {
 
     await firstDatabase.commit([
       {
-        type: 'put',
-        namespace: 'records',
-        id: 'first',
         document: { value: 'one' },
+        id: 'first',
+        namespace: 'records',
+        type: 'put',
       },
       {
-        type: 'put',
-        namespace: 'records',
-        id: 'second',
         document: { value: 'two' },
+        id: 'second',
+        namespace: 'records',
+        type: 'put',
       },
-      { type: 'del', namespace: 'records', id: 'removed' },
+      { id: 'removed', namespace: 'records', type: 'del' },
     ]);
 
     await expect(secondDatabase.findOne('records', 'first')).resolves.toEqual({
@@ -88,12 +88,12 @@ describe('EmbeddedLocalDatabase', () => {
   it('rejects duplicate keys before changing the database', async () => {
     const operations: EmbeddedLocalDatabaseOperation[] = [
       {
-        type: 'put',
-        namespace: 'records',
-        id: 'same',
         document: { value: 'one' },
+        id: 'same',
+        namespace: 'records',
+        type: 'put',
       },
-      { type: 'del', namespace: 'records', id: 'same' },
+      { id: 'same', namespace: 'records', type: 'del' },
     ];
 
     await expect(firstDatabase.commit(operations)).rejects.toThrow(
@@ -110,16 +110,16 @@ describe('EmbeddedLocalDatabase', () => {
     await expect(
       firstDatabase.commit([
         {
-          type: 'put',
-          namespace: 'records',
-          id: 'existing',
           document: { value: 'after' },
+          id: 'existing',
+          namespace: 'records',
+          type: 'put',
         },
         {
-          type: 'put',
-          namespace: 'records',
-          id: 'invalid',
           document: { value: BigInt(1) },
+          id: 'invalid',
+          namespace: 'records',
+          type: 'put',
         },
       ]),
     ).rejects.toThrow();
@@ -178,9 +178,9 @@ describe('EmbeddedLocalDatabase', () => {
 
       await runningNode.close();
 
-      await expect(lockedDatabase.findOne('nodes', 'node-1')).resolves.toEqual(
-        { name: 'Node 1' },
-      );
+      await expect(lockedDatabase.findOne('nodes', 'node-1')).resolves.toEqual({
+        name: 'Node 1',
+      });
     });
   });
 });

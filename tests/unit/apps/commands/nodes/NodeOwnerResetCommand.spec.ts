@@ -1,6 +1,6 @@
 import NodeOwnerResetCommand from '@app/apps/commands/nodes/NodeOwnerResetCommand';
 import NodeOwnerSettingsResetter from '@app/contexts/nodes/application/reset-owner-settings/NodeOwnerSettingsResetter';
-import { ClearedNodeOwnerSetting } from '@app/contexts/nodes/domain/ClearedNodeOwnerSetting';
+import { ClearedNodeOwnerSetting } from '@app/contexts/nodes/domain/value-objects/ClearedNodeOwnerSetting';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import LocalDatabaseIsLockedError from '@app/shared/infrastructure/local-db/LocalDatabaseIsLockedError';
 import { mock, MockProxy } from 'jest-mock-extended';
