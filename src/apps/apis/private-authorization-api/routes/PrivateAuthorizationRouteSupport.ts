@@ -8,7 +8,7 @@ export abstract class PrivateAuthorizationRouteSupport extends Route {
     SignedHttpRequestAuthenticator,
   );
 
-  protected authenticate(request: Request): IdentityId {
+  protected async authenticate(request: Request): Promise<IdentityId> {
     return this.authenticator.authenticate(request);
   }
 }

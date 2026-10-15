@@ -72,7 +72,8 @@ services:
       - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
   apps/apis/shared/SignedHttpRequestAuthenticator:
     class: /apps/apis/shared/SignedHttpRequestAuthenticator
-    arguments: []
+    arguments:
+      - '@contexts/nodes/domain/services/NodeBlockPolicy'
   apps/consumers/private-authorization-consumer/PrivateAuthorizationFrameConsumer:
     class: >-
       /apps/consumers/private-authorization-consumer/PrivateAuthorizationFrameConsumer
@@ -236,6 +237,10 @@ services:
       - '@contexts/keychains/domain/services/KeychainSignatureDomainService'
       - '@contexts/keychains/infrastructure/ipfs/mappers/IpfsKeychainMapper'
       - '@contexts/shared/infrastructure/ipfs/IPFS'
+  apps/initializers/nodes/NodeBlockPolicyInitializer:
+    class: /apps/initializers/nodes/NodeBlockPolicyInitializer
+    arguments:
+      - '@contexts/nodes/domain/services/NodeBlockPolicy'
   apps/initializers/public-mutations/CallMutationPolicies:
     class: /apps/initializers/public-mutations/CallMutationPolicies
     arguments:
@@ -1169,6 +1174,7 @@ services:
       - '@contexts/content-replication/domain/ContentReplicationNetworkBudget'
       - >-
         @contexts/content-replication/domain/services/ContentReplicationBudgetAllocator
+      - '@contexts/nodes/domain/services/NodeBlockPolicy'
   contexts/content-replication/application/find-summary/ContentReplicationStatusSummaryFinder:
     class: >-
       /contexts/content-replication/application/find-summary/ContentReplicationStatusSummaryFinder
@@ -1799,6 +1805,7 @@ services:
     arguments:
       - '@contexts/nodes/domain/services/NodeLoaderService'
       - '@contexts/nodes/domain/services/NodeSaverService'
+      - '@contexts/nodes/domain/services/NodeBlockPolicy'
   contexts/nodes/application/change-registration-mode/NodeRegistrationModeChanger:
     class: >-
       /contexts/nodes/application/change-registration-mode/NodeRegistrationModeChanger
@@ -1806,6 +1813,10 @@ services:
       - '@contexts/nodes/domain/services/NodeLoaderService'
       - '@contexts/nodes/domain/services/NodeSaverService'
       - '@shared/infrastructure/messageBus/LocalDomainEventPublisher'
+  contexts/nodes/application/find-block-list/NodeBlockListFinder:
+    class: /contexts/nodes/application/find-block-list/NodeBlockListFinder
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeBlockListRepository'
   contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationFinder:
     class: >-
       /contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationFinder
@@ -1862,6 +1873,12 @@ services:
     arguments:
       - '@contexts/nodes/domain/repositories/NodeRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/nodes/application/store-block-list/NodeBlockListStorer:
+    class: /contexts/nodes/application/store-block-list/NodeBlockListStorer
+    arguments:
+      - '@contexts/nodes/domain/services/NodeLoaderService'
+      - '@contexts/nodes/domain/repositories/NodeBlockListRepository'
+      - '@contexts/nodes/domain/services/NodeBlockPolicy'
   contexts/nodes/application/update-relay-configuration/NodeRelayConfigurationUpdater:
     class: >-
       /contexts/nodes/application/update-relay-configuration/NodeRelayConfigurationUpdater
@@ -1869,9 +1886,17 @@ services:
       - '@contexts/nodes/domain/services/NodeLoaderService'
       - '@contexts/nodes/domain/services/NodeSaverService'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/nodes/domain/repositories/NodeBlockListRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeBlockListRepository'
   contexts/nodes/domain/repositories/NodePeerRepository: '@contexts/nodes/infrastructure/local-db/LocalNodePeerRepository'
   contexts/nodes/domain/repositories/NodeRegistrationCodeRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeRegistrationCodeRepository'
   contexts/nodes/domain/repositories/NodeRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeMetadataRepository'
+  contexts/nodes/domain/services/NodeBlockEnforcer: '@contexts/nodes/infrastructure/blocking/RuntimeNodeBlockEnforcer'
+  contexts/nodes/domain/services/NodeBlockPolicy:
+    class: /contexts/nodes/domain/services/NodeBlockPolicy
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeBlockListRepository'
+      - '@contexts/nodes/domain/services/NodeLoaderService'
+      - '@contexts/nodes/domain/services/NodeBlockEnforcer'
   contexts/nodes/domain/services/NodeCommunityStateDigester: >-
     @contexts/nodes/infrastructure/network-synchronization/CommunityRepositoryNodeCommunityStateDigester
   contexts/nodes/domain/services/NodeLoaderService:
@@ -1883,6 +1908,16 @@ services:
     class: /contexts/nodes/domain/services/NodeSaverService
     arguments:
       - '@contexts/nodes/domain/repositories/NodeRepository'
+  contexts/nodes/infrastructure/blocking/RuntimeNodeBlockEnforcer:
+    class: /contexts/nodes/infrastructure/blocking/RuntimeNodeBlockEnforcer
+    arguments:
+      - '@contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry'
+    parent: contexts/nodes/domain/services/NodeBlockEnforcer
+  contexts/nodes/infrastructure/local-db/LocalNodeBlockListRepository:
+    class: /contexts/nodes/infrastructure/local-db/LocalNodeBlockListRepository
+    arguments:
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+    parent: contexts/nodes/domain/repositories/NodeBlockListRepository
   contexts/nodes/infrastructure/local-db/LocalNodeMetadataRepository:
     class: /contexts/nodes/infrastructure/local-db/LocalNodeMetadataRepository
     arguments:
@@ -2338,6 +2373,7 @@ services:
       - '@contexts/push-notifications/application/send/PushNotificationDelivery'
       - >-
         @contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker
+      - '@contexts/nodes/domain/services/NodeBlockPolicy'
   contexts/push-notifications/application/test/PushTestNotificationSender:
     class: /contexts/push-notifications/application/test/PushTestNotificationSender
     arguments:

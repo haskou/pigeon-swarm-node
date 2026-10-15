@@ -1,3 +1,4 @@
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import DeviceAuthorizationTransitionApplier from '@app/contexts/identity-devices/application/apply-transition/DeviceAuthorizationTransitionApplier';
 import { ApplyDeviceAuthorizationTransitionMessage } from '@app/contexts/identity-devices/application/apply-transition/messages/ApplyDeviceAuthorizationTransitionMessage';
 import DeviceAuthorizationFinder from '@app/contexts/identity-devices/application/find/DeviceAuthorizationFinder';
@@ -20,6 +21,9 @@ import { DeviceAuthorizationViewModel } from '../view-model/DeviceAuthorizationV
 
 @JsonController('/identity-devices')
 export class PostDeviceAuthorizationTransitionRoute extends Route {
+  private readonly signedRequestAuthenticator =
+    this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
+
   private readonly applier = this.get<DeviceAuthorizationTransitionApplier>(
     DeviceAuthorizationTransitionApplier,
   );
@@ -85,6 +89,9 @@ export class PostDeviceAuthorizationTransitionRoute extends Route {
     const message = request.getMessage();
 
     this.rateLimiter.consume(message.transition.getIdentityId());
+    await this.signedRequestAuthenticator.assertIsNotBlocked(
+      message.transition.getIdentityId(),
+    );
     const { authorization, sealedSecrets } = await this.applyTransition(
       request,
       message,

@@ -144,8 +144,8 @@ export class IPFSNetwork {
     return this.connection.subscribePubSub(topic, handler);
   }
 
-  public async blockPeer(peerId: string): Promise<void> {
-    return this.connection.blockPeer(peerId);
+  public async disconnectPeer(peerId: string): Promise<void> {
+    return this.connection.disconnectPeer(peerId);
   }
 
   public getPeers(): string[] {

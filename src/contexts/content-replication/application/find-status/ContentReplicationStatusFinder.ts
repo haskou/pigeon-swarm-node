@@ -1,6 +1,7 @@
 import { NodePeer } from '@app/contexts/nodes/domain/NodePeer';
 import NodePeerRepository from '@app/contexts/nodes/domain/repositories/NodePeerRepository';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { Timestamp } from '@haskou/value-objects';
 import { createHash } from 'crypto';
 
@@ -22,6 +23,7 @@ export default class ContentReplicationStatusFinder {
     private readonly policy: ContentReplicationPolicy,
     private readonly budget: ContentReplicationNetworkBudget,
     private readonly allocator: ContentReplicationBudgetAllocator,
+    private readonly blockPolicy: NodeBlockPolicy,
   ) {}
 
   private async localNodeId(): Promise<string> {
@@ -155,6 +157,19 @@ export default class ContentReplicationStatusFinder {
     return charged;
   }
 
+  /** Identities blocked on this node get no share of its replication budget. */
+  private async unblockedRegistrations(
+    registrations: ContentReplication[],
+  ): Promise<ContentReplication[]> {
+    const blocked = await Promise.all(
+      registrations.map((registration) =>
+        this.blockPolicy.isIdentityBlocked(registration.getOwnerIdentityId()),
+      ),
+    );
+
+    return registrations.filter((_registration, index) => !blocked[index]);
+  }
+
   public async find(): Promise<ContentReplicationStatus> {
     const registrations = await this.contentRepository.findAll();
     const contents = this.distinct(registrations);
@@ -193,8 +208,10 @@ export default class ContentReplicationStatusFinder {
         .map(({ content }) => content.getId()),
     );
     const charged = this.chargedWithinBudget(
-      registrations.filter((registration) =>
-        localResponsibleIds.has(registration.getId()),
+      await this.unblockedRegistrations(
+        registrations.filter((registration) =>
+          localResponsibleIds.has(registration.getId()),
+        ),
       ),
     );
 

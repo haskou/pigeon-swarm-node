@@ -73,6 +73,7 @@ export const pigeonEnvironmentSchema = {
     defaultValue: MAILBOX_RETENTION_DEFAULT_MS,
     type: 'number',
   },
+  NODE_BLOCK_LIST_MAX_BYTES: { defaultValue: 64 * 1024 * 1024, type: 'number' },
   NODE_ENV: { defaultValue: 'local', type: 'string' },
   NODE_REGISTRATION_CODE_MAX_TTL_DAYS: { defaultValue: 30, type: 'number' },
   NODE_REGISTRATION_CODE_MAX_USES: { defaultValue: 100, type: 'number' },

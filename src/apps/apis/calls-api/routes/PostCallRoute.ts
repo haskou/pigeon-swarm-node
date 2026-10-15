@@ -17,7 +17,7 @@ export class PostCallRoute extends CallRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const creatorIdentityId = this.authenticate(request);
+    const creatorIdentityId = await this.authenticate(request);
     const call = await this.starter.start(
       new CallStartMessage(
         creatorIdentityId.valueOf(),

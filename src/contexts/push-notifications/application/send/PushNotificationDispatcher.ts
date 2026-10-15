@@ -1,3 +1,4 @@
+import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { NotificationDeliveryShouldSendPushMessage } from '@app/contexts/notification-settings/application/should-deliver/messages/NotificationDeliveryShouldSendPushMessage';
 import NotificationDeliveryPreferenceChecker from '@app/contexts/notification-settings/application/should-deliver/NotificationDeliveryPreferenceChecker';
 import { NotificationSettingScopeType } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScopeType';
@@ -77,6 +78,7 @@ export default class PushNotificationDispatcher {
     private readonly presenceRepository: IdentityPresenceRepository,
     private readonly delivery: PushNotificationDelivery,
     private readonly preferenceChecker: NotificationDeliveryPreferenceChecker,
+    private readonly blockPolicy: NodeBlockPolicy,
   ) {}
 
   private withoutActor(
@@ -238,6 +240,10 @@ export default class PushNotificationDispatcher {
     identityId: IdentityId,
     intent: PushNotificationIntent,
   ): Promise<void> {
+    if (await this.blockPolicy.isIdentityBlocked(identityId)) {
+      return;
+    }
+
     if (await this.shouldSkipForBusy(identityId, intent.respectBusy)) {
       return;
     }

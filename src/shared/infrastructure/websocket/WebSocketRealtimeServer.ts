@@ -57,6 +57,13 @@ export class WebSocketRealtimeServer {
     try {
       const identityId = this.ticketAuthenticator.authenticate(request);
 
+      if (webSocketEventHub.isIdentityBlocked(identityId)) {
+        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+        socket.destroy();
+
+        return;
+      }
+
       this.server.handleUpgrade(request, socket, head, (client) => {
         webSocketEventHub.register(identityId, client);
         this.server.emit('connection', client, request);

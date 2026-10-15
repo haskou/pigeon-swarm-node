@@ -41,7 +41,7 @@ export class GetDeviceAuthorizationRoute extends Route {
     identityId: string,
     request: Request,
   ): Promise<DeviceAuthorization> {
-    const requesterIdentityId = this.authenticator.authenticate(request);
+    const requesterIdentityId = await this.authenticator.authenticate(request);
     const targetIdentityId = new IdentityId(decodeURIComponent(identityId));
 
     assert(

@@ -1,3 +1,4 @@
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import IdentityCreationDetector from '@app/contexts/identities/application/detect-creation/IdentityCreationDetector';
 import { IdentityCreationDetectorMessage } from '@app/contexts/identities/application/detect-creation/messages/IdentityCreationDetectorMessage';
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
@@ -25,6 +26,9 @@ import { InsufficientAdmissionProofViewModel } from '../view-model/InsufficientA
 
 @JsonController('/identities')
 export class PostIdentityRoute extends Route {
+  private readonly signedRequestAuthenticator =
+    this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
+
   private readonly identityPublisher: IdentityPublisher =
     this.get<IdentityPublisher>(IdentityPublisher);
 
@@ -88,6 +92,9 @@ export class PostIdentityRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     this.sourceRateLimiter.consume(httpRequest.ip ?? 'unknown');
+    await this.signedRequestAuthenticator.assertIsNotBlocked(
+      new IdentityId(body.id),
+    );
 
     const message = new PostIdentityRequest(body).getIdentityPublishMessage();
     const reservation = await this.admitRegistration(message, httpRequest);

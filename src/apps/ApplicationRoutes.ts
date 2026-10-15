@@ -91,6 +91,7 @@ import { DeleteNodeDiagnosticsRoute } from '@app/apps/apis/nodes-api/routes/Dele
 import { DeleteNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/DeleteNodeNetworkRoute';
 import { DeleteNodeRegistrationCodeRoute } from '@app/apps/apis/nodes-api/routes/DeleteNodeRegistrationCodeRoute';
 import { GetClientContractRoute } from '@app/apps/apis/nodes-api/routes/GetClientContractRoute';
+import { GetNodeBlocksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeBlocksRoute';
 import { GetNodeDiagnosticsRoute } from '@app/apps/apis/nodes-api/routes/GetNodeDiagnosticsRoute';
 import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNetworksRoute';
 import { GetNodeRegistrationCodesRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRegistrationCodesRoute';
@@ -100,6 +101,7 @@ import { GetPeersRoute } from '@app/apps/apis/nodes-api/routes/GetPeersRoute';
 import { PostNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodeNetworkRoute';
 import { PostNodePublicNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodePublicNetworkRoute';
 import { PostNodeRegistrationCodeRoute } from '@app/apps/apis/nodes-api/routes/PostNodeRegistrationCodeRoute';
+import { PutNodeBlocksRoute } from '@app/apps/apis/nodes-api/routes/PutNodeBlocksRoute';
 import { PutNodeDiagnosticsRoute } from '@app/apps/apis/nodes-api/routes/PutNodeDiagnosticsRoute';
 import { PutNodeOwnerRoute } from '@app/apps/apis/nodes-api/routes/PutNodeOwnerRoute';
 import { PutNodeRegistrationRoute } from '@app/apps/apis/nodes-api/routes/PutNodeRegistrationRoute';
@@ -211,6 +213,8 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   DeleteNodeRegistrationCodeRoute,
   GetNodeRelayConfigurationRoute,
   PutNodeRelayConfigurationRoute,
+  GetNodeBlocksRoute,
+  PutNodeBlocksRoute,
   PutNodeDiagnosticsRoute,
   GetNodeDiagnosticsRoute,
   DeleteNodeDiagnosticsRoute,

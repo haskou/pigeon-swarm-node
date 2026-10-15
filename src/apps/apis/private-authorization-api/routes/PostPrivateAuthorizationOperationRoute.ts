@@ -21,7 +21,7 @@ export class PostPrivateAuthorizationOperationRoute extends PrivateAuthorization
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    this.authenticate(request);
+    await this.authenticate(request);
     const result = await this.acceptor.accept(
       new PrivateOperationAcceptMessage(
         body.signedOperationJson,
