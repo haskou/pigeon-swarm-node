@@ -177,6 +177,23 @@ export class Notification extends AggregateRoot {
     return this.id;
   }
 
+  /**
+   * The inviter of a group invitation its recipient has signed no `accepted`
+   * or `declined` state for: the letters the recipient caps count. Undefined
+   * for every other notification.
+   */
+  public pendingGroupInviterIdentityId(): IdentityId | undefined {
+    if (
+      !this.type.isEqual(NotificationType.GROUP_CONVERSATION_INVITATION) ||
+      !this.state.isEqual(NotificationState.PENDING) ||
+      !(this.payload instanceof ConversationInvitationPayload)
+    ) {
+      return undefined;
+    }
+
+    return this.payload.getInviterIdentityId();
+  }
+
   public markAsRead(): void {
     this.status = NotificationStatus.READ;
   }

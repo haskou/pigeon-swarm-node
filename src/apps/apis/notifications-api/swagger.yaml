@@ -11,6 +11,16 @@ paths:
       tags:
         - notifications
       summary: List authenticated identity notifications
+      description: >-
+        Lists the recipient's notifications, newest record id first. Pending
+        group conversation invitations (no signed accepted or declined state)
+        are taken in ascending record id order and listed at most
+        NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_PAIR (default 4) per
+        inviter and NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_RECIPIENT
+        (default 100) in total; the rest is held back, stays stored and can
+        still be updated by id. The caps apply before limit and
+        beforeNotificationId; a held-back beforeNotificationId restarts from
+        the first page.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'

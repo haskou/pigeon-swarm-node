@@ -867,7 +867,12 @@ bounds what it keeps per author deterministically: the genuine invitations of on
 inviter (`NOTIFICATIONS_MAX_INVITATIONS_PER_IDENTITY`, default 10000) and the
 genuine states of one recipient (`NOTIFICATIONS_MAX_STATES_PER_IDENTITY`, default 30000) sort by id and only the first ones that fit are admitted, whatever order
 they arrived in. A malicious replica can still publish up to the quota for each
-identity it controls.
+identity it controls. Listing does not change replication: pending group invitations
+beyond `NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_PAIR` (default 4) per
+(inviter, recipient) or `NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_RECIPIENT`
+(default 100) per recipient, in ascending record id order, are admitted and replicated
+as usual and only held back from `GET /notifications`, identically on every node that
+holds the same records.
 
 Calls are no longer unsigned (#373); see [Durable call state convergence](#durable-call-state-convergence).
 Gossiped `calls.v1.*` lifecycle events (`call.started`, `participant.joined|left|declined|missed`,

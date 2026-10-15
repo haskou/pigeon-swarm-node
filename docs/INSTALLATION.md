@@ -152,6 +152,8 @@ installed `web-push` module path.
 | `NOTIFICATIONS_RECORD_RATE_LIMIT_PER_MINUTE` | `30` | No | Notification record writes per minute. |
 | `NOTIFICATIONS_MAX_INVITATIONS_PER_IDENTITY` | `10000` | No | Maximum stored invitations per identity. |
 | `NOTIFICATIONS_MAX_STATES_PER_IDENTITY` | `30000` | No | Maximum stored notification states per identity. |
+| `NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_PAIR` | `4` | No | Maximum pending group invitations listed per (inviter, recipient) pair; extra ones are held back, not deleted. Positive integer, otherwise the default. |
+| `NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_RECIPIENT` | `100` | No | Maximum pending group invitations listed per recipient after the per-pair cap; extra ones are held back, not deleted. Positive integer, otherwise the default. |
 | `CONTENT_REPLICATION_MAX_RECORDS_PER_IDENTITY` | `10000` | No | Maximum replicated content records per identity. |
 | `CONTENT_REPLICATION_QUOTA_BYTES` | `1073741824` | No | Replicated content byte quota (1 GiB). |
 | `CONTENT_REPLICATION_NETWORK_BUDGET_BYTES` | `34359738368` | No | Content bytes replication maintenance schedules per network across all owners (32 GiB), shared fairly by owner; responsible replicas beyond it are deferred. A value that is not a positive integer, or is above 2⁵³−1, falls back to the default. |

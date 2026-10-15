@@ -536,7 +536,6 @@ async function main(): Promise<void> {
   for (const replica of [honest]) {
     const list = await replica.repository!.findByRecipient(
       new IdentityId(victim.id),
-      50,
     );
 
     assert.deepEqual(
@@ -553,10 +552,7 @@ async function main(): Promise<void> {
     for (const other of [bob, outsider, mallory])
       assert.deepEqual(
         (
-          await replica.repository!.findByRecipient(
-            new IdentityId(other.id),
-            50,
-          )
+          await replica.repository!.findByRecipient(new IdentityId(other.id))
         ).map((value) => value.toPrimitives().id),
         other === bob ? [id] : [],
       );
@@ -646,7 +642,7 @@ async function main(): Promise<void> {
     (
       await Promise.all(
         [alice, bob].map((recipient) =>
-          replica.repository!.findByRecipient(new IdentityId(recipient.id), 50),
+          replica.repository!.findByRecipient(new IdentityId(recipient.id)),
         ),
       )
     )

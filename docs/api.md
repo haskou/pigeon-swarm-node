@@ -4700,6 +4700,23 @@ Implemented:
 - support `limit` and `beforeNotificationId`
 - can include backend-created `missed_call` notifications for conversation
   calls
+- hold back pending group invitations beyond two caps. A
+  `group_conversation_invitation` is pending while its recipient has signed no
+  `accepted` or `declined` state for it (a read mark keeps it pending). Pending
+  group invitations are taken in ascending record id order, the order record
+  admission uses: at most `NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_PAIR`
+  (default 4) per inviter, then at most
+  `NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_RECIPIENT` (default 100) in
+  total. A held-back letter stays stored and replicated, is never deleted and
+  can still be updated by id; it is only left out of the listing. The selection
+  depends only on the records the node holds, so nodes holding the same records
+  list the same letters. Accepting or declining a listed letter lists the next
+  held-back one. The inviter is not told. Answered group invitations and every
+  other notification type are listed as before
+- apply the caps before pagination: `limit` and `beforeNotificationId` page over
+  the listed notifications only, newest record id first. A held-back
+  `beforeNotificationId` is treated like an unknown one and the listing starts
+  from the first page
 
 ### Create an invitation notification
 

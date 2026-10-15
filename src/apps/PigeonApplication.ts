@@ -41,8 +41,10 @@ import { NodeCommunityStateWasAnnounced } from '../contexts/nodes/domain/events/
 import NotificationScopeSettingsRepository from '../contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
 import NotificationScopeSettingsRepositoryRouter from '../contexts/notification-settings/infrastructure/NotificationScopeSettingsRepositoryRouter';
 import { NotificationReplicationLimits } from '../contexts/notifications/domain/NotificationReplicationLimits';
+import { PendingGroupInvitationLimits } from '../contexts/notifications/domain/PendingGroupInvitationLimits';
 import NotificationRepository from '../contexts/notifications/domain/repositories/NotificationRepository';
 import { NotificationReplicationLimitsFromEnvironment } from '../contexts/notifications/infrastructure/environment/NotificationReplicationLimitsFromEnvironment';
+import { PendingGroupInvitationLimitsFromEnvironment } from '../contexts/notifications/infrastructure/environment/PendingGroupInvitationLimitsFromEnvironment';
 import NotificationRepositoryRouter from '../contexts/notifications/infrastructure/NotificationRepositoryRouter';
 import IdentityPresenceRepository from '../contexts/presence/domain/repositories/IdentityPresenceRepository';
 import InMemoryIdentityPresenceRepository from '../contexts/presence/infrastructure/memory/InMemoryIdentityPresenceRepository';
@@ -352,6 +354,10 @@ export default class PigeonApplication {
         {
           token: NotificationReplicationLimits,
           useFactory: () => NotificationReplicationLimitsFromEnvironment.load(),
+        },
+        {
+          token: PendingGroupInvitationLimits,
+          useFactory: () => PendingGroupInvitationLimitsFromEnvironment.load(),
         },
       ],
     });

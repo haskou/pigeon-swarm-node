@@ -30,23 +30,11 @@ export default class NotificationRepositoryRouter extends NotificationRepository
 
   public async findByRecipient(
     recipientIdentityId: IdentityId,
-    limit: number,
-    beforeNotificationId?: NotificationId,
   ): Promise<Notification[]> {
-    const all = [
-      ...(await this.replicated.findByRecipient(
-        recipientIdentityId,
-        Number.MAX_SAFE_INTEGER,
-      )),
+    return [
+      ...(await this.replicated.findByRecipient(recipientIdentityId)),
       ...(await this.local.findByRecipient(recipientIdentityId)),
-    ].sort((left, right) =>
-      right.getId().valueOf().localeCompare(left.getId().valueOf()),
-    );
-    const start = beforeNotificationId
-      ? all.findIndex((n) => n.getId().isEqual(beforeNotificationId)) + 1
-      : 0;
-
-    return all.slice(start, start + limit);
+    ];
   }
 
   public saveInvitation(
