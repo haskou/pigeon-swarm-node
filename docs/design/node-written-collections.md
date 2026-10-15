@@ -202,6 +202,12 @@ the frontier and the per-author quota went with the group operations (D15).
 Call policies read the participants from this fold; a record that arrives
 before its conversation is refused and re-admitted by the registry.
 
+Residual: a participant can sign many distinct valid geneses for the same pair
+and network by varying `createdAt`. Each one has its own record id, so every
+node stores them all. The fold still converges on the lowest digest, and the
+winner only decides `creatorId`, which grants no authority. The per-author quota
+never bounded storage, so its removal does not widen this.
+
 ### UI/API contract changes
 
 - `POST /conversations` gains a required client-device-signed `mutation` over
