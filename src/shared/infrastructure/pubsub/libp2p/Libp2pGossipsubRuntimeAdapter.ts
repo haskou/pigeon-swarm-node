@@ -95,15 +95,23 @@ export default class Libp2pGossipsubRuntimeAdapter {
       >[0],
     )) as unknown as Libp2pPubSubNode;
 
-    nodePeerConnectionGate.onPeersBlocked(async (peerIds) => {
-      const blocked = new Set(peerIds);
+    const stopListening = nodePeerConnectionGate.onPeersBlocked(
+      async (peerIds) => {
+        const blocked = new Set(peerIds);
 
-      await Promise.all(
-        (node.getPeers?.() ?? [])
-          .filter((peer) => blocked.has(peer.toString()))
-          .map((peer) => node.hangUp?.(peer)),
-      );
-    });
+        await Promise.all(
+          (node.getPeers?.() ?? [])
+            .filter((peer) => blocked.has(peer.toString()))
+            .map((peer) => node.hangUp?.(peer)),
+        );
+      },
+    );
+    const stop = node.stop?.bind(node);
+
+    node.stop = async () => {
+      stopListening();
+      await stop?.();
+    };
 
     return node;
   }

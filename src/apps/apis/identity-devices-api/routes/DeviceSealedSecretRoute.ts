@@ -60,7 +60,6 @@ export class DeviceSealedSecretRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     const target = new IdentityId(identityId);
-    await this.signedRequestAuthenticator.assertIsNotBlocked(target);
     const authorization = await this.authorizationFinder.find(
       new DeviceAuthorizationFindMessage(target),
     );
@@ -69,6 +68,7 @@ export class DeviceSealedSecretRoute extends Route {
         request,
         authorization,
       );
+    await this.signedRequestAuthenticator.assertIsNotBlocked(target);
     const signature = request.header('x-device-signature');
 
     if (
@@ -108,7 +108,6 @@ export class DeviceSealedSecretRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     const target = new IdentityId(identityId);
-    await this.signedRequestAuthenticator.assertIsNotBlocked(target);
     const authorization = await this.authorizationFinder.find(
       new DeviceAuthorizationFindMessage(target),
     );
@@ -117,6 +116,7 @@ export class DeviceSealedSecretRoute extends Route {
         request,
         authorization,
       );
+    await this.signedRequestAuthenticator.assertIsNotBlocked(target);
 
     try {
       const delivery = await this.finder.find(

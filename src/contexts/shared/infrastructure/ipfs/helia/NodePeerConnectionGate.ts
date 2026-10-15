@@ -27,8 +27,15 @@ export class NodePeerConnectionGate {
   }
 
   /** Libp2p nodes outside the network registry register here to drop connections of newly blocked peers. */
-  public onPeersBlocked(listener: (peerIds: string[]) => Promise<void>): void {
+  /** Registers a listener and returns the function that removes it. */
+  public onPeersBlocked(
+    listener: (peerIds: string[]) => Promise<void>,
+  ): () => void {
     this.blockListeners.add(listener);
+
+    return () => {
+      this.blockListeners.delete(listener);
+    };
   }
 
   /** Replaces the blocked set and returns the peer ids that were not blocked before. */

@@ -131,6 +131,8 @@ paths:
           description: The list is not signed by the current owner, its signature does not verify, or its version is not higher than the stored one.
         '413':
           description: The body exceeds NODE_BLOCK_LIST_MAX_BYTES.
+        '429':
+          description: Another block list upload is in progress (code 429060).
   /node/diagnostics/:
     put:
       tags:

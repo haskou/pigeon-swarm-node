@@ -1847,12 +1847,13 @@ document without `identitySignature`. Both arrays are sorted and hold no
 duplicates. Each change is a new document with a higher `version`; the whole
 list is replaced. There is no entry cap; the body is limited to
 `NODE_BLOCK_LIST_MAX_BYTES` (`413` when larger). A non-owner or a stale
-timestamp is refused before the body is read.
+timestamp is refused before the body is read. Only one upload runs at a time.
 
 Responses: `200` with `{ "blockList": <stored document> }`; `401` for an invalid or stale
 signed request; `403` with code `403010` when the caller is not the node
 owner; `409` when the document is not signed by the current owner, its
-signature does not verify, or its version is not higher than the stored one.
+signature does not verify, or its version is not higher than the stored one;
+`429` with code `429060` while another block list upload is in progress.
 
 ```http
 GET /node/blocks

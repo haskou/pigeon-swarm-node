@@ -181,7 +181,7 @@ package "nodes" {
       +load(): Promise<void>
       +replace(blocks: NodeBlocks, node: Node): Promise<void>
       +ownerChanged(node: Node): Promise<void>
-      +isIdentityBlocked(identityId: IdentityId): boolean
+      +isIdentityBlocked(identityId: IdentityId): Promise<boolean>
     }
 
     note right of NodeBlockPolicy

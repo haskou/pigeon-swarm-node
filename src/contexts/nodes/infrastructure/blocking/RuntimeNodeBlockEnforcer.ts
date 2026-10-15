@@ -40,7 +40,7 @@ export default class RuntimeNodeBlockEnforcer extends NodeBlockEnforcer {
       await this.withoutOwnPeerId(nodePeerIds),
     );
 
-    await Promise.all(
+    await Promise.allSettled(
       this.networkRegistry
         .getAll()
         .flatMap((network) =>
