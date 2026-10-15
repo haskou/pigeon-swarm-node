@@ -9,9 +9,11 @@ import { NodeNetworkNotFoundError } from './errors/NodeNetworkNotFoundError';
 import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from './errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
 import { NodeNetworkWasAdded } from './events/NodeNetworkWasAdded';
 import { NodeNetworkWasRemoved } from './events/NodeNetworkWasRemoved';
+import { NodeRegistrationModeWasChanged } from './events/NodeRegistrationModeWasChanged';
 import { NodeRelayConfigurationWasUpdated } from './events/NodeRelayConfigurationWasUpdated';
 import { Network } from './Network';
 import { NodeRelayConfiguration } from './NodeRelayConfiguration';
+import { NodeRegistrationMode } from './value-objects/NodeRegistrationMode';
 
 export class Node extends AggregateRoot {
   public static fromPrimitives(primitives: PrimitiveOf<Node>): Node {
@@ -25,6 +27,7 @@ export class Node extends AggregateRoot {
       ),
       primitives.owner ? new IdentityId(primitives.owner) : undefined,
       NodeRelayConfiguration.fromPrimitives(primitives.relayConfiguration),
+      NodeRegistrationMode.fromPrimitives(primitives.registrationMode),
     );
   }
 
@@ -33,6 +36,7 @@ export class Node extends AggregateRoot {
     private readonly networks: Map<NetworkId, Network> = new Map(),
     private owner?: IdentityId,
     private relayConfiguration: NodeRelayConfiguration = NodeRelayConfiguration.default(),
+    private registrationMode: NodeRegistrationMode = NodeRegistrationMode.OPEN,
   ) {
     super();
   }
@@ -104,6 +108,27 @@ export class Node extends AggregateRoot {
     );
   }
 
+  public changeRegistrationMode(registrationMode: NodeRegistrationMode): void {
+    if (this.registrationMode.isEqual(registrationMode)) {
+      return;
+    }
+
+    this.registrationMode = registrationMode;
+    this.record(
+      new NodeRegistrationModeWasChanged(this.id.valueOf(), {
+        registrationMode: this.registrationMode.valueOf(),
+      }),
+    );
+  }
+
+  public isOpenForRegistration(): boolean {
+    return this.registrationMode.isOpen();
+  }
+
+  public isClosedForRegistration(): boolean {
+    return this.registrationMode.isClosed();
+  }
+
   public hasOwner(): boolean {
     return this.owner !== undefined;
   }
@@ -130,6 +155,7 @@ export class Node extends AggregateRoot {
         ]),
       ),
       owner: this.owner?.valueOf(),
+      registrationMode: this.registrationMode.valueOf(),
       relayConfiguration: this.relayConfiguration.toPrimitives(),
     };
   }

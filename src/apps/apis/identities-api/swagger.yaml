@@ -11,6 +11,13 @@ paths:
       tags:
         - identities
       summary: Publish signed identity
+      parameters:
+        - in: header
+          name: X-Registration-Code
+          required: false
+          description: Registration code issued by the node owner. Needed only to create an identity this node does not hold yet while the node's registration mode is `codes`.
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -30,6 +37,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InsufficientAdmissionProofResource'
+        '403':
+          description: Identity creation refused by this node's registration control (code 403011) - the mode is `closed`, or it is `codes` and the registration code is missing, unknown, expired or used up. Only creation of an identity this node does not hold yet is gated.
         '429':
           description: Identity publication rate limit exceeded (code 429040, IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE publications per identity per minute). Identity admission network quota exceeded (code 429041, IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE, off by default). Identity admission rate limit per client address exceeded (code 429042, IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE, default 30).
   /identities/{reference}:

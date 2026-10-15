@@ -1357,6 +1357,10 @@ services:
       /contexts/diagnostics/infrastructure/memory/InMemoryDiagnosticsSessionRepository
     arguments: []
     parent: contexts/diagnostics/domain/repositories/DiagnosticsSessionRepository
+  contexts/identities/application/detect-creation/IdentityCreationDetector:
+    class: /contexts/identities/application/detect-creation/IdentityCreationDetector
+    arguments:
+      - '@contexts/identities/domain/repositories/IdentityRepository'
   contexts/identities/application/find/IdentityFinder:
     class: /contexts/identities/application/find/IdentityFinder
     arguments:
@@ -1777,6 +1781,11 @@ services:
       - '@contexts/nodes/domain/services/NodeLoaderService'
       - '@contexts/nodes/domain/services/NodeSaverService'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/nodes/application/admit-registration/NodeRegistrationAdmitter:
+    class: /contexts/nodes/application/admit-registration/NodeRegistrationAdmitter
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeRepository'
+      - '@contexts/nodes/domain/repositories/NodeRegistrationCodeRepository'
   contexts/nodes/application/announce-community-state/NodeCommunityStateAnnouncer:
     class: >-
       /contexts/nodes/application/announce-community-state/NodeCommunityStateAnnouncer
@@ -1790,6 +1799,13 @@ services:
     arguments:
       - '@contexts/nodes/domain/services/NodeLoaderService'
       - '@contexts/nodes/domain/services/NodeSaverService'
+  contexts/nodes/application/change-registration-mode/NodeRegistrationModeChanger:
+    class: >-
+      /contexts/nodes/application/change-registration-mode/NodeRegistrationModeChanger
+    arguments:
+      - '@contexts/nodes/domain/services/NodeLoaderService'
+      - '@contexts/nodes/domain/services/NodeSaverService'
+      - '@shared/infrastructure/messageBus/LocalDomainEventPublisher'
   contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationFinder:
     class: >-
       /contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationFinder
@@ -1803,6 +1819,17 @@ services:
     arguments:
       - '@contexts/nodes/domain/repositories/NodePeerRepository'
       - '@contexts/nodes/domain/repositories/NodeRepository'
+  contexts/nodes/application/find-registration-codes/NodeRegistrationCodesFinder:
+    class: >-
+      /contexts/nodes/application/find-registration-codes/NodeRegistrationCodesFinder
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeRegistrationCodeRepository'
+  contexts/nodes/application/issue-registration-code/NodeRegistrationCodeIssuer:
+    class: >-
+      /contexts/nodes/application/issue-registration-code/NodeRegistrationCodeIssuer
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeRegistrationCodeRepository'
+      - '@contexts/nodes/domain/NodeRegistrationCodeLimits'
   contexts/nodes/application/load/NodeLoader:
     class: /contexts/nodes/application/load/NodeLoader
     arguments:
@@ -1825,6 +1852,11 @@ services:
       - '@contexts/nodes/domain/services/NodeSaverService'
       - '@contexts/nodes/domain/services/NodeNetworkDataCleaner'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/nodes/application/revoke-registration-code/NodeRegistrationCodeRevoker:
+    class: >-
+      /contexts/nodes/application/revoke-registration-code/NodeRegistrationCodeRevoker
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeRegistrationCodeRepository'
   contexts/nodes/application/send-heartbeat/NodeHeartbeatSender:
     class: /contexts/nodes/application/send-heartbeat/NodeHeartbeatSender
     arguments:
@@ -1838,6 +1870,7 @@ services:
       - '@contexts/nodes/domain/services/NodeSaverService'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/nodes/domain/repositories/NodePeerRepository: '@contexts/nodes/infrastructure/local-db/LocalNodePeerRepository'
+  contexts/nodes/domain/repositories/NodeRegistrationCodeRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeRegistrationCodeRepository'
   contexts/nodes/domain/repositories/NodeRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeMetadataRepository'
   contexts/nodes/domain/services/NodeCommunityStateDigester: >-
     @contexts/nodes/infrastructure/network-synchronization/CommunityRepositoryNodeCommunityStateDigester
@@ -1868,6 +1901,12 @@ services:
     arguments:
       - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
     parent: contexts/nodes/domain/repositories/NodePeerRepository
+  contexts/nodes/infrastructure/local-db/LocalNodeRegistrationCodeRepository:
+    class: >-
+      /contexts/nodes/infrastructure/local-db/LocalNodeRegistrationCodeRepository
+    arguments:
+      - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+    parent: contexts/nodes/domain/repositories/NodeRegistrationCodeRepository
   contexts/nodes/infrastructure/local-db/mappers/LocalNodeMetadataMapper:
     class: /contexts/nodes/infrastructure/local-db/mappers/LocalNodeMetadataMapper
     arguments: []
@@ -2619,6 +2658,8 @@ services:
     synthetic: true
   ddd-kernel.override.factory.PendingGroupInvitationLimits:
     synthetic: true
+  ddd-kernel.override.factory.NodeRegistrationCodeLimits:
+    synthetic: true
   shared/infrastructure/lifecycle/Runtime: '@apps/apis/calls-api/CallRelayRuntime'
   shared/infrastructure/http/HttpClient: '@shared/infrastructure/http/FetchHttpClient'
   shared/infrastructure/logs/Log: '@shared/infrastructure/logs/WinstonLogger'
@@ -2659,3 +2700,4 @@ services:
   contexts/content-replication/domain/ContentReplicationNetworkBudget: '@ddd-kernel.override.factory.ContentReplicationNetworkBudget'
   contexts/notifications/domain/NotificationReplicationLimits: '@ddd-kernel.override.factory.NotificationReplicationLimits'
   contexts/notifications/domain/PendingGroupInvitationLimits: '@ddd-kernel.override.factory.PendingGroupInvitationLimits'
+  contexts/nodes/domain/NodeRegistrationCodeLimits: '@ddd-kernel.override.factory.NodeRegistrationCodeLimits'

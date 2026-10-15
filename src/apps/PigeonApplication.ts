@@ -38,6 +38,8 @@ import LocalMailboxRepository from '../contexts/mailboxes/infrastructure/local-d
 import NodeNetworkSynchronizationMonitor from '../contexts/nodes/application/find-network-synchronization/NodeNetworkSynchronizationMonitor';
 import NodeLoader from '../contexts/nodes/application/load/NodeLoader';
 import { NodeCommunityStateWasAnnounced } from '../contexts/nodes/domain/events/NodeCommunityStateWasAnnounced';
+import { NodeRegistrationCodeLimits } from '../contexts/nodes/domain/NodeRegistrationCodeLimits';
+import { NodeRegistrationCodeLimitsFromEnvironment } from '../contexts/nodes/infrastructure/environment/NodeRegistrationCodeLimitsFromEnvironment';
 import NotificationScopeSettingsRepository from '../contexts/notification-settings/domain/repositories/NotificationScopeSettingsRepository';
 import NotificationScopeSettingsRepositoryRouter from '../contexts/notification-settings/infrastructure/NotificationScopeSettingsRepositoryRouter';
 import { NotificationReplicationLimits } from '../contexts/notifications/domain/NotificationReplicationLimits';
@@ -358,6 +360,10 @@ export default class PigeonApplication {
         {
           token: PendingGroupInvitationLimits,
           useFactory: () => PendingGroupInvitationLimitsFromEnvironment.load(),
+        },
+        {
+          token: NodeRegistrationCodeLimits,
+          useFactory: () => NodeRegistrationCodeLimitsFromEnvironment.load(),
         },
       ],
     });

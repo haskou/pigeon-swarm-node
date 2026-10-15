@@ -166,6 +166,7 @@ export default class Definitions {
   private conversationId: string | undefined;
   private currentNetworkId: string | undefined;
   private createdIdentityId: string | undefined;
+  private registrationCode: { code: string; id: string } | undefined;
   private keychainExternalIdentifier: string | undefined;
   private messageId: string | undefined;
   private notificationId: string | undefined;
@@ -1507,6 +1508,7 @@ export default class Definitions {
     this.conversationId = undefined;
     this.currentNetworkId = undefined;
     this.createdIdentityId = undefined;
+    this.registrationCode = undefined;
     this.keychainExternalIdentifier = undefined;
     this.messageId = undefined;
     this.notificationId = undefined;
@@ -1610,6 +1612,67 @@ export default class Definitions {
   @given('I set header {string} to {string}')
   public iSetHeaderTo(header: string, value: string): void {
     this.headers[header] = value;
+  }
+
+  @given(
+    'I set a registration code body with {int} uses expiring in {int} days',
+  )
+  public iSetARegistrationCodeBody(maxUses: number, days: number): void {
+    this.body = JSON.stringify({
+      expiresAt: Date.now() + days * 86_400_000 - 60_000,
+      maxUses,
+    });
+  }
+
+  @given('I remember the issued registration code')
+  public iRememberTheIssuedRegistrationCode(): void {
+    const { code, id } = this.response.data as { code: string; id: string };
+
+    this.registrationCode = { code, id };
+  }
+
+  @given('I send the remembered registration code')
+  public iSendTheRememberedRegistrationCode(): void {
+    if (!this.registrationCode) {
+      throw new Error('A registration code must be issued first.');
+    }
+
+    this.headers['X-Registration-Code'] = this.registrationCode.code;
+  }
+
+  @given('I sign a DELETE request to the remembered registration code')
+  public async iSignADeleteRequestToTheRememberedRegistrationCode(): Promise<void> {
+    if (!this.registrationCode) {
+      throw new Error('A registration code must be issued first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'DELETE',
+      `/node/registration-codes/${this.registrationCode.id}`,
+    );
+  }
+
+  @when('I DELETE the remembered registration code')
+  public async iDeleteTheRememberedRegistrationCode(): Promise<void> {
+    if (!this.registrationCode) {
+      throw new Error('A registration code must be issued first.');
+    }
+
+    this.response = await this.restClient.delete(
+      `/node/registration-codes/${this.registrationCode.id}`,
+      undefined,
+      { headers: this.headers },
+    );
+  }
+
+  @given('I switch to a new identity')
+  public iSwitchToANewIdentity(): void {
+    this.identityKeyPair = undefined;
+    this.identityRecoveryKeyPair = undefined;
+    this.identityDeviceOwnerKeyPair = undefined;
+    this.ownerIdentityId = undefined;
+    this.createdIdentityId = undefined;
   }
 
   @given('I clear request headers')

@@ -1264,7 +1264,10 @@ Response:
 ```json
 {
   "id": "<nodeId>",
-  "owner": "<identityId>"
+  "owner": "<identityId>",
+  "registration": {
+    "mode": "open"
+  }
 }
 ```
 
@@ -1272,6 +1275,8 @@ Implemented:
 
 - return the local node id
 - return the owner when the node has already been claimed
+- return the registration mode (`open`, `codes` or `closed`), so a client
+  knows before creating a key whether it needs a registration link
 - keep networks out of this response
 
 ### Get local node relay configuration
@@ -1538,6 +1543,150 @@ Implemented:
 - change the owner only when the request is signed by the current owner
 - persist owner state in the local embedded database
 - load persisted node state when the API process starts
+
+### Put local node registration mode
+
+```http
+PUT /node/registration
+X-Identity-Id: <ownerIdentityId>
+X-Timestamp: <millisecondsSinceEpoch>
+X-Signature: <signature>
+```
+
+Request:
+
+```json
+{
+  "mode": "codes"
+}
+```
+
+Response:
+
+```json
+{
+  "mode": "codes"
+}
+```
+
+Implemented:
+
+- require signed request auth from the current node owner; anonymous,
+  non-owner requests and requests to an unclaimed node are refused with `403`,
+  code `403010`
+- `open` (default): anyone who pays the admission proof can create an identity
+  through this node
+- `codes`: creating an identity through this node needs a registration code
+- `closed`: nobody can create an identity through this node, the owner
+  included; switch to `codes` to invite someone
+- the mode only gates **creation** through this node: a `POST /identities`
+  for an identity this node does not hold yet, whatever its version. Updates
+  and republishing of an identity this node already holds, login and every
+  other route are never gated
+- changing the mode is local: it is neither gossiped nor pushed to WebSocket
+  clients; `GET /node` reads it
+- the proof of work and its pricing apply unchanged in every mode
+- persist the mode in local node metadata; it is not replicated
+
+### Issue a registration code
+
+```http
+POST /node/registration-codes
+X-Identity-Id: <ownerIdentityId>
+X-Timestamp: <millisecondsSinceEpoch>
+X-Signature: <signature>
+```
+
+Request:
+
+```json
+{
+  "maxUses": 1,
+  "expiresAt": 1773848829055
+}
+```
+
+Response `201`, with `Cache-Control: no-store`:
+
+```json
+{
+  "id": "<codeId>",
+  "code": "<43 base64url characters>",
+  "maxUses": 1,
+  "expiresAt": 1773848829055
+}
+```
+
+Implemented:
+
+- require signed request auth from the current node owner (`403010` otherwise)
+- `maxUses` is optional and defaults to `1`; it must be between `1` and
+  `NODE_REGISTRATION_CODE_MAX_USES` (default `100`)
+- `expiresAt` (milliseconds since epoch) is required, must be in the future and
+  at most `NODE_REGISTRATION_CODE_MAX_TTL_DAYS` (default `30`) days ahead
+- an out-of-range `maxUses` or `expiresAt` is refused with `400`, code `400070`
+- the code is 32 random bytes, base64url. It appears only in this response:
+  the node stores its SHA-256, `maxUses`, the uses left and `expiresAt` in a
+  local collection that is never replicated
+- uses are counted on this node only, because the code only gates creation
+  through this node
+
+The owner's client builds the registration link; the node needs no UI address:
+
+```text
+https://<ui-origin>/register#node=<encodeURIComponent(node endpoint)>&code=<code>
+```
+
+The code travels in the fragment, so it never reaches the UI host's logs or a
+`Referer` header.
+
+### List registration codes
+
+```http
+GET /node/registration-codes
+X-Identity-Id: <ownerIdentityId>
+X-Timestamp: <millisecondsSinceEpoch>
+X-Signature: <signature>
+```
+
+Response:
+
+```json
+{
+  "codes": [
+    {
+      "id": "<codeId>",
+      "maxUses": 5,
+      "usesLeft": 3,
+      "expiresAt": 1773848829055
+    }
+  ]
+}
+```
+
+Implemented:
+
+- require signed request auth from the current node owner (`403010` otherwise)
+- never return the code itself
+- expired codes are dropped; used-up codes are not listed but kept until they
+  expire, so a use given back by a failed creation is not lost
+
+### Revoke a registration code
+
+```http
+DELETE /node/registration-codes/{codeId}
+X-Identity-Id: <ownerIdentityId>
+X-Timestamp: <millisecondsSinceEpoch>
+X-Signature: <signature>
+```
+
+Response: `204` without body.
+
+Implemented:
+
+- require signed request auth from the current node owner (`403010` otherwise)
+- remove the code so it can no longer create identities
+- revoking an unknown or already dropped code also returns `204`
 
 ### Get active peers
 
@@ -2245,6 +2394,28 @@ and before the per-identity and per-network counters, so a flood from one addres
 is refused without spending them; the next admission from that address is refused
 with `429`, code `429042`. The count is in memory and local to the node, and it
 resets on restart. Clients behind one NAT share the count.
+
+When this node's registration mode is `codes`, creating an identity through it
+needs the registration code in a header:
+
+```http
+POST /identities
+X-Registration-Code: <code>
+```
+
+Registration control applies only when the body is an identity this node does
+not hold yet, whatever its version: a later version whose genesis lives
+elsewhere still brings a new identity here. An identity that already
+replicated here is a republish or an update and is never gated, nor is login.
+The check runs after the per-address limiter and before the per-identity and
+per-network counters, so refused attempts never spend those limits. One use of
+the code is reserved before publishing and released if publishing fails, so a
+refused proof never burns a use and two concurrent requests cannot both spend
+the last one. Creation is refused with `403`, code `403011`, when the mode is
+`closed` ("Identity creation on this node is closed.") and in `codes` mode
+when the code is missing, unknown, expired or used up ("Identity creation on
+this node needs a valid registration code." for all four), so a caller learns
+nothing about which codes exist.
 
 ### Update identity
 

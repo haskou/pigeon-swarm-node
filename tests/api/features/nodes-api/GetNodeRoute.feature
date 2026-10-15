@@ -6,3 +6,7 @@ Feature: Get node
     Then response code is equal to 200
     And response body should contain "id"
     And response body should not contain "owner"
+    And response data should match partially
+      """
+      { "registration": { "mode": "open" } }
+      """

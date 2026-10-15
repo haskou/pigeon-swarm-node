@@ -1,6 +1,7 @@
 # Node owner registration control and blocking (optional)
 
-Status: design for issue #384, decisions confirmed by the owner. The price-based
+Status: design for issue #384, decisions confirmed by the owner. Built:
+registration control (delivery step 1). The price-based
 admission model stays the default, and every node stays open unless its owner
 changes that. A node owner gets two optional, local tools:
 
@@ -115,10 +116,11 @@ the others.
 `POST /identities` publishes both new identities and new versions of existing
 ones. A version with no previous reference is a genesis
 (`IdentityPublisher.ts:28-41`, `Identity.ts:146-147`). Registration control
-applies only when the body is a genesis **and** this node does not hold that
-identity yet. A genesis that already replicated here is a republish, not a
-creation. Updates, network additions, device transitions, login and every
-other route are never gated.
+applies when this node does not hold that identity yet, whatever the version:
+a later version whose genesis was published elsewhere and is reachable over
+IPFS would otherwise bring a new identity onto a closed node. An identity that
+already replicated here is a republish, not a creation, so its updates, network
+additions, device transitions, login and every other route are never gated.
 
 ### Registration codes
 
@@ -136,7 +138,8 @@ other route are never gated.
   repository.
 - `GET /node/registration-codes` (owner-signed) lists codes by id with uses
   left and expiry, never the code. `DELETE /node/registration-codes/{id}`
-  revokes one. Expired and used-up codes are dropped.
+  revokes one. Expired codes are dropped; used-up codes are hidden and kept
+  until they expire, so a use given back by a failed creation is not lost.
 - **Uses are counted on this node only.** That is safe because the code only
   gates creation through this node. No other node checks it, and the identity
   record does not carry it, so no replica has to agree on the remaining uses.

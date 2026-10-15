@@ -11,6 +11,7 @@ export class NodeViewModel {
     return {
       id: primitives.id,
       owner: primitives.owner,
+      registration: { mode: primitives.registrationMode },
     };
   }
 }

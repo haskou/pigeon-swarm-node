@@ -1,5 +1,13 @@
+import IdentityCreationDetector from '@app/contexts/identities/application/detect-creation/IdentityCreationDetector';
+import { IdentityCreationDetectorMessage } from '@app/contexts/identities/application/detect-creation/messages/IdentityCreationDetectorMessage';
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
+import { IdentityPublishMessage } from '@app/contexts/identities/application/publish/messages/IdentityPublishMessage';
 import { InsufficientIdentityAdmissionProofError } from '@app/contexts/identities/domain/errors/InsufficientIdentityAdmissionProofError';
+import { NodeRegistrationAdmitterMessage } from '@app/contexts/nodes/application/admit-registration/messages/NodeRegistrationAdmitterMessage';
+import NodeRegistrationAdmitter from '@app/contexts/nodes/application/admit-registration/NodeRegistrationAdmitter';
+import { NodeRegistrationReservation } from '@app/contexts/nodes/application/admit-registration/NodeRegistrationReservation';
+import { NodeRegistrationCodeIsNotValidError } from '@app/contexts/nodes/domain/errors/NodeRegistrationCodeIsNotValidError';
+import { NodeRegistrationIsClosedError } from '@app/contexts/nodes/domain/errors/NodeRegistrationIsClosedError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
@@ -7,6 +15,7 @@ import { Request, Response } from 'express';
 import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 
 import { PostIdentityBody } from '../bodies/PostIdentityBody';
+import { IdentityCreationIsRefusedOnThisNodeError } from '../errors/IdentityCreationIsRefusedOnThisNodeError';
 import IdentityAdmissionSourceRateLimiter from '../IdentityAdmissionSourceRateLimiter';
 import IdentityNetworkAdmissionRateLimiter from '../IdentityNetworkAdmissionRateLimiter';
 import IdentityPublishRateLimiter from '../IdentityPublishRateLimiter';
@@ -33,6 +42,41 @@ export class PostIdentityRoute extends Route {
       IdentityNetworkAdmissionRateLimiter,
     );
 
+  private readonly creationDetector = this.get<IdentityCreationDetector>(
+    IdentityCreationDetector,
+  );
+
+  private readonly registrationAdmitter = this.get<NodeRegistrationAdmitter>(
+    NodeRegistrationAdmitter,
+  );
+
+  private async admitRegistration(
+    message: IdentityPublishMessage,
+    httpRequest: Request,
+  ): Promise<NodeRegistrationReservation> {
+    const isCreation = await this.creationDetector.isCreation(
+      new IdentityCreationDetectorMessage(message.identity),
+    );
+
+    try {
+      return await this.registrationAdmitter.admit(
+        new NodeRegistrationAdmitterMessage(
+          isCreation,
+          httpRequest.header('X-Registration-Code'),
+        ),
+      );
+    } catch (error: unknown) {
+      if (
+        error instanceof NodeRegistrationIsClosedError ||
+        error instanceof NodeRegistrationCodeIsNotValidError
+      ) {
+        throw new IdentityCreationIsRefusedOnThisNodeError(error.message);
+      }
+
+      throw error;
+    }
+  }
+
   @Post('/')
   public async createIdentity(
     @Body({
@@ -44,13 +88,15 @@ export class PostIdentityRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     this.sourceRateLimiter.consume(httpRequest.ip ?? 'unknown');
-    await this.rateLimiter.consume(new IdentityId(body.id));
-    await this.networkAdmissionRateLimiter.consume(body.networks);
+
+    const message = new PostIdentityRequest(body).getIdentityPublishMessage();
+    const reservation = await this.admitRegistration(message, httpRequest);
 
     try {
-      const candidate = await this.identityPublisher.publish(
-        new PostIdentityRequest(body).getIdentityPublishMessage(),
-      );
+      await this.rateLimiter.consume(new IdentityId(body.id));
+      await this.networkAdmissionRateLimiter.consume(body.networks);
+
+      const candidate = await this.identityPublisher.publish(message);
       const viewModel = new IdentityViewModel(
         candidate.getIdentity(),
         candidate.getExternalIdentifier(),
@@ -60,6 +106,8 @@ export class PostIdentityRoute extends Route {
         .status(HttpRouteStatusEnum.OK)
         .send(viewModel.toResource());
     } catch (error: unknown) {
+      await this.registrationAdmitter.release(reservation);
+
       if (error instanceof InsufficientIdentityAdmissionProofError) {
         return response
           .status(HttpRouteStatusEnum.BAD_REQUEST)

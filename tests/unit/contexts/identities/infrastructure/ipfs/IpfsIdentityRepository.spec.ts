@@ -1,3 +1,4 @@
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -438,6 +439,47 @@ describe('IpfsIdentityRepository', () => {
         ),
       ).rejects.toThrow(IdentityNotFoundError);
       expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('holds', () => {
+    it('should hold an identity with replicated metadata on this node', async () => {
+      const identity = await mother.build();
+      const primitives = identity.toPrimitives();
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          cid: 'bafyheldcid',
+          identity,
+          identityId: primitives.id,
+          previousCid: primitives.previousIdentityExternalIdentifier,
+          version: primitives.version,
+        },
+      ]);
+
+      await expect(
+        repository.holds(new IdentityId(primitives.id)),
+      ).resolves.toBe(true);
+    });
+
+    it('should not hold an identity without metadata on this node', async () => {
+      const identity = await mother.build();
+
+      metadataRepository.findByIdentityId.mockResolvedValue([]);
+
+      await expect(repository.holds(identity.getId())).resolves.toBe(false);
+    });
+
+    it('should not mistake unready replicated state for an unknown identity', async () => {
+      const identity = await mother.build();
+
+      metadataRepository.findByIdentityId.mockRejectedValue(
+        new ReplicatedStateNotReadyError(),
+      );
+
+      await expect(repository.holds(identity.getId())).rejects.toBeInstanceOf(
+        ReplicatedStateNotReadyError,
+      );
     });
   });
 

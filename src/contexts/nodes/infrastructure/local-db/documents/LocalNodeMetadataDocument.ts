@@ -13,5 +13,6 @@ export interface LocalNodeMetadataDocument extends Record<string, unknown> {
   >;
   nodeId: string;
   owner?: string;
+  registrationMode: string;
   relayConfiguration: PrimitiveOf<NodeRelayConfiguration>;
 }

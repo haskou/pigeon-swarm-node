@@ -282,6 +282,12 @@ paths:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1networks~1public~1'
   /node/owner/:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1owner~1'
+  /node/registration/:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1registration~1'
+  /node/registration-codes/:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1registration-codes~1'
+  /node/registration-codes/{codeId}/:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1registration-codes~1{codeId}~1'
   /peers/:
     $ref: './nodes-api/swagger.yaml#/paths/~1peers~1'
   /notifications/:

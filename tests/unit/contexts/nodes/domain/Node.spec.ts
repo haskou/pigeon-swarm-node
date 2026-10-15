@@ -3,9 +3,11 @@ import { NodeNetworkNotFoundError } from '@app/contexts/nodes/domain/errors/Node
 import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from '@app/contexts/nodes/domain/errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
 import { NodeNetworkWasAdded } from '@app/contexts/nodes/domain/events/NodeNetworkWasAdded';
 import { NodeNetworkWasRemoved } from '@app/contexts/nodes/domain/events/NodeNetworkWasRemoved';
+import { NodeRegistrationModeWasChanged } from '@app/contexts/nodes/domain/events/NodeRegistrationModeWasChanged';
 import { NodeRelayConfigurationWasUpdated } from '@app/contexts/nodes/domain/events/NodeRelayConfigurationWasUpdated';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
+import { NodeRegistrationMode } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationMode';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { PrimitiveOf } from '@haskou/value-objects';
@@ -42,6 +44,7 @@ describe('Node', () => {
         ]),
       ),
       owner: mother.owner?.valueOf(),
+      registrationMode: 'open',
       relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
     };
   });
@@ -120,6 +123,7 @@ describe('Node', () => {
           [networkId.valueOf()]: network.toPrimitives(),
         },
         owner: undefined,
+        registrationMode: 'open',
         relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
       });
 
@@ -201,6 +205,38 @@ describe('Node', () => {
       expect(node.pullDomainEvents()).toEqual([
         expect.any(NodeRelayConfigurationWasUpdated),
       ]);
+    });
+  });
+
+  describe('changeRegistrationMode', () => {
+    it('should be open for registration by default', () => {
+      expect(node.isOpenForRegistration()).toBe(true);
+      expect(node.isClosedForRegistration()).toBe(false);
+      expect(node.toPrimitives().registrationMode).toBe('open');
+    });
+
+    it('should change the registration mode and record a domain event', () => {
+      node.changeRegistrationMode(NodeRegistrationMode.CLOSED);
+
+      expect(node.isClosedForRegistration()).toBe(true);
+      expect(node.isOpenForRegistration()).toBe(false);
+      const events = node.pullDomainEvents();
+
+      expect(events).toEqual([expect.any(NodeRegistrationModeWasChanged)]);
+      expect(events[0].attributes).toEqual({ registrationMode: 'closed' });
+    });
+
+    it('should neither be open nor closed in codes mode', () => {
+      node.changeRegistrationMode(NodeRegistrationMode.CODES);
+
+      expect(node.isOpenForRegistration()).toBe(false);
+      expect(node.isClosedForRegistration()).toBe(false);
+    });
+
+    it('should not record an event when the mode does not change', () => {
+      node.changeRegistrationMode(NodeRegistrationMode.OPEN);
+
+      expect(node.pullDomainEvents()).toEqual([]);
     });
   });
 });

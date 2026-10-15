@@ -1,6 +1,7 @@
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import { NodeRegistrationMode } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationMode';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
@@ -33,6 +34,7 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
       typeof document.nodeId === 'string' &&
       this.hasValidNetworks(document.networks) &&
       this.hasValidOwner(document.owner) &&
+      this.hasValidRegistrationMode(document.registrationMode) &&
       this.hasValidRelayConfiguration(document.relayConfiguration)
     );
   }
@@ -47,6 +49,12 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
 
   private hasValidOwner(owner: unknown): boolean {
     return owner === undefined || typeof owner === 'string';
+  }
+
+  private hasValidRegistrationMode(registrationMode: unknown): boolean {
+    return (
+      registrationMode === undefined || typeof registrationMode === 'string'
+    );
   }
 
   private hasValidRelayConfiguration(relayConfiguration: unknown): boolean {
@@ -70,6 +78,8 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
         networks: document.networks,
         nodeId: new NodeId(document.nodeId).valueOf(),
         owner: document.owner,
+        registrationMode:
+          document.registrationMode ?? NodeRegistrationMode.OPEN.valueOf(),
         relayConfiguration:
           document.relayConfiguration ??
           NodeRelayConfiguration.default().toPrimitives(),
@@ -162,6 +172,7 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
       id: metadata.nodeId,
       networks: metadata.networks,
       owner: metadata.owner,
+      registrationMode: metadata.registrationMode,
       relayConfiguration: metadata.relayConfiguration,
     });
   }
@@ -195,6 +206,12 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     const metadata = await this.loadOrCreateMetadata();
 
     return new NodeId(metadata.nodeId);
+  }
+
+  public async loadLocalNodeRegistrationMode(): Promise<NodeRegistrationMode> {
+    const metadata = await this.loadOrCreateMetadata();
+
+    return NodeRegistrationMode.fromPrimitives(metadata.registrationMode);
   }
 
   public async saveLocalNode(node: Node): Promise<void> {

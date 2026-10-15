@@ -167,6 +167,10 @@ export class Identity extends AggregateRoot {
     );
   }
 
+  public getId(): IdentityId {
+    return this.id;
+  }
+
   public isIdentifiedBy(id: IdentityId): boolean {
     return this.id.isEqual(id);
   }

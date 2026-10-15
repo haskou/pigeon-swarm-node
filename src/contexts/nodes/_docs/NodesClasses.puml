@@ -8,12 +8,58 @@ package "nodes" {
       -id: NodeId
       -networks: Map<NetworkId, Network>
       -owner?: IdentityId
+      -registrationMode: NodeRegistrationMode
       +addNetwork(network: Network): void
       +assignOwner(owner: IdentityId, authenticatedIdentityId: IdentityId): void
       +hasOwner(): boolean
       +isOwnedBy(identityId: IdentityId): boolean
+      +changeRegistrationMode(mode: NodeRegistrationMode): void
+      +isOpenForRegistration(): boolean
+      +isClosedForRegistration(): boolean
       +toPrimitives(): object
     }
+
+    class NodeRegistrationMode <StringValueObject>
+
+    class NodeRegistrationModeWasChanged <DomainEvent> {
+      +eventName(): string
+    }
+
+    class NodeRegistrationCode <AggregateRoot> {
+      -id: NodeRegistrationCodeId
+      -hash: NodeRegistrationCodeHash
+      -maxUses: Integer
+      -usesLeft: Integer
+      -expiresAt: Timestamp
+      +{static} issue(secret, maxUses, expiresAt, limits, now): NodeRegistrationCode
+      +isUsableAt(now: Timestamp): boolean
+      +isExpiredAt(now: Timestamp): boolean
+      +reserveUse(now: Timestamp): void
+      +releaseUse(): void
+      +toPrimitives(): NodeRegistrationCodePrimitives
+    }
+
+    class NodeRegistrationCodeSecret
+    class NodeRegistrationCodeHash
+    class NodeRegistrationCodeId <UUID>
+    class NodeRegistrationCodeLimits {
+      +maxUses: number
+      +maxTtlDays: number
+    }
+
+    abstract class NodeRegistrationCodeRepository {
+      +save(code: NodeRegistrationCode): Promise<void>
+      +findAll(): Promise<NodeRegistrationCode[]>
+      +remove(id: NodeRegistrationCodeId): Promise<void>
+      +removeExpired(now: Timestamp): Promise<void>
+      +reserveUse(hash: NodeRegistrationCodeHash, now: Timestamp): Promise<NodeRegistrationCode | undefined>
+      +releaseUse(id: NodeRegistrationCodeId): Promise<void>
+    }
+
+    class NodeRegistrationIsClosedError <DomainError>
+    class NodeRegistrationCodeIsNotValidError <DomainError>
+    class NodeRegistrationCodeMaxUsesIsOutOfRangeError <DomainError>
+    class NodeRegistrationCodeExpiryIsOutOfRangeError <DomainError>
 
     class Network {
       -id: NetworkId
@@ -66,6 +112,13 @@ package "nodes" {
 
     Node o--> "0..N" Network
     Node ..> NodeNetworkWasAdded
+    Node *--> NodeRegistrationMode
+    Node ..> NodeRegistrationModeWasChanged
+    NodeRegistrationCode *--> NodeRegistrationCodeId
+    NodeRegistrationCode *--> NodeRegistrationCodeHash
+    NodeRegistrationCode ..> NodeRegistrationCodeLimits
+    NodeRegistrationCodeSecret ..> NodeRegistrationCodeHash
+    NodeRegistrationCodeRepository o--> NodeRegistrationCode
     NodePeer o--> "0..N" NodePeerNetwork
     NodePeer --> NodeId
     NodePeerNetwork *--> NodePeerNetworkType
@@ -76,6 +129,7 @@ package "nodes" {
 
     class NodeRepository <interface> {
       +loadLocalNode(): Promise<Node>
+      +loadLocalNodeRegistrationMode(): Promise<NodeRegistrationMode>
       +saveLocalNode(node: Node): Promise<void>
     }
 
@@ -182,6 +236,33 @@ package "nodes" {
       +record(message: NodePeerCommunityStateRecordMessage): void
     }
 
+    class NodeRegistrationModeChanger {
+      +change(message: NodeRegistrationModeChangerMessage): Promise<Node>
+    }
+
+    class NodeRegistrationCodeIssuer {
+      +issue(message: NodeRegistrationCodeIssuerMessage): Promise<IssuedNodeRegistrationCode>
+    }
+
+    class NodeRegistrationCodesFinder {
+      +find(): Promise<NodeRegistrationCode[]>
+    }
+
+    class NodeRegistrationCodeRevoker {
+      +revoke(message: NodeRegistrationCodeRevokerMessage): Promise<void>
+    }
+
+    class NodeRegistrationAdmitter {
+      +admit(message: NodeRegistrationAdmitterMessage): Promise<NodeRegistrationReservation>
+      +release(reservation: NodeRegistrationReservation): Promise<void>
+    }
+
+    note right of NodeRegistrationAdmitter
+      Gates identity creation through this node:
+      open admits, closed refuses, codes reserves
+      one use atomically; release returns it.
+    end note
+
     NodeNetworkAdder --> NodeLoaderService
     NodeNetworkAdder --> NodeSaverService
     NodeNetworkAdder --> NodeNetworkAdderMessage
@@ -204,14 +285,31 @@ package "nodes" {
     NodeCommunityStateAnnouncer --> NodeCommunityStateDigester
     NodeCommunityStateAnnouncer ..> NodeCommunityStateWasAnnounced
     NodePeerCommunityStateRecorder --> NodeNetworkSynchronizationMonitor
+    NodeRegistrationModeChanger --> NodeLoaderService
+    NodeRegistrationModeChanger --> NodeSaverService
+    NodeRegistrationCodeIssuer --> NodeRegistrationCodeRepository
+    NodeRegistrationCodesFinder --> NodeRegistrationCodeRepository
+    NodeRegistrationCodeRevoker --> NodeRegistrationCodeRepository
+    NodeRegistrationAdmitter --> NodeRepository
+    NodeRegistrationAdmitter --> NodeRegistrationCodeRepository
   }
 
   package "infrastructure" {
     class LocalNodeMetadataRepository {
       -networkRegistry: IPFSNetworkRegistry
       +loadLocalNode(): Promise<Node>
+      +loadLocalNodeRegistrationMode(): Promise<NodeRegistrationMode>
       +saveLocalNode(node: Node): Promise<void>
     }
+
+    class LocalNodeRegistrationCodeRepository {
+      +reserveUse(hash: NodeRegistrationCodeHash, now: Timestamp): Promise<NodeRegistrationCode | undefined>
+    }
+
+    note right of LocalNodeRegistrationCodeRepository
+      Local-only collection of code hashes and uses left.
+      A serial queue makes reserve and release atomic.
+    end note
 
     class LocalNodePeerRepository {
       +save(peer: NodePeer): Promise<void>
@@ -240,6 +338,7 @@ package "nodes" {
 
     LocalNodeMetadataRepository ..|> NodeRepository
     LocalNodePeerRepository ..|> NodePeerRepository
+    LocalNodeRegistrationCodeRepository ..|> NodeRegistrationCodeRepository
     InMemoryNodeNetworkSynchronizationMonitor ..|> NodeNetworkSynchronizationMonitor
     CommunityRepositoryNodeCommunityStateDigester ..|> NodeCommunityStateDigester
   }
