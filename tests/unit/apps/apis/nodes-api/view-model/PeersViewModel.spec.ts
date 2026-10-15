@@ -24,6 +24,7 @@ describe('PeersViewModel', () => {
         },
       },
       owner: undefined,
+      registrationMode: 'open',
       relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
     });
     const peer = NodePeer.fromPrimitives({
@@ -97,6 +98,7 @@ describe('PeersViewModel', () => {
         },
       },
       owner: undefined,
+      registrationMode: 'open',
       relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
     });
     const peer = NodePeer.fromPrimitives({
@@ -167,6 +169,7 @@ describe('PeersViewModel', () => {
         },
       },
       owner: undefined,
+      registrationMode: 'open',
       relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
     });
 

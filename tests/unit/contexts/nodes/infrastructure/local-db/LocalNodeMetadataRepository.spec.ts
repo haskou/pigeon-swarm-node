@@ -81,6 +81,7 @@ describe('LocalNodeMetadataRepository', () => {
         },
         nodeId: canonicalNodeId,
         owner: owner.valueOf(),
+        registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
       networkRegistry.getAll.mockReturnValue([]);
@@ -99,6 +100,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: owner.valueOf(),
+        registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
       expect(networkRegistry.initialize).toHaveBeenCalled();
@@ -119,11 +121,73 @@ describe('LocalNodeMetadataRepository', () => {
         _id: 'local',
         networks: {},
         nodeId: primitives.id,
+        registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
       expect(primitives.networks).toEqual({});
       expect(primitives.owner).toBeUndefined();
       expect(primitives.relayConfiguration).toEqual(defaultRelayConfiguration);
+    });
+
+    it('should load a node without a persisted registration mode as open', async () => {
+      database.findOne.mockResolvedValue({
+        _id: 'local',
+        networks: {},
+        nodeId: canonicalNodeId,
+        relayConfiguration: defaultRelayConfiguration,
+      });
+      networkRegistry.getAll.mockReturnValue([]);
+
+      const localNode = await repository.loadLocalNode();
+
+      expect(localNode.toPrimitives().registrationMode).toBe('open');
+      expect(localNode.isOpenForRegistration()).toBe(true);
+    });
+
+    it('should load the persisted registration mode', async () => {
+      database.findOne.mockResolvedValue({
+        _id: 'local',
+        networks: {},
+        nodeId: canonicalNodeId,
+        registrationMode: 'closed',
+        relayConfiguration: defaultRelayConfiguration,
+      });
+      networkRegistry.getAll.mockReturnValue([]);
+
+      const localNode = await repository.loadLocalNode();
+
+      expect(localNode.isClosedForRegistration()).toBe(true);
+    });
+  });
+
+  describe('loadLocalNodeRegistrationMode', () => {
+    it('should read the persisted mode without touching the runtime networks', async () => {
+      database.findOne.mockResolvedValue({
+        _id: 'local',
+        networks: {},
+        nodeId: canonicalNodeId,
+        registrationMode: 'codes',
+        relayConfiguration: defaultRelayConfiguration,
+      });
+
+      const mode = await repository.loadLocalNodeRegistrationMode();
+
+      expect(mode.valueOf()).toBe('codes');
+      expect(networkRegistry.initialize).not.toHaveBeenCalled();
+      expect(networkRegistry.removeNetwork).not.toHaveBeenCalled();
+    });
+
+    it('should read a missing mode as open', async () => {
+      database.findOne.mockResolvedValue({
+        _id: 'local',
+        networks: {},
+        nodeId: canonicalNodeId,
+        relayConfiguration: defaultRelayConfiguration,
+      });
+
+      const mode = await repository.loadLocalNodeRegistrationMode();
+
+      expect(mode.isOpen()).toBe(true);
     });
   });
 
@@ -141,6 +205,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
 
@@ -183,6 +248,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
 
@@ -217,6 +283,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
       const latestNode = Node.fromPrimitives({
@@ -230,6 +297,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
 
@@ -255,6 +323,7 @@ describe('LocalNodeMetadataRepository', () => {
         id: canonicalNodeId,
         networks: {},
         owner: undefined,
+        registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
       const obsoleteNetwork = mock<IPFSNetwork>();
@@ -292,6 +361,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
 
@@ -322,6 +392,7 @@ describe('LocalNodeMetadataRepository', () => {
           [privateNetworkId.valueOf()]: networkMother.build().toPrimitives(),
         },
         owner: undefined,
+        registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
 
@@ -347,6 +418,7 @@ describe('LocalNodeMetadataRepository', () => {
           [privateNetworkId.valueOf()]: networkMother.build().toPrimitives(),
         },
         owner: undefined,
+        registrationMode: 'open',
         relayConfiguration: NodeRelayConfiguration.fromPrimitives({
           privateRelay: {
             enabled: true,

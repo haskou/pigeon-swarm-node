@@ -198,3 +198,188 @@ Feature: Post identity route
     When I PUT the created identity
     Then response code is equal to 429
     And response body should contain "429042"
+
+  Scenario: Refuse identity creation on a closed node
+    Given the local node has no owner and no networks
+    And I sign the current node owner request
+    When I PUT "/node/owner/"
+    Then response code is equal to 200
+
+    Given I set json body
+      """
+      { "mode": "closed" }
+      """
+    And I sign a PUT request to "/node/registration/"
+    When I PUT "/node/registration/"
+    Then response code is equal to 200
+    And I clear request headers
+    And the current node has a test network with id "123e4567-e89b-12d3-a456-426614174980" and name "registration-network-80"
+    And I set a client-signed identity body with name "closed" and handle "closed"
+    When I POST to "/identities/"
+    Then response code is equal to 403
+    And response body should contain "403011"
+
+  Scenario: Keep republishing and updates working on a closed node
+    Given the local node has no owner and no networks
+    And I sign the current node owner request
+    When I PUT "/node/owner/"
+    Then response code is equal to 200
+    And I clear request headers
+    And the current node has a test network with id "123e4567-e89b-12d3-a456-426614174981" and name "registration-network-81"
+    And I set a client-signed identity body with name "resident" and handle "resident"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+
+    Given I set json body
+      """
+      { "mode": "closed" }
+      """
+    And I sign a PUT request to "/node/registration/"
+    When I PUT "/node/registration/"
+    Then response code is equal to 200
+    And I clear request headers
+    And I set a client-signed identity body with name "resident" and handle "resident"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I set a client-signed identity update body with name "resident updated", handle "resident_new" and password "New-client-password1!"
+    And I sign the current identity update request
+    When I PUT the created identity
+    Then response code is equal to 200
+
+  Scenario: Create an identity with a registration code and count its use
+    Given the local node has no owner and no networks
+    And I sign the current node owner request
+    When I PUT "/node/owner/"
+    Then response code is equal to 200
+
+    Given I set json body
+      """
+      { "mode": "codes" }
+      """
+    And I sign a PUT request to "/node/registration/"
+    When I PUT "/node/registration/"
+    Then response code is equal to 200
+
+    Given I set a registration code body with 2 uses expiring in 1 days
+    And I sign a POST request to "/node/registration-codes/"
+    When I POST to "/node/registration-codes/"
+    Then response code is equal to 201
+    And I remember the issued registration code
+    And I clear request headers
+    And the current node has a test network with id "123e4567-e89b-12d3-a456-426614174982" and name "registration-network-82"
+    And I set a client-signed identity body with name "invited" and handle "invited"
+    And I send the remembered registration code
+    When I POST to "/identities/"
+    Then response code is equal to 200
+
+    Given I sign a GET request to "/node/registration-codes/"
+    When I GET "/node/registration-codes/"
+    Then response code is equal to 200
+    And response data should match partially
+      """
+      { "codes": [{ "maxUses": 2, "usesLeft": 1 }] }
+      """
+
+  Scenario: Refuse identity creation without a registration code
+    Given the local node has no owner and no networks
+    And I sign the current node owner request
+    When I PUT "/node/owner/"
+    Then response code is equal to 200
+
+    Given I set json body
+      """
+      { "mode": "codes" }
+      """
+    And I sign a PUT request to "/node/registration/"
+    When I PUT "/node/registration/"
+    Then response code is equal to 200
+    And I clear request headers
+    And the current node has a test network with id "123e4567-e89b-12d3-a456-426614174983" and name "registration-network-83"
+    And I set a client-signed identity body with name "uninvited" and handle "uninvited"
+    When I POST to "/identities/"
+    Then response code is equal to 403
+    And response body should contain "403011"
+
+  Scenario: Refuse identity creation with an unknown registration code
+    Given the local node has no owner and no networks
+    And I sign the current node owner request
+    When I PUT "/node/owner/"
+    Then response code is equal to 200
+
+    Given I set json body
+      """
+      { "mode": "codes" }
+      """
+    And I sign a PUT request to "/node/registration/"
+    When I PUT "/node/registration/"
+    Then response code is equal to 200
+    And I clear request headers
+    And the current node has a test network with id "123e4567-e89b-12d3-a456-426614174984" and name "registration-network-84"
+    And I set header "X-Registration-Code" to "dGhpcy1pcy1ub3QtYS1yZWFsLXJlZ2lzdHJhdGlvbi1jb2Rl"
+    And I set a client-signed identity body with name "guesser" and handle "guesser"
+    When I POST to "/identities/"
+    Then response code is equal to 403
+    And response body should contain "403011"
+
+  Scenario: Refuse identity creation with a used-up registration code
+    Given the local node has no owner and no networks
+    And I sign the current node owner request
+    When I PUT "/node/owner/"
+    Then response code is equal to 200
+
+    Given I set json body
+      """
+      { "mode": "codes" }
+      """
+    And I sign a PUT request to "/node/registration/"
+    When I PUT "/node/registration/"
+    Then response code is equal to 200
+
+    Given I set a registration code body with 1 uses expiring in 1 days
+    And I sign a POST request to "/node/registration-codes/"
+    When I POST to "/node/registration-codes/"
+    Then response code is equal to 201
+    And I remember the issued registration code
+    And I clear request headers
+    And the current node has a test network with id "123e4567-e89b-12d3-a456-426614174985" and name "registration-network-85"
+    And I set a client-signed identity body with name "first guest" and handle "first-guest"
+    And I send the remembered registration code
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I switch to a new identity
+    And I set a client-signed identity body with name "second guest" and handle "second-guest"
+    When I POST to "/identities/"
+    Then response code is equal to 403
+    And response body should contain "403011"
+
+  Scenario: Give the registration code use back when publishing fails
+    Given the local node has no owner and no networks
+    And I sign the current node owner request
+    When I PUT "/node/owner/"
+    Then response code is equal to 200
+
+    Given I set json body
+      """
+      { "mode": "codes" }
+      """
+    And I sign a PUT request to "/node/registration/"
+    When I PUT "/node/registration/"
+    Then response code is equal to 200
+
+    Given I set a registration code body with 1 uses expiring in 1 days
+    And I sign a POST request to "/node/registration-codes/"
+    When I POST to "/node/registration-codes/"
+    Then response code is equal to 201
+    And I remember the issued registration code
+    And I clear request headers
+    And the current node has a test network with id "123e4567-e89b-12d3-a456-426614174986" and name "registration-network-86"
+    And identity admission proofs are mined at exactly 16 bits
+    And identity bodies are signed 11 minutes ago
+    And I set a client-signed identity body with name "unlucky" and handle "unlucky"
+    And I send the remembered registration code
+    When I POST to "/identities/"
+    Then response code is equal to 400
+    Given identity bodies are signed 0 minutes ago
+    And I set a client-signed identity body with name "unlucky" and handle "unlucky"
+    When I POST to "/identities/"
+    Then response code is equal to 200

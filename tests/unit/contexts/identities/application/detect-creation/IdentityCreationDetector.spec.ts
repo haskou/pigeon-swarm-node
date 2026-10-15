@@ -1,0 +1,52 @@
+import IdentityCreationDetector from '@app/contexts/identities/application/detect-creation/IdentityCreationDetector';
+import { IdentityCreationDetectorMessage } from '@app/contexts/identities/application/detect-creation/messages/IdentityCreationDetectorMessage';
+import { Identity } from '@app/contexts/identities/domain/Identity';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { mock, MockProxy } from 'jest-mock-extended';
+
+describe('IdentityCreationDetector', () => {
+  const id = new IdentityId(
+    'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
+  );
+  let repository: MockProxy<IdentityRepository>;
+  let detector: IdentityCreationDetector;
+
+  const identity = (hasPreviousReference: boolean): Identity => {
+    const candidate = mock<Identity>();
+
+    candidate.getId.mockReturnValue(id);
+    candidate.hasNoPreviousReference.mockReturnValue(!hasPreviousReference);
+
+    return candidate;
+  };
+
+  beforeEach(() => {
+    repository = mock<IdentityRepository>();
+    detector = new IdentityCreationDetector(repository);
+  });
+
+  it('should treat a genesis this node does not hold as a creation', async () => {
+    repository.holds.mockResolvedValue(false);
+
+    await expect(
+      detector.isCreation(new IdentityCreationDetectorMessage(identity(false))),
+    ).resolves.toBe(true);
+    expect(repository.holds).toHaveBeenCalledWith(id);
+  });
+
+  it('should treat a genesis this node holds as a republish', async () => {
+    repository.holds.mockResolvedValue(true);
+
+    await expect(
+      detector.isCreation(new IdentityCreationDetectorMessage(identity(false))),
+    ).resolves.toBe(false);
+  });
+
+  it('should never treat an update as a creation', async () => {
+    await expect(
+      detector.isCreation(new IdentityCreationDetectorMessage(identity(true))),
+    ).resolves.toBe(false);
+    expect(repository.holds).not.toHaveBeenCalled();
+  });
+});
