@@ -528,4 +528,68 @@ describe('OrbitDBCallRepository', () => {
       ).resolves.toBeUndefined();
     });
   });
+
+  describe('while the call store history could not be replayed yet', () => {
+    const unknownCallId = new CallId('550e8400-e29b-41d4-a716-446655440019');
+
+    beforeEach(async () => {
+      jest.useFakeTimers({ doNotFake: ['setImmediate'] });
+      await build(false);
+      calls.all.mockRejectedValueOnce(
+        new DOMException(
+          'The operation was aborted due to timeout',
+          'TimeoutError',
+        ),
+      );
+      await projection.start();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('answers a call it cannot find yet as not ready, not as missing', async () => {
+      await expect(repository.requireById(unknownCallId)).rejects.toBeInstanceOf(
+        ReplicatedStateNotReadyError,
+      );
+      await expect(
+        repository.assertParticipantSettled(
+          unknownCallId,
+          new IdentityId(peer.id),
+        ),
+      ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
+    });
+
+    it('answers a missing call as missing once the replay succeeds', async () => {
+      const start = conversationStart();
+
+      await replicate(start.payload, start.proof);
+
+      await expect(repository.requireById(unknownCallId)).rejects.toBeInstanceOf(
+        CallNotFoundError,
+      );
+      await expect(
+        repository.assertParticipantSettled(
+          unknownCallId,
+          new IdentityId(peer.id),
+        ),
+      ).resolves.toBeUndefined();
+    });
+
+    it('answers a missing call as missing once the bounded wait is over', async () => {
+      await jest.advanceTimersByTimeAsync(
+        OrbitDBReplicatedStateRegistry.DEFERRED_BOOTSTRAP_NOT_READY_MS,
+      );
+
+      await expect(repository.requireById(unknownCallId)).rejects.toBeInstanceOf(
+        CallNotFoundError,
+      );
+      await expect(
+        repository.assertParticipantSettled(
+          unknownCallId,
+          new IdentityId(peer.id),
+        ),
+      ).resolves.toBeUndefined();
+    });
+  });
 });
