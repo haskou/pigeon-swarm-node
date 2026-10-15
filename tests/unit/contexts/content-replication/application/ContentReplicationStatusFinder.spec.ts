@@ -6,6 +6,8 @@ import ContentReplicationRepository from '@app/contexts/content-replication/doma
 import ContentReplicationBudgetAllocator from '@app/contexts/content-replication/domain/services/ContentReplicationBudgetAllocator';
 import NodePeerRepository from '@app/contexts/nodes/domain/repositories/NodePeerRepository';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { Timestamp } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -34,6 +36,7 @@ const record = (
 describe('ContentReplicationStatusFinder', () => {
   let contentRepository: MockProxy<ContentReplicationRepository>;
   let nodePeerRepository: MockProxy<NodePeerRepository>;
+  let blockPolicy: MockProxy<NodeBlockPolicy>;
 
   const finderWithBudget = (bytes: number): ContentReplicationStatusFinder => {
     const nodeRepository = mock<NodeRepository>();
@@ -47,6 +50,7 @@ describe('ContentReplicationStatusFinder', () => {
       new ContentReplicationPolicy(),
       new ContentReplicationNetworkBudget(bytes),
       new ContentReplicationBudgetAllocator(),
+      blockPolicy,
     );
   };
 
@@ -64,6 +68,8 @@ describe('ContentReplicationStatusFinder', () => {
     contentRepository = mock<ContentReplicationRepository>();
     nodePeerRepository = mock<NodePeerRepository>();
     nodePeerRepository.findActive.mockResolvedValue([]);
+    blockPolicy = mock<NodeBlockPolicy>();
+    blockPolicy.isIdentityBlocked.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -94,6 +100,21 @@ describe('ContentReplicationStatusFinder', () => {
       [`${NETWORK}:bafy-large`]: true,
       [`${NETWORK}:bafy-larger`]: false,
       [`${NETWORK}:bafy-small`]: true,
+    });
+  });
+
+  it('gives identities blocked on this node no share of the budget', async () => {
+    blockPolicy.isIdentityBlocked.mockImplementation(
+      async (identityId: IdentityId) => identityId.valueOf() === ownerOf(1),
+    );
+    contentRepository.findAll.mockResolvedValue([
+      record(1, 'bafy-blocked', 10),
+      record(2, 'bafy-allowed', 10),
+    ]);
+
+    await expect(withinBudgetByCid(finderWithBudget(1024))).resolves.toEqual({
+      [`${NETWORK}:bafy-allowed`]: true,
+      [`${NETWORK}:bafy-blocked`]: false,
     });
   });
 

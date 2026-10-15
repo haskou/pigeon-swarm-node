@@ -32,6 +32,7 @@ import { NodeNetworkAdderMessage } from '@app/contexts/nodes/application/add-net
 import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNetworkAdder';
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
 import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
+import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
@@ -1457,6 +1458,42 @@ export default class Definitions {
       .valueOf();
   }
 
+  private async setNodeBlockListBody(
+    version: number,
+    blocked: string,
+    owner: string,
+    signer: string,
+  ): Promise<void> {
+    const identities: Record<string, () => Promise<KeyPair>> = {
+      other: () => this.ensureOtherIdentityKeyPair(),
+      owner: () => this.ensureIdentityKeyPair(),
+    };
+    const publicKeyOf = async (name: string): Promise<string> =>
+      new IdentityId(
+        (await identities[name]()).toPrimitives().publicKey,
+      ).valueOf();
+    const blockedNames = blocked === 'nobody' ? [] : blocked.split(',');
+    const blockedIdentityIds = (
+      await Promise.all(blockedNames.map((name) => publicKeyOf(name.trim())))
+    ).sort();
+    const unsigned = {
+      blockedIdentityIds,
+      blockedNodePeerIds: [] as string[],
+      issuedAt: Date.now(),
+      ownerIdentityId: await publicKeyOf(owner),
+      type: 'pigeon-node-block-list',
+      version,
+    };
+    const signerKeyPair = await identities[signer]();
+
+    this.body = JSON.stringify({
+      ...unsigned,
+      identitySignature: signerKeyPair
+        .sign(`pigeon:node-block-list:v1\n${canonicalize(unsigned)}`)
+        .valueOf(),
+    });
+  }
+
   private resolveResponsePath(value: unknown, path: string): unknown {
     const arrayPath = /^(.*)\[(\d+)\]$/.exec(path);
 
@@ -1541,6 +1578,7 @@ export default class Definitions {
     delete process.env.IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE;
     delete process.env.IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE;
     delete process.env.IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE;
+    delete process.env.NODE_BLOCK_LIST_MAX_BYTES;
   }
 
   @after()
@@ -1552,6 +1590,7 @@ export default class Definitions {
       Kernel.di.getService<CallRelayRecordRegistry>(CallRelayRecordRegistry);
 
     await database.clear();
+    await Kernel.di.getService<NodeBlockPolicy>(NodeBlockPolicy).load();
     callRelayRecordRegistry.clear();
     await this.ipfsDefinition.cleanupRegisteredNetworks();
     this.ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
@@ -1569,6 +1608,8 @@ export default class Definitions {
     );
 
     await database.delete('node_metadata', 'local');
+    await database.delete('node_block_list', 'local');
+    await Kernel.di.getService<NodeBlockPolicy>(NodeBlockPolicy).load();
     await this.ipfsDefinition.cleanupRegisteredNetworks();
   }
 
@@ -4779,6 +4820,65 @@ export default class Definitions {
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
+    );
+  }
+
+  /** `blocked` is a comma list of `owner` and `other`, or `nobody`. */
+  @given('I set a node block list body version {int} blocking {string}')
+  public async iSetANodeBlockListBody(
+    version: number,
+    blocked: string,
+  ): Promise<void> {
+    await this.setNodeBlockListBody(version, blocked, 'owner', 'owner');
+  }
+
+  @given(
+    'I set a node block list body version {int} blocking {string} owned by the {word} identity and signed by the {word} identity',
+  )
+  public async iSetANodeBlockListBodyOwnedAndSignedBy(
+    version: number,
+    blocked: string,
+    owner: string,
+    signer: string,
+  ): Promise<void> {
+    await this.setNodeBlockListBody(version, blocked, owner, signer);
+  }
+
+  @given('I set a node block list body of {int} bytes')
+  public iSetANodeBlockListBodyOfBytes(bytes: number): void {
+    const envelope = JSON.stringify({ type: '' });
+
+    this.body = JSON.stringify({
+      type: 'x'.repeat(bytes - envelope.length),
+    });
+  }
+
+  @given('the node block list byte limit is {int}')
+  public theNodeBlockListByteLimitIs(bytes: number): void {
+    process.env.NODE_BLOCK_LIST_MAX_BYTES = String(bytes);
+  }
+
+  @given(
+    'another identity signs the node blocks request with an expired timestamp',
+  )
+  public async anotherIdentitySignsTheNodeBlocksRequestWithAnExpiredTimestamp(): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    await this.signCurrentRequest(
+      'PUT',
+      '/node/blocks/',
+      String(Date.now() - 31_000),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I sign the node blocks request with an expired timestamp')
+  public async iSignTheNodeBlocksRequestWithAnExpiredTimestamp(): Promise<void> {
+    await this.signCurrentRequest(
+      'PUT',
+      '/node/blocks/',
+      String(Date.now() - 31_000),
     );
   }
 

@@ -928,7 +928,9 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
         cacheSizeBefore + 1,
       );
       const departedCacheKey = `${network.getId()}:${departedRelay.peerId}`;
-      expect(cacheState.relayPublisherPeerObservedAt[departedCacheKey]).toBe(now);
+      expect(cacheState.relayPublisherPeerObservedAt[departedCacheKey]).toBe(
+        now,
+      );
       now += 1001;
       publicConnection.publishPubSub.mockClear();
       publicConnection.findRecordProviderMultiaddrs.mockClear();
@@ -1424,18 +1426,16 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     expect(publicConnection.stop).not.toHaveBeenCalled();
   });
 
-  it('should preserve blocked public peers while resetting the peer cache', async () => {
+  it('should reset the whole public peer cache', async () => {
     const directory = createDirectory(localDatabase);
     const storageLocation = path.join(
       localDatabasePath,
       'public-relay-record-directory',
     );
-    const blockedPeersPath = path.join(storageLocation, 'blockedPeers.json');
-
     await fs.mkdir(path.join(storageLocation, 'datastore'), {
       recursive: true,
     });
-    await fs.writeFile(blockedPeersPath, '["blocked-peer"]');
+    await fs.writeFile(path.join(storageLocation, 'peer-cache.json'), '[]');
     await fs.writeFile(
       path.join(storageLocation, 'datastore', 'stale'),
       'cache',
@@ -1447,9 +1447,9 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       }
     ).preparePublicConnectionStorage();
 
-    await expect(fs.readFile(blockedPeersPath, 'utf8')).resolves.toBe(
-      '["blocked-peer"]',
-    );
+    await expect(
+      fs.access(path.join(storageLocation, 'peer-cache.json')),
+    ).rejects.toThrow();
     await expect(
       fs.access(path.join(storageLocation, 'datastore')),
     ).rejects.toThrow();

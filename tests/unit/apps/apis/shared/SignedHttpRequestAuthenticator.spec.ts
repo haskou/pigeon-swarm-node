@@ -1,8 +1,10 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
+import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Request } from 'express';
+import { mock, MockProxy } from 'jest-mock-extended';
 
 async function buildSignedRequest(
   method: string,
@@ -32,14 +34,21 @@ async function buildSignedRequest(
 }
 
 describe('SignedHttpRequestAuthenticator', () => {
-  const authenticator = new SignedHttpRequestAuthenticator();
+  let blockPolicy: MockProxy<NodeBlockPolicy>;
+  let authenticator: SignedHttpRequestAuthenticator;
+
+  beforeEach(() => {
+    blockPolicy = mock<NodeBlockPolicy>();
+    blockPolicy.isIdentityBlocked.mockResolvedValue(false);
+    authenticator = new SignedHttpRequestAuthenticator(blockPolicy);
+  });
 
   it('rejects a replayed state-changing request', async () => {
     const request = await buildSignedRequest('POST', { value: 1 });
 
-    authenticator.authenticate(request);
+    await authenticator.authenticate(request);
 
-    expect(() => authenticator.authenticate(request)).toThrow(
+    await expect(authenticator.authenticate(request)).rejects.toThrow(
       'Invalid signed request.',
     );
   });
@@ -47,8 +56,20 @@ describe('SignedHttpRequestAuthenticator', () => {
   it('allows identical safe requests inside the same millisecond', async () => {
     const request = await buildSignedRequest('GET', {});
 
-    authenticator.authenticate(request);
+    await authenticator.authenticate(request);
 
-    expect(() => authenticator.authenticate(request)).not.toThrow();
+    await expect(authenticator.authenticate(request)).resolves.toBeDefined();
+  });
+
+  it('refuses an identity blocked on this node with 403012', async () => {
+    blockPolicy.isIdentityBlocked.mockResolvedValue(true);
+
+    await expect(
+      authenticator.authenticate(await buildSignedRequest('GET', {})),
+    ).rejects.toMatchObject({
+      code: 403012,
+      httpCode: 403,
+      message: 'Identity is blocked on this node.',
+    });
   });
 });
