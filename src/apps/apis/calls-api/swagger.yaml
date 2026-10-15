@@ -484,7 +484,11 @@ components:
       properties:
         connected:
           type: boolean
-          description: A current runtime lease exists for this authorized participant.
+          description: >-
+            A current runtime lease exists for this authorized participant. A
+            node that just started presents a joined participant whose lease it
+            has not heard yet as joined but not connected for five seconds after
+            its call projection becomes ready.
         identityId:
           type: string
         status:

@@ -532,7 +532,9 @@ GET /calls/{callId}
 
 Returns a minimal snapshot after checking current scope access. `participantIds`
 and `participants` contain only authorized connected participants and current
-ringing invitees. Departed/expired participants, join/leave timestamps, heartbeat
+ringing invitees, plus, during the lease warm-up described under
+[Presence retention](#presence-retention), joined participants whose lease the
+node has not heard yet. Departed/expired participants, join/leave timestamps, heartbeat
 timestamps and remote transport diagnostics are omitted. Community snapshots omit `creatorIdentityId`,
 `createdAt`, `endedAt` and `endedByIdentityId`; conversation snapshots retain the
 caller and lifecycle times needed for incoming-call and ended-call UI. An ended
@@ -562,6 +564,13 @@ heartbeat, checked by the scheduled expiration pass; disconnected entries are
 purged after sixty seconds. Local expiry updates local clients but is never
 republished as a claim by the remote owner. Only the owner publishes its own
 disconnection. Stable heartbeat traffic remains necessary between nodes.
+
+A node that just started has heard no lease yet. Until five seconds after its
+call projection becomes ready, HTTP and WebSocket snapshots keep a joined
+participant without any lease on the node as `status: joined` with
+`connected: false`, so a restart does not read as that participant leaving.
+A participant whose lease the node holds as disconnected is omitted as usual.
+The window is local and bounded; nothing a peer publishes opens or extends it.
 
 Community sessions retire only on an explicit end operation. A local final
 departure cannot safely prove that no concurrent remote join exists. Lifecycle
@@ -1056,7 +1065,9 @@ Implemented:
   leave, lost runtime state, or sixty seconds without a real renewal requires an
   explicit join; a heartbeat cannot silently rejoin or borrow another node's grant
 - conversation heartbeats can recreate a runtime lease for a persisted joined participant
-- live `participants[].connected` is true while an authorized identity has a live lease
+- live `participants[].connected` is true while an authorized identity has a live lease;
+  a joined participant whose lease a just-started node has not heard yet reads
+  `connected: false` until the lease warm-up ends
 - heartbeat timestamps and remote ICE reports stay out of the live HTTP/WebSocket contract
 - remote nodes expire stale lease copies locally, while only the owner node may
   announce its lease as disconnected

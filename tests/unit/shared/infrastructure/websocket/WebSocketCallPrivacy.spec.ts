@@ -1,18 +1,18 @@
-import { callStartArgs } from '../../../../support/signCall';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { CallViewModel } from '@app/apps/apis/calls-api/view-model/CallViewModel';
-import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import CallSignalAcknowledger from '@app/contexts/calls/application/acknowledge-signal/CallSignalAcknowledger';
+import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import { Call } from '@app/contexts/calls/domain/Call';
-import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
+import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
+import CallParticipantLeaseWarmUp from '@app/contexts/calls/infrastructure/memory/CallParticipantLeaseWarmUp';
 import InMemoryCallParticipantLeaseRepository from '@app/contexts/calls/infrastructure/memory/InMemoryCallParticipantLeaseRepository';
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import MailboxRepository from '@app/contexts/mailboxes/domain/repositories/MailboxRepository';
 import IdentityPresenceHeartbeatRecorder from '@app/contexts/presence/application/record-heartbeat/IdentityPresenceHeartbeatRecorder';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -20,9 +20,12 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import WebSocketClientMessageHandler from '@app/shared/infrastructure/websocket/WebSocketClientMessageHandler';
 import { WebSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
+import { Timestamp } from '@haskou/value-objects';
 import { mock } from 'jest-mock-extended';
 import { generateKeyPairSync } from 'node:crypto';
 import { WebSocket } from 'ws';
+
+import { callStartArgs } from '../../../../support/signCall';
 
 const creator = new IdentityId(
   'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=',
@@ -41,20 +44,29 @@ function startCall() {
       new CommunityId('community-1'),
       new CommunityChannelId('voice-1'),
     ),
-    [], ...callStartArgs(),
+    [],
+    ...callStartArgs(),
   );
 }
 
 function socket() {
   return {
     on: jest.fn(),
-    send: jest.fn(),
     readyState: WebSocket.OPEN,
+    send: jest.fn(),
   } as unknown as WebSocket;
 }
 
 async function flush() {
   await new Promise<void>((resolve) => setImmediate(resolve));
+}
+
+function warmedUp(): CallParticipantLeaseWarmUp {
+  const warmUp = new CallParticipantLeaseWarmUp();
+
+  warmUp.begin(new Timestamp(0));
+
+  return warmUp;
 }
 
 describe('live call privacy', () => {
@@ -63,16 +75,22 @@ describe('live call privacy', () => {
       creator,
       network,
       CallScope.conversation(new ConversationId('conversation-1')),
-      [other], ...callStartArgs(),
+      [other],
+      ...callStartArgs(),
     );
     direct.end(creator);
-    const directResource = new CallViewModel(direct, [], []).toResource();
+    const directResource = new CallViewModel(
+      direct,
+      [],
+      [],
+      false,
+    ).toResource();
     expect(directResource.endedByIdentityId).toBe(creator.valueOf());
     expect(directResource.endedAt).toEqual(expect.any(Number));
     const communityCall = startCall();
     communityCall.end(creator);
     expect(
-      new CallViewModel(communityCall, [], []).toResource(),
+      new CallViewModel(communityCall, [], [], false).toResource(),
     ).not.toHaveProperty('endedByIdentityId');
   });
 
@@ -88,16 +106,18 @@ describe('live call privacy', () => {
     const ended = startCall();
     ended.end(creator);
 
-    expect(new CallViewModel(superseded, [], []).toResource()).toMatchObject({
+    expect(
+      new CallViewModel(superseded, [], [], false).toResource(),
+    ).toMatchObject({
       status: 'ended',
       supersededByCallId: winner.getId().valueOf(),
     });
-    expect(new CallViewModel(winner, [], []).toResource()).not.toHaveProperty(
-      'supersededByCallId',
-    );
-    expect(new CallViewModel(ended, [], []).toResource()).not.toHaveProperty(
-      'supersededByCallId',
-    );
+    expect(
+      new CallViewModel(winner, [], [], false).toResource(),
+    ).not.toHaveProperty('supersededByCallId');
+    expect(
+      new CallViewModel(ended, [], [], false).toResource(),
+    ).not.toHaveProperty('supersededByCallId');
   });
 
   it('exposes only current presence, without departed identities, session history or transport diagnostics', () => {
@@ -115,25 +135,30 @@ describe('live call privacy', () => {
       call,
       [lease],
       call.getParticipantIds(),
+      false,
     ).toResource();
     expect(resource).toEqual({
       id: call.getId().valueOf(),
       networkId: network.valueOf(),
-      scope: call.getScope().toPrimitives(),
-      status: 'active',
       participantIds: [other.valueOf()],
       participants: [
         {
-          identityId: other.valueOf(),
           connected: true,
+          identityId: other.valueOf(),
           status: 'joined',
         },
       ],
+      scope: call.getScope().toPrimitives(),
+      status: 'active',
     });
     lease.disconnect();
     expect(
-      new CallViewModel(call, [lease], call.getParticipantIds()).toResource()
-        .participants,
+      new CallViewModel(
+        call,
+        [lease],
+        call.getParticipantIds(),
+        false,
+      ).toResource().participants,
     ).toEqual([]);
   });
 
@@ -165,6 +190,7 @@ describe('live call privacy', () => {
         mock<CallSignalAcknowledger>(),
         calls,
         leases,
+        warmedUp(),
         new CallAccessAuthorizer(conversations, communities),
         mock<MailboxRepository>(),
       ),
@@ -179,12 +205,13 @@ describe('live call privacy', () => {
     const message = JSON.parse((client.send as jest.Mock).mock.calls[0][0]);
     expect(message.event.attributes).toEqual({
       callId: call.getId().valueOf(),
-      liveCallRevision: 1,
       liveCall: new CallViewModel(
         call,
         [lease],
         call.getParticipantIds(),
+        false,
       ).toResource(),
+      liveCallRevision: 1,
     });
     (client.send as jest.Mock).mockClear();
     hub.publish(lease.pullDomainEvents());
@@ -241,6 +268,7 @@ describe('live call privacy', () => {
         mock<CallSignalAcknowledger>(),
         calls,
         leases,
+        warmedUp(),
         new CallAccessAuthorizer(conversations, communities),
         mock<MailboxRepository>(),
       ),
@@ -249,16 +277,18 @@ describe('live call privacy', () => {
     hub.register(other, client);
     const outsider = new IdentityId(
       generateKeyPairSync('ed25519')
-        .publicKey.export({ type: 'spki', format: 'der' })
+        .publicKey.export({ format: 'der', type: 'spki' })
         .toString('base64'),
     );
     const outsiderClient = socket();
     const community = await communities.requireById(
       new CommunityId('community-1'),
     );
-    jest.mocked(community.authorizeVoiceChannelCall).mockImplementation((identityId) => {
-      if (identityId.isEqual(outsider)) throw new Error('Not a member');
-    });
+    jest
+      .mocked(community.authorizeVoiceChannelCall)
+      .mockImplementation((identityId) => {
+        if (identityId.isEqual(outsider)) throw new Error('Not a member');
+      });
     hub.register(outsider, outsiderClient);
     (client.send as jest.Mock).mockClear();
     (outsiderClient.send as jest.Mock).mockClear();
@@ -271,6 +301,56 @@ describe('live call privacy', () => {
       .event.attributes.liveCall;
     expect(resource.participantIds).toEqual([other.valueOf()]);
     expect(outsiderClient.send).not.toHaveBeenCalled();
+  });
+
+  it('keeps a joined participant whose lease has not been heard yet in live call snapshots while leases warm up', async () => {
+    const call = startCall();
+    call.joinOrAdd(other);
+    const calls = mock<CallRepository>();
+    calls.hasById.mockResolvedValue(true);
+    calls.requireById.mockResolvedValue(call);
+    const conversations = mock<ConversationRepository>();
+    const communities = mock<CommunityRepository>();
+    communities.hasById.mockResolvedValue(true);
+    communities.requireById.mockResolvedValue(mock<Community>());
+    const leases = new InMemoryCallParticipantLeaseRepository();
+    await leases.save(
+      CallParticipantLease.connect(
+        call.getId(),
+        other,
+        node,
+        network,
+        call.getParticipantIds(),
+      ),
+    );
+    const hub = new WebSocketEventHub();
+    hub.setClientMessageHandler(
+      new WebSocketClientMessageHandler(
+        conversations,
+        communities,
+        mock<IdentityPresenceHeartbeatRecorder>(),
+        mock<CallSignalAcknowledger>(),
+        calls,
+        leases,
+        new CallParticipantLeaseWarmUp(),
+        new CallAccessAuthorizer(conversations, communities),
+        mock<MailboxRepository>(),
+      ),
+    );
+    const client = socket();
+    hub.register(other, client);
+    (client.send as jest.Mock).mockClear();
+    hub.publishCallSnapshot(call.getId().valueOf());
+    await flush();
+    expect(client.send).toHaveBeenCalledTimes(1);
+    const resource = JSON.parse((client.send as jest.Mock).mock.calls[0][0])
+      .event.attributes.liveCall;
+    expect(resource.participants).toEqual(
+      expect.arrayContaining([
+        { connected: true, identityId: other.valueOf(), status: 'joined' },
+        { connected: false, identityId: creator.valueOf(), status: 'joined' },
+      ]),
+    );
   });
 
   it('fails closed when the authorization handler is unavailable', async () => {

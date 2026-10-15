@@ -5,6 +5,7 @@ import { Call } from '@app/contexts/calls/domain/Call';
 import CallParticipantLeaseRepository from '@app/contexts/calls/domain/repositories/CallParticipantLeaseRepository';
 import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
+import CallParticipantLeaseWarmUp from '@app/contexts/calls/infrastructure/memory/CallParticipantLeaseWarmUp';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -29,6 +30,7 @@ export default class WebSocketClientMessageHandler {
     private readonly signalAcknowledger: CallSignalAcknowledger,
     private readonly callRepository: CallRepository,
     private readonly callLeases: CallParticipantLeaseRepository,
+    private readonly callLeaseWarmUp: CallParticipantLeaseWarmUp,
     private readonly callAccess: CallAccessAuthorizer,
     private readonly mailboxRepository: MailboxRepository,
   ) {}
@@ -80,7 +82,13 @@ export default class WebSocketClientMessageHandler {
 
     const participants = await this.callAccess.authorizedParticipants(call);
 
-    return { call, leases, participants, recipientIds };
+    return {
+      call,
+      leases,
+      leasesWarmingUp: this.callLeaseWarmUp.isWarmingUp(),
+      participants,
+      recipientIds,
+    };
   }
 
   /**

@@ -355,6 +355,7 @@ services:
       /apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime
     arguments:
       - '@contexts/calls/infrastructure/orbitdb/OrbitDBCallProjection'
+      - '@contexts/calls/infrastructure/memory/CallParticipantLeaseWarmUp'
   apps/runtimes/orbitdb-identity-admission-observation-runtime/OrbitDBIdentityAdmissionObservationRuntime:
     class: >-
       /apps/runtimes/orbitdb-identity-admission-observation-runtime/OrbitDBIdentityAdmissionObservationRuntime
@@ -555,6 +556,9 @@ services:
   contexts/calls/domain/repositories/CallParticipantLeaseRepository: '@contexts/calls/infrastructure/memory/InMemoryCallParticipantLeaseRepository'
   contexts/calls/domain/repositories/CallRepository: '@contexts/calls/infrastructure/orbitdb/OrbitDBCallRepository'
   contexts/calls/domain/repositories/CallSignalDeliveryRepository: '@contexts/calls/infrastructure/memory/InMemoryCallSignalDeliveryRepository'
+  contexts/calls/infrastructure/memory/CallParticipantLeaseWarmUp:
+    class: /contexts/calls/infrastructure/memory/CallParticipantLeaseWarmUp
+    arguments: []
   contexts/calls/infrastructure/memory/InMemoryCallParticipantLeaseRepository:
     class: >-
       /contexts/calls/infrastructure/memory/InMemoryCallParticipantLeaseRepository
@@ -2592,6 +2596,7 @@ services:
       - '@contexts/calls/application/acknowledge-signal/CallSignalAcknowledger'
       - '@contexts/calls/domain/repositories/CallRepository'
       - '@contexts/calls/domain/repositories/CallParticipantLeaseRepository'
+      - '@contexts/calls/infrastructure/memory/CallParticipantLeaseWarmUp'
       - '@contexts/calls/application/authorize-call/CallAccessAuthorizer'
       - '@contexts/mailboxes/domain/repositories/MailboxRepository'
   ddd-kernel.override.factory.MailboxLimits:

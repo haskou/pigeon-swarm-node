@@ -5,6 +5,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 export interface CallRealtimeAudience {
   call: Call;
   leases: CallParticipantLease[];
+  leasesWarmingUp: boolean;
   participants: IdentityId[];
   recipientIds: string[];
 }

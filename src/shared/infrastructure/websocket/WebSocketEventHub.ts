@@ -724,6 +724,7 @@ export class WebSocketEventHub {
               audience.call,
               audience.leases,
               audience.participants,
+              audience.leasesWarmingUp,
             ).toResource(),
             liveCallRevision: ++this.liveCallRevision,
           };
@@ -816,6 +817,7 @@ export class WebSocketEventHub {
               audience.call,
               audience.leases,
               audience.participants,
+              audience.leasesWarmingUp,
             ).toResource(),
             liveCallRevision: ++this.liveCallRevision,
           },
