@@ -11,6 +11,7 @@ import { PublicMutationProof } from '@app/contexts/public-mutations/domain/Publi
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { Timestamp } from '@haskou/value-objects';
 
 import { CallRecordIds } from '../../domain/CallRecordIds';
@@ -254,14 +255,26 @@ export default class OrbitDBCallRepository extends CallRepository {
     return (await this.findCallById(id)) !== undefined;
   }
 
+  /**
+   * A node that just restarted replays the call records before the
+   * authorization they rest on has loaded from its peers, so it holds the
+   * start of a live call without having admitted it yet. That call is not
+   * missing: the caller is told to retry instead of ending it.
+   */
   public async requireById(id: CallId): Promise<Call> {
     const call = await this.findCallById(id);
 
-    if (!call) {
-      throw new CallNotFoundError();
-    }
+    if (call) return call;
 
-    return call;
+    if (
+      this.registry.isDocumentPendingAdmission(
+        'calls',
+        CallRecordIds.start(id.valueOf()),
+      )
+    )
+      throw new ReplicatedStateNotReadyError();
+
+    throw new CallNotFoundError();
   }
 
   public async findActiveByParticipant(

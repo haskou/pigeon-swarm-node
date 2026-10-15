@@ -171,7 +171,7 @@ async function retryAcrossRestart(
   const started = startNode(node);
   const observed: string[] = [];
 
-  started.catch(() => undefined);
+  started.catch((): void => undefined);
 
   for (;;) {
     const outcome = await attempt();
@@ -196,7 +196,8 @@ async function retryAcrossRestart(
   await started;
   console.log(
     `${label} on the restarted node succeeded after ${observed.length} attempts` +
-      ` (${observed.at(-1)?.split(' ')[0]})`,
+      ` (${observed.at(-1)?.split(' ')[0]}; ` +
+      `${observed.filter((line) => line.includes(' 503 ')).length} not ready)`,
   );
 }
 

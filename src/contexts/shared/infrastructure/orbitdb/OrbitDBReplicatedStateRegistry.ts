@@ -612,6 +612,10 @@ export default class OrbitDBReplicatedStateRegistry {
         return true;
       },
       scope: store,
+      subject:
+        typeof document.id === 'string'
+          ? `${storeName}:${document.id}`
+          : undefined,
     });
   }
 
@@ -2382,6 +2386,20 @@ export default class OrbitDBReplicatedStateRegistry {
     );
 
     return results.flat();
+  }
+
+  /**
+   * Whether this node holds the document but has not admitted it yet and still
+   * may: the gate rejected it, possibly because the authorization it rests on
+   * had not loaded yet (right after a restart), and it waits to be offered
+   * again. It lets a read tell "not ready yet" from "missing". The wait is
+   * bounded, so a forged document keeps this answer for a short while at most.
+   */
+  public isDocumentPendingAdmission(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    id: string,
+  ): boolean {
+    return this.readmissions.isPending(`${storeName}:${id}`);
   }
 
   public async replicateDocumentInBackground(

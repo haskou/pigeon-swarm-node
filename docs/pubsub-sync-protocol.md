@@ -679,6 +679,15 @@ its join, and the head would otherwise stay demoted until the 60 s retry.
   the state that woke it. Worst case per scope: 256 records offered about 39
   times each (3 retries and a wake every 2 s for 72 s); a head offer runs the
   gate once per gated record it carries.
+- A read can ask whether a document waits for readmission, by store and id
+  (`isDocumentPendingAdmission`), to tell "not admitted yet" from "missing". A
+  call endpoint answers a call whose start waits as `503020` not ready instead
+  of `CallNotFoundError`, so a call survives the seconds after a node restart in
+  which its records are replayed before the authorization they rest on loads.
+  Asking never admits the record. A waiting document is counted under its id
+  but never merged by it, so a forged document with the id of a legitimate one
+  waits beside it; at worst it turns `CallNotFoundError` into `503020` for that
+  id, within the bound and window above.
 
 ### Replicated store audit
 

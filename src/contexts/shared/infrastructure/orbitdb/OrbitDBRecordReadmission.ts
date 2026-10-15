@@ -35,6 +35,9 @@ export class OrbitDBRecordReadmission {
     Map<unknown, OrbitDBPendingRecordReadmission>
   >();
 
+  /** How many pending records name each subject. */
+  private readonly pendingCountBySubject = new Map<string, number>();
+
   private wakeTimer?: NodeJS.Timeout;
 
   private draining = false;
@@ -61,24 +64,36 @@ export class OrbitDBRecordReadmission {
   }
 
   /**
+   * Whether a record scheduled under the subject still waits to be offered
+   * again: the node holds it but has not admitted it yet, and may still.
+   */
+  public isPending(subject: string): boolean {
+    return this.pendingCountBySubject.has(subject);
+  }
+
+  /**
    * The pending offers are bounded per scope (a network or a store), so a
    * flood of rejected records cannot pin them in memory, multiply the work
    * of a wake, or take the place of the records of another scope; past the
    * bound a rejection is final. A record whose key is already pending is
    * not scheduled again, so a record received many times waits once and
-   * keeps its first wait. `offer` admits and delivers the record, and
-   * resolves whether it is settled.
+   * keeps its first wait. `subject` names what the record is about, for
+   * `isPending`; unlike the key it never merges records, so a forged record
+   * about a subject cannot take the place of a legitimate one. `offer`
+   * admits and delivers the record, and resolves whether it is settled.
    */
   public schedule({
     isCurrent,
     key,
     offer,
     scope,
+    subject,
   }: {
     isCurrent: () => boolean;
     key?: string;
     offer: () => Promise<boolean>;
     scope: string | object;
+    subject?: string;
   }): void {
     const pending =
       this.pendingByScope.get(scope) ??
@@ -97,11 +112,25 @@ export class OrbitDBRecordReadmission {
         pending.delete(entryKey);
 
         if (pending.size === 0) this.pendingByScope.delete(scope);
+
+        if (subject === undefined) return;
+        const remaining = (this.pendingCountBySubject.get(subject) ?? 1) - 1;
+
+        if (remaining === 0) this.pendingCountBySubject.delete(subject);
+        else this.pendingCountBySubject.set(subject, remaining);
       },
     );
 
     pending.set(entryKey, readmission);
     this.pendingByScope.set(scope, pending);
+
+    if (subject !== undefined) {
+      this.pendingCountBySubject.set(
+        subject,
+        (this.pendingCountBySubject.get(subject) ?? 0) + 1,
+      );
+    }
+
     readmission.start();
   }
 
