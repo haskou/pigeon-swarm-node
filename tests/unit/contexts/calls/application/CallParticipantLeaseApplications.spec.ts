@@ -5,6 +5,7 @@ import CallParticipantHeartbeatRecorder from '@app/contexts/calls/application/re
 import { CallParticipantHeartbeatRecordMessage } from '@app/contexts/calls/application/record-participant-heartbeat/messages/CallParticipantHeartbeatRecordMessage';
 import CallParticipantLeaseRenewer from '@app/contexts/calls/application/renew-participant-lease/CallParticipantLeaseRenewer';
 import { Call } from '@app/contexts/calls/domain/Call';
+import { CallParticipantNotFoundError } from '@app/contexts/calls/domain/errors/CallParticipantNotFoundError';
 import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
 import { CallParticipantMediaConnection } from '@app/contexts/calls/domain/CallParticipantMediaConnection';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
@@ -55,6 +56,49 @@ describe('call participant lease application services', () => {
     expect(callRepository.saveParticipant).not.toHaveBeenCalled();
     expect(leaseRenewer.renew).toHaveBeenCalledWith(call, creator, []);
     expect(eventPublisher.publish).toHaveBeenCalledWith([]);
+    expect(callRepository.assertParticipantSettled).not.toHaveBeenCalled();
+  });
+
+  describe('for a participant the call does not show as joined', () => {
+    function heartbeat(calls: CallRepository, call: Call): Promise<Call> {
+      return new CallParticipantHeartbeatRecorder(
+        calls,
+        mock<CallParticipantLeaseRenewer>(),
+        mock<DomainEventPublisher>(),
+        mock<CallAccessAuthorizer>(),
+      ).record(
+        new CallParticipantHeartbeatRecordMessage(
+          call.getId().valueOf(),
+          participant.valueOf(),
+          [],
+        ),
+      );
+    }
+
+    it('answers not ready while the record of the participant awaits admission', async () => {
+      const call = ringingCall();
+      const calls = mock<CallRepository>();
+      const notReady = new Error('not ready');
+      calls.requireById.mockResolvedValue(call);
+      calls.assertParticipantSettled.mockRejectedValue(notReady);
+
+      await expect(heartbeat(calls, call)).rejects.toBe(notReady);
+      expect(calls.assertParticipantSettled).toHaveBeenCalledWith(
+        call.getId(),
+        participant,
+      );
+    });
+
+    it('answers the participant as not found once its record is settled', async () => {
+      const call = ringingCall();
+      const calls = mock<CallRepository>();
+      calls.requireById.mockResolvedValue(call);
+      calls.assertParticipantSettled.mockResolvedValue();
+
+      await expect(heartbeat(calls, call)).rejects.toBeInstanceOf(
+        CallParticipantNotFoundError,
+      );
+    });
   });
 
   it('renews and releases the lease owned by the local node', async () => {
@@ -196,6 +240,17 @@ describe('call participant lease application services', () => {
       networkId,
       CallScope.conversation(new ConversationId('one-to-one:lease-apps')),
       [],
+      ...callStartArgs(),
+    );
+  }
+
+  /** A call the participant was invited to but has not joined. */
+  function ringingCall(): Call {
+    return Call.start(
+      creator,
+      networkId,
+      CallScope.conversation(new ConversationId('one-to-one:lease-apps')),
+      [participant],
       ...callStartArgs(),
     );
   }

@@ -9,6 +9,7 @@ import CallSignalDeliveryRegistrar from '@app/contexts/calls/application/registe
 import { CallSignalDeliveryRegisterMessage } from '@app/contexts/calls/application/register-signal-delivery/messages/CallSignalDeliveryRegisterMessage';
 import CallSignalDeliveryRetrier from '@app/contexts/calls/application/retry-signal-deliveries/CallSignalDeliveryRetrier';
 import { Call } from '@app/contexts/calls/domain/Call';
+import { CallParticipantNotFoundError } from '@app/contexts/calls/domain/errors/CallParticipantNotFoundError';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
@@ -161,9 +162,9 @@ describe('Call signal delivery applications', () => {
       new Timestamp(1_770_000_020_000),
     );
 
-    await expect(
-      repository.hasById(new CallSignalId(signalId)),
-    ).resolves.toBe(false);
+    await expect(repository.hasById(new CallSignalId(signalId))).resolves.toBe(
+      false,
+    );
   });
 
   it('creates and publishes a pending delivery when sending', async () => {
@@ -207,4 +208,58 @@ describe('Call signal delivery applications', () => {
       deliveryRepository.requireById(delivery.getId()),
     ).resolves.toBeDefined();
   });
+
+  it.each([
+    ['not ready while its record awaits admission', new Error('not ready')],
+    ['as not found once the records of both are settled', undefined],
+  ])(
+    'answers a sender the call does not show as joined %s',
+    async (_case, notReady) => {
+      const callRepository = mock<CallRepository>();
+      const caller = new IdentityId(senderIdentityId);
+      const invited = new IdentityId(recipientIdentityId);
+      const call = Call.start(
+        caller,
+        new NetworkId(networkId),
+        CallScope.conversation(new ConversationId('one-to-one:signal-test')),
+        [invited],
+        ...callStartArgs(),
+      );
+
+      callRepository.requireById.mockResolvedValue(call);
+      if (notReady) {
+        callRepository.assertParticipantSettled.mockRejectedValue(notReady);
+      } else callRepository.assertParticipantSettled.mockResolvedValue();
+      const sender = new CallSignalSender(
+        callRepository,
+        new InMemoryCallSignalDeliveryRepository(),
+        mock<DomainEventPublisher>(),
+        mock<NodeRepository>(),
+        mock<CallAccessAuthorizer>(),
+      );
+
+      const sent = sender.send(
+        new CallSignalSendMessage(
+          call.getId().valueOf(),
+          recipientIdentityId,
+          senderIdentityId,
+          new CallSignalType('offer').valueOf(),
+          { sdp: 'offer-sdp' },
+        ),
+      );
+
+      if (notReady) await expect(sent).rejects.toBe(notReady);
+      else {
+        await expect(sent).rejects.toBeInstanceOf(CallParticipantNotFoundError);
+        expect(callRepository.assertParticipantSettled).toHaveBeenCalledWith(
+          call.getId(),
+          caller,
+        );
+      }
+      expect(callRepository.assertParticipantSettled).toHaveBeenCalledWith(
+        call.getId(),
+        invited,
+      );
+    },
+  );
 });

@@ -22,6 +22,8 @@ import CallParticipantLeaseReleaser from '@app/contexts/calls/application/releas
 import CallParticipantLeaseRenewer from '@app/contexts/calls/application/renew-participant-lease/CallParticipantLeaseRenewer';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallNotFoundError } from '@app/contexts/calls/domain/errors/CallNotFoundError';
+import { CallParticipantNotFoundError } from '@app/contexts/calls/domain/errors/CallParticipantNotFoundError';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
 import CallParticipantLeaseRepository from '@app/contexts/calls/domain/repositories/CallParticipantLeaseRepository';
 import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
@@ -193,6 +195,43 @@ describe('Call application use cases', () => {
     expect(repository.saveEnd).toHaveBeenCalledWith(call, expect.anything());
     expect(eventPublisher.publish).toHaveBeenCalledWith(events);
   });
+
+  it.each([
+    ['not ready while its record awaits admission', new Error('not ready')],
+    ['as not found once its record is settled', undefined],
+  ])(
+    'CallEnder answers a participant the call does not show as joined %s',
+    async (_case, notReady) => {
+      const repository = mock<CallRepository>();
+      const call = mock<Call>();
+      const notFound = new CallParticipantNotFoundError();
+
+      call.getId.mockReturnValue(mock());
+      call.end.mockImplementation(() => {
+        throw notFound;
+      });
+      repository.requireById.mockResolvedValue(call);
+      if (notReady)
+        repository.assertParticipantSettled.mockRejectedValue(notReady);
+      else repository.assertParticipantSettled.mockResolvedValue();
+
+      await expect(
+        new CallEnder(repository, mock<DomainEventPublisher>(), authorizer).end(
+          new CallEndMessage(
+            callId,
+            participantIdentityId,
+            mutation,
+            1_770_000_000_000,
+          ),
+        ),
+      ).rejects.toBe(notReady ?? notFound);
+      expect(repository.assertParticipantSettled).toHaveBeenCalledWith(
+        call.getId(),
+        new IdentityId(participantIdentityId),
+      );
+      expect(repository.saveEnd).not.toHaveBeenCalled();
+    },
+  );
 
   it('CallJoiner renews the lease and publishes aggregate events', async () => {
     const repository = mock<CallRepository>();

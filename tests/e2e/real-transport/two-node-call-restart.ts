@@ -36,10 +36,11 @@ import {
 /**
  * The callee's node restarts during a live direct call. It replays the call
  * records before the caller's device authorization they rest on has loaded
- * from its peers, so for a moment it holds them unadmitted. Meanwhile a join
- * or a heartbeat must answer the retryable 503, never the final 409
- * `CallNotFoundError` a client ends the call on, and it succeeds once the
- * records are admitted.
+ * from its peers, so for a moment it holds them unadmitted, and it may admit
+ * the start of the call before the callee's own participant record. Meanwhile
+ * a join or a heartbeat must answer the retryable 503, never a final 409
+ * (`CallNotFoundError` or `CallParticipantNotFoundError`) a client ends the
+ * call on, and it succeeds once the records are admitted.
  */
 
 const TMP_ROOT = path.resolve(__dirname, '../../../.tmp/two-node-call-restart');
