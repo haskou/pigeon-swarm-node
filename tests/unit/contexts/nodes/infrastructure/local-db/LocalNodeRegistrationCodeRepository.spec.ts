@@ -1,5 +1,6 @@
 import { NodeRegistrationCode } from '@app/contexts/nodes/domain/NodeRegistrationCode';
 import { NodeRegistrationCodeLimits } from '@app/contexts/nodes/domain/NodeRegistrationCodeLimits';
+import { NodeRegistrationCodeId } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationCodeId';
 import { NodeRegistrationCodeSecret } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationCodeSecret';
 import LocalNodeRegistrationCodeRepository from '@app/contexts/nodes/infrastructure/local-db/LocalNodeRegistrationCodeRepository';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
@@ -119,5 +120,39 @@ describe('LocalNodeRegistrationCodeRepository', () => {
     await expect(
       repository.reserveUse(secret.hash(), now),
     ).resolves.toBeUndefined();
+  });
+  it('should remove only expired codes', async () => {
+    const expiredSecret = NodeRegistrationCodeSecret.generate();
+    const live = issue(1);
+    const expired = NodeRegistrationCode.fromPrimitives({
+      expiresAt: now.valueOf() - 1,
+      hash: expiredSecret.hash().valueOf(),
+      id: NodeRegistrationCodeId.generate().valueOf(),
+      maxUses: 1,
+      usesLeft: 1,
+    });
+
+    await repository.save(live);
+    await repository.save(expired);
+    await repository.removeExpired(now);
+
+    const remaining = await repository.findAll();
+
+    expect(remaining.map((code) => code.getId().valueOf())).toEqual([
+      live.getId().valueOf(),
+    ]);
+  });
+
+  it('should keep a used-up code so its released use comes back', async () => {
+    const code = issue(1);
+
+    await repository.save(code);
+    await repository.reserveUse(secret.hash(), now);
+    await repository.removeExpired(now);
+    await repository.releaseUse(code.getId());
+
+    await expect(
+      repository.reserveUse(secret.hash(), now),
+    ).resolves.toBeDefined();
   });
 });

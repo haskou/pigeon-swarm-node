@@ -43,10 +43,19 @@ describe('IdentityCreationDetector', () => {
     ).resolves.toBe(false);
   });
 
-  it('should never treat an update as a creation', async () => {
+  it('should treat a later version of an identity this node does not hold as a creation', async () => {
+    repository.holds.mockResolvedValue(false);
+
+    await expect(
+      detector.isCreation(new IdentityCreationDetectorMessage(identity(true))),
+    ).resolves.toBe(true);
+  });
+
+  it('should never treat an update of an identity this node holds as a creation', async () => {
+    repository.holds.mockResolvedValue(true);
+
     await expect(
       detector.isCreation(new IdentityCreationDetectorMessage(identity(true))),
     ).resolves.toBe(false);
-    expect(repository.holds).not.toHaveBeenCalled();
   });
 });

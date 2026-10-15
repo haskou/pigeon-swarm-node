@@ -24,7 +24,7 @@ describe('NodeRegistrationCodesFinder', () => {
     finder = new NodeRegistrationCodesFinder(repository);
   });
 
-  it('should list usable codes and drop expired and used-up ones', async () => {
+  it('should drop expired codes and list only usable ones', async () => {
     const usable = code(1, Timestamp.now().addDays(1));
     const usedUp = code(0, Timestamp.now().addDays(1));
     const expired = code(2, new Timestamp(Timestamp.now().valueOf() - 1));
@@ -32,8 +32,16 @@ describe('NodeRegistrationCodesFinder', () => {
     repository.findAll.mockResolvedValue([usable, usedUp, expired]);
 
     await expect(finder.find()).resolves.toEqual([usable]);
-    expect(repository.remove).toHaveBeenCalledTimes(2);
-    expect(repository.remove).toHaveBeenCalledWith(usedUp.getId());
-    expect(repository.remove).toHaveBeenCalledWith(expired.getId());
+    expect(repository.removeExpired).toHaveBeenCalledTimes(1);
+    expect(repository.remove).not.toHaveBeenCalled();
+  });
+
+  it('should keep used-up codes so a use released later is not lost', async () => {
+    const usedUp = code(0, Timestamp.now().addDays(1));
+
+    repository.findAll.mockResolvedValue([usedUp]);
+
+    await expect(finder.find()).resolves.toEqual([]);
+    expect(repository.remove).not.toHaveBeenCalledWith(usedUp.getId());
   });
 });
