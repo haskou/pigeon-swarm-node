@@ -24,8 +24,13 @@ import { GenuineRecordQuota } from './GenuineRecordQuota';
 /**
  * An invitation is admitted only when its inviter signed it, its id is derived
  * from the inviter, recipient, subject and nonce, the signed community or
- * conversation state lets the inviter invite that recipient, and the inviter is
- * still within the invitation quota.
+ * one-to-one conversation state lets the inviter invite that recipient, and
+ * the inviter is still within the invitation quota.
+ *
+ * A group letter names no subject: its id derives from the inviter, recipient
+ * and nonce alone, and a letter that carries a `subjectId` is refused. The
+ * group roster lives in MLS, so the node checks no participants for it; the
+ * signature and the inviter quota bound it like every other invitation.
  *
  * Invitations carry no signed time, and a node only sees them when they reach
  * it, so a per-minute window would admit different records on different
@@ -42,7 +47,7 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
     NotificationType.GROUP_CONVERSATION_INVITATION.valueOf(),
   ];
 
-  private readonly shape = new PublicMutationRecordShape(
+  private readonly subjectShape = new PublicMutationRecordShape(
     [
       'id',
       'inviterIdentityId',
@@ -54,6 +59,19 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
     [],
     'notification_invitation',
     { optionalStrings: ['encryptedKey'] },
+  );
+
+  private readonly groupShape = new PublicMutationRecordShape(
+    [
+      'encryptedKey',
+      'id',
+      'inviterIdentityId',
+      'nonce',
+      'recipientIdentityId',
+      'type',
+    ],
+    [],
+    'notification_invitation',
   );
 
   private readonly communities = new ShortLivedLookup<Community | undefined>();
@@ -147,8 +165,6 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
   public expectationOf(
     record: Record<string, unknown>,
   ): Omit<PublicMutationExpectation, 'payload'> {
-    this.shape.assert(record);
-
     if (
       record.removed !== undefined ||
       !NotificationInvitationMutationPolicy.TYPES.includes(
@@ -158,16 +174,32 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
       throw new InvalidPublicMutationError();
     }
 
+    const group =
+      record.type === NotificationType.GROUP_CONVERSATION_INVITATION.valueOf();
+
+    (group ? this.groupShape : this.subjectShape).assert(record);
+
     try {
       new IdentityId(record.recipientIdentityId as string);
       new InvitationNonce(record.nonce as string);
       this.assertKey(record);
 
-      const id = NotificationId.invitation(
-        new IdentityId(record.inviterIdentityId as string).valueOf(),
-        record.recipientIdentityId as string,
-        record.subjectId as string,
-        record.nonce as string,
+      const inviterIdentityId = new IdentityId(
+        record.inviterIdentityId as string,
+      ).valueOf();
+      const id = (
+        group
+          ? NotificationId.groupInvitation(
+              inviterIdentityId,
+              record.recipientIdentityId as string,
+              record.nonce as string,
+            )
+          : NotificationId.invitation(
+              inviterIdentityId,
+              record.recipientIdentityId as string,
+              record.subjectId as string,
+              record.nonce as string,
+            )
       ).valueOf();
 
       if (record.id !== id) throw new InvalidPublicMutationError();
@@ -192,7 +224,9 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
     try {
       if (this.isCommunity(record)) {
         await this.assertCommunityInviter(record, authorIdentityId);
-      } else {
+      } else if (
+        record.type === NotificationType.CONVERSATION_INVITATION.valueOf()
+      ) {
         await this.assertConversationParticipants(record, authorIdentityId);
       }
 

@@ -1,4 +1,5 @@
 import { Notification } from '@app/contexts/notifications/domain/Notification';
+import { PrimitiveOf } from '@haskou/value-objects';
 
 import { OrbitDBNotificationInvitationDocument } from '../documents/OrbitDBNotificationInvitationDocument';
 import { OrbitDBNotificationStateDocument } from '../documents/OrbitDBNotificationStateDocument';
@@ -27,6 +28,7 @@ export default class OrbitDBNotificationMapper {
   ): OrbitDBNotificationInvitationDocument {
     const primitives = notification.toPrimitives();
     const payload = primitives.payload as InvitationPayload;
+    const subjectId = payload.communityId ?? payload.conversationId;
 
     return {
       ...(payload.encryptedConversationKey
@@ -37,7 +39,7 @@ export default class OrbitDBNotificationMapper {
       nonce: payload.nonce,
       recipientIdentityId: primitives.recipientIdentityId,
       scopeType: 'notification_invitation',
-      subjectId: payload.communityId ?? payload.conversationId,
+      ...(subjectId === undefined ? {} : { subjectId }),
       type: primitives.type,
     };
   }
@@ -61,25 +63,30 @@ export default class OrbitDBNotificationMapper {
     invitation: OrbitDBNotificationInvitationDocument,
     state?: OrbitDBNotificationStateDocument,
   ): Notification {
-    const community = invitation.type === 'community_invitation';
     const common = {
       inviterIdentityId: invitation.inviterIdentityId,
       nonce: invitation.nonce,
       recipientIdentityId: invitation.recipientIdentityId,
     };
+    const sealed = {
+      ...common,
+      encryptedConversationKey: invitation.encryptedKey ?? '',
+    };
+    const payloads: Record<string, PrimitiveOf<Notification>['payload']> = {
+      community_invitation: {
+        ...common,
+        communityId: invitation.subjectId ?? '',
+      },
+      conversation_invitation: {
+        ...sealed,
+        conversationId: invitation.subjectId ?? '',
+      },
+      group_conversation_invitation: sealed,
+    };
 
     return Notification.fromPrimitives({
       id: invitation.id,
-      payload: community
-        ? {
-            ...common,
-            communityId: invitation.subjectId,
-          }
-        : {
-            ...common,
-            conversationId: invitation.subjectId,
-            encryptedConversationKey: invitation.encryptedKey ?? '',
-          },
+      payload: payloads[invitation.type],
       recipientIdentityId: invitation.recipientIdentityId,
       state: state?.state ?? 'pending',
       status: state?.read ? 'read' : 'unread',

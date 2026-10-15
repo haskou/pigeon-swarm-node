@@ -61,6 +61,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NotificationResource'
+        '400':
+          description: >-
+            Invalid body. Code 400070: a group conversation invitation must not
+            carry a conversation id.
         '403':
           description: Authenticated identity is not the inviter.
   /notifications/{notificationId}:
@@ -124,6 +128,29 @@ components:
       properties:
         conversationId:
           type: string
+        inviterIdentityId:
+          type: string
+        recipientIdentityId:
+          type: string
+        encryptedConversationKey:
+          type: string
+        nonce:
+          type: string
+          description: Client-generated base64url nonce (16-128 chars) the invitation id is derived from.
+    GroupConversationInvitationPayload:
+      type: object
+      description: >-
+        A group letter names no conversation; the conversation id travels only
+        inside the seal, and a letter carrying conversationId is rejected.
+      required:
+        - inviterIdentityId
+        - recipientIdentityId
+        - encryptedConversationKey
+        - nonce
+      not:
+        required:
+          - conversationId
+      properties:
         inviterIdentityId:
           type: string
         recipientIdentityId:
@@ -204,6 +231,7 @@ components:
           oneOf:
             - $ref: '#/components/schemas/CommunityInvitationPayload'
             - $ref: '#/components/schemas/ConversationInvitationPayload'
+            - $ref: '#/components/schemas/GroupConversationInvitationPayload'
             - $ref: '#/components/schemas/MissedCallPayload'
     NotificationsResource:
       type: object
@@ -231,7 +259,7 @@ components:
                   enum:
                     - conversation_invitation
         - allOf:
-            - $ref: '#/components/schemas/ConversationInvitationPayload'
+            - $ref: '#/components/schemas/GroupConversationInvitationPayload'
             - type: object
               required:
                 - type

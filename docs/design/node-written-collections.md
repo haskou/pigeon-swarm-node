@@ -278,11 +278,11 @@ Invitation (`collection: notifications`, `scopeType: notification_invitation`):
 
 ```jsonc
 {
-  "id": "invitation:<hash(inviterIdentityId:recipientIdentityId:subjectId:nonce)>",
+  "id": "invitation:<hash(inviterIdentityId:recipientIdentityId[:subjectId]:nonce)>",
   "type": "conversation_invitation | group_conversation_invitation | community_invitation",
   "inviterIdentityId": "<identityId>",
   "recipientIdentityId": "<identityId>",
-  "subjectId": "<conversationId | communityId>",
+  "subjectId": "<conversationId | communityId>  // absent for group_conversation_invitation",
   "encryptedKey": "<encryptedConversationKey>  // absent for community_invitation",
   "nonce": "<base64url>",
   "mutation": { /* PublicMutationProof, author == inviter */ }
@@ -303,8 +303,11 @@ field is redundant with the device-signed proof and is removed from the payload
   invitation requires an admitted conversation record (slice 1) where the
   inviter and the recipient are both in `participantIds`; community invitation
   requires the inviter to hold the invite permission in the community state
-  (existing community authority) for `subjectId`; `encryptedKey` bounded by the
-  existing value object; recipient is a syntactically valid identity id.
+  (existing community authority) for `subjectId`; group conversation invitation
+  carries no `subjectId` (refused if present) and gets no participant check,
+  since the group roster lives in MLS (D15), only the signature and the quotas;
+  `encryptedKey` bounded by the existing value object; recipient is a
+  syntactically valid identity id.
 - State: author == `recipientIdentityId` of the invitation it references; the
   invitation exists and is admitted; `accepted`/`declined` are terminal (no
   transitions out), `read` is monotonic.
@@ -323,7 +326,11 @@ field is redundant with the device-signed proof and is removed from the payload
   of stored records, never on arrival order. The 30 records per minute cap
   stays a write-path control of the local node. A malicious replica can still
   fill each identity's quota, and mint identities freely until identity creation
-  is bounded (haskou/pigeon-swarm-node#384).
+  is bounded (haskou/pigeon-swarm-node#384). Since group letters have no
+  participant check (D15 slice 6), any identity may address any recipient, so
+  the group letters stored for one recipient grow with the number of identities
+  a spammer controls: each inviter is bounded by its quota and the listing by
+  the caps below, but the total is not bounded until #384.
 - Listing caps: `GET /notifications` holds back pending
   `group_conversation_invitation` letters (no signed `accepted`/`declined`
   state) beyond `NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_PAIR` (default

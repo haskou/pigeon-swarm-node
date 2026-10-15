@@ -15,6 +15,12 @@ export type NotificationResource = {
         recipientIdentityId: string;
       }
     | {
+        encryptedConversationKey: string;
+        inviterIdentityId: string;
+        nonce: string;
+        recipientIdentityId: string;
+      }
+    | {
         callId: string;
         callerIdentityId: string;
         networkId: string;

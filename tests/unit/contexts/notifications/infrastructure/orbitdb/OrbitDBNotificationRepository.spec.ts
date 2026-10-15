@@ -1,3 +1,4 @@
+import { Notification } from '@app/contexts/notifications/domain/Notification';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NotificationId } from '@app/contexts/notifications/domain/value-objects/NotificationId';
@@ -96,7 +97,6 @@ describe('OrbitDBNotificationRepository', () => {
         nonce: `notification-caps-nonce-${index}`.padEnd(24, '0'),
         recipientIdentityId: recipientId,
         signer: inviter,
-        subjectId: 'group:notification-caps',
         type: 'group_conversation_invitation',
       });
 
@@ -109,6 +109,39 @@ describe('OrbitDBNotificationRepository', () => {
 
     expect(list.map((n) => n.getId().valueOf()).sort()).toEqual([...ids].sort());
     for (const id of ids) expect(await repository.hasById(new NotificationId(id))).toBe(true);
+  });
+
+  it('stores a group letter with no subject and reads it back naming no conversation', async () => {
+    const inviterKeys = await KeyPair.generate();
+    const inviterId = new IdentityId(inviterKeys.toPrimitives().publicKey).valueOf();
+    const recipientId = new IdentityId((await KeyPair.generate()).toPrimitives().publicKey).valueOf();
+    const inviter = { deviceCredential: inviterId, deviceKeyPair: inviterKeys, id: inviterId };
+    const signed = signNotificationInvitation({
+      encryptedKey: 'sealed-group-letter',
+      nonce: 'notification-group-nonce-0001',
+      recipientIdentityId: recipientId,
+      signer: inviter,
+      type: 'group_conversation_invitation',
+    });
+    const primitives = {
+      id: signed.payload.id,
+      payload: {
+        encryptedConversationKey: 'sealed-group-letter',
+        inviterIdentityId: inviterId,
+        nonce: 'notification-group-nonce-0001',
+        recipientIdentityId: recipientId,
+      },
+      recipientIdentityId: recipientId,
+      state: 'pending',
+      status: 'unread',
+      type: 'group_conversation_invitation',
+    };
+
+    await repository.saveInvitation(Notification.fromPrimitives(primitives), signed.proof);
+
+    expect(PublicMutationRecord.payloadOf(stored[0])).toEqual(signed.payload);
+    expect(PublicMutationRecord.payloadOf(stored[0])).not.toHaveProperty('subjectId');
+    expect((await repository.requireById(new NotificationId(signed.payload.id))).toPrimitives()).toEqual(primitives);
   });
 
   it('refuses to store missed calls', async () => {

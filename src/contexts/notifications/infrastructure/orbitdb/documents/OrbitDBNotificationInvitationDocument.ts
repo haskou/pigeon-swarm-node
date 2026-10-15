@@ -5,6 +5,7 @@ export type OrbitDBNotificationInvitationDocument = {
   nonce: string;
   recipientIdentityId: string;
   scopeType: 'notification_invitation';
-  subjectId: string;
+  /** The community or one-to-one conversation; a group letter names none. */
+  subjectId?: string;
   type: string;
 };

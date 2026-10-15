@@ -1,5 +1,6 @@
 import { CommunityInvitationPayload } from '@app/contexts/notifications/domain/CommunityInvitationPayload';
 import { ConversationInvitationPayload } from '@app/contexts/notifications/domain/ConversationInvitationPayload';
+import { GroupConversationInvitationPayload } from '@app/contexts/notifications/domain/GroupConversationInvitationPayload';
 import { NotificationType } from '@app/contexts/notifications/domain/value-objects/NotificationType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
@@ -13,7 +14,9 @@ export class NotificationCreateMessagePayload {
   public readonly mutation!: Record<string, unknown>;
 
   public readonly payload!:
-    CommunityInvitationPayload | ConversationInvitationPayload;
+    | CommunityInvitationPayload
+    | ConversationInvitationPayload
+    | GroupConversationInvitationPayload;
 
   public readonly type!:
     | typeof NotificationType.COMMUNITY_INVITATION

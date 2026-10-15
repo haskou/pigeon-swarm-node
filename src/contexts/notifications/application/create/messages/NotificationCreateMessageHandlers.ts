@@ -1,5 +1,6 @@
 import { CommunityInvitationPayload } from '@app/contexts/notifications/domain/CommunityInvitationPayload';
 import { ConversationInvitationPayload } from '@app/contexts/notifications/domain/ConversationInvitationPayload';
+import { GroupConversationInvitationPayload } from '@app/contexts/notifications/domain/GroupConversationInvitationPayload';
 
 export class NotificationCreateMessageHandlers<T> {
   public readonly communityInvitation!: (
@@ -11,6 +12,6 @@ export class NotificationCreateMessageHandlers<T> {
   ) => T;
 
   public readonly groupConversationInvitation!: (
-    payload: ConversationInvitationPayload,
+    payload: GroupConversationInvitationPayload,
   ) => T;
 }

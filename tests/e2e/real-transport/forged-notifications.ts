@@ -278,22 +278,16 @@ const act = (name: keyof typeof ConversationOperationAction & string): string =>
 const NONCE = (n: number): string =>
   `notification-e2e-nonce-${String(n).padStart(4, '0')}`;
 
+/** A group letter names no conversation: its id commits to no subject. */
 function invitationNotification(
   inviter: string,
   recipient: string,
-  subjectId: string,
   nonce: string,
   key: string,
 ): Notification {
   return Notification.fromPrimitives({
-    id: NotificationId.invitation(
-      inviter,
-      recipient,
-      subjectId,
-      nonce,
-    ).valueOf(),
+    id: NotificationId.groupInvitation(inviter, recipient, nonce).valueOf(),
     payload: {
-      conversationId: subjectId,
       encryptedConversationKey: key,
       inviterIdentityId: inviter,
       nonce,
@@ -323,25 +317,21 @@ async function main(): Promise<void> {
   process.env.PIGEON_PUBLIC_BOOTSTRAP_ENABLED = 'false';
   await startNodes();
   const [honest, malicious, control] = nodes;
-  const [owner, alice, bob, mallory, outsider, victim] = await Promise.all(
-    Array.from({ length: 6 }, () => actor()),
-  );
+  const [owner, alice, bob, mallory, outsider, victim, stranger] =
+    await Promise.all(Array.from({ length: 7 }, () => actor()));
 
   await connect();
   await synchronization(true);
 
-  stage = 'signed group creation replicates';
-  const nonce = randomUUID();
-  const group = ConversationId.deriveGroup(networkId, owner.id, nonce);
+  stage = 'signed one-to-one creation replicates';
+  const direct = ConversationId.deterministic(owner.id, bob.id, networkId);
   const genesis = signConversationOperation({
     action: act('CONVERSATION_CREATED'),
     args: {
-      name: 'Invitations',
-      nonce,
-      participantIds: [owner.id, alice.id, bob.id].sort(),
-      type: 'group',
+      participantIds: [owner.id, bob.id].sort(),
+      type: 'one-to-one',
     },
-    conversationId: group.valueOf(),
+    conversationId: direct.valueOf(),
     createdAt: clock++,
     networkId,
     parents: [],
@@ -349,27 +339,24 @@ async function main(): Promise<void> {
   });
 
   await honest.conversations!.saveOperation(genesis.operation, genesis.proof);
-  await until('group reached every node', async () => {
+  await until('one-to-one reached every node', async () => {
     for (const replica of nodes)
-      if (!(await replica.conversations!.hasById(group))) return false;
+      if (!(await replica.conversations!.hasById(direct))) return false;
 
     return true;
   });
 
   stage = 'signed invitation and recipient state replicate';
-  const subject = group.valueOf();
   const signed = signNotificationInvitation({
     encryptedKey: 'encrypted-key-for-bob',
     nonce: NONCE(1),
     recipientIdentityId: bob.id,
     signer: owner,
-    subjectId: subject,
     type: 'group_conversation_invitation',
   });
   const invitation = invitationNotification(
     owner.id,
     bob.id,
-    subject,
     NONCE(1),
     'encrypted-key-for-bob',
   );
@@ -410,8 +397,41 @@ async function main(): Promise<void> {
 
     return true;
   });
+  // A group letter names no conversation, so the node admits it between
+  // identities that share none: the roster lives in MLS, not on the node.
+  const unacquainted = signNotificationInvitation({
+    encryptedKey: 'encrypted-key-for-outsider',
+    nonce: NONCE(30),
+    recipientIdentityId: outsider.id,
+    signer: stranger,
+    type: 'group_conversation_invitation',
+  });
+
+  await control.repository!.saveInvitation(
+    invitationNotification(
+      stranger.id,
+      outsider.id,
+      NONCE(30),
+      'encrypted-key-for-outsider',
+    ),
+    unacquainted.proof,
+  );
+  await until('a letter between strangers reached the honest node', () =>
+    honest.repository!.hasById(new NotificationId(unacquainted.payload.id)),
+  );
+  assert.equal(
+    JSON.stringify(
+      (
+        await honest.repository!.requireById(
+          new NotificationId(unacquainted.payload.id),
+        )
+      ).toPrimitives(),
+    ).includes('conversationId'),
+    false,
+    'A group letter must name no conversation',
+  );
   console.log(
-    'PASS signed invitation and recipient state replicated to three nodes',
+    'PASS signed invitation and recipient state replicated to three nodes, and a group letter needs no shared conversation',
   );
 
   stage = 'forged notification records are ignored';
@@ -431,28 +451,30 @@ async function main(): Promise<void> {
     );
   };
   const make = (
+    type: 'conversation_invitation' | 'group_conversation_invitation',
     inviter: NotificationSigner,
     recipient: string,
-    subjectId: string,
     nonceValue: string,
-    key = 'forged-key',
+    subjectId?: string,
   ) =>
     invitationPayload({
-      encryptedKey: key,
+      encryptedKey: 'forged-key',
       nonce: nonceValue,
       recipientIdentityId: recipient,
       signer: inviter,
       subjectId,
-      type: 'group_conversation_invitation',
+      type,
     });
-  const outsiderGroup = ConversationId.deriveGroup(
-    networkId,
+  const unknownConversation = ConversationId.deterministic(
     mallory.id,
-    'x',
+    bob.id,
+    networkId,
   ).valueOf();
 
   // Forged encryptedKey presented as an invitation from the real owner.
-  const asOwner = { ...make(owner, victim.id, subject, NONCE(2)) };
+  const asOwner = {
+    ...make('group_conversation_invitation', owner, victim.id, NONCE(2)),
+  };
   ids.push(asOwner.id);
   await malicious.stores!.notifications.put!(
     PublicMutationRecord.withProof(
@@ -462,17 +484,55 @@ async function main(): Promise<void> {
   );
   // Id that does not derive from the claimed fields.
   const wrongId = {
-    ...make(mallory, bob.id, subject, NONCE(3)),
+    ...make('group_conversation_invitation', mallory, bob.id, NONCE(3)),
     id: `invitation:${'0'.repeat(64)}`,
   };
 
   await plantRecord(wrongId, mallory);
-  // Inviter not in the conversation.
-  await plantRecord(make(mallory, bob.id, subject, NONCE(4)), mallory);
-  // Recipient not in the conversation.
-  await plantRecord(make(owner, outsider.id, subject, NONCE(5)), owner);
-  // Unknown conversation.
-  await plantRecord(make(mallory, bob.id, outsiderGroup, NONCE(6)), mallory);
+  // A group letter that names a conversation, validly signed by its inviter.
+  await plantRecord(
+    make(
+      'group_conversation_invitation',
+      owner,
+      bob.id,
+      NONCE(4),
+      direct.valueOf(),
+    ),
+    owner,
+  );
+  // One-to-one inviter not in the conversation.
+  await plantRecord(
+    make(
+      'conversation_invitation',
+      mallory,
+      bob.id,
+      NONCE(7),
+      direct.valueOf(),
+    ),
+    mallory,
+  );
+  // One-to-one recipient not in the conversation.
+  await plantRecord(
+    make(
+      'conversation_invitation',
+      owner,
+      outsider.id,
+      NONCE(5),
+      direct.valueOf(),
+    ),
+    owner,
+  );
+  // Unknown one-to-one conversation.
+  await plantRecord(
+    make(
+      'conversation_invitation',
+      mallory,
+      bob.id,
+      NONCE(6),
+      unknownConversation,
+    ),
+    mallory,
+  );
   // State by a non recipient, for the real invitation.
   const byOther = statePayload(id, bob.id, 'pending', true);
 
@@ -554,7 +614,11 @@ async function main(): Promise<void> {
         (
           await replica.repository!.findByRecipient(new IdentityId(other.id))
         ).map((value) => value.toPrimitives().id),
-        other === bob ? [id] : [],
+        other === bob
+          ? [id]
+          : other === outsider
+            ? [unacquainted.payload.id]
+            : [],
       );
     assert.equal(
       await stateOf(replica),
@@ -572,16 +636,18 @@ async function main(): Promise<void> {
     'The ungated control node must hold the forged transition, otherwise the test proves nothing',
   );
   console.log(
-    'PASS forged key under another inviter, id mismatch, inviter or recipient outside the conversation, unknown conversation, state by a non recipient, state out of a terminal state, state of an unknown notification and recipient-index heads rejected',
+    'PASS forged key under another inviter, id mismatch, group letter naming a conversation, one-to-one inviter or recipient outside the conversation, unknown conversation, state by a non recipient, state out of a terminal state, state of an unknown notification and recipient-index heads rejected',
   );
 
   stage = 'invitations over the inviter quota are held back';
   // The owner already holds one admitted invitation, plus the validly signed
-  // one for a recipient outside the group that the previous stage planted: it
-  // is refused for its recipient, yet it still counts against its inviter's
-  // own quota. The control node, which has no gate, publishes five more
-  // genuine ones, newest id first, so the honest node sees the order that
-  // would favour a first-come quota.
+  // one-to-one one for a recipient outside the conversation that the previous
+  // stage planted: it is refused for its recipient, yet it still counts
+  // against its inviter's own quota. The group letter that names a
+  // conversation never counts: it is not a well-formed letter. The control
+  // node, which has no gate, publishes five more genuine ones, newest id
+  // first, so the honest node sees the order that would favour a first-come
+  // quota.
   const flood = await Promise.all(
     [10, 11, 12, 13, 14].map(async (index) => {
       const recipient = index % 2 === 0 ? alice : bob;
@@ -591,7 +657,6 @@ async function main(): Promise<void> {
         nonce: NONCE(index),
         recipientIdentityId: recipient.id,
         signer: owner,
-        subjectId: subject,
         type: 'group_conversation_invitation',
       });
 
@@ -600,7 +665,6 @@ async function main(): Promise<void> {
         invitation: invitationNotification(
           owner.id,
           recipient.id,
-          subject,
           NONCE(index),
           key,
         ),
@@ -608,7 +672,13 @@ async function main(): Promise<void> {
       };
     }),
   );
-  const refused = make(owner, outsider.id, subject, NONCE(5)).id;
+  const refused = make(
+    'conversation_invitation',
+    owner,
+    outsider.id,
+    NONCE(5),
+    direct.valueOf(),
+  ).id;
   const countedIds = [id, refused, ...flood.map((value) => value.id)].sort();
   const expectedVisible = countedIds
     .slice(0, INVITATION_QUOTA)
@@ -699,13 +769,11 @@ async function main(): Promise<void> {
       nonce: NONCE(index),
       recipientIdentityId: bob.id,
       signer: alice,
-      subjectId: subject,
       type: 'group_conversation_invitation',
     });
     const notification = invitationNotification(
       alice.id,
       bob.id,
-      subject,
       NONCE(index),
       key,
     );
