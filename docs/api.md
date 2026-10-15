@@ -366,8 +366,10 @@ Ephemeral typing indicators:
 Typing messages are not persisted and are never sent through IPFS/pubsub. The
 backend ignores client-sent identity fields and uses the identity authenticated
 by the WebSocket handshake. Conversation typing is relayed only to the other
-conversation participants. Community channel typing is relayed only to the
-other community members when the channel is a text channel.
+participant of a direct conversation; typing in a group conversation is never
+relayed, because it travels as an MLS record through the group mailboxes.
+Community channel typing is relayed only to the other community members when
+the channel is a text channel.
 
 Delivered typing messages:
 
