@@ -13,7 +13,14 @@ export default class CallEnder {
     private readonly accessAuthorizer: CallAccessAuthorizer,
   ) {}
 
-  public async end(message: CallEndMessage): Promise<Call> {
+  /**
+   * `onRecordAccepted` runs once the call accepts the end, right before it is
+   * stored; a rejection stores nothing.
+   */
+  public async end(
+    message: CallEndMessage,
+    onRecordAccepted?: () => Promise<void>,
+  ): Promise<Call> {
     const call = await this.repository.requireById(message.callId);
 
     await this.accessAuthorizer.assertAccess(
@@ -33,6 +40,7 @@ export default class CallEnder {
       throw error;
     }
 
+    await onRecordAccepted?.();
     await this.repository.saveEnd(call, message.getProof());
     await this.eventPublisher.publish(call.pullDomainEvents());
 

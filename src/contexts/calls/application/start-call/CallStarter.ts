@@ -20,6 +20,7 @@ export default class CallStarter {
   private async startResolved(
     message: CallStartMessage,
     resolvedScope: ResolvedCallScope,
+    onRecordAccepted?: () => Promise<void>,
   ): Promise<Call> {
     if (message.scopeType.isCommunityChannel()) {
       // One live call per channel: the caller signs a join instead of a start.
@@ -48,6 +49,7 @@ export default class CallStarter {
       message.sessionEpoch,
     );
 
+    await onRecordAccepted?.();
     await this.repository.saveStart(call, message.getProof());
     const lease = await this.leaseRenewer.renew(
       call,
@@ -61,17 +63,25 @@ export default class CallStarter {
     return call;
   }
 
-  public async start(message: CallStartMessage): Promise<Call> {
+  /**
+   * `onRecordAccepted` runs once the start is accepted, right before it is
+   * stored; a rejection stores nothing. A refused or not yet answerable start,
+   * or a live community call returned instead, never reaches it.
+   */
+  public async start(
+    message: CallStartMessage,
+    onRecordAccepted?: () => Promise<void>,
+  ): Promise<Call> {
     const resolvedScope = await this.scopeResolver.resolve(message);
 
     if (!message.scopeType.isCommunityChannel()) {
-      return this.startResolved(message, resolvedScope);
+      return this.startResolved(message, resolvedScope, onRecordAccepted);
     }
 
     return this.communityChannelStartCoordinator.coordinate(
       message.getCommunityId(),
       message.getCommunityChannelId(),
-      () => this.startResolved(message, resolvedScope),
+      () => this.startResolved(message, resolvedScope, onRecordAccepted),
     );
   }
 }

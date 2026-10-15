@@ -138,7 +138,7 @@ installed `web-push` module path.
 | --- | --- | --- | --- |
 | `CALLS_ICE_TRANSPORT_POLICY` | `all` | No | ICE transport policy returned to clients. |
 | `CALLS_MAX_DURATION_MS` | `43200000` | No | Maximum call duration (12 hours). |
-| `CALLS_RECORD_RATE_LIMIT_PER_MINUTE` | `30` | No | Call record rate limit per minute; excess returns `429` with code `429021`. |
+| `CALLS_RECORD_RATE_LIMIT_PER_MINUTE` | `30` | No | Call record rate limit per minute, charged only for records about to be stored; excess returns `429` with code `429021`. |
 | `CALLS_SIGNAL_RATE_LIMIT_PER_MINUTE` | `120` | No | Signal rate limit per call and sender per minute; excess returns `429` with code `429010`. |
 | `CALLS_TURN_CREDENTIAL_TTL_SECONDS` | `3600` | No | Lifetime of issued TURN credentials, in seconds. |
 | `CALLS_TURN_DISCOVERY_ENABLED` | `true` | No | Enables node-to-node TURN relay discovery. |

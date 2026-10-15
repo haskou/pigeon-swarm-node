@@ -17,7 +17,7 @@ export class PostCallRoute extends CallRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const creatorIdentityId = await this.authenticateRecordAuthor(request);
+    const creatorIdentityId = this.authenticate(request);
     const call = await this.starter.start(
       new CallStartMessage(
         creatorIdentityId.valueOf(),
@@ -32,6 +32,7 @@ export class PostCallRoute extends CallRouteSupport {
         body.startedAt,
         body.sessionEpoch,
       ),
+      this.chargeRecordTo(creatorIdentityId),
     );
 
     return response

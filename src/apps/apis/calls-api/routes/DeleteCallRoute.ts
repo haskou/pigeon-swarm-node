@@ -25,7 +25,7 @@ export class DeleteCallRoute extends CallRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const participantIdentityId = await this.authenticateRecordAuthor(request);
+    const participantIdentityId = this.authenticate(request);
     const call = await this.ender.end(
       new CallEndMessage(
         callId,
@@ -33,6 +33,7 @@ export class DeleteCallRoute extends CallRouteSupport {
         body.mutation,
         body.at,
       ),
+      this.chargeRecordTo(participantIdentityId),
     );
 
     return response
