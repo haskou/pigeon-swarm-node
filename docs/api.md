@@ -488,8 +488,9 @@ the authenticated participants.
 
 ## Calls HTTP API
 
-Calls can be scoped to a one-to-one conversation, a group conversation or a
-community voice channel. All endpoints require signed request authentication.
+Calls can be scoped to a one-to-one conversation, a group capability (the group
+itself lives in MLS on the clients) or a community voice channel. All endpoints
+require signed request authentication.
 
 An endpoint that addresses a call by id answers HTTP 503
 `ReplicatedStateNotReadyError` (code `503020`) instead of 409
