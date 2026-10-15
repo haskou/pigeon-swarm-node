@@ -7,8 +7,7 @@ Feature: PUT /presence/me
     Given I set json body
       """
       {
-        "status": "busy",
-        "customMessage": "Recording"
+        "status": "busy"
       }
       """
     And I sign the current presence update request
@@ -17,10 +16,22 @@ Feature: PUT /presence/me
     And response data should match partially
       """
       {
+        "status": "busy"
+      }
+      """
+    And response does not contain property "customMessage"
+
+  Scenario: Reject a presence custom message
+    Given I set json body
+      """
+      {
         "status": "busy",
         "customMessage": "Recording"
       }
       """
+    And I sign the current presence update request
+    When I PUT "/presence/me"
+    Then response code is equal to 400
 
   Scenario: Reject disconnected as a selected presence
     Given I set json body

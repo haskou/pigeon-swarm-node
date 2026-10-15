@@ -7,8 +7,7 @@ Feature: GET /presence
     Given I set json body
       """
       {
-        "status": "available",
-        "customMessage": "Ready"
+        "status": "available"
       }
       """
     And I sign the current presence update request
@@ -20,8 +19,7 @@ Feature: GET /presence
     And response data should match partially
       """
       {
-        "status": "available",
-        "customMessage": "Ready"
+        "status": "available"
       }
       """
 
@@ -31,12 +29,11 @@ Feature: GET /presence
     Then response code is equal to 200
     And response body is an array with length of 1
 
-  Scenario: Hide presence status and message from a viewer without a shared relationship
+  Scenario: Hide presence status from a viewer without a shared relationship
     Given I set json body
       """
       {
-        "status": "available",
-        "customMessage": "Ready"
+        "status": "available"
       }
       """
     And I sign the current presence update request
@@ -51,14 +48,12 @@ Feature: GET /presence
         "status": "disconnected"
       }
       """
-    And response body should not contain "Ready"
 
-  Scenario: Hide presence list status and message from a viewer without a shared relationship
+  Scenario: Hide presence list status from a viewer without a shared relationship
     Given I set json body
       """
       {
-        "status": "available",
-        "customMessage": "Ready"
+        "status": "available"
       }
       """
     And I sign the current presence update request
