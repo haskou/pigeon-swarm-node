@@ -135,3 +135,23 @@ Feature: Put node blocks
     And I sign a POST request to "/realtime/v1/tickets"
     When I POST to "/realtime/v1/tickets"
     Then response code is equal to 201
+
+  Scenario: A request claiming the owner with a bad signature is refused before validation
+    Given I set a node block list body version 1 blocking "other"
+    And I sign a PUT request to "/node/blocks/"
+    And I set a node block list body of 512 bytes
+    When I PUT "/node/blocks/"
+    Then response code is equal to 401
+    And response body should contain "401020"
+
+  Scenario: A new owner replaces the previous owner's list whatever its version
+    Given I set a node block list body version 9007199254740991 blocking "other"
+    And I sign a PUT request to "/node/blocks/"
+    When I PUT "/node/blocks/"
+    Then response code is equal to 200
+
+    Given I hand the node over to the other identity
+    And I set a node block list body version 1 blocking "nobody" owned by the other identity and signed by the other identity
+    And another identity signs a PUT request to "/node/blocks/"
+    When I PUT "/node/blocks/"
+    Then response code is equal to 200

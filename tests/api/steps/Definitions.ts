@@ -4809,6 +4809,15 @@ export default class Definitions {
     await this.signCurrentRequest('PUT', '/node/owner/');
   }
 
+  @given('I hand the node over to the other identity')
+  public async iHandTheNodeOverToTheOtherIdentity(): Promise<void> {
+    await this.ensureOtherIdentityKeyPair();
+    this.body = JSON.stringify({ identityId: this.otherIdentityId });
+    await this.signCurrentRequest('PUT', '/node/owner/');
+    await this.iPUT('/node/owner/');
+    expect(this.response.status).to.equal(200);
+  }
+
   @given('another identity signs the current node owner request')
   public async anotherIdentitySignsTheCurrentNodeOwnerRequest(): Promise<void> {
     const keyPair = await this.ensureOtherIdentityKeyPair();

@@ -127,4 +127,16 @@ describe('NodeBlockList', () => {
     ).toBe(false);
     expect(new NoNodeBlocks().acceptsReplacement()).toBe(true);
   });
+
+  it('should accept any version from a new owner', async () => {
+    const current = new NodeBlockListMother(await KeyPair.generate())
+      .withVersion(Number.MAX_SAFE_INTEGER)
+      .build();
+
+    expect(
+      current.acceptsReplacement(
+        new NodeBlockListMother(await KeyPair.generate()).build(),
+      ),
+    ).toBe(true);
+  });
 });
