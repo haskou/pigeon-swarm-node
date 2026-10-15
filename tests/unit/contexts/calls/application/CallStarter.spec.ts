@@ -162,8 +162,14 @@ describe('CallStarter', () => {
       1,
     );
 
-    const call = await starter.start(message);
+    const onRecordAccepted = jest.fn().mockResolvedValue(undefined);
 
+    const call = await starter.start(message, onRecordAccepted);
+
+    expect(onRecordAccepted).toHaveBeenCalledTimes(1);
+    expect(onRecordAccepted.mock.invocationCallOrder[0]).toBeLessThan(
+      repository.saveStart.mock.invocationCallOrder[0],
+    );
     expect(repository.saveStart).toHaveBeenCalledWith(call, message.getProof());
     expect(call.toPrimitives().participantIds).toEqual([caller.valueOf()]);
     expect(call.toPrimitives()).toHaveProperty('sessionEpoch', 1);
@@ -188,6 +194,7 @@ describe('CallStarter', () => {
       undefined,
       communityRepositoryFor(),
     );
+    const onRecordAccepted = jest.fn().mockResolvedValue(undefined);
 
     const call = await starter.start(
       startMessage(
@@ -198,10 +205,12 @@ describe('CallStarter', () => {
         },
         1,
       ),
+      onRecordAccepted,
     );
 
     expect(call.getId().isEqual(active.getId())).toBe(true);
     expect(repository.saveStart).not.toHaveBeenCalled();
+    expect(onRecordAccepted).not.toHaveBeenCalled();
     expect(eventPublisher.publish).not.toHaveBeenCalled();
   });
 
@@ -231,6 +240,7 @@ describe('CallStarter', () => {
     const conversationRepository = mock<ConversationRepository>();
     conversationRepository.hasById.mockResolvedValue(false);
     const { starter } = build(repository, conversationRepository);
+    const onRecordAccepted = jest.fn().mockResolvedValue(undefined);
 
     await expect(
       starter.start(
@@ -238,8 +248,37 @@ describe('CallStarter', () => {
           conversationId: 'one-to-one:none',
           type: 'conversation',
         }),
+        onRecordAccepted,
       ),
     ).rejects.toThrow();
+    expect(onRecordAccepted).not.toHaveBeenCalled();
     expect(repository.saveStart).not.toHaveBeenCalled();
+  });
+
+  it('stores no start when the accepted record is refused', async () => {
+    const repository = mock<CallRepository>();
+    repository.hasActiveByCommunityChannel.mockResolvedValue(false);
+    const { eventPublisher, starter } = build(
+      repository,
+      undefined,
+      communityRepositoryFor(),
+    );
+    const overBudget = new Error('over budget');
+
+    await expect(
+      starter.start(
+        startMessage(
+          {
+            channelId: 'voice-1',
+            communityId: 'community-1',
+            type: 'community_channel',
+          },
+          1,
+        ),
+        jest.fn().mockRejectedValue(overBudget),
+      ),
+    ).rejects.toBe(overBudget);
+    expect(repository.saveStart).not.toHaveBeenCalled();
+    expect(eventPublisher.publish).not.toHaveBeenCalled();
   });
 });
