@@ -1,13 +1,14 @@
 # Node owner registration control and blocking (optional)
 
-Status: design for issue #384. Owner decision: the price-based admission model
-stays the default, and every node stays open unless its owner changes that. A
-node owner gets two optional, local tools:
+Status: design for issue #384, decisions confirmed by the owner. The price-based
+admission model stays the default, and every node stays open unless its owner
+changes that. A node owner gets two optional, local tools:
 
 1. **Registration control.** Decide whether new identities may be **created**
    through this node. It never gates existing identities or login.
-2. **Blocking.** Stop this node from acting for chosen identities. Optionally,
-   publish the block list so other node owners can adopt it.
+2. **Blocking.** Stop this node from serving chosen identities and from talking
+   to chosen nodes. Optionally publish the block list so other node owners can
+   adopt it.
 
 There is no network admin, no allowlist of admitted identities, no replicated
 admission state and no cross-node consensus.
@@ -20,8 +21,9 @@ counts per network (`IdentityAdmissionPricingDomainService.ts:9-15`, #518), and
 each node can cap admissions per network
 (`IdentityNetworkAdmissionRateLimiter.ts:8-13`). An operator who runs a node for
 a known group still cannot say "nobody creates accounts here except people I
-invited", and has no way to stop serving an abusive identity. The operator
-already exists in the code as the **node owner**.
+invited", and has no way to stop serving an abusive identity or talking to a
+misbehaving node. The operator already exists in the code as the **node
+owner**.
 
 ## Goals and non-goals
 
@@ -65,25 +67,48 @@ Both tools reuse the existing node owner unchanged:
 ### Owner loss and reset
 
 There is no key-based recovery protocol. Control of the host is ownership: an
-operator who lost the owner key, or whose key was stolen, resets the owner by
-deleting local state while the node is stopped.
+operator who lost the owner key, or whose key was stolen, resets the owner from
+the host while the node is stopped.
 
+- **Owner reset command.** `yarn node:reset-owner` clears only the owner and the
+  settings of this design: registration mode (back to `open`), registration
+  codes, own blocks, adopted sources with their pending and approved entries,
+  local exceptions and the publication setting. Networks, mailboxes, private
+  blobs, the node id and the libp2p peer key stay. The command opens the same
+  local database, whose lock (`level`, `EmbeddedLocalDatabase.ts:3`) makes it
+  fail while the node is running.
 - **Full reset.** Delete the local database folder, `PIGEON_LOCAL_DB_PATH`
   (default `<project root>/local_storage`; `EmbeddedLocalDatabase.ts:48-49`).
-  Next start, the node creates new metadata with a new random node id
-  (`LocalNodeMetadataMapper.ts:23-27`). This also drops everything else kept
-  locally: configured networks and their keys, relay configuration, mailboxes,
-  private blob records, push subscriptions and rate-limit counters.
-- **Owner reset.** A host-side command, run while the node is stopped, deletes
-  only the owner and the owner-scoped settings of this design (see open
-  questions).
-- Either reset also resets the registration mode to `open` and deletes
-  registration codes, blocks, adopted block sources and the publication setting.
-- After a reset the node is unclaimed. Today the first signed caller claims it
-  and may name any identity (`PutNodeOwnerRoute.ts:32`), so the operator claims
-  it before exposing the API again.
+  This clears the same settings and everything else kept locally: configured
+  networks and their keys, relay configuration, mailboxes, private blob
+  records, push subscriptions and rate-limit counters. Next start, the node
+  creates new metadata with a new random node id
+  (`LocalNodeMetadataMapper.ts:23-27`). The libp2p peer key lives under
+  `IPFS_STORAGE_PATH` (`IPFSNetworkRegistry.ts:254-299`), so the peer id
+  survives unless that folder is deleted too.
+- After either reset the node is unclaimed; the operator claims it again with
+  `PUT /node/owner` (`PutNodeOwnerRoute.ts:32` lets the first signed caller
+  claim an unclaimed node).
 
 ## Registration control
+
+### Modes
+
+`Node` gains `NodeRegistrationMode`:
+
+- `open` (default): as today.
+- `codes`: a new identity can be created only with a registration code, which
+  the owner hands out as a registration link.
+- `closed`: nobody can create an identity through this node, the owner
+  included. The owner switches to `codes` to invite someone.
+
+Owner-only creation (the owner submits each newcomer's record) is not built:
+an owner who wants it issues a single-use link and uses it at once.
+
+In every mode the proof of work and the #518 pricing apply unchanged. A code
+only grants the right to try. It never lowers the price, because the identity
+replicates to every node of its networks and one node cannot vouch for it to
+the others.
 
 ### What counts as creation
 
@@ -95,52 +120,78 @@ identity yet. A genesis that already replicated here is a republish, not a
 creation. Updates, network additions, device transitions, login and every
 other route are never gated.
 
-### Options evaluated
+### Registration codes
 
-| Option                                                                              | Security                                                                                 | Usability                                                                                     | Cost                                                      |
-| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
-| A. Owner-only creation: the genesis must arrive in an owner-signed request          | Strongest; no secret to leak                                                             | Poor: the newcomer must hand the record to the owner, who submits it while online             | One check; client hand-off flow                           |
-| B. Registration codes: the owner issues single-use codes; the newcomer presents one | Strong: a leaked code admits at most its uses before it expires; the owner can revoke it | Good: a link or QR code, and the newcomer registers alone                                     | Small local collection, three owner endpoints, one header |
-| C. Closed: no new identities through this node; PoW unchanged everywhere            | Strongest, and simplest                                                                  | Only for nodes whose users already exist; newcomers register elsewhere and then use this node | One check                                                 |
+- `POST /node/registration-codes` (owner-signed) takes
+  `{ "maxUses": 1, "expiresAt": <ms> }` and returns
+  `{ "id", "code", "maxUses", "expiresAt" }`. The code appears only in this
+  response.
+  - `maxUses` defaults to `1`. Multi-use codes suit an invite link shared with
+    a group, at a higher cost if leaked.
+  - `expiresAt` is required and at most `NODE_REGISTRATION_CODE_MAX_TTL_DAYS`
+    (default `30`) ahead. `maxUses` is at most
+    `NODE_REGISTRATION_CODE_MAX_USES` (default `100`).
+- The code is 32 random bytes, base64url. The node stores only its SHA-256,
+  `maxUses`, the uses left and `expiresAt`, in a local collection with its own
+  repository.
+- `GET /node/registration-codes` (owner-signed) lists codes by id with uses
+  left and expiry, never the code. `DELETE /node/registration-codes/{id}`
+  revokes one. Expired and used-up codes are dropped.
+- **Uses are counted on this node only.** That is safe because the code only
+  gates creation through this node. No other node checks it, and the identity
+  record does not carry it, so no replica has to agree on the remaining uses.
+  Replicated community invites need that agreement (`api.md`, "Create community
+  invite link token"); registration codes do not.
 
-**Recommendation: ship `open` (default), `codes` (B) and `closed` (C); do not
-build A.** B covers what A offers: the owner can issue a code and use it at once.
-In every mode the proof of work and the #518 pricing apply unchanged. A code
-only grants the right to try. It never lowers the price, because the identity
-replicates to every node of its networks and one node cannot vouch for it to
-the others.
+### Registration link
 
-### Shape
+The owner's client builds the link; the node needs no UI address:
 
-- `Node` gains `NodeRegistrationMode` (`open | codes | closed`), stored in
-  `node_metadata` and recorded with a domain event like the relay
-  configuration. It is set by owner-signed `PUT /node/registration`.
-- `GET /node` (public) returns `registration: { mode }`, so a client knows
-  before creating a key whether to ask for a code.
-- Codes live in their own local collection with their own repository:
-  - `POST /node/registration-codes` (owner-signed) takes `{ expiresAt, uses }`
-    and returns `{ code }` once. The code is a random 256-bit value; the node
-    stores only its SHA-256, the expiry and the remaining uses.
-  - `GET /node/registration-codes` lists them by id without the code;
-    `DELETE /node/registration-codes/{id}` revokes one.
-- The newcomer sends `X-Registration-Code` with `POST /identities`. The record
-  format does not change.
+```text
+https://<ui-origin>/register#node=<encodeURIComponent(node endpoint)>&code=<code>
+```
+
+- `node` is the node endpoint the owner's client uses, in the form the UI
+  already accepts (`ClientNodeEndpoint.normalize` in pigeon-swarm-ui: HTTPS, or
+  HTTP on loopback, without credentials, query or fragment).
+- The code travels in the fragment, so it never reaches the UI host's logs or
+  a `Referer` header. The UI removes the fragment from the address bar as soon
+  as it reads it, as it does for community invites.
+- Opening the link selects that node and starts identity creation with the
+  code already filled in: no node URL to type, no code to copy. If the browser
+  already has an identity on another node, the UI asks before switching.
+- The owner's UI shows the link and a QR code of it.
+
+### Enforcement
+
+- The newcomer's client sends `X-Registration-Code` with `POST /identities`.
+  The record format does not change.
 - **Order in `POST /identities`** (`PostIdentityRoute.ts:46-48`): the per-address
   limiter first, so codes cannot be guessed fast; then the registration check;
   then the publish limiter and the network admission limiter. Refused attempts
-  therefore never consume the shared limits honest users depend on. A code use
-  is reserved atomically before publishing and released if publishing fails,
-  so a failed proof never burns a code and two concurrent requests cannot both
-  spend the last use.
-- Refusal: `403` with new code `403011`, "Identity creation on this node needs
-  a valid registration code" or "is closed". One code for missing, unknown,
-  expired and used codes, so a caller learns nothing about which codes exist.
+  therefore never consume the shared limits honest users depend on.
+- A code use is reserved atomically before publishing and released if
+  publishing fails, so a failed proof never burns a use and two concurrent
+  requests cannot both spend the last one.
+- Refusal: `403` with new code `403011`, message "Identity creation on this
+  node is closed" or "needs a valid registration code". One code for missing,
+  unknown, expired and used-up codes, so a caller learns nothing about which
+  codes exist.
+- `PUT /node/registration` (owner-signed) sets the mode. `GET /node` (public)
+  returns `registration: { mode }`, so a client knows before creating a key
+  whether it needs a link.
 
 ## Blocking
 
-### What a block does on this node
+A block names either an **identity** or a **node**. A node is named by its
+libp2p peer id: one per node, shared by all its networks
+(`IPFSNetworkRegistry.ts:233-299`), and shown by `GET /peers`. The `NodeId` in
+`GET /node` is a random UUID the node reports about itself, which a connection
+cannot prove, so it is not used.
 
-For a blocked identity, while it is blocked, this node:
+### What an identity block does on this node
+
+While the identity is blocked, this node:
 
 - refuses every request authenticated as it, reads included, with `403` and new
   code `403012` "Identity is blocked on this node". The check runs right after
@@ -159,27 +210,53 @@ For a blocked identity, while it is blocked, this node:
   (`ContentReplicationMaintainer.ts:57`), so this node neither fetches nor
   announces its content. Other owners share the budget it no longer uses.
 
+### What a node block does on this node
+
+While the node is blocked, this node:
+
+- refuses every libp2p connection with that peer id, inbound and outbound, on
+  every network, through the existing connection gater
+  (`HeliaIPFSParser.ts:115-128`);
+- closes its open connections when the block takes effect;
+- as a result, exchanges no gossip, OrbitDB replication or bitswap blocks with
+  it, neither fetching from it nor announcing to it, and relays no traffic for
+  it when this node is a relay.
+
+The gater today reads a process-wide list loaded from a `blockedPeers.json` file
+in each network folder (`HeliaIPFSParser.ts:17,97-181`), written by
+`HeliaIPFS.blockPeer` (`HeliaIPFS.ts:1397-1408`), which nothing calls. The
+implementation replaces that with the block policy below and removes the file
+handling, including its skip in `PrivateNetworkRelayRecordDirectory.ts:221`.
+
 ### What a block never does
 
 - It never deletes anything: not records, content bytes already held (the
   maintainer never removes a replica's bytes, `ContentReplicationMaintainer.ts:15`),
   private blobs, push subscriptions, mailboxes or the identity.
-- It never hides or refuses the identity's replicated records. They are still
-  stored, replicated, served to other users and counted by #518.
+- It never hides or refuses replicated records. An identity block leaves its
+  records stored, replicated, served to other users and counted by #518. A node
+  block stops only the exchange with that peer: records that came from it stay,
+  and the same records still arrive through other peers.
 - It never touches mailboxes. Mailbox operations are anonymous capabilities
   (`opaque-mailboxes.md`), so the node cannot tell whose mailbox it is. Other
   bearer-capability routes, such as downloading an existing private blob, are
   likewise unaffected.
+- An identity block never blocks a node and a node block never blocks an
+  identity; users whose home is a blocked node can still use this node.
 - It never affects other nodes, unless their owners adopt this list.
-- It never applies to the node's own owner. A block entry for the owner is
-  ignored.
+- It never applies to this node itself: the owner's identity and this node's
+  own peer id are ignored if listed.
 
 Unblocking restores everything above at once; nothing has to be rebuilt.
 
+A node block stops a known misbehaving peer, not a determined one: an operator
+can generate a new peer key. Likewise an identity block does not stop the same
+person from paying for a new identity elsewhere.
+
 ### Block list format
 
-The owner's client keeps the whole list as one document signed by the owner
-identity:
+The owner's client keeps the whole list, identities and nodes, as one document
+signed by the owner identity:
 
 ```jsonc
 {
@@ -188,14 +265,20 @@ identity:
   "version": 7, // strictly increasing
   "issuedAt": 1770000000000, // metadata only
   "blockedIdentityIds": ["<identityId>", "..."], // sorted, unique
+  "blockedNodePeerIds": ["<libp2p peer id>", "..."], // sorted, unique
   "identitySignature": "<ed25519 by the owner identity key over \"pigeon:node-block-list:v1\\n\" + canonical JSON without this field>",
 }
 ```
 
+- One document keeps signing, versioning, publishing and adopting to a single
+  path for both kinds.
 - `PUT /node/blocks` (owner-signed request) stores a document whose signer is
   the current owner and whose version is higher than the stored one.
-  `GET /node/blocks` (owner-signed) returns it. Adding or removing one identity
-  is a new version written by the client.
+  `GET /node/blocks` (owner-signed) returns it. Adding or removing one entry is
+  a new version written by the client.
+- Size: at most `NODE_BLOCK_LIST_MAX_ENTRIES` entries per document, counting
+  both arrays (default `10000`). The same limit applies to this node's own list
+  and to each adopted list.
 - The document carries no reasons. A published list must not become a place
   for accusations or personal data; any note stays in the owner's client.
 - The identity id is the public key, so anyone can verify the document from
@@ -214,14 +297,28 @@ identity:
   - the signature verifies against the **pinned** `ownerIdentityId`;
   - the version is higher than the last one kept, so a served old version
     cannot roll blocks back;
-  - it fits the size limit.
+  - it fits `NODE_BLOCK_LIST_MAX_ENTRIES`.
 
   An unreachable source or an invalid response keeps the last valid version.
   Outbound requests reuse the private-address guard used for link previews
   (`LinkPreviewUrlGuard.ts`).
 
-- **Effect.** This node blocks the union of its own list and every adopted
-  list, never its own owner. Removing a source removes its effect at once.
+- **Review queue (default).** Entries a source adds are **pending**: they have
+  no effect until this node's owner approves them. The owner approves all
+  pending entries of a source with one action, or picks entries one by one.
+  Auto-apply would let a publisher silently block this node's users or cut it
+  off from its peers, so it is not the default.
+- **Auto-apply (opt-in per source).** The owner may turn on `autoApply` for a
+  source they fully trust; its added entries then take effect on fetch.
+- **Removals** by a source take effect on fetch in both modes: they only lift
+  blocks. An owner who wants to keep such a block adds the entry to their own
+  list.
+- **Local exceptions.** The owner keeps a list of identities and peer ids that
+  adopted lists never block, in either mode. Their own list is unaffected.
+- **Effect.** This node blocks the union of its own list and, per source,
+  the approved entries still present in its latest version (all of them with
+  `autoApply`), minus local exceptions, the owner's identity and this node's
+  peer id. Removing a source removes its effect at once.
 - **No consensus.** Lists are never gossiped or merged into shared state. Each
   node decides whose lists to trust, one owner identity at a time.
 - **Publisher owner change.** After a rotation or reset, the publisher's new
@@ -235,9 +332,9 @@ identity:
   gate and never lower the price.
 - **Per-node limits:** unchanged. Registration refusals happen before the
   publish limiter and the network admission limiter.
-- **#557 budget:** registration control does not affect it. Blocked owners are
-  left out of this node's allocation, as described above. Responsibility
-  (`ContentReplicationStatusFinder`) is unchanged: for a blocked owner's
+- **#557 budget:** registration control does not affect it. Blocked identities
+  are left out of this node's allocation, as described above. Responsibility
+  (`ContentReplicationStatusFinder`) is unchanged: for a blocked identity's
   content this node behaves like a node with an exhausted budget, which the
   network already handles.
 
@@ -245,21 +342,23 @@ identity:
 
 - `GET /node` shows the registration mode.
 - `GET /node/blocks/published` exists only when the owner publishes.
+- A blocked node sees its connections refused.
 - Nothing else: no heartbeat field, no replicated record, no protocol change.
 
 ## Failure modes
 
-| Failure                               | Effect                                                          | Recovery                                                                              |
-| ------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Registration code leaked              | Up to its remaining uses can create identities until it expires | Owner revokes it; blocks identities created with it                                   |
-| Owner offline                         | No new codes or blocks; everything already set keeps working    | None needed                                                                           |
-| Owner key lost or stolen              | Settings frozen, or changed by the thief                        | Host-side owner reset, then claim again before exposing the API                       |
-| Node reset                            | Registration open, blocks and sources gone, node unclaimed      | Claim, then restore the settings; a published list must be re-signed by the new owner |
-| Adopted source unreachable            | Last valid version stays in effect                              | None needed; diagnostics show when it was last fetched                                |
-| Adopted source publishes a bad list   | This node blocks whoever that list names                        | Remove the source; the effect ends at once and nothing was deleted                    |
-| Publisher's owner changes             | Subscribers keep the old list and reject the new signer         | Subscriber owner pins the new identity if they trust it                               |
-| Blocked identity uses other nodes     | Works as before; its records still reach this node's users      | Users block it in their clients; other owners adopt the list                          |
-| Identities created through open nodes | They can use this node                                          | Blocking; registration control only removes this node as an entry point               |
+| Failure                               | Effect                                                                  | Recovery                                                                           |
+| ------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Registration link leaked              | Up to its uses left can create identities until it expires              | Owner revokes the code; blocks identities created with it                          |
+| Owner offline                         | No new codes, blocks or approvals; everything already set keeps working | None needed                                                                        |
+| Owner key lost or stolen              | Settings frozen, or changed by the thief                                | `yarn node:reset-owner`, then claim again                                          |
+| Full reset                            | As an owner reset, plus networks, mailboxes and node id gone            | Claim, rejoin networks, restore the settings                                       |
+| Adopted source unreachable            | Last valid version stays in effect                                      | None needed; diagnostics show when it was last fetched                             |
+| Adopted source adds bad entries       | Pending only; with `autoApply`, this node blocks them                   | Do not approve, or add local exceptions, or remove the source; nothing was deleted |
+| Publisher's owner changes             | Subscribers keep the old list and reject the new signer                 | Subscriber owner pins the new identity if they trust it                            |
+| Blocked identity uses other nodes     | Works as before; its records still reach this node's users              | Users block it in their clients; other owners adopt the list                       |
+| Blocked node rotates its peer key     | It connects again under a new peer id                                   | Block the new peer id                                                              |
+| Identities created through open nodes | They can use this node                                                  | Blocking; registration control only removes this node as an entry point            |
 
 ## Usability
 
@@ -267,60 +366,39 @@ identity:
   latency.
 - **Owner.** In node settings:
   - registration mode with one sentence explaining each;
-  - create a code as a link or QR, see the remaining uses and revoke it;
-  - block or unblock by identity id or handle;
-  - publish the list on or off, add or remove sources, and see each source's
-    last fetch.
-- **Newcomer.** The client reads `registration.mode` from `GET /node`:
-  - `codes`: it asks for the code, or takes it from the link;
+  - create a registration link (uses, expiry), copy it or show its QR code, see
+    the uses left and revoke it;
+  - block or unblock an identity by id or handle, and a node from the peers
+    list;
+  - publish the list on or off; add or remove sources, toggle `autoApply`, see
+    each source's last fetch and approve its pending entries with one action;
+  - manage local exceptions.
+- **Newcomer.** Opening a registration link selects the node and starts
+  creation with the code filled in. Without a link, the client reads
+  `registration.mode` from `GET /node`:
+  - `codes`: it explains that this node needs a registration link from its
+    owner;
   - `closed`: it explains that the node takes no new accounts and lets the user
     choose another node;
   - `403011` shows the same messages.
 - **Blocked user.** `403012` shows "This node no longer serves your identity"
   and offers another node. Their data stays in the network.
 
-## Implementation slices (after this design merges)
+## Implementation slices
 
 Red-first, each a complete cutover of its part. Endpoint changes update
-`docs/api.md`, the nodes-api and identities-api swagger and `open-api.yaml`.
+`docs/api.md`, the nodes-api and identities-api swagger and `open-api.yaml`;
+new variables go to `INSTALLATION.md`.
 
 1. **Registration control.** `NodeRegistrationMode`, the registration code
-   collection, the check in `POST /identities`, `/node/registration` and
-   `/node/registration-codes`, and `GET /node`.
+   collection, the check in `POST /identities`, `/node/registration`,
+   `/node/registration-codes` and `GET /node`.
 2. **Local blocking.** The signed block list value objects, `PUT`/`GET
-/node/blocks`, one `NodeBlockPolicy` and every enforcement point above.
-   This includes the inventory of record-signed write routes.
-3. **Sharing.** Publication, sources, the fetcher with verification, and
-   diagnostics.
-4. **Owner reset.** The host-side command and `INSTALLATION.md`.
-5. **UI** (haskou/pigeon-swarm-ui): owner settings, newcomer and blocked
-   states.
-
-## Open questions (owner decisions needed)
-
-1. **Registration modes.** Recommendation: `open`, `codes` and `closed`, with
-   no owner-only creation (option A). B covers A's use case with far better
-   usability.
-2. **Code limits.** Recommendation: single use by default; the owner may allow
-   more uses and choose the expiry, up to a maximum the slice makes
-   configurable. The question is whether multi-use codes are wanted at all.
-   They suit a club invite link, and a leak costs more.
-3. **Sharing transport.** Recommendation: the subscriber pulls the signed
-   document from the publisher node's origin. It needs no protocol change and
-   no replicated state. Alternatives: a replicated collection of signed lists,
-   which reaches nodes without HTTP access to each other but adds shared
-   state; or manual import of the document, which needs no network access but
-   goes stale.
-4. **Applying adopted updates.** Recommendation: apply new versions
-   automatically (subscribing means trusting that owner), plus a local
-   exception list so an owner can keep one identity unblocked without dropping
-   the whole source. The alternative is a review queue the owner approves; it
-   is safer but slow, and ignored lists go stale.
-5. **List size limit.** A bound is needed for storage and for fetched
-   responses. Recommendation: 10 000 identities per document, for both a
-   node's own list and each adopted list.
-6. **Owner reset mechanism.** Recommendation: a host-side command that clears
-   only the owner and this design's settings, besides documenting full
-   deletion of the local database folder. Full deletion also loses mailboxes,
-   networks and the node id, which is too costly for a lost key. The
-   alternative is documenting full deletion only.
+/node/blocks`, one `NodeBlockPolicy` and every enforcement point above,
+   including the connection gater cutover and the inventory of record-signed
+   write routes.
+3. **Sharing.** Publication, sources, the fetcher with verification, the review
+   queue, `autoApply`, local exceptions and diagnostics.
+4. **Owner reset.** `yarn node:reset-owner` and `INSTALLATION.md`.
+5. **UI** (haskou/pigeon-swarm-ui): registration link flow, owner settings,
+   newcomer and blocked states.
