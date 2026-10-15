@@ -23,9 +23,12 @@ export default class NotificationsFinder {
       .listed(
         await this.repository.findByRecipient(message.recipientIdentityId),
       )
-      .sort((left, right) =>
-        right.getId().valueOf().localeCompare(left.getId().valueOf()),
-      );
+      .sort((left, right) => {
+        const leftId = left.getId().valueOf();
+        const rightId = right.getId().valueOf();
+
+        return leftId < rightId ? 1 : leftId > rightId ? -1 : 0;
+      });
     const before = message.beforeNotificationId;
     const start = before
       ? listed.findIndex((notification) =>
