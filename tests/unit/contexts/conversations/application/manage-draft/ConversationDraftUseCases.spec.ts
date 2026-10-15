@@ -218,6 +218,23 @@ describe('Conversation draft use cases', () => {
     ]);
   });
 
+  it('treats a null update time as now', async () => {
+    const key = draftKey('group:conversation');
+    const before = Date.now();
+
+    await saver.save(
+      new ConversationDraftSaveMessage(
+        ownerIdentityId,
+        key,
+        'sealed',
+        null as unknown as number,
+      ),
+    );
+
+    const [draft] = await draftsOf(ownerIdentityId);
+    expect(draft.updatedAt).toBeGreaterThanOrEqual(before);
+  });
+
   it('purges stored drafts that still name their conversation', async () => {
     const key = draftKey('group:conversation');
 
