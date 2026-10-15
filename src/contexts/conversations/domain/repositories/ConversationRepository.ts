@@ -38,16 +38,6 @@ export default abstract class ConversationRepository {
     beforeConversationId?: ConversationId,
   ): Promise<Conversation[]>;
 
-  /**
-   * The one-to-one conversations `participantId` belongs to, newest first.
-   * Group co-membership grants nothing outside the group, so callers that
-   * decide who learns about an identity read only these.
-   */
-  public abstract findOneToOneByParticipant(
-    participantId: IdentityId,
-    limit: number,
-  ): Promise<Conversation[]>;
-
   /** The operations nobody built on yet: the parents of the next operation. */
   public abstract findFrontier(
     conversationId: ConversationId,

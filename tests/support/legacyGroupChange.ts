@@ -14,7 +14,7 @@ export function legacyGroupChange(input: {
   createdAt?: number;
   networkId: string;
   parents: string[];
-}): Record<string, unknown> {
+}): Record<string, unknown> & { id: string } {
   const content = {
     action: input.action,
     args: input.args,

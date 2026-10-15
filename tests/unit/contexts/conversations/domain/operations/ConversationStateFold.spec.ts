@@ -5,23 +5,18 @@ import { ConversationStateFold } from '@app/contexts/conversations/domain/operat
 import { ConversationOperationAction } from '@app/contexts/conversations/domain/value-objects/ConversationOperationAction';
 
 import {
-  add,
   alice,
   bob,
   creator,
-  leave,
   mallory,
   oneToOneGenesis,
   operation,
-  promote,
-  remove,
 } from './ConversationOperationFixtures';
 
 function stateOf(operations: ConversationOperation[]) {
   const state = ConversationStateFold.fold(operations);
 
   return {
-    admins: state.roster?.getAdmins(),
     frontier: state.frontier,
     members: state.roster?.getMembers(),
     skipped: [...state.skipped].sort(),
@@ -52,7 +47,6 @@ describe('ConversationStateFold', () => {
         alice.valueOf(),
       ]);
       expect(state.roster?.getCreator()).toBe(creator.valueOf());
-      expect(state.roster?.getAdmins()).toEqual([]);
       expect(state.skipped).toEqual([]);
     });
 
@@ -121,51 +115,38 @@ describe('ConversationStateFold', () => {
     });
   });
 
-  describe('one-to-one immutability', () => {
-    it.each([
-      [ConversationOperationAction.MEMBER_ADDED, creator, bob.valueOf()],
-      [ConversationOperationAction.MEMBER_REMOVED, creator, alice.valueOf()],
-      [ConversationOperationAction.MEMBER_LEFT, alice, undefined],
-      [ConversationOperationAction.ADMIN_PROMOTED, creator, alice.valueOf()],
-    ])('skips a 1:1 %s', (action, author, target) => {
-      const genesis = oneToOneGenesis();
-      const forged = operation(
-        action,
-        author,
-        target ? { identityId: target } : {},
-        [genesis],
-        2,
+  describe('a replayed genesis', () => {
+    const genesisAt = (createdAt: number) =>
+      operation(
+        ConversationOperationAction.CONVERSATION_CREATED,
+        creator,
+        {
+          participantIds: [creator.valueOf(), alice.valueOf()],
+          type: 'one-to-one',
+        },
+        [],
+        createdAt,
       );
 
-      expect(() =>
-        ConversationStateFold.rosterAfter([genesis], forged),
-      ).toThrow(InvalidConversationOperationError);
-      expect(ConversationStateFold.fold([genesis, forged])).toMatchObject({
-        skipped: [forged.getHash()],
-      });
-      expect(
-        ConversationStateFold.fold([genesis, forged]).roster?.getMembers(),
-      ).toEqual([creator.valueOf(), alice.valueOf()]);
-    });
-  });
+    it('keeps one roster and skips every other genesis', () => {
+      const state = ConversationStateFold.fold([1, 2, 3].map(genesisAt));
 
-  describe('convergence', () => {
+      expect(state.roster?.getMembers()).toEqual([
+        creator.valueOf(),
+        alice.valueOf(),
+      ]);
+      expect(state.skipped).toHaveLength(2);
+    });
+
     it('folds every ordering of the same operations to the same state', () => {
-      const genesis = oneToOneGenesis();
-      const added = add([genesis], bob);
-      const removed = remove([genesis], alice);
-      const left = leave([genesis], alice);
-      const promoted = promote([genesis], alice, mallory);
-      const operations = [genesis, added, removed, left, promoted];
+      const operations = [1, 2, 3, 4, 5].map(genesisAt);
       const expected = stateOf(operations);
 
       for (let seed = 1; seed <= 40; seed++) {
         expect(stateOf(shuffled(operations, seed))).toEqual(expected);
       }
       expect(expected.members).toEqual([creator.valueOf(), alice.valueOf()]);
-      expect(expected.skipped).toEqual(
-        [added, removed, left, promoted].map((item) => item.getHash()).sort(),
-      );
+      expect(expected.skipped).toHaveLength(4);
     });
   });
 });

@@ -1134,14 +1134,6 @@ export default class Definitions {
     this.body = JSON.stringify({ ...body, operation: signed.body });
   }
 
-  private async conversationFrontier(
-    conversationId: string,
-  ): Promise<string[]> {
-    return Kernel.di
-      .getService<ConversationRepository>(ConversationRepository)
-      .findFrontier(new ConversationId(conversationId));
-  }
-
   /** Adds the client-signed conversation operation to a conversation mutation body. */
   private async attachConversationOperation(
     method: string,
@@ -1160,31 +1152,18 @@ export default class Definitions {
       id: actorIdentityId,
     };
 
-    if (body.operation) {
+    if (body.operation || method !== 'POST' || pathname !== '/conversations/') {
       return;
     }
 
-    const genesis =
-      method === 'POST' && pathname === '/conversations/'
-        ? this.conversationGenesis(body, actorIdentityId)
-        : undefined;
-    const rule = genesis ?? this.conversationChange(method, pathname, body);
-
-    if (!rule) {
-      return;
-    }
-
+    const genesis = this.conversationGenesis(body, actorIdentityId);
     const signed = signConversationOperation({
-      action: rule.action,
-      args: rule.args,
-      conversationId: rule.conversationId,
+      action: genesis.action,
+      args: genesis.args,
+      conversationId: genesis.conversationId,
       createdAt,
-      networkId: genesis
-        ? String(body.networkId)
-        : String(this.currentNetworkId),
-      parents: genesis
-        ? []
-        : await this.conversationFrontier(rule.conversationId),
+      networkId: String(body.networkId),
+      parents: [],
       signer,
     });
 
@@ -1214,48 +1193,6 @@ export default class Definitions {
         String(body.networkId),
       ).valueOf(),
     };
-  }
-
-  private conversationChange(
-    method: string,
-    pathname: string,
-    body: Record<string, unknown>,
-  ):
-    | { action: string; args: Record<string, unknown>; conversationId: string }
-    | undefined {
-    const member = /^\/conversations\/([^/]+)\/members(?:\/([^/]+))?$/.exec(
-      pathname,
-    );
-    const admin = /^\/conversations\/([^/]+)\/admins\/([^/]+)$/.exec(pathname);
-
-    if (member) {
-      const conversationId = decodeURIComponent(member[1]);
-      const target = member[2] && decodeURIComponent(member[2]);
-
-      if (method === 'POST') {
-        return {
-          action: 'member_added',
-          args: { identityId: body.identityId },
-          conversationId,
-        };
-      }
-
-      return target === 'me'
-        ? { action: 'member_left', args: {}, conversationId }
-        : {
-            action: 'member_removed',
-            args: { identityId: target },
-            conversationId,
-          };
-    }
-
-    return admin
-      ? {
-          action: method === 'PUT' ? 'admin_promoted' : 'admin_demoted',
-          args: { identityId: decodeURIComponent(admin[2]) },
-          conversationId: decodeURIComponent(admin[1]),
-        }
-      : undefined;
   }
 
   /** Adds the client-signed call record the call endpoints require to the body. */
@@ -3859,15 +3796,6 @@ export default class Definitions {
 
     this.body = JSON.stringify({
       identityId: new IdentityId(keyPair.toPrimitives().publicKey).valueOf(),
-    });
-  }
-
-  @given('I set a conversation member body for the other identity')
-  public async iSetAConversationMemberBodyForTheOtherIdentity(): Promise<void> {
-    await this.ensureOtherIdentityKeyPair();
-
-    this.body = JSON.stringify({
-      identityId: this.otherIdentityId?.valueOf(),
     });
   }
 

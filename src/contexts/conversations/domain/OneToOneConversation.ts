@@ -4,9 +4,7 @@ import { assert, PrimitiveOf } from '@haskou/value-objects';
 
 import { Conversation } from './Conversation';
 import { ConversationMustHaveTwoDifferentParticipantsError } from './errors/ConversationMustHaveTwoDifferentParticipantsError';
-import { ConversationAdmins } from './value-objects/ConversationAdmins';
 import { ConversationId } from './value-objects/ConversationId';
-import { ConversationType } from './value-objects/ConversationType';
 
 /**
  * A 1:1 conversation is immutable: its two participants are fixed by the
@@ -19,11 +17,9 @@ export class OneToOneConversation extends Conversation {
     return new OneToOneConversation(
       new ConversationId(primitives.id),
       new NetworkId(primitives.networkId),
-      ConversationType.ONE_TO_ONE,
       primitives.participantIds.map(
         (participantId) => new IdentityId(participantId),
       ),
-      undefined,
       primitives.creatorId ? new IdentityId(primitives.creatorId) : undefined,
     );
   }
@@ -31,19 +27,10 @@ export class OneToOneConversation extends Conversation {
   constructor(
     id: ConversationId,
     networkId: NetworkId,
-    type: ConversationType,
     participants: IdentityId[],
-    name: undefined = undefined,
     creatorId: IdentityId | undefined = undefined,
   ) {
-    super(
-      id,
-      networkId,
-      type,
-      participants,
-      name,
-      new ConversationAdmins(creatorId),
-    );
+    super(id, networkId, participants, creatorId);
 
     assert(
       participants.length === 2 && participants[0].isNotEqual(participants[1]),

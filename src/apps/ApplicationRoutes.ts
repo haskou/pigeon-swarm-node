@@ -55,15 +55,11 @@ import { PostMLSRecordRoute } from '@app/apps/apis/communities-api/routes/PostML
 import { PutCommunityChannelDraftRoute } from '@app/apps/apis/communities-api/routes/PutCommunityChannelDraftRoute';
 import { PutCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/PutCommunityChannelMessageRoute';
 import { PutCommunityMemberRolesRoute } from '@app/apps/apis/communities-api/routes/PutCommunityMemberRolesRoute';
-import { DeleteConversationAdminRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationAdminRoute';
 import { DeleteConversationDraftRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationDraftRoute';
-import { DeleteConversationMemberRoute } from '@app/apps/apis/conversations-api/routes/DeleteConversationMemberRoute';
 import { GetConversationDraftsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationDraftsRoute';
 import { GetConversationFrontierRoute } from '@app/apps/apis/conversations-api/routes/GetConversationFrontierRoute';
 import { GetConversationsRoute } from '@app/apps/apis/conversations-api/routes/GetConversationsRoute';
-import { PostConversationMemberRoute } from '@app/apps/apis/conversations-api/routes/PostConversationMemberRoute';
 import { PostConversationRoute } from '@app/apps/apis/conversations-api/routes/PostConversationRoute';
-import { PutConversationAdminRoute } from '@app/apps/apis/conversations-api/routes/PutConversationAdminRoute';
 import { PutConversationDraftRoute } from '@app/apps/apis/conversations-api/routes/PutConversationDraftRoute';
 import { GetIdentityRoute } from '@app/apps/apis/identities-api/routes/GetIdentityRoute';
 import { PostIdentityRoute } from '@app/apps/apis/identities-api/routes/PostIdentityRoute';
@@ -179,10 +175,6 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PutConversationDraftRoute,
   DeleteConversationDraftRoute,
   GetConversationFrontierRoute,
-  PostConversationMemberRoute,
-  DeleteConversationMemberRoute,
-  PutConversationAdminRoute,
-  DeleteConversationAdminRoute,
   GetContentReplicationStatusRoute,
   PutContentReplicationRoute,
   DeleteMailboxReaderRoute,

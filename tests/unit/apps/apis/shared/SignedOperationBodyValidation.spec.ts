@@ -13,21 +13,13 @@ import { PostCommunityInviteAcceptBody } from '@app/apps/apis/communities-api/bo
 import { PostCommunityTextChannelBody } from '@app/apps/apis/communities-api/bodies/PostCommunityTextChannelBody';
 import { PostCommunityVoiceChannelBody } from '@app/apps/apis/communities-api/bodies/PostCommunityVoiceChannelBody';
 import { PutCommunityMemberRolesBody } from '@app/apps/apis/communities-api/bodies/PutCommunityMemberRolesBody';
-import { ConversationSignedOperationBody } from '@app/apps/apis/conversations-api/bodies/ConversationSignedOperationBody';
 import { PostConversationBody } from '@app/apps/apis/conversations-api/bodies/PostConversationBody';
-import { PostConversationMemberBody } from '@app/apps/apis/conversations-api/bodies/PostConversationMemberBody';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
 type BodyClass = new () => object;
 
 const operationCases: [string, BodyClass, string[]][] = [
-  ['PostConversationMemberBody', PostConversationMemberBody, ['operation']],
-  [
-    'ConversationSignedOperationBody',
-    ConversationSignedOperationBody,
-    ['operation'],
-  ],
   ['PostConversationBody', PostConversationBody, ['operation']],
   ['PostCommunityBody', PostCommunityBody, ['operation']],
   [
@@ -116,18 +108,24 @@ describe('Signed operation body validation', () => {
 
   it('rejects a conversation operation missing its mutation', async () => {
     const errors = await validate(
-      plainToInstance(ConversationSignedOperationBody, {
+      plainToInstance(PostConversationBody, {
+        keychainExternalIdentifier: 'keychain',
+        networkId: 'network',
         operation: { createdAt: 1, parents: [] },
+        participantIds: ['participant'],
       }),
     );
 
-    expect(errors.map((error) => error.property)).toContain('operation');
+    expect(errors.map((error) => error.property)).toEqual(['operation']);
   });
 
   it('accepts a well-formed conversation operation', async () => {
     const errors = await validate(
-      plainToInstance(ConversationSignedOperationBody, {
+      plainToInstance(PostConversationBody, {
+        keychainExternalIdentifier: 'keychain',
+        networkId: 'network',
         operation: { createdAt: 1, mutation: {}, parents: [] },
+        participantIds: ['participant'],
       }),
     );
 

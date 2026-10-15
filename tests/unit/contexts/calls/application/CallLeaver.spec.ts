@@ -15,7 +15,6 @@ import CommunityRepository from '@app/contexts/communities/domain/repositories/C
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { ConversationType } from '@app/contexts/conversations/domain/value-objects/ConversationType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
@@ -61,9 +60,7 @@ describe('CallLeaver', () => {
     const conversation = new OneToOneConversation(
       ConversationId.deterministic(creator, recipient, networkId),
       networkId,
-      ConversationType.ONE_TO_ONE,
       [creator, recipient],
-      undefined,
       creator,
     );
     const call = Call.start(

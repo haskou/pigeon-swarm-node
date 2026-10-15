@@ -92,9 +92,9 @@ export default class WebSocketClientMessageHandler {
   }
 
   /**
-   * Who hears a conversation typing indicator: the other participants of a
-   * direct conversation. None for a group conversation, whose typing travels
-   * as an MLS record through its group mailboxes.
+   * Who hears a conversation typing indicator: the other participant of the
+   * 1:1 conversation. Group typing travels as an MLS record through the group
+   * mailboxes instead.
    */
   public async findConversationTypingRecipients(
     identityId: string,
@@ -110,7 +110,7 @@ export default class WebSocketClientMessageHandler {
     const conversation =
       await this.conversationRepository.requireMetadataById(id);
 
-    if (conversation.isGroup() || !conversation.hasParticipant(actorId)) {
+    if (!conversation.hasParticipant(actorId)) {
       return [];
     }
 
@@ -169,16 +169,16 @@ export default class WebSocketClientMessageHandler {
   }
 
   /**
-   * Identities that share a one-to-one conversation or a community with
-   * `identityId`. Group co-membership grants nothing: group rosters are not a
-   * fan-out input for presence or identity updates.
+   * Identities that share a 1:1 conversation or a community with
+   * `identityId`. The node never knows a group roster, so group co-membership
+   * is no fan-out input for presence or identity updates.
    */
   public async findIdentityUpdateRecipients(
     identityId: string,
   ): Promise<string[]> {
     const actorId = new IdentityId(identityId);
     const [conversations, communities] = await Promise.all([
-      this.conversationRepository.findOneToOneByParticipant(
+      this.conversationRepository.findByParticipant(
         actorId,
         WebSocketClientMessageHandler.IDENTITY_UPDATE_CONVERSATION_LIMIT,
       ),

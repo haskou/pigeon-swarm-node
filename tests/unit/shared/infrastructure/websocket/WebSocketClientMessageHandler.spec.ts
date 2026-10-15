@@ -152,9 +152,7 @@ describe('WebSocketClientMessageHandler', () => {
       conversationRecipient,
       communityRecipient,
     ]);
-    conversationRepository.findOneToOneByParticipant.mockResolvedValue([
-      conversation,
-    ]);
+    conversationRepository.findByParticipant.mockResolvedValue([conversation]);
     communityRepository.findByMember.mockResolvedValue([community]);
 
     await expect(
@@ -165,21 +163,21 @@ describe('WebSocketClientMessageHandler', () => {
     ]);
   });
 
-  it('should not read group conversations for identity update recipients, as group co-membership grants no presence', async () => {
+  it('should read at most 500 conversations for identity update recipients', async () => {
     const updatedIdentity = new IdentityId(
       'MCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
     );
 
-    conversationRepository.findOneToOneByParticipant.mockResolvedValue([]);
+    conversationRepository.findByParticipant.mockResolvedValue([]);
     communityRepository.findByMember.mockResolvedValue([]);
 
     await expect(
       handler.findIdentityUpdateRecipients(updatedIdentity.valueOf()),
     ).resolves.toEqual([]);
-    expect(conversationRepository.findByParticipant).not.toHaveBeenCalled();
-    expect(
-      conversationRepository.findOneToOneByParticipant,
-    ).toHaveBeenCalledWith(updatedIdentity, 500);
+    expect(conversationRepository.findByParticipant).toHaveBeenCalledWith(
+      updatedIdentity,
+      500,
+    );
   });
 
   it('should record identity heartbeat', async () => {

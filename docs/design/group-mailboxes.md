@@ -44,10 +44,9 @@ Goals:
 
 Non-goals (stated so nobody claims them):
 
-- Hiding the group roster from the node in this design. The roster stays in the signed
-  conversation operation log and is plaintext there, so the
-  no-plaintext-participant-list goal is not met for groups yet. The owner decided to
-  remove it (D15); the design is [`group-roster-in-mls.md`](group-roster-in-mls.md).
+- Hiding the group roster from the node in this design. The roster stayed in the signed
+  conversation operation log at first; D15 removed it, and the node now refuses group
+  roster records (the design is [`group-roster-in-mls.md`](group-roster-in-mls.md)).
 - Hiding IP addresses, connection timing or the shape of fan-out bursts.
 - Giving a joiner history from before it joined. MLS gives no past epoch secrets to
   a joiner.
@@ -265,7 +264,7 @@ N = group members including the sender. Values are from code unless marked.
 
 | Quantity | Value | Source |
 | --- | --- | --- |
-| Members on the mailbox path | up to 256 | `MAX_GROUP_PARTICIPANTS` (`src/contexts/conversations/domain/operations/ConversationOperationLimits.ts`) |
+| Members on the mailbox path | up to 256 | the MLS roster check of the members ([`group-roster-in-mls.md`](group-roster-in-mls.md)) |
 | Appends per message | N | fan-out above |
 | Upload per message | N x bucket; at N = 256 and 4 KiB, about 1 MiB | `MailboxPolicy.SIZE_BUCKETS` |
 | Download per member per message | one bucket, 4 KiB for typical text | one inbox read |
@@ -313,7 +312,6 @@ N = group members including the sender. Values are from code unless marked.
 | Item | Why it stays | Node sees in clear |
 | --- | --- | --- |
 | Identity publication with `mailboxHome` | discovery of home nodes; parsed as the `IdentityMailboxHome` value object (`src/contexts/identities/domain/value-objects/IdentityMailboxHome.ts`: http or https URL, at most 255 characters) | identity id, home node |
-| Roster ops `member_added`, `member_removed` | the roster itself (D15); members check MLS leaves against it | group id, member identity ids, timing |
 | Invitation notifications `group_conversation_invitation` | tells the invitee a conversation exists; also carries sealed control letters (key package request and response, `{welcome, k}`) (D8) | recipient identity, inviter identity, type, timing; since D15 slice 6 the conversation id travels only inside the seal |
 | Private blobs (#290) | large attachments; retention `max(PRIVATE_BLOB_RETENTION_MS, MAILBOX_RETENTION_MS)` (`own-copy-and-history-backfill.md` L56, #446) | blob ids |
 | Own copy and pairing export | own devices and history | per own-copy document |
@@ -329,13 +327,13 @@ and the group path inherits it. The UI router falls back to the local node
 
 | Signal | With group mailboxes |
 | --- | --- |
-| Conversation id per message | not in mailbox data; in roster and invitations |
+| Conversation id per message | not in mailbox data; only inside sealed invitations |
 | Sender identity per message | not in mailbox data; inside MLS |
 | Message type and scope | not in mailbox data |
-| Who is in the group | plaintext roster (D15) |
-| Group size | from roster; also from fan-out burst |
+| Who is in the group | not on the node; the roster lives in MLS (D15) |
+| Group size | from fan-out burst |
 | Message timing per group | per inbox append burst; N appends from one client reveal one fan-out |
-| Membership change | roster op plus rotation burst: N - 1 PUTs from N - 1 clients |
+| Membership change | rotation burst: N - 1 PUTs from N - 1 clients |
 | Inbox linkage across generations | none; ids change per generation and carry no identity |
 | Copy linkage across inboxes | none with D5 option A; prefix match with option B |
 | Sizes | bucketed |
@@ -343,9 +341,9 @@ and the group path inherits it. The UI router falls back to the local node
 | IP address and timing | visible (non-goal) |
 
 The design removes message-level metadata: conversation id, sender, type, and per-message
-participants. Group-level metadata stays. The roster is the largest remaining leak. It
-is the reason the no-plaintext-participant-list goal is not met for groups;
-[`group-roster-in-mls.md`](group-roster-in-mls.md) removes it.
+participants. Group-level metadata stays: the fan-out burst reveals group size and
+membership changes. The roster itself is no longer on the node (D15,
+[`group-roster-in-mls.md`](group-roster-in-mls.md)).
 
 ## Decisions
 
@@ -365,8 +363,8 @@ is the reason the no-plaintext-participant-list goal is not met for groups;
 | D12 | Removed-member spam | accepted; bounded by 120 per minute and the 1000-envelope cap; MLS rejects unknown senders on read | node-side writer sets: see D3 |
 | D13 | Joiner history | none before join | sealed export from a member: later, as part of the pairing export |
 | D14 | Existing groups | groups run only on mailboxes; the node keeps no group message log and the client does not migrate older group data; such groups are re-created | per-group flag: rejected (one delivery path) |
-| D15 | Roster | owner decision: remove the roster from the node and keep it in the MLS GroupContext ([`group-roster-in-mls.md`](group-roster-in-mls.md)). Until its final slice lands, the roster stays plaintext in the signed conversation operation log | encrypt roster ops on the node: the node still has to check them, so it would need the plaintext |
-| D16 | Group size cap | 256 on the mailbox path (`MAX_GROUP_PARTICIPANTS`) | raise: upload grows linearly with N |
+| D15 | Roster | owner decision: remove the roster from the node and keep it in the MLS GroupContext ([`group-roster-in-mls.md`](group-roster-in-mls.md)). Done: the node refuses group genesis, member and admin records | encrypt roster ops on the node: the node still has to check them, so it would need the plaintext |
+| D16 | Group size cap | 256 on the mailbox path, enforced by members in the MLS roster check ([`group-roster-in-mls.md`](group-roster-in-mls.md)) | raise: upload grows linearly with N |
 | D17 | Message rate | 120 per minute per group, the inbox append limit | raise the limit: needs a node change; measure first |
 | D18 | Large payloads | private blobs (#290); the envelope carries a reference only | envelopes up to 65504 bytes: N x cost per copy |
 | D19 | MLS leaf granularity | device leaves, so device revocation is a removal commit | identity leaves: device revocation needs a separate rotation path |
@@ -385,8 +383,8 @@ is the reason the no-plaintext-participant-list goal is not met for groups;
 4. Node: no group-specific endpoint. The mailbox routes cover the flow:
    `PUT /mailboxes/{id}`, `POST /mailboxes/{id}/envelopes`,
    `GET /mailboxes/{id}/envelopes`, `POST /mailboxes/{id}/ack`, the reader routes,
-   and `DELETE /mailboxes/{id}` for D11. The node keeps the roster in the signed
-   conversation operation log and has no group message routes.
+   and `DELETE /mailboxes/{id}` for D11. The node holds no group roster (D15) and
+   has no group message routes.
 
 Open in the UI: background unread counts, thread reply counts and the outbox UI of
 group conversations; abandoning a locally persisted commit (#380); authenticated

@@ -20,13 +20,10 @@ describe('Conversation', () => {
     const primitives = mother.build().toPrimitives();
 
     expect(Object.keys(primitives).sort()).toEqual([
-      'adminIds',
       'creatorId',
       'id',
-      'name',
       'networkId',
       'participantIds',
-      'type',
     ]);
   });
 

@@ -8,15 +8,14 @@ import { ConversationRoster } from './ConversationRoster';
 import { ConversationState } from './ConversationState';
 
 /**
- * Deterministic roster of a conversation: a pure function of the set of
- * verified operations. Operations are applied in a total order (parents first,
- * the lowest digest first among concurrent ones), and each one is authorized
- * again against the roster it applies to, so concurrent conflicting operations
- * converge on every node without any wall clock.
+ * Deterministic roster of a 1:1 conversation: a pure function of the set of
+ * verified operations. Only a genesis decodes; operations are taken in a total
+ * order (parents first, the lowest digest first among concurrent ones) and the
+ * first valid genesis wins, so every node converges without any wall clock.
  *
  * An identity other than the creator (the genesis author) signs a bounded
  * number of operations per conversation: the ones ordered after its quota are
- * skipped, whether or not they were permitted.
+ * skipped.
  */
 export class ConversationStateFold {
   /** Operations whose parents are all known, deduplicated by digest. */
@@ -169,19 +168,9 @@ export class ConversationStateFold {
       }
 
       try {
-        if (operation.isGenesis()) {
-          assert(!roster, new InvalidConversationOperationError());
-          roster = ConversationOperationApplier.create(operation);
-        } else {
-          assert(roster, new InvalidConversationOperationError());
-          // A failed operation must not leave a half applied roster behind.
-          const candidate = ConversationRoster.fromPrimitives(
-            roster.toPrimitives(),
-          );
-
-          ConversationOperationApplier.apply(candidate, operation);
-          roster = candidate;
-        }
+        // Only a genesis decodes, and a conversation has exactly one.
+        assert(!roster, new InvalidConversationOperationError());
+        roster = ConversationOperationApplier.create(operation);
       } catch {
         skipped.push(operation.getHash());
       }
@@ -192,29 +181,5 @@ export class ConversationStateFold {
       roster,
       skipped,
     };
-  }
-
-  /**
-   * The roster `candidate` produces when applied to the causal past of its
-   * parents, or an error when its author may not perform it there. A parent
-   * nobody knows, or a past without a genesis, is refused.
-   */
-  public static rosterAfter(
-    operations: ConversationOperation[],
-    candidate: ConversationOperation,
-  ): ConversationRoster {
-    assert(!candidate.isGenesis(), new InvalidConversationOperationError());
-
-    const { roster } = ConversationStateFold.fold(
-      ConversationStateFold.closureOf(operations, candidate.getParents()),
-    );
-
-    assert(roster, new InvalidConversationOperationError());
-
-    const next = ConversationRoster.fromPrimitives(roster.toPrimitives());
-
-    ConversationOperationApplier.apply(next, candidate);
-
-    return next;
   }
 }

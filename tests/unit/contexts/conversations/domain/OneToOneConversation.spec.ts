@@ -1,7 +1,6 @@
 import { ConversationMustHaveTwoDifferentParticipantsError } from '@app/contexts/conversations/domain/errors/ConversationMustHaveTwoDifferentParticipantsError';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { ConversationType } from '@app/contexts/conversations/domain/value-objects/ConversationType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { UUID } from '@haskou/value-objects';
@@ -61,7 +60,6 @@ describe('OneToOneConversation', () => {
             networkId,
           ),
           networkId,
-          ConversationType.ONE_TO_ONE,
           [firstParticipant, firstParticipant],
         ),
     ).toThrow(ConversationMustHaveTwoDifferentParticipantsError);

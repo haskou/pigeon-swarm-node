@@ -97,16 +97,6 @@ describe('OrbitDBConversationRepository', () => {
     expect(operationsQuery).not.toHaveBeenCalled();
   });
 
-  it('should find the one-to-one conversations of a participant', async () => {
-    const oneToOne = await seeded(mother.build());
-
-    const found = await repository.findOneToOneByParticipant(mother.author, 10);
-
-    expect(found.map((conversation) => conversation.getId())).toEqual([
-      oneToOne.getId(),
-    ]);
-  });
-
   it('should neither find nor list a group conversation stored by an older node', async () => {
     const legacy = legacyGroupGenesis({
       creatorIdentityId: mother.author.valueOf(),
