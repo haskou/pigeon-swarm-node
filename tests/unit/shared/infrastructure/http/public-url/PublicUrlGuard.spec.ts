@@ -48,12 +48,16 @@ describe('PublicUrlGuard', () => {
   it.each([
     'http://100.64.0.1/',
     'http://198.18.0.1/',
+    'http://192.0.2.1/',
+    'http://198.51.100.1/',
+    'http://203.0.113.1/',
+    'http://192.88.99.1/',
     'http://224.0.0.1/',
     'http://255.255.255.255/',
     'http://[::]/',
     'http://[ff02::1]/',
   ])(
-    'rejects the shared, benchmark, multicast or reserved address %s',
+    'rejects the shared, benchmark, documentation, relay, multicast or reserved address %s',
     (url) => {
       expect(() => new PublicUrlGuard().parse(url)).toThrow(
         UrlIsNotPublicError,
@@ -94,9 +98,9 @@ describe('PublicUrlGuard', () => {
   );
 
   it('accepts an IPv4-mapped IPv6 literal of a public address', () => {
-    expect(new PublicUrlGuard().parse('https://[::ffff:8.8.8.8]/').hostname).toBe(
-      '[::ffff:808:808]',
-    );
+    expect(
+      new PublicUrlGuard().parse('https://[::ffff:8.8.8.8]/').hostname,
+    ).toBe('[::ffff:808:808]');
   });
 
   it('accepts a public IPv6 literal', () => {
@@ -148,6 +152,19 @@ describe('PublicUrlGuard', () => {
         { address: '93.184.216.34', family: 4 },
         { address: '2606:4700::1111', family: 6 },
       ],
+    });
+  });
+
+  it('resolves a bracketed IPv6 literal by its address', async () => {
+    mockedLookup.mockResolvedValue([
+      { address: '2606:4700::1111', family: 6 },
+    ] as never);
+
+    await new PublicUrlGuard().resolve('https://[2606:4700::1111]/');
+
+    expect(mockedLookup).toHaveBeenCalledWith('2606:4700::1111', {
+      all: true,
+      verbatim: true,
     });
   });
 });
