@@ -1,6 +1,7 @@
+import { SignedHttpRequestSignature } from '@haskou/pigeon-swarm-crypto';
+
 export class SignedRequestReplayGuard {
   private static readonly MAX_ENTRIES = 100_000;
-  public static readonly MAX_CLOCK_SKEW_MS = 30 * 1000;
 
   private readonly expirationBySignature = new Map<string, number>();
 
@@ -39,7 +40,7 @@ export class SignedRequestReplayGuard {
 
     this.expirationBySignature.set(
       key,
-      now + SignedRequestReplayGuard.MAX_CLOCK_SKEW_MS * 2,
+      now + SignedHttpRequestSignature.REPLAY_WINDOW_MS,
     );
 
     return true;

@@ -1,11 +1,11 @@
-import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { IdentitySignature, Signature } from '@haskou/pigeon-swarm-crypto';
 
 import { IdentitySignaturePayload } from '../IdentitySignaturePayload';
 import { DeviceCredential } from '../value-objects/DeviceCredential';
 
 export class IdentitySignatureDomainService {
   public getCanonicalSigningContent(payload: IdentitySignaturePayload): string {
-    return JSON.stringify(payload.toPrimitives());
+    return IdentitySignature.signingContent(payload.toPrimitives());
   }
 
   public isValidSignature(

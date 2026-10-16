@@ -55,14 +55,7 @@ export class DeviceAuthorizationRequestAuthenticator {
       new InvalidSignedRequestError(),
     );
     const timestamp = this.verifier.getRequiredHeader(request, 'x-timestamp');
-    const payload = JSON.stringify(
-      this.verifier.getCanonicalPayload(
-        request.method,
-        request.path,
-        timestamp,
-        request.body,
-      ),
-    );
+    const payload = this.verifier.signingContent(request, timestamp);
 
     if (hasRecoveryProof) {
       const recoveryAuthority = authorization.getRecoveryAuthority();
@@ -125,14 +118,7 @@ export class DeviceAuthorizationRequestAuthenticator {
       );
       const timestamp = this.verifier.getRequiredHeader(request, 'x-timestamp');
       assertSignedRequestTimestampIsFresh(timestamp);
-      const payload = JSON.stringify(
-        this.verifier.getCanonicalPayload(
-          request.method,
-          request.path,
-          timestamp,
-          request.body,
-        ),
-      );
+      const payload = this.verifier.signingContent(request, timestamp);
       const credential = this.verifyDevice(
         request.header('x-device-credential'),
         request.header('x-device-signature'),

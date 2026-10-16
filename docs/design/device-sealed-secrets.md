@@ -91,7 +91,7 @@ the generation and the revision it was made for, so the node cannot splice
 entries across generations or identities.
 
 Byte-exact vectors for this preimage and its signature are in
-[`tests/fixtures/device-sealed-secret-vectors.json`](../../tests/fixtures/device-sealed-secret-vectors.json).
+`@haskou/pigeon-swarm-crypto/vectors/device-sealed-secret.json`.
 The `DeviceSealedSecretVectors` unit spec checks them against the domain code.
 `tests/e2e/real-transport/device-sealed-secret-bundle.ts` rebuilds them with
 `node:crypto` only and submits them to a real node. The node must accept the

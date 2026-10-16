@@ -218,9 +218,9 @@ never bounded storage, so its removal does not widen this.
   and are removed by D15: they answer `404`, because a 1:1 has no operation
   after its genesis and group rosters live in MLS.
 - `docs/api.md` documents the byte-exact canonical signing input and
-  `tests/fixtures/conversation-operation-vectors.json` pins test vectors. Update
-  both swagger files and `docs/pubsub-sync-protocol.md` (audit table, new
-  "Conversation operations" section).
+  `@haskou/pigeon-swarm-crypto/vectors/conversation-operation.json` pins test
+  vectors. Update both swagger files and `docs/pubsub-sync-protocol.md` (audit
+  table, new "Conversation operations" section).
 
 ### Tests required
 
