@@ -104,7 +104,7 @@ export class PublicRelayPeerAnnouncer {
         return;
       } catch (error: unknown) {
         this.debug(
-          `Public relay peer dial failed peerId="${announcement.peerId}" address="${address}" error=${errorClassName(error)}`,
+          `Public relay peer dial failed: error=${errorClassName(error)}`,
         );
       }
     }

@@ -231,7 +231,7 @@ describe('OrbitDBReplicatedStateRuntime', () => {
     expect(replicatedStateRegistry.unregister).not.toHaveBeenCalled();
     expect(Kernel.logger.warn).toHaveBeenCalledWith(
       expect.stringContaining(
-        'OrbitDB replicated state registration degraded: networkId=network-1',
+        'OrbitDB replicated state registration degraded: error=',
       ),
     );
   });

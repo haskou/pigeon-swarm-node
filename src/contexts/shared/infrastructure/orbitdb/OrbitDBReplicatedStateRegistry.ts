@@ -1548,8 +1548,7 @@ export default class OrbitDBReplicatedStateRegistry {
       Number(process.hrtime.bigint() - startedAt) / 1_000_000;
 
     Kernel.logger.debug?.(
-      `OrbitDB replicated head cache reconciled: networkId=${networkId}` +
-        ` heads=${reconciledHeads}` +
+      `OrbitDB replicated head cache reconciled: heads=${reconciledHeads}` +
         ` durationMs=${elapsedMilliseconds.toFixed(3)}`,
     );
   }
@@ -1610,14 +1609,14 @@ export default class OrbitDBReplicatedStateRegistry {
 
       if (heads.length > 0) {
         Kernel.logger.debug?.(
-          `OrbitDB replicated head cache restored: networkId=${networkId} heads=${heads.length}`,
+          `OrbitDB replicated head cache restored: heads=${heads.length}`,
         );
       }
 
       return { heads: heads.length, reconciledHeadSignature, warm };
     } catch (error) {
       Kernel.logger.warn?.(
-        `OrbitDB replicated head cache restore failed: networkId=${networkId} error=${errorClassName(error)}`,
+        `OrbitDB replicated head cache restore failed: error=${errorClassName(error)}`,
       );
 
       return { heads: 0, warm: false };
@@ -1650,7 +1649,7 @@ export default class OrbitDBReplicatedStateRegistry {
       return true;
     } catch (error) {
       Kernel.logger.warn?.(
-        `OrbitDB replicated head cache persistence failed: networkId=${networkId} error=${errorClassName(error)}`,
+        `OrbitDB replicated head cache persistence failed: error=${errorClassName(error)}`,
       );
 
       return false;
@@ -1669,7 +1668,7 @@ export default class OrbitDBReplicatedStateRegistry {
       await this.headCache.markWarm(networkId, reconciledHeadSignature);
     } catch (error) {
       Kernel.logger.warn?.(
-        `OrbitDB replicated head cache warm marker failed: networkId=${networkId} error=${errorClassName(error)}`,
+        `OrbitDB replicated head cache warm marker failed: error=${errorClassName(error)}`,
       );
     }
   }
