@@ -1035,21 +1035,18 @@ export default class PrivateNetworkRelayRecordDirectory {
     );
 
     for (const multiaddr of providerMultiaddrs) {
-      const relayRecord = this.providerRelayRecord(network, multiaddr);
+      const provider = this.providerRelayRecord(network, multiaddr);
 
       if (
-        relayRecord &&
-        (await this.dialPrivateRelayRecord(network, relayRecord))
+        provider &&
+        (await this.dialPrivateRelayRecord(network, provider.relayRecord))
       ) {
         this.logDiscoveryPass(
           network,
           'provider-record-connected',
           providerMultiaddrs.length,
         );
-        await this.saveRelayRecordEnvelope(
-          network,
-          PrivateNetworkRelayRecordCodec.seal(network, relayRecord),
-        );
+        await this.saveRelayRecordEnvelope(network, provider.envelope);
 
         return true;
       }
@@ -1112,7 +1109,7 @@ export default class PrivateNetworkRelayRecordDirectory {
   private providerRelayRecord(
     network: IPFSNetwork,
     multiaddr: string,
-  ): PrivateNetworkRelayRecord | undefined {
+  ): { envelope: string; relayRecord: PrivateNetworkRelayRecord } | undefined {
     const peerId = multiaddr.match(/\/p2p\/([^/]+)$/)?.[1];
 
     if (!peerId) {
@@ -1125,8 +1122,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     }
 
     const issuedAt = Date.now();
-
-    return {
+    const relayRecord: PrivateNetworkRelayRecord = {
       expiresAt: issuedAt + this.settings.getRelayRecordTtlMs(),
       issuedAt,
       multiaddrs: [multiaddr],
@@ -1134,6 +1130,20 @@ export default class PrivateNetworkRelayRecordDirectory {
       role: 'relay',
       version: 1,
     };
+
+    try {
+      return {
+        envelope: PrivateNetworkRelayRecordCodec.seal(network, relayRecord),
+        relayRecord,
+      };
+    } catch {
+      Kernel.logger.debug(
+        `Private IPFS relay provider ignored: networkId=${network.getId()}` +
+          ` reason="Invalid relay record."`,
+      );
+
+      return undefined;
+    }
   }
 
   private async connectToPublicRelayRecordProvider(
@@ -1537,16 +1547,10 @@ export default class PrivateNetworkRelayRecordDirectory {
     return publicConnection;
   }
 
-  private async publishRelayRecord(
+  private ownRelayRecord(
     network: IPFSNetwork,
     relayOptions: PrivateRelayListenOptions,
-    sharedPrivateKey: Libp2pPrivateKeyLike,
-    shouldContinue: () => boolean,
-  ): Promise<boolean> {
-    if (!shouldContinue()) {
-      return false;
-    }
-
+  ): { envelope: string; relayRecord: PrivateNetworkRelayRecord } | undefined {
     const multiaddrs = this.getPrivateRelayRecordMultiaddrs(
       network,
       relayOptions,
@@ -1558,7 +1562,7 @@ export default class PrivateNetworkRelayRecordDirectory {
           ' reason="No dialable relay multiaddr available."',
       );
 
-      return false;
+      return undefined;
     }
 
     const issuedAt = Date.now();
@@ -1571,6 +1575,39 @@ export default class PrivateNetworkRelayRecordDirectory {
       version: 1,
     };
 
+    try {
+      return {
+        envelope: PrivateNetworkRelayRecordCodec.seal(network, relayRecord),
+        relayRecord,
+      };
+    } catch {
+      Kernel.logger.warn(
+        `Private IPFS relay record not published: networkId=${network.getId()}` +
+          ' reason="Relay record exceeds the envelope limits."',
+      );
+
+      return undefined;
+    }
+  }
+
+  private async publishRelayRecord(
+    network: IPFSNetwork,
+    relayOptions: PrivateRelayListenOptions,
+    sharedPrivateKey: Libp2pPrivateKeyLike,
+    shouldContinue: () => boolean,
+  ): Promise<boolean> {
+    if (!shouldContinue()) {
+      return false;
+    }
+
+    const ownRecord = this.ownRelayRecord(network, relayOptions);
+
+    if (!ownRecord) {
+      return false;
+    }
+
+    const { envelope, relayRecord } = ownRecord;
+
     this.rememberActiveRelayRecord(network, relayRecord);
 
     const publicConnection = await this.getPublishablePublicConnection(
@@ -1582,8 +1619,6 @@ export default class PrivateNetworkRelayRecordDirectory {
     if (!publicConnection) {
       return false;
     }
-
-    const envelope = PrivateNetworkRelayRecordCodec.seal(network, relayRecord);
 
     this.relayRecordEnvelopeCache.set(
       this.relayRecordCacheKey(network.getId(), relayRecord.peerId),
@@ -1636,7 +1671,7 @@ export default class PrivateNetworkRelayRecordDirectory {
           ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
           ` peerId=${relayRecord.peerId}` +
           ` publicPeers=${publicConnection.getPeers().length}` +
-          ` multiaddrs="${multiaddrs.join(',')}"`,
+          ` multiaddrs="${relayRecord.multiaddrs.join(',')}"`,
       );
 
       return true;
