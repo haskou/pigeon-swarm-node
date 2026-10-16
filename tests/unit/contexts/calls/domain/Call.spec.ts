@@ -1,6 +1,7 @@
-import { callStartArgs } from '../../../../support/signCall';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
+import { CallParticipantNotFoundError } from '@app/contexts/calls/domain/errors/CallParticipantNotFoundError';
+import { InactiveCallError } from '@app/contexts/calls/domain/errors/InactiveCallError';
 import { CallEndedEvent } from '@app/contexts/calls/domain/events/CallEndedEvent';
 import { CallMissedEvent } from '@app/contexts/calls/domain/events/CallMissedEvent';
 import { CallParticipantDeclinedEvent } from '@app/contexts/calls/domain/events/CallParticipantDeclinedEvent';
@@ -9,18 +10,19 @@ import { CallParticipantLeftEvent } from '@app/contexts/calls/domain/events/Call
 import { CallParticipantMissedEvent } from '@app/contexts/calls/domain/events/CallParticipantMissedEvent';
 import { CallSignalSentEvent } from '@app/contexts/calls/domain/events/CallSignalSentEvent';
 import { CallStartedEvent } from '@app/contexts/calls/domain/events/CallStartedEvent';
-import { InactiveCallError } from '@app/contexts/calls/domain/errors/InactiveCallError';
-import { CallParticipantNotFoundError } from '@app/contexts/calls/domain/errors/CallParticipantNotFoundError';
-import { CallSignalType } from '@app/contexts/calls/domain/value-objects/CallSignalType';
+import { CallCapabilityHash } from '@app/contexts/calls/domain/value-objects/CallCapabilityHash';
 import { CallSignalId } from '@app/contexts/calls/domain/value-objects/CallSignalId';
+import { CallSignalType } from '@app/contexts/calls/domain/value-objects/CallSignalType';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { CallCapabilityHash } from '@app/contexts/calls/domain/value-objects/CallCapabilityHash';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
+
+import { callStartArgs } from '../../../../support/signCall';
 
 describe('Call', () => {
   const creator = new IdentityId(
@@ -182,8 +184,8 @@ describe('Call', () => {
       payload: { sdp: 'offer-sdp' },
       recipientIdentityId: recipient.valueOf(),
       senderIdentityId: creator.valueOf(),
-      signalType: 'offer',
       signalId: signalId.valueOf(),
+      signalType: 'offer',
     });
   });
 
@@ -302,7 +304,9 @@ describe('Call', () => {
       'MCowBQYDK2VwAyEAoZUOXZj5HZm3Tb5CEojEXtNLxBIHkE2s28l/FsBICaU=',
     );
     const groupScope = CallScope.groupCapability(
-      CallCapabilityHash.of('group-call-capability-token'),
+      new CallCapabilityHash(
+        BearerCapability.hash('group-call-capability-token'),
+      ),
     );
     const startGroup = () => {
       const call = Call.start(
@@ -343,9 +347,7 @@ describe('Call', () => {
         participantIds: [],
         participants: [],
         scope: {
-          capabilityHash: CallCapabilityHash.of(
-            'group-call-capability-token',
-          ).valueOf(),
+          capabilityHash: BearerCapability.hash('group-call-capability-token'),
           type: 'group_capability',
         },
       });
@@ -447,7 +449,6 @@ describe('Call', () => {
 
     expect(missedParticipants).toEqual([recipient]);
     expect(call.toPrimitives()).toMatchObject({
-      status: 'missed',
       participants: [
         { identityId: creator.valueOf(), status: 'joined' },
         {
@@ -456,6 +457,7 @@ describe('Call', () => {
           status: 'missed',
         },
       ],
+      status: 'missed',
     });
     expect(events[0]).toBeInstanceOf(CallParticipantMissedEvent);
     expect(events[1]).toBeInstanceOf(CallMissedEvent);

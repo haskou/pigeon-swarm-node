@@ -1,3 +1,4 @@
+import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject } from '@haskou/value-objects';
 import { createHash } from 'crypto';
 
@@ -7,9 +8,8 @@ export class CommunityInviteToken extends StringValueObject {
     'pigeon:community-invite-reference:v1\n';
 
   /**
-   * base64url(sha256(JSON([communityId, creatorIdentityId, nonce, maxUses,
-   * expiresAt ?? null]))). The token commits to the invite limits, so no
-   * record carrying it can rewrite them.
+   * The token commits to the invite limits, so no record carrying it can
+   * rewrite them.
    */
   public static derive(
     communityId: string,
@@ -19,17 +19,13 @@ export class CommunityInviteToken extends StringValueObject {
     expiresAt?: number,
   ): CommunityInviteToken {
     return new CommunityInviteToken(
-      createHash('sha256')
-        .update(
-          JSON.stringify([
-            communityId,
-            creatorIdentityId,
-            nonce,
-            maxUses,
-            expiresAt ?? null,
-          ]),
-        )
-        .digest('base64url'),
+      CommitmentId.communityInviteToken(
+        communityId,
+        creatorIdentityId,
+        nonce,
+        maxUses,
+        expiresAt,
+      ),
     );
   }
 

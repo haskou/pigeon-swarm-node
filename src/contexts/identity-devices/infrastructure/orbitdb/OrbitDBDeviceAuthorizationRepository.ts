@@ -88,7 +88,6 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     );
     this.validator = new OrbitDBDeviceAuthorizationDocumentValidator(
       policy,
-      canonicalizer,
       this.factory,
       this.genesisMatcher,
       replayer,

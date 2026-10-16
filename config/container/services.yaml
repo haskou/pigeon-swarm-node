@@ -1576,8 +1576,6 @@ services:
     arguments:
       - '@contexts/identity-devices/domain/services/DeviceAuthorizationPolicy'
       - >-
-        @contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationCanonicalizer
-      - >-
         @contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationDocumentFactory
       - >-
         @contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationGenesisMatcher

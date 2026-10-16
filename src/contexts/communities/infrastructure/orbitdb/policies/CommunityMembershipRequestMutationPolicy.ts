@@ -57,6 +57,23 @@ export default class CommunityMembershipRequestMutationPolicy extends PublicMuta
       });
   }
 
+  private derivedIdOf(request: CommunityMembershipRequest): string {
+    const { communityId, createdAt, creatorIdentityId, identityId } =
+      request.toPrimitives();
+
+    try {
+      return CommunityRequestId.derive(
+        communityId,
+        request.getType(),
+        creatorIdentityId,
+        identityId,
+        createdAt,
+      ).valueOf();
+    } catch {
+      throw new InvalidPublicMutationError();
+    }
+  }
+
   private toRequest(
     record: Record<string, unknown>,
   ): CommunityMembershipRequest {
@@ -79,13 +96,7 @@ export default class CommunityMembershipRequestMutationPolicy extends PublicMuta
     if (record.removed !== undefined) throw new InvalidPublicMutationError();
 
     const request = this.toRequest(record);
-    const id = CommunityRequestId.derive(
-      record.communityId as string,
-      record.type as string,
-      record.creatorIdentityId as string,
-      record.identityId as string,
-      record.createdAt as number,
-    ).valueOf();
+    const id = this.derivedIdOf(request);
 
     if (record.id !== id || request.getId().valueOf() !== id) {
       throw new InvalidPublicMutationError();

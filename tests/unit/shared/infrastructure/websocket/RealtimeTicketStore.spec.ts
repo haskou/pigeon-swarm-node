@@ -1,5 +1,11 @@
 import { RealtimeTicketStore } from '@app/shared/infrastructure/websocket/RealtimeTicketStore';
 
+import { cryptoVectors } from '../../../../support/cryptoVectors';
+
+const { hash } = cryptoVectors<{
+  hash: { invalid: { name: string; token: string }[] };
+}>('bearer-capabilities');
+
 describe('RealtimeTicketStore', () => {
   const START = 1_700_000_000_000;
   let store: RealtimeTicketStore;
@@ -44,6 +50,12 @@ describe('RealtimeTicketStore', () => {
     issueFor('alice');
 
     expect(store.consume('A'.repeat(43))).toBeUndefined();
+  });
+
+  it.each(hash.invalid)('refuses a ticket with $name', ({ token }) => {
+    issueFor('alice');
+
+    expect(store.consume(token)).toBeUndefined();
   });
 
   it('accepts a ticket until the instant before expiry', () => {

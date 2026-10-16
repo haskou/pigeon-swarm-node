@@ -6,7 +6,6 @@ import CommunityInviteRepository from '@app/contexts/communities/domain/reposito
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
 import { CommunityModerationLogId } from '@app/contexts/communities/domain/value-objects/CommunityModerationLogId';
-import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
 import CommunityChannelMessageMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageMutationPolicy';
 import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy';
 import CommunityInviteMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy';
@@ -29,7 +28,7 @@ import StickerFavoriteMutationPolicy from '@app/contexts/stickers/infrastructure
 import StickerPackMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerPackMutationPolicy';
 import StickerRecentMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerRecentMutationPolicy';
 import StickerSavedPackMutationPolicy from '@app/contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy';
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { CommitmentId, KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
 const FRONTIER = ['A'.repeat(43)];
@@ -681,13 +680,13 @@ describe('PublicMutationGate over community invites and requests', () => {
     nonce,
     1,
   ).valueOf();
-  const requestId = CommunityRequestId.derive(
+  const requestId = CommitmentId.communityRequest(
     communityId,
     'invitation',
     creator,
     invitee,
     createdAt,
-  ).valueOf();
+  );
   const invite = {
     communityId,
     createdAt,

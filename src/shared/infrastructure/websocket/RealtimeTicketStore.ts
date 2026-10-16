@@ -1,17 +1,10 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
+
+import type { IssuedRealtimeTicket } from './IssuedRealtimeTicket';
+import type { RealtimeTicketEntry } from './RealtimeTicketEntry';
 
 export const REALTIME_PROTOCOL_VERSION = 'pigeon-realtime.v1';
 export const REALTIME_TICKET_PROTOCOL_PREFIX = 'ticket.';
-
-type TicketEntry = {
-  expiresAt: number;
-  identityId: string;
-};
-
-export type IssuedRealtimeTicket = {
-  expiresAt: number;
-  ticket: string;
-};
 
 /**
  * Node-local, in-memory, single-use WebSocket tickets. Only a SHA-256 digest
@@ -26,7 +19,7 @@ export class RealtimeTicketStore {
   public static readonly MAX_ACTIVE_TICKETS_PER_IDENTITY = 8;
 
   // TTL is constant, so insertion order is expiry order.
-  private readonly entries = new Map<string, TicketEntry>();
+  private readonly entries = new Map<string, RealtimeTicketEntry>();
 
   private prune(now: number): void {
     for (const [key, entry] of this.entries) {
@@ -66,13 +59,12 @@ export class RealtimeTicketStore {
       return undefined;
     }
 
-    const ticket = randomBytes(32).toString('base64url');
+    const { hash, token } = BearerCapability.generate();
     const expiresAt = now + RealtimeTicketStore.TTL_MS;
-    const key = createHash('sha256').update(ticket).digest('hex');
 
-    this.entries.set(key, { expiresAt, identityId });
+    this.entries.set(hash, { expiresAt, identityId });
 
-    return { expiresAt, ticket };
+    return { expiresAt, ticket: token };
   }
 
   /**
@@ -80,7 +72,14 @@ export class RealtimeTicketStore {
    * when the ticket exists and has not expired; it is removed either way.
    */
   public consume(ticket: string): string | undefined {
-    const key = createHash('sha256').update(ticket).digest('hex');
+    let key: string;
+
+    try {
+      key = BearerCapability.hash(ticket);
+    } catch {
+      return undefined;
+    }
+
     const entry = this.entries.get(key);
 
     if (!entry) {

@@ -1,14 +1,13 @@
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { MailboxCapability } from '@app/contexts/mailboxes/domain/MailboxCapability';
 import { NodeCommunityStateWasAnnounced } from '@app/contexts/nodes/domain/events/NodeCommunityStateWasAnnounced';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import WebSocketClientMessageHandler from '@app/shared/infrastructure/websocket/WebSocketClientMessageHandler';
 import { WebSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { BearerCapability, KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { WebSocket } from 'ws';
 
 import { callStartArgs } from '../../../../support/signCall';
@@ -1161,7 +1160,7 @@ describe('WebSocketEventHub', () => {
 
     hub.dropMailboxReaderSubscriptions(
       mailboxId,
-      MailboxCapability.hash(readToken),
+      BearerCapability.hash(readToken),
     );
     (client.send as jest.Mock).mockClear();
     hub.publishMailboxEnvelope(mailboxId, 4);

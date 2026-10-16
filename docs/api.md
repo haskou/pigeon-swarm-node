@@ -4602,9 +4602,10 @@ kind, payload, recipientIdentityId})))`, and the signed `mutation` targets store
 Publishing the same record twice is a no-op. An empty `recipientIdentityId` is
 omitted from the record id like an absent one.
 
-Byte-exact vectors (canonical JSON, record id and proof record id) are in
-[`tests/fixtures/mls-record-id-vectors.json`](../tests/fixtures/mls-record-id-vectors.json),
-checked by the `MLSRecordIdVectors` unit spec.
+`@haskou/pigeon-swarm-crypto` owns the derivation (`CommitmentId.mlsRecord`) and
+ships byte-exact vectors, invalid cases included, in
+`vectors/commitment-ids.json`; the `MLSRecordIdVectors` unit spec runs them
+through the node.
 
 The proof record id is `community:<communityId>:mls:<recordId>`, and the proof is a
 `put` (records cannot be deleted). `payloadDigest` covers the stored document

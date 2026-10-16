@@ -9,7 +9,9 @@ import { Integer, Timestamp } from '@haskou/value-objects';
 describe('NodeRegistrationCode', () => {
   const now = new Timestamp(1_700_000_000_000);
   const limits = new NodeRegistrationCodeLimits(10, 30);
-  const secret = new NodeRegistrationCodeSecret('a-code');
+  const secret = new NodeRegistrationCodeSecret(
+    'YS1yZWdpc3RyYXRpb24tY29kZS1mb3ItdGhlLXNwZWM',
+  );
 
   const issue = (
     maxUses = 2,
@@ -27,7 +29,7 @@ describe('NodeRegistrationCode', () => {
     const primitives = issue().toPrimitives();
 
     expect(primitives.hash).toBe(secret.hash().valueOf());
-    expect(JSON.stringify(primitives)).not.toContain('a-code');
+    expect(JSON.stringify(primitives)).not.toContain(secret.valueOf());
     expect(primitives.usesLeft).toBe(2);
     expect(primitives.maxUses).toBe(2);
   });

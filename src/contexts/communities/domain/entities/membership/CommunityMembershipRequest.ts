@@ -24,7 +24,7 @@ export class CommunityMembershipRequest extends AggregateRoot {
     const request = new CommunityMembershipRequest(
       CommunityRequestId.derive(
         communityId.valueOf(),
-        CommunityRequestType.INVITATION.valueOf(),
+        CommunityRequestType.INVITATION,
         creatorIdentityId.valueOf(),
         identityId.valueOf(),
         createdAt.valueOf(),
@@ -51,7 +51,7 @@ export class CommunityMembershipRequest extends AggregateRoot {
     const request = new CommunityMembershipRequest(
       CommunityRequestId.derive(
         communityId.valueOf(),
-        CommunityRequestType.REQUEST.valueOf(),
+        CommunityRequestType.REQUEST,
         requesterIdentityId.valueOf(),
         requesterIdentityId.valueOf(),
         createdAt.valueOf(),

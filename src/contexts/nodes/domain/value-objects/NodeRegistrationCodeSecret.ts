@@ -1,21 +1,23 @@
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject } from '@haskou/value-objects';
-import { createHash, randomBytes } from 'crypto';
 
+import { NodeRegistrationCodeIsNotValidError } from '../errors/NodeRegistrationCodeIsNotValidError';
 import { NodeRegistrationCodeHash } from './NodeRegistrationCodeHash';
 
-/** The registration code itself: 32 random bytes, base64url. Never stored. */
+/** The registration code itself, a bearer capability. Never stored. */
 export class NodeRegistrationCodeSecret extends StringValueObject {
-  private static readonly BYTES = 32;
-
   public static generate(): NodeRegistrationCodeSecret {
-    return new NodeRegistrationCodeSecret(
-      randomBytes(NodeRegistrationCodeSecret.BYTES).toString('base64url'),
-    );
+    return new NodeRegistrationCodeSecret(BearerCapability.generate().token);
   }
 
+  /** A malformed code cannot match any issued one, so it is not valid. */
   public hash(): NodeRegistrationCodeHash {
-    return new NodeRegistrationCodeHash(
-      createHash('sha256').update(this.valueOf(), 'utf8').digest('hex'),
-    );
+    try {
+      return new NodeRegistrationCodeHash(
+        BearerCapability.hash(this.valueOf()),
+      );
+    } catch {
+      throw new NodeRegistrationCodeIsNotValidError();
+    }
   }
 }

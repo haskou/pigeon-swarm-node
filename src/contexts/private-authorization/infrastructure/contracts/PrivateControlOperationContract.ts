@@ -3,10 +3,8 @@ import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authoriz
 import { PrivateControlOperation } from '@app/contexts/private-authorization/domain/PrivateControlOperation';
 import { PrivateControlOperationPrimitives } from '@app/contexts/private-authorization/domain/PrivateControlOperationPrimitives';
 import { PrivateOperationJson } from '@app/contexts/private-authorization/domain/value-objects/PrivateOperationJson';
-import { assert } from '@haskou/value-objects';
+import { StateDigest } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
-import canonicalize from 'canonicalize';
-import { createHash } from 'crypto';
 
 export default class PrivateControlOperationContract extends PrivateOperationDecoder {
   private exact(value: unknown, fields: string[]): Record<string, unknown> {
@@ -241,8 +239,6 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
       if (value.version !== 1) {
         throw new InvalidPrivateAuthorizationError();
       }
-      const canonical = canonicalize(value);
-      assert(canonical, new InvalidPrivateAuthorizationError());
       const mapped = this.controlPayload(value.kind, value.payload);
       const payload = value.payload as Record<string, unknown>;
       const primitives: PrivateControlOperationPrimitives = {
@@ -251,9 +247,7 @@ export default class PrivateControlOperationContract extends PrivateOperationDec
         authorizationRevision: this.revision(value.authorizationRevision),
         byteSize: Buffer.byteLength(boundedJson, 'utf8'),
         control: mapped.control,
-        digest: createHash('sha256')
-          .update(canonical, 'utf8')
-          .digest('base64url'),
+        digest: StateDigest.of(value),
         id: this.encoded(value.operationId, 16),
         identityAuthorizationEpoch: this.text(
           payload.identityAuthorizationEpoch,

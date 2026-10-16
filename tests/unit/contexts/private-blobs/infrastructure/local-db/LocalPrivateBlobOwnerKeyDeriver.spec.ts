@@ -1,9 +1,18 @@
+import { PrivateBlobOwnerKey } from '@app/contexts/private-blobs/domain/value-objects/PrivateBlobOwnerKey';
 import LocalPrivateBlobOwnerKeyDeriver from '@app/contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobOwnerKeyDeriver';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
+
+import { cryptoVectors } from '../../../../../support/cryptoVectors';
+
+const { privateBlobOwner } = cryptoVectors<{
+  privateBlobOwner: {
+    valid: { args: [string, string]; id: string; name: string }[];
+  };
+}>('commitment-ids');
 
 const ALICE = new IdentityId(
   'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
@@ -35,6 +44,19 @@ describe('LocalPrivateBlobOwnerKeyDeriver', () => {
     }
     await fs.rm(databasePath, { force: true, recursive: true });
   });
+
+  it.each(privateBlobOwner.valid)(
+    'derives the $name key from the stored salt',
+    async ({ args: [salt, identityId], id }) => {
+      await database.save('private_blob_meta', 'owner-key-salt', { salt });
+
+      await expect(
+        new LocalPrivateBlobOwnerKeyDeriver(database).derive(
+          new IdentityId(identityId),
+        ),
+      ).resolves.toEqual(new PrivateBlobOwnerKey(id));
+    },
+  );
 
   it('derives the same key for the same identity', async () => {
     const deriver = new LocalPrivateBlobOwnerKeyDeriver(database);

@@ -17,10 +17,9 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import EmbeddedLocalDatabase, {
   EmbeddedLocalDatabaseOperation,
 } from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import { StateDigest } from '@haskou/pigeon-swarm-crypto';
 import { assert, Integer } from '@haskou/value-objects';
 import { Buffer } from 'buffer';
-import canonicalize from 'canonicalize';
-import { createHash } from 'crypto';
 
 import PrivateAuthorizationStorageCoordinator from '../PrivateAuthorizationStorageCoordinator';
 import LocalPrivateAuthorizationRepository from './LocalPrivateAuthorizationRepository';
@@ -341,17 +340,13 @@ export default class LocalPrivateOperationUnitOfWork extends PrivateOperationUni
   private genesisFingerprint(
     genesis: PrivateAuthorizationGenesisCommit,
   ): PrivateAuthorizationGenesisFingerprint {
-    const canonical = canonicalize({
-      ownerIdentityId: genesis.ownerIdentityId.valueOf(),
-      projection: genesis.projection,
-      protectedMlsState: genesis.protectedMlsState,
-      scope: genesis.scope.toPrimitives(),
-    });
-
-    assert(canonical, new InvalidPrivateAuthorizationError());
-
     return new PrivateAuthorizationGenesisFingerprint(
-      createHash('sha256').update(canonical).digest('base64url'),
+      StateDigest.of({
+        ownerIdentityId: genesis.ownerIdentityId.valueOf(),
+        projection: genesis.projection,
+        protectedMlsState: genesis.protectedMlsState,
+        scope: genesis.scope.toPrimitives(),
+      }),
     );
   }
 

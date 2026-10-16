@@ -5,9 +5,9 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
-import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
@@ -23,6 +23,10 @@ import {
 } from '../../support/signCall';
 import { signCommunityOperation } from '../../support/signCommunityOperation';
 import {
+  connectRealtimeSocket,
+  issueRealtimeTicket,
+} from './RealtimeTicketClient';
+import {
   addPrivateNetwork,
   buildNodeRuntime,
   IdentityFixture,
@@ -35,10 +39,6 @@ import {
   stopNode,
   waitFor,
 } from './two-real-node-gossipsub';
-import {
-  connectRealtimeSocket,
-  issueRealtimeTicket,
-} from './RealtimeTicketClient';
 
 type LiveCall = {
   id: string;
@@ -538,13 +538,13 @@ async function main(): Promise<void> {
       communityId: community.id,
       createdAt: joinCreatedAt,
       creatorIdentityId: requesterId,
-      id: CommunityRequestId.derive(
+      id: CommitmentId.communityRequest(
         community.id,
         'request',
         requesterId,
         requesterId,
         joinCreatedAt,
-      ).valueOf(),
+      ),
       identityId: requesterId,
       scopeType: 'community_membership_request',
       status: 'pending',
@@ -885,6 +885,7 @@ async function main(): Promise<void> {
     }, 'revoked access on both nodes');
     await pause(1000);
     const frameBoundary = streams[1].frames.length;
+
     // Admission follows the current community state: when the revoked identity
     // created the winning call, the call itself is no longer admissible.
     if (callCreators.get(callId)?.id === identities[0].id) {

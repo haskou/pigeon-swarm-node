@@ -13,8 +13,8 @@ import { AuthenticatedPrivateOperationJson } from '@app/contexts/private-authori
 import { PrivateAuthorizationDeviceKey } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationDeviceKey';
 import { PrivateProtectedMlsState } from '@app/contexts/private-authorization/domain/value-objects/PrivateProtectedMlsState';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { StateDigest } from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
-import { createHash } from 'crypto';
 
 import PrivateControlTransitionVerifier from './PrivateControlTransitionVerifier';
 import PrivateMlsPolicyVerifier from './PrivateMlsPolicyVerifier';
@@ -45,7 +45,7 @@ export default class VerifiedPrivateControlTransitionProcessor extends PrivateCo
   }
 
   private hash(value: Buffer): string {
-    return createHash('sha256').update(value).digest('base64url');
+    return StateDigest.ofBytes(value);
   }
 
   private parse(canonical: string): VerifiedTransition {
