@@ -114,15 +114,14 @@ signature:
 }
 ```
 
-`frontier` is present only on records scoped to a community or conversation
-(channel messages, reactions, pins, invites, membership requests, moderation
-log, MLS records, polls) and absent
-everywhere else; the node rejects a scoped record without it and any other
-record with it. It lists 1–64 digests of the scope's operations, strictly
-ascending, that the author had observed (`GET /communities/:id/frontier`,
-the conversation frontier). The record's permission is judged against the
-scope folded at exactly that frontier, so the verdict does not depend on what
-a node holds when it evaluates the record; an unknown head is refused and
+`frontier` is present only on records scoped to a community (channel messages,
+reactions, pins, invites, membership requests, moderation log, MLS records,
+polls) and absent everywhere else; the node rejects a scoped record without it
+and any other record with it. It lists 1–64 digests of the community's
+operations, strictly ascending, that the author had observed
+(`GET /communities/:id/frontier`). The record's permission is judged against the
+community folded at exactly that frontier, so the verdict does not depend on
+what a node holds when it evaluates the record; an unknown head is refused and
 retried after replication, like an unknown operation parent.
 
 The device signs the UTF-8 bytes `"pigeon:public-mutation:v2\n" +
@@ -489,8 +488,9 @@ the authenticated participants.
 
 ## Calls HTTP API
 
-Calls can be scoped to a one-to-one conversation, a group conversation or a
-community voice channel. All endpoints require signed request authentication.
+Calls can be scoped to a one-to-one conversation, a group capability (the group
+itself lives in MLS on the clients) or a community voice channel. All endpoints
+require signed request authentication.
 
 An endpoint that addresses a call by id answers HTTP 503
 `ReplicatedStateNotReadyError` (code `503020`) instead of 409
@@ -2697,9 +2697,9 @@ has exactly these nine fields, no more and no fewer:
 the canonical (RFC 8785, `canonicalize`) JSON of the record **without `id`**. The
 record id is `conversation:<conversationId>:op:<digest>`, and the proof's `recordId`
 is that id. `payloadDigest` is the same base64url sha256 of the canonical record
-**with** `id` (what `PublicMutationProof.digestOf` computes). `parents` is sorted
-ascending, unique, at most 64 digests, and is the same array in the record and in
-`operation.parents` (the genesis has `[]`).
+**with** `id` (what `PublicMutationProof.digestOf` computes). `parents` is always
+`[]`, in the record and in `operation.parents`: the only admitted operation is the
+genesis.
 
 **Proof and signing bytes.** `mutation` is the proof body plus its signature:
 
@@ -2739,10 +2739,10 @@ replication gate and by the decoder, so they never change a conversation: a
 creator, network and nonce) and every `member_added`, `member_removed`,
 `member_left`, `admin_promoted` and `admin_demoted` record.
 
-**Genesis.** The client signs the genesis with empty `parents`. The node rebuilds
-the operation from the authenticated actor, the `args` it derives from the body,
-and `createdAt` and `parents`; the signature only verifies if the client signed
-exactly that.
+**Genesis.** The client signs the genesis with empty `parents`; a genesis with
+parents is refused. The node rebuilds the operation from the authenticated
+actor, the `args` it derives from the body, and `createdAt` and `parents`; the
+signature only verifies if the client signed exactly that.
 
 | Route                 | action                 | `args`                                 |
 | --------------------- | ---------------------- | -------------------------------------- |
@@ -2805,21 +2805,11 @@ genesis and the member and admin cases are the records older nodes accepted;
 nodes now refuse them, and the spec asserts that the decoder refuses them and that
 they fold to no conversation.
 
-### Conversation frontier
-
-```http
-GET /conversations/{conversationId}/frontier
-```
-
-Implemented:
-
-- member-only; returns `{ "frontier": ["<digest>"] }`, the sorted digests no other
-  operation names as parent
-
 The member and admin routes (`POST /conversations/{id}/members`,
 `DELETE .../members/me`, `DELETE .../members/{identityId}`,
-`PUT`/`DELETE .../admins/{identityId}`) are gone and answer `404`: group rosters
-live in MLS on the clients (D15).
+`PUT`/`DELETE .../admins/{identityId}`) and `GET /conversations/{id}/frontier`
+are gone and answer `404`: a 1:1 has no operation after its genesis, and group
+rosters live in MLS on the clients (D15).
 
 ### Conversation drafts
 

@@ -281,9 +281,9 @@ local secrets. A revoked device reads up to the group that removed it. See
 
 ## Residuals
 
-- **Backdating a scoped record's frontier.** Non-operation community and
-  conversation records carry a signed `frontier` in their proof, and their
-  permission is judged against the scope folded at that frontier. A member
+- **Backdating a scoped record's frontier.** Non-operation community records
+  carry a signed `frontier` in their proof, and their permission is judged
+  against the community folded at that frontier. A member
   removed later can still sign a record that claims an older frontier, which no
   node can tell apart from honest late delivery without a trusted clock. It is
   the same family as the compromised-device window tracked in #386.

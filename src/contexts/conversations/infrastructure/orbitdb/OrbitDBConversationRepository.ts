@@ -142,18 +142,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     return entry;
   }
 
-  private async findState(
-    conversationId: ConversationId,
-  ): Promise<ConversationState | undefined> {
-    const records = await this.operationIndex.findRecords(
-      this.headKey(conversationId),
-    );
-
-    return records.length === 0
-      ? undefined
-      : this.stateOf(conversationId.valueOf(), records).state;
-  }
-
   private async findFolded(
     conversationId: ConversationId,
   ): Promise<FoldedConversation | undefined> {
@@ -219,25 +207,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     return this.conversationOf(found);
   }
 
-  public async requireMetadataAtFrontier(
-    conversationId: ConversationId,
-    frontier: string[],
-  ): Promise<Conversation> {
-    const records = await this.operationIndex.findRecords(
-      this.headKey(conversationId),
-    );
-    const { roster } = ConversationStateFold.fold(
-      ConversationStateFold.closureOf(
-        this.operationsOf(conversationId.valueOf(), records),
-        frontier,
-      ),
-    );
-
-    if (!roster) throw new ConversationNotFoundError(conversationId);
-
-    return this.conversationOf({ createdAt: 0, roster });
-  }
-
   public findByParticipant(
     participantId: IdentityId,
     limit: number,
@@ -291,11 +260,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
           record.conversationId === payload.conversationId,
       },
     );
-  }
-
-  /** The operations nobody built on yet: the parents of the next operation. */
-  public async findFrontier(conversationId: ConversationId): Promise<string[]> {
-    return (await this.findState(conversationId))?.frontier ?? [];
   }
 
   /** Every stored operation of the conversation log, in no particular order. */

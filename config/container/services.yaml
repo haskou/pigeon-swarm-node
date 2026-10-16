@@ -1294,11 +1294,6 @@ services:
     class: /contexts/conversations/application/find-conversations/ConversationsFinder
     arguments:
       - '@contexts/conversations/domain/repositories/ConversationRepository'
-  contexts/conversations/application/find-frontier/ConversationFrontierFinder:
-    class: >-
-      /contexts/conversations/application/find-frontier/ConversationFrontierFinder
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
   contexts/conversations/application/manage-draft/ConversationDraftDeleter:
     class: /contexts/conversations/application/manage-draft/ConversationDraftDeleter
     arguments:

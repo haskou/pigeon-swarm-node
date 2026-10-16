@@ -2,9 +2,10 @@ import { ConversationOperation } from '@app/contexts/conversations/domain/operat
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 
 /**
- * A member or admin change of a group conversation as nodes accepted it
- * before group rosters moved into MLS. Nodes now refuse this shape, so the
- * domain cannot build it: the record is spelled out here.
+ * A conversation operation record as older nodes accepted it: a member or
+ * admin change of a group conversation, or an operation with parents. Nodes
+ * now refuse these shapes, so the domain cannot build them: the record is
+ * spelled out here.
  */
 export function legacyGroupChange(input: {
   action: string;

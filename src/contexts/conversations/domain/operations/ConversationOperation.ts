@@ -16,9 +16,6 @@ import { ConversationOperationPrimitives } from './ConversationOperationPrimitiv
  * past only. A 1:1 conversation is a log made of its genesis alone.
  */
 export class ConversationOperation {
-  private static readonly DIGEST = /^[A-Za-z0-9_-]{43}$/;
-  private static readonly MAX_PARENTS = 64;
-
   public static readonly SCOPE_TYPE = 'conversation_operation';
 
   private readonly hash: string;
@@ -70,27 +67,13 @@ export class ConversationOperation {
     return args;
   }
 
-  private static parents(value: unknown): string[] {
-    if (
-      !Array.isArray(value) ||
-      value.length > ConversationOperation.MAX_PARENTS ||
-      value.some(
-        (parent) =>
-          typeof parent !== 'string' ||
-          !ConversationOperation.DIGEST.test(parent),
-      )
-    ) {
-      throw new InvalidConversationOperationError();
-    }
-    const parents = value as string[];
-
-    if (
-      parents.some((parent, index) => index > 0 && parents[index - 1] >= parent)
-    ) {
+  /** Only a genesis decodes, and a genesis has no parents. */
+  private static noParents(value: unknown): string[] {
+    if (!Array.isArray(value) || value.length > 0) {
       throw new InvalidConversationOperationError();
     }
 
-    return parents;
+    return [];
   }
 
   private static contentOf(
@@ -169,7 +152,7 @@ export class ConversationOperation {
       createdAt: record.createdAt as number,
       id: ConversationOperation.text(record.id),
       networkId: ConversationOperation.text(record.networkId),
-      parents: ConversationOperation.parents(record.parents),
+      parents: ConversationOperation.noParents(record.parents),
       scopeType: record.scopeType as 'conversation_operation',
     };
 
@@ -213,10 +196,8 @@ export class ConversationOperation {
           primitives.conversationId,
           this.hash,
         ) ||
-      action.isGenesis() !== (primitives.parents.length === 0) ||
-      (action.isGenesis() &&
-        primitives.conversationId !==
-          ConversationOperation.genesisConversationIdOf(primitives))
+      primitives.conversationId !==
+        ConversationOperation.genesisConversationIdOf(primitives)
     ) {
       throw new InvalidConversationOperationError();
     }

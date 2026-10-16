@@ -58,9 +58,7 @@ package "conversations.domain" {
   interface ConversationRepository {
     +hasById(id: ConversationId): Promise<boolean>
     +requireMetadataById(id: ConversationId): Promise<Conversation>
-    +requireMetadataAtFrontier(id: ConversationId, frontier: string[]): Promise<Conversation>
     +findByParticipant(participantId: IdentityId, limit: number, beforeConversationId?: ConversationId): Promise<Conversation[]>
-    +findFrontier(id: ConversationId): Promise<string[]>
     +findOperations(id: ConversationId): Promise<ConversationOperation[]>
     +saveOperation(operation: ConversationOperation, proof: PublicMutationProof): Promise<void>
   }
@@ -102,10 +100,6 @@ package "conversations.application" {
     +create(message: ConversationCreateMessage): Promise<Conversation>
   }
 
-  class ConversationFrontierFinder {
-    +find(id: ConversationId, requester: IdentityId): Promise<string[]>
-  }
-
   class ConversationsFinder {
     +find(query): Promise<Conversation[]>
   }
@@ -120,7 +114,6 @@ package "conversations.application" {
   }
 
   ConversationCreator --> ConversationRepository
-  ConversationFrontierFinder --> ConversationRepository
   ConversationsFinder --> ConversationRepository
   ConversationDraftSaver --> ConversationDraftRepository
   ConversationDraftDeleter --> ConversationDraftRepository

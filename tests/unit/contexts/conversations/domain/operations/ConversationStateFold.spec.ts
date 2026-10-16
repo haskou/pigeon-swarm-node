@@ -17,7 +17,6 @@ function stateOf(operations: ConversationOperation[]) {
   const state = ConversationStateFold.fold(operations);
 
   return {
-    frontier: state.frontier,
     members: state.roster?.getMembers(),
     skipped: [...state.skipped].sort(),
   };
@@ -136,6 +135,15 @@ describe('ConversationStateFold', () => {
         alice.valueOf(),
       ]);
       expect(state.skipped).toHaveLength(2);
+    });
+
+    it('keeps the genesis with the lowest digest', () => {
+      const operations = [1, 2, 3].map(genesisAt);
+      const kept = operations.map((genesis) => genesis.getHash()).sort()[0];
+
+      expect(ConversationStateFold.fold(operations).skipped).not.toContain(
+        kept,
+      );
     });
 
     it('folds every ordering of the same operations to the same state', () => {

@@ -1,9 +1,9 @@
 /**
- * The causal reference a scoped record carries: the digests of the scope's
- * operations (community or conversation) its author had observed when signing.
- * The record's permission is judged against the scope folded at exactly that
- * frontier, so the verdict does not depend on what a node happens to hold when
- * it evaluates the record.
+ * The causal reference a community-scoped record carries: the digests of the
+ * community's operations its author had observed when signing. The record's
+ * permission is judged against the community folded at exactly that frontier,
+ * so the verdict does not depend on what a node happens to hold when it
+ * evaluates the record.
  *
  * A frontier is a non-empty, strictly ascending set of operation digests.
  */
