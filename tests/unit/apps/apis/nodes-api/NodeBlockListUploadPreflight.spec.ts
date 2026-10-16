@@ -39,7 +39,7 @@ const jsonBytes = (value: unknown): Buffer =>
 const responses: EventEmitter[] = [];
 
 const response = (): Response & EventEmitter => {
-  const created = new EventEmitter();
+  const created = Object.assign(new EventEmitter(), { setHeader: jest.fn() });
   responses.push(created);
 
   return created as unknown as Response & EventEmitter;
@@ -281,8 +281,14 @@ describe('NodeBlockListUploadPreflight', () => {
     process.env.NODE_BLOCK_LIST_BODY_TIMEOUT_MS = '20';
     const preflight = new NodeBlockListUploadPreflight();
     const stalled = signedUpload({ signer: owner, stalls: true });
-    expect(await outcome(preflight, stalled, response())).toBeInstanceOf(
+    const timedOutResponse = response();
+    expect(await outcome(preflight, stalled, timedOutResponse)).toBeInstanceOf(
       SignedRequestBodyReadTimeoutError,
+    );
+    // The unread rest of the body must not keep the connection open.
+    expect(timedOutResponse.setHeader).toHaveBeenCalledWith(
+      'Connection',
+      'close',
     );
 
     expect(

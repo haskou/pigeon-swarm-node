@@ -90,4 +90,15 @@ describe('PostIdentityRoute', () => {
     expect(await publish()).toBe(failure);
     expect(registrationAdmitter.release).toHaveBeenCalledWith(reservation);
   });
+
+  it('should report the original failure and keep the use spent when the re-check fails', async () => {
+    const failure = new Error('event publish failed after save');
+    creationDetector.isCreation
+      .mockResolvedValueOnce(true)
+      .mockRejectedValueOnce(new Error('store unavailable'));
+    publisher.publish.mockRejectedValue(failure);
+
+    expect(await publish()).toBe(failure);
+    expect(registrationAdmitter.release).not.toHaveBeenCalled();
+  });
 });
