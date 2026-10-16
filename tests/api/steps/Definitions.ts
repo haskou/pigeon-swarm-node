@@ -52,6 +52,8 @@ import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedL
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { Kernel } from '@haskou/ddd-kernel';
 import {
+  IdentitySignature,
+  KeychainSignature,
   KeyPair,
   PrivateGenesisSignature,
   PrivateKey,
@@ -312,7 +314,9 @@ export default class Definitions {
       timestamp: Date.now() + this.identitySignedOffsetMs + version,
       version,
     };
-    const signature = keyPair.sign(JSON.stringify(signaturePayload)).valueOf();
+    const signature = keyPair
+      .sign(IdentitySignature.signingContent(signaturePayload))
+      .valueOf();
 
     this.body = JSON.stringify({
       ...signaturePayload,
@@ -1702,7 +1706,7 @@ export default class Definitions {
       version: parsedBody.version,
     };
     const signature = keyPair
-      .sign(JSON.stringify(keychainSignaturePayload))
+      .sign(KeychainSignature.signingContent(keychainSignaturePayload))
       .valueOf();
     const signedBody = {
       ...parsedBody,
