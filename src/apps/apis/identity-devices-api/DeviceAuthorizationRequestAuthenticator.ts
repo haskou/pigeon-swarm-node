@@ -2,7 +2,6 @@ import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationTransitionReader } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionReader';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { assert } from '@haskou/value-objects';
 import { Request } from 'express';
 
@@ -14,9 +13,10 @@ export class DeviceAuthorizationRequestAuthenticator {
   private readonly verifier = new SignedHttpRequestVerifier();
 
   private verifyDevice(
+    request: Request,
+    timestamp: string,
     credentialValue: string | undefined,
     signatureValue: string | undefined,
-    payload: string,
   ): DeviceCredential {
     assert(
       credentialValue !== undefined &&
@@ -26,10 +26,7 @@ export class DeviceAuthorizationRequestAuthenticator {
       new InvalidSignedRequestError(),
     );
     const credential = DeviceCredential.fromWire(credentialValue);
-    assert(
-      credential.isValidSignature(payload, new Signature(signatureValue)),
-      new InvalidSignedRequestError(),
-    );
+    this.verifier.verifyWith(request, timestamp, signatureValue, credential);
 
     return credential;
   }
@@ -55,23 +52,29 @@ export class DeviceAuthorizationRequestAuthenticator {
       new InvalidSignedRequestError(),
     );
     const timestamp = this.verifier.getRequiredHeader(request, 'x-timestamp');
-    const payload = this.verifier.signingContent(request, timestamp);
 
     if (hasRecoveryProof) {
       const recoveryAuthority = authorization.getRecoveryAuthority();
       assert(
-        recoverySignatureValue.length > 0 &&
-          recoveryAuthority.isValidSignature(
-            payload,
-            new Signature(recoverySignatureValue),
-          ),
+        recoverySignatureValue.length > 0,
         new InvalidSignedRequestError(),
+      );
+      this.verifier.verifyWith(
+        request,
+        timestamp,
+        recoverySignatureValue,
+        recoveryAuthority,
       );
 
       return recoveryAuthority;
     }
 
-    return this.verifyDevice(credentialValue, deviceSignatureValue, payload);
+    return this.verifyDevice(
+      request,
+      timestamp,
+      credentialValue,
+      deviceSignatureValue,
+    );
   }
 
   public authenticate(
@@ -118,11 +121,11 @@ export class DeviceAuthorizationRequestAuthenticator {
       );
       const timestamp = this.verifier.getRequiredHeader(request, 'x-timestamp');
       assertSignedRequestTimestampIsFresh(timestamp);
-      const payload = this.verifier.signingContent(request, timestamp);
       const credential = this.verifyDevice(
+        request,
+        timestamp,
         request.header('x-device-credential'),
         request.header('x-device-signature'),
-        payload,
       );
       assert(
         authorization.isAuthorized(credential),

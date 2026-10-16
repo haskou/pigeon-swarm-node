@@ -8,11 +8,16 @@ export default class KeychainSignatureDomainService {
   }
 
   public isValidSignature(keychain: Keychain): boolean {
-    return keychain
-      .getOwnerPublicKey()
-      .isValidSignature(
-        this.getCanonicalSigningContent(keychain.getSignaturePayload()),
+    try {
+      KeychainSignature.verify(
+        keychain.getSignaturePayload().toPrimitives(),
         keychain.getSignature(),
+        keychain.getOwnerPublicKey(),
       );
+
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

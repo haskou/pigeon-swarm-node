@@ -24,15 +24,30 @@ export class SignedHttpRequestVerifier {
     return normalizedValue;
   }
 
-  /** The exact bytes the request signer signed, as the library defines them. */
-  public signingContent(request: SignedHttpRequest, timestamp: string): string {
+  /**
+   * Verifies that `key` signed the request at `timestamp` with `signature`,
+   * which must be the single canonical encoding of the signature bytes.
+   */
+  public verifyWith(
+    request: SignedHttpRequest,
+    timestamp: string,
+    signature: string,
+    key: PublicKey,
+  ): Signature {
     try {
-      return SignedHttpRequestSignature.signingContent({
-        body: request.body as SignedHttpRequestBody,
-        method: request.method,
-        path: request.path,
-        timestamp: Number(timestamp),
-      });
+      const parsed = new Signature(signature);
+      SignedHttpRequestSignature.verify(
+        {
+          body: request.body as SignedHttpRequestBody,
+          method: request.method,
+          path: request.path,
+          timestamp: Number(timestamp),
+        },
+        parsed,
+        key,
+      );
+
+      return parsed;
     } catch {
       throw new InvalidSignedRequestError();
     }
@@ -40,25 +55,21 @@ export class SignedHttpRequestVerifier {
 
   public verifySignature(request: SignedHttpRequest): {
     identityId: IdentityId;
+    signature: Signature;
     timestamp: string;
   } {
     const identityId = new IdentityId(
       this.getRequiredHeader(request, 'x-identity-id'),
     );
     const timestamp = this.getRequiredHeader(request, 'x-timestamp');
-    const signature = new Signature(
+    const signature = this.verifyWith(
+      request,
+      timestamp,
       this.getRequiredHeader(request, 'x-signature'),
-    );
-    const isValid = PublicKey.fromPEM(identityId.toString()).isValidSignature(
-      this.signingContent(request, timestamp),
-      signature,
+      PublicKey.fromPEM(identityId.toString()),
     );
 
-    if (!isValid) {
-      throw new InvalidSignedRequestError();
-    }
-
-    return { identityId, timestamp };
+    return { identityId, signature, timestamp };
   }
 
   public verify(request: SignedHttpRequest): IdentityId {

@@ -13,9 +13,12 @@ export class IdentitySignatureDomainService {
     payload: IdentitySignaturePayload,
     signature: Signature,
   ): boolean {
-    return credential.isValidSignature(
-      this.getCanonicalSigningContent(payload),
-      signature,
-    );
+    try {
+      IdentitySignature.verify(payload.toPrimitives(), signature, credential);
+
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

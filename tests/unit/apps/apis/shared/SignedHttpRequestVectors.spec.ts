@@ -27,18 +27,6 @@ describe('Signed HTTP request vectors', () => {
   const verifier = new SignedHttpRequestVerifier();
 
   it.each(vectors.cases)(
-    'derives the library signing content of $name',
-    ({ derived, headers, input }) => {
-      expect(
-        verifier.signingContent(
-          requestOf(input, headers),
-          headers['x-timestamp'],
-        ),
-      ).toBe(derived.signingContent);
-    },
-  );
-
-  it.each(vectors.cases)(
     'accepts $name and returns the signer and timestamp',
     ({ headers, input }) => {
       const result = verifier.verifySignature(requestOf(input, headers));

@@ -1,4 +1,8 @@
-import { SignedHttpRequestSignature } from '@haskou/pigeon-swarm-crypto';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import {
+  Signature,
+  SignedHttpRequestSignature,
+} from '@haskou/pigeon-swarm-crypto';
 
 export class SignedRequestReplayGuard {
   private static readonly MAX_ENTRIES = 100_000;
@@ -22,9 +26,12 @@ export class SignedRequestReplayGuard {
    * and rejects new signatures: live entries are never evicted, so an attacker
    * cannot flush an intercepted signature out of the guard to replay it.
    */
-  public accept(identityId: string, signature: string): boolean {
+  public accept(identityId: IdentityId, signature: Signature): boolean {
     const now = Date.now();
-    const key = `${identityId}:${signature}`;
+    const key = SignedHttpRequestSignature.replayKey(
+      identityId.valueOf(),
+      signature,
+    );
 
     this.prune(now);
 
