@@ -2,6 +2,7 @@ import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/I
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import PubSubTransport from '@app/shared/infrastructure/pubsub/PubSubTransport';
 import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
+import Kernel from '@haskou/ddd-kernel';
 import { Constructor } from '@haskou/ddd-kernel/domain';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
@@ -11,13 +12,13 @@ import { networkFanoutSuppression } from '../NetworkFanoutSuppression';
 import PubSubNetworkMessageCodec from './PubSubNetworkMessageCodec';
 import PubSubTopicResolver from './PubSubTopicResolver';
 
-type SubscriptionHandler = (event: DomainEvent) => Promise<void>;
+interface Subscription {
+  queueName: string;
+  handler: (event: DomainEvent) => Promise<void>;
+}
 
 export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
-  private readonly subscriptionHandlers = new Map<
-    string,
-    SubscriptionHandler[]
-  >();
+  private readonly subscriptions = new Map<string, Subscription[]>();
 
   constructor(
     private readonly transport: PubSubTransport,
@@ -87,92 +88,137 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
     return networks.filter((network) => networkIds.includes(network.getId()));
   }
 
-  private async subscribeToNetwork(
+  /**
+   * Logs only static labels and the error class: the topic carries the network
+   * id, and payload fields and exception messages can carry private data.
+   */
+  private logDroppedEvent(
     bindingKey: string,
-    network: IPFSNetwork,
-    DomainEventInstance: Constructor<DomainEvent>,
-    handler: SubscriptionHandler,
-  ): Promise<void> {
-    const topic = this.networkTopic(bindingKey, network);
-    const subscriptionKey = `${topic}:${bindingKey}`;
-    const handlers = this.subscriptionHandlers.get(subscriptionKey);
+    cause: string,
+    error: unknown,
+  ): void {
+    Kernel.logger.error(
+      `Dropped pubsub event: event=${bindingKey} ${cause} error=${error instanceof Error ? error.name : typeof error}`,
+    );
+  }
 
-    if (handlers) {
-      handlers.push(handler);
+  private decodeEvent(
+    bindingKey: string,
+    DomainEventInstance: Constructor<DomainEvent>,
+    payload: string,
+  ): DomainEvent | undefined {
+    const message = JSON.parse(payload) as Message;
+
+    if (message.type !== bindingKey) {
+      return undefined;
+    }
+
+    return this.instanceDomainEvent(DomainEventInstance, message);
+  }
+
+  private async deliver(
+    bindingKey: string,
+    subscriptionKey: string,
+    DomainEventInstance: Constructor<DomainEvent>,
+    readPayload: () => string,
+  ): Promise<void> {
+    let event: DomainEvent | undefined;
+
+    try {
+      event = this.decodeEvent(bindingKey, DomainEventInstance, readPayload());
+    } catch (error: unknown) {
+      this.logDroppedEvent(bindingKey, 'stage=decode', error);
 
       return;
     }
 
-    this.subscriptionHandlers.set(subscriptionKey, [handler]);
+    if (!event) {
+      return;
+    }
 
-    await network.subscribePubSub(topic, async (payload) => {
-      const message = JSON.parse(
-        this.codec.decode(payload, network, topic),
-      ) as Message;
+    const subscriptions = [...(this.subscriptions.get(subscriptionKey) || [])];
+    const results = await Promise.allSettled(
+      subscriptions.map(({ handler }) => handler(event)),
+    );
+    let dropped = false;
 
-      if (message.type !== bindingKey) {
-        return;
-      }
-
-      const event = this.instanceDomainEvent(DomainEventInstance, message);
-
-      await Promise.all(
-        (this.subscriptionHandlers.get(subscriptionKey) || []).map(
-          (subscriptionHandler) => subscriptionHandler(event),
-        ),
-      );
-
-      if (!networkFanoutSuppression.has(event)) {
-        webSocketEventHub.publishFromNetwork([event]);
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        dropped = true;
+        this.logDroppedEvent(
+          bindingKey,
+          `consumer=${subscriptions[index].queueName}`,
+          result.reason,
+        );
       }
     });
+
+    if (!dropped && !networkFanoutSuppression.has(event)) {
+      webSocketEventHub.publishFromNetwork([event]);
+    }
+  }
+
+  private async subscribeToNetwork(
+    bindingKey: string,
+    network: IPFSNetwork,
+    DomainEventInstance: Constructor<DomainEvent>,
+    subscription: Subscription,
+  ): Promise<void> {
+    const topic = this.networkTopic(bindingKey, network);
+    const subscriptionKey = `${topic}:${bindingKey}`;
+    const subscriptions = this.subscriptions.get(subscriptionKey);
+
+    if (subscriptions) {
+      subscriptions.push(subscription);
+
+      return;
+    }
+
+    this.subscriptions.set(subscriptionKey, [subscription]);
+
+    await network.subscribePubSub(topic, (payload) =>
+      this.deliver(bindingKey, subscriptionKey, DomainEventInstance, () =>
+        this.codec.decode(payload, network, topic),
+      ),
+    );
   }
 
   private async subscribeToTransport(
     bindingKey: string,
     DomainEventInstance: Constructor<DomainEvent>,
-    handler: SubscriptionHandler,
+    subscription: Subscription,
   ): Promise<void> {
     const topic = this.topicResolver.fromRoutingKey(bindingKey);
     const subscriptionKey = `${topic}:${bindingKey}`;
-    const handlers = this.subscriptionHandlers.get(subscriptionKey);
+    const subscriptions = this.subscriptions.get(subscriptionKey);
 
-    if (handlers) {
-      handlers.push(handler);
+    if (subscriptions) {
+      subscriptions.push(subscription);
 
       return;
     }
 
-    this.subscriptionHandlers.set(subscriptionKey, [handler]);
+    this.subscriptions.set(subscriptionKey, [subscription]);
 
-    await this.transport.subscribe(topic, async (payload) => {
-      const message = JSON.parse(payload) as Message;
-
-      if (message.type !== bindingKey) {
-        return;
-      }
-
-      const event = this.instanceDomainEvent(DomainEventInstance, message);
-
-      await Promise.all(
-        (this.subscriptionHandlers.get(subscriptionKey) || []).map(
-          (subscriptionHandler) => subscriptionHandler(event),
-        ),
-      );
-
-      if (!networkFanoutSuppression.has(event)) {
-        webSocketEventHub.publishFromNetwork([event]);
-      }
-    });
+    await this.transport.subscribe(topic, (payload) =>
+      this.deliver(
+        bindingKey,
+        subscriptionKey,
+        DomainEventInstance,
+        () => payload,
+      ),
+    );
   }
 
   public async consume(
-    _queueName: string,
+    queueName: string,
     bindingKey: string,
     DomainEventInstance: Constructor<DomainEvent>,
     _exchange: string,
     handler: (event: DomainEvent) => Promise<void>,
   ): Promise<void> {
+    const subscription: Subscription = { handler, queueName };
+
     if (this.networkRegistry) {
       const networks = this.networkRegistry.getAll();
 
@@ -183,7 +229,7 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
               bindingKey,
               network,
               DomainEventInstance,
-              handler,
+              subscription,
             ),
           ),
         );
@@ -194,7 +240,7 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
           bindingKey,
           network,
           DomainEventInstance,
-          handler,
+          subscription,
         );
       });
 
@@ -203,7 +249,11 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
       }
     }
 
-    await this.subscribeToTransport(bindingKey, DomainEventInstance, handler);
+    await this.subscribeToTransport(
+      bindingKey,
+      DomainEventInstance,
+      subscription,
+    );
   }
 
   public async publish(domainEvents: DomainEvent[]): Promise<void> {
