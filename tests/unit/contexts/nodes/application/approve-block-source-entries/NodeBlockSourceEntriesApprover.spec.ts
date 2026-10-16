@@ -97,11 +97,22 @@ describe('NodeBlockSourceEntriesApprover', () => {
     ]);
   });
 
-  it('should refuse approving a version the owner did not review', async () => {
+  it('should refuse approving everything of a version the owner did not review, applying nothing', async () => {
     await expect(
       approver.approve(message({ all: true, version: 3 })),
     ).rejects.toThrow(NodeBlockSourceVersionHasChangedError);
     expect(repository.save).not.toHaveBeenCalled();
+    expect(source.applied().count()).toBe(0);
+  });
+
+  it('should refuse approving chosen entries of a version the owner did not review, applying nothing', async () => {
+    await expect(
+      approver.approve(
+        message({ blockedIdentityIds: [a.valueOf()], version: 5 }),
+      ),
+    ).rejects.toThrow(NodeBlockSourceVersionHasChangedError);
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(source.applied().count()).toBe(0);
   });
 
   it('should require either all entries or chosen ones, never both or neither', () => {

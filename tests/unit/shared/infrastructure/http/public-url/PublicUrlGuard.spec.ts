@@ -80,8 +80,12 @@ describe('PublicUrlGuard', () => {
     'http://[::ffff:0:7f00:1]/',
     'http://[0:0:0:0:0:ffff:7f00:1]/',
     'http://[0:0:0:0:0:0:0:1]/',
+    'http://[2001:1::1]/',
+    'http://[3fff::1]/',
+    'http://[5f00::1]/',
+    'http://[4000::1]/',
   ])(
-    'rejects the documentation, discard, IPv4-compatible or translated IPv6 address %s',
+    'rejects the reserved, documentation, discard, IPv4-compatible, translated or non-global IPv6 address %s',
     (url) => {
       expect(() => new PublicUrlGuard().parse(url)).toThrow(
         UrlIsNotPublicError,
