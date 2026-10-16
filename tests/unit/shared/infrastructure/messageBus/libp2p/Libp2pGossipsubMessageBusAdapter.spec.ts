@@ -1,6 +1,8 @@
+import { IdentityNotFoundError } from '@app/contexts/identities/domain/errors/IdentityNotFoundError';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import Kernel from '@haskou/ddd-kernel';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import Libp2pGossipsubAdapter from '@app/shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter';
 import { networkFanoutSuppression } from '@app/shared/infrastructure/messageBus/NetworkFanoutSuppression';
@@ -32,6 +34,7 @@ describe('Libp2pGossipsubAdapter', () => {
   let transport: MockProxy<PubSubTransport>;
   let networkRegistry: MockProxy<IPFSNetworkRegistry>;
   let adapter: Libp2pGossipsubAdapter;
+  let log: jest.Mock;
 
   const createNetwork = (options: {
     id: string;
@@ -63,6 +66,10 @@ describe('Libp2pGossipsubAdapter', () => {
     networkRegistry = mock<IPFSNetworkRegistry>();
     networkRegistry.getAll.mockReturnValue([]);
     adapter = createAdapter();
+    log = jest.fn();
+    jest
+      .spyOn(Kernel, 'logger', 'get')
+      .mockReturnValue({ error: log } as unknown as typeof Kernel.logger);
   });
 
   afterEach(() => {
@@ -187,16 +194,17 @@ describe('Libp2pGossipsubAdapter', () => {
     expect(otherClient.send).not.toHaveBeenCalled();
   });
 
-  it('should not publish rejected transport payloads to websockets', async () => {
-    const expectedError = new Error('rejected remote event');
-    const handler = jest.fn().mockRejectedValue(expectedError);
+  it('should drop rejected transport payloads with the event and consumer name only', async () => {
+    const handler = jest
+      .fn()
+      .mockRejectedValue(new Error('rejected remote event'));
     const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
     const publishSpy = jest
       .spyOn(webSocketEventHub, 'publish')
       .mockImplementation(() => undefined);
 
     transport.subscribe.mockImplementation(async (_topic, callback) => {
-      await expect(callback(event.decode())).rejects.toBe(expectedError);
+      await expect(callback(event.decode())).resolves.toBeUndefined();
     });
 
     await adapter.consume(
@@ -207,6 +215,11 @@ describe('Libp2pGossipsubAdapter', () => {
       handler,
     );
 
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith(
+      'Dropped pubsub event: event=identities.v1.identity.was_created consumer=queue error=Error',
+    );
     expect(publishSpy).not.toHaveBeenCalled();
 
     publishSpy.mockRestore();
@@ -377,7 +390,7 @@ describe('Libp2pGossipsubAdapter', () => {
     expect(handler.mock.calls[0][0].aggregateId).toBe('aggregate-id');
   });
 
-  it('should refuse cleartext payloads on a private network', async () => {
+  it('should drop cleartext payloads on a private network as a decode failure', async () => {
     const handler = jest.fn();
     const privateNetwork = createNetwork({
       id: 'private-network-id',
@@ -406,8 +419,12 @@ describe('Libp2pGossipsubAdapter', () => {
       subscribedHandler?.(
         JSON.stringify({ encrypted: false, payload: event.decode() }),
       ),
-    ).rejects.toThrow();
+    ).resolves.toBeUndefined();
     expect(handler).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith(
+      'Dropped pubsub event: event=identities.v1.identity.was_created stage=decode error=InvalidPrivateNetworkMessageError',
+    );
   });
 
   it('should publish network payloads to websockets after consumers accept them', async () => {
@@ -441,11 +458,17 @@ describe('Libp2pGossipsubAdapter', () => {
     publishSpy.mockRestore();
   });
 
-  it('should not publish rejected network payloads to websockets', async () => {
-    const expectedError = new Error('rejected remote event');
-    const handler = jest.fn().mockRejectedValue(expectedError);
-    const network = createNetwork({ id: 'network-id' });
-    const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
+  it('should name each rejecting consumer of a private network event without private data', async () => {
+    const identityId = 'f'.repeat(64);
+    const rejectingHandler = jest
+      .fn()
+      .mockRejectedValue(new IdentityNotFoundError(identityId));
+    const acceptingHandler = jest.fn();
+    const network = createNetwork({
+      id: 'private-network-id',
+      isPrivate: true,
+    });
+    const event = new TestDomainEvent(identityId, { name: 'alice' });
     const publishSpy = jest
       .spyOn(webSocketEventHub, 'publish')
       .mockImplementation(() => undefined);
@@ -458,18 +481,36 @@ describe('Libp2pGossipsubAdapter', () => {
     adapter = createAdapter();
 
     await adapter.consume(
-      'queue',
+      'identity-devices.provision_device_authorization',
       TestDomainEvent.EVENT_NAME,
       TestDomainEvent,
       'test-service',
-      handler,
+      rejectingHandler,
+    );
+    await adapter.consume(
+      'identities.register_identity',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      acceptingHandler,
     );
     await adapter.publish([event]);
 
     await expect(
       subscribedHandler?.(network.publishPubSub.mock.calls[0][1]),
-    ).rejects.toBe(expectedError);
+    ).resolves.toBeUndefined();
 
+    const logged = log.mock.calls.flat().join('\n');
+
+    expect(acceptingHandler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith(
+      'Dropped pubsub event: event=identities.v1.identity.was_created consumer=identity-devices.provision_device_authorization error=IdentityNotFoundError',
+    );
+    expect(logged).not.toContain(identityId);
+    expect(logged).not.toContain('private-network-id');
+    expect(logged).not.toContain('alice');
+    expect(logged).not.toContain(network.subscribePubSub.mock.calls[0][0]);
     expect(publishSpy).not.toHaveBeenCalled();
 
     publishSpy.mockRestore();
