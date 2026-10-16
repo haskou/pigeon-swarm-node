@@ -101,6 +101,15 @@ Feature: Put node blocks
     Then response code is equal to 401
     And response body should contain "401020"
 
+  Scenario: A signed body that is not a block list document is a bad request
+    Given I set json body
+      """
+      {"type":"pigeon-node-block-list","unexpected":true}
+      """
+    And I sign a PUT request to "/node/blocks/"
+    When I PUT "/node/blocks/"
+    Then response code is equal to 400
+
   Scenario: A blocked identity is refused on signed reads and realtime tickets until unblocked
     Given I set a node block list body version 1 blocking "other"
     And I sign a PUT request to "/node/blocks/"
