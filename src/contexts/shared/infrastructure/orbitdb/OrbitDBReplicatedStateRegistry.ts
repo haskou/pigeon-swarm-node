@@ -438,18 +438,26 @@ export default class OrbitDBReplicatedStateRegistry {
    * rest; an offer that admits nothing new delivers nothing. A head is keyed
    * by its value too: a copy received again waits once, and a different
    * value under the same key (from any peer) never takes the place of the
-   * pending one.
+   * pending one. A head that is not plain JSON has no digest, so it stays
+   * demoted and is never offered again.
    */
   private scheduleReadmission(
     value: Record<string, unknown>,
     admitted: Record<string, unknown>,
     { key, networkId, onReadmitted }: OrbitDBHeadReadmission,
   ): void {
+    let digest: string;
+
+    try {
+      digest = StateDigest.of(value);
+    } catch {
+      return;
+    }
     let admittedRecords = this.gatedRecordCount(admitted);
 
     this.headReadmissions.schedule({
       isCurrent: () => this.storesByNetworkId.has(networkId),
-      key: key === undefined ? undefined : `${key}:${StateDigest.of(value)}`,
+      key: key === undefined ? undefined : `${key}:${digest}`,
       offer: async (): Promise<boolean> => {
         const offered = await this.admitGatedCollections(value);
 
