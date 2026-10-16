@@ -2,7 +2,7 @@ import { NodeBlockEntriesAreNotListedBySourceError } from '@app/contexts/nodes/d
 import { NodeBlockSourceVersionHasChangedError } from '@app/contexts/nodes/domain/errors/NodeBlockSourceVersionHasChangedError';
 import { NodeBlockEntries } from '@app/contexts/nodes/domain/NodeBlockEntries';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
-import { NodeBlockListPrimitives } from '@app/contexts/nodes/domain/NodeBlockListPrimitives';
+import { SignedNodeBlockList } from '@app/contexts/nodes/domain/SignedNodeBlockList';
 import { NodeBlockListVersion } from '@app/contexts/nodes/domain/value-objects/NodeBlockListVersion';
 import { NodeBlockSourceFetchOutcome } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceFetchOutcome';
 import { NodeBlockSourceOrigin } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceOrigin';
@@ -28,11 +28,11 @@ describe('NodeBlockSource', () => {
   const list = (
     version: number,
     identityIds: IdentityId[],
-  ): NodeBlockListPrimitives =>
+  ): SignedNodeBlockList =>
     new NodeBlockListMother(publisher)
       .withVersion(version)
       .blockingIdentities(identityIds)
-      .primitives();
+      .signed();
 
   const source = (
     autoApply = false,
@@ -76,7 +76,7 @@ describe('NodeBlockSource', () => {
       new NodeBlockListMother(publisher)
         .blockingIdentities([a, b])
         .blockingNodePeers([NODE_PEER_ID_A])
-        .primitives(),
+        .signed(),
       at,
     );
     adopted.approve(
@@ -203,27 +203,30 @@ describe('NodeBlockSource', () => {
     expect(adopted.toPrimitives().list?.version).toBe(2);
   });
 
-  it('should keep the last valid list when another identity signed', async () => {
+  it('should keep the last valid list when another key signed', async () => {
     const adopted = source(true);
     const impostor = new NodeBlockListMother(await KeyPair.generate())
       .withVersion(9)
       .blockingIdentities([b])
-      .primitives();
+      .signed();
 
     adopted.receive(list(1, [a]), at);
 
     expect(adopted.receive(impostor, at)).toEqual(
-      NodeBlockSourceFetchOutcome.WRONG_SIGNER,
+      NodeBlockSourceFetchOutcome.INVALID_SIGNATURE,
     );
     expect(values(adopted.applied())).toEqual([a.valueOf()]);
   });
 
   it('should keep the last valid list when the signature does not verify', () => {
     const adopted = source(true);
-    const forged = {
-      ...new NodeBlockListMother(publisher).blockingIdentities([a]).primitives(),
-      version: 5,
-    };
+    const forged = new SignedNodeBlockList(
+      new NodeBlockListMother(publisher)
+        .blockingIdentities([a])
+        .withVersion(5)
+        .content(),
+      list(1, [a]).getIdentitySignature(),
+    );
 
     adopted.receive(list(1, [a]), at);
 
@@ -233,58 +236,75 @@ describe('NodeBlockSource', () => {
     expect(adopted.toPrimitives().list?.version).toBe(1);
   });
 
-  describe('before validating any entry', () => {
-    const unparseable = (mother: NodeBlockListMother): NodeBlockListPrimitives => {
-      mother.blockedIdentityIds = ['not-an-identity-id'];
+  it('should refuse a list the pinned key signed naming another owner', async () => {
+    const adopted = source(true);
+    const renamed = new NodeBlockListMother(publisher)
+      .naming(await NodeBlockListMother.identityId())
+      .withVersion(2)
+      .signed();
 
-      return mother.primitives();
-    };
+    expect(adopted.receive(renamed, at)).toEqual(
+      NodeBlockSourceFetchOutcome.WRONG_SIGNER,
+    );
+    expect(adopted.toPrimitives().list).toBeNull();
+  });
 
-    it('should refuse another signer', async () => {
-      const impostor = unparseable(
-        new NodeBlockListMother(await KeyPair.generate()).withVersion(9),
-      );
+  describe('before parsing the served bytes', () => {
+    it('should refuse bytes another key signed even when they are not JSON', async () => {
+      const impostor = new NodeBlockListMother(
+        await KeyPair.generate(),
+      ).signing('not json');
 
       expect(source().receive(impostor, at)).toEqual(
-        NodeBlockSourceFetchOutcome.WRONG_SIGNER,
-      );
-    });
-
-    it('should refuse a version that is not newer', () => {
-      const adopted = source(false, new NodeBlockSourceVersionFloor(4));
-
-      expect(
-        adopted.receive(
-          unparseable(new NodeBlockListMother(publisher).withVersion(4)),
-          at,
-        ),
-      ).toEqual(NodeBlockSourceFetchOutcome.NOT_NEWER);
-    });
-
-    it('should refuse a signature that does not verify', () => {
-      const forged = {
-        ...unparseable(new NodeBlockListMother(publisher)),
-        version: 2,
-      };
-
-      expect(source().receive(forged, at)).toEqual(
         NodeBlockSourceFetchOutcome.INVALID_SIGNATURE,
       );
     });
+
+    it('should refuse unsigned bytes even when they hold a valid list', () => {
+      const content = new NodeBlockListMother(publisher)
+        .withVersion(2)
+        .content();
+
+      expect(
+        source().receive(
+          new SignedNodeBlockList(
+            content,
+            list(1, []).getIdentitySignature(),
+          ),
+          at,
+        ),
+      ).toEqual(NodeBlockSourceFetchOutcome.INVALID_SIGNATURE);
+    });
   });
 
-  it('should refuse a document the publisher signed with invalid entries', () => {
-    const adopted = source(true);
-    const mother = new NodeBlockListMother(publisher);
+  it.each([
+    ['entries that are not identity ids', false],
+    ['a form that is not canonical', true],
+  ])(
+    'should refuse a document the publisher signed with %s',
+    (_, pretty) => {
+      const adopted = source(true);
+      const mother = new NodeBlockListMother(publisher);
 
-    mother.blockedIdentityIds = ['not-an-identity-id'];
+      if (!pretty) {
+        mother.blockedIdentityIds = ['not-an-identity-id'];
+      }
 
-    expect(adopted.receive(mother.primitives(), at)).toEqual(
-      NodeBlockSourceFetchOutcome.INVALID_DOCUMENT,
-    );
-    expect(adopted.toPrimitives().list).toBeNull();
-    expect(adopted.toPrimitives().versionFloor).toBe(0);
-  });
+      const content = pretty
+        ? JSON.stringify(
+            JSON.parse(mother.content().toString('utf8')),
+            undefined,
+            2,
+          )
+        : mother.content();
+
+      expect(adopted.receive(mother.signing(content), at)).toEqual(
+        NodeBlockSourceFetchOutcome.INVALID_DOCUMENT,
+      );
+      expect(adopted.toPrimitives().list).toBeNull();
+      expect(adopted.toPrimitives().versionFloor).toBe(0);
+    },
+  );
 
   it('should record fetch diagnostics without changing the list', () => {
     const adopted = source(true);

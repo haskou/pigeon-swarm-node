@@ -35,6 +35,7 @@ import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign
 import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
 import NodeOwnerSettingsResetter from '@app/contexts/nodes/application/reset-owner-settings/NodeOwnerSettingsResetter';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
+import { SignedNodeBlockList } from '@app/contexts/nodes/domain/SignedNodeBlockList';
 import NodeBlockListRepository from '@app/contexts/nodes/domain/repositories/NodeBlockListRepository';
 import NodeBlockSourceRepository from '@app/contexts/nodes/domain/repositories/NodeBlockSourceRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
@@ -62,6 +63,7 @@ import {
   KeyPair,
   PrivateGenesisSignature,
   PrivateKey,
+  Signature,
   SignedHttpRequestBody,
   SignedHttpRequestSignature,
 } from '@haskou/pigeon-swarm-crypto';
@@ -1434,13 +1436,15 @@ export default class Definitions {
       new NodeBlockSourceVersionFloor(0),
     );
 
+    const content = Buffer.from(canonicalize(unsigned)!);
+
     source.receive(
-      {
-        ...unsigned,
-        identitySignature: publisher
-          .sign(`pigeon:node-block-list:v1\n${canonicalize(unsigned)}`)
-          .valueOf(),
-      },
+      new SignedNodeBlockList(
+        content,
+        publisher.sign(
+          Buffer.concat([Buffer.from('pigeon:node-block-list:v1\n'), content]),
+        ),
+      ),
       Timestamp.now(),
     );
     await Kernel.di
@@ -5027,13 +5031,34 @@ export default class Definitions {
     );
   }
 
-  @then('the response is the stored node block list verbatim')
-  public async theResponseIsTheStoredNodeBlockListVerbatim(): Promise<void> {
-    const stored = await Kernel.di
-      .getService<NodeBlockListRepository>(NodeBlockListRepository)
-      .findLocal();
+  @then('the response is the stored node block list as signed canonical bytes')
+  public async theResponseIsTheStoredNodeBlockListAsSignedCanonicalBytes(): Promise<void> {
+    const stored = (
+      await Kernel.di
+        .getService<NodeBlockListRepository>(NodeBlockListRepository)
+        .findLocal()
+    ).toPrimitives();
+    const body = this.response.data;
 
-    expect(this.response.data).to.deep.equal(stored.toPrimitives());
+    if (!stored || !Buffer.isBuffer(body)) {
+      throw new Error('Expected a stored list and a binary response.');
+    }
+
+    const { identitySignature, ...unsigned } = stored;
+
+    expect(this.response.headers['content-type']).to.match(
+      /^application\/json/,
+    );
+    expect(this.response.headers['x-identity-signature']).to.equal(
+      identitySignature,
+    );
+    expect(body.toString('utf8')).to.equal(canonicalize(unsigned));
+    expect(
+      new IdentityId(unsigned.ownerIdentityId).isValidSignature(
+        Buffer.concat([Buffer.from('pigeon:node-block-list:v1\n'), body]),
+        new Signature(identitySignature),
+      ),
+    ).to.equal(true);
   }
 
   @given(
@@ -7101,6 +7126,11 @@ export default class Definitions {
   @when('I GET {string}')
   public async iGET(path: string): Promise<void> {
     this.response = await this.restClient.get(path, this.headers);
+  }
+
+  @when('I GET {string} as binary')
+  public async iGETAsBinary(path: string): Promise<void> {
+    this.response = await this.restClient.getBinary(path, this.headers);
   }
 
   @when('I GET the published IPFS content as binary')

@@ -42,20 +42,24 @@ describe('HttpNodeBlockListDownloader', () => {
     downloader = new HttpNodeBlockListDownloader(getter, limits);
   });
 
-  it('should fetch the published list of the origin within the size and time limits', async () => {
+  it('should return the exact served bytes with the signature of their header', async () => {
     const mother = new NodeBlockListMother(
       await KeyPair.generate(),
     ).withVersion(3);
+    const signed = mother.signed();
 
     getter.get.mockResolvedValue({
-      body: Buffer.from(JSON.stringify(mother.primitives())),
+      body: signed.getContent(),
+      headers: {
+        'x-identity-signature': signed.getIdentitySignature().valueOf(),
+      },
       redirectLocation: undefined,
       statusCode: 200,
     });
 
-    const document = await downloader.download(origin);
+    const downloaded = await downloader.download(origin);
 
-    expect(document).toEqual(mother.primitives());
+    expect(downloaded.isEqual(signed)).toBe(true);
     expect(getter.get).toHaveBeenCalledWith(
       new URL('https://publisher.example/node/blocks/published'),
       expect.objectContaining({
@@ -66,6 +70,43 @@ describe('HttpNodeBlockListDownloader', () => {
       }),
     );
   });
+
+  it('should leave the bytes unread, even when they are not JSON', async () => {
+    const signed = new NodeBlockListMother(await KeyPair.generate()).signing(
+      'not json',
+    );
+
+    getter.get.mockResolvedValue({
+      body: signed.getContent(),
+      headers: {
+        'x-identity-signature': signed.getIdentitySignature().valueOf(),
+      },
+      redirectLocation: undefined,
+      statusCode: 200,
+    });
+
+    expect((await downloader.download(origin)).isEqual(signed)).toBe(true);
+  });
+
+  it.each([
+    ['missing', {}],
+    ['not a signature', { 'x-identity-signature': 'not-a-signature' }],
+    ['repeated', { 'x-identity-signature': ['a', 'b'] }],
+  ])(
+    'should report a signature header that is %s as an invalid signature',
+    async (_, headers) => {
+      getter.get.mockResolvedValue({
+        body: new NodeBlockListMother(await KeyPair.generate()).content(),
+        headers,
+        redirectLocation: undefined,
+        statusCode: 200,
+      });
+
+      expect(await outcomeOf()).toEqual(
+        NodeBlockSourceFetchOutcome.INVALID_SIGNATURE,
+      );
+    },
+  );
 
   it('should report a document above the byte limit as too large', async () => {
     getter.get.mockRejectedValue(new PublicHttpResponseTooLargeError());
@@ -84,6 +125,7 @@ describe('HttpNodeBlockListDownloader', () => {
   it('should not follow a redirect', async () => {
     getter.get.mockResolvedValue({
       body: Buffer.alloc(0),
+      headers: {},
       redirectLocation: new URL('https://elsewhere.example/'),
       statusCode: 302,
     });
@@ -96,38 +138,12 @@ describe('HttpNodeBlockListDownloader', () => {
     getter.get.mockRejectedValueOnce(new PublicHttpFetchError('Timed out.'));
     getter.get.mockResolvedValueOnce({
       body: Buffer.alloc(0),
+      headers: {},
       redirectLocation: undefined,
       statusCode: 404,
     });
 
     expect(await outcomeOf()).toEqual(NodeBlockSourceFetchOutcome.UNREACHABLE);
     expect(await outcomeOf()).toEqual(NodeBlockSourceFetchOutcome.UNREACHABLE);
-  });
-
-  it.each(['not json', '[1]', '"list"', 'null'])(
-    'should report the body %s, which is not a JSON object, as an invalid document',
-    async (body) => {
-      getter.get.mockResolvedValue({
-        body: Buffer.from(body),
-        redirectLocation: undefined,
-        statusCode: 200,
-      });
-
-      expect(await outcomeOf()).toEqual(
-        NodeBlockSourceFetchOutcome.INVALID_DOCUMENT,
-      );
-    },
-  );
-
-  it('should leave validating the entries to the source, after its signer, version and signature checks', async () => {
-    const unvalidated = { blockedIdentityIds: ['not-an-identity-id'] };
-
-    getter.get.mockResolvedValue({
-      body: Buffer.from(JSON.stringify(unvalidated)),
-      redirectLocation: undefined,
-      statusCode: 200,
-    });
-
-    await expect(downloader.download(origin)).resolves.toEqual(unvalidated);
   });
 });

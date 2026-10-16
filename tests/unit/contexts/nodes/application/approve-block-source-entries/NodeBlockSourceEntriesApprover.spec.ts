@@ -61,7 +61,7 @@ describe('NodeBlockSourceEntriesApprover', () => {
         .withVersion(4)
         .blockingIdentities([a, b])
         .blockingNodePeers([NODE_PEER_ID_A])
-        .primitives(),
+        .signed(),
       new Timestamp(1),
     );
     repository = mock<NodeBlockSourceRepository>();

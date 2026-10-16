@@ -34,7 +34,7 @@ describe('LocalNodeBlockSourceRepository', () => {
       new NodeBlockSourceVersionFloor(0),
     );
     source.receive(
-      new NodeBlockListMother(publisher).withVersion(3).primitives(),
+      new NodeBlockListMother(publisher).withVersion(3).signed(),
       new Timestamp(1),
     );
     await repository.save(source);

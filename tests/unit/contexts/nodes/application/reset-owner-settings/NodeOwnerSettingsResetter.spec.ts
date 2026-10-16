@@ -141,7 +141,7 @@ describe('NodeOwnerSettingsResetter', () => {
       new NodeBlockListMother(publisherKeyPair)
         .withVersion(2)
         .blockingIdentities([listed, await NodeBlockListMother.identityId()])
-        .primitives(),
+        .signed(),
       new Timestamp(1),
     );
     source.approve(

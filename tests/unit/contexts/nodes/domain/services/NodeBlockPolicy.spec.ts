@@ -51,7 +51,7 @@ describe('NodeBlockPolicy', () => {
       new NodeBlockSourceVersionFloor(0),
     );
 
-    source.receive(mother.primitives(), Timestamp.now());
+    source.receive(mother.signed(), Timestamp.now());
 
     return source;
   };

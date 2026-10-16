@@ -11,28 +11,28 @@ describe('PublishedNodeBlockListFinder', () => {
   let publications: MockProxy<NodeBlockPublicationRepository>;
   let lists: MockProxy<NodeBlockListRepository>;
   let finder: PublishedNodeBlockListFinder;
+  let mother: NodeBlockListMother;
 
   beforeEach(async () => {
     publications = mock<NodeBlockPublicationRepository>();
     lists = mock<NodeBlockListRepository>();
-    lists.findLocal.mockResolvedValue(
-      new NodeBlockListMother(await KeyPair.generate()).build(),
-    );
+    mother = new NodeBlockListMother(await KeyPair.generate());
+    lists.findLocal.mockResolvedValue(mother.build());
     finder = new PublishedNodeBlockListFinder(publications, lists);
   });
 
   it('should publish nothing until the owner opts in', async () => {
     publications.find.mockResolvedValue(NodeBlockPublication.unpublished());
 
-    expect((await finder.find()).toPrimitives()).toBeUndefined();
+    expect((await finder.find()).toSigned()).toBeUndefined();
     expect(lists.findLocal).not.toHaveBeenCalled();
   });
 
-  it('should return the stored list once the owner published it', async () => {
-    const stored = await lists.findLocal();
-
+  it('should serve the stored list as the bytes its owner signed once published', async () => {
     publications.find.mockResolvedValue(new NodeBlockPublication(true));
 
-    expect((await finder.find()).toPrimitives()).toEqual(stored.toPrimitives());
+    expect((await finder.find()).toSigned()?.isEqual(mother.signed())).toBe(
+      true,
+    );
   });
 });

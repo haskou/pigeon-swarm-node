@@ -28,9 +28,9 @@ Feature: Node block sharing
       {"published": true}
       """
 
-    When I GET "/node/blocks/published"
+    When I GET "/node/blocks/published" as binary
     Then response code is equal to 200
-    And the response is the stored node block list verbatim
+    And the response is the stored node block list as signed canonical bytes
 
     Given I set json body
       """

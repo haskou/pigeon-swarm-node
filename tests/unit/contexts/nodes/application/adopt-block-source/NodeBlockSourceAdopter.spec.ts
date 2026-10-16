@@ -44,13 +44,13 @@ describe('NodeBlockSourceAdopter', () => {
     expect(repository.versionFloor).toHaveBeenCalledWith(owner);
     expect(
       adopted.receive(
-        new NodeBlockListMother(publisher).withVersion(5).primitives(),
+        new NodeBlockListMother(publisher).withVersion(5).signed(),
         new Timestamp(1),
       ),
     ).toEqual(NodeBlockSourceFetchOutcome.NOT_NEWER);
     expect(
       adopted.receive(
-        new NodeBlockListMother(publisher).withVersion(6).primitives(),
+        new NodeBlockListMother(publisher).withVersion(6).signed(),
         new Timestamp(2),
       ),
     ).toEqual(NodeBlockSourceFetchOutcome.ACCEPTED);

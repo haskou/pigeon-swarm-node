@@ -1,6 +1,5 @@
 import NodeBlockSourcesRefresher from '@app/contexts/nodes/application/refresh-block-sources/NodeBlockSourcesRefresher';
 import { NodeBlockSourceFetchFailedError } from '@app/contexts/nodes/domain/errors/NodeBlockSourceFetchFailedError';
-import { NodeBlockListPrimitives } from '@app/contexts/nodes/domain/NodeBlockListPrimitives';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
 import { NodeBlockSourceFetchLimits } from '@app/contexts/nodes/domain/NodeBlockSourceFetchLimits';
 import NodeBlockSourceRepository from '@app/contexts/nodes/domain/repositories/NodeBlockSourceRepository';
@@ -9,6 +8,7 @@ import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy
 import { NodeBlockSourceFetchOutcome } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceFetchOutcome';
 import { NodeBlockSourceOrigin } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceOrigin';
 import { NodeBlockSourceVersionFloor } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceVersionFloor';
+import { SignedNodeBlockList } from '@app/contexts/nodes/domain/SignedNodeBlockList';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Duration, Timestamp } from '@haskou/value-objects';
@@ -28,11 +28,11 @@ describe('NodeBlockSourcesRefresher', () => {
   let refresher: NodeBlockSourcesRefresher;
   let stored: NodeBlockSource;
 
-  const list = (signer: KeyPair, version: number): NodeBlockListPrimitives =>
+  const list = (signer: KeyPair, version: number): SignedNodeBlockList =>
     new NodeBlockListMother(signer)
       .withVersion(version)
       .blockingIdentities([blocked])
-      .primitives();
+      .signed();
 
   const adopted = (autoApply = false): NodeBlockSource =>
     NodeBlockSource.adopt(
@@ -107,7 +107,9 @@ describe('NodeBlockSourcesRefresher', () => {
     await refresher.refresh(now);
 
     expect(saved().toPrimitives().list?.version).toBe(2);
-    expect(saved().toPrimitives().lastFetch?.outcome).toBe('wrong-signer');
+    expect(saved().toPrimitives().lastFetch?.outcome).toBe(
+      'invalid-signature',
+    );
   });
 
   it('should keep the last valid list on a rollback to an older version', async () => {

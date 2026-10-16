@@ -3,6 +3,7 @@ import { InvalidNodeBlockListVersionError } from '@app/contexts/nodes/domain/err
 import { NodeBlockList } from '@app/contexts/nodes/domain/NodeBlockList';
 import { NoNodeBlocks } from '@app/contexts/nodes/domain/NoNodeBlocks';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import canonicalize from 'canonicalize';
 
 import {
   NODE_PEER_ID_A,
@@ -138,5 +139,72 @@ describe('NodeBlockList', () => {
         new NodeBlockListMother(await KeyPair.generate()).build(),
       ),
     ).toBe(true);
+  });
+
+  describe('signed form', () => {
+    it('should be the canonical JSON without the signature, signed by the owner', async () => {
+      const mother = new NodeBlockListMother(owner)
+        .blockingIdentities([await NodeBlockListMother.identityId()])
+        .blockingNodePeers([NODE_PEER_ID_A])
+        .withVersion(4);
+      const signed = mother.build().toSigned();
+
+      expect(signed.getContent().equals(mother.content())).toBe(true);
+      expect(signed.isEqual(mother.signed())).toBe(true);
+      expect(signed.isSignedBy(mother.ownerIdentityId())).toBe(true);
+    });
+
+    it('should open the exact bytes the owner signed', () => {
+      const mother = new NodeBlockListMother(owner)
+        .blockingNodePeers([NODE_PEER_ID_A, NODE_PEER_ID_B])
+        .withVersion(7);
+
+      expect(NodeBlockList.fromSigned(mother.signed()).toPrimitives()).toEqual(
+        mother.primitives(),
+      );
+    });
+
+    it('should refuse signed bytes that are not the canonical form', () => {
+      const mother = new NodeBlockListMother(owner);
+      const parsed = JSON.parse(mother.content().toString('utf8')) as object;
+
+      expect(() =>
+        NodeBlockList.fromSigned(
+          mother.signing(JSON.stringify(parsed, undefined, 2)),
+        ),
+      ).toThrow(InvalidNodeBlockListError);
+      expect(() =>
+        NodeBlockList.fromSigned(
+          mother.signing(
+            JSON.stringify({
+              ...mother.primitives(),
+              identitySignature: undefined,
+              note: 'x',
+            }),
+          ),
+        ),
+      ).toThrow(InvalidNodeBlockListError);
+    });
+
+    it('should refuse signed bytes that carry their own signature field', () => {
+      const mother = new NodeBlockListMother(owner);
+
+      expect(() =>
+        NodeBlockList.fromSigned(
+          mother.signing(canonicalize(mother.primitives()) as string),
+        ),
+      ).toThrow(InvalidNodeBlockListError);
+    });
+
+    it.each(['not json', '[1]', '"list"', 'null', '{}'])(
+      'should refuse the signed bytes %s as an invalid list',
+      (content) => {
+        expect(() =>
+          NodeBlockList.fromSigned(
+            new NodeBlockListMother(owner).signing(content),
+          ),
+        ).toThrow(InvalidNodeBlockListError);
+      },
+    );
   });
 });

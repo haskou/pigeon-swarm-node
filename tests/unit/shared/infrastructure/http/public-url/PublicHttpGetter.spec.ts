@@ -60,9 +60,10 @@ describe('PublicHttpGetter', () => {
     getter = new PublicHttpGetter(guard);
   });
 
-  it('should read a body within the limit from the checked address', async () => {
+  it('should read a body within the limit and its headers from the checked address', async () => {
     handler = (_request, response): void => {
       response.setHeader('content-type', 'application/json');
+      response.setHeader('X-Identity-Signature', 'c2lnbmVk');
       response.end('{"ok":true}');
     };
 
@@ -70,6 +71,7 @@ describe('PublicHttpGetter', () => {
 
     expect(result.statusCode).toBe(200);
     expect(result.body.toString()).toBe('{"ok":true}');
+    expect(result.headers['x-identity-signature']).toBe('c2lnbmVk');
     expect(guard.resolve).toHaveBeenCalledWith(url());
   });
 
