@@ -1,5 +1,6 @@
 import { NodeBlockEntries } from '@app/contexts/nodes/domain/NodeBlockEntries';
 import NodeBlockExceptionsRepository from '@app/contexts/nodes/domain/repositories/NodeBlockExceptionsRepository';
+import { ClearedNodeOwnerSetting } from '@app/contexts/nodes/domain/value-objects/ClearedNodeOwnerSetting';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 
 import { LocalNodeBlockExceptionsDocument } from './documents/LocalNodeBlockExceptionsDocument';
@@ -38,5 +39,20 @@ export default class LocalNodeBlockExceptionsRepository extends NodeBlockExcepti
       LocalNodeBlockExceptionsRepository.LOCAL_ID,
       document,
     );
+  }
+
+  public async resetOwnerSettings(): Promise<ClearedNodeOwnerSetting[]> {
+    const exceptions = await this.find();
+
+    if (exceptions.count() === 0) {
+      return [];
+    }
+
+    await this.database.delete(
+      LocalNodeBlockExceptionsRepository.NAMESPACE,
+      LocalNodeBlockExceptionsRepository.LOCAL_ID,
+    );
+
+    return [ClearedNodeOwnerSetting.blockExceptions(exceptions)];
   }
 }

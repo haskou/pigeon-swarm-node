@@ -1,6 +1,7 @@
 import { NodeBlockSourceNotFoundError } from '@app/contexts/nodes/domain/errors/NodeBlockSourceNotFoundError';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
 import NodeBlockSourceRepository from '@app/contexts/nodes/domain/repositories/NodeBlockSourceRepository';
+import { ClearedNodeOwnerSetting } from '@app/contexts/nodes/domain/value-objects/ClearedNodeOwnerSetting';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 
@@ -71,5 +72,15 @@ export default class LocalNodeBlockSourceRepository extends NodeBlockSourceRepos
       LocalNodeBlockSourceRepository.NAMESPACE,
       ownerIdentityId.valueOf(),
     );
+  }
+
+  public async resetOwnerSettings(): Promise<ClearedNodeOwnerSetting[]> {
+    const sources = await this.findAll();
+
+    for (const source of sources) {
+      await this.delete(source.getOwnerIdentityId());
+    }
+
+    return sources.map((source) => ClearedNodeOwnerSetting.blockSource(source));
   }
 }

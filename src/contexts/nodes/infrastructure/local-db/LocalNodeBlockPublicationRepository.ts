@@ -1,5 +1,6 @@
 import { NodeBlockPublication } from '@app/contexts/nodes/domain/NodeBlockPublication';
 import NodeBlockPublicationRepository from '@app/contexts/nodes/domain/repositories/NodeBlockPublicationRepository';
+import { ClearedNodeOwnerSetting } from '@app/contexts/nodes/domain/value-objects/ClearedNodeOwnerSetting';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 
 import { LocalNodeBlockPublicationDocument } from './documents/LocalNodeBlockPublicationDocument';
@@ -38,5 +39,20 @@ export default class LocalNodeBlockPublicationRepository extends NodeBlockPublic
       LocalNodeBlockPublicationRepository.LOCAL_ID,
       document,
     );
+  }
+
+  public async resetOwnerSettings(): Promise<ClearedNodeOwnerSetting[]> {
+    const publication = await this.find();
+
+    if (!publication.isPublished()) {
+      return [];
+    }
+
+    await this.database.delete(
+      LocalNodeBlockPublicationRepository.NAMESPACE,
+      LocalNodeBlockPublicationRepository.LOCAL_ID,
+    );
+
+    return [ClearedNodeOwnerSetting.blockListPublication()];
   }
 }

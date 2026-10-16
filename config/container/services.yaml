@@ -1916,6 +1916,9 @@ services:
       - '@contexts/nodes/domain/repositories/NodeRepository'
       - '@contexts/nodes/domain/repositories/NodeRegistrationCodeRepository'
       - '@contexts/nodes/domain/repositories/NodeBlockListRepository'
+      - '@contexts/nodes/domain/repositories/NodeBlockPublicationRepository'
+      - '@contexts/nodes/domain/repositories/NodeBlockSourceRepository'
+      - '@contexts/nodes/domain/repositories/NodeBlockExceptionsRepository'
   contexts/nodes/application/revoke-registration-code/NodeRegistrationCodeRevoker:
     class: >-
       /contexts/nodes/application/revoke-registration-code/NodeRegistrationCodeRevoker

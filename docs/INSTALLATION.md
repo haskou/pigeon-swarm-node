@@ -46,7 +46,9 @@ The command refuses, changes nothing and exits with status `1` when the new owne
 
 - the previous node owner;
 - the registration mode, back to `open`, and every registration code;
-- the node's own block list.
+- the node's own block list and whether it is published;
+- every adopted block source, with its pending and approved entries;
+- the local block exceptions.
 
 It keeps the node id, networks, relay configuration, identities, content and keys. It needs no confirmation flag: naming the new owner is the confirmation. Check the id before running it: a valid id whose key nobody holds leaves the node with an owner no one can sign as, and the reset has to be run again.
 
