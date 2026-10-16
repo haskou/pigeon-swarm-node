@@ -40,7 +40,7 @@ The node owner is the identity that claimed the node with `PUT /node/owner`. If 
 1. Pick the new owner: an identity whose key you hold. You need its identity id, the base64 public key without the PEM header and footer. It must differ from the current owner.
 2. Stop the node. The command opens the local database at `PIGEON_LOCAL_DB_PATH`, which a running node keeps locked; while the node runs it prints `Owner reset failed: The local database at <path> is in use by another process, such as a running node.`, changes nothing and exits with status `1`.
 3. From a checkout, run `yarn build` once, then `yarn node:reset-owner <new owner identity id>` with the same `PIGEON_LOCAL_DB_PATH` as the node. In a container built from the `final` target, run it in a one-off container with the node's volumes and environment. With the bundled `docker-compose.yml`, stop the backend and run `docker compose run --rm backend sh -c "yarn build && yarn node:reset-owner <new owner identity id>"`.
-4. Start the node. The new owner already owns it: only that identity can sign owner requests, and a `PUT /node/owner` from any other identity is refused. The node is never unclaimed, so there is no window in which someone else could claim it.
+4. Start the node. The new owner already owns it: only that identity can sign owner requests, and a `PUT /node/owner` from any other identity is refused. The node is never unclaimed, so there is no window in which someone else could claim it. Registration is `open` again, so if the node was `codes` or `closed`, the new owner sets the mode again with `PUT /node/registration` right after the start.
 
 The command refuses, changes nothing and exits with status `1` when the new owner is missing, is not an identity id, or already owns the node, and when no node has run on the local database yet. Otherwise it installs the new owner, clears only the old owner's settings and prints each one it cleared:
 
@@ -48,7 +48,7 @@ The command refuses, changes nothing and exits with status `1` when the new owne
 - the registration mode, back to `open`, and every registration code;
 - the node's own block list.
 
-It keeps the node id, networks, relay configuration, identities, content and keys. It needs no confirmation flag: naming the new owner is the confirmation.
+It keeps the node id, networks, relay configuration, identities, content and keys. It needs no confirmation flag: naming the new owner is the confirmation. Check the id before running it: a valid id whose key nobody holds leaves the node with an owner no one can sign as, and the reset has to be run again.
 
 To start over instead, stop the node and delete the `PIGEON_LOCAL_DB_PATH` folder. The node then starts with a new node id and no owner, networks, relay configuration or other local data, while the IPFS peer key under `IPFS_STORAGE_PATH` survives. Such a node is unclaimed, like a new installation: claim it with `PUT /node/owner` before anyone else can reach the API.
 
