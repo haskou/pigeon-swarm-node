@@ -2,6 +2,8 @@ import { Keychain } from '@app/contexts/keychains/domain/Keychain';
 import KeychainSignatureDomainService from '@app/contexts/keychains/domain/services/KeychainSignatureDomainService';
 import { readFileSync } from 'node:fs';
 
+import { SignatureMother } from '../../../mothers/SignatureMother';
+
 type Vectors = {
   accepted: {
     expected: { signature: string; signingPayload: string };
@@ -66,4 +68,15 @@ describe('Keychain signature vectors', () => {
       false,
     );
   });
+
+  it.each(vectors.accepted)(
+    'rejects $name with its signature re-encoded without changing its bytes',
+    ({ expected, input }) => {
+      expect(
+        service.isValidSignature(
+          keychainOf(input, SignatureMother.reencoded(expected.signature)),
+        ),
+      ).toBe(false);
+    },
+  );
 });

@@ -10,6 +10,8 @@ import {
 } from '@haskou/pigeon-swarm-crypto';
 import { Request } from 'express';
 
+import { SignatureMother } from '../../../mothers/SignatureMother';
+
 describe(DeviceAuthorizationRequestAuthenticator.name, () => {
   async function fixture(deviceInput?: KeyPair) {
     const device = deviceInput ?? (await KeyPair.generate());
@@ -147,6 +149,20 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
 
     expect(() =>
       new DeviceAuthorizationRequestAuthenticator().authenticate(
+        request,
+        authorization,
+      ),
+    ).toThrow('Invalid signed request.');
+  });
+
+  it('rejects a device signature re-encoded without changing its bytes', async () => {
+    const { authorization, headers, request } = await fixture();
+    headers['x-device-signature'] = SignatureMother.reencoded(
+      String(headers['x-device-signature']),
+    );
+
+    expect(() =>
+      new DeviceAuthorizationRequestAuthenticator().authenticateCurrentDevice(
         request,
         authorization,
       ),

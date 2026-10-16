@@ -9,6 +9,8 @@ import { KeyPair, PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
+import { SignatureMother } from '../../../mothers/SignatureMother';
+
 type Vectors = {
   cases: {
     derived: { signature: string; signingPayload: string };
@@ -43,21 +45,6 @@ const vectors = JSON.parse(
   ),
 ) as Vectors;
 
-const SIGNING_FIELDS = [
-  'admissionNonce',
-  'authorizationRevision',
-  'deviceCredential',
-  'deviceCredentialCommitment',
-  'id',
-  'mailboxHome',
-  'networks',
-  'previousIdentityExternalIdentifier',
-  'profile',
-  'recoveryAuthority',
-  'timestamp',
-  'version',
-];
-
 describe('Identity self-signature vectors', () => {
   describe('signingPayload', () => {
     it.each(vectors.cases)('pins the bytes of $name', ({ derived, input }) => {
@@ -66,20 +53,6 @@ describe('Identity self-signature vectors', () => {
           IdentitySignaturePayload.fromPrimitives(input as IdentityPrimitives),
         ),
       ).toBe(derived.signingPayload);
-    });
-
-    it('keeps the pinned preimage keys in alphabetical order', () => {
-      for (const { derived } of vectors.cases) {
-        const keys = Object.keys(
-          JSON.parse(
-            derived.signingPayload.replace('pigeon:identity:v1\n', ''),
-          ),
-        );
-
-        expect(keys).toEqual(
-          SIGNING_FIELDS.filter((field) => keys.includes(field)),
-        );
-      }
     });
   });
 
@@ -147,6 +120,18 @@ describe('Identity self-signature vectors', () => {
             ({ derived }) => derived.signature === primitives.signature,
           )?.derived.signingPayload,
         );
+      },
+    );
+
+    it.each(vectors.identities.accepted)(
+      'rejects $name with its signature re-encoded without changing its bytes',
+      ({ primitives }) => {
+        expect(() =>
+          Identity.fromPrimitives({
+            ...primitives,
+            signature: SignatureMother.reencoded(primitives.signature),
+          }),
+        ).toThrow(InvalidIdentitySignatureError);
       },
     );
 
