@@ -1,3 +1,4 @@
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
 import { Duration, Timestamp } from '@haskou/value-objects';
 
 import { MailboxAppendRateLimitedError } from './errors/MailboxAppendRateLimitedError';
@@ -7,7 +8,6 @@ import { MailboxLastReaderError } from './errors/MailboxLastReaderError';
 import { MailboxLimitReachedError } from './errors/MailboxLimitReachedError';
 import { MailboxReaderLimitReachedError } from './errors/MailboxReaderLimitReachedError';
 import { MailboxReaderNotFoundError } from './errors/MailboxReaderNotFoundError';
-import { MailboxCapability } from './MailboxCapability';
 import { MailboxEnvelope } from './MailboxEnvelope';
 import MailboxPolicy from './MailboxPolicy';
 import { MailboxPrimitives } from './MailboxPrimitives';
@@ -111,7 +111,7 @@ export class Mailbox {
   }
 
   public acceptsPost(token: MailboxPostToken): boolean {
-    return MailboxCapability.matches(
+    return BearerCapability.verify(
       token.valueOf(),
       this.state.postTokenHash.valueOf(),
     );

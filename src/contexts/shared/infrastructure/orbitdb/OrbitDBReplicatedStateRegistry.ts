@@ -3,8 +3,7 @@ import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/Publ
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import Kernel from '@haskou/ddd-kernel';
-import canonicalize from 'canonicalize';
-import { createHash } from 'crypto';
+import { StateDigest } from '@haskou/pigeon-swarm-crypto';
 
 import { CompositeOrbitDBMutationGate } from './CompositeOrbitDBMutationGate';
 import LocalOrbitDBReplicatedHeadCache from './LocalOrbitDBReplicatedHeadCache';
@@ -450,12 +449,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
     this.headReadmissions.schedule({
       isCurrent: () => this.storesByNetworkId.has(networkId),
-      key:
-        key === undefined
-          ? undefined
-          : `${key}:${createHash('sha256')
-              .update(canonicalize(value) ?? '')
-              .digest('hex')}`,
+      key: key === undefined ? undefined : `${key}:${StateDigest.of(value)}`,
       offer: async (): Promise<boolean> => {
         const offered = await this.admitGatedCollections(value);
 

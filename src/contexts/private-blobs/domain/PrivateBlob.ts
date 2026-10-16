@@ -1,6 +1,6 @@
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
 import { Duration, Timestamp } from '@haskou/value-objects';
 
-import { PrivateBlobCapability } from './PrivateBlobCapability';
 import { PrivateBlobPrimitives } from './PrivateBlobPrimitives';
 import { PrivateBlobState } from './PrivateBlobState';
 import { PrivateBlobDownloadToken } from './value-objects/PrivateBlobDownloadToken';
@@ -48,8 +48,8 @@ export class PrivateBlob {
     downloadToken: PrivateBlobDownloadToken;
     uploadToken: PrivateBlobUploadToken;
   } {
-    const upload = PrivateBlobCapability.generate();
-    const download = PrivateBlobCapability.generate();
+    const upload = BearerCapability.generate();
+    const download = BearerCapability.generate();
 
     return {
       blob: new PrivateBlob({
@@ -73,7 +73,7 @@ export class PrivateBlob {
   public acceptsDownload(token: PrivateBlobDownloadToken): boolean {
     return (
       this.isStored() &&
-      PrivateBlobCapability.matches(
+      BearerCapability.verify(
         token.valueOf(),
         this.state.downloadTokenHash.valueOf(),
       )
@@ -81,7 +81,7 @@ export class PrivateBlob {
   }
 
   public acceptsUpload(token: PrivateBlobUploadToken): boolean {
-    return PrivateBlobCapability.matches(
+    return BearerCapability.verify(
       token.valueOf(),
       this.state.uploadTokenHash.valueOf(),
     );

@@ -1,11 +1,11 @@
 import { CallViewModel } from '@app/apps/apis/calls-api/view-model/CallViewModel';
 import CallEventAttestor from '@app/contexts/calls/application/attest-event/CallEventAttestor';
 import { CallEventAttestation } from '@app/contexts/calls/domain/CallEventAttestation';
-import { MailboxCapability } from '@app/contexts/mailboxes/domain/MailboxCapability';
 import { NodeCommunityStateWasAnnounced } from '@app/contexts/nodes/domain/events/NodeCommunityStateWasAnnounced';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Kernel from '@haskou/ddd-kernel';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
 import { randomUUID } from 'node:crypto';
 import { RawData, WebSocket } from 'ws';
 
@@ -498,7 +498,7 @@ export class WebSocketEventHub {
       return;
     }
 
-    const readTokenHash = MailboxCapability.hash(message.readToken);
+    const readTokenHash = BearerCapability.hash(message.readToken);
 
     this.mailboxSubscriptions.add(client, message.mailboxId, readTokenHash);
 

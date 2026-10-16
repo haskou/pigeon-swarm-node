@@ -1,13 +1,12 @@
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
-import { createHash } from 'node:crypto';
+import { StateDigest } from '@haskou/pigeon-swarm-crypto';
 import { isDeepStrictEqual } from 'node:util';
 
 import { OrbitDBDeviceAuthorizationDocument } from './documents/OrbitDBDeviceAuthorizationDocument';
 import { OrbitDBDeviceAuthorizationReplay } from './documents/OrbitDBDeviceAuthorizationReplay';
 import { OrbitDBDeviceAuthorizationSource } from './documents/OrbitDBDeviceAuthorizationSource';
-import OrbitDBDeviceAuthorizationCanonicalizer from './OrbitDBDeviceAuthorizationCanonicalizer';
 import OrbitDBDeviceAuthorizationDocumentFactory from './OrbitDBDeviceAuthorizationDocumentFactory';
 import OrbitDBDeviceAuthorizationDocumentShape from './OrbitDBDeviceAuthorizationDocumentShape';
 import OrbitDBDeviceAuthorizationGenesisMatcher from './OrbitDBDeviceAuthorizationGenesisMatcher';
@@ -19,7 +18,6 @@ export default class OrbitDBDeviceAuthorizationDocumentValidator {
 
   public constructor(
     private readonly policy: DeviceAuthorizationPolicy,
-    private readonly canonicalizer: OrbitDBDeviceAuthorizationCanonicalizer,
     private readonly factory: OrbitDBDeviceAuthorizationDocumentFactory,
     private readonly genesisMatcher: OrbitDBDeviceAuthorizationGenesisMatcher,
     private readonly replayer: OrbitDBDeviceAuthorizationReplayer,
@@ -252,9 +250,7 @@ export default class OrbitDBDeviceAuthorizationDocumentValidator {
         return false;
       }
 
-      fingerprint = createHash('sha256')
-        .update(this.canonicalizer.serialize(value))
-        .digest('base64url');
+      fingerprint = StateDigest.of(value);
     } catch {
       return false;
     }

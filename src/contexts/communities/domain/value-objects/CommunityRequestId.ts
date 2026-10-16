@@ -1,28 +1,24 @@
+import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
 import { ShortId } from '@haskou/value-objects';
-import { createHash } from 'crypto';
+
+import { CommunityRequestType } from './CommunityRequestType';
 
 export class CommunityRequestId extends ShortId {
-  /** First 24 hex chars of sha256(JSON([communityId, type, creator, identity, createdAt])). */
   public static derive(
     communityId: string,
-    type: string,
+    type: CommunityRequestType,
     creatorIdentityId: string,
     identityId: string,
     createdAt: number,
   ): CommunityRequestId {
     return new CommunityRequestId(
-      createHash('sha256')
-        .update(
-          JSON.stringify([
-            communityId,
-            type,
-            creatorIdentityId,
-            identityId,
-            createdAt,
-          ]),
-        )
-        .digest('hex')
-        .slice(0, 24),
+      CommitmentId.communityRequest(
+        communityId,
+        type.isInvitation() ? 'invitation' : 'request',
+        creatorIdentityId,
+        identityId,
+        createdAt,
+      ),
     );
   }
 }

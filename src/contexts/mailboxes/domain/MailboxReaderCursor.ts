@@ -1,4 +1,5 @@
-import { MailboxCapability } from './MailboxCapability';
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
+
 import { MailboxReaderPrimitives } from './MailboxReaderPrimitives';
 import { MailboxCursor } from './value-objects/MailboxCursor';
 import { MailboxReadToken } from './value-objects/MailboxReadToken';
@@ -28,7 +29,7 @@ export class MailboxReaderCursor {
   ) {}
 
   public acceptsRead(token: MailboxReadToken): boolean {
-    return MailboxCapability.matches(
+    return BearerCapability.verify(
       token.valueOf(),
       this.readTokenHash.valueOf(),
     );

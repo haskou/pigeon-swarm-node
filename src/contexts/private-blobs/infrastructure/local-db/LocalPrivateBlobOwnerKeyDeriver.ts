@@ -1,41 +1,41 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
-import { createHmac, randomBytes } from 'crypto';
+import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
 
 import PrivateBlobOwnerKeyDeriver from '../../domain/services/PrivateBlobOwnerKeyDeriver';
 import { PrivateBlobOwnerKey } from '../../domain/value-objects/PrivateBlobOwnerKey';
 
 /**
- * HMAC-SHA256 of the identity id under a random per-node salt. The salt is
- * created on first use and kept in the embedded local database, so owner keys
- * stay stable across restarts and never leave the node.
+ * Keys an identity under a random per-node salt. The salt is created on first
+ * use and kept in the embedded local database, so owner keys stay stable
+ * across restarts and never leave the node.
  */
 export default class LocalPrivateBlobOwnerKeyDeriver extends PrivateBlobOwnerKeyDeriver {
   private static readonly META = 'private_blob_meta';
   private static readonly SALT_ID = 'owner-key-salt';
 
-  private saltPromise?: Promise<Buffer>;
+  private saltPromise?: Promise<string>;
 
   constructor(private readonly database: EmbeddedLocalDatabase) {
     super();
   }
 
-  private async loadOrCreateSalt(): Promise<Buffer> {
+  private async loadOrCreateSalt(): Promise<string> {
     const stored = await this.database.findOne(
       LocalPrivateBlobOwnerKeyDeriver.META,
       LocalPrivateBlobOwnerKeyDeriver.SALT_ID,
     );
 
     if (typeof stored?.salt === 'string') {
-      return Buffer.from(stored.salt, 'hex');
+      return stored.salt;
     }
 
-    const salt = randomBytes(32);
+    const salt = CommitmentId.privateBlobOwnerSalt();
 
     await this.database.save(
       LocalPrivateBlobOwnerKeyDeriver.META,
       LocalPrivateBlobOwnerKeyDeriver.SALT_ID,
-      { salt: salt.toString('hex') },
+      { salt },
     );
 
     return salt;
@@ -45,9 +45,10 @@ export default class LocalPrivateBlobOwnerKeyDeriver extends PrivateBlobOwnerKey
     this.saltPromise ??= this.loadOrCreateSalt();
 
     return new PrivateBlobOwnerKey(
-      createHmac('sha256', await this.saltPromise)
-        .update(identityId.valueOf())
-        .digest('hex'),
+      CommitmentId.privateBlobOwner(
+        await this.saltPromise,
+        identityId.valueOf(),
+      ),
     );
   }
 }
