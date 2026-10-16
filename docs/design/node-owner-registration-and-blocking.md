@@ -340,8 +340,13 @@ signed by the owner identity:
   An unreachable source or an invalid response keeps the last valid version.
   Verifying first means an unauthenticated server never reaches the JSON
   parser with bytes the pinned publisher did not sign.
-  Outbound requests reuse the private-address guard used for link previews
-  (`LinkPreviewUrlGuard.ts`).
+  Floors only rise and no API lowers them. Whoever holds the publisher key
+  can therefore publish a huge version and freeze that publisher on every
+  subscriber; that key could already publish any list, so subscribers that
+  stop trusting it remove the source. Only deleting the local database clears
+  the floors, and with them this rollback protection.
+  Outbound requests go through the shared public-address guard also used for
+  link previews (`src/shared/infrastructure/http/public-url/PublicUrlGuard.ts`).
 
 - **Review queue (default).** Entries a source adds are **pending**: they have
   no effect until this node's owner approves them. The owner approves all
