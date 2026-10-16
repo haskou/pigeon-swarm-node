@@ -21,18 +21,22 @@ Feature: Put node owner
     When I PUT "/node/owner/"
     Then response code is equal to 409
 
-  Scenario: Another identity claims the node after the operator reset the owner
+  Scenario: The operator replaces a lost owner and no one else can claim the node
     Given the local node has no owner and no networks
     And I sign the current node owner request
     When I PUT "/node/owner/"
     Then response code is equal to 200
 
-    Given the node operator reset the node owner while the node was stopped
-    And I set json body
+    Given the node operator replaced the lost node owner with the other identity while the node was stopped
+    When I GET "/node/"
+    Then response code is equal to 200
+    And response body should contain the other identity id
+
+    Given I set json body
       """
       {}
       """
-    And another identity signs the current node owner request
+    And I sign the current node owner request
     When I PUT "/node/owner/"
-    Then response code is equal to 200
+    Then response code is equal to 409
     And the local node is owned by the other identity

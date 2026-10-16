@@ -22,9 +22,10 @@ import { NodeBlockListMother } from '../../unit/mothers/NodeBlockListMother';
 import { NodeMother } from '../../unit/mothers/NodeMother';
 
 /**
- * Runs the compiled `yarn node:reset-owner` command against a claimed node's
- * local database: first while another process holds the database, as a
- * running node does, then on the stopped node. Run `yarn build` first.
+ * Runs the compiled `yarn node:reset-owner <new owner identity id>` command
+ * against a claimed node's local database: without a valid new owner, while
+ * another process holds the database, as a running node does, and then on the
+ * stopped node. Run `yarn build` first.
  */
 
 const REPOSITORY_ROOT = path.resolve(__dirname, '../../..');
@@ -55,7 +56,7 @@ function withDatabase<T>(
   return use(database).finally(() => database.close());
 }
 
-async function seedClaimedNode(databasePath: string): Promise<void> {
+async function seedClaimedNode(databasePath: string): Promise<IdentityId> {
   const ownerKeyPair = await KeyPair.generate();
   const owner = new IdentityId(ownerKeyPair.toPrimitives().publicKey);
   const network = new NetworkMother().withPrivateKey();
@@ -95,6 +96,8 @@ async function seedClaimedNode(databasePath: string): Promise<void> {
     );
     await database.save('identities', 'someone', { name: 'kept' });
   });
+
+  return owner;
 }
 
 function readState(databasePath: string): Promise<StoredState> {
@@ -108,9 +111,10 @@ function readState(databasePath: string): Promise<StoredState> {
 
 function runResetCommand(
   environment: Record<string, string>,
+  args: string[],
 ): Promise<ExitResult> {
   const { promise, reject, resolve } = Promise.withResolvers<ExitResult>();
-  const child = spawn(process.execPath, [ENTRY_POINT], {
+  const child = spawn(process.execPath, [ENTRY_POINT, ...args], {
     cwd: REPOSITORY_ROOT,
     env: {
       ...process.env,
@@ -146,18 +150,70 @@ function runResetCommand(
   return promise;
 }
 
+function describe(result: ExitResult): string {
+  return `exit ${result.code}; stdout:\n${result.stdout}\nstderr:\n${result.stderr}`;
+}
+
+async function refusesWithoutAValidNewOwner(
+  databasePath: string,
+  environment: Record<string, string>,
+  currentOwner: IdentityId,
+): Promise<void> {
+  const before = await readState(databasePath);
+  const runningNode = new Level(databasePath, { valueEncoding: 'json' });
+  const refusals: [string[], string][] = [
+    [
+      [],
+      'Name the new node owner: yarn node:reset-owner <new owner identity id>',
+    ],
+    [
+      ['not-an-identity'],
+      'The new node owner must be an identity id: yarn node:reset-owner <new owner identity id>',
+    ],
+  ];
+
+  // The arguments are checked before the database is opened: even a running
+  // node's lock is not reached.
+  await runningNode.open();
+  try {
+    for (const [args, message] of refusals) {
+      const result = await runResetCommand(environment, args);
+
+      assert.equal(result.timedOut, false, `command hung; ${describe(result)}`);
+      assert.equal(result.code, 1, `expected exit 1; ${describe(result)}`);
+      assert.ok(result.stderr.includes(message), describe(result));
+      assert.doesNotMatch(result.stderr, /in use/, describe(result));
+      assert.doesNotMatch(result.stdout, /New node owner/, describe(result));
+    }
+  } finally {
+    await runningNode.close();
+  }
+
+  const unchanged = await runResetCommand(environment, [
+    currentOwner.valueOf(),
+  ]);
+
+  assert.equal(unchanged.code, 1, `expected exit 1; ${describe(unchanged)}`);
+  assert.ok(
+    unchanged.stderr.includes('The node is already owned by this identity.'),
+    describe(unchanged),
+  );
+  assert.deepEqual(await readState(databasePath), before, 'database changed');
+}
+
 async function failsWhileTheNodeRuns(
   databasePath: string,
   environment: Record<string, string>,
+  newOwner: IdentityId,
 ): Promise<void> {
   const before = await readState(databasePath);
   const runningNode = new Level(databasePath, { valueEncoding: 'json' });
 
   await runningNode.open();
-  const result = await runResetCommand(environment).finally(() =>
-    runningNode.close(),
-  );
-  const context = `exit ${result.code}; stdout:\n${result.stdout}\nstderr:\n${result.stderr}`;
+  const result = await runResetCommand(environment, [
+    newOwner.valueOf(),
+  ]).finally(() => runningNode.close());
+  const context = describe(result);
 
   assert.equal(result.timedOut, false, `command hung; ${context}`);
   assert.equal(result.code, 1, `expected exit status 1; ${context}`);
@@ -177,17 +233,18 @@ async function failsWhileTheNodeRuns(
     /^\s+at /m,
     `stack trace printed; ${context}`,
   );
-  assert.doesNotMatch(result.stdout, /Cleared:/, context);
+  assert.doesNotMatch(result.stdout, /New node owner/, context);
   assert.deepEqual(await readState(databasePath), before, 'database changed');
 }
 
-async function resetsTheStoppedNode(
+async function replacesTheOwnerOfTheStoppedNode(
   databasePath: string,
   environment: Record<string, string>,
+  newOwner: IdentityId,
 ): Promise<void> {
   const before = await readState(databasePath);
-  const result = await runResetCommand(environment);
-  const context = `exit ${result.code}; stdout:\n${result.stdout}\nstderr:\n${result.stderr}`;
+  const result = await runResetCommand(environment, [newOwner.valueOf()]);
+  const context = describe(result);
   const after = await readState(databasePath);
 
   assert.equal(result.timedOut, false, `command hung; ${context}`);
@@ -195,8 +252,9 @@ async function resetsTheStoppedNode(
   assert.ok(
     result.stdout.includes(
       [
+        `New node owner: ${newOwner.valueOf()}`,
         'Cleared:',
-        '  - node owner',
+        '  - previous node owner',
         '  - registration mode codes (now open)',
         '  - 2 registration codes',
         '  - own block list version 4 (1 identity, 0 nodes)',
@@ -204,21 +262,19 @@ async function resetsTheStoppedNode(
     ),
     context,
   );
-  const keptMetadata: Record<string, unknown> = {
-    ...before.metadata,
-    registrationMode: 'open',
-  };
-
-  delete keptMetadata.owner;
   assert.deepEqual(
     after,
     {
       blockList: undefined,
       codes: 0,
       identity: before.identity,
-      metadata: keptMetadata,
+      metadata: {
+        ...before.metadata,
+        owner: newOwner.valueOf(),
+        registrationMode: 'open',
+      },
     },
-    'expected only the owner settings to be cleared',
+    'expected the new owner and only the owner settings to be cleared',
   );
 }
 
@@ -237,12 +293,26 @@ async function main(): Promise<void> {
   };
 
   try {
-    await seedClaimedNode(databasePath);
-    await failsWhileTheNodeRuns(databasePath, environment);
-    console.log('PASS node:reset-owner refuses to run while the node runs');
-    await resetsTheStoppedNode(databasePath, environment);
+    const currentOwner = await seedClaimedNode(databasePath);
+    const newOwner = await NodeBlockListMother.identityId();
+
+    await refusesWithoutAValidNewOwner(
+      databasePath,
+      environment,
+      currentOwner,
+    );
     console.log(
-      'PASS node:reset-owner clears the owner settings of a stopped node',
+      'PASS node:reset-owner refuses a missing, invalid or unchanged new owner',
+    );
+    await failsWhileTheNodeRuns(databasePath, environment, newOwner);
+    console.log('PASS node:reset-owner refuses to run while the node runs');
+    await replacesTheOwnerOfTheStoppedNode(
+      databasePath,
+      environment,
+      newOwner,
+    );
+    console.log(
+      'PASS node:reset-owner installs the new owner and clears the owner settings of a stopped node',
     );
   } finally {
     await rm(workspace, { force: true, recursive: true });

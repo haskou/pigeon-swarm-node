@@ -1620,11 +1620,14 @@ export default class Definitions {
   }
 
   /** Runs what `yarn node:reset-owner` runs, then reloads blocks as a restart does. */
-  @given('the node operator reset the node owner while the node was stopped')
-  public async theNodeOperatorResetTheNodeOwner(): Promise<void> {
+  @given(
+    'the node operator replaced the lost node owner with the other identity while the node was stopped',
+  )
+  public async theNodeOperatorReplacedTheLostNodeOwner(): Promise<void> {
+    await this.ensureOtherIdentityKeyPair();
     await Kernel.di
       .getService<NodeOwnerSettingsResetter>(NodeOwnerSettingsResetter)
-      .reset();
+      .reset(this.otherIdentityId as IdentityId);
     await Kernel.di.getService<NodeBlockPolicy>(NodeBlockPolicy).load();
   }
 

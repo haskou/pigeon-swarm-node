@@ -1,4 +1,7 @@
 import NodeOwnerSettingsResetter from '@app/contexts/nodes/application/reset-owner-settings/NodeOwnerSettingsResetter';
+import { LocalNodeNotFoundError } from '@app/contexts/nodes/domain/errors/LocalNodeNotFoundError';
+import { NodeIsAlreadyOwnedByThisIdentityError } from '@app/contexts/nodes/domain/errors/NodeIsAlreadyOwnedByThisIdentityError';
+import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from '@app/contexts/nodes/domain/errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodeRegistrationCode } from '@app/contexts/nodes/domain/NodeRegistrationCode';
 import { NodeRegistrationCodeLimits } from '@app/contexts/nodes/domain/NodeRegistrationCodeLimits';
@@ -42,6 +45,7 @@ describe('NodeOwnerSettingsResetter', () => {
   let resetter: NodeOwnerSettingsResetter;
   let ownerKeyPair: KeyPair;
   let owner: IdentityId;
+  let newOwner: IdentityId;
   let claimedNode: Node;
 
   const issueCode = (): NodeRegistrationCode => {
@@ -85,6 +89,7 @@ describe('NodeOwnerSettingsResetter', () => {
 
     ownerKeyPair = await KeyPair.generate();
     owner = new IdentityId(ownerKeyPair.toPrimitives().publicKey);
+    newOwner = await NodeBlockListMother.identityId();
     const network = new NetworkMother().withPrivateKey();
 
     claimedNode = await nodeRepository.loadLocalNode();
@@ -119,16 +124,16 @@ describe('NodeOwnerSettingsResetter', () => {
     await fs.rm(databasePath, { force: true, recursive: true });
   });
 
-  it('should clear the owner, the registration mode and codes and the own block list', async () => {
-    const cleared = await resetter.reset();
+  it('should install the new owner and clear the registration mode and codes and the own block list', async () => {
+    const cleared = await resetter.reset(newOwner);
 
     expect(cleared.map((setting) => setting.valueOf())).toEqual([
-      'node owner',
+      'previous node owner',
       'registration mode codes (now open)',
       '2 registration codes',
       'own block list version 4 (1 identity, 0 nodes)',
     ]);
-    expect((await storedMetadata())?.owner).toBeUndefined();
+    expect((await storedMetadata())?.owner).toBe(newOwner.valueOf());
     await expect(
       nodeRepository.loadLocalNodeRegistrationMode(),
     ).resolves.toEqual(NodeRegistrationMode.OPEN);
@@ -141,7 +146,7 @@ describe('NodeOwnerSettingsResetter', () => {
   it('should keep the node id, networks, relay configuration and other local data', async () => {
     const before = claimedNode.toPrimitives();
 
-    await resetter.reset();
+    await resetter.reset(newOwner);
 
     const stored = await storedMetadata();
 
@@ -157,39 +162,68 @@ describe('NodeOwnerSettingsResetter', () => {
   });
 
   it('should not start or change the runtime networks', async () => {
-    await resetter.reset();
+    await resetter.reset(newOwner);
 
     expect(networkRegistry.initialize).not.toHaveBeenCalled();
     expect(networkRegistry.register).not.toHaveBeenCalled();
     expect(networkRegistry.removeNetwork).not.toHaveBeenCalled();
   });
 
-  it('should report nothing when run again', async () => {
-    await resetter.reset();
+  it('should refuse the identity that already owns the node and change nothing', async () => {
+    const before = await storedMetadata();
 
-    await expect(resetter.reset()).resolves.toEqual([]);
+    await expect(resetter.reset(new IdentityId(owner))).rejects.toThrow(
+      NodeIsAlreadyOwnedByThisIdentityError,
+    );
+
+    await expect(storedMetadata()).resolves.toEqual(before);
+    await expect(registrationCodeRepository.findAll()).resolves.toHaveLength(
+      2,
+    );
+    await expect(blockListRepository.findLocal()).resolves.not.toBeInstanceOf(
+      NoNodeBlocks,
+    );
   });
 
-  it('should not create node metadata on a database that has none', async () => {
+  it('should refuse a database no node has run on, and create no node there', async () => {
     await database.delete('node_metadata', 'local');
 
-    await resetter.reset();
+    await expect(resetter.reset(newOwner)).rejects.toThrow(
+      LocalNodeNotFoundError,
+    );
 
     await expect(storedMetadata()).resolves.toBeUndefined();
+    await expect(registrationCodeRepository.findAll()).resolves.toHaveLength(
+      2,
+    );
   });
 
-  it('should let a new identity claim the node after the reset', async () => {
-    const nextOwner = await NodeBlockListMother.identityId();
+  it('should keep the previous owner when clearing a setting fails, so the operator can run it again', async () => {
+    jest
+      .spyOn(blockListRepository, 'resetOwnerSettings')
+      .mockRejectedValueOnce(new Error('disk full'));
 
-    await resetter.reset();
+    await expect(resetter.reset(newOwner)).rejects.toThrow('disk full');
+    expect((await storedMetadata())?.owner).toBe(owner.valueOf());
+
+    const cleared = await resetter.reset(newOwner);
+
+    expect(cleared.map((setting) => setting.valueOf())).toContain(
+      'previous node owner',
+    );
+    expect((await storedMetadata())?.owner).toBe(newOwner.valueOf());
+  });
+
+  it('should never leave the node without an owner another identity could claim', async () => {
+    const other = await NodeBlockListMother.identityId();
+
+    await resetter.reset(newOwner);
 
     const node = await nodeRepository.loadLocalNode();
 
-    node.assignOwner(nextOwner, nextOwner);
-    await nodeRepository.saveLocalNode(node);
-
-    expect((await nodeRepository.loadLocalNode()).isOwnedBy(nextOwner)).toBe(
-      true,
+    expect(() => node.assignOwner(other, other)).toThrow(
+      NodeOwnerCanOnlyBeChangedByCurrentOwnerError,
     );
+    expect(node.isOwnedBy(newOwner)).toBe(true);
   });
 });
