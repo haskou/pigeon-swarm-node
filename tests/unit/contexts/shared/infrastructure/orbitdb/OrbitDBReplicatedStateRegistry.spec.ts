@@ -1506,6 +1506,49 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     }
   });
 
+  it('caches a degraded head that is not plain JSON without offering it again', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+    try {
+      const gate = mock<OrbitDBMutationGate>();
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const firstNetwork = createStores();
+      let nested: Record<string, unknown> = {};
+
+      for (let depth = 0; depth < 70; depth += 1) nested = { nested };
+      gate.governs.mockImplementation(
+        (collection) => collection === 'communityOperations',
+      );
+      gate.governsHead.mockReturnValue(false);
+      gate.accepts.mockResolvedValue(false);
+      registry.addMutationGate(gate);
+      await registry.register('network-1', firstNetwork.stores);
+      firstNetwork.heads.emitUpdate({
+        payload: {
+          key: 'community:community-1',
+          value: {
+            communityOperations: [{ id: 'forged-1' }],
+            id: 'community-1',
+            nested,
+            updatedAt: 10,
+          },
+        },
+      });
+      await jest.advanceTimersByTimeAsync(0);
+
+      await expect(registry.findHead('community:community-1')).resolves.toEqual(
+        expect.objectContaining({ id: 'community-1', updatedAt: 0 }),
+      );
+      gate.accepts.mockClear();
+      await jest.advanceTimersByTimeAsync(2_000 + 10_000);
+
+      expect(gate.accepts).not.toHaveBeenCalled();
+      registry.clear();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   describe('replicated documents the mutation gate rejected', () => {
     const gateOf = (
       collection: string,
