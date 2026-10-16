@@ -52,6 +52,13 @@ node can locate and connect to them; the CID is a discovery key without a block
 payload. The encrypted relay record itself remains on the scoped gossipsub
 topic.
 
+`<scope>` is the base64url of `PrivateNetworkKeys.relayLookupKey` from
+`@haskou/pigeon-swarm-crypto`, which also derives the record key and the
+synthetic DHT key. Records are sealed with
+`PrivateNetworkRelayRecordEnvelope`: the library validates the exact record
+fields, and a node drops an envelope that fails to open. The node still checks
+record expiry and the peer signature before using a relay.
+
 The public relay-record connection has no HTTP or Bitswap block brokers and
 uses ephemeral blockstore/datastore instances. It still provides Kademlia,
 gossipsub and circuit-relay transport. IPFS blocks transferred through a
@@ -247,8 +254,17 @@ Members of a network can observe:
 - Signal acknowledgements (`calls.v1.signal.acknowledged`): the signal id and
   both identity ids.
 
-Public-network events are plain JSON. Private-network events are encrypted with
-a key derived from the network key, so every admitted node can read them.
+Public-network events are plain JSON. Private-network events are sealed with
+`PrivateNetworkPubSubEnvelope` from `@haskou/pigeon-swarm-crypto`: AES-256-GCM
+under a key derived from the network key, with the network id and topic bound
+as associated data, so every admitted node can read them and an envelope moved
+to another network or topic fails to open.
+
+The libp2p swarm PSK (`PrivateNetworkKeys.swarmKey`), the pubsub key and the
+relay lookup and record keys all come from the same library derivations.
+Nodes that derive these values differently cannot connect, read events or find
+relays, so changing a derivation is a coordinated cutover of every node in the
+network with no mixed-version window.
 
 Local WebSocket clients receive a call event only when this node's authorization
 check places them in the call's audience. Lifecycle events are attested by this

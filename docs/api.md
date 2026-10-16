@@ -642,7 +642,9 @@ Implemented:
 - generate local/v1 temporary coturn REST credentials per authenticated identity using
   a configured private `CALLS_TURN_SHARED_SECRET`:
   `username=<expiresAtUnix>:<identityId>` and
-  `credential=base64(hmac-sha1(username, CALLS_TURN_SHARED_SECRET))`
+  `credential=base64(hmac-sha1(username, CALLS_TURN_SHARED_SECRET))`, issued by
+  `TurnRestCredential` from `@haskou/pigeon-swarm-crypto`; the secret is at most
+  4096 UTF-16 code units and an invalid secret fails configuration loading
 - publish signed v1 records on public IPFS networks and v2 records on shared
   private networks when at least one local TURN URL and a private local secret are configured
 - use the node's locally configured TURN URLs when it exposes a calls relay

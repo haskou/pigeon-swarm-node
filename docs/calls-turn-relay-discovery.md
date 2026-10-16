@@ -220,11 +220,14 @@ pool secret before its URLs are returned with local coturn credentials.
 It does not prove that the TURN service is reachable; WebRTC ICE still does the
 final connectivity check.
 
+The canonical payload, pool signature and signature verification are
+implemented by `CallRelayRecordSignature` in `@haskou/pigeon-swarm-crypto`.
 Byte-exact v1 and v2 records (canonical payload, pool signature, signature and
-the fixed relay key) are in
-[`tests/fixtures/call-relay-record-vectors.json`](../tests/fixtures/call-relay-record-vectors.json),
-checked by the `CallRelayRecordVectors` unit spec. Only nodes sign and verify
-these records, so the frontend does not mirror the fixture.
+the fixed relay key) are the library's `vectors/relay-records.json`, checked by
+the node's `CallRelayRecordVectors` unit spec. The node keeps the expiry check,
+the v1-only pool HMAC check and the check that `peerId` derives from
+`publicKey`; v2 records are never treated as pool-authenticated. Only nodes sign
+and verify these records, so the frontend does not use the vectors.
 
 ## Validation
 
@@ -305,6 +308,10 @@ username=<expiresAtUnix>:<identityId>
 credential=base64(hmac-sha1(username, CALLS_TURN_SHARED_SECRET))
 ```
 
+The node issues these credentials with `TurnRestCredential` from
+`@haskou/pigeon-swarm-crypto`; the library's `vectors/turn-credentials.json`
+holds byte-exact usernames, credentials and peer subjects.
+
 For v2, the username is `<expiresAtUnix>:<opaquePeerSubject>`. The subject is
 32 hexadecimal characters derived with the owner's secret and requesting peer;
 it contains no application identity or call ID. The owner signs the username
@@ -324,6 +331,9 @@ for admission, renewal and rotation details.
 
 When the local `CALLS_TURN_SHARED_SECRET` is missing, blank or equals the known
 public secret, local issuance and relay publication are disabled with a warning.
+A configured secret longer than 4096 UTF-16 code units after trimming, or one
+containing a lone surrogate, fails configuration loading with
+`InvalidCallTurnSharedSecretError`.
 Explicit static credentials remain supported for local URLs only. This does not
 disable fetching credentials from eligible private v2 owners. Only local/v1
 issuers and the coturn servers they advertise must share a secret. Independent v2
@@ -385,16 +395,16 @@ over TCP and TURN media over UDP.
 
 ## Configuration
 
-| Variable                             | Purpose                                                                                                                                                                                                      |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `CALLS_TURN_SHARED_SECRET`           | Local coturn REST secret. Required for local issuance and publication; missing or known public values disable those operations with a warning. Not required to fetch credentials from another v2 owner.      |
-| `CALLS_TURN_URLS`                    | Explicit local TURN URLs to advertise and return. Comma-separated.                                                                                                                                           |
-| `CALLS_TURN_TRANSPORTS`              | Transports used when deriving URLs. Defaults to `udp,tcp`.                                                                                                                                                   |
-| `CALLS_TURN_RECORD_TTL_MS`           | Signed record lifetime. Defaults to 10 minutes.                                                                                                                                                              |
-| `CALLS_TURN_PUBLICATION_INTERVAL_MS` | Republish interval. Defaults to half the TTL.                                                                                                                                                                |
-| `CALLS_TURN_DISCOVERY_ENABLED`       | Set to `false` to disable pubsub discovery.                                                                                                                                                                  |
-| `CALLS_TURN_CREDENTIAL_TTL_SECONDS`  | Local/v1 credential lifetime, default 3600 seconds. V2 owner credentials always last ten minutes.                                                                                                            |
-| `CALLS_ICE_TRANSPORT_POLICY`         | Defaults to `all`, allowing direct ICE candidates when an advertised TURN service is unreachable. Configure `relay` explicitly only after verifying coturn reachability from every supported client network. |
+| Variable                             | Purpose                                                                                                                                                                                                                                 |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CALLS_TURN_SHARED_SECRET`           | Local coturn REST secret. Required for local issuance and publication; missing or known public values disable those operations with a warning. At most 4096 UTF-16 code units. Not required to fetch credentials from another v2 owner. |
+| `CALLS_TURN_URLS`                    | Explicit local TURN URLs to advertise and return. Comma-separated.                                                                                                                                                                      |
+| `CALLS_TURN_TRANSPORTS`              | Transports used when deriving URLs. Defaults to `udp,tcp`.                                                                                                                                                                              |
+| `CALLS_TURN_RECORD_TTL_MS`           | Signed record lifetime. Defaults to 10 minutes.                                                                                                                                                                                         |
+| `CALLS_TURN_PUBLICATION_INTERVAL_MS` | Republish interval. Defaults to half the TTL.                                                                                                                                                                                           |
+| `CALLS_TURN_DISCOVERY_ENABLED`       | Set to `false` to disable pubsub discovery.                                                                                                                                                                                             |
+| `CALLS_TURN_CREDENTIAL_TTL_SECONDS`  | Local/v1 credential lifetime, default 3600 seconds. V2 owner credentials always last ten minutes.                                                                                                                                       |
+| `CALLS_ICE_TRANSPORT_POLICY`         | Defaults to `all`, allowing direct ICE candidates when an advertised TURN service is unreachable. Configure `relay` explicitly only after verifying coturn reachability from every supported client network.                            |
 
 When explicit `CALLS_TURN_URLS` are not enough, local TURN URLs are derived from
 `relayConfiguration.publicHost` and `relayConfiguration.callsRelay.port` in

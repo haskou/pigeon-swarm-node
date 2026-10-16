@@ -2,25 +2,12 @@ import {
   libp2pKeyAdapter,
   Libp2pPrivateKeyLike,
 } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
+import { PublicRelayRecordSignature } from '@haskou/pigeon-swarm-crypto';
 
 import { PublicRelayRecord } from './PublicRelayRecord';
 import { PublicRelayRecordPayload } from './PublicRelayRecordPayload';
 
 export class PublicRelayRecordSigner {
-  private static readonly encoder = new TextEncoder();
-
-  private canonicalPayload(payload: PublicRelayRecordPayload): string {
-    return JSON.stringify({
-      expiresAt: payload.expiresAt,
-      issuedAt: payload.issuedAt,
-      multiaddrs: [...payload.multiaddrs].sort(),
-      peerId: payload.peerId,
-      publicKey: payload.publicKey,
-      role: payload.role,
-      version: payload.version,
-    });
-  }
-
   private async buildPayload(
     payload: Omit<PublicRelayRecordPayload, 'publicKey'>,
     privateKey: Libp2pPrivateKeyLike,
@@ -40,9 +27,7 @@ export class PublicRelayRecordSigner {
   ): Promise<PublicRelayRecord> {
     const completePayload = await this.buildPayload(payload, privateKey);
     const signature = await privateKey.sign(
-      PublicRelayRecordSigner.encoder.encode(
-        this.canonicalPayload(completePayload),
-      ),
+      PublicRelayRecordSignature.signingBytes(completePayload),
     );
 
     return new PublicRelayRecord(
@@ -60,17 +45,16 @@ export class PublicRelayRecordSigner {
       return false;
     }
 
+    try {
+      PublicRelayRecordSignature.verify(payload, signature);
+    } catch {
+      return false;
+    }
+
     const publicKey = await libp2pKeyAdapter.publicKeyFromProtobuf(
       Buffer.from(payload.publicKey, 'base64url'),
     );
 
-    if (libp2pKeyAdapter.peerIdFromPublicKey(publicKey) !== payload.peerId) {
-      return false;
-    }
-
-    return publicKey.verify(
-      PublicRelayRecordSigner.encoder.encode(this.canonicalPayload(payload)),
-      Buffer.from(signature, 'base64url'),
-    );
+    return libp2pKeyAdapter.peerIdFromPublicKey(publicKey) === payload.peerId;
   }
 }
