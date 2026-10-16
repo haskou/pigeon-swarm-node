@@ -5,11 +5,12 @@ import ts from 'typescript';
 /**
  * Exception messages and stacks can carry identity ids, record keys,
  * addresses or payload fragments, so a log line may name a caught error only
- * through a function that reduces it to a fixed label.
+ * through a function that reduces it to a fixed label or a flag.
  */
 const ERROR_LABELLING_FUNCTIONS = new Set([
   'errorClassName',
   'getIPNSResolutionSkipReason',
+  'isOrbitDBTransientBlockError',
 ]);
 const ERROR_PARAMETER_TYPES = new Set(['Error', 'unknown']);
 const ERROR_TEXT_PROPERTIES = new Set(['message', 'stack']);

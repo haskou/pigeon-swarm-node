@@ -5,6 +5,7 @@ import {
 } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import { PublicRelayPeerAnnouncer } from '@app/shared/infrastructure/pubsub/libp2p/PublicRelayPeerAnnouncer';
 import Kernel from '@haskou/ddd-kernel';
 
@@ -119,7 +120,7 @@ export default class PublicRelayRuntime {
     this.networkRegistry.onRelaySettingsChanged(() => {
       this.start().catch((error: unknown) => {
         Kernel.logger.warn(
-          `Public relay runtime reload failed: ${String(error)}`,
+          `Public relay runtime reload failed: error=${errorClassName(error)}`,
         );
       });
     });
@@ -241,7 +242,7 @@ export default class PublicRelayRuntime {
       );
     } catch (error: unknown) {
       Kernel.logger.warn(
-        `Public relay record publication failed: ${String(error)}`,
+        `Public relay record publication failed: error=${errorClassName(error)}`,
       );
     }
   }
@@ -289,7 +290,7 @@ export default class PublicRelayRuntime {
       if (!this.state.node) {
         this.start().catch((error: unknown) => {
           Kernel.logger.warn(
-            `Public relay auto-enable failed: ${String(error)}`,
+            `Public relay auto-enable failed: error=${errorClassName(error)}`,
           );
         });
       }

@@ -2,6 +2,7 @@ import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domai
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import Kernel from '@haskou/ddd-kernel';
 import { StateDigest } from '@haskou/pigeon-swarm-crypto';
 
@@ -578,7 +579,7 @@ export default class OrbitDBReplicatedStateRegistry {
     for (const listener of this.documentUpdateListeners.get(storeName) ?? []) {
       void Promise.resolve(listener(document)).catch((error) => {
         Kernel.logger.warn?.(
-          `OrbitDB document projection failed: store=${storeName} error=${String(error)}`,
+          `OrbitDB document projection failed: store=${storeName} error=${errorClassName(error)}`,
         );
       });
     }
@@ -727,7 +728,7 @@ export default class OrbitDBReplicatedStateRegistry {
       } catch (error) {
         Kernel.logger.warn?.(
           `OrbitDB head reconciliation failed: scope=${pending.scope}` +
-            ` error=${String(error)}`,
+            ` error=${errorClassName(error)}`,
         );
 
         continue;
@@ -847,7 +848,7 @@ export default class OrbitDBReplicatedStateRegistry {
     this.pendingSubscriberBootstraps.set(store, pending);
     Kernel.logger.warn?.(
       `OrbitDB document subscriber bootstrap deferred: store=${storeName}` +
-        ` error=${String(error)}` +
+        ` error=${errorClassName(error)}` +
         ' recovery=retry-on-store-head-update',
     );
   }
@@ -885,7 +886,7 @@ export default class OrbitDBReplicatedStateRegistry {
           this.settleSubscriberBootstrap(store);
           Kernel.logger.warn?.(
             `OrbitDB document subscriber bootstrap failed: store=${storeName}` +
-              ` error=${String(error)}`,
+              ` error=${errorClassName(error)}`,
           );
         },
       );
@@ -1493,7 +1494,7 @@ export default class OrbitDBReplicatedStateRegistry {
       return this.headSignature(await store.log?.heads());
     } catch (error) {
       Kernel.logger.warn?.(
-        `OrbitDB current head signature unavailable: error=${String(error)}`,
+        `OrbitDB current head signature unavailable: error=${errorClassName(error)}`,
       );
 
       return undefined;
@@ -1616,7 +1617,7 @@ export default class OrbitDBReplicatedStateRegistry {
       return { heads: heads.length, reconciledHeadSignature, warm };
     } catch (error) {
       Kernel.logger.warn?.(
-        `OrbitDB replicated head cache restore failed: networkId=${networkId} error=${String(error)}`,
+        `OrbitDB replicated head cache restore failed: networkId=${networkId} error=${errorClassName(error)}`,
       );
 
       return { heads: 0, warm: false };
@@ -1649,7 +1650,7 @@ export default class OrbitDBReplicatedStateRegistry {
       return true;
     } catch (error) {
       Kernel.logger.warn?.(
-        `OrbitDB replicated head cache persistence failed: networkId=${networkId} key=${key} error=${String(error)}`,
+        `OrbitDB replicated head cache persistence failed: networkId=${networkId} error=${errorClassName(error)}`,
       );
 
       return false;
@@ -1668,7 +1669,7 @@ export default class OrbitDBReplicatedStateRegistry {
       await this.headCache.markWarm(networkId, reconciledHeadSignature);
     } catch (error) {
       Kernel.logger.warn?.(
-        `OrbitDB replicated head cache warm marker failed: networkId=${networkId} error=${String(error)}`,
+        `OrbitDB replicated head cache warm marker failed: networkId=${networkId} error=${errorClassName(error)}`,
       );
     }
   }
@@ -2500,8 +2501,7 @@ export default class OrbitDBReplicatedStateRegistry {
     ).catch((error) => {
       Kernel.logger.warn?.(
         `OrbitDB replicated document refresh failed: store=${storeName}` +
-          ` id=${this.stringValue(cleanDocument, 'id') ?? 'unknown'}` +
-          ` error=${String(error)}`,
+          ` error=${errorClassName(error)}`,
       );
     });
   }
@@ -2565,7 +2565,7 @@ export default class OrbitDBReplicatedStateRegistry {
   ): void {
     void this.putHead(key, value, networkIds, force).catch((error) => {
       Kernel.logger.warn?.(
-        `OrbitDB replicated head refresh failed: key=${key} error=${String(error)}`,
+        `OrbitDB replicated head refresh failed: error=${errorClassName(error)}`,
       );
     });
   }

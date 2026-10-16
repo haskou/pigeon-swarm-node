@@ -1,3 +1,4 @@
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import { Libp2pPubSubNode } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubNode';
 import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEvent';
 import Kernel from '@haskou/ddd-kernel';
@@ -123,9 +124,7 @@ export class PublicRelayRecordDiscovery {
         return;
       } catch (error: unknown) {
         Kernel.logger.debug(
-          `Public relay record dial failed peerId="${record.peerId}" address="${address}" error="${String(
-            error,
-          )}"`,
+          `Public relay record dial failed peerId="${record.peerId}" address="${address}" error=${errorClassName(error)}`,
         );
       }
     }
@@ -200,7 +199,7 @@ export class PublicRelayRecordDiscovery {
     const listener = (event: PubSubEvent): void => {
       this.handleEvent(node, event).catch((error: unknown) => {
         Kernel.logger.debug(
-          `Public relay record discovery failed: ${String(error)}`,
+          `Public relay record discovery failed: error=${errorClassName(error)}`,
         );
       });
     };

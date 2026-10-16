@@ -1,5 +1,6 @@
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import PubSubTransport from '@app/shared/infrastructure/pubsub/PubSubTransport';
 import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import Kernel from '@haskou/ddd-kernel';
@@ -98,7 +99,7 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
     error: unknown,
   ): void {
     Kernel.logger.error(
-      `Dropped pubsub event: event=${bindingKey} ${cause} error=${error instanceof Error ? error.name : typeof error}`,
+      `Dropped pubsub event: event=${bindingKey} ${cause} error=${errorClassName(error)}`,
     );
   }
 

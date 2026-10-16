@@ -1,6 +1,7 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DiagnosticIdentifierRedactor } from '@app/shared/infrastructure/logs/DiagnosticIdentifierRedactor';
 import { DiagnosticsTrace } from '@app/shared/infrastructure/logs/DiagnosticsTrace';
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import { PublicRelayRecordPrimitives } from '@app/shared/infrastructure/network/relay/PublicRelayRecordPrimitives';
 import { PublicRelayRecordRegistry } from '@app/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
 import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
@@ -190,9 +191,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
           }
         } catch (error: unknown) {
           Kernel.logger.debug(
-            `Private network "${networkName}" failed to connect to ${source} "${address}": ${String(
-              error,
-            )}`,
+            `Private network "${networkName}" failed to connect to ${source} "${address}": error=${errorClassName(error)}`,
           );
         }
       }),
@@ -687,7 +686,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     void this.publishPendingRoutingRecordsNow()
       .catch((error: unknown) => {
         Kernel.logger.debug?.(
-          `IPFS pending DHT record publication failed: ${String(error)}`,
+          `IPFS pending DHT record publication failed: error=${errorClassName(error)}`,
         );
         this.scheduleRoutingPublicationRetry();
       })
@@ -726,9 +725,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       this.queueContentProviderRetry(cid);
 
       Kernel.logger.debug?.(
-        `IPFS provider publication failed for cid="${cid.valueOf()}": ${String(
-          error,
-        )}`,
+        `IPFS provider publication failed: error=${errorClassName(error)}`,
       );
 
       throw error;
@@ -807,7 +804,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     void this.publishPendingContentProvidersNow()
       .catch((error: unknown) => {
         Kernel.logger.debug?.(
-          `IPFS pending provider publication failed: ${String(error)}`,
+          `IPFS pending provider publication failed: error=${errorClassName(error)}`,
         );
       })
       .finally(() => {
@@ -1197,7 +1194,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       return providerAnnounced;
     } catch (error: unknown) {
       Kernel.logger.debug?.(
-        `DHT provider publication skipped for key="${key}": ${String(error)}`,
+        `DHT provider publication skipped: error=${errorClassName(error)}`,
       );
 
       return false;
@@ -1234,7 +1231,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       }
     } catch (error: unknown) {
       Kernel.logger.debug?.(
-        `DHT provider lookup skipped for key="${key}": ${String(error)}`,
+        `DHT provider lookup skipped: error=${errorClassName(error)}`,
       );
     } finally {
       clearTimeout(routingAbort.timeout);
@@ -1310,9 +1307,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       return heliaRuntimeAdapter.getIPNSName(privateKey);
     } catch (error: unknown) {
       Kernel.logger.debug?.(
-        `IPNS record publication skipped name="${heliaRuntimeAdapter.getIPNSName(
-          privateKey,
-        )}" error=${String(error)}`,
+        `IPNS record publication skipped: error=${errorClassName(error)}`,
       );
     } finally {
       clearTimeout(routingAbort.timeout);
@@ -1349,11 +1344,10 @@ export abstract class HeliaIPFS implements IPFSConnection {
       );
     } catch (error: unknown) {
       Kernel.logger.debug?.(
-        `IPNS record not available in public routing yet: name="${heliaRuntimeAdapter.getIPNSName(
-          privateKey,
-        )}" reason="${this.getIPNSResolutionSkipReason(error)}"` +
+        `IPNS record not available in public routing yet:` +
+          ` reason="${this.getIPNSResolutionSkipReason(error)}"` +
           ` publicPeers=${this.getPeers().length}` +
-          ` details=${String(error)}`,
+          ` error=${errorClassName(error)}`,
       );
     } finally {
       clearTimeout(routingAbort.timeout);
@@ -1383,7 +1377,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       handler(new TextDecoder().decode(message.data)).catch(
         (error: unknown) => {
           Kernel.logger.error(
-            `IPFS pubsub handler failed: ${error instanceof Error ? error.name : typeof error}`,
+            `IPFS pubsub handler failed: error=${errorClassName(error)}`,
           );
         },
       );
@@ -1416,7 +1410,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
       void Promise.resolve(listener(peerId)).catch((error: unknown) => {
         Kernel.logger.warn(
-          `IPFS peer connection listener failed: peerId=${peerId} error=${String(error)}`,
+          `IPFS peer connection listener failed: peerId=${peerId} error=${errorClassName(error)}`,
         );
       });
 
@@ -1432,7 +1426,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
       void Promise.resolve(listener(peerId)).catch((error: unknown) => {
         Kernel.logger.warn(
-          `IPFS peer disconnection listener failed: peerId=${peerId} error=${String(error)}`,
+          `IPFS peer disconnection listener failed: peerId=${peerId} error=${errorClassName(error)}`,
         );
       });
     });

@@ -8,6 +8,7 @@ import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/I
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import Kernel from '@haskou/ddd-kernel';
 
 import { LocalNodeMetadataDocument } from './documents/LocalNodeMetadataDocument';
@@ -230,7 +231,7 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
   private syncRuntimeNetworksInBackground(): void {
     void this.syncLatestRuntimeNetworks().catch((error: unknown) => {
       Kernel.logger.warn?.(
-        `Local node runtime network sync failed: error=${String(error)}`,
+        `Local node runtime network sync failed: error=${errorClassName(error)}`,
       );
     });
   }

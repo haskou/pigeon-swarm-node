@@ -1,5 +1,6 @@
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import Kernel from '@haskou/ddd-kernel';
 import path from 'path';
 
@@ -106,7 +107,7 @@ export class OrbitDBPrivateNetworkStores {
         `OrbitDB private network store sync error handled: networkId=${networkId}` +
           ` store=${store}` +
           ` transient=${transient}` +
-          ` error=${String(error)}`,
+          ` error=${errorClassName(error)}`,
       );
     });
   }

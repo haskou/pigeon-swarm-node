@@ -1,6 +1,7 @@
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { Runtime } from '@app/shared/infrastructure/lifecycle/Runtime';
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import Kernel from '@haskou/ddd-kernel';
 
 import { CallRelayConfiguration } from './CallRelayConfiguration';
@@ -75,7 +76,7 @@ export default class CallRelayRuntime implements Runtime {
     } catch (error: unknown) {
       Kernel.logger.warn(
         `Call relay record publication failed: networkId=${network.getId()}` +
-          ` error=${String(error)}`,
+          ` error=${errorClassName(error)}`,
       );
     }
   }
@@ -121,7 +122,7 @@ export default class CallRelayRuntime implements Runtime {
     this.networkRegistry.onRelaySettingsChanged(() => {
       return this.restartPublication().catch((error: unknown) => {
         Kernel.logger.warn(
-          `Call relay publication reload failed: ${String(error)}`,
+          `Call relay publication reload failed: error=${errorClassName(error)}`,
         );
       });
     });
@@ -193,7 +194,7 @@ export default class CallRelayRuntime implements Runtime {
       this.startOnNetwork(network).catch((error: unknown) => {
         Kernel.logger.warn(
           `Call relay discovery startup failed: networkId=${network.getId()}` +
-            ` error=${String(error)}`,
+            ` error=${errorClassName(error)}`,
         );
       }),
     );

@@ -95,7 +95,7 @@ describe('PublicRelayRuntime', () => {
       record,
     );
     expect(logger.warn).toHaveBeenCalledWith(
-      'Public relay record publication failed: Error: pubsub stopped',
+      'Public relay record publication failed: error=Error',
     );
   });
 

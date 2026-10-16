@@ -1,4 +1,5 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { LocalDomainEventPublisher } from '@app/shared/infrastructure/messageBus/LocalDomainEventPublisher';
@@ -16,8 +17,8 @@ import { Message } from './Message';
 import { MessageBusAdapter } from './MessageBusAdapter';
 
 type LocalSubscriptionHandler = {
-  DomainEventInstance: typeof DomainEvent;
   handler: (event: DomainEvent) => Promise<void>;
+  queueName: string;
 };
 
 export default class MessageBus
@@ -124,13 +125,13 @@ export default class MessageBus
   }
 
   private registerLocalHandler(
+    queueName: string,
     bindingKey: string,
-    DomainEventInstance: typeof DomainEvent,
     handler: (event: DomainEvent) => Promise<void>,
   ): void {
     const handlers = this.localSubscriptionHandlers.get(bindingKey) || [];
 
-    handlers.push({ DomainEventInstance, handler });
+    handlers.push({ handler, queueName });
     this.localSubscriptionHandlers.set(bindingKey, handlers);
   }
 
@@ -158,12 +159,12 @@ export default class MessageBus
     try {
       void Promise.resolve(publish()).catch((error: unknown) => {
         Kernel.logger.warn?.(
-          `Domain event publish side effect failed: ${description} error=${String(error)}`,
+          `Domain event publish side effect failed: ${description} error=${errorClassName(error)}`,
         );
       });
     } catch (error: unknown) {
       Kernel.logger.warn?.(
-        `Domain event publish side effect failed: ${description} error=${String(error)}`,
+        `Domain event publish side effect failed: ${description} error=${errorClassName(error)}`,
       );
     }
   }
@@ -173,20 +174,24 @@ export default class MessageBus
       webSocketEventHub.publish(domainEvents);
     } catch (error: unknown) {
       Kernel.logger.warn?.(
-        `Domain event websocket publish failed: error=${String(error)}`,
+        `Domain event websocket publish failed: error=${errorClassName(error)}`,
       );
     }
   }
 
+  /**
+   * Logs only static labels and the error class: exception messages can carry
+   * identity ids and other private data.
+   */
   private async runLocalHandler(
     domainEvent: DomainEvent,
-    handler: (event: DomainEvent) => Promise<void>,
+    { handler, queueName }: LocalSubscriptionHandler,
   ): Promise<void> {
     try {
       await handler(domainEvent);
     } catch (error: unknown) {
       Kernel.logger.warn?.(
-        `Local domain event handler failed: error=${String(error)}`,
+        `Local domain event handler failed: event=${domainEvent.eventName()} consumer=${queueName} error=${errorClassName(error)}`,
       );
     }
   }
@@ -216,8 +221,8 @@ export default class MessageBus
       const handlers =
         this.localSubscriptionHandlers.get(domainEvent.eventName()) || [];
 
-      for (const { handler } of handlers) {
-        await this.runLocalHandler(domainEvent, handler);
+      for (const subscription of handlers) {
+        await this.runLocalHandler(domainEvent, subscription);
       }
     }
   }
@@ -238,7 +243,7 @@ export default class MessageBus
       }
     };
 
-    this.registerLocalHandler(bindingKey, domainEvent, wrappedHandler);
+    this.registerLocalHandler(queueName, bindingKey, wrappedHandler);
 
     await this.adapter.consume(
       queueName,
