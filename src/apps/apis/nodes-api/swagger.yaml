@@ -105,7 +105,7 @@ paths:
       tags:
         - nodes
       summary: Replace the node block list
-      description: Stores a block list signed by the current node owner. Blocked identities get 403 with code 403012 on identity-signed requests; blocked node peer ids cannot connect. The owner is never blocked. X-Signature signs the canonical request with the X-Body-Hash string as its body, so the signature, timestamp, replay, block, owner and single-upload checks all run before any body byte is read. The body is then streamed, reading stops once it exceeds NODE_BLOCK_LIST_MAX_BYTES, and it is parsed only when its bytes hash to X-Body-Hash. There is no entry cap.
+      description: Stores a block list signed by the current node owner. Blocked identities get 403 with code 403012 on identity-signed requests; blocked node peer ids cannot connect. The owner is never blocked. X-Signature signs the canonical request with the X-Body-Hash string as its body, so the signature, timestamp, replay, block, owner and single-upload checks all run before any body byte is read. The body is then streamed, reading stops once it exceeds NODE_BLOCK_LIST_MAX_BYTES or NODE_BLOCK_LIST_BODY_TIMEOUT_MS, and it is parsed only when its bytes hash to X-Body-Hash. There is no entry cap.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -130,6 +130,8 @@ paths:
           description: The signed request is invalid, stale or replayed, X-Body-Hash is malformed, or the body does not hash to X-Body-Hash (code 401020); a signed header is missing (code 401021).
         '403':
           description: The authenticated identity is not the node owner (code 403010).
+        '408':
+          description: The body was not received within NODE_BLOCK_LIST_BODY_TIMEOUT_MS (code 408010).
         '409':
           description: The list is not signed by the current owner, its signature does not verify, or its version is not higher than the stored one.
         '413':

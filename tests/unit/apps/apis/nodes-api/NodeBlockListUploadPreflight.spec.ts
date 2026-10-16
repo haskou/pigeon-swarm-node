@@ -1,6 +1,6 @@
 import { AuthenticatedIdentityIsNotNodeOwnerError } from '@app/apps/apis/nodes-api/errors/AuthenticatedIdentityIsNotNodeOwnerError';
 import { NodeBlockListUploadInProgressError } from '@app/apps/apis/nodes-api/errors/NodeBlockListUploadInProgressError';
-import { NodeBlockListUploadPreflight } from '@app/apps/apis/nodes-api/middlewares/NodeBlockListUploadPreflight';
+import { NodeBlockListUploadPreflight } from '@app/apps/apis/nodes-api/NodeBlockListUploadPreflight';
 import { InvalidSignedRequestError } from '@app/apps/apis/shared/errors/InvalidSignedRequestError';
 import { SignedRequestBodyIsTooLargeError } from '@app/apps/apis/shared/errors/SignedRequestBodyIsTooLargeError';
 import { SignedRequestBodyReadTimeoutError } from '@app/apps/apis/shared/errors/SignedRequestBodyReadTimeoutError';
@@ -25,6 +25,7 @@ type UploadRequest = Request & PassThrough;
 
 const PATH = '/node/blocks/';
 const MAX_BYTES = 1024;
+const UPLOADED = { type: 'pigeon-node-block-list' };
 
 const hashOf = (bytes: Buffer): string =>
   createHash('sha256').update(bytes).digest('hex');
@@ -44,13 +45,17 @@ const response = (): Response & EventEmitter => {
   return created as unknown as Response & EventEmitter;
 };
 
-const nextCall = (): {
-  next: jest.Mock;
-  settled: Promise<unknown>;
-} => {
-  const { promise, resolve } = Promise.withResolvers<unknown>();
-
-  return { next: jest.fn(resolve), settled: promise };
+// The parsed body on success, the thrown error otherwise.
+const outcome = async (
+  preflight: NodeBlockListUploadPreflight,
+  request: UploadRequest,
+  upload: Response,
+): Promise<unknown> => {
+  try {
+    return await preflight.read(request, upload);
+  } catch (error: unknown) {
+    return error;
+  }
 };
 
 describe('NodeBlockListUploadPreflight', () => {
@@ -60,7 +65,7 @@ describe('NodeBlockListUploadPreflight', () => {
   let previousMaxBytes: string | undefined;
 
   const signedUpload = ({
-    body = jsonBytes({ type: 'pigeon-node-block-list' }),
+    body = jsonBytes(UPLOADED),
     declaredBody = body,
     identityId,
     sendsLength = true,
@@ -118,7 +123,6 @@ describe('NodeBlockListUploadPreflight', () => {
     expect(request.readableFlowing).toBeNull();
     expect(request.listenerCount('data')).toBe(0);
     expect(request.readableLength).toBe(body.length);
-    expect(request.body).toBeUndefined();
   };
 
   beforeAll(async () => {
@@ -169,11 +173,9 @@ describe('NodeBlockListUploadPreflight', () => {
       identityId: identityOf(owner),
       signer: stranger,
     });
-    const { next, settled } = nextCall();
-
-    new NodeBlockListUploadPreflight().use(request, response(), next);
-
-    expect(await settled).toBeInstanceOf(InvalidSignedRequestError);
+    expect(
+      await outcome(new NodeBlockListUploadPreflight(), request, response()),
+    ).toBeInstanceOf(InvalidSignedRequestError);
     expectNoBodyByteRead(request, body);
     expect(nodeLoader.loadNode).not.toHaveBeenCalled();
   });
@@ -181,24 +183,18 @@ describe('NodeBlockListUploadPreflight', () => {
   it('should refuse a signed non-owner before reading any body byte', async () => {
     const body = Buffer.alloc(MAX_BYTES * 2, 'x');
     const request = signedUpload({ body, signer: stranger });
-    const { next, settled } = nextCall();
-
-    new NodeBlockListUploadPreflight().use(request, response(), next);
-
-    expect(await settled).toBeInstanceOf(
-      AuthenticatedIdentityIsNotNodeOwnerError,
-    );
+    expect(
+      await outcome(new NodeBlockListUploadPreflight(), request, response()),
+    ).toBeInstanceOf(AuthenticatedIdentityIsNotNodeOwnerError);
     expectNoBodyByteRead(request, body);
   });
 
   it('should refuse a declared oversize body before reading any body byte', async () => {
     const body = Buffer.alloc(MAX_BYTES + 1, 'x');
     const request = signedUpload({ body, signer: owner });
-    const { next, settled } = nextCall();
-
-    new NodeBlockListUploadPreflight().use(request, response(), next);
-
-    expect(await settled).toBeInstanceOf(SignedRequestBodyIsTooLargeError);
+    expect(
+      await outcome(new NodeBlockListUploadPreflight(), request, response()),
+    ).toBeInstanceOf(SignedRequestBodyIsTooLargeError);
     expectNoBodyByteRead(request, body);
   });
 
@@ -208,12 +204,9 @@ describe('NodeBlockListUploadPreflight', () => {
       sendsLength: false,
       signer: owner,
     });
-    const { next, settled } = nextCall();
-
-    new NodeBlockListUploadPreflight().use(request, response(), next);
-
-    expect(await settled).toBeInstanceOf(SignedRequestBodyIsTooLargeError);
-    expect(request.body).toBeUndefined();
+    expect(
+      await outcome(new NodeBlockListUploadPreflight(), request, response()),
+    ).toBeInstanceOf(SignedRequestBodyIsTooLargeError);
   });
 
   it('should refuse a body that does not match the signed hash before parsing it', async () => {
@@ -222,22 +215,16 @@ describe('NodeBlockListUploadPreflight', () => {
       declaredBody: jsonBytes({ type: 'pigeon-node-block-list' }),
       signer: owner,
     });
-    const { next, settled } = nextCall();
-
-    new NodeBlockListUploadPreflight().use(request, response(), next);
-
-    expect(await settled).toBeInstanceOf(InvalidSignedRequestError);
-    expect(request.body).toBeUndefined();
+    expect(
+      await outcome(new NodeBlockListUploadPreflight(), request, response()),
+    ).toBeInstanceOf(InvalidSignedRequestError);
   });
 
   it('should refuse a replayed upload', async () => {
     const preflight = new NodeBlockListUploadPreflight();
     const request = signedUpload({ signer: owner });
     const first = response();
-    const accepted = nextCall();
-
-    preflight.use(request, first, accepted.next);
-    expect(await accepted.settled).toBeUndefined();
+    expect(await outcome(preflight, request, first)).toEqual(UPLOADED);
     first.emit('close');
 
     const replayed = Object.assign(new PassThrough(), {
@@ -245,22 +232,18 @@ describe('NodeBlockListUploadPreflight', () => {
       method: 'PUT',
       path: PATH,
     }) as unknown as UploadRequest;
-    const refused = nextCall();
-    preflight.use(replayed, response(), refused.next);
-
-    expect(await refused.settled).toBeInstanceOf(InvalidSignedRequestError);
+    expect(await outcome(preflight, replayed, response())).toBeInstanceOf(
+      InvalidSignedRequestError,
+    );
   });
 
   it('should hand the parsed body to the route without any parser flag', async () => {
     const document = { type: 'pigeon-node-block-list', version: 1 };
     const request = signedUpload({ body: jsonBytes(document), signer: owner });
     const upload = response();
-    const { next, settled } = nextCall();
-
-    new NodeBlockListUploadPreflight().use(request, upload, next);
-
-    expect(await settled).toBeUndefined();
-    expect(request.body).toEqual(document);
+    expect(
+      await outcome(new NodeBlockListUploadPreflight(), request, upload),
+    ).toEqual(document);
     expect(request).not.toHaveProperty('_body');
     upload.emit('close');
   });
@@ -269,34 +252,28 @@ describe('NodeBlockListUploadPreflight', () => {
     const preflight = new NodeBlockListUploadPreflight();
     const first = signedUpload({ signer: owner });
     const firstResponse = response();
-    const accepted = nextCall();
 
-    preflight.use(first, firstResponse, accepted.next);
-    await accepted.settled;
+    expect(await outcome(preflight, first, firstResponse)).toEqual(UPLOADED);
 
-    const refused = nextCall();
-    preflight.use(signedUpload({ signer: owner }), response(), refused.next);
-
-    expect(await refused.settled).toBeInstanceOf(
-      NodeBlockListUploadInProgressError,
-    );
+    expect(
+      await outcome(preflight, signedUpload({ signer: owner }), response()),
+    ).toBeInstanceOf(NodeBlockListUploadInProgressError);
     firstResponse.emit('close');
   });
 
   it('should accept the next upload once the previous response closes', async () => {
     const preflight = new NodeBlockListUploadPreflight();
     const firstResponse = response();
-    const first = nextCall();
 
-    preflight.use(signedUpload({ signer: owner }), firstResponse, first.next);
-    await first.settled;
+    expect(
+      await outcome(preflight, signedUpload({ signer: owner }), firstResponse),
+    ).toEqual(UPLOADED);
     firstResponse.emit('close');
 
     const secondResponse = response();
-    const second = nextCall();
-    preflight.use(signedUpload({ signer: owner }), secondResponse, second.next);
-
-    expect(await second.settled).toBeUndefined();
+    expect(
+      await outcome(preflight, signedUpload({ signer: owner }), secondResponse),
+    ).toEqual(UPLOADED);
     secondResponse.emit('close');
   });
 
@@ -304,35 +281,27 @@ describe('NodeBlockListUploadPreflight', () => {
     process.env.NODE_BLOCK_LIST_BODY_TIMEOUT_MS = '20';
     const preflight = new NodeBlockListUploadPreflight();
     const stalled = signedUpload({ signer: owner, stalls: true });
-    const timedOut = nextCall();
-
-    preflight.use(stalled, response(), timedOut.next);
-
-    expect(await timedOut.settled).toBeInstanceOf(
+    expect(await outcome(preflight, stalled, response())).toBeInstanceOf(
       SignedRequestBodyReadTimeoutError,
     );
-    expect(stalled.body).toBeUndefined();
 
-    const next = nextCall();
-    preflight.use(signedUpload({ signer: owner }), response(), next.next);
-
-    expect(await next.settled).toBeUndefined();
+    expect(
+      await outcome(preflight, signedUpload({ signer: owner }), response()),
+    ).toEqual(UPLOADED);
   });
 
   it('should free the slot when the client aborts the upload', async () => {
     const preflight = new NodeBlockListUploadPreflight();
     const aborted = signedUpload({ signer: owner, stalls: true });
-    const refused = nextCall();
+    const refused = outcome(preflight, aborted, response());
 
-    preflight.use(aborted, response(), refused.next);
     await setImmediate();
     aborted.destroy();
 
-    expect(await refused.settled).toBeInstanceOf(InvalidSignedRequestError);
+    expect(await refused).toBeInstanceOf(InvalidSignedRequestError);
 
-    const next = nextCall();
-    preflight.use(signedUpload({ signer: owner }), response(), next.next);
-
-    expect(await next.settled).toBeUndefined();
+    expect(
+      await outcome(preflight, signedUpload({ signer: owner }), response()),
+    ).toEqual(UPLOADED);
   });
 });

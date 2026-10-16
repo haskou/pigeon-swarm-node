@@ -11,19 +11,21 @@ import {
   Put,
   Req,
   Res,
-  UseBefore,
 } from 'routing-controllers';
 
 import { PutNodeBlocksBody } from '../bodies/PutNodeBlocksBody';
-import { NodeBlockListUploadPreflight } from '../middlewares/NodeBlockListUploadPreflight';
+import { NodeBlockListUploadPreflight } from '../NodeBlockListUploadPreflight';
 import { NodeBlocksViewModel } from '../view-model/NodeBlocksViewModel';
 
 /**
- * The preflight authenticates the owner and parses the signed body, so this
- * route only validates the parsed document before storing it.
+ * The preflight authenticates the owner before reading the signed body and
+ * returns it parsed, so this route only validates the document before storing
+ * it.
  */
 @JsonController('/node/blocks')
 export class PutNodeBlocksRoute extends Route {
+  private readonly preflight = new NodeBlockListUploadPreflight();
+
   private readonly storer: NodeBlockListStorer =
     this.get<NodeBlockListStorer>(NodeBlockListStorer);
 
@@ -54,12 +56,13 @@ export class PutNodeBlocksRoute extends Route {
   }
 
   @Put('/')
-  @UseBefore(NodeBlockListUploadPreflight)
   public async putBlocks(
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const body = await this.validBody(request.body);
+    const body = await this.validBody(
+      await this.preflight.read(request, response),
+    );
     const blockList = await this.storer.store(
       new NodeBlockListStorerMessage({
         blockedIdentityIds: body.blockedIdentityIds,

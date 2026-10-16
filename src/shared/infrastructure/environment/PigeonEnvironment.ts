@@ -73,6 +73,7 @@ export const pigeonEnvironmentSchema = {
     defaultValue: MAILBOX_RETENTION_DEFAULT_MS,
     type: 'number',
   },
+  NODE_BLOCK_LIST_BODY_TIMEOUT_MS: { defaultValue: 120_000, type: 'number' },
   NODE_BLOCK_LIST_MAX_BYTES: { defaultValue: 64 * 1024 * 1024, type: 'number' },
   NODE_BLOCK_SOURCE_FETCH_INTERVAL_MS: {
     defaultValue: 60 * 60 * 1000,

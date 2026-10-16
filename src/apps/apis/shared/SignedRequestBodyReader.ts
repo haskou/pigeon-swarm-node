@@ -3,15 +3,20 @@ import { Request } from 'express';
 
 import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';
 import { SignedRequestBodyIsTooLargeError } from './errors/SignedRequestBodyIsTooLargeError';
+import { SignedRequestBodyReadTimeoutError } from './errors/SignedRequestBodyReadTimeoutError';
 import { SignedRequestBodyHash } from './SignedRequestBodyHash';
 
 /**
  * Streams a request body whose hash the signature already covers. It stops
- * reading as soon as the body exceeds `maxBytes`, and resolves only when the
- * bytes hash to the declared value, so callers never parse unsigned bytes.
+ * reading as soon as the body exceeds `maxBytes` or takes longer than
+ * `timeoutMs` in total, and resolves only when the bytes hash to the declared
+ * value, so callers never parse unsigned bytes.
  */
 export class SignedRequestBodyReader {
-  public constructor(private readonly maxBytes: number) {}
+  public constructor(
+    private readonly maxBytes: number,
+    private readonly timeoutMs: number,
+  ) {}
 
   public async read(
     request: Request,
@@ -37,6 +42,14 @@ export class SignedRequestBodyReader {
       request.pause();
       outcome();
     };
+
+    const deadline = setTimeout(
+      () =>
+        settle(() =>
+          reject(new SignedRequestBodyReadTimeoutError(this.timeoutMs)),
+        ),
+      this.timeoutMs,
+    );
 
     request.on('data', (chunk: Buffer) => {
       if (settled) {
@@ -68,6 +81,6 @@ export class SignedRequestBodyReader {
       settle(() => reject(new InvalidSignedRequestError())),
     );
 
-    return promise;
+    return promise.finally(() => clearTimeout(deadline));
   }
 }

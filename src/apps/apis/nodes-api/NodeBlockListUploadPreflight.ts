@@ -4,26 +4,22 @@ import { SignedRequestBodyReader } from '@app/apps/apis/shared/SignedRequestBody
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
-import { NextFunction, Request, Response } from 'express';
-import {
-  BadRequestError,
-  ExpressMiddlewareInterface,
-} from 'routing-controllers';
+import { Request, Response } from 'express';
+import { BadRequestError } from 'routing-controllers';
 
-import { AuthenticatedIdentityIsNotNodeOwnerError } from '../errors/AuthenticatedIdentityIsNotNodeOwnerError';
-import { NodeBlockListUploadInProgressError } from '../errors/NodeBlockListUploadInProgressError';
+import { AuthenticatedIdentityIsNotNodeOwnerError } from './errors/AuthenticatedIdentityIsNotNodeOwnerError';
+import { NodeBlockListUploadInProgressError } from './errors/NodeBlockListUploadInProgressError';
 
 /**
  * Authenticates a block list upload before reading its body. The signature
  * covers the declared `X-Body-Hash`, so signature, freshness, replay, block
  * and owner checks all run on headers alone. Only then, holding the single
  * upload slot (a concurrent upload gets 429), the body is streamed up to
- * `NODE_BLOCK_LIST_MAX_BYTES` and parsed once it matches the signed hash.
+ * `NODE_BLOCK_LIST_MAX_BYTES` within `NODE_BLOCK_LIST_BODY_TIMEOUT_MS` and
+ * parsed once it matches the signed hash. A failed, slow or aborted read frees
+ * the slot at once; a successful one holds it until the response closes.
  */
-export class NodeBlockListUploadPreflight
-  extends Route
-  implements ExpressMiddlewareInterface
-{
+export class NodeBlockListUploadPreflight extends Route {
   private static uploadInFlight = false;
 
   private async authenticateOwner(
@@ -42,16 +38,23 @@ export class NodeBlockListUploadPreflight
     return bodyHash;
   }
 
-  /** Holds the single upload slot until the response is closed. */
-  private acquireUploadSlot(response: Response): void {
+  /** Holds the single upload slot; returns its release. */
+  private acquireUploadSlot(response: Response): () => void {
     if (NodeBlockListUploadPreflight.uploadInFlight) {
       throw new NodeBlockListUploadInProgressError();
     }
 
-    response.once('close', () => {
-      NodeBlockListUploadPreflight.uploadInFlight = false;
-    });
     NodeBlockListUploadPreflight.uploadInFlight = true;
+    let held = true;
+    const release = (): void => {
+      if (held) {
+        held = false;
+        NodeBlockListUploadPreflight.uploadInFlight = false;
+      }
+    };
+    response.once('close', release);
+
+    return release;
   }
 
   private parse(bytes: Buffer): unknown {
@@ -62,21 +65,23 @@ export class NodeBlockListUploadPreflight
     }
   }
 
-  private async readSignedBody(
-    request: Request,
-    response: Response,
-  ): Promise<void> {
+  /** Returns the parsed body of an authenticated owner upload. */
+  public async read(request: Request, response: Response): Promise<unknown> {
     const bodyHash = await this.authenticateOwner(request);
+    const environment = pigeonEnvironment();
+    const releaseUploadSlot = this.acquireUploadSlot(response);
 
-    this.acquireUploadSlot(response);
-    request.body = this.parse(
-      await new SignedRequestBodyReader(
-        pigeonEnvironment().NODE_BLOCK_LIST_MAX_BYTES,
-      ).read(request, bodyHash),
-    );
-  }
+    try {
+      return this.parse(
+        await new SignedRequestBodyReader(
+          environment.NODE_BLOCK_LIST_MAX_BYTES,
+          environment.NODE_BLOCK_LIST_BODY_TIMEOUT_MS,
+        ).read(request, bodyHash),
+      );
+    } catch (error: unknown) {
+      releaseUploadSlot();
 
-  public use(request: Request, response: Response, next: NextFunction): void {
-    this.readSignedBody(request, response).then(() => next(), next);
+      throw error;
+    }
   }
 }
