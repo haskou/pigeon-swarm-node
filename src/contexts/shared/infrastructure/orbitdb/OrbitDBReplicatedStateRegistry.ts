@@ -2150,7 +2150,7 @@ export default class OrbitDBReplicatedStateRegistry {
       this.reconcileStoreAfterHeadExchange(
         stores.heads,
         heads,
-        `replicated head cache networkId=${networkId}`,
+        'replicated head cache',
         async (headSignature): Promise<void> =>
           this.reconcileHeadCache(networkId, stores, headSignature),
       ),
