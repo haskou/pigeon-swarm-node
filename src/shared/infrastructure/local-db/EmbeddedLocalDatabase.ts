@@ -3,6 +3,8 @@ import Kernel from '@haskou/ddd-kernel';
 import { Level } from 'level';
 import path from 'path';
 
+import LocalDatabaseIsLockedError from './LocalDatabaseIsLockedError';
+
 export type EmbeddedLocalDatabaseOperation =
   | {
       type: 'put';
@@ -50,13 +52,44 @@ export default class EmbeddedLocalDatabase {
     this.database = EmbeddedLocalDatabase.getDatabase(this.databasePath);
   }
 
+  /** LevelDB holds a lock file while open, so a running node keeps others out. */
+  private async open(): Promise<void> {
+    try {
+      await this.database.open();
+    } catch (error: unknown) {
+      const cause = error instanceof Error ? error.cause : undefined;
+
+      if (
+        typeof cause === 'object' &&
+        cause !== null &&
+        'code' in cause &&
+        cause.code === 'LEVEL_LOCKED'
+      ) {
+        throw new LocalDatabaseIsLockedError(this.databasePath);
+      }
+
+      throw error;
+    }
+  }
+
   private async ensureOpen(): Promise<void> {
     if (this.database.status === 'open') {
       return;
     }
 
     if (this.database.status === 'opening') {
-      await this.database.open();
+      await this.open();
+
+      return;
+    }
+
+    // Closed but still registered: the open failed (for example on the lock)
+    // and may be retried; `close()` unregisters the instance it closes.
+    if (
+      this.database.status === 'closed' &&
+      EmbeddedLocalDatabase.databases.get(this.databasePath) === this.database
+    ) {
+      await this.open();
 
       return;
     }

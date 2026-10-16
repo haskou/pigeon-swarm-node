@@ -35,6 +35,7 @@ import { NodeNetworkAdderMessage } from '@app/contexts/nodes/application/add-net
 import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNetworkAdder';
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
 import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
+import NodeOwnerSettingsResetter from '@app/contexts/nodes/application/reset-owner-settings/NodeOwnerSettingsResetter';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
@@ -1535,6 +1536,30 @@ export default class Definitions {
     await database.delete('node_block_list', 'local');
     await Kernel.di.getService<NodeBlockPolicy>(NodeBlockPolicy).load();
     await this.ipfsDefinition.cleanupRegisteredNetworks();
+  }
+
+  /** Runs what `yarn node:reset-owner` runs, then reloads blocks as a restart does. */
+  @given(
+    'the node operator replaced the lost node owner with the other identity while the node was stopped',
+  )
+  public async theNodeOperatorReplacedTheLostNodeOwner(): Promise<void> {
+    const otherKeyPair = await this.ensureOtherIdentityKeyPair();
+
+    await Kernel.di
+      .getService<NodeOwnerSettingsResetter>(NodeOwnerSettingsResetter)
+      .reset(new IdentityId(otherKeyPair.toPrimitives().publicKey));
+    await Kernel.di.getService<NodeBlockPolicy>(NodeBlockPolicy).load();
+  }
+
+  @then('the local node is owned by the other identity')
+  public async theLocalNodeIsOwnedByTheOtherIdentity(): Promise<void> {
+    const otherIdentityId = this.otherIdentityId;
+    const node = await Kernel.di
+      .getService<NodeLoaderService>(NodeLoaderService)
+      .loadNode();
+
+    expect(otherIdentityId).not.to.equal(undefined);
+    expect(node.isOwnedBy(otherIdentityId as IdentityId)).to.equal(true);
   }
 
   @given('a node peer heartbeat has been received')

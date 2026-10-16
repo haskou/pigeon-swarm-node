@@ -5,6 +5,7 @@ import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import { assert, PrimitiveOf } from '@haskou/value-objects';
 
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from './errors/NodeCannotHaveMoreThanOnePublicNetworkError';
+import { NodeIsAlreadyOwnedByThisIdentityError } from './errors/NodeIsAlreadyOwnedByThisIdentityError';
 import { NodeNetworkNotFoundError } from './errors/NodeNetworkNotFoundError';
 import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from './errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
 import { NodeNetworkWasAdded } from './events/NodeNetworkWasAdded';
@@ -13,6 +14,7 @@ import { NodeRegistrationModeWasChanged } from './events/NodeRegistrationModeWas
 import { NodeRelayConfigurationWasUpdated } from './events/NodeRelayConfigurationWasUpdated';
 import { Network } from './Network';
 import { NodeRelayConfiguration } from './NodeRelayConfiguration';
+import { ClearedNodeOwnerSetting } from './value-objects/ClearedNodeOwnerSetting';
 import { NodeRegistrationMode } from './value-objects/NodeRegistrationMode';
 
 export class Node extends AggregateRoot {
@@ -91,6 +93,35 @@ export class Node extends AggregateRoot {
     }
 
     this.owner = owner;
+  }
+
+  /**
+   * Hands the node to a new owner when the owner key is lost and opens
+   * registration again. The node is never left without an owner, so no other
+   * identity can claim it. The node operator runs it on the host, so it
+   * records no event.
+   */
+  public replaceLostOwner(newOwner: IdentityId): ClearedNodeOwnerSetting[] {
+    assert(
+      !this.isOwnedBy(newOwner),
+      new NodeIsAlreadyOwnedByThisIdentityError(),
+    );
+    const cleared: ClearedNodeOwnerSetting[] = [];
+
+    if (this.owner) {
+      cleared.push(ClearedNodeOwnerSetting.previousOwner());
+    }
+
+    if (!this.registrationMode.isOpen()) {
+      cleared.push(
+        ClearedNodeOwnerSetting.registrationMode(this.registrationMode),
+      );
+    }
+
+    this.owner = newOwner;
+    this.registrationMode = NodeRegistrationMode.OPEN;
+
+    return cleared;
   }
 
   public updateRelayConfiguration(

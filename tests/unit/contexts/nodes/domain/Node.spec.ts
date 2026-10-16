@@ -1,4 +1,5 @@
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from '@app/contexts/nodes/domain/errors/NodeCannotHaveMoreThanOnePublicNetworkError';
+import { NodeIsAlreadyOwnedByThisIdentityError } from '@app/contexts/nodes/domain/errors/NodeIsAlreadyOwnedByThisIdentityError';
 import { NodeNetworkNotFoundError } from '@app/contexts/nodes/domain/errors/NodeNetworkNotFoundError';
 import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from '@app/contexts/nodes/domain/errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
 import { NodeNetworkWasAdded } from '@app/contexts/nodes/domain/events/NodeNetworkWasAdded';
@@ -166,6 +167,77 @@ describe('Node', () => {
       node.assignOwner(owner, owner);
 
       expect(() => node.assignOwner(nextOwner, anotherIdentity)).toThrow(
+        NodeOwnerCanOnlyBeChangedByCurrentOwnerError,
+      );
+    });
+  });
+
+  describe('replaceLostOwner', () => {
+    it('should install the new owner and open registration but keep the rest', () => {
+      const owner = new IdentityMother().id;
+      const newOwner = generateIdentityId();
+      const claimed = new NodeMother()
+        .withNetwork(networkMother.id, networkMother.build())
+        .withOwner(owner)
+        .withRegistrationMode(NodeRegistrationMode.CODES)
+        .build();
+      const before = claimed.toPrimitives();
+
+      const cleared = claimed.replaceLostOwner(newOwner);
+
+      expect(cleared.map((setting) => setting.valueOf())).toEqual([
+        'previous node owner',
+        'registration mode codes (now open)',
+      ]);
+      expect(claimed.isOwnedBy(newOwner)).toBe(true);
+      expect(claimed.isOwnedBy(owner)).toBe(false);
+      expect(claimed.isOpenForRegistration()).toBe(true);
+      expect(claimed.toPrimitives()).toEqual({
+        ...before,
+        owner: newOwner.valueOf(),
+        registrationMode: 'open',
+      });
+    });
+
+    it('should install an owner on a node that has none', () => {
+      const newOwner = generateIdentityId();
+
+      expect(node.replaceLostOwner(newOwner)).toEqual([]);
+      expect(node.isOwnedBy(newOwner)).toBe(true);
+    });
+
+    it('should refuse the identity that already owns the node', () => {
+      const owner = new IdentityMother().id;
+      const claimed = new NodeMother()
+        .withOwner(owner)
+        .withRegistrationMode(NodeRegistrationMode.CLOSED)
+        .build();
+      const before = claimed.toPrimitives();
+
+      expect(() => claimed.replaceLostOwner(new IdentityId(owner.valueOf()))).toThrow(
+        NodeIsAlreadyOwnedByThisIdentityError,
+      );
+      expect(claimed.toPrimitives()).toEqual(before);
+    });
+
+    it('should record no replicated event, the replacement is local to the host', () => {
+      const claimed = new NodeMother()
+        .withOwner(new IdentityMother().id)
+        .withRegistrationMode(NodeRegistrationMode.CLOSED)
+        .build();
+
+      claimed.replaceLostOwner(generateIdentityId());
+
+      expect(claimed.pullDomainEvents()).toEqual([]);
+    });
+
+    it('should refuse another identity claiming the node after the replacement', () => {
+      const newOwner = generateIdentityId();
+      const other = generateIdentityId();
+
+      node.replaceLostOwner(newOwner);
+
+      expect(() => node.assignOwner(other, other)).toThrow(
         NodeOwnerCanOnlyBeChangedByCurrentOwnerError,
       );
     });

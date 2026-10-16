@@ -1,7 +1,9 @@
 import EmbeddedLocalDatabase, {
   EmbeddedLocalDatabaseOperation,
 } from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import LocalDatabaseIsLockedError from '@app/shared/infrastructure/local-db/LocalDatabaseIsLockedError';
 import * as fs from 'fs/promises';
+import { Level } from 'level';
 import os from 'os';
 import path from 'path';
 
@@ -56,18 +58,18 @@ describe('EmbeddedLocalDatabase', () => {
 
     await firstDatabase.commit([
       {
-        type: 'put',
-        namespace: 'records',
-        id: 'first',
         document: { value: 'one' },
+        id: 'first',
+        namespace: 'records',
+        type: 'put',
       },
       {
-        type: 'put',
-        namespace: 'records',
-        id: 'second',
         document: { value: 'two' },
+        id: 'second',
+        namespace: 'records',
+        type: 'put',
       },
-      { type: 'del', namespace: 'records', id: 'removed' },
+      { id: 'removed', namespace: 'records', type: 'del' },
     ]);
 
     await expect(secondDatabase.findOne('records', 'first')).resolves.toEqual({
@@ -86,12 +88,12 @@ describe('EmbeddedLocalDatabase', () => {
   it('rejects duplicate keys before changing the database', async () => {
     const operations: EmbeddedLocalDatabaseOperation[] = [
       {
-        type: 'put',
-        namespace: 'records',
-        id: 'same',
         document: { value: 'one' },
+        id: 'same',
+        namespace: 'records',
+        type: 'put',
       },
-      { type: 'del', namespace: 'records', id: 'same' },
+      { id: 'same', namespace: 'records', type: 'del' },
     ];
 
     await expect(firstDatabase.commit(operations)).rejects.toThrow(
@@ -108,16 +110,16 @@ describe('EmbeddedLocalDatabase', () => {
     await expect(
       firstDatabase.commit([
         {
-          type: 'put',
-          namespace: 'records',
-          id: 'existing',
           document: { value: 'after' },
+          id: 'existing',
+          namespace: 'records',
+          type: 'put',
         },
         {
-          type: 'put',
-          namespace: 'records',
-          id: 'invalid',
           document: { value: BigInt(1) },
+          id: 'invalid',
+          namespace: 'records',
+          type: 'put',
         },
       ]),
     ).rejects.toThrow();
@@ -127,5 +129,58 @@ describe('EmbeddedLocalDatabase', () => {
     await expect(
       secondDatabase.findOne('records', 'invalid'),
     ).resolves.toBeUndefined();
+  });
+
+  describe('when another process holds the database', () => {
+    let lockedPath: string;
+    let runningNode: Level<string, Record<string, unknown>>;
+    let lockedDatabase: EmbeddedLocalDatabase;
+
+    beforeEach(async () => {
+      lockedPath = await fs.mkdtemp(
+        path.join(os.tmpdir(), 'pigeon-locked-local-db-'),
+      );
+      runningNode = new Level(lockedPath, { valueEncoding: 'json' });
+      await runningNode.open();
+      await runningNode.put('nodes:node-1', { name: 'Node 1' });
+      process.env.PIGEON_LOCAL_DB_PATH = lockedPath;
+      lockedDatabase = new EmbeddedLocalDatabase();
+    });
+
+    afterEach(async () => {
+      await lockedDatabase.close();
+      await runningNode.close();
+      await fs.rm(lockedPath, { force: true, recursive: true });
+    });
+
+    it('should explain that the database is in use instead of failing obscurely', async () => {
+      const failure = lockedDatabase.findOne('nodes', 'node-1');
+
+      await expect(failure).rejects.toBeInstanceOf(LocalDatabaseIsLockedError);
+      await expect(failure).rejects.toThrow(
+        `The local database at ${lockedPath} is in use by another process, such as a running node.`,
+      );
+    });
+
+    it('should fail every attempt while the lock is held', async () => {
+      await expect(lockedDatabase.findOne('nodes', 'node-1')).rejects.toThrow(
+        LocalDatabaseIsLockedError,
+      );
+      await expect(
+        lockedDatabase.save('nodes', 'node-2', { name: 'Node 2' }),
+      ).rejects.toThrow(LocalDatabaseIsLockedError);
+    });
+
+    it('should open once the other process has released the database', async () => {
+      await expect(lockedDatabase.findOne('nodes', 'node-1')).rejects.toThrow(
+        LocalDatabaseIsLockedError,
+      );
+
+      await runningNode.close();
+
+      await expect(lockedDatabase.findOne('nodes', 'node-1')).resolves.toEqual({
+        name: 'Node 1',
+      });
+    });
   });
 });

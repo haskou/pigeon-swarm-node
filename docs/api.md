@@ -1543,6 +1543,10 @@ Implemented:
 - change the owner only when the request is signed by the current owner
 - persist owner state in the local embedded database
 - load persisted node state when the API process starts
+- after the node operator ran `yarn node:reset-owner <new owner identity id>`
+  on the stopped node (see
+  [Resetting the Node Owner](INSTALLATION.md#resetting-the-node-owner)), the
+  named identity owns the node and a claim by any other identity is refused
 
 ### Put local node registration mode
 

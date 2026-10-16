@@ -1,7 +1,8 @@
 # Node owner registration control and blocking (optional)
 
 Status: design for issue #384, decisions confirmed by the owner. Built:
-registration control (delivery step 1) and local blocking (slice 2). The
+registration control (delivery step 1), local blocking (slice 2) and the host
+owner reset `yarn node:reset-owner` (slice 4). The
 price-based
 admission model stays the default, and every node stays open unless its owner
 changes that. A node owner gets two optional, local tools:
@@ -72,13 +73,17 @@ There is no key-based recovery protocol. Control of the host is ownership: an
 operator who lost the owner key, or whose key was stolen, resets the owner from
 the host while the node is stopped.
 
-- **Owner reset command.** `yarn node:reset-owner` clears only the owner and the
+- **Owner reset command.** `yarn node:reset-owner <new owner identity id>`
+  hands the node to the identity the operator names and clears only the
   settings of this design: registration mode (back to `open`), registration
   codes, own blocks, adopted sources with their pending and approved entries,
-  local exceptions and the publication setting. Networks, mailboxes, private
-  blobs, the node id and the libp2p peer key stay. The command opens the same
-  local database, whose lock (`level`, `EmbeddedLocalDatabase.ts:3`) makes it
-  fail while the node is running.
+  local exceptions and the publication setting. The new owner is written in the
+  same metadata write that drops the old one, so the node is never unclaimed
+  and no other identity can claim it. The command refuses, before opening the
+  database, a missing or invalid identity id, and refuses the current owner.
+  Networks, mailboxes, private blobs, the node id and the libp2p peer key stay.
+  The command opens the same local database, whose lock (`level`,
+  `EmbeddedLocalDatabase.ts:3`) makes it fail while the node is running.
 - **Full reset.** Delete the local database folder, `PIGEON_LOCAL_DB_PATH`
   (default `<project root>/local_storage`; `EmbeddedLocalDatabase.ts:48-49`).
   This clears the same settings and everything else kept locally: configured
@@ -88,9 +93,9 @@ the host while the node is stopped.
   (`LocalNodeMetadataMapper.ts:23-27`). The libp2p peer key lives under
   `IPFS_STORAGE_PATH` (`IPFSNetworkRegistry.ts:254-299`), so the peer id
   survives unless that folder is deleted too.
-- After either reset the node is unclaimed; the operator claims it again with
+- After a full reset the node is unclaimed; the operator claims it again with
   `PUT /node/owner` (`PutNodeOwnerRoute.ts:32` lets the first signed caller
-  claim an unclaimed node).
+  claim an unclaimed node) before anyone else can reach the API.
 
 ## Registration control
 
@@ -372,7 +377,7 @@ signed by the owner identity:
 | ------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Registration link leaked              | Up to its uses left can create identities until it expires              | Owner revokes the code; blocks identities created with it                          |
 | Owner offline                         | No new codes, blocks or approvals; everything already set keeps working | None needed                                                                        |
-| Owner key lost or stolen              | Settings frozen, or changed by the thief                                | `yarn node:reset-owner`, then claim again                                          |
+| Owner key lost or stolen              | Settings frozen, or changed by the thief                                | `yarn node:reset-owner <new owner identity id>`                                    |
 | Full reset                            | As an owner reset, plus networks, mailboxes and node id gone            | Claim, rejoin networks, restore the settings                                       |
 | Adopted source unreachable            | Last valid version stays in effect                                      | None needed; diagnostics show when it was last fetched                             |
 | Adopted source adds bad entries       | Pending only; with `autoApply`, this node blocks them                   | Do not approve, or add local exceptions, or remove the source; nothing was deleted |
@@ -420,6 +425,7 @@ new variables go to `INSTALLATION.md`.
    write routes.
 3. **Sharing.** Publication, sources, the fetcher with verification, the review
    queue, `autoApply`, local exceptions and diagnostics.
-4. **Owner reset.** `yarn node:reset-owner` and `INSTALLATION.md`.
+4. **Owner reset.** `yarn node:reset-owner <new owner identity id>` and
+   `INSTALLATION.md`.
 5. **UI** (haskou/pigeon-swarm-ui): registration link flow, owner settings,
    newcomer and blocked states.
