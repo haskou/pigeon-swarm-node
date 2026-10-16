@@ -1,9 +1,12 @@
 import { NodeBlockListStorerMessage } from '@app/contexts/nodes/application/store-block-list/messages/NodeBlockListStorerMessage';
 import NodeBlockListStorer from '@app/contexts/nodes/application/store-block-list/NodeBlockListStorer';
+import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
+import { plainToInstance } from 'class-transformer';
+import { validateOrReject } from 'class-validator';
 import { Request, Response } from 'express';
 import {
-  Body,
+  BadRequestError,
   JsonController,
   Put,
   Req,
@@ -14,23 +17,49 @@ import {
 import { PutNodeBlocksBody } from '../bodies/PutNodeBlocksBody';
 import { NodeBlockListUploadPreflight } from '../middlewares/NodeBlockListUploadPreflight';
 import { NodeBlocksViewModel } from '../view-model/NodeBlocksViewModel';
-import { NodeOwnerRouteSupport } from './NodeOwnerRouteSupport';
 
+/**
+ * The preflight authenticates the owner and parses the signed body, so this
+ * route only validates the parsed document before storing it.
+ */
 @JsonController('/node/blocks')
-export class PutNodeBlocksRoute extends NodeOwnerRouteSupport {
+export class PutNodeBlocksRoute extends Route {
   private readonly storer: NodeBlockListStorer =
     this.get<NodeBlockListStorer>(NodeBlockListStorer);
+
+  private async validBody(body: unknown): Promise<PutNodeBlocksBody> {
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+      throw new BadRequestError('Node block list body must be a JSON object.');
+    }
+
+    const document = plainToInstance(PutNodeBlocksBody, body);
+
+    try {
+      await validateOrReject(document, {
+        forbidNonWhitelisted: true,
+        forbidUnknownValues: false,
+        validationError: { target: false, value: false },
+        whitelist: true,
+      });
+    } catch (errors) {
+      throw Object.assign(
+        new BadRequestError(
+          "Invalid body, check 'errors' property for more info.",
+        ),
+        { errors },
+      );
+    }
+
+    return document;
+  }
 
   @Put('/')
   @UseBefore(NodeBlockListUploadPreflight)
   public async putBlocks(
-    @Body({ validate: { forbidNonWhitelisted: true, whitelist: true } })
-    body: PutNodeBlocksBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.assertOwnerCanManageNode(request);
-
+    const body = await this.validBody(request.body);
     const blockList = await this.storer.store(
       new NodeBlockListStorerMessage({
         blockedIdentityIds: body.blockedIdentityIds,
