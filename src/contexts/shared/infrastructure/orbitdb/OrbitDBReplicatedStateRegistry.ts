@@ -383,9 +383,7 @@ export default class OrbitDBReplicatedStateRegistry {
       try {
         if (await gate.acceptsHead(key, value)) admitted.push(key);
       } catch {
-        Kernel.logger.warn?.(
-          `Rejected unauthenticated replicated head: key=${key}`,
-        );
+        Kernel.logger.warn?.('Rejected unauthenticated replicated head');
       }
     }
 
