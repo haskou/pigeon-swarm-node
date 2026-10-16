@@ -13,7 +13,11 @@ import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import { Kernel } from '@haskou/ddd-kernel';
 import { setDefaultTimeout } from '@cucumber/cucumber';
-import { KeyPair, PrivateKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  IdentitySignature,
+  KeyPair,
+  PrivateKey,
+} from '@haskou/pigeon-swarm-crypto';
 import { expect } from 'chai';
 import { after, before, binding, given, then, when } from 'cucumber-tsflow';
 import * as fsSync from 'fs';
@@ -183,7 +187,9 @@ export default class RegisterIdentityWhenPublishedDefinition {
     const candidate = await publisher.publish(
       new IdentityPublishMessage({
         ...signaturePayload,
-        signature: keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
+        signature: keyPair
+          .sign(IdentitySignature.signingContent(signaturePayload))
+          .valueOf(),
       }),
     );
 

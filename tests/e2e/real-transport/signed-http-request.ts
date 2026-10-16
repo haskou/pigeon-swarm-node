@@ -109,7 +109,7 @@ function assertVectorsReproduce(): void {
 
     assert.equal(content, vector.derived.signingContent, vector.name);
     assert.deepEqual(
-      JSON.parse(content),
+      JSON.parse(content.slice(content.indexOf('\n') + 1)),
       vector.derived.canonicalPayload,
       `${vector.name} canonical payload`,
     );

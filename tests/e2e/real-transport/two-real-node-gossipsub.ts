@@ -5,6 +5,8 @@ import { ConversationOperationAction } from '@app/contexts/conversations/domain/
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import {
+  IdentitySignature,
+  KeychainSignature,
   KeyPair,
   SignedHttpRequestBody,
   SignedHttpRequestSignature,
@@ -470,7 +472,9 @@ async function publishIdentity(
   };
   const body = {
     ...signaturePayload,
-    signature: keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
+    signature: keyPair
+      .sign(IdentitySignature.signingContent(signaturePayload))
+      .valueOf(),
   };
   const response = await request<IdentityResponse>(
     node,
@@ -520,7 +524,7 @@ async function updateIdentity(
   const body = {
     ...signaturePayload,
     signature: identity.keyPair
-      .sign(JSON.stringify(signaturePayload))
+      .sign(IdentitySignature.signingContent(signaturePayload))
       .valueOf(),
   };
   const response = await request<IdentityResponse>(
@@ -568,7 +572,7 @@ async function publishKeychain(
   const body = {
     ...bodyWithoutSignature,
     signature: identity.keyPair
-      .sign(JSON.stringify(signaturePayload))
+      .sign(KeychainSignature.signingContent(signaturePayload))
       .valueOf(),
   };
   const response = await request<KeychainResponse>(
