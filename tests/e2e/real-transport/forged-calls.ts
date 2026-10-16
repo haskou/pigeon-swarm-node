@@ -32,7 +32,11 @@ import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { orbitDBRuntimeAdapter } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBRuntimeAdapter';
 import Kernel from '@haskou/ddd-kernel';
-import { KeyPair, PrivateKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  BearerCapability,
+  KeyPair,
+  PrivateKey,
+} from '@haskou/pigeon-swarm-crypto';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { mkdtemp } from 'node:fs/promises';
@@ -291,9 +295,9 @@ async function main(): Promise<void> {
 
   stage = 'signed group-capability call start replicates';
   const scope = {
-    capabilityHash: CallCapabilityHash.of(
+    capabilityHash: BearerCapability.hash(
       'Zm9yLXRoZS1ncm91cC1jYWxsLW9ubHktMzItYnl0ZXM',
-    ).valueOf(),
+    ),
     type: 'group_capability',
   } as const;
   const startedAt = Date.now();

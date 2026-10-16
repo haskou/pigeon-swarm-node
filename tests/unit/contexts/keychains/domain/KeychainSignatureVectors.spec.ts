@@ -1,5 +1,6 @@
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
 import KeychainSignatureDomainService from '@app/contexts/keychains/domain/services/KeychainSignatureDomainService';
+import { InvalidSignatureError } from '@haskou/pigeon-swarm-crypto';
 import { readFileSync } from 'node:fs';
 
 import { SignatureMother } from '../../../mothers/SignatureMother';
@@ -72,11 +73,9 @@ describe('Keychain signature vectors', () => {
   it.each(vectors.accepted)(
     'rejects $name with its signature re-encoded without changing its bytes',
     ({ expected, input }) => {
-      expect(
-        service.isValidSignature(
-          keychainOf(input, SignatureMother.reencoded(expected.signature)),
-        ),
-      ).toBe(false);
+      expect(() =>
+        keychainOf(input, SignatureMother.reencoded(expected.signature)),
+      ).toThrow(InvalidSignatureError);
     },
   );
 });

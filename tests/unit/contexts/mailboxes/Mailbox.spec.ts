@@ -1,6 +1,5 @@
 import { MailboxCursorInvalidError } from '@app/contexts/mailboxes/domain/errors/MailboxCursorInvalidError';
 import { Mailbox } from '@app/contexts/mailboxes/domain/Mailbox';
-import { MailboxCapability } from '@app/contexts/mailboxes/domain/MailboxCapability';
 import { MailboxLimits } from '@app/contexts/mailboxes/domain/MailboxLimits';
 import MailboxPolicy from '@app/contexts/mailboxes/domain/MailboxPolicy';
 import { MailboxCursor } from '@app/contexts/mailboxes/domain/value-objects/MailboxCursor';
@@ -8,12 +7,13 @@ import { MailboxId } from '@app/contexts/mailboxes/domain/value-objects/MailboxI
 import { MailboxPostTokenHash } from '@app/contexts/mailboxes/domain/value-objects/MailboxPostTokenHash';
 import { MailboxReadToken } from '@app/contexts/mailboxes/domain/value-objects/MailboxReadToken';
 import { MailboxReadTokenHash } from '@app/contexts/mailboxes/domain/value-objects/MailboxReadTokenHash';
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
 import { Duration, Timestamp } from '@haskou/value-objects';
 
 describe('Mailbox', () => {
   const readToken = new MailboxReadToken('r'.repeat(43));
   const readTokenHash = new MailboxReadTokenHash(
-    MailboxCapability.hash(readToken.valueOf()),
+    BearerCapability.hash(readToken.valueOf()),
   );
   const policy = new MailboxPolicy(
     new MailboxLimits(0, 1_000_000, 100, 10, 4, Duration.fromSeconds(1)),

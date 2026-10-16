@@ -5,7 +5,12 @@ import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrim
 import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { KeyPair, PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
+import {
+  InvalidSignatureError,
+  KeyPair,
+  PublicKey,
+  Signature,
+} from '@haskou/pigeon-swarm-crypto';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
@@ -131,7 +136,7 @@ describe('Identity self-signature vectors', () => {
             ...primitives,
             signature: SignatureMother.reencoded(primitives.signature),
           }),
-        ).toThrow(InvalidIdentitySignatureError);
+        ).toThrow(InvalidSignatureError);
       },
     );
 

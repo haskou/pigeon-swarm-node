@@ -11,7 +11,6 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
 import { CommunityModerationLogId } from '@app/contexts/communities/domain/value-objects/CommunityModerationLogId';
-import { CommunityRequestId } from '@app/contexts/communities/domain/value-objects/CommunityRequestId';
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
@@ -52,6 +51,7 @@ import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedL
 import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { Kernel } from '@haskou/ddd-kernel';
 import {
+  CommitmentId,
   IdentitySignature,
   KeychainSignature,
   KeyPair,
@@ -476,13 +476,13 @@ export default class Definitions {
       communityId,
       createdAt,
       creatorIdentityId,
-      id: CommunityRequestId.derive(
+      id: CommitmentId.communityRequest(
         communityId,
         type,
         creatorIdentityId,
         identityId,
         createdAt,
-      ).valueOf(),
+      ),
       identityId,
       scopeType: 'community_membership_request',
       status: 'pending',
@@ -692,13 +692,13 @@ export default class Definitions {
           action: 'invitation_created',
           details: { identityId: body.identityId },
           target: {
-            id: CommunityRequestId.derive(
+            id: CommitmentId.communityRequest(
               communityId,
               'invitation',
               actorIdentityId,
               text.identityId,
               Number(body.createdAt),
-            ).valueOf(),
+            ),
             type: 'membership_request',
           },
         }),

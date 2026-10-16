@@ -1,7 +1,20 @@
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { NodeCommunityStateDigest } from '@app/contexts/nodes/domain/value-objects/NodeCommunityStateDigest';
 import CommunityRepositoryNodeCommunityStateDigester from '@app/contexts/nodes/infrastructure/network-synchronization/CommunityRepositoryNodeCommunityStateDigester';
 import { mock, MockProxy } from 'jest-mock-extended';
+
+import { cryptoVectors } from '../../../../../support/cryptoVectors';
+
+const { communityFrontiers } = cryptoVectors<{
+  communityFrontiers: {
+    valid: {
+      args: [{ communityId: string; frontier: string[] }[]];
+      id: string;
+      name: string;
+    }[];
+  };
+}>('commitment-ids');
 
 describe('CommunityRepositoryNodeCommunityStateDigester', () => {
   let communityRepository: MockProxy<CommunityRepository>;
@@ -13,6 +26,22 @@ describe('CommunityRepositoryNodeCommunityStateDigester', () => {
       communityRepository,
     );
   });
+
+  it.each(communityFrontiers.valid)(
+    'digests $name like the library vectors',
+    async ({ args: [entries], id }) => {
+      communityRepository.findFrontiersByNetwork.mockResolvedValue(
+        entries.map(({ communityId, frontier }) => ({
+          communityId: new CommunityId(communityId),
+          frontier,
+        })),
+      );
+
+      await expect(digester.digest('network-1')).resolves.toEqual(
+        new NodeCommunityStateDigest(id),
+      );
+    },
+  );
 
   it('digests the community frontiers of one network', async () => {
     communityRepository.findFrontiersByNetwork.mockResolvedValue([

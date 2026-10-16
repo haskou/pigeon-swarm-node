@@ -6,9 +6,8 @@ import { CallStartMessage } from '@app/contexts/calls/application/start-call/mes
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
-import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import { InvalidCallScopeError } from '@app/contexts/calls/domain/errors/InvalidCallScopeError';
-import { CallCapabilityHash } from '@app/contexts/calls/domain/value-objects/CallCapabilityHash';
+import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -19,6 +18,7 @@ import IdentityRepository from '@app/contexts/identities/domain/repositories/Ide
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import {
@@ -147,8 +147,8 @@ describe('CallStarter', () => {
     expect(call.hasParticipant(caller)).toBe(true);
     expect(call.hasParticipant(recipient)).toBe(true);
     expect(call.toPrimitives()).toMatchObject({
-      nonce: message.nonce.valueOf(),
       createdAt: 1_770_000_000_000,
+      nonce: message.nonce.valueOf(),
     });
     expect(leaseRenewer.renew).toHaveBeenCalledWith(call, caller);
     expect(eventPublisher.publish).toHaveBeenCalledWith(expect.any(Array));
@@ -276,7 +276,7 @@ describe('CallStarter', () => {
   });
 
   describe('a group-capability call', () => {
-    const capabilityHash = CallCapabilityHash.of('group-capability').valueOf();
+    const capabilityHash = BearerCapability.hash('group-call-capability');
     const identityRepositoryOn = (networks: NetworkId[]) => {
       const identityRepository = mock<IdentityRepository>();
       identityRepository.findById.mockResolvedValue({

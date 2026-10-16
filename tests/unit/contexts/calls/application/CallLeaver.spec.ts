@@ -1,5 +1,3 @@
-import { sampleMutation } from '../../../../support/signCall';
-import { callStartArgs } from '../../../../support/signCall';
 import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import CallLeaver from '@app/contexts/calls/application/leave-call/CallLeaver';
 import { CallLeaveMessage } from '@app/contexts/calls/application/leave-call/messages/CallLeaveMessage';
@@ -18,7 +16,11 @@ import { ConversationId } from '@app/contexts/conversations/domain/value-objects
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
+
+import { sampleMutation } from '../../../../support/signCall';
+import { callStartArgs } from '../../../../support/signCall';
 
 describe('CallLeaver', () => {
   let mutation: Record<string, unknown>;
@@ -105,7 +107,9 @@ describe('CallLeaver', () => {
       const call = Call.start(
         creator,
         networkId,
-        CallScope.groupCapability(CallCapabilityHash.of(capability)),
+        CallScope.groupCapability(
+          new CallCapabilityHash(BearerCapability.hash(capability)),
+        ),
         [],
         ...callStartArgs(),
       );

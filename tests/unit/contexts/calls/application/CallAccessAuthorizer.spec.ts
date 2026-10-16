@@ -1,19 +1,21 @@
-import { callStartArgs } from '../../../../support/signCall';
 import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
-import { CallCapabilityHash } from '@app/contexts/calls/domain/value-objects/CallCapabilityHash';
 import { CallNotFoundError } from '@app/contexts/calls/domain/errors/CallNotFoundError';
+import { CallCapabilityHash } from '@app/contexts/calls/domain/value-objects/CallCapabilityHash';
 import { Community } from '@app/contexts/communities/domain/Community';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
+
+import { callStartArgs } from '../../../../support/signCall';
 
 const identity = new IdentityId(
   'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=',
@@ -88,7 +90,9 @@ describe('CallAccessAuthorizer', () => {
       Call.start(
         identity,
         network,
-        CallScope.groupCapability(CallCapabilityHash.of(capability)),
+        CallScope.groupCapability(
+          new CallCapabilityHash(BearerCapability.hash(capability)),
+        ),
         [],
         ...callStartArgs(),
       );

@@ -1,5 +1,16 @@
+import { NodeRegistrationCodeIsNotValidError } from '@app/contexts/nodes/domain/errors/NodeRegistrationCodeIsNotValidError';
 import { NodeRegistrationCodeSecret } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationCodeSecret';
-import { createHash } from 'crypto';
+
+import { cryptoVectors } from '../../../../../support/cryptoVectors';
+
+interface Vectors {
+  hash: {
+    invalid: { name: string; token: string }[];
+    valid: { hash: string; name: string; token: string }[];
+  };
+}
+
+const vectors = cryptoVectors<Vectors>('bearer-capabilities');
 
 describe('NodeRegistrationCodeSecret', () => {
   it('should generate 32 random bytes encoded as base64url', () => {
@@ -10,11 +21,19 @@ describe('NodeRegistrationCodeSecret', () => {
     expect(NodeRegistrationCodeSecret.generate().valueOf()).not.toBe(secret);
   });
 
-  it('should hash the code with SHA-256', () => {
-    const secret = new NodeRegistrationCodeSecret('a-code');
+  it.each(vectors.hash.valid)(
+    'should commit to the $name code',
+    ({ hash, token }) => {
+      expect(new NodeRegistrationCodeSecret(token).hash().valueOf()).toBe(hash);
+    },
+  );
 
-    expect(secret.hash().valueOf()).toBe(
-      createHash('sha256').update('a-code').digest('hex'),
-    );
-  });
+  it.each(vectors.hash.invalid)(
+    'should reject a code with $name',
+    ({ token }) => {
+      expect(() => new NodeRegistrationCodeSecret(token).hash()).toThrow(
+        NodeRegistrationCodeIsNotValidError,
+      );
+    },
+  );
 });

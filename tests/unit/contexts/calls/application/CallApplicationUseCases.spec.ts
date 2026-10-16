@@ -1,8 +1,3 @@
-import { sampleMutation } from '../../../../support/signCall';
-import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
-import { CallScope } from '@app/contexts/calls/domain/CallScope';
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import CallAccessAuthorizer from '@app/contexts/calls/application/authorize-call/CallAccessAuthorizer';
 import CallEnder from '@app/contexts/calls/application/end-call/CallEnder';
 import { CallEndMessage } from '@app/contexts/calls/application/end-call/messages/CallEndMessage';
@@ -21,17 +16,24 @@ import { CallLeaveMessage } from '@app/contexts/calls/application/leave-call/mes
 import CallParticipantLeaseReleaser from '@app/contexts/calls/application/release-participant-lease/CallParticipantLeaseReleaser';
 import CallParticipantLeaseRenewer from '@app/contexts/calls/application/renew-participant-lease/CallParticipantLeaseRenewer';
 import { Call } from '@app/contexts/calls/domain/Call';
+import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
+import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import { CallNotFoundError } from '@app/contexts/calls/domain/errors/CallNotFoundError';
 import { CallParticipantNotFoundError } from '@app/contexts/calls/domain/errors/CallParticipantNotFoundError';
-import { CallCapabilityHash } from '@app/contexts/calls/domain/value-objects/CallCapabilityHash';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { CallParticipantLease } from '@app/contexts/calls/domain/CallParticipantLease';
 import CallParticipantLeaseRepository from '@app/contexts/calls/domain/repositories/CallParticipantLeaseRepository';
 import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
+import { CallCapabilityHash } from '@app/contexts/calls/domain/value-objects/CallCapabilityHash';
+import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
+
+import { sampleMutation } from '../../../../support/signCall';
 
 let mutation: Record<string, unknown>;
 const callId = '550e8400-e29b-41d4-a716-446655440001';
@@ -219,6 +221,7 @@ describe('Call application use cases', () => {
         throw notFound;
       });
       repository.requireById.mockResolvedValue(call);
+
       if (notReady)
         repository.assertParticipantSettled.mockRejectedValue(notReady);
       else repository.assertParticipantSettled.mockResolvedValue();
@@ -288,7 +291,9 @@ describe('Call application use cases', () => {
     const groupCall = () => {
       const call = mock<Call>();
       call.getScope.mockReturnValue(
-        CallScope.groupCapability(CallCapabilityHash.of(capability)),
+        CallScope.groupCapability(
+          new CallCapabilityHash(BearerCapability.hash(capability)),
+        ),
       );
       call.pullDomainEvents.mockReturnValue([]);
 

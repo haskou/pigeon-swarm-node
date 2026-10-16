@@ -4,11 +4,8 @@ import { PrivateBlobId } from '@app/contexts/private-blobs/domain/value-objects/
 import { PrivateBlobOwnerKey } from '@app/contexts/private-blobs/domain/value-objects/PrivateBlobOwnerKey';
 import { PrivateBlobSize } from '@app/contexts/private-blobs/domain/value-objects/PrivateBlobSize';
 import { PrivateBlobUploadToken } from '@app/contexts/private-blobs/domain/value-objects/PrivateBlobUploadToken';
+import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
 import { Duration, Timestamp } from '@haskou/value-objects';
-import { createHash } from 'crypto';
-
-const sha = (token: string): string =>
-  createHash('sha256').update(token).digest('hex');
 
 describe('PrivateBlob', () => {
   const now = new Timestamp(1_000_000);
@@ -77,10 +74,10 @@ describe('PrivateBlob', () => {
       false,
     );
     expect(blob.toPrimitives()).toMatchObject({
-      downloadTokenHash: sha(downloadToken.valueOf()),
+      downloadTokenHash: BearerCapability.hash(downloadToken.valueOf()),
       ownerKey: 'owner-a',
       retentionMs: 5_000,
-      uploadTokenHash: sha(uploadToken.valueOf()),
+      uploadTokenHash: BearerCapability.hash(uploadToken.valueOf()),
     });
   });
 
