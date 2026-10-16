@@ -13,7 +13,7 @@ import { UrlIsNotPublicError } from './UrlIsNotPublicError';
  */
 export default class PublicUrlGuard {
   private static readonly ALLOWED_PROTOCOLS = ['http:', 'https:'];
-  /** Loopback, private, link-local, this-network, shared, IETF, benchmark, multicast and reserved. */
+  /** Loopback, private, link-local, this-network, shared, IETF, documentation, 6to4 relay, benchmark, multicast and reserved. */
   private static readonly BLOCKED_IPV4_RANGES: [string, number][] = [
     ['127.0.0.0', 8],
     ['10.0.0.0', 8],
@@ -23,7 +23,11 @@ export default class PublicUrlGuard {
     ['0.0.0.0', 8],
     ['100.64.0.0', 10],
     ['192.0.0.0', 24],
+    ['192.0.2.0', 24],
+    ['192.88.99.0', 24],
     ['198.18.0.0', 15],
+    ['198.51.100.0', 24],
+    ['203.0.113.0', 24],
     ['224.0.0.0', 3],
   ];
 
@@ -128,15 +132,14 @@ export default class PublicUrlGuard {
 
   /**
    * Inside global unicast (2000::/3): IETF protocol assignments including
-   * Teredo (2001::/23), documentation (2001:db8::/32, 3fff::/20), 6to4
-   * (2002::/16) and SRv6 SIDs (5f00::/16) are never public services.
+   * Teredo (2001::/23), documentation (2001:db8::/32, 3fff::/20) and 6to4
+   * (2002::/16) are never public services.
    */
   private isReservedGlobalIpv6([first, second]: number[]): boolean {
     return (
       (first === 0x2001 && (second < 0x200 || second === 0x0db8)) ||
       first === 0x2002 ||
-      (first === 0x3fff && second < 0x1000) ||
-      first === 0x5f00
+      (first === 0x3fff && second < 0x1000)
     );
   }
 
@@ -197,7 +200,7 @@ export default class PublicUrlGuard {
       typeof rawUrl === 'string'
         ? this.parse(rawUrl)
         : this.parse(rawUrl.toString());
-    const addresses = await lookup(url.hostname, {
+    const addresses = await lookup(this.normalizedAddress(url.hostname), {
       all: true,
       verbatim: true,
     });
