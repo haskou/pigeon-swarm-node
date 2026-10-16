@@ -1,5 +1,5 @@
-import { createHmac } from 'crypto';
 import CallRelayCredentialIssuer from '@app/apps/apis/calls-api/CallRelayCredentialIssuer';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/turn-credentials.json';
 
 describe('CallRelayCredentialIssuer', () => {
   it('issues temporary credentials with the owner secret and an opaque stable subject', () => {
@@ -12,12 +12,14 @@ describe('CallRelayCredentialIssuer', () => {
       owner,
       1000000,
     );
-    expect(first.credential).toBe(
-      createHmac('sha1', owner).update(first.username).digest('base64'),
+    const strangers = issuer.issue(
+      'private-peer',
+      ['turn:relay.test:4101'],
+      stranger,
+      1000000,
     );
-    expect(first.credential).not.toBe(
-      createHmac('sha1', stranger).update(first.username).digest('base64'),
-    );
+    expect(first.credential).not.toBe(strangers.credential);
+    expect(first.username).not.toBe(strangers.username);
     expect(first.username).not.toContain('private-peer');
     expect(first.username).toMatch(/^1600:[a-f0-9]{32}$/);
     const next = issuer.issue(
@@ -27,6 +29,24 @@ describe('CallRelayCredentialIssuer', () => {
       1001000,
     );
     expect(next.username.split(':')[1]).toBe(first.username.split(':')[1]);
+  });
+  it('issues the shared relay peer subject vector byte for byte', () => {
+    const [subject] = vectors.peerSubjects;
+    const expected = vectors.credentials.find(
+      (vector) => vector.name === 'relay_peer_subject',
+    )!;
+    const credential = new CallRelayCredentialIssuer().issue(
+      subject.peerId,
+      ['turn:relay.test:4101'],
+      subject.sharedSecret,
+      (expected.expiresAtSeconds - 600) * 1000,
+    );
+
+    expect(credential).toEqual({
+      credential: expected.credential,
+      urls: ['turn:relay.test:4101'],
+      username: expected.username,
+    });
   });
   it('limits issuance per peer and across peers', () => {
     const issuer = new CallRelayCredentialIssuer();

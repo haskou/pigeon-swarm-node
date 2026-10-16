@@ -1,21 +1,21 @@
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
-import { PrivateNetworkRelayRecord } from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecord';
 import PrivateNetworkRelayRecordCodec from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordCodec';
-import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
-import { generateKeyPairSync } from 'crypto';
+import {
+  PrivateKey,
+  PrivateNetworkRelayRecord,
+} from '@haskou/pigeon-swarm-crypto';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/private-network.json';
 import { mock } from 'jest-mock-extended';
 
-function privateKey(): PrivateKey {
-  const { privateKey: key } = generateKeyPairSync('ed25519');
+const keys = {
+  network: new PrivateKey(vectors.keys.network.privateKeyPem),
+  other: new PrivateKey(vectors.keys.other.privateKeyPem),
+};
+const record = vectors.relayRecord.record as PrivateNetworkRelayRecord;
 
-  return new PrivateKey(
-    key.export({ format: 'pem', type: 'pkcs8' }).toString(),
-  );
-}
-
-function network(networkKey: PrivateKey): IPFSNetwork {
+function network(networkKey?: PrivateKey): IPFSNetwork {
   return new IPFSNetwork(
     new IPFSNetworkConfig('network-1', 'private', networkKey),
     mock<IPFSConnection>(),
@@ -23,55 +23,56 @@ function network(networkKey: PrivateKey): IPFSNetwork {
 }
 
 describe('PrivateNetworkRelayRecordCodec', () => {
-  it('should derive a deterministic lookup key from the private network key', () => {
-    const networkKey = privateKey();
-    const firstNetwork = network(networkKey);
-    const secondNetwork = network(networkKey);
-
-    expect(PrivateNetworkRelayRecordCodec.lookupKey(firstNetwork)).toBe(
-      PrivateNetworkRelayRecordCodec.lookupKey(secondNetwork),
+  it('should derive the vector fingerprint and lookup key', () => {
+    expect(
+      PrivateNetworkRelayRecordCodec.fingerprint(network(keys.network)),
+    ).toBe(vectors.derived.fingerprint);
+    expect(
+      PrivateNetworkRelayRecordCodec.lookupKey(network(keys.network)),
+    ).toBe(vectors.derived.relayLookupKey);
+    expect(PrivateNetworkRelayRecordCodec.lookupKey(network(keys.other))).toBe(
+      vectors.otherDerived.relayLookupKey,
     );
   });
 
-  it('should seal and open relay records with the same private network key', () => {
-    const privateNetwork = network(privateKey());
-    const relayRecord: PrivateNetworkRelayRecord = {
-      expiresAt: 2,
-      issuedAt: 1,
-      multiaddrs: ['/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelay'],
-      peerId: '12D3KooWRelay',
-      role: 'relay',
-      version: 1,
-    };
-
-    const envelope = PrivateNetworkRelayRecordCodec.seal(
-      privateNetwork,
-      relayRecord,
-    );
-
+  it('should open the vector envelope', () => {
     expect(
-      PrivateNetworkRelayRecordCodec.open(privateNetwork, envelope),
-    ).toEqual(relayRecord);
+      PrivateNetworkRelayRecordCodec.open(
+        network(keys.network),
+        vectors.relayRecord.envelope,
+      ),
+    ).toEqual(record);
   });
 
-  it('should not open relay records with another private network key', () => {
-    const privateNetwork = network(privateKey());
-    const otherPrivateNetwork = network(privateKey());
-    const relayRecord: PrivateNetworkRelayRecord = {
-      expiresAt: 2,
-      issuedAt: 1,
-      multiaddrs: ['/dns4/relay.example.com/tcp/4100/p2p/12D3KooWRelay'],
-      peerId: '12D3KooWRelay',
-      role: 'relay',
-      version: 1,
-    };
+  it('should seal relay records that only the same network key opens', () => {
     const envelope = PrivateNetworkRelayRecordCodec.seal(
-      privateNetwork,
-      relayRecord,
+      network(keys.network),
+      record,
     );
 
     expect(
-      PrivateNetworkRelayRecordCodec.open(otherPrivateNetwork, envelope),
+      PrivateNetworkRelayRecordCodec.open(network(keys.network), envelope),
+    ).toEqual(record);
+    expect(
+      PrivateNetworkRelayRecordCodec.open(network(keys.other), envelope),
     ).toBeUndefined();
+  });
+
+  it.each(vectors.relayRecord.invalid.map((vector) => [vector.name, vector]))(
+    'should reject the %s vector',
+    (_name, vector) => {
+      expect(
+        PrivateNetworkRelayRecordCodec.open(
+          network(keys[vector.key as keyof typeof keys]),
+          vector.envelope,
+        ),
+      ).toBeUndefined();
+    },
+  );
+
+  it('should refuse a network without a private key', () => {
+    expect(() => PrivateNetworkRelayRecordCodec.lookupKey(network())).toThrow(
+      'cannot use private relay records without a private network key',
+    );
   });
 });

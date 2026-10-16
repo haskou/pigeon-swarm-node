@@ -9,12 +9,14 @@ import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/Pu
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
 import PrivateNetworkRelayDirectorySettings from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayDirectorySettings';
-import { PrivateNetworkRelayRecord } from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecord';
 import PrivateNetworkRelayRecordCodec from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordCodec';
 import PrivateNetworkRelayRecordDirectory from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
 import { PrivateRelayRecordCacheDocument } from '@app/shared/infrastructure/network/relay/PrivateRelayRecordCacheDocument';
 import Kernel from '@haskou/ddd-kernel';
-import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  PrivateKey,
+  PrivateNetworkRelayRecord,
+} from '@haskou/pigeon-swarm-crypto';
 import { generateKeyPairSync } from 'crypto';
 import * as fs from 'fs/promises';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -32,7 +34,7 @@ function privateKey(): PrivateKey {
 function privateNetwork(
   networkKey: PrivateKey,
   connection: MockProxy<IPFSConnection> = mock<IPFSConnection>(),
-  peerId: string = '12D3KooWRelay',
+  peerId: string = '12D3KooWRe1ay',
 ): IPFSNetwork {
   connection.getPeerId.mockReturnValue(peerId);
 
@@ -120,7 +122,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const directory = createDirectory(localDatabase);
     const publicConnection = mock<IPFSConnection>();
 
-    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPub1icPeer']);
     publicConnection.waitForPeers.mockResolvedValue(true);
     publicConnection.publishPubSub.mockResolvedValue(undefined);
     publicConnection.provideRecord.mockResolvedValue(true);
@@ -135,7 +137,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       network,
       {
         announceAddresses: [
-          '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay',
+          '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRe1ay',
         ],
         listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
         relayDataLimitBytes: 67_108_864,
@@ -162,7 +164,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const publicConnection = mock<IPFSConnection>();
     const network = privateNetwork(privateKey());
 
-    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPub1icPeer']);
     publicConnection.provideRecord.mockResolvedValue(false);
     publicConnection.publishPubSub.mockResolvedValue(undefined);
     publicConnection.waitForPeers.mockResolvedValue(true);
@@ -177,7 +179,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
         network,
         {
           announceAddresses: [
-            '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay',
+            '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRe1ay',
           ],
           listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
           relayDataLimitBytes: 67_108_864,
@@ -197,7 +199,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const network = privateNetwork(privateKey());
     let requestHandler: ((payload: string) => Promise<void>) | undefined;
 
-    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPub1icPeer']);
     publicConnection.provideRecord.mockResolvedValue(true);
     publicConnection.waitForPeers.mockResolvedValue(true);
     publicConnection.publishPubSub.mockResolvedValue(undefined);
@@ -218,7 +220,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       network,
       {
         announceAddresses: [
-          '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay',
+          '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRe1ay',
         ],
         listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
         relayDataLimitBytes: 67_108_864,
@@ -242,7 +244,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       privateNetwork(privateKey()),
       {
         announceAddresses: [
-          '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay',
+          '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRe1ay',
         ],
         listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
         relayDataLimitBytes: 67_108_864,
@@ -427,7 +429,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
         network,
         {
           announceAddresses: [
-            '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay',
+            '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRe1ay',
           ],
           listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
           relayDataLimitBytes: 67_108_864,
@@ -443,7 +445,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       expect(publicConnection.waitForPeers).toHaveBeenCalledTimes(1);
       expect(publicConnection.publishPubSub).not.toHaveBeenCalled();
 
-      publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+      publicConnection.getPeers.mockReturnValue(['12D3KooWPub1icPeer']);
       publicConnection.waitForPeers.mockResolvedValue(true);
       jest.advanceTimersByTime(15_000);
       await flushPromises();
@@ -486,7 +488,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
         network,
         {
           announceAddresses: [
-            '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay',
+            '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRe1ay',
           ],
           listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
           relayDataLimitBytes: 67_108_864,
@@ -527,8 +529,8 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const relayRecord: PrivateNetworkRelayRecord = {
       expiresAt: Date.now() + 60_000,
       issuedAt: Date.now(),
-      multiaddrs: ['/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay'],
-      peerId: '12D3KooWRelay',
+      multiaddrs: ['/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRe1ay'],
+      peerId: '12D3KooWRe1ay',
       role: 'relay',
       version: 1,
     };
@@ -574,7 +576,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     );
     const publicConnection = mock<IPFSConnection>();
     const providerMultiaddr =
-      '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
+      '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRe1ay';
 
     privateConnection.getMultiaddrs.mockReturnValue([]);
     privateConnection.getPeers.mockReturnValue([]);
@@ -583,7 +585,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([
       providerMultiaddr,
     ]);
-    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPub1icPeer']);
     publicConnection.publishPubSub.mockResolvedValue(undefined);
     publicConnection.subscribePubSub.mockResolvedValue(undefined);
     publicConnection.waitForPeers.mockResolvedValue(true);
@@ -617,16 +619,16 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const firstRelay: PrivateNetworkRelayRecord = {
       expiresAt: Date.now() + 60_000,
       issuedAt: Date.now(),
-      multiaddrs: ['/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayA'],
-      peerId: '12D3KooWRelayA',
+      multiaddrs: ['/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRe1ayA'],
+      peerId: '12D3KooWRe1ayA',
       role: 'relay',
       version: 1,
     };
     const secondRelay: PrivateNetworkRelayRecord = {
       expiresAt: Date.now() + 60_000,
       issuedAt: Date.now(),
-      multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB'],
-      peerId: '12D3KooWRelayB',
+      multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRe1ayB'],
+      peerId: '12D3KooWRe1ayB',
       role: 'relay',
       version: 1,
     };
@@ -671,13 +673,13 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const network = privateNetwork(
       networkKey,
       privateConnection,
-      '12D3KooWRelayA',
+      '12D3KooWRe1ayA',
     );
     const remoteRelay: PrivateNetworkRelayRecord = {
       expiresAt: Date.now() + 60_000,
       issuedAt: Date.now(),
-      multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB'],
-      peerId: '12D3KooWRelayB',
+      multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRe1ayB'],
+      peerId: '12D3KooWRe1ayB',
       role: 'relay',
       version: 1,
     };
@@ -687,9 +689,9 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     privateConnection.dial.mockResolvedValue(undefined);
     publicConnection.dial.mockResolvedValue(undefined);
     publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([
-      '/dns4/public-provider.example.com/tcp/4001/p2p/12D3KooWPublicProvider',
+      '/dns4/public-provider.example.com/tcp/4001/p2p/12D3KooWPub1icProvider',
     ]);
-    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPub1icPeer']);
     publicConnection.provideRecord.mockResolvedValue(true);
     publicConnection.publishPubSub.mockResolvedValue(undefined);
     publicConnection.subscribePubSub.mockImplementation((topic, handler) => {
@@ -708,7 +710,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       network,
       {
         announceAddresses: [
-          '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayA',
+          '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRe1ayA',
         ],
         listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
         relayDataLimitBytes: 67_108_864,
@@ -728,7 +730,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
 
     expect(relayRecordHandler).toBeDefined();
     await relayRecordHandler?.(
-      JSON.stringify(PrivateNetworkRelayRecordCodec.seal(network, remoteRelay)),
+      PrivateNetworkRelayRecordCodec.seal(network, remoteRelay),
     );
 
     expect(privateConnection.dial).toHaveBeenCalledWith(
@@ -737,7 +739,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     );
     expect(privateConnection.listen).not.toHaveBeenCalled();
     expect(publicConnection.dial).toHaveBeenCalledWith(
-      expect.stringContaining('12D3KooWPublicProvider'),
+      expect.stringContaining('12D3KooWPub1icProvider'),
       expect.any(AbortSignal),
     );
     directory.stop(network.getId());
@@ -753,19 +755,19 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const network = privateNetwork(
       privateKey(),
       privateConnection,
-      '12D3KooWRelayA',
+      '12D3KooWRe1ayA',
     );
     const knownRelay: PrivateNetworkRelayRecord = {
       expiresAt: now + 600_000,
       issuedAt: now,
-      multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB'],
-      peerId: '12D3KooWRelayB',
+      multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRe1ayB'],
+      peerId: '12D3KooWRe1ayB',
       role: 'relay',
       version: 1,
     };
     const subscriptions = new Map<string, (payload: string) => Promise<void>>();
     privateConnection.getPeers.mockReturnValue([knownRelay.peerId]);
-    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPub1icPeer']);
     publicConnection.waitForPeers.mockResolvedValue(true);
     publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([]);
     publicConnection.provideRecord.mockResolvedValue(true);
@@ -786,7 +788,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
         network,
         {
           announceAddresses: [
-            '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayA',
+            '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRe1ayA',
           ],
           listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
           relayDataLimitBytes: 67_108_864,
@@ -806,11 +808,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
         ([topic]) => !topic.endsWith('.request'),
       )?.[1];
       expect(handler).toBeDefined();
-      await handler?.(
-        JSON.stringify(
-          PrivateNetworkRelayRecordCodec.seal(network, knownRelay),
-        ),
-      );
+      await handler?.(PrivateNetworkRelayRecordCodec.seal(network, knownRelay));
       publicConnection.publishPubSub.mockClear();
       publicConnection.findRecordProviderMultiaddrs.mockClear();
 
@@ -852,19 +850,19 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const network = privateNetwork(
       privateKey(),
       privateConnection,
-      '12D3KooWRelayZ',
+      '12D3KooWRe1ayZ',
     );
     const knownRelay: PrivateNetworkRelayRecord = {
       expiresAt: now + 600_000,
       issuedAt: now,
-      multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB'],
-      peerId: '12D3KooWRelayB',
+      multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRe1ayB'],
+      peerId: '12D3KooWRe1ayB',
       role: 'relay',
       version: 1,
     };
     const subscriptions = new Map<string, (payload: string) => Promise<void>>();
     privateConnection.getPeers.mockReturnValue([knownRelay.peerId]);
-    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPub1icPeer']);
     publicConnection.waitForPeers.mockResolvedValue(true);
     publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([]);
     publicConnection.provideRecord.mockResolvedValue(true);
@@ -885,7 +883,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
         network,
         {
           announceAddresses: [
-            '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayZ',
+            '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRe1ayZ',
           ],
           listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
           relayDataLimitBytes: 67_108_864,
@@ -900,16 +898,12 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
         ([topic]) => !topic.endsWith('.request'),
       )?.[1];
       expect(handler).toBeDefined();
-      await handler?.(
-        JSON.stringify(
-          PrivateNetworkRelayRecordCodec.seal(network, knownRelay),
-        ),
-      );
+      await handler?.(PrivateNetworkRelayRecordCodec.seal(network, knownRelay));
       const departedRelay: PrivateNetworkRelayRecord = {
         ...knownRelay,
         expiresAt: now + 1000,
-        multiaddrs: ['/dns4/relay-c.example.com/tcp/4181/p2p/12D3KooWRelayC'],
-        peerId: '12D3KooWRelayC',
+        multiaddrs: ['/dns4/relay-c.example.com/tcp/4181/p2p/12D3KooWRe1ayC'],
+        peerId: '12D3KooWRe1ayC',
       };
       const cacheState = directory as unknown as {
         relayRecordEnvelopeCache: Map<string, string>;
@@ -919,9 +913,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       const cacheSizeBefore = cacheState.relayRecordEnvelopeCache.size;
       for (let publication = 0; publication < 100; publication += 1) {
         await handler?.(
-          JSON.stringify(
-            PrivateNetworkRelayRecordCodec.seal(network, departedRelay),
-          ),
+          PrivateNetworkRelayRecordCodec.seal(network, departedRelay),
         );
       }
       expect(cacheState.relayRecordEnvelopeCache.size).toBe(
@@ -966,13 +958,11 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       ).toHaveBeenCalledTimes(2);
       // A new valid record must make the publisher eligible for recovery again.
       await handler?.(
-        JSON.stringify(
-          PrivateNetworkRelayRecordCodec.seal(network, {
-            ...departedRelay,
-            expiresAt: now + 600_000,
-            issuedAt: now,
-          }),
-        ),
+        PrivateNetworkRelayRecordCodec.seal(network, {
+          ...departedRelay,
+          expiresAt: now + 600_000,
+          issuedAt: now,
+        }),
       );
       await directory.discover(network, mock());
       await directory.discover(network, mock());
@@ -994,13 +984,13 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const network = privateNetwork(
       networkKey,
       privateConnection,
-      '12D3KooWRelayA',
+      '12D3KooWRe1ayA',
     );
     const remoteRelay: PrivateNetworkRelayRecord = {
       expiresAt: Date.now() + 60_000,
       issuedAt: Date.now(),
-      multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB'],
-      peerId: '12D3KooWRelayB',
+      multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRe1ayB'],
+      peerId: '12D3KooWRe1ayB',
       role: 'relay',
       version: 1,
     };
@@ -1012,7 +1002,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       privatePeers = [remoteRelay.peerId];
     });
     publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([]);
-    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPub1icPeer']);
     publicConnection.provideRecord.mockResolvedValue(true);
     publicConnection.publishPubSub.mockResolvedValue(undefined);
     publicConnection.subscribePubSub.mockImplementation((topic, handler) => {
@@ -1032,7 +1022,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
         network,
         {
           announceAddresses: [
-            '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRelayA',
+            '/dns4/relay-a.example.com/tcp/4181/p2p/12D3KooWRe1ayA',
           ],
           listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
           relayDataLimitBytes: 67_108_864,
@@ -1064,9 +1054,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
 
       expect(relayRecordHandler).toBeDefined();
       await relayRecordHandler?.(
-        JSON.stringify(
-          PrivateNetworkRelayRecordCodec.seal(network, remoteRelay),
-        ),
+        PrivateNetworkRelayRecordCodec.seal(network, remoteRelay),
       );
 
       jest.advanceTimersByTime(5_000);
@@ -1096,9 +1084,9 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     privateConnection.getMultiaddrs.mockReturnValue([]);
     privateConnection.getPeers.mockReturnValue([]);
     publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([
-      '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay',
+      '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRe1ay',
     ]);
-    publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPub1icPeer']);
     publicConnection.publishPubSub.mockResolvedValue(undefined);
     publicConnection.subscribePubSub.mockResolvedValue(undefined);
     publicConnection.waitForPeers.mockResolvedValue(true);
@@ -1130,12 +1118,12 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       '12D3KooWLeaf',
     );
     const publicConnection = mock<IPFSConnection>();
-    const relayMultiaddr = '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
+    const relayMultiaddr = '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRe1ay';
     const relayRecord: PrivateNetworkRelayRecord = {
       expiresAt: Date.now() + 60_000,
       issuedAt: Date.now(),
       multiaddrs: [relayMultiaddr],
-      peerId: '12D3KooWRelay',
+      peerId: '12D3KooWRe1ay',
       role: 'relay',
       version: 1,
     };
@@ -1145,7 +1133,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     privateConnection.getPeers
       .mockReturnValueOnce([])
       .mockReturnValueOnce([])
-      .mockReturnValue(['12D3KooWRelay']);
+      .mockReturnValue(['12D3KooWRe1ay']);
     privateConnection.getMultiaddrs.mockReturnValue([
       `${relayMultiaddr}/p2p-circuit`,
     ]);
@@ -1200,12 +1188,12 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       '12D3KooWLeaf',
     );
     const publicConnection = mock<IPFSConnection>();
-    const relayMultiaddr = '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
+    const relayMultiaddr = '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRe1ay';
     const relayRecord: PrivateNetworkRelayRecord = {
       expiresAt: Date.now() + 60_000,
       issuedAt: Date.now(),
       multiaddrs: [relayMultiaddr],
-      peerId: '12D3KooWRelay',
+      peerId: '12D3KooWRe1ay',
       role: 'relay',
       version: 1,
     };
@@ -1274,12 +1262,12 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       '12D3KooWLeaf',
     );
     const publicConnection = mock<IPFSConnection>();
-    const relayMultiaddr = '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
+    const relayMultiaddr = '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRe1ay';
     const relayRecord: PrivateNetworkRelayRecord = {
       expiresAt: now + 60_000,
       issuedAt: now,
       multiaddrs: [relayMultiaddr],
-      peerId: '12D3KooWRelay',
+      peerId: '12D3KooWRe1ay',
       role: 'relay',
       version: 1,
     };
@@ -1345,12 +1333,12 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       '12D3KooWLeaf',
     );
     const publicConnection = mock<IPFSConnection>();
-    const relayMultiaddr = '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRelay';
+    const relayMultiaddr = '/dns4/relay.example.com/tcp/4181/p2p/12D3KooWRe1ay';
     const relayRecord: PrivateNetworkRelayRecord = {
       expiresAt: Date.now() + 60_000,
       issuedAt: Date.now(),
       multiaddrs: [relayMultiaddr],
-      peerId: '12D3KooWRelay',
+      peerId: '12D3KooWRe1ay',
       role: 'relay',
       version: 1,
     };
@@ -1511,13 +1499,13 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
       const network = privateNetwork(
         networkKey,
         privateConnection,
-        '12D3KooWRelayZ',
+        '12D3KooWRe1ayZ',
       );
       const remoteRelay: PrivateNetworkRelayRecord = {
         expiresAt: Date.now() + 600_000,
         issuedAt: Date.now(),
-        multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRelayB'],
-        peerId: '12D3KooWRelayB',
+        multiaddrs: ['/dns4/relay-b.example.com/tcp/4181/p2p/12D3KooWRe1ayB'],
+        peerId: '12D3KooWRe1ayB',
         role: 'relay',
         version: 1,
       };
@@ -1532,7 +1520,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
         privatePeers = [remoteRelay.peerId];
       });
       publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([]);
-      publicConnection.getPeers.mockReturnValue(['12D3KooWPublicPeer']);
+      publicConnection.getPeers.mockReturnValue(['12D3KooWPub1icPeer']);
       publicConnection.provideRecord.mockResolvedValue(true);
       publicConnection.publishPubSub.mockResolvedValue(undefined);
       publicConnection.subscribePubSub.mockImplementation((topic, handler) => {
@@ -1552,7 +1540,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
           network,
           {
             announceAddresses: [
-              '/dns4/relay-z.example.com/tcp/4181/p2p/12D3KooWRelayZ',
+              '/dns4/relay-z.example.com/tcp/4181/p2p/12D3KooWRe1ayZ',
             ],
             listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
             relayDataLimitBytes: 67_108_864,
@@ -1572,9 +1560,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
 
         expect(relayRecordHandler).toBeDefined();
         await relayRecordHandler?.(
-          JSON.stringify(
-            PrivateNetworkRelayRecordCodec.seal(network, remoteRelay),
-          ),
+          PrivateNetworkRelayRecordCodec.seal(network, remoteRelay),
         );
         await flushPromises();
 
@@ -1631,11 +1617,11 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     const network = privateNetwork(
       networkKey,
       privateConnection,
-      '12D3KooWRelayZ',
+      '12D3KooWRe1ayZ',
     );
     const remoteRelays: PrivateNetworkRelayRecord[] = [
-      '12D3KooWRelayB',
-      '12D3KooWRelayC',
+      '12D3KooWRe1ayB',
+      '12D3KooWRe1ayC',
     ].map((peerId) => ({
       expiresAt: Date.now() + 600_000,
       issuedAt: Date.now(),
@@ -1648,7 +1634,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     }));
     const subscriptions = new Map<string, (payload: string) => Promise<void>>();
     // Already connected to one publisher; B and C remain missing.
-    const privatePeers: string[] = ['12D3KooWRelayA'];
+    const privatePeers: string[] = ['12D3KooWRe1ayA'];
     const dialedMultiaddrs: string[] = [];
 
     privateConnection.getPeers.mockImplementation(() => privatePeers);
@@ -1677,7 +1663,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
         network,
         {
           announceAddresses: [
-            '/dns4/relay-z.example.com/tcp/4181/p2p/12D3KooWRelayZ',
+            '/dns4/relay-z.example.com/tcp/4181/p2p/12D3KooWRe1ayZ',
           ],
           listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
           relayDataLimitBytes: 67_108_864,
@@ -1699,9 +1685,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
 
       for (const remoteRelay of remoteRelays) {
         await relayRecordHandler?.(
-          JSON.stringify(
-            PrivateNetworkRelayRecordCodec.seal(network, remoteRelay),
-          ),
+          PrivateNetworkRelayRecordCodec.seal(network, remoteRelay),
         );
       }
       await flushPromises();

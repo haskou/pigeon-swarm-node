@@ -38,11 +38,7 @@ describe('Libp2pGossipsubAdapter', () => {
     isPrivate?: boolean;
   }): MockProxy<IPFSNetwork> => {
     const network = mock<IPFSNetwork>();
-    const key = options.isPrivate
-      ? mock<PrivateKey>({
-          valueOf: () => 'private-network-key',
-        })
-      : undefined;
+    const key = options.isPrivate ? PrivateKey.generate() : undefined;
 
     network.getId.mockReturnValue(options.id);
     network.isPrivate.mockReturnValue(Boolean(options.isPrivate));
@@ -339,7 +335,7 @@ describe('Libp2pGossipsubAdapter', () => {
     );
     expect(privateNetwork.publishPubSub).toHaveBeenCalledWith(
       'pigeon-swarm.networks.private-network-id.identities.v1.announcements',
-      expect.stringContaining('"encrypted":true'),
+      expect.stringContaining('"version":2'),
     );
   });
 
@@ -379,6 +375,39 @@ describe('Libp2pGossipsubAdapter', () => {
     );
     expect(handler).toHaveBeenCalledWith(expect.any(TestDomainEvent));
     expect(handler.mock.calls[0][0].aggregateId).toBe('aggregate-id');
+  });
+
+  it('should refuse cleartext payloads on a private network', async () => {
+    const handler = jest.fn();
+    const privateNetwork = createNetwork({
+      id: 'private-network-id',
+      isPrivate: true,
+    });
+    const event = new TestDomainEvent('aggregate-id', { name: 'alice' });
+    let subscribedHandler: ((payload: string) => Promise<void>) | undefined;
+
+    networkRegistry.getAll.mockReturnValue([privateNetwork]);
+    privateNetwork.subscribePubSub.mockImplementation(
+      async (_topic, callback) => {
+        subscribedHandler = callback;
+      },
+    );
+    adapter = createAdapter();
+
+    await adapter.consume(
+      'queue',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'test-service',
+      handler,
+    );
+
+    await expect(
+      subscribedHandler?.(
+        JSON.stringify({ encrypted: false, payload: event.decode() }),
+      ),
+    ).rejects.toThrow();
+    expect(handler).not.toHaveBeenCalled();
   });
 
   it('should publish network payloads to websockets after consumers accept them', async () => {

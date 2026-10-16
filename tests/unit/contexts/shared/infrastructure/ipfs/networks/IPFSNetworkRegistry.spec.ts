@@ -1,5 +1,6 @@
 import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
-import { generateKeyPairSync } from 'crypto';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/relay-records.json';
+import { createPublicKey, generateKeyPairSync } from 'crypto';
 import * as fs from 'fs/promises';
 import { mock } from 'jest-mock-extended';
 
@@ -356,6 +357,46 @@ describe('IPFSNetworkRegistry', () => {
       await expect(registry.getSharedPeerPrivateKey()).rejects.toBe(exists);
       expect(await registry.getSharedPeerPrivateKey()).toBe(existingKey);
       expect(generate).toHaveBeenCalledTimes(1);
+    });
+
+    describe('PEM export', () => {
+      const seed = Buffer.from(vectors.keys.relay.seedHex, 'hex');
+      const publicKeyRaw = Buffer.from(
+        vectors.keys.relay.publicKey,
+        'base64url',
+      ).subarray(4);
+      const sharedKey = (publicKey: Uint8Array): Libp2pPrivateKeyLike =>
+        ({
+          publicKey: { raw: publicKey },
+          raw: Buffer.concat([seed, publicKey]),
+          type: 'Ed25519',
+        }) as unknown as Libp2pPrivateKeyLike;
+
+      it('exports the shared peer key as the PKCS#8 PEM of its seed', async () => {
+        jest.mocked(fs.readFile).mockResolvedValue(Buffer.from('persisted'));
+        jest
+          .spyOn(libp2pKeyAdapter, 'privateKeyFromProtobuf')
+          .mockResolvedValue(sharedKey(publicKeyRaw));
+
+        const pem = await createRegistry().getSharedPeerPrivateKeyPem();
+
+        expect(createPublicKey(pem).export({ format: 'jwk' }).x).toBe(
+          publicKeyRaw.toString('base64url'),
+        );
+      });
+
+      it('refuses a shared peer key whose public key does not match its seed', async () => {
+        jest.mocked(fs.readFile).mockResolvedValue(Buffer.from('persisted'));
+        jest
+          .spyOn(libp2pKeyAdapter, 'privateKeyFromProtobuf')
+          .mockResolvedValue(sharedKey(Buffer.alloc(32, 1)));
+
+        await expect(
+          createRegistry().getSharedPeerPrivateKeyPem(),
+        ).rejects.toThrow(
+          'Shared peer private key does not match its public key.',
+        );
+      });
     });
   });
 

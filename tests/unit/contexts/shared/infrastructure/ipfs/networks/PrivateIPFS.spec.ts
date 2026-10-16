@@ -174,7 +174,7 @@ jest.mock('@haskou/ddd-kernel', () => ({
 }));
 
 import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
-import { createHash, createPrivateKey, generateKeyPairSync } from 'crypto';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/private-network.json';
 
 import {
   PrivateIPFS,
@@ -184,8 +184,7 @@ import { PublicRelayRecordPrimitives } from '../../../../../../../src/shared/inf
 import { PublicRelayRecordRegistry } from '../../../../../../../src/shared/infrastructure/network/relay/PublicRelayRecordRegistry';
 
 describe('PrivateIPFS', () => {
-  const { privateKey: nodeKey } = generateKeyPairSync('ed25519');
-  const validPem = nodeKey.export({ format: 'pem', type: 'pkcs8' }).toString();
+  const validPem = vectors.keys.network.privateKeyPem;
   const publicRelayRecordRegistry = new PublicRelayRecordRegistry();
   let previousPublicRelayRecordsPath: string | undefined;
 
@@ -243,16 +242,10 @@ describe('PrivateIPFS', () => {
       expect(mockWithHTTP).not.toHaveBeenCalled();
     });
 
-    it('should use preSharedKey with the provided key', async () => {
+    it('should use the versioned swarm key of the network key', async () => {
       await PrivateIPFS.create(defaultOptions);
 
-      const keyObject = createPrivateKey(defaultOptions.key.valueOf());
-      const jwk = keyObject.export({ format: 'jwk' }) as { d: string };
-      const pskSeed = new Uint8Array(Buffer.from(jwk.d, 'base64url'));
-      const pskHex = createHash('sha256').update(pskSeed).digest('hex');
-      const expectedPsk = new Uint8Array(
-        Buffer.from(`/key/swarm/psk/1.0.0/\n/base16/\n${pskHex}`),
-      );
+      const expectedPsk = new TextEncoder().encode(vectors.derived.swarmKey);
 
       expect(mockPreSharedKey).toHaveBeenCalledWith({ psk: expectedPsk });
     });
