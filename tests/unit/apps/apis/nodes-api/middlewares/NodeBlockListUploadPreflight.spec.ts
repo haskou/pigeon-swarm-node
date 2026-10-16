@@ -3,6 +3,7 @@ import { NodeBlockListUploadInProgressError } from '@app/apps/apis/nodes-api/err
 import { NodeBlockListUploadPreflight } from '@app/apps/apis/nodes-api/middlewares/NodeBlockListUploadPreflight';
 import { InvalidSignedRequestError } from '@app/apps/apis/shared/errors/InvalidSignedRequestError';
 import { SignedRequestBodyIsTooLargeError } from '@app/apps/apis/shared/errors/SignedRequestBodyIsTooLargeError';
+import { SignedRequestBodyReadTimeoutError } from '@app/apps/apis/shared/errors/SignedRequestBodyReadTimeoutError';
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
 import { Node } from '@app/contexts/nodes/domain/Node';
@@ -18,6 +19,7 @@ import { EventEmitter } from 'events';
 import { Request, Response } from 'express';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { PassThrough } from 'stream';
+import { setImmediate } from 'timers/promises';
 
 type UploadRequest = Request & PassThrough;
 
@@ -63,12 +65,14 @@ describe('NodeBlockListUploadPreflight', () => {
     identityId,
     sendsLength = true,
     signer,
+    stalls = false,
   }: {
     body?: Buffer;
     declaredBody?: Buffer;
     identityId?: IdentityId;
     sendsLength?: boolean;
     signer: KeyPair;
+    stalls?: boolean;
   }): UploadRequest => {
     const timestamp = String(Date.now());
     const bodyHash = hashOf(declaredBody);
@@ -94,7 +98,13 @@ describe('NodeBlockListUploadPreflight', () => {
     }
 
     const stream = new PassThrough();
-    stream.end(body);
+
+    if (stalls) {
+      // Sends one byte, then nothing: a client that never finishes the body.
+      stream.write(body.subarray(0, 1));
+    } else {
+      stream.end(body);
+    }
 
     return Object.assign(stream, {
       header: (name: string) => headers[name.toLowerCase()],
@@ -143,6 +153,7 @@ describe('NodeBlockListUploadPreflight', () => {
 
   afterEach(() => {
     responses.splice(0).forEach((created) => created.emit('close'));
+    delete process.env.NODE_BLOCK_LIST_BODY_TIMEOUT_MS;
 
     if (previousMaxBytes === undefined) {
       delete process.env.NODE_BLOCK_LIST_MAX_BYTES;
@@ -287,5 +298,41 @@ describe('NodeBlockListUploadPreflight', () => {
 
     expect(await second.settled).toBeUndefined();
     secondResponse.emit('close');
+  });
+
+  it('should time out a slow upload and free the slot before its response closes', async () => {
+    process.env.NODE_BLOCK_LIST_BODY_TIMEOUT_MS = '20';
+    const preflight = new NodeBlockListUploadPreflight();
+    const stalled = signedUpload({ signer: owner, stalls: true });
+    const timedOut = nextCall();
+
+    preflight.use(stalled, response(), timedOut.next);
+
+    expect(await timedOut.settled).toBeInstanceOf(
+      SignedRequestBodyReadTimeoutError,
+    );
+    expect(stalled.body).toBeUndefined();
+
+    const next = nextCall();
+    preflight.use(signedUpload({ signer: owner }), response(), next.next);
+
+    expect(await next.settled).toBeUndefined();
+  });
+
+  it('should free the slot when the client aborts the upload', async () => {
+    const preflight = new NodeBlockListUploadPreflight();
+    const aborted = signedUpload({ signer: owner, stalls: true });
+    const refused = nextCall();
+
+    preflight.use(aborted, response(), refused.next);
+    await setImmediate();
+    aborted.destroy();
+
+    expect(await refused.settled).toBeInstanceOf(InvalidSignedRequestError);
+
+    const next = nextCall();
+    preflight.use(signedUpload({ signer: owner }), response(), next.next);
+
+    expect(await next.settled).toBeUndefined();
   });
 });
