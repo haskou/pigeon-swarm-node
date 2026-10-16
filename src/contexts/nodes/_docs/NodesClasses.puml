@@ -130,17 +130,13 @@ package "nodes" {
     class NodeRepository <interface> {
       +loadLocalNode(): Promise<Node>
       +loadLocalNodeRegistrationMode(): Promise<NodeRegistrationMode>
-      +saveLocalNode(node: Node): Promise<void>
+      +updateLocalNode(change: (node: Node) => void): Promise<Node>
+      +updateStoppedLocalNode(change: (node: Node) => void): Promise<Node>
     }
 
     class NodeLoaderService {
       -repository: NodeRepository
       +loadNode(): Promise<Node>
-    }
-
-    class NodeSaverService {
-      -repository: NodeRepository
-      +saveNode(node: Node): Promise<void>
     }
 
     interface NodePeerRepository {
@@ -151,7 +147,6 @@ package "nodes" {
     NodeRepository o--> Node
     NodePeerRepository o--> NodePeer
     NodeLoaderService --> NodeRepository
-    NodeSaverService --> NodeRepository
 
     abstract class NodeBlocks {
       +acceptsReplacement(list: NodeBlockList): boolean
@@ -291,16 +286,14 @@ package "nodes" {
 
   package "application" {
     class NodeNetworkAdder {
-      -loader: NodeLoaderService
-      -saver: NodeSaverService
+      -nodes: NodeRepository
       -eventPublisher: DomainEventPublisher
       +addNetwork(message: NodeNetworkAdderMessage): Promise<void>
       +addPublicNetwork(message: NodePublicNetworkAdderMessage): Promise<void>
     }
 
     class NodeNetworkRemover {
-      -loader: NodeLoaderService
-      -saver: NodeSaverService
+      -nodes: NodeRepository
       -cleaner: NodeNetworkDataCleaner
       -eventPublisher: DomainEventPublisher
       +remove(message: NodeNetworkRemoverMessage): Promise<void>
@@ -335,8 +328,8 @@ package "nodes" {
     }
 
     class NodeOwnerAssigner {
-      -loader: NodeLoaderService
-      -saver: NodeSaverService
+      -nodes: NodeRepository
+      -blockPolicy: NodeBlockPolicy
       +assignOwner(message: NodeOwnerAssignerMessage): Promise<void>
     }
 
@@ -398,17 +391,15 @@ package "nodes" {
       one use atomically; release returns it.
     end note
 
-    NodeNetworkAdder --> NodeLoaderService
-    NodeNetworkAdder --> NodeSaverService
+    NodeNetworkAdder --> NodeRepository
     NodeNetworkAdder --> NodeNetworkAdderMessage
     NodeNetworkAdder --> NodePublicNetworkAdderMessage
-    NodeNetworkRemover --> NodeLoaderService
-    NodeNetworkRemover --> NodeSaverService
+    NodeNetworkRemover --> NodeRepository
     NodeNetworkRemover --> NodeNetworkDataCleaner
     NodeNetworkRemover --> NodeNetworkRemoverMessage
     NodeLoader --> NodeLoaderService
-    NodeOwnerAssigner --> NodeLoaderService
-    NodeOwnerAssigner --> NodeSaverService
+    NodeOwnerAssigner --> NodeRepository
+    NodeOwnerAssigner --> NodeBlockPolicy
     NodeOwnerAssigner --> NodeOwnerAssignerMessage
     NodeHeartbeatSender --> NodeLoaderService
     NodeHeartbeatSender ..> NodeHeartbeatWasSent
@@ -420,8 +411,7 @@ package "nodes" {
     NodeCommunityStateAnnouncer --> NodeCommunityStateDigester
     NodeCommunityStateAnnouncer ..> NodeCommunityStateWasAnnounced
     NodePeerCommunityStateRecorder --> NodeNetworkSynchronizationMonitor
-    NodeRegistrationModeChanger --> NodeLoaderService
-    NodeRegistrationModeChanger --> NodeSaverService
+    NodeRegistrationModeChanger --> NodeRepository
     NodeRegistrationCodeIssuer --> NodeRegistrationCodeRepository
     NodeRegistrationCodesFinder --> NodeRegistrationCodeRepository
     NodeRegistrationCodeRevoker --> NodeRegistrationCodeRepository
@@ -510,7 +500,8 @@ package "nodes" {
       -networkRegistry: IPFSNetworkRegistry
       +loadLocalNode(): Promise<Node>
       +loadLocalNodeRegistrationMode(): Promise<NodeRegistrationMode>
-      +saveLocalNode(node: Node): Promise<void>
+      +updateLocalNode(change: (node: Node) => void): Promise<Node>
+      +updateStoppedLocalNode(change: (node: Node) => void): Promise<Node>
     }
 
     class LocalNodeRegistrationCodeRepository {
