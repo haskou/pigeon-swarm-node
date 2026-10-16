@@ -2748,8 +2748,11 @@ public key without PEM headers.
 
 **Conversation id.** `one-to-one:` + hex sha256 of `<first>:<second>:<networkId>`,
 where `first` and `second` are the two identity ids sorted ascending (plain string
-order). It is the same for both participants. The genesis must carry exactly the id
-derived from its own args.
+order); an empty id or one with `:` is refused. It is the same for both
+participants. The genesis must carry exactly the id derived from its own args.
+`@haskou/pigeon-swarm-crypto` owns the derivation
+(`CommitmentId.oneToOneConversation`) and `vectors/commitment-ids.json`; the
+`ConversationIdVectors` unit spec runs them against the node.
 
 Group conversations live in MLS on the clients (D15): the node creates and folds no
 group conversation. The records older nodes accepted for groups are refused by the
@@ -4945,7 +4948,9 @@ checked by `NotificationVectors.spec.ts`):
   where `subjectId` is the one-to-one conversation id or the community id. A
   group invitation has no subject: its id is
   `"invitation:" + hex(sha256(utf8(canonicalize({inviterIdentityId, nonce, recipientIdentityId}))))`.
-  The node derives the id; a client never sends it.
+  The node derives the id; a client never sends it. `@haskou/pigeon-swarm-crypto`
+  owns the derivation (`CommitmentId.invitation`) and `vectors/commitment-ids.json`;
+  the `NotificationIdVectors` unit spec runs them against the node.
 - signed payload (RFC 8785 canonical JSON): `{encryptedKey?, id, inviterIdentityId, nonce, recipientIdentityId, scopeType: "notification_invitation", subjectId, type}`
   for conversation and community invitations, and
   `{encryptedKey, id, inviterIdentityId, nonce, recipientIdentityId, scopeType: "notification_invitation", type}`

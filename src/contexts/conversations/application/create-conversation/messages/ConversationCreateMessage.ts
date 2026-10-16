@@ -10,8 +10,9 @@ import { ConversationOperationMutationPrimitives } from '../../record-operation/
 
 /**
  * Creates a 1:1 conversation from the genesis operation its creator signed.
- * The participants are the creator plus the requested one, deduplicated and
- * sorted, which is the exact list the client must have signed.
+ * The participants are the creator plus the requested one, each an identity,
+ * deduplicated and sorted, which is the exact list the client must have
+ * signed.
  */
 export class ConversationCreateMessage {
   public readonly genesis: ConversationOperation;
@@ -30,7 +31,11 @@ export class ConversationCreateMessage {
   ) {
     const network = new NetworkId(payload.networkId);
     const participantIds = [
-      ...new Set([ownerIdentityId, ...payload.participantIds]),
+      ...new Set(
+        [ownerIdentityId, ...payload.participantIds].map((identityId) =>
+          new IdentityId(identityId).valueOf(),
+        ),
+      ),
     ].sort();
 
     this.ownerIdentityId = new IdentityId(ownerIdentityId);

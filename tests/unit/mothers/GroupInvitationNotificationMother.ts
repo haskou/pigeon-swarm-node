@@ -33,18 +33,11 @@ export class GroupInvitationNotificationMother {
     const conversationId = 'one-to-one:notification-caps';
 
     return Notification.fromPrimitives({
-      id: (oneToOne
-        ? NotificationId.invitation(
-            inviter.valueOf(),
-            recipient.valueOf(),
-            conversationId,
-            nonce,
-          )
-        : NotificationId.groupInvitation(
-            inviter.valueOf(),
-            recipient.valueOf(),
-            nonce,
-          )
+      id: NotificationId.invitation(
+        inviter.valueOf(),
+        recipient.valueOf(),
+        nonce,
+        oneToOne ? conversationId : undefined,
       ).valueOf(),
       payload: oneToOne ? { ...letter, conversationId } : letter,
       recipientIdentityId: recipient.valueOf(),

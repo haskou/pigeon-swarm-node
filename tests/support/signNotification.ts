@@ -62,18 +62,11 @@ export function invitationPayload(
     ...(input.encryptedKey !== undefined && {
       encryptedKey: input.encryptedKey,
     }),
-    id: (input.subjectId === undefined
-      ? NotificationId.groupInvitation(
-          input.signer.id,
-          input.recipientIdentityId,
-          input.nonce,
-        )
-      : NotificationId.invitation(
-          input.signer.id,
-          input.recipientIdentityId,
-          input.subjectId,
-          input.nonce,
-        )
+    id: NotificationId.invitation(
+      input.signer.id,
+      input.recipientIdentityId,
+      input.nonce,
+      input.subjectId,
     ).valueOf(),
     inviterIdentityId: input.signer.id,
     nonce: input.nonce,

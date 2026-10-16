@@ -36,8 +36,8 @@ export class CommunityInvitationPayload {
     return NotificationId.invitation(
       this.inviterIdentityId.valueOf(),
       this.recipientIdentityId.valueOf(),
-      this.communityId.valueOf(),
       this.nonce.valueOf(),
+      this.communityId.valueOf(),
     );
   }
 

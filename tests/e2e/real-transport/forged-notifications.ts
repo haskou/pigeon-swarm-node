@@ -286,7 +286,7 @@ function invitationNotification(
   key: string,
 ): Notification {
   return Notification.fromPrimitives({
-    id: NotificationId.groupInvitation(inviter, recipient, nonce).valueOf(),
+    id: NotificationId.invitation(inviter, recipient, nonce).valueOf(),
     payload: {
       encryptedConversationKey: key,
       inviterIdentityId: inviter,

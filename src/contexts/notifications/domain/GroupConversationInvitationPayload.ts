@@ -39,7 +39,7 @@ export class GroupConversationInvitationPayload {
   }
 
   public notificationId(): NotificationId {
-    return NotificationId.groupInvitation(
+    return NotificationId.invitation(
       this.inviterIdentityId.valueOf(),
       this.recipientIdentityId.valueOf(),
       this.nonce.valueOf(),
