@@ -1,9 +1,12 @@
-import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { IdentityNotFoundError } from '@app/contexts/identities/domain/errors/IdentityNotFoundError';
 import Libp2pGossipsubAdapter from '@app/shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter';
 import MemoryMessageBusAdapter from '@app/shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter';
 import MessageBus from '@app/shared/infrastructure/messageBus/MessageBus';
 import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
+import Kernel from '@haskou/ddd-kernel';
+import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { mock, MockProxy } from 'jest-mock-extended';
+import { setImmediate } from 'node:timers/promises';
 
 class TestDomainEvent extends DomainEvent {
   public static EVENT_NAME = 'test.event';
@@ -33,10 +36,7 @@ describe('MessageBus', () => {
     const websocketPublish = jest
       .spyOn(webSocketEventHub, 'publish')
       .mockImplementation();
-    const messageBus = new MessageBus(
-      memoryAdapter,
-      libp2pGossipsubAdapter,
-    );
+    const messageBus = new MessageBus(memoryAdapter, libp2pGossipsubAdapter);
 
     await messageBus.publish([event]);
 
@@ -51,10 +51,7 @@ describe('MessageBus', () => {
     const websocketPublish = jest
       .spyOn(webSocketEventHub, 'publish')
       .mockImplementation();
-    const messageBus = new MessageBus(
-      memoryAdapter,
-      libp2pGossipsubAdapter,
-    );
+    const messageBus = new MessageBus(memoryAdapter, libp2pGossipsubAdapter);
 
     libp2pGossipsubAdapter.publish.mockReturnValue(
       new Promise(() => undefined),
@@ -74,10 +71,7 @@ describe('MessageBus', () => {
     const websocketPublish = jest
       .spyOn(webSocketEventHub, 'publish')
       .mockImplementation();
-    const messageBus = new MessageBus(
-      memoryAdapter,
-      libp2pGossipsubAdapter,
-    );
+    const messageBus = new MessageBus(memoryAdapter, libp2pGossipsubAdapter);
 
     memoryAdapter.publish.mockReturnValue(new Promise(() => undefined));
 
@@ -126,5 +120,58 @@ describe('MessageBus', () => {
     );
 
     await expect(messageBus.publishLocally([event])).resolves.toBeUndefined();
+  });
+
+  it('should name the event, consumer and error class when a local handler rejects', async () => {
+    process.env.TRANSPORT_DSN = 'in-memory://';
+    const identityId = 'f'.repeat(64);
+    const warn = jest.fn();
+    const messageBus = new MessageBus(memoryAdapter, libp2pGossipsubAdapter);
+
+    jest
+      .spyOn(Kernel, 'logger', 'get')
+      .mockReturnValue({ warn } as unknown as typeof Kernel.logger);
+    await messageBus.consume(
+      'identity-devices.provision_device_authorization',
+      TestDomainEvent.EVENT_NAME,
+      TestDomainEvent,
+      'local-exchange',
+      jest.fn().mockRejectedValue(new IdentityNotFoundError(identityId)),
+    );
+
+    await messageBus.publishLocally([new TestDomainEvent(identityId, {})]);
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      'Local domain event handler failed: event=test.event consumer=identity-devices.provision_device_authorization error=IdentityNotFoundError',
+    );
+    expect(warn.mock.calls.flat().join('\n')).not.toContain(identityId);
+  });
+
+  it('should log only the error class when a publish side effect fails', async () => {
+    process.env.TRANSPORT_DSN = 'in-memory://';
+    const identityId = 'f'.repeat(64);
+    const warn = jest.fn();
+    const messageBus = new MessageBus(memoryAdapter, libp2pGossipsubAdapter);
+
+    jest
+      .spyOn(Kernel, 'logger', 'get')
+      .mockReturnValue({ warn } as unknown as typeof Kernel.logger);
+    jest.spyOn(webSocketEventHub, 'publish').mockImplementation(() => {
+      throw new IdentityNotFoundError(identityId);
+    });
+    memoryAdapter.publish.mockRejectedValue(
+      new IdentityNotFoundError(identityId),
+    );
+
+    await messageBus.publish([new TestDomainEvent(identityId, {})]);
+    await setImmediate();
+
+    expect(warn.mock.calls).toEqual([
+      ['Domain event websocket publish failed: error=IdentityNotFoundError'],
+      [
+        'Domain event publish side effect failed: transport error=IdentityNotFoundError',
+      ],
+    ]);
   });
 });
