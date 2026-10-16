@@ -4,14 +4,13 @@ import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/serv
 import { PublicMutationExpectation } from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 
 import { ConversationOperation } from '../../../domain/operations/ConversationOperation';
-import { ConversationOperationLedger } from '../../../domain/operations/ConversationOperationLedger';
+import { ConversationOperationApplier } from '../../../domain/operations/ConversationOperationApplier';
 
 /**
- * Admits a signed conversation operation only when its author was permitted
- * to perform it in the history the operation builds on. Every admitted
- * operation is remembered here, so the parents of a replicated batch are
- * found whatever the order it arrives in; an operation whose parents have not
- * replicated yet is refused and retried by the registry.
+ * Admits a signed conversation operation only when it is the valid genesis of
+ * a 1:1 conversation. Group rosters live in MLS: the group genesis and the
+ * member and admin changes older nodes still replicate do not decode, so they
+ * are refused before their proof is checked.
  */
 export default class ConversationOperationMutationPolicy extends PublicMutationPolicy {
   private readonly shape = new PublicMutationRecordShape(
@@ -20,8 +19,6 @@ export default class ConversationOperationMutationPolicy extends PublicMutationP
     'conversation_operation',
     { arrays: ['parents'], objects: ['args'] },
   );
-
-  private readonly ledgers = new Map<string, ConversationOperationLedger>();
 
   public readonly collection = 'conversationOperations';
 
@@ -33,18 +30,6 @@ export default class ConversationOperationMutationPolicy extends PublicMutationP
     } catch {
       throw new InvalidPublicMutationError();
     }
-  }
-
-  private ledgerOf(
-    operation: ConversationOperation,
-  ): ConversationOperationLedger {
-    const conversationId = operation.getConversationId().valueOf();
-    const ledger =
-      this.ledgers.get(conversationId) ?? new ConversationOperationLedger();
-
-    this.ledgers.set(conversationId, ledger);
-
-    return ledger;
   }
 
   public expectationOf(
@@ -71,10 +56,7 @@ export default class ConversationOperationMutationPolicy extends PublicMutationP
     return new Promise<void>((resolve) => {
       if (isDeletion) throw new InvalidPublicMutationError();
 
-      const operation = this.toOperation(record);
-      const ledger = this.ledgerOf(operation);
-
-      if (!ledger.has(operation)) ledger.admit(operation);
+      ConversationOperationApplier.create(this.toOperation(record));
       resolve();
     });
   }

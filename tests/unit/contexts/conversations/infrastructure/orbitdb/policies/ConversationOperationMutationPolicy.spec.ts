@@ -1,19 +1,17 @@
 import { ConversationOperation } from '@app/contexts/conversations/domain/operations/ConversationOperation';
+import { ConversationOperationAction } from '@app/contexts/conversations/domain/value-objects/ConversationOperationAction';
 import ConversationOperationMutationPolicy from '@app/contexts/conversations/infrastructure/orbitdb/policies/ConversationOperationMutationPolicy';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 
+import { legacyGroupChange } from '../../../../../../support/legacyGroupChange';
 import { legacyGroupGenesis } from '../../../../../../support/legacyGroupGenesis';
 import {
-  add,
   alice,
   bob,
   creator,
-  leave,
-  mallory,
   networkId,
   oneToOneGenesis,
-  promote,
-  remove,
+  operation,
 } from '../../../domain/operations/ConversationOperationFixtures';
 
 describe('ConversationOperationMutationPolicy', () => {
@@ -62,9 +60,17 @@ describe('ConversationOperationMutationPolicy', () => {
     });
 
     it('refuses a record whose id was swapped for another operation', () => {
+      const later = operation(
+        ConversationOperationAction.CONVERSATION_CREATED,
+        creator,
+        { ...oneToOneGenesis().getArguments() },
+        [],
+        2,
+      );
+
       expect(() =>
         policy.expectationOf({
-          ...record(add([oneToOneGenesis()], bob)),
+          ...record(later),
           id: oneToOneGenesis().getId(),
         }),
       ).toThrow(InvalidPublicMutationError);
@@ -91,18 +97,68 @@ describe('ConversationOperationMutationPolicy', () => {
     it('admits the genesis of a 1:1 conversation', async () => {
       await expect(admit(oneToOneGenesis())).resolves.toBeUndefined();
     });
+  });
 
-    it('refuses any change of a 1:1 conversation', async () => {
-      const created = oneToOneGenesis();
-
-      await admit(created);
-
-      await expect(admit(leave([created], alice))).rejects.toThrow();
-      await expect(admit(add([created], bob))).rejects.toThrow();
-      await expect(admit(remove([created], alice))).rejects.toThrow();
-      await expect(admit(promote([created], alice))).rejects.toThrow();
-      await expect(admit(add([created], mallory, mallory))).rejects.toThrow();
+  describe('a member or admin change replicated by an older node', () => {
+    const oneToOne = oneToOneGenesis();
+    const group = legacyGroupGenesis({
+      creatorIdentityId: creator.valueOf(),
+      networkId: networkId.valueOf(),
+      participantIds: [creator.valueOf(), alice.valueOf()],
     });
+    const genesisOf = {
+      group: {
+        conversationId: String(group.conversationId),
+        hash: String(group.id).split(':op:')[1],
+      },
+      'one-to-one': {
+        conversationId: oneToOne.getConversationId().valueOf(),
+        hash: oneToOne.getHash(),
+      },
+    };
+    const changes = (['group', 'one-to-one'] as const).flatMap((type) =>
+      (
+        [
+          ['member_added', creator, { identityId: bob.valueOf() }],
+          ['member_removed', creator, { identityId: alice.valueOf() }],
+          ['member_left', alice, {}],
+          ['admin_promoted', creator, { identityId: alice.valueOf() }],
+          ['admin_demoted', creator, { identityId: alice.valueOf() }],
+        ] as const
+      ).map(([action, author, args]) => ({
+        action,
+        author: author.valueOf(),
+        record: legacyGroupChange({
+          action,
+          args,
+          authorIdentityId: author.valueOf(),
+          conversationId: genesisOf[type].conversationId,
+          networkId: networkId.valueOf(),
+          parents: [genesisOf[type].hash],
+        }),
+        type,
+      })),
+    );
+
+    it.each(changes)(
+      'refuses $action on a $type conversation before checking the proof',
+      ({ record: change }) => {
+        expect(() => policy.expectationOf({ ...change })).toThrow(
+          InvalidPublicMutationError,
+        );
+      },
+    );
+
+    it.each(changes)(
+      'refuses to admit $action on a $type conversation',
+      async ({ author, record: change }) => {
+        await admit(oneToOne);
+
+        await expect(
+          policy.assertPermitted({ ...change }, author, false),
+        ).rejects.toThrow(InvalidPublicMutationError);
+      },
+    );
   });
 
   describe('a group conversation replicated by an older node', () => {

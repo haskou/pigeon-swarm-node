@@ -15,7 +15,6 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { ConversationType } from '@app/contexts/conversations/domain/value-objects/ConversationType';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -125,12 +124,10 @@ describe('CallStarter', () => {
       recipient,
       networkId,
     );
-    const conversation = new Conversation(
-      conversationId,
-      networkId,
-      ConversationType.ONE_TO_ONE,
-      [caller, recipient],
-    );
+    const conversation = new Conversation(conversationId, networkId, [
+      caller,
+      recipient,
+    ]);
     const repository = mock<CallRepository>();
     const conversationRepository = mock<ConversationRepository>();
     conversationRepository.hasById.mockResolvedValue(true);
@@ -263,14 +260,10 @@ describe('CallStarter', () => {
     expect(repository.saveStart).not.toHaveBeenCalled();
   });
 
-  it('refuses a conversation call in a group conversation, whose calls carry an MLS capability', async () => {
-    const conversation = mock<Conversation>();
-    conversation.hasParticipant.mockReturnValue(true);
-    conversation.isGroup.mockReturnValue(true);
+  it('refuses a conversation call in a group conversation, which the node does not know: its calls carry an MLS capability', async () => {
     const repository = mock<CallRepository>();
     const conversationRepository = mock<ConversationRepository>();
-    conversationRepository.hasById.mockResolvedValue(true);
-    conversationRepository.requireMetadataById.mockResolvedValue(conversation);
+    conversationRepository.hasById.mockResolvedValue(false);
     const { starter } = build(repository, conversationRepository);
 
     await expect(
@@ -278,6 +271,7 @@ describe('CallStarter', () => {
         startMessage({ conversationId: 'group:any', type: 'conversation' }),
       ),
     ).rejects.toBeInstanceOf(InvalidCallScopeError);
+    expect(conversationRepository.requireMetadataById).not.toHaveBeenCalled();
     expect(repository.saveStart).not.toHaveBeenCalled();
   });
 

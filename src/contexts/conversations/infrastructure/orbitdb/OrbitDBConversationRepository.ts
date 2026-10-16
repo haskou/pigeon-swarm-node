@@ -1,9 +1,7 @@
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
-import { GroupConversation } from '@app/contexts/conversations/domain/GroupConversation';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { ConversationOperation } from '@app/contexts/conversations/domain/operations/ConversationOperation';
-import { ConversationOperationLimits } from '@app/contexts/conversations/domain/operations/ConversationOperationLimits';
 import { ConversationRoster } from '@app/contexts/conversations/domain/operations/ConversationRoster';
 import { ConversationState } from '@app/contexts/conversations/domain/operations/ConversationState';
 import { ConversationStateFold } from '@app/contexts/conversations/domain/operations/ConversationStateFold';
@@ -21,8 +19,8 @@ type FoldedConversation = { createdAt: number; roster: ConversationRoster };
  * Conversations exist only as the signed operations replicated in the
  * `conversationOperations` store. Every conversation read here is the
  * deterministic fold of those operations, so nothing a peer replicates can
- * state a participant or a role that no authorized member signed. The
- * participant index is not replicated: it is the fold of the cached logs.
+ * state a participant that did not sign the 1:1 genesis or is not named by it.
+ * The participant index is not replicated: it is the fold of the cached logs.
  */
 export default class OrbitDBConversationRepository implements ConversationRepository {
   private static readonly HEAD_PREFIX = 'conversation-operation-index:';
@@ -197,49 +195,14 @@ export default class OrbitDBConversationRepository implements ConversationReposi
   }
 
   private conversationOf(found: FoldedConversation): Conversation {
-    const { admins, creator, id, members, name, networkId, type } =
-      found.roster.toPrimitives();
-    const primitives = {
-      adminIds: admins,
-      creatorId: creator,
-      id,
-      name,
-      networkId,
-      participantIds: members,
-      type,
-    };
+    const { roster } = found;
 
-    return type === 'group'
-      ? GroupConversation.fromPrimitives(primitives)
-      : OneToOneConversation.fromPrimitives(primitives);
-  }
-
-  /** Fails with the limit error a client can show, before the write is refused deeper down. */
-  private assertWithinQuota(
-    conversationId: string,
-    records: Record<string, unknown>[],
-    operation: ConversationOperation,
-  ): void {
-    const author = operation.getAuthorIdentityId().valueOf();
-
-    if (
-      !ConversationOperationLimits.isAuthorQuotaReached(
-        records.filter(
-          (record) =>
-            PublicMutationRecord.payloadOf(record).authorIdentityId === author,
-        ).length,
-      )
-    ) {
-      return;
-    }
-
-    ConversationOperationLimits.assertAuthorQuota(
-      ConversationStateFold.closureOf(
-        this.operationsOf(conversationId, records),
-        operation.getParents(),
-      ),
-      operation,
-    );
+    return OneToOneConversation.fromPrimitives({
+      creatorId: roster.getCreator(),
+      id: roster.getId(),
+      networkId: roster.getNetworkId(),
+      participantIds: roster.getMembers(),
+    });
   }
 
   public async hasById(conversationId: ConversationId): Promise<boolean> {
@@ -297,22 +260,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
     );
   }
 
-  public findOneToOneByParticipant(
-    participantId: IdentityId,
-    limit: number,
-  ): Promise<Conversation[]> {
-    return Promise.resolve(
-      this.cachedConversations()
-        .filter(
-          (found) =>
-            !found.roster.isGroup() &&
-            found.roster.isMember(participantId.valueOf()),
-        )
-        .slice(0, limit)
-        .map((found) => this.conversationOf(found)),
-    );
-  }
-
   public async saveOperation(
     operation: ConversationOperation,
     proof: PublicMutationProof,
@@ -327,9 +274,6 @@ export default class OrbitDBConversationRepository implements ConversationReposi
       document,
     );
 
-    if (!operation.isGenesis()) {
-      this.assertWithinQuota(payload.conversationId, records, operation);
-    }
     await this.registry.putDocument('conversationOperations', document, [
       payload.networkId,
     ]);

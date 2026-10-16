@@ -2,65 +2,19 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { assert } from '@haskou/value-objects';
 
 import { InvalidConversationOperationError } from '../errors/InvalidConversationOperationError';
-import { ConversationOperationAction } from '../value-objects/ConversationOperationAction';
 import { ConversationOperation } from './ConversationOperation';
 import { ConversationOperationArgumentReader } from './ConversationOperationArgumentReader';
 import { ConversationRoster } from './ConversationRoster';
 
 /**
- * Turns one operation into a change of the conversation roster. The roster
- * decides whether the author is allowed to perform it, so a signed operation
- * never carries authority on its own: it only wins when the roster it applies
- * to grants the permission.
+ * Turns the genesis of a 1:1 conversation into its roster. Its arguments
+ * (every key is required) are type 'one-to-one' and participantIds: exactly
+ * the two identities, strictly ascending, the author one of them.
  *
- * Arguments per action (every key is required):
- * - conversation_created: type 'one-to-one', participantIds (exactly the two
- *   identities, strictly ascending, the author one of them). Group rosters
- *   live in MLS, so a group genesis is refused before it gets here.
- * - member_added, member_removed, admin_promoted, admin_demoted: identityId
- * - member_left: none
- *
- * A 1:1 roster accepts no other action than its genesis, so it is immutable.
+ * Group rosters live in MLS, so a group genesis is refused before it gets
+ * here, and no other action exists: a 1:1 roster is immutable.
  */
 export class ConversationOperationApplier {
-  private static readonly HANDLERS: Record<
-    string,
-    (roster: ConversationRoster, operation: ConversationOperation) => void
-  > = {
-    [ConversationOperationAction.ADMIN_DEMOTED.valueOf()]: (roster, op) =>
-      roster.demoteAdmin(
-        op.getAuthorIdentityId().valueOf(),
-        ConversationOperationApplier.target(op),
-      ),
-    [ConversationOperationAction.ADMIN_PROMOTED.valueOf()]: (roster, op) =>
-      roster.promoteAdmin(
-        op.getAuthorIdentityId().valueOf(),
-        ConversationOperationApplier.target(op),
-      ),
-    [ConversationOperationAction.MEMBER_ADDED.valueOf()]: (roster, op) =>
-      roster.addMember(
-        op.getAuthorIdentityId().valueOf(),
-        ConversationOperationApplier.target(op),
-      ),
-    [ConversationOperationAction.MEMBER_LEFT.valueOf()]: (roster, op) => {
-      new ConversationOperationArgumentReader(op.getArguments(), []);
-      roster.leave(op.getAuthorIdentityId().valueOf());
-    },
-    [ConversationOperationAction.MEMBER_REMOVED.valueOf()]: (roster, op) =>
-      roster.removeMember(
-        op.getAuthorIdentityId().valueOf(),
-        ConversationOperationApplier.target(op),
-      ),
-  };
-
-  private static target(operation: ConversationOperation): string {
-    return ConversationOperationApplier.identity(
-      new ConversationOperationArgumentReader(operation.getArguments(), [
-        'identityId',
-      ]).string('identityId'),
-    );
-  }
-
   /** An identity in the exact form the network exchanges: no PEM header. */
   private static identity(value: string): string {
     assert(
@@ -89,27 +43,6 @@ export class ConversationOperationApplier {
     return participantIds;
   }
 
-  private static createOneToOne(
-    operation: ConversationOperation,
-    reader: ConversationOperationArgumentReader,
-  ): ConversationRoster {
-    const author = operation.getAuthorIdentityId().valueOf();
-    const participantIds = ConversationOperationApplier.participants(reader);
-
-    assert(
-      participantIds.length === 2 && participantIds.includes(author),
-      new InvalidConversationOperationError(),
-    );
-
-    return new ConversationRoster(
-      operation.getConversationId().valueOf(),
-      operation.getNetworkId().valueOf(),
-      'one-to-one',
-      author,
-      participantIds,
-    );
-  }
-
   /** The roster a genesis operation creates. */
   public static create(genesis: ConversationOperation): ConversationRoster {
     assert(genesis.isGenesis(), new InvalidConversationOperationError());
@@ -117,27 +50,21 @@ export class ConversationOperationApplier {
 
     assert(args.type === 'one-to-one', new InvalidConversationOperationError());
 
-    return ConversationOperationApplier.createOneToOne(
-      genesis,
+    const author = genesis.getAuthorIdentityId().valueOf();
+    const participantIds = ConversationOperationApplier.participants(
       new ConversationOperationArgumentReader(args, ['participantIds', 'type']),
     );
-  }
-
-  /** Applies a non genesis operation; throws when it is not permitted. */
-  public static apply(
-    roster: ConversationRoster,
-    operation: ConversationOperation,
-  ): void {
-    const handler =
-      ConversationOperationApplier.HANDLERS[operation.getAction().valueOf()];
 
     assert(
-      handler &&
-        !operation.isGenesis() &&
-        operation.getConversationId().valueOf() === roster.getId() &&
-        operation.getNetworkId().valueOf() === roster.getNetworkId(),
+      participantIds.length === 2 && participantIds.includes(author),
       new InvalidConversationOperationError(),
     );
-    handler(roster, operation);
+
+    return new ConversationRoster(
+      genesis.getConversationId().valueOf(),
+      genesis.getNetworkId().valueOf(),
+      author,
+      participantIds,
+    );
   }
 }

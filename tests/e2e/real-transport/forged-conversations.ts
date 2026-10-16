@@ -30,6 +30,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 
+import { legacyGroupChange } from '../../support/legacyGroupChange';
 import { legacyGroupGenesis } from '../../support/legacyGroupGenesis';
 import {
   ConversationOperationSigner,
@@ -222,28 +223,21 @@ const expectedOf = (id: ConversationId) =>
 
 /** What a conversation looks like to its members, order independent. */
 const viewOf = (value: {
-  adminIds: string[];
   creatorId: string;
-  name?: string;
   participantIds: string[];
 }): unknown => ({
-  admins: [...value.adminIds].sort(),
   creator: value.creatorId,
   members: [...value.participantIds].sort(),
-  name: value.name,
 });
 
 function expectedView(id: ConversationId): unknown {
   const roster = expectedOf(id).roster;
 
   if (!roster) return undefined;
-  const { admins, creator, members, name } = roster.toPrimitives();
 
   return viewOf({
-    adminIds: admins,
-    creatorId: creator,
-    name,
-    participantIds: members,
+    creatorId: roster.getCreator(),
+    participantIds: roster.getMembers(),
   });
 }
 
@@ -602,55 +596,96 @@ async function main(): Promise<void> {
     'PASS forged signature, 1:1 hijack, tombstone and cross-scope replay rejected by the gated node while the ungated node replicated them',
   );
 
-  stage = 'one-to-one is immutable';
-  const oneToOneForged = [
-    handmade({
-      content: content(
-        owner,
-        'MEMBER_ADDED',
-        oneToOneId,
-        { identityId: frank.id },
-        await honest.repository!.findFrontier(oneToOneId),
-      ),
-      signer: owner,
-    }),
-    handmade({
-      content: content(
-        erin,
-        'MEMBER_LEFT',
-        oneToOneId,
-        {},
-        await honest.repository!.findFrontier(oneToOneId),
-      ),
-      signer: erin,
-    }),
-    handmade({
-      content: content(
-        owner,
-        'ADMIN_PROMOTED',
-        oneToOneId,
-        { identityId: erin.id },
-        await honest.repository!.findFrontier(oneToOneId),
-      ),
-      signer: owner,
-    }),
+  stage = 'member and admin changes an older node signed are refused';
+  const frontier = await honest.repository!.findFrontier(oneToOneId);
+  const legacyChange = (
+    signer: ConversationOperationSigner,
+    action: string,
+    conversationId: ConversationId,
+    args: Record<string, unknown>,
+    parents: string[],
+  ): Record<string, unknown> => {
+    const change = legacyGroupChange({
+      action,
+      args,
+      authorIdentityId: signer.id,
+      conversationId: conversationId.valueOf(),
+      createdAt: clock++,
+      networkId,
+      parents,
+    });
+
+    return PublicMutationRecord.withProof(
+      change,
+      signConversationOperationRecord(change, signer),
+    );
+  };
+  const oneToOneChanges = [
+    legacyChange(
+      owner,
+      'member_added',
+      oneToOneId,
+      { identityId: frank.id },
+      frontier,
+    ),
+    legacyChange(erin, 'member_left', oneToOneId, {}, frontier),
+    legacyChange(
+      owner,
+      'admin_promoted',
+      oneToOneId,
+      { identityId: erin.id },
+      frontier,
+    ),
+  ];
+  const groupChanges = [
+    legacyChange(owner, 'member_added', legacyId, { identityId: frank.id }, [
+      legacy.id,
+    ]),
+    legacyChange(owner, 'admin_promoted', legacyId, { identityId: alice.id }, [
+      legacy.id,
+    ]),
   ];
 
-  await plant(malicious, oneToOneId, oneToOneForged);
-  await reachedRawStores('1:1 operations', [honest, control], oneToOneForged);
+  await plant(malicious, oneToOneId, oneToOneChanges);
+  await plant(malicious, legacyId, groupChanges, [legacyRecord]);
+  await reachedRawStores(
+    'legacy member and admin changes',
+    [honest, control],
+    [...oneToOneChanges, ...groupChanges],
+  );
   await pause(3000);
-  await assertControlHoldsForged(
-    oneToOneId,
-    control,
-    oneToOneForged.map((forgery) => forgery.id as string),
+  // The decoder itself refuses these shapes, so even the ungated node keeps
+  // them out of its fold. The control node still holds the earlier forgeries
+  // it adopted without the gate, so only the honest node must hold nothing
+  // but the ledger; both must hold none of these changes.
+  const changeIds = new Set(
+    [...oneToOneChanges, ...groupChanges].map((change) => change.id as string),
   );
+
   await assertNoForgedOperation('1:1 after genesis', oneToOneId, honest);
-  assert.deepEqual(
-    (await honest.repository!.requireMetadataById(oneToOneId)).toPrimitives()
-      .participantIds,
-    [owner.id, erin.id].sort(),
+  for (const replica of [honest, control]) {
+    assert.deepEqual(
+      (await replica.repository!.findOperations(oneToOneId))
+        .map((operation) => operation.getId())
+        .filter((operationId) => changeIds.has(operationId)),
+      [],
+      `${replica.name} must not admit a legacy member or admin change`,
+    );
+    assert.equal(
+      await replica.repository!.hasById(legacyId),
+      false,
+      `${replica.name} must not fold legacy group changes into a conversation`,
+    );
+    assert.deepEqual(
+      (await replica.repository!.requireMetadataById(oneToOneId)).toPrimitives()
+        .participantIds,
+      [owner.id, erin.id].sort(),
+      `${replica.name} must keep the 1:1 participants`,
+    );
+  }
+  console.log(
+    'PASS really signed member and admin changes replicated to the raw stores and changed no conversation on the gated or the ungated node',
   );
-  console.log('PASS operations on a 1:1 after its genesis rejected');
 }
 
 const watchdog = setTimeout(() => {

@@ -6,26 +6,17 @@ package "conversations.domain" {
   abstract class Conversation <<AggregateRoot>> {
     -id: ConversationId
     -networkId: NetworkId
-    -type: ConversationType
     -participants: IdentityId[]
-    -name?: GroupConversationName
-    -admins: ConversationAdmins
     +hasParticipant(identityId: IdentityId): boolean
-    +isGroup(): boolean
-    +isAdmin(identityId: IdentityId): boolean
-    +getAdminIds(): IdentityId[]
     +getCreatorId(): IdentityId | undefined
   }
 
   class OneToOneConversation
-  class GroupConversation
 
-  class ConversationType <<ValueObject>>
-  class GroupConversationName <<ValueObject>>
-  class ConversationAdmins <<ValueObject>> {
-    -creatorId?: IdentityId
-    -adminIds: IdentityId[]
-  }
+  note right of OneToOneConversation
+    The only conversation the node knows.
+    Group rosters live in MLS on the clients.
+  end note
 
   class ConversationDraft {
     -draftKey: ConversationDraftKey
@@ -49,18 +40,17 @@ package "conversations.domain" {
   }
 
   class ConversationOperationAction <<Enum>>
-  class ConversationOperationApplier
   class ConversationOperationArgumentReader
   class ConversationOperationLimits
   class ConversationRoster {
-    +addMember(actor, identityId): void
-    +removeMember(actor, identityId): void
-    +leave(actor): void
-    +promoteAdmin(actor, identityId): void
-    +demoteAdmin(actor, identityId): void
+    +getCreator(): string
+    +getMembers(): string[]
+  }
+  class ConversationOperationApplier {
+    +create(genesis): ConversationRoster
   }
   class ConversationStateFold {
-    +rosterAfter(operations, candidate): ConversationRoster
+    +fold(operations): ConversationState
   }
   class InvalidConversationOperationError
   class ConversationOperationLimitExceededError
@@ -70,7 +60,6 @@ package "conversations.domain" {
     +requireMetadataById(id: ConversationId): Promise<Conversation>
     +requireMetadataAtFrontier(id: ConversationId, frontier: string[]): Promise<Conversation>
     +findByParticipant(participantId: IdentityId, limit: number, beforeConversationId?: ConversationId): Promise<Conversation[]>
-    +findOneToOneByParticipant(participantId: IdentityId, limit: number): Promise<Conversation[]>
     +findFrontier(id: ConversationId): Promise<string[]>
     +findOperations(id: ConversationId): Promise<ConversationOperation[]>
     +saveOperation(operation: ConversationOperation, proof: PublicMutationProof): Promise<void>
@@ -91,11 +80,7 @@ package "conversations.domain" {
   end note
 
   Conversation <|-- OneToOneConversation
-  Conversation <|-- GroupConversation
   Conversation --> NetworkId
-  Conversation --> ConversationType
-  Conversation --> GroupConversationName
-  Conversation --> ConversationAdmins
   Conversation o--> IdentityId
   ConversationDraft --> ConversationDraftKey
   ConversationDraft --> EncryptedMessagePayload
@@ -108,17 +93,13 @@ package "conversations.domain" {
   ConversationOperationApplier ..> ConversationOperationArgumentReader
   ConversationOperation ..> ConversationOperationLimits
   ConversationOperation --> ConversationOperationAction
-  ConversationRoster ..> InvalidConversationOperationError
+  ConversationOperationApplier ..> InvalidConversationOperationError
   ConversationOperationLimits ..> ConversationOperationLimitExceededError
 }
 
 package "conversations.application" {
   class ConversationCreator {
     +create(message: ConversationCreateMessage): Promise<Conversation>
-  }
-
-  class ConversationMemberChanger {
-    +change(message: ConversationMemberChangeMessage): Promise<Conversation>
   }
 
   class ConversationFrontierFinder {
@@ -139,7 +120,6 @@ package "conversations.application" {
   }
 
   ConversationCreator --> ConversationRepository
-  ConversationMemberChanger --> ConversationRepository
   ConversationFrontierFinder --> ConversationRepository
   ConversationsFinder --> ConversationRepository
   ConversationDraftSaver --> ConversationDraftRepository
@@ -162,8 +142,9 @@ package "conversations.infrastructure" {
 
   note bottom of ConversationOperationMutationPolicy
     Admits only the signed genesis of a 1:1.
-    Group genesis records of older nodes are
-    refused: group rosters live in MLS.
+    Group genesis, member and admin records of
+    older nodes are refused: group rosters live
+    in MLS.
   end note
 
   OrbitDBConversationRepository ..|> ConversationRepository

@@ -1282,11 +1282,6 @@ services:
       - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
       - '@contexts/content-replication/domain/ContentReplicationLimits'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
-  contexts/conversations/application/change-members/ConversationMemberChanger:
-    class: >-
-      /contexts/conversations/application/change-members/ConversationMemberChanger
-    arguments:
-      - '@contexts/conversations/domain/repositories/ConversationRepository'
   contexts/conversations/application/create-conversation/ConversationCreator:
     class: >-
       /contexts/conversations/application/create-conversation/ConversationCreator

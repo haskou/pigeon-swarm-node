@@ -139,7 +139,6 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
     const claimed = [...(record.participantIds as string[])].sort();
 
     if (
-      conversation.isGroup() ||
       !admitted.includes(authorIdentityId) ||
       conversation.getNetworkId().valueOf() !== record.networkId ||
       admitted.length !== 2 ||

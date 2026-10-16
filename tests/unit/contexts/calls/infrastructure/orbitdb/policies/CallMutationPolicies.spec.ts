@@ -50,7 +50,6 @@ describe('call mutation policies', () => {
       getNetworkId: () => ({ valueOf: () => NETWORK }),
       getParticipantIds: () =>
         [alice, bob].map((id) => ({ valueOf: () => id })),
-      isGroup: () => false,
     };
     const query = jest.fn(
       (_s: string, m: (d: Record<string, unknown>) => boolean) =>
@@ -241,11 +240,16 @@ describe('call mutation policies', () => {
       ).rejects.toBeInstanceOf(InvalidPublicMutationError);
     });
 
-    it('rejects a conversation start of a group conversation, whose calls are group-capability calls', async () => {
-      conversation.isGroup = () => true;
+    it('rejects a conversation start of a conversation that is not 1:1, whatever the record claims', async () => {
+      conversation.getParticipantIds = () =>
+        [alice, bob, carol].map((id) => ({ valueOf: () => id }));
 
       await expect(
-        startPolicy.assertPermitted(conversationStart(), alice, false),
+        startPolicy.assertPermitted(
+          conversationStart({ participantIds: [alice, bob, carol] }),
+          alice,
+          false,
+        ),
       ).rejects.toBeInstanceOf(InvalidPublicMutationError);
     });
 

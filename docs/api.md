@@ -2635,8 +2635,9 @@ Response:
 }
 ```
 
-`ConversationResource` carries `adminIds` (always empty for a 1:1) and `creatorId`
-(the author of the genesis). `participantIds` is the folded roster.
+`ConversationResource` carries `adminIds` (always empty, kept because clients still
+read it) and `creatorId` (the author of the genesis). `participantIds` is the folded
+roster.
 
 Implemented:
 
@@ -2656,17 +2657,16 @@ clients.
 
 ### Signed conversation operations
 
-A conversation is not a replicated document: its roster (members, admins, creator)
-is the deterministic fold of the operations its members signed, so a peer cannot
-forge a participant, an admin or a removal. The node never signs for a user and has
-no unsigned fallback. A route that creates or changes a conversation takes an
-`operation` body field:
+A conversation is not a replicated document: its participants and creator are the
+deterministic fold of the genesis its creator signed, so a peer cannot forge a
+participant. The node never signs for a user and has no unsigned fallback.
+`POST /conversations` takes an `operation` body field:
 
 ```json
 {
   "operation": {
     "createdAt": 1773848829055,
-    "parents": ["<digest from GET /conversations/{id}/frontier>"],
+    "parents": [],
     "mutation": { "...": "SignedPublicMutation" }
   }
 }
@@ -2683,9 +2683,12 @@ has exactly these nine fields, no more and no fewer:
   "conversationId": "<conversationId>",
   "networkId": "<networkId>",
   "authorIdentityId": "<identityId>",
-  "action": "member_added",
-  "args": { "identityId": "<identityId>" },
-  "parents": ["<digest>"],
+  "action": "conversation_created",
+  "args": {
+    "participantIds": ["<identityId>", "<identityId>"],
+    "type": "one-to-one"
+  },
+  "parents": [],
   "createdAt": 1773848829055
 }
 ```
@@ -2730,79 +2733,43 @@ order). It is the same for both participants. The genesis must carry exactly the
 derived from its own args.
 
 Group conversations live in MLS on the clients (D15): the node creates and folds no
-group conversation. A `conversation_created` record with `type: "group"` (the shape
-older nodes accepted, with a `group:` id derived from creator, network and nonce) is
-refused by the replication gate and by the decoder, so it never becomes a
-conversation.
+group conversation. The records older nodes accepted for groups are refused by the
+replication gate and by the decoder, so they never change a conversation: a
+`conversation_created` record with `type: "group"` (with a `group:` id derived from
+creator, network and nonce) and every `member_added`, `member_removed`,
+`member_left`, `admin_promoted` and `admin_demoted` record.
 
-**Frontier.** The client reads `frontier` from `GET /conversations/{conversationId}/frontier`
-immediately before signing and sends it as the sorted `parents`. The genesis has
-none. The node rebuilds the operation from the path conversation, the authenticated
-actor, the action of the endpoint, the `args` it derives from the other body fields,
+**Genesis.** The client signs the genesis with empty `parents`. The node rebuilds
+the operation from the authenticated actor, the `args` it derives from the body,
 and `createdAt` and `parents`; the signature only verifies if the client signed
-exactly that. An operation whose author lacks the permission in the roster folded
-from `parents`, or that names an unknown parent, is rejected. Operations are applied
-in a total order (parents first, lowest digest first among concurrent ones) and
-each is authorized again at that point, so concurrent conflicting changes converge
-on every node.
+exactly that.
 
-| Route                                             | action                 | `args`                                         |
-| ------------------------------------------------- | ---------------------- | ---------------------------------------------- |
-| `POST /conversations`                             | `conversation_created` | `{type: "one-to-one", participantIds}`         |
-| `POST /conversations/{id}/members`                | `member_added`         | `{identityId}`                                 |
-| `DELETE /conversations/{id}/members/{identityId}` | `member_removed`       | `{identityId}`                                 |
-| `DELETE /conversations/{id}/members/me`           | `member_left`          | `{}`                                           |
-| `PUT /conversations/{id}/admins/{identityId}`     | `admin_promoted`       | `{identityId}`                                 |
-| `DELETE /conversations/{id}/admins/{identityId}`  | `admin_demoted`        | `{identityId}`                                 |
+| Route                 | action                 | `args`                                 |
+| --------------------- | ---------------------- | -------------------------------------- |
+| `POST /conversations` | `conversation_created` | `{type: "one-to-one", participantIds}` |
 
-Each `args` accepts exactly the listed keys (an extra or missing key is refused).
-`participantIds` of a genesis is strictly ascending, unique, includes the author and
-has exactly 2 entries. The author of `member_left` is the leaving identity, taken
-from the authenticated headers, so its `args` is empty.
+`args` accepts exactly the listed keys (an extra or missing key is refused).
+`participantIds` is strictly ascending, unique, includes the author and has
+exactly 2 entries. A 1:1 is immutable: it accepts its genesis and refuses every
+other operation. Calls authorize against the participants of the signed genesis.
 
-**Roster rules** (applied identically when a route admits an operation and when
-every node folds it):
-
-- The creator (author of the genesis) is always a member and never an admin.
-- `member_added`: by the creator or an admin, the target is not yet a member, the
-  group has fewer than 256 members.
-- `member_removed`: by the creator or an admin; the target is a member, is not the
-  creator and is not the author (nobody removes themselves; they leave); removing an
-  admin is only allowed to the creator.
-- `member_left`: by any member except the creator.
-- `admin_promoted`: only by the creator; the target is a member, not the creator and
-  not already an admin. `admin_demoted`: only by the creator; the target is an admin.
-- A 1:1 is immutable: it accepts its genesis and refuses every other operation.
-- Calls of both kinds authorize against the folded roster
-  (1:1 from the signed genesis); a removed member loses access.
-
-**Limits.** `args` is at most 4096 bytes of JSON, a group has at most 256 members and
-an identity other than the creator signs at most 1000 operations per conversation
-(the creator is exempt). They are decided from the signed operation and its causal
-past, so every node agrees. A route that would exceed one answers `409` with code
-`ConversationOperationLimitExceededError` (`Conversation operation limit exceeded`)
-and stores nothing; an operation another author signed concurrently beyond the quota
-is skipped by the fold on every node without any error.
+**Limits.** `args` is at most 4096 bytes of JSON. A genesis beyond it answers `409`
+with code `ConversationOperationLimitExceededError` (`Conversation operation limit
+exceeded`) and stores nothing.
 
 **Errors.** A body whose signed `operation` (or, on community routes, `operation` /
 `moderationLog`) is missing, not an object or lacks `createdAt`, `parents` or `mutation`
 is rejected before any signature check with `400` (validation error); it never
-reaches the use case. A malformed record, wrong args, a wrong id, a mismatching signature
-author, an unknown parent or any violated roster rule answers `409` with code
-`InvalidConversationOperationError` (`Invalid conversation operation`). An unknown
-conversation answers `409` with code `ConversationNotFoundError`.
+reaches the use case. A malformed record, wrong args, a wrong id or a mismatching
+signature author answers `409` with code `InvalidConversationOperationError`
+(`Invalid conversation operation`).
 
-**Worked examples** (all use `X-Identity-Id`, `X-Timestamp` and `X-Signature` like
-every route; `operation` is built as above, with `action` and `args` of the row):
+**Worked example** (uses `X-Identity-Id`, `X-Timestamp` and `X-Signature` like
+every route; `operation` is built as above):
 
 ```text
 POST /conversations                                  action conversation_created
   parents []                                         args {"participantIds":["<A>","<B>"],"type":"one-to-one"}
-POST /conversations/{id}/members   {"identityId":"<C>"}   action member_added   args {"identityId":"<C>"}
-DELETE /conversations/{id}/members/<C>                    action member_removed args {"identityId":"<C>"}
-DELETE /conversations/{id}/members/me                     action member_left    args {}
-PUT /conversations/{id}/admins/<B>                        action admin_promoted args {"identityId":"<B>"}
-DELETE /conversations/{id}/admins/<B>                     action admin_demoted  args {"identityId":"<B>"}
 ```
 
 For the first line `<A>` signs the record
@@ -2829,40 +2796,30 @@ record with `id`, and sends `participantIds: ["<B>"]` (or both), `networkId`,
 `keychainExternalIdentifier` and `operation`. A reference signer lives in
 `tests/support/signConversationOperation.ts`.
 
-Fixed, byte-exact test vectors (keys, ids, digests, signing content, signatures for
-every action, including a two-parent operation) live in
+Fixed, byte-exact test vectors (keys, ids, digests, signing content, signatures)
+live in
 [`tests/fixtures/conversation-operation-vectors.json`](../tests/fixtures/conversation-operation-vectors.json);
 a unit spec recomputes every value with the real domain code, so a client signer can
-assert it reproduces them. The `group_genesis` and `group_genesis_unicode` cases are
-the group genesis records older nodes accepted; nodes now refuse them, and the spec
-asserts that the decoder refuses them and that the group operations fold to no
-conversation.
+assert it reproduces them. Only the 1:1 genesis cases are admitted. The group
+genesis and the member and admin cases are the records older nodes accepted;
+nodes now refuse them, and the spec asserts that the decoder refuses them and that
+they fold to no conversation.
 
-### Conversation members and admins
-
-Each route below carries `{ "operation": { "createdAt", "parents", "mutation" } }`
-(see _Signed conversation operations_), is authenticated with the signed HTTP
-headers, and answers the updated `ConversationResource`.
+### Conversation frontier
 
 ```http
-POST   /conversations/{conversationId}/members            body: { "identityId": "<identityId>", "operation": {...} }
-DELETE /conversations/{conversationId}/members/me         body: { "operation": {...} }
-DELETE /conversations/{conversationId}/members/{identityId} body: { "operation": {...} }
-PUT    /conversations/{conversationId}/admins/{identityId}  body: { "operation": {...} }
-DELETE /conversations/{conversationId}/admins/{identityId}  body: { "operation": {...} }
-GET    /conversations/{conversationId}/frontier
+GET /conversations/{conversationId}/frontier
 ```
 
 Implemented:
 
-- add a member (`member_added`), remove one (`member_removed`), leave
-  (`member_left`), promote (`admin_promoted`) and demote (`admin_demoted`)
-- refuse with `409` an unknown conversation (`ConversationNotFoundError`) and with `409` any change the roster
-  rules or limits do not allow (`Invalid conversation operation`,
-  `Conversation operation limit exceeded`); nothing is stored on refusal
-- `GET .../frontier` is member-only and returns `{ "frontier": ["<digest>"] }`, the
-  sorted digests no other operation names as parent: the `parents` of the next
-  signed operation
+- member-only; returns `{ "frontier": ["<digest>"] }`, the sorted digests no other
+  operation names as parent
+
+The member and admin routes (`POST /conversations/{id}/members`,
+`DELETE .../members/me`, `DELETE .../members/{identityId}`,
+`PUT`/`DELETE .../admins/{identityId}`) are gone and answer `404`: group rosters
+live in MLS on the clients (D15).
 
 ### Conversation drafts
 

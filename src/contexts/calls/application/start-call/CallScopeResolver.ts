@@ -35,8 +35,8 @@ export default class CallScopeResolver {
   }
 
   /**
-   * Group calls carry an MLS capability instead: the node must not learn a
-   * group's roster from a call, so a group conversation is no call scope.
+   * A conversation call is a 1:1 call between its participants. Group calls
+   * carry an MLS capability instead: the node never knows a group's roster.
    */
   private async resolveConversation(
     message: CallStartMessage,
@@ -50,10 +50,7 @@ export default class CallScopeResolver {
     const conversation =
       await this.conversationRepository.requireMetadataById(conversationId);
 
-    if (
-      conversation.isGroup() ||
-      !conversation.hasParticipant(message.requesterIdentityId)
-    ) {
+    if (!conversation.hasParticipant(message.requesterIdentityId)) {
       throw new InvalidCallScopeError();
     }
 

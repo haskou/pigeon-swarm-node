@@ -78,8 +78,9 @@ recommended design does not need it.
 
 > **D15 (group roster in MLS):** group conversations no longer live on the
 > node. Their roster moved into MLS on the clients, and the node refuses the
-> group records older nodes accepted. The group parts of this slice describe
-> what was built and is being removed.
+> group records older nodes accepted: the group genesis and every member and
+> admin change. The group parts of this slice describe what was built and has
+> been removed.
 
 ### Threat today
 
@@ -123,8 +124,8 @@ One signed operation log per conversation, in a new replicated store
 A 1:1 conversation is a log that holds only its genesis operation; every other
 operation on it is refused, which makes it immutable without a second code path.
 
-A parallel `ConversationOperation` family (operation, ledger, fold, limits,
-argument reader, applier) is built in the conversations context instead of
+A parallel `ConversationOperation` family (operation, fold, limits, argument
+reader, applier) is built in the conversations context instead of
 generalising the community classes. The community classes are bound to the
 `Community` aggregate, `CommunityId.derive`, `scopeType: community_operation`,
 the `communityId` field and ids of the form `community:<id>:op:<hash>`;
@@ -139,7 +140,7 @@ reused unchanged: `PublicMutationProof`, `PublicMutationPolicy`,
 
 ```jsonc
 {
-  "action": "conversation_created | member_added | member_removed | member_left | admin_promoted | admin_demoted",
+  "action": "conversation_created",
   "args": { /* per action, see below */ },
   "authorIdentityId": "<identityId>",
   "conversationId": "one-to-one:<hash>",
@@ -156,14 +157,13 @@ Canonicalization, digest and signature are exactly those of
 `PublicMutationRecord.withProof`. Removed fields: `updatedAt`, `receivedAt`,
 `lastEventId`, `lastEventType` (local-only).
 
-| Action | Args | Authorization (against the folded past) |
+| Action | Args | Authorization |
 | --- | --- | --- |
 | `conversation_created` | `{type: 'one-to-one', participantIds}` | genesis, see below |
-| `member_added` | `{identityId}` | author is creator or admin; target not a member; member cap |
-| `member_removed` | `{identityId}` | author is creator or admin; target is a member and not the creator; removing an admin needs the creator |
-| `member_left` | `{}` | author is a member and not the creator |
-| `admin_promoted` | `{identityId}` | author is the creator; target is a member |
-| `admin_demoted` | `{identityId}` | author is the creator; target is an admin |
+
+The group actions older nodes accepted (`member_added`, `member_removed`,
+`member_left`, `admin_promoted`, `admin_demoted`) are refused by the gate and by
+the decoder (D15).
 
 Genesis id binding (policy recomputes it, rejects on mismatch):
 
@@ -179,9 +179,9 @@ Genesis id binding (policy recomputes it, rejects on mismatch):
 1. Shape valid; operation id recomputes; genesis if and only if `parents` is empty.
 2. Genesis: id binding above; `participantIds` sorted, unique, includes the
    author and holds exactly 2 identities.
-3. Other operations: every parent is known (else refused and retried by the
-   registry), the author is authorized by the state folded from the parents,
-   arguments at most 4096 bytes, per-author quota (creator exempt).
+3. Other operations: refused. The member and admin actions older nodes accepted
+   (`member_added`, `member_removed`, `member_left`, `admin_promoted`,
+   `admin_demoted`) no longer decode (D15).
 4. `networkId` is a network of the author identity. Participants need not be
    known locally.
 5. No deletions, no `removed` tombstones.

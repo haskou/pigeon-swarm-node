@@ -4,7 +4,7 @@ import { ConversationOperationAction } from '@app/contexts/conversations/domain/
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 
-/** Ascending, as the genesis of a conversation requires: creator < alice < bob < carol < dave < mallory. */
+/** Ascending, as the genesis of a conversation requires: creator < alice < bob < mallory. */
 export const creator = new IdentityId(
   'MCowBQYDK2VwAyEA7UkoxijRwsbq6QM4kFmVYSlZJzpcY/k2NsFGFKyHN9E=',
 );
@@ -13,12 +13,6 @@ export const alice = new IdentityId(
 );
 export const bob = new IdentityId(
   'MCowBQYDK2VwAyEAgTl3Dqh9F19Wo1Rmw0x+zMuNipG07jeiXfYPW4/Js5Q=',
-);
-export const carol = new IdentityId(
-  'MCowBQYDK2VwAyEAiodf/x6zhFFXes1a/uQFRWVo3XyJ4JCGOgVXvHr0nxc=',
-);
-export const dave = new IdentityId(
-  'MCowBQYDK2VwAyEAiojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w=',
 );
 export const mallory = new IdentityId(
   'MCowBQYDK2VwAyEAypOsFwUYcHHWe4PH/w7+gQjo7EUwV113JoeTM9vavnw=',
@@ -58,79 +52,5 @@ export function oneToOneGenesis(): ConversationOperation {
       type: 'one-to-one',
     },
     [],
-  );
-}
-
-export function add(
-  parents: ConversationOperation[],
-  member: IdentityId,
-  author = creator,
-  createdAt = 2,
-): ConversationOperation {
-  return operation(
-    ConversationOperationAction.MEMBER_ADDED,
-    author,
-    { identityId: member.valueOf() },
-    parents,
-    createdAt,
-  );
-}
-
-export function remove(
-  parents: ConversationOperation[],
-  member: IdentityId,
-  author = creator,
-  createdAt = 2,
-): ConversationOperation {
-  return operation(
-    ConversationOperationAction.MEMBER_REMOVED,
-    author,
-    { identityId: member.valueOf() },
-    parents,
-    createdAt,
-  );
-}
-
-export function promote(
-  parents: ConversationOperation[],
-  member: IdentityId,
-  author = creator,
-  createdAt = 2,
-): ConversationOperation {
-  return operation(
-    ConversationOperationAction.ADMIN_PROMOTED,
-    author,
-    { identityId: member.valueOf() },
-    parents,
-    createdAt,
-  );
-}
-
-export function demote(
-  parents: ConversationOperation[],
-  member: IdentityId,
-  author = creator,
-  createdAt = 2,
-): ConversationOperation {
-  return operation(
-    ConversationOperationAction.ADMIN_DEMOTED,
-    author,
-    { identityId: member.valueOf() },
-    parents,
-    createdAt,
-  );
-}
-
-export function leave(
-  parents: ConversationOperation[],
-  author: IdentityId,
-  createdAt = 2,
-): ConversationOperation {
-  return operation(
-    ConversationOperationAction.MEMBER_LEFT,
-    author,
-    {},
-    parents,
-    createdAt,
   );
 }

@@ -25,7 +25,7 @@ recomputed whenever a record is admitted or read, so:
 | Check | Evaluated against | Causal? |
 | --- | --- | --- |
 | Community operation permission (`CommunityOperationLedger.admit`) | `CommunityStateFold` of `closureOf(parents)`; unknown parents are refused | yes |
-| Conversation operation permission (`ConversationOperationLedger.admit`) | `ConversationStateFold` of `closureOf(parents)`; unknown parents are refused | yes |
+| Conversation operation permission (`ConversationOperationApplier.create`) | the genesis alone; a 1:1 accepts no other operation, and the group member and admin operations are refused since D15 | yes |
 | Device authorization of **every** signed record, operations included | the current head of the author's identity | **no** |
 | Community / conversation permission of non-operation records (community channel messages, pins and reactions, moderation log, invites, polls, calls) | the current folded community or conversation state | no, evaluated at admission (see [Residuals](#residuals)) |
 

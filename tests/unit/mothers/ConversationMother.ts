@@ -1,6 +1,5 @@
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { ConversationType } from '@app/contexts/conversations/domain/value-objects/ConversationType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
@@ -56,11 +55,9 @@ export class ConversationMother {
     return new OneToOneConversation(
       ConversationId.deterministic(this.author, this.recipient, this.networkId),
       this.networkId,
-      ConversationType.ONE_TO_ONE,
       [this.author, this.recipient].sort((left, right) =>
         left.valueOf() < right.valueOf() ? -1 : 1,
       ),
-      undefined,
       this.author,
     );
   }
