@@ -7,6 +7,7 @@ import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedL
 import LocalDatabaseIsLockedError from '@app/shared/infrastructure/local-db/LocalDatabaseIsLockedError';
 import { mock, MockProxy } from 'jest-mock-extended';
 
+import { IdentityIdMother } from '../../../mothers/IdentityIdMother';
 import { NodeBlockListMother } from '../../../mothers/NodeBlockListMother';
 
 describe('NodeOwnerResetCommand', () => {
@@ -85,6 +86,17 @@ describe('NodeOwnerResetCommand', () => {
       'The new node owner must be an identity id: yarn node:reset-owner <new owner identity id>',
     );
   });
+
+  it.each(IdentityIdMother.forged())(
+    'should refuse an id with %s, which is not a usable identity key',
+    (_case, forged: IdentityId) => {
+      expect(() =>
+        NodeOwnerResetCommand.newOwnerFrom([forged.valueOf()]),
+      ).toThrow(
+        'The new node owner must be an identity id: yarn node:reset-owner <new owner identity id>',
+      );
+    },
+  );
 
   it('should close the local database after the reset', async () => {
     resetter.reset.mockResolvedValue([]);
