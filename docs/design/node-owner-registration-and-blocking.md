@@ -328,8 +328,8 @@ signed by the owner identity:
   streams the body, hashing as it reads, stops at `NODE_BLOCK_LIST_MAX_BYTES`
   (`413`) or after `NODE_BLOCK_LIST_BODY_TIMEOUT_MS` (default 2 minutes,
   `408`), and parses JSON only once the bytes hash to `X-Body-Hash` (`401`
-  otherwise). A failed, slow or aborted body frees the slot at once, so a
-  slow client cannot hold uploads back.
+  otherwise). A failed, slow or aborted body frees the slot at once and its
+  response closes the connection, so a slow client cannot hold uploads back.
 - The document carries no reasons. A published list must not become a place
   for accusations or personal data; any note stays in the owner's client.
 - The identity id is the public key, so anyone can verify the document from

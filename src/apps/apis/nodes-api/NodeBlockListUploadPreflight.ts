@@ -79,6 +79,8 @@ export class NodeBlockListUploadPreflight extends Route {
         ).read(request, bodyHash),
       );
     } catch (error: unknown) {
+      // The rest of a refused body stays unread; do not keep its socket.
+      response.setHeader('Connection', 'close');
       releaseUploadSlot();
 
       throw error;

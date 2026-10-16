@@ -86,6 +86,23 @@ export class PostIdentityRoute extends Route {
     }
   }
 
+  /**
+   * Whether a failed creation left the identity unsaved. A failure after the
+   * save (charge, event publish) still created it, and a failing check is
+   * treated as created, so the code use stays spent either way.
+   */
+  private async isStillNotCreated(
+    message: IdentityPublishMessage,
+  ): Promise<boolean> {
+    try {
+      return await this.creationDetector.isCreation(
+        new IdentityCreationDetectorMessage(message.identity),
+      );
+    } catch {
+      return false;
+    }
+  }
+
   private async admitAndPublish(
     message: IdentityPublishMessage,
     body: PostIdentityBody,
@@ -108,13 +125,7 @@ export class PostIdentityRoute extends Route {
         .status(HttpRouteStatusEnum.OK)
         .send(viewModel.toResource());
     } catch (error: unknown) {
-      // A failure after the identity was saved (charge, event publish) still
-      // created it, so its code use stays spent.
-      if (
-        await this.creationDetector.isCreation(
-          new IdentityCreationDetectorMessage(message.identity),
-        )
-      ) {
+      if (await this.isStillNotCreated(message)) {
         await this.registrationAdmitter.release(reservation);
       }
 

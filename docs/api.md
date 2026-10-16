@@ -1876,7 +1876,8 @@ hashing it as it arrives, stops reading as soon as it exceeds
 `NODE_BLOCK_LIST_MAX_BYTES` or takes longer than
 `NODE_BLOCK_LIST_BODY_TIMEOUT_MS` (default 120000 ms), and parses JSON only
 once the bytes hash to `X-Body-Hash`. A failed, slow or aborted body frees the
-upload slot at once, so the next upload is not held back.
+upload slot at once, so the next upload is not held back, and its response
+closes the connection.
 
 Responses: `200` with `{ "blockList": <stored document> }`; `401` with code
 `401020` for an invalid, stale or replayed signature, a malformed
