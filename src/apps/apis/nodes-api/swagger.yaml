@@ -181,14 +181,19 @@ paths:
       tags:
         - nodes
       summary: Get the published own block list
-      description: Public. Returns the stored own block list document verbatim so other nodes can verify its signature.
+      description: Public. Returns the stored own block list as the exact bytes its owner signed, the RFC 8785 canonical JSON of the document without identitySignature, and the signature in the X-Identity-Signature header, so a subscriber verifies the bytes against the identity it pinned before parsing them.
       responses:
         '200':
-          description: The stored own block list.
+          description: The canonical JSON bytes the owner signed.
+          headers:
+            X-Identity-Signature:
+              description: Owner signature over "pigeon:node-block-list:v1\n" followed by the response body bytes. Exposed to browsers through Access-Control-Expose-Headers.
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NodeBlockList'
+                $ref: '#/components/schemas/PublishedNodeBlockList'
         '404':
           description: Publication is off or no list is stored (code 404040).
   /node/block-sources/:
@@ -755,6 +760,38 @@ components:
         identitySignature:
           type: string
           description: Owner signature over "pigeon:node-block-list:v1\n" plus the RFC 8785 canonical JSON of the document without this field.
+    PublishedNodeBlockList:
+      type: object
+      additionalProperties: false
+      description: Served as its RFC 8785 canonical JSON, byte for byte the content the owner signed.
+      required:
+        [
+          type,
+          ownerIdentityId,
+          version,
+          issuedAt,
+          blockedIdentityIds,
+          blockedNodePeerIds,
+        ]
+      properties:
+        type:
+          type: string
+          enum: [pigeon-node-block-list]
+        ownerIdentityId:
+          type: string
+        version:
+          type: integer
+          minimum: 1
+        issuedAt:
+          type: integer
+        blockedIdentityIds:
+          type: array
+          items:
+            type: string
+        blockedNodePeerIds:
+          type: array
+          items:
+            type: string
     NodeBlocksResource:
       type: object
       required: [blockList]

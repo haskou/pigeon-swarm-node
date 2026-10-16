@@ -82,6 +82,11 @@ the host while the node is stopped.
   and no other identity can claim it. The command refuses, before opening the
   database, a missing or invalid identity id, and refuses the current owner.
   Networks, mailboxes, private blobs, the node id and the libp2p peer key stay.
+  So do the version floors of adopted publishers (the highest version this
+  node ever accepted from each one): they are anti-rollback state, not owner
+  settings, and they hold only public publisher ids and version numbers.
+  Clearing them would let a stale or captured old list of a publisher roll
+  blocks back once the new owner adopts it again.
   The command opens the same local database, whose lock (`level`,
   `EmbeddedLocalDatabase.ts:3`) makes it fail while the node is running.
 - **Full reset.** Delete the local database folder, `PIGEON_LOCAL_DB_PATH`
@@ -310,19 +315,31 @@ signed by the owner identity:
 
 - **Publishing.** The owner turns on publication with owner-signed
   `PUT /node/blocks/publication { "published": true }`. The node then serves
-  the stored document verbatim at public `GET /node/blocks/published`. It is
-  off by default, because a published list reveals whom this owner blocked.
+  public `GET /node/blocks/published`: the body is exactly the signed content,
+  the RFC 8785 canonical JSON of the stored document without
+  `identitySignature`, and the signature travels in the `X-Identity-Signature`
+  response header. It is off by default, because a published list reveals
+  whom this owner blocked.
 - **Adopting.** Another node's owner adds a source with owner-signed
   `PUT /node/block-sources/{ownerIdentityId} { "origin": "https://..." }`. That
-  node periodically fetches `GET {origin}/node/blocks/published` and keeps the
-  response only if:
-  - the signature verifies against the **pinned** `ownerIdentityId`;
-  - the version is higher than any this node ever accepted from that
-    publisher, even before the source was removed or the owner settings were
-    reset, so a served old version cannot roll blocks back;
-  - it fits in `NODE_BLOCK_LIST_MAX_BYTES`, enforced while streaming.
+  node periodically fetches `GET {origin}/node/blocks/published`, reading at
+  most `NODE_BLOCK_LIST_MAX_BYTES` while streaming, and judges the response in
+  this order, recording the first failure as the fetch outcome:
+  1. the header signature verifies against the **pinned** `ownerIdentityId`
+     over `"pigeon:node-block-list:v1\n"` + the raw body bytes, before any
+     byte is parsed (`invalid-signature`, also for a missing or malformed
+     header);
+  2. the bytes parse as a valid block list and are already in canonical
+     form, so the signed bytes and the kept document cannot differ
+     (`invalid-document`);
+  3. the document names the pinned identity as its owner (`wrong-signer`);
+  4. the version is higher than any this node ever accepted from that
+     publisher, even before the source was removed or the owner settings were
+     reset, so a served old version cannot roll blocks back (`not-newer`).
 
   An unreachable source or an invalid response keeps the last valid version.
+  Verifying first means an unauthenticated server never reaches the JSON
+  parser with bytes the pinned publisher did not sign.
   Outbound requests reuse the private-address guard used for link previews
   (`LinkPreviewUrlGuard.ts`).
 
@@ -346,9 +363,10 @@ signed by the owner identity:
 - **No consensus.** Lists are never gossiped or merged into shared state. Each
   node decides whose lists to trust, one owner identity at a time.
 - **Publisher owner change.** After a rotation or reset, the publisher's new
-  documents are signed by another identity. Subscribers reject them and keep
-  the last valid version until their owner pins the new identity. A new owner
-  therefore cannot silently take over other nodes' block decisions.
+  documents are signed by another identity. Their signature does not verify
+  against the pinned identity, so subscribers record `invalid-signature` and
+  keep the last valid version until their owner pins the new identity. A new
+  owner therefore cannot silently take over other nodes' block decisions.
 - **Local owner change.** This node's stored list survives an owner change: it
   still blocks what the previous owner blocked, and only the new owner can
   replace it, with a version higher than the stored one. The current owner is

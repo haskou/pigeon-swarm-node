@@ -1916,9 +1916,24 @@ shape.
 GET /node/blocks/published
 ```
 
-Public. Returns the stored own block list document verbatim, so any node can
-verify its `identitySignature`. Returns `404` with code `404040` while
-publication is off or no list is stored.
+Public. Returns the stored own block list as the exact bytes its owner signed:
+the canonical JSON (RFC 8785) of the document without `identitySignature`,
+with `Content-Type: application/json`. The signature travels apart, in the
+`X-Identity-Signature` response header (exposed to browsers through
+`Access-Control-Expose-Headers`). It covers `"pigeon:node-block-list:v1\n"`
+followed by the body bytes, so a subscriber verifies the bytes against the
+identity it pinned before it parses them.
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json; charset=utf-8
+X-Identity-Signature: <base64 signature>
+
+{"blockedIdentityIds":["<identityId>"],"blockedNodePeerIds":[],"issuedAt":1773848829055,"ownerIdentityId":"<identityId>","type":"pigeon-node-block-list","version":3}
+```
+
+Returns `404` with code `404040` while publication is off or no list is
+stored.
 
 ```http
 PUT /node/block-sources/{ownerIdentityId}
@@ -1961,9 +1976,9 @@ fetch. `lastFetchOutcome` is one of:
 |---|---|
 | `accepted` | The fetched document was kept. |
 | `not-newer` | Its `version` was not higher than the one kept. |
-| `wrong-signer` | It was not owned by the pinned identity. |
-| `invalid-signature` | Its signature did not verify. |
-| `invalid-document` | It could not be parsed. |
+| `invalid-signature` | The pinned identity did not sign the served bytes, or `X-Identity-Signature` was missing or malformed. Checked before the bytes are parsed, so a publisher that changed its key lands here. |
+| `invalid-document` | The signed bytes are not a valid block list in canonical form. |
+| `wrong-signer` | The pinned identity signed a list that names another owner. |
 | `too-large` | It was larger than `NODE_BLOCK_LIST_MAX_BYTES`. |
 | `redirected` | The source answered with a redirect. |
 | `refused-address` | The origin resolved to a non-public address. |
