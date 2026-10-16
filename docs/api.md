@@ -1887,7 +1887,7 @@ The node blocks:
 
 - the owner's own list,
 - plus, from each source, the entries the owner approved that the source
-  still lists, or every entry it lists when `autoApply` is on,
+  still lists, or every entry of a list fetched while `autoApply` is on,
 - minus the local exceptions,
 - and never the owner or this node's own peer id.
 
@@ -1931,7 +1931,11 @@ PUT /node/block-sources/{ownerIdentityId}
 Adopts the list that `ownerIdentityId` publishes at
 `{origin}/node/blocks/published`, or changes an adopted source's `origin` or
 `autoApply`. Changing the origin keeps the pin and the last valid version.
-Turning `autoApply` on approves every pending entry. `origin` must be a bare
+Turning `autoApply` on approves nothing already pending; it applies the lists
+fetched from then on. Pending entries are approved only naming the version
+shown to the owner. A source refuses any list whose version is not above the
+highest one this node ever accepted from that publisher, even after the source
+was removed or the owner settings were reset. `origin` must be a bare
 `https` origin; anything else gets `409 InvalidNodeBlockSourceOriginError`.
 The source is fetched on the next refresh run.
 

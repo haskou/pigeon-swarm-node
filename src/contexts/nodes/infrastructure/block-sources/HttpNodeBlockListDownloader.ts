@@ -1,5 +1,4 @@
 import { NodeBlockSourceFetchFailedError } from '@app/contexts/nodes/domain/errors/NodeBlockSourceFetchFailedError';
-import { NodeBlockList } from '@app/contexts/nodes/domain/NodeBlockList';
 import { NodeBlockListPrimitives } from '@app/contexts/nodes/domain/NodeBlockListPrimitives';
 import { NodeBlockSourceFetchLimits } from '@app/contexts/nodes/domain/NodeBlockSourceFetchLimits';
 import NodeBlockListDownloader from '@app/contexts/nodes/domain/services/NodeBlockListDownloader';
@@ -14,7 +13,8 @@ import { UrlIsNotPublicError } from '@app/shared/infrastructure/http/public-url/
  * Downloads a published list over HTTPS from a public address only, without
  * following redirects, within the fetch timeout, and stops reading as soon as
  * the document passes `NODE_BLOCK_LIST_MAX_BYTES`. The document is parsed only
- * once it was read in full within that limit.
+ * once it was read in full within that limit, and its entries only once the
+ * source verified its signature.
  */
 export default class HttpNodeBlockListDownloader extends NodeBlockListDownloader {
   private static readonly ACCEPT = 'application/json';
@@ -32,16 +32,31 @@ export default class HttpNodeBlockListDownloader extends NodeBlockListDownloader
     return NodeBlockSourceFetchOutcome.UNREACHABLE;
   }
 
-  private static parse(body: Buffer): NodeBlockList {
+  private static invalidDocument(): NodeBlockSourceFetchFailedError {
+    return new NodeBlockSourceFetchFailedError(
+      NodeBlockSourceFetchOutcome.INVALID_DOCUMENT,
+    );
+  }
+
+  /** Only a JSON object; its fields are checked by the source, signature first. */
+  private static parse(body: Buffer): NodeBlockListPrimitives {
+    let document: unknown;
+
     try {
-      return NodeBlockList.fromPrimitives(
-        JSON.parse(body.toString('utf8')) as NodeBlockListPrimitives,
-      );
+      document = JSON.parse(body.toString('utf8'));
     } catch {
-      throw new NodeBlockSourceFetchFailedError(
-        NodeBlockSourceFetchOutcome.INVALID_DOCUMENT,
-      );
+      throw HttpNodeBlockListDownloader.invalidDocument();
     }
+
+    if (
+      typeof document !== 'object' ||
+      document === null ||
+      Array.isArray(document)
+    ) {
+      throw HttpNodeBlockListDownloader.invalidDocument();
+    }
+
+    return document as NodeBlockListPrimitives;
   }
 
   constructor(
@@ -67,7 +82,9 @@ export default class HttpNodeBlockListDownloader extends NodeBlockListDownloader
     }
   }
 
-  public async download(origin: NodeBlockSourceOrigin): Promise<NodeBlockList> {
+  public async download(
+    origin: NodeBlockSourceOrigin,
+  ): Promise<NodeBlockListPrimitives> {
     const response = await this.get(origin.publishedListUrl());
 
     if (response.redirectLocation) {

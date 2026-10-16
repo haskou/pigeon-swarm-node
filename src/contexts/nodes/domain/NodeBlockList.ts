@@ -58,6 +58,43 @@ export class NodeBlockList extends NodeBlocks {
     return values.map((value) => new NodePeerId(value));
   }
 
+  /** Only the signed fields, so an unvalidated document is never canonicalized whole. */
+  private static signedContentOf(primitives: NodeBlockListPrimitives): string {
+    const canonical = canonicalize({
+      blockedIdentityIds: primitives.blockedIdentityIds,
+      blockedNodePeerIds: primitives.blockedNodePeerIds,
+      issuedAt: primitives.issuedAt,
+      ownerIdentityId: primitives.ownerIdentityId,
+      type: primitives.type,
+      version: primitives.version,
+    });
+
+    assert(
+      canonical !== undefined,
+      new InvalidNodeBlockListError('document cannot be canonicalized'),
+    );
+
+    return `${NodeBlockList.SIGNING_DOMAIN}${canonical}`;
+  }
+
+  /**
+   * Whether `identityId` signed `primitives`, checked before any entry is
+   * validated so an unsigned document costs no more than one verification.
+   */
+  public static isSignedBy(
+    primitives: NodeBlockListPrimitives,
+    identityId: IdentityId,
+  ): boolean {
+    try {
+      return identityId.isValidSignature(
+        NodeBlockList.signedContentOf(primitives),
+        new Signature(primitives.identitySignature),
+      );
+    } catch {
+      return false;
+    }
+  }
+
   public static fromPrimitives(
     primitives: NodeBlockListPrimitives,
   ): NodeBlockList {
@@ -93,20 +130,6 @@ export class NodeBlockList extends NodeBlocks {
     );
   }
 
-  private signedContent(): string {
-    const canonical = canonicalize({
-      ...this.toPrimitives(),
-      identitySignature: undefined,
-    });
-
-    assert(
-      canonical !== undefined,
-      new InvalidNodeBlockListError('document cannot be canonicalized'),
-    );
-
-    return `${NodeBlockList.SIGNING_DOMAIN}${canonical}`;
-  }
-
   /**
    * A newer version from the same owner, or any list from a new owner: the
    * storer has already checked that `list` is signed by the current owner, so
@@ -132,10 +155,7 @@ export class NodeBlockList extends NodeBlocks {
   }
 
   public hasValidSignature(): boolean {
-    return this.ownerIdentityId.isValidSignature(
-      this.signedContent(),
-      this.identitySignature,
-    );
+    return NodeBlockList.isSignedBy(this.toPrimitives(), this.ownerIdentityId);
   }
 
   public isVersion(version: NodeBlockListVersion): boolean {

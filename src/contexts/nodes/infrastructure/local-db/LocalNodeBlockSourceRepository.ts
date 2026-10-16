@@ -2,14 +2,21 @@ import { NodeBlockSourceNotFoundError } from '@app/contexts/nodes/domain/errors/
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
 import NodeBlockSourceRepository from '@app/contexts/nodes/domain/repositories/NodeBlockSourceRepository';
 import { ClearedNodeOwnerSetting } from '@app/contexts/nodes/domain/value-objects/ClearedNodeOwnerSetting';
+import { NodeBlockSourceVersionFloor } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceVersionFloor';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 
 import { LocalNodeBlockSourceDocument } from './documents/LocalNodeBlockSourceDocument';
+import { LocalNodeBlockSourceVersionFloorDocument } from './documents/LocalNodeBlockSourceVersionFloorDocument';
 
-/** Adopted block sources, keyed by the publisher identity they are pinned to. */
+/**
+ * Adopted block sources, keyed by the publisher identity they are pinned to.
+ * Version floors live in their own namespace, which removing a source or
+ * resetting the owner settings never clears.
+ */
 export default class LocalNodeBlockSourceRepository extends NodeBlockSourceRepository {
   private static readonly NAMESPACE = 'node_block_sources';
+  private static readonly FLOORS_NAMESPACE = 'node_block_source_version_floors';
 
   private static toSource(document: Record<string, unknown>): NodeBlockSource {
     return NodeBlockSource.fromPrimitives(
@@ -19,6 +26,28 @@ export default class LocalNodeBlockSourceRepository extends NodeBlockSourceRepos
 
   constructor(private readonly database: EmbeddedLocalDatabase) {
     super();
+  }
+
+  /** Never lowers the stored floor, whatever version the saved source holds. */
+  private async raiseVersionFloor(source: NodeBlockSource): Promise<void> {
+    const ownerIdentityId = source.getOwnerIdentityId();
+    const stored = await this.versionFloor(ownerIdentityId);
+    const floor = source.getVersionFloor();
+
+    if (!floor.isGreaterThan(stored)) {
+      return;
+    }
+
+    const document: LocalNodeBlockSourceVersionFloorDocument = {
+      _id: ownerIdentityId.valueOf(),
+      versionFloor: floor.valueOf(),
+    };
+
+    await this.database.save(
+      LocalNodeBlockSourceRepository.FLOORS_NAMESPACE,
+      document._id,
+      document,
+    );
   }
 
   public async findAll(): Promise<NodeBlockSource[]> {
@@ -53,6 +82,17 @@ export default class LocalNodeBlockSourceRepository extends NodeBlockSourceRepos
     return document !== undefined;
   }
 
+  public async versionFloor(
+    ownerIdentityId: IdentityId,
+  ): Promise<NodeBlockSourceVersionFloor> {
+    const document = (await this.database.findOne(
+      LocalNodeBlockSourceRepository.FLOORS_NAMESPACE,
+      ownerIdentityId.valueOf(),
+    )) as LocalNodeBlockSourceVersionFloorDocument | undefined;
+
+    return new NodeBlockSourceVersionFloor(document?.versionFloor ?? 0);
+  }
+
   public async save(source: NodeBlockSource): Promise<void> {
     const id = source.getOwnerIdentityId().valueOf();
     const document: LocalNodeBlockSourceDocument = {
@@ -60,6 +100,7 @@ export default class LocalNodeBlockSourceRepository extends NodeBlockSourceRepos
       source: source.toPrimitives(),
     };
 
+    await this.raiseVersionFloor(source);
     await this.database.save(
       LocalNodeBlockSourceRepository.NAMESPACE,
       id,

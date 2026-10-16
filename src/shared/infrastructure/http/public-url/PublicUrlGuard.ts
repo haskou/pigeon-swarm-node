@@ -8,7 +8,7 @@ import { UrlIsNotPublicError } from './UrlIsNotPublicError';
  * Refuses URLs that would make this node call itself or its private network:
  * non-http(s) schemes, localhost names and private, loopback, link-local,
  * shared, benchmark, multicast or reserved addresses, including every address
- * a hostname resolves to. Callers connect to the resolved address only, so a
+ * a hostname resolves to. Callers connect only to the checked addresses, so a
  * second DNS answer cannot swap in a private one.
  */
 export default class PublicUrlGuard {
@@ -74,66 +74,10 @@ export default class PublicUrlGuard {
     return normalized;
   }
 
-  private mappedIpv4Address(address: string): string | undefined {
-    if (!address.startsWith('::ffff:')) {
-      return undefined;
-    }
-
-    const suffix = address.replace('::ffff:', '');
-
-    if (net.isIP(suffix) === 4) {
-      return suffix;
-    }
-
-    return this.mappedIpv4AddressFromHextets(suffix.split(':'));
-  }
-
-  private mappedIpv4AddressFromHextets(hextets: string[]): string | undefined {
-    if (hextets.length !== 2) {
-      return undefined;
-    }
-
-    const [high, low] = hextets.map((hextet) => parseInt(hextet, 16));
-
-    if (
-      !this.isValidMappedIpv4Hextet(high) ||
-      !this.isValidMappedIpv4Hextet(low)
-    ) {
-      return undefined;
-    }
-
-    return [
-      Math.floor(high / 256),
-      high % 256,
-      Math.floor(low / 256),
-      low % 256,
-    ].join('.');
-  }
-
-  private isValidMappedIpv4Hextet(hextet: number): boolean {
-    return !Number.isNaN(hextet) && hextet >= 0 && hextet <= 0xffff;
-  }
-
   private isBlockedIpv4(address: string): boolean {
     return PublicUrlGuard.BLOCKED_IPV4_RANGES.some(([base, prefixLength]) =>
       this.isIpv4InRange(address, base, prefixLength),
     );
-  }
-
-  private isUniqueLocalIpv6(address: string): boolean {
-    return address.startsWith('fc') || address.startsWith('fd');
-  }
-
-  private isLinkLocalIpv6(address: string): boolean {
-    return ['fe8', 'fe9', 'fea', 'feb'].some((prefix) =>
-      address.startsWith(prefix),
-    );
-  }
-
-  private isBlockedMappedIpv4(address: string): boolean {
-    const mappedAddress = this.mappedIpv4Address(address);
-
-    return mappedAddress !== undefined && this.isBlockedIpv4(mappedAddress);
   }
 
   private ipv6GroupHextets(group: string): number[] {
@@ -164,33 +108,55 @@ export default class PublicUrlGuard {
     return [...headHextets, ...zeros, ...tailHextets];
   }
 
-  /**
-   * NAT64 (64:ff9b::/32, well-known and local-use), 6to4 (2002::/16) and
-   * Teredo (2001::/32) embed or route to IPv4 space; site-local (fec0::/10)
-   * is private.
-   */
-  private isTunnelledOrSiteLocalIpv6(address: string): boolean {
-    const [first, second] = this.ipv6Hextets(address);
+  private embeddedIpv4(high: number, low: number): string {
+    return [
+      Math.floor(high / 256),
+      high % 256,
+      Math.floor(low / 256),
+      low % 256,
+    ].join('.');
+  }
 
+  private areZero(hextets: number[]): boolean {
+    return hextets.every((hextet) => hextet === 0);
+  }
+
+  /** An IPv4-mapped address (::ffff:0:0/96), however it is spelled. */
+  private isMappedIpv4(hextets: number[]): boolean {
+    return this.areZero(hextets.slice(0, 5)) && hextets[5] === 0xffff;
+  }
+
+  /**
+   * Inside global unicast (2000::/3): IETF protocol assignments including
+   * Teredo (2001::/23), documentation (2001:db8::/32, 3fff::/20), 6to4
+   * (2002::/16) and SRv6 SIDs (5f00::/16) are never public services.
+   */
+  private isReservedGlobalIpv6([first, second]: number[]): boolean {
     return (
-      (first === 0x64 && second === 0xff9b) ||
+      (first === 0x2001 && (second < 0x200 || second === 0x0db8)) ||
       first === 0x2002 ||
-      (first === 0x2001 && second === 0) ||
-      (first >= 0xfec0 && first <= 0xfeff)
+      (first === 0x3fff && second < 0x1000) ||
+      first === 0x5f00
     );
   }
 
+  /**
+   * Only global unicast (2000::/3) is allowed, which refuses unspecified,
+   * loopback, IPv4-compatible and -translated, NAT64, discard-only, unique
+   * local, link-local, site-local and multicast addresses. IPv4-mapped
+   * addresses are judged by the IPv4 address they carry.
+   */
   private isBlockedIpv6(address: string): boolean {
-    const normalized = this.normalizedAddress(address);
+    const hextets = this.ipv6Hextets(this.normalizedAddress(address));
+
+    if (this.isMappedIpv4(hextets)) {
+      return this.isBlockedIpv4(this.embeddedIpv4(hextets[6], hextets[7]));
+    }
 
     return (
-      normalized === '::1' ||
-      normalized === '::' ||
-      normalized.startsWith('ff') ||
-      this.isUniqueLocalIpv6(normalized) ||
-      this.isLinkLocalIpv6(normalized) ||
-      this.isBlockedMappedIpv4(normalized) ||
-      this.isTunnelledOrSiteLocalIpv6(normalized)
+      hextets[0] < 0x2000 ||
+      hextets[0] > 0x3fff ||
+      this.isReservedGlobalIpv6(hextets)
     );
   }
 
@@ -243,8 +209,10 @@ export default class PublicUrlGuard {
     addresses.forEach((address) => this.assertAllowedAddress(address.address));
 
     return {
-      address: addresses[0].address,
-      family: addresses[0].family as 4 | 6,
+      addresses: addresses.map(({ address, family }) => ({
+        address,
+        family: family as 4 | 6,
+      })),
       url,
     };
   }

@@ -317,8 +317,9 @@ signed by the owner identity:
   node periodically fetches `GET {origin}/node/blocks/published` and keeps the
   response only if:
   - the signature verifies against the **pinned** `ownerIdentityId`;
-  - the version is higher than the last one kept, so a served old version
-    cannot roll blocks back;
+  - the version is higher than any this node ever accepted from that
+    publisher, even before the source was removed or the owner settings were
+    reset, so a served old version cannot roll blocks back;
   - it fits in `NODE_BLOCK_LIST_MAX_BYTES`, enforced while streaming.
 
   An unreachable source or an invalid response keeps the last valid version.
@@ -331,7 +332,8 @@ signed by the owner identity:
   Auto-apply would let a publisher silently block this node's users or cut it
   off from its peers, so it is not the default.
 - **Auto-apply (opt-in per source).** The owner may turn on `autoApply` for a
-  source they fully trust; its added entries then take effect on fetch.
+  source they fully trust; entries added by lists fetched from then on take
+  effect on fetch. Turning it on approves nothing already pending.
 - **Removals** by a source take effect on fetch in both modes: they only lift
   blocks. An owner who wants to keep such a block adds the entry to their own
   list.

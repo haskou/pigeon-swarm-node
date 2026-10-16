@@ -7,11 +7,13 @@ import { PublicHttpGetOptions } from './PublicHttpGetOptions';
 import { PublicHttpResponse } from './PublicHttpResponse';
 import { PublicHttpResponseTooLargeError } from './PublicHttpResponseTooLargeError';
 import PublicUrlGuard from './PublicUrlGuard';
+import { ResolvedPublicAddress } from './ResolvedPublicAddress';
 import { ResolvedPublicUrl } from './ResolvedPublicUrl';
 
 /**
- * One GET to a public URL. The host is resolved and checked by the guard and
- * the connection goes to that checked address only. Redirects are returned,
+ * One GET to a public URL. The host is resolved and every address is checked
+ * by the guard; the connection goes to those checked addresses only, trying
+ * each in turn. Redirects are returned,
  * never followed. The whole exchange has one deadline, and the body is
  * streamed and abandoned as soon as it passes `maxBytes`, so a hostile server
  * can neither hold the caller nor make it buffer more than the limit.
@@ -94,15 +96,18 @@ export default class PublicHttpGetter {
   }
 
   private request(
-    resolved: ResolvedPublicUrl,
+    url: URL,
+    target: ResolvedPublicAddress,
     options: PublicHttpGetOptions,
     signal: AbortSignal,
   ): Promise<http.IncomingMessage> {
     const { promise, reject, resolve } =
       Promise.withResolvers<http.IncomingMessage>();
-    const request = this.client(resolved.url).request(
-      resolved.url,
+    const request = this.client(url).request(
+      url,
       {
+        /** A pooled socket is keyed by host, not by the checked address it reached. */
+        agent: false,
         headers: {
           accept: options.accept,
           'accept-encoding': 'identity',
@@ -110,17 +115,12 @@ export default class PublicHttpGetter {
         },
         lookup: (_hostname, lookupOptions, callback) => {
           if (typeof lookupOptions === 'object' && lookupOptions.all) {
-            callback(null, [
-              {
-                address: resolved.address,
-                family: resolved.family,
-              } as LookupAddress,
-            ]);
+            callback(null, [target as LookupAddress]);
 
             return;
           }
 
-          callback(null, resolved.address, resolved.family);
+          callback(null, target.address, target.family);
         },
         method: 'GET',
         signal,
@@ -136,6 +136,30 @@ export default class PublicHttpGetter {
     return promise;
   }
 
+  /**
+   * Connects to each checked address in resolver order and keeps the first
+   * that answers, so one unreachable address family does not fail the fetch.
+   */
+  private async firstAnswer(
+    resolved: ResolvedPublicUrl,
+    options: PublicHttpGetOptions,
+    signal: AbortSignal,
+  ): Promise<http.IncomingMessage> {
+    for (const target of resolved.addresses) {
+      signal.throwIfAborted();
+
+      try {
+        return await this.request(resolved.url, target, options, signal);
+      } catch (error) {
+        if (!(error instanceof PublicHttpFetchError)) {
+          throw error;
+        }
+      }
+    }
+
+    throw new PublicHttpFetchError('Could not fetch URL.');
+  }
+
   private async exchange(
     url: URL,
     options: PublicHttpGetOptions,
@@ -145,7 +169,7 @@ export default class PublicHttpGetter {
 
     signal.throwIfAborted();
 
-    const response = await this.request(resolved, options, signal);
+    const response = await this.firstAnswer(resolved, options, signal);
     const statusCode = response.statusCode ?? 0;
 
     if (statusCode < 200 || statusCode >= 300) {

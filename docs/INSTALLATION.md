@@ -50,7 +50,7 @@ The command refuses, changes nothing and exits with status `1` when the new owne
 - every adopted block source, with its pending and approved entries;
 - the local block exceptions.
 
-It keeps the node id, networks, relay configuration, identities, content and keys. It needs no confirmation flag: naming the new owner is the confirmation. Check the id before running it: a valid id whose key nobody holds leaves the node with an owner no one can sign as, and the reset has to be run again.
+It keeps the node id, networks, the highest list version accepted from each block publisher (so an older list cannot be replayed), relay configuration, identities, content and keys. It needs no confirmation flag: naming the new owner is the confirmation. Check the id before running it: a valid id whose key nobody holds leaves the node with an owner no one can sign as, and the reset has to be run again.
 
 To start over instead, stop the node and delete the `PIGEON_LOCAL_DB_PATH` folder. The node then starts with a new node id and no owner, networks, relay configuration or other local data, while the IPFS peer key under `IPFS_STORAGE_PATH` survives. Such a node is unclaimed, like a new installation: claim it with `PUT /node/owner` before anyone else can reach the API.
 

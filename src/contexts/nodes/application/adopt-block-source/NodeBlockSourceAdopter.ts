@@ -6,7 +6,8 @@ import { NodeBlockSourceAdopterMessage } from './messages/NodeBlockSourceAdopter
 /**
  * Adopts another owner's published list, pinned to that owner's identity, or
  * changes where it is fetched from and whether additions apply on their own.
- * The list is fetched by the refresher; nothing applies before the first one.
+ * The list is fetched by the refresher; nothing applies before the first one,
+ * and no list older than one accepted before the source was removed is kept.
  */
 export default class NodeBlockSourceAdopter {
   constructor(
@@ -22,6 +23,7 @@ export default class NodeBlockSourceAdopter {
         message.ownerIdentityId,
         message.origin,
         message.autoApply,
+        await this.repository.versionFloor(message.ownerIdentityId),
       );
 
       await this.repository.save(adopted);

@@ -215,7 +215,7 @@ paths:
       tags:
         - nodes
       summary: Adopt or reconfigure a block source
-      description: Adopts the list ownerIdentityId publishes at {origin}/node/blocks/published, pinned to that identity, or changes its origin or autoApply. Turning autoApply on approves every pending entry. Requires a signed request from the current node owner.
+      description: Adopts the list ownerIdentityId publishes at {origin}/node/blocks/published, pinned to that identity, or changes its origin or autoApply. Turning autoApply on approves nothing already pending; it applies the lists fetched from then on. A list whose version is not above the highest one ever accepted from that publisher, even before a removal or owner reset, is refused. Requires a signed request from the current node owner.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'

@@ -9,4 +9,6 @@ export interface NodeBlockSourcePrimitives {
   list: NodeBlockListPrimitives | null;
   origin: string;
   ownerIdentityId: string;
+  /** Highest version ever accepted from this publisher; it outlives the source. */
+  versionFloor: number;
 }

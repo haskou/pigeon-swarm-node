@@ -1,5 +1,7 @@
+import { ResolvedPublicAddress } from './ResolvedPublicAddress';
+
 export type ResolvedPublicUrl = {
-  address: string;
-  family: 4 | 6;
+  /** Every address the hostname resolved to, in resolver order. */
+  addresses: ResolvedPublicAddress[];
   url: URL;
 };
