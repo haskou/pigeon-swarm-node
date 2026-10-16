@@ -35,21 +35,22 @@ If initialization fails (for example an invalid environment value, an `API_PORT`
 
 ## Resetting the Node Owner
 
-The node owner is the identity that claimed the node with `PUT /node/owner`. If its key is lost, no one can sign as the owner again, so the node operator clears the owner on the host:
+The node owner is the identity that claimed the node with `PUT /node/owner`. If its key is lost, no one can sign as the owner again, so the node operator hands the node to a new owner on the host:
 
-1. Stop the node. The command opens the local database at `PIGEON_LOCAL_DB_PATH`, which a running node keeps locked; while the node runs it prints `Owner reset failed: The local database at <path> is in use by another process, such as a running node.`, changes nothing and exits with status `1`.
-2. From a checkout, run `yarn build` once, then `yarn node:reset-owner` with the same `PIGEON_LOCAL_DB_PATH` as the node. In a container built from the `final` target, run `yarn node:reset-owner` in a one-off container with the node's volumes and environment. With the bundled `docker-compose.yml`, stop the backend and run `docker compose run --rm backend sh -c "yarn build && yarn node:reset-owner"`.
-3. Start the node. The next `PUT /node/owner` works as on an unclaimed node, so the first identity to claim it becomes the owner: claim it before anyone else can reach the API.
+1. Pick the new owner: an identity whose key you hold. You need its identity id, the base64 public key without the PEM header and footer. It must differ from the current owner.
+2. Stop the node. The command opens the local database at `PIGEON_LOCAL_DB_PATH`, which a running node keeps locked; while the node runs it prints `Owner reset failed: The local database at <path> is in use by another process, such as a running node.`, changes nothing and exits with status `1`.
+3. From a checkout, run `yarn build` once, then `yarn node:reset-owner <new owner identity id>` with the same `PIGEON_LOCAL_DB_PATH` as the node. In a container built from the `final` target, run it in a one-off container with the node's volumes and environment. With the bundled `docker-compose.yml`, stop the backend and run `docker compose run --rm backend sh -c "yarn build && yarn node:reset-owner <new owner identity id>"`.
+4. Start the node. The new owner already owns it: only that identity can sign owner requests, and a `PUT /node/owner` from any other identity is refused. The node is never unclaimed, so there is no window in which someone else could claim it.
 
-The command clears only the owner settings and prints each one it cleared:
+The command refuses, changes nothing and exits with status `1` when the new owner is missing, is not an identity id, or already owns the node, and when no node has run on the local database yet. Otherwise it installs the new owner, clears only the old owner's settings and prints each one it cleared:
 
-- the node owner;
+- the previous node owner;
 - the registration mode, back to `open`, and every registration code;
 - the node's own block list.
 
-It keeps the node id, networks, relay configuration, identities, content and keys. It needs no confirmation flag and prints `Nothing to clear` when there is no owner setting.
+It keeps the node id, networks, relay configuration, identities, content and keys. It needs no confirmation flag: naming the new owner is the confirmation.
 
-To start over instead, stop the node and delete the `PIGEON_LOCAL_DB_PATH` folder. The node then starts with a new node id and no owner, networks, relay configuration or other local data, while the IPFS peer key under `IPFS_STORAGE_PATH` survives.
+To start over instead, stop the node and delete the `PIGEON_LOCAL_DB_PATH` folder. The node then starts with a new node id and no owner, networks, relay configuration or other local data, while the IPFS peer key under `IPFS_STORAGE_PATH` survives. Such a node is unclaimed, like a new installation: claim it with `PUT /node/owner` before anyone else can reach the API.
 
 ## Frontend Static Assets
 
