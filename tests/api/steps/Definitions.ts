@@ -1624,10 +1624,11 @@ export default class Definitions {
     'the node operator replaced the lost node owner with the other identity while the node was stopped',
   )
   public async theNodeOperatorReplacedTheLostNodeOwner(): Promise<void> {
-    await this.ensureOtherIdentityKeyPair();
+    const otherKeyPair = await this.ensureOtherIdentityKeyPair();
+
     await Kernel.di
       .getService<NodeOwnerSettingsResetter>(NodeOwnerSettingsResetter)
-      .reset(this.otherIdentityId as IdentityId);
+      .reset(new IdentityId(otherKeyPair.toPrimitives().publicKey));
     await Kernel.di.getService<NodeBlockPolicy>(NodeBlockPolicy).load();
   }
 

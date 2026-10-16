@@ -1,7 +1,7 @@
+import { LocalNodeNotFoundError } from '@app/contexts/nodes/domain/errors/LocalNodeNotFoundError';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
-import { ClearedNodeOwnerSetting } from '@app/contexts/nodes/domain/value-objects/ClearedNodeOwnerSetting';
 import { NodeRegistrationMode } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationMode';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
@@ -233,29 +233,20 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     this.syncRuntimeNetworksInBackground();
   }
 
-  /**
-   * Rewrites only the owner and registration mode; the runtime networks are
-   * left alone because the node is stopped and its networks are kept.
-   */
-  public async resetOwnerSettings(): Promise<ClearedNodeOwnerSetting[]> {
+  public async loadStoppedLocalNode(): Promise<Node> {
     const storedMetadata = await this.findMetadata();
 
     if (!storedMetadata) {
-      return [];
+      throw new LocalNodeNotFoundError();
     }
 
-    const node = this.nodeFromMetadata(storedMetadata);
-    const cleared = node.resetOwner();
+    return this.nodeFromMetadata(storedMetadata);
+  }
 
-    if (cleared.length === 0) {
-      return [];
-    }
-
+  public async saveStoppedLocalNode(node: Node): Promise<void> {
     const metadata = this.metadataMapper.toDocument(node);
 
     await this.persistMetadata(metadata);
     this.latestSavedMetadata = metadata;
-
-    return cleared;
   }
 }

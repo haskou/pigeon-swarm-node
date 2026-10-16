@@ -1,10 +1,10 @@
+import { NodeOwnerResetUsageError } from '@app/apps/commands/nodes/errors/NodeOwnerResetUsageError';
 import NodeOwnerResetCommand from '@app/apps/commands/nodes/NodeOwnerResetCommand';
-import NodeOwnerResetUsageError from '@app/apps/commands/nodes/errors/NodeOwnerResetUsageError';
 import NodeOwnerSettingsResetter from '@app/contexts/nodes/application/reset-owner-settings/NodeOwnerSettingsResetter';
 import { ClearedNodeOwnerSetting } from '@app/contexts/nodes/domain/value-objects/ClearedNodeOwnerSetting';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import LocalDatabaseIsLockedError from '@app/shared/infrastructure/local-db/LocalDatabaseIsLockedError';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { NodeBlockListMother } from '../../../mothers/NodeBlockListMother';

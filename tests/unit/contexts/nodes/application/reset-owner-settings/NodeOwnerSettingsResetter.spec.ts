@@ -172,14 +172,12 @@ describe('NodeOwnerSettingsResetter', () => {
   it('should refuse the identity that already owns the node and change nothing', async () => {
     const before = await storedMetadata();
 
-    await expect(resetter.reset(new IdentityId(owner))).rejects.toThrow(
+    await expect(resetter.reset(new IdentityId(owner.valueOf()))).rejects.toThrow(
       NodeIsAlreadyOwnedByThisIdentityError,
     );
 
     await expect(storedMetadata()).resolves.toEqual(before);
-    await expect(registrationCodeRepository.findAll()).resolves.toHaveLength(
-      2,
-    );
+    await expect(registrationCodeRepository.findAll()).resolves.toHaveLength(2);
     await expect(blockListRepository.findLocal()).resolves.not.toBeInstanceOf(
       NoNodeBlocks,
     );
@@ -193,9 +191,7 @@ describe('NodeOwnerSettingsResetter', () => {
     );
 
     await expect(storedMetadata()).resolves.toBeUndefined();
-    await expect(registrationCodeRepository.findAll()).resolves.toHaveLength(
-      2,
-    );
+    await expect(registrationCodeRepository.findAll()).resolves.toHaveLength(2);
   });
 
   it('should keep the previous owner when clearing a setting fails, so the operator can run it again', async () => {

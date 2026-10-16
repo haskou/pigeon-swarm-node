@@ -76,6 +76,7 @@ import { PrivateBlobLimitsFromEnvironment } from '../contexts/private-blobs/infr
 import FilePrivateBlobBytesStore from '../contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore';
 import LocalPrivateBlobOwnerKeyDeriver from '../contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobOwnerKeyDeriver';
 import LocalPrivateBlobRepository from '../contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository';
+import { IdentityId } from '../contexts/shared/domain/value-objects/IdentityId';
 import { pigeonEnvironmentSchema } from '../shared/infrastructure/environment/PigeonEnvironment';
 import HttpRequestContext from '../shared/infrastructure/express/HttpRequestContext';
 import {
@@ -479,11 +480,11 @@ export default class PigeonApplication {
     await nodeLoader.loadNode();
   }
 
-  /** Runs `yarn node:reset-owner`; returns the report for the operator. */
-  public async resetNodeOwner(): Promise<string> {
+  /** Runs `yarn node:reset-owner <new owner identity id>`; returns the report for the operator. */
+  public async resetNodeOwner(newOwner: IdentityId): Promise<string> {
     return this.kernel.di
       .getService<NodeOwnerResetCommand>(NodeOwnerResetCommand)
-      .run();
+      .run(newOwner);
   }
 
   public async shutdown(): Promise<void> {

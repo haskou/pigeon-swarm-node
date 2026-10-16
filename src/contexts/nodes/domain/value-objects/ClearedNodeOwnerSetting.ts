@@ -13,8 +13,8 @@ export class ClearedNodeOwnerSetting extends StringValueObject {
     return `${count} ${count === 1 ? singular : plural}`;
   }
 
-  public static owner(): ClearedNodeOwnerSetting {
-    return new ClearedNodeOwnerSetting('node owner');
+  public static previousOwner(): ClearedNodeOwnerSetting {
+    return new ClearedNodeOwnerSetting('previous node owner');
   }
 
   public static registrationMode(

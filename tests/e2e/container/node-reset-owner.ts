@@ -296,21 +296,13 @@ async function main(): Promise<void> {
     const currentOwner = await seedClaimedNode(databasePath);
     const newOwner = await NodeBlockListMother.identityId();
 
-    await refusesWithoutAValidNewOwner(
-      databasePath,
-      environment,
-      currentOwner,
-    );
+    await refusesWithoutAValidNewOwner(databasePath, environment, currentOwner);
     console.log(
       'PASS node:reset-owner refuses a missing, invalid or unchanged new owner',
     );
     await failsWhileTheNodeRuns(databasePath, environment, newOwner);
     console.log('PASS node:reset-owner refuses to run while the node runs');
-    await replacesTheOwnerOfTheStoppedNode(
-      databasePath,
-      environment,
-      newOwner,
-    );
+    await replacesTheOwnerOfTheStoppedNode(databasePath, environment, newOwner);
     console.log(
       'PASS node:reset-owner installs the new owner and clears the owner settings of a stopped node',
     );
