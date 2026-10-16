@@ -56,8 +56,9 @@ topic.
 `@haskou/pigeon-swarm-crypto`, which also derives the record key and the
 synthetic DHT key. Records are sealed with
 `PrivateNetworkRelayRecordEnvelope`: the library validates the exact record
-fields, and a node drops an envelope that fails to open. The node still checks
-record expiry and the peer signature before using a relay.
+fields, and a node drops an envelope that fails to open. Private relay records
+carry no signature: only members holding the network seed can seal them, and
+the node checks record expiry before using a relay.
 
 The public relay-record connection has no HTTP or Bitswap block brokers and
 uses ephemeral blockstore/datastore instances. It still provides Kademlia,
