@@ -6,13 +6,22 @@ export default abstract class NodeRepository {
   public abstract loadLocalNodeId(): Promise<NodeId>;
   public abstract loadLocalNode(): Promise<Node>;
   public abstract loadLocalNodeRegistrationMode(): Promise<NodeRegistrationMode>;
-  public abstract saveLocalNode(node: Node): Promise<void>;
   /**
-   * The local node of a stopped node, for the host commands: generates no node
-   * and leaves the runtime networks alone. Throws `LocalNodeNotFoundError` when
-   * no node has run on the local database.
+   * Loads the latest local node, applies `change` and saves it, with no other
+   * update of the local node in between, so concurrent owner writes never
+   * revert each other. Nothing is saved when `change` throws. Returns the
+   * changed node, its domain events still to pull.
    */
-  public abstract loadStoppedLocalNode(): Promise<Node>;
-  /** Saves the local node of a stopped node without starting its networks. */
-  public abstract saveStoppedLocalNode(node: Node): Promise<void>;
+  public abstract updateLocalNode(
+    change: (node: Node) => Promise<void> | void,
+  ): Promise<Node>;
+
+  /**
+   * `updateLocalNode` for a stopped node, for the host commands: generates no
+   * node and leaves the runtime networks alone. Throws `LocalNodeNotFoundError`
+   * when no node has run on the local database.
+   */
+  public abstract updateStoppedLocalNode(
+    change: (node: Node) => Promise<void> | void,
+  ): Promise<Node>;
 }

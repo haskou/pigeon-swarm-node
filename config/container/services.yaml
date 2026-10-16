@@ -40,6 +40,9 @@ services:
   apps/apis/identities-api/IdentityAdmissionSourceRateLimiter:
     class: /apps/apis/identities-api/IdentityAdmissionSourceRateLimiter
     arguments: []
+  apps/apis/identities-api/IdentityCreationQueue:
+    class: /apps/apis/identities-api/IdentityCreationQueue
+    arguments: []
   apps/apis/identities-api/IdentityNetworkAdmissionRateLimiter:
     class: /apps/apis/identities-api/IdentityNetworkAdmissionRateLimiter
     arguments:
@@ -1783,8 +1786,7 @@ services:
   contexts/nodes/application/add-network/NodeNetworkAdder:
     class: /contexts/nodes/application/add-network/NodeNetworkAdder
     arguments:
-      - '@contexts/nodes/domain/services/NodeLoaderService'
-      - '@contexts/nodes/domain/services/NodeSaverService'
+      - '@contexts/nodes/domain/repositories/NodeRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/nodes/application/admit-registration/NodeRegistrationAdmitter:
     class: /contexts/nodes/application/admit-registration/NodeRegistrationAdmitter
@@ -1813,15 +1815,13 @@ services:
   contexts/nodes/application/assign-owner/NodeOwnerAssigner:
     class: /contexts/nodes/application/assign-owner/NodeOwnerAssigner
     arguments:
-      - '@contexts/nodes/domain/services/NodeLoaderService'
-      - '@contexts/nodes/domain/services/NodeSaverService'
+      - '@contexts/nodes/domain/repositories/NodeRepository'
       - '@contexts/nodes/domain/services/NodeBlockPolicy'
   contexts/nodes/application/change-registration-mode/NodeRegistrationModeChanger:
     class: >-
       /contexts/nodes/application/change-registration-mode/NodeRegistrationModeChanger
     arguments:
-      - '@contexts/nodes/domain/services/NodeLoaderService'
-      - '@contexts/nodes/domain/services/NodeSaverService'
+      - '@contexts/nodes/domain/repositories/NodeRepository'
       - '@shared/infrastructure/messageBus/LocalDomainEventPublisher'
   contexts/nodes/application/find-block-exceptions/NodeBlockExceptionsFinder:
     class: >-
@@ -1906,8 +1906,7 @@ services:
   contexts/nodes/application/remove-network/NodeNetworkRemover:
     class: /contexts/nodes/application/remove-network/NodeNetworkRemover
     arguments:
-      - '@contexts/nodes/domain/services/NodeLoaderService'
-      - '@contexts/nodes/domain/services/NodeSaverService'
+      - '@contexts/nodes/domain/repositories/NodeRepository'
       - '@contexts/nodes/domain/services/NodeNetworkDataCleaner'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/nodes/application/reset-owner-settings/NodeOwnerSettingsResetter:
@@ -1950,8 +1949,7 @@ services:
     class: >-
       /contexts/nodes/application/update-relay-configuration/NodeRelayConfigurationUpdater
     arguments:
-      - '@contexts/nodes/domain/services/NodeLoaderService'
-      - '@contexts/nodes/domain/services/NodeSaverService'
+      - '@contexts/nodes/domain/repositories/NodeRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/nodes/domain/repositories/NodeBlockExceptionsRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeBlockExceptionsRepository'
   contexts/nodes/domain/repositories/NodeBlockListRepository: '@contexts/nodes/infrastructure/local-db/LocalNodeBlockListRepository'
@@ -1981,10 +1979,6 @@ services:
     arguments:
       - '@contexts/nodes/domain/repositories/NodeRepository'
   contexts/nodes/domain/services/NodeNetworkDataCleaner: '@contexts/nodes/infrastructure/local-db/LocalNodeNetworkDataCleaner'
-  contexts/nodes/domain/services/NodeSaverService:
-    class: /contexts/nodes/domain/services/NodeSaverService
-    arguments:
-      - '@contexts/nodes/domain/repositories/NodeRepository'
   contexts/nodes/infrastructure/block-sources/HttpNodeBlockListDownloader:
     class: /contexts/nodes/infrastructure/block-sources/HttpNodeBlockListDownloader
     arguments:

@@ -111,12 +111,12 @@ describe('NodeOwnerSettingsResetter', () => {
     newOwner = await NodeBlockListMother.identityId();
     const network = new NetworkMother().withPrivateKey();
 
-    claimedNode = await nodeRepository.loadLocalNode();
-    claimedNode.addNetwork(network.build());
-    claimedNode.assignOwner(owner, owner);
-    claimedNode.changeRegistrationMode(NodeRegistrationMode.CODES);
-    claimedNode.updateRelayConfiguration(relayConfiguration);
-    await nodeRepository.saveLocalNode(claimedNode);
+    claimedNode = await nodeRepository.updateLocalNode((node) => {
+      node.addNetwork(network.build());
+      node.assignOwner(owner, owner);
+      node.changeRegistrationMode(NodeRegistrationMode.CODES);
+      node.updateRelayConfiguration(relayConfiguration);
+    });
     await registrationCodeRepository.save(issueCode());
     await registrationCodeRepository.save(issueCode());
     await blockListRepository.saveLocal(

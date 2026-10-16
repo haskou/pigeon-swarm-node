@@ -69,6 +69,12 @@ Implemented:
 - replay rejection: a mutating (non-GET/HEAD/OPTIONS) signed request whose
   identity and signature were already accepted inside the freshness window is
   rejected with `401`; the guard is in-memory and per node
+- declared body hash (`PUT /node/blocks` only): the request also carries
+  `X-Body-Hash`, the lowercase hex SHA-256 of the exact body bytes, and the
+  canonical payload is built with that hex string as its `body` instead of the
+  body itself. The node verifies the signature, freshness, replay and owner
+  from the headers before reading any body byte, then streams the body and
+  refuses it with `401` code `401020` unless it hashes to `X-Body-Hash`
 - Cucumber scenarios for invalid and stale signed requests
 
 Byte-exact vectors for the canonical request payload and its Ed25519 signature
@@ -1833,10 +1839,16 @@ are not gated.
 
 ```http
 PUT /node/blocks
+Content-Type: application/json
 X-Identity-Id: <owner identityId>
 X-Timestamp: <ms>
+X-Body-Hash: <lowercase hex SHA-256 of the exact body bytes>
 X-Signature: <signature>
 ```
+
+`X-Signature` signs the canonical request (see _Authentication_) with
+`body` set to the `X-Body-Hash` string, not the JSON document:
+`SignedHttpRequestSignature.signingContent({ method: "PUT", path, timestamp, body: <X-Body-Hash> })`.
 
 ```json
 {
@@ -1855,14 +1867,28 @@ X-Signature: <signature>
 document without `identitySignature`. Both arrays are sorted and hold no
 duplicates. Each change is a new document with a higher `version`; the whole
 list is replaced. There is no entry cap; the body is limited to
-`NODE_BLOCK_LIST_MAX_BYTES` (`413` when larger). A non-owner or a stale
-timestamp is refused before the body is read. Only one upload runs at a time.
+`NODE_BLOCK_LIST_MAX_BYTES`.
 
-Responses: `200` with `{ "blockList": <stored document> }`; `401` for an invalid or stale
-signed request; `403` with code `403010` when the caller is not the node
-owner; `409` when the document is not signed by the current owner, its
-signature does not verify, or its version is not higher than the stored one;
-`429` with code `429060` while another block list upload is in progress.
+The node checks, in order, before reading any body byte: the signature over
+`X-Body-Hash`, the timestamp, replay, the block list, that the signer is the
+current owner, and that no other upload is running. It then streams the body,
+hashing it as it arrives, stops reading as soon as it exceeds
+`NODE_BLOCK_LIST_MAX_BYTES` or takes longer than
+`NODE_BLOCK_LIST_BODY_TIMEOUT_MS` (default 120000 ms), and parses JSON only
+once the bytes hash to `X-Body-Hash`. A failed, slow or aborted body frees the
+upload slot at once, so the next upload is not held back, and its response
+closes the connection.
+
+Responses: `200` with `{ "blockList": <stored document> }`; `401` with code
+`401020` for an invalid, stale or replayed signature, a malformed
+`X-Body-Hash`, or a body that does not hash to it (`401021` when a signed
+header is missing); `403` with code `403010` when the signer is not the node
+owner; `413` with code `413010` when the body is larger than
+`NODE_BLOCK_LIST_MAX_BYTES`; `408` with code `408010` when the body is not
+received within `NODE_BLOCK_LIST_BODY_TIMEOUT_MS`; `429` with code `429060` while another block list
+upload is in progress; `400` when the body is not JSON or not a block list
+document; `409` when the document is not signed by the current owner, its
+signature does not verify, or its version is not higher than the stored one.
 
 ```http
 GET /node/blocks
@@ -2655,9 +2681,10 @@ elsewhere still brings a new identity here. An identity that already
 replicated here is a republish or an update and is never gated, nor is login.
 The check runs after the per-address limiter and before the per-identity and
 per-network counters, so refused attempts never spend those limits. One use of
-the code is reserved before publishing and released if publishing fails, so a
-refused proof never burns a use and two concurrent requests cannot both spend
-the last one. Creation is refused with `403`, code `403011`, when the mode is
+the code is reserved before publishing and released if publishing fails before
+the identity is saved, so a refused proof never burns a use, a failure after
+the save never makes a creation free, and two concurrent requests cannot both
+spend the last one. Creation is refused with `403`, code `403011`, when the mode is
 `closed` ("Identity creation on this node is closed.") and in `codes` mode
 when the code is missing, unknown, expired or used up ("Identity creation on
 this node needs a valid registration code." for all four), so a caller learns

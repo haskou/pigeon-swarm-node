@@ -43,14 +43,15 @@ export default class NodeOwnerSettingsResetter {
    * the node and the operator can run the reset again.
    */
   public async reset(newOwner: IdentityId): Promise<ClearedNodeOwnerSetting[]> {
-    const node = await this.nodes.loadStoppedLocalNode();
-    const cleared = node.replaceLostOwner(newOwner);
+    const cleared: ClearedNodeOwnerSetting[] = [];
 
-    for (const store of this.resets()) {
-      cleared.push(...(await store.resetOwnerSettings()));
-    }
+    await this.nodes.updateStoppedLocalNode(async (node) => {
+      cleared.push(...node.replaceLostOwner(newOwner));
 
-    await this.nodes.saveStoppedLocalNode(node);
+      for (const store of this.resets()) {
+        cleared.push(...(await store.resetOwnerSettings()));
+      }
+    });
 
     return cleared;
   }

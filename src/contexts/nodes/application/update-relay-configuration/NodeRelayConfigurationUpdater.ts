@@ -1,24 +1,21 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
-import NodeLoaderService from '../../domain/services/NodeLoaderService';
-import NodeSaverService from '../../domain/services/NodeSaverService';
+import NodeRepository from '../../domain/repositories/NodeRepository';
 import { NodeRelayConfigurationUpdaterMessage } from './messages/NodeRelayConfigurationUpdaterMessage';
 
 export default class NodeRelayConfigurationUpdater {
   constructor(
-    private readonly loader: NodeLoaderService,
-    private readonly saver: NodeSaverService,
+    private readonly nodes: NodeRepository,
     private readonly eventPublisher: DomainEventPublisher,
   ) {}
 
   public async update(
     message: NodeRelayConfigurationUpdaterMessage,
   ): Promise<void> {
-    const node = await this.loader.loadNode();
+    const node = await this.nodes.updateLocalNode((latest) =>
+      latest.updateRelayConfiguration(message.relayConfiguration),
+    );
 
-    node.updateRelayConfiguration(message.relayConfiguration);
-
-    await this.saver.saveNode(node);
     await this.eventPublisher.publish(node.pullDomainEvents());
   }
 }

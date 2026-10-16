@@ -98,6 +98,39 @@ describe('LocalNodeRegistrationCodeRepository', () => {
     expect((await repository.findAll())[0].toPrimitives().usesLeft).toBe(0);
   });
 
+  it('should let only one of concurrent requests through separate database handles take the last use', async () => {
+    await repository.save(issue(1));
+
+    const repositories = Array.from(
+      { length: 5 },
+      () => new LocalNodeRegistrationCodeRepository(new EmbeddedLocalDatabase()),
+    );
+    const results = await Promise.all(
+      repositories.map((handle) => handle.reserveUse(secret.hash(), now)),
+    );
+
+    expect(results.filter((result) => result !== undefined)).toHaveLength(1);
+    expect((await repository.findAll())[0].toPrimitives().usesLeft).toBe(0);
+  });
+
+  it('should keep every use when a release races a reservation through another handle', async () => {
+    const code = issue(2);
+
+    await repository.save(code);
+    await repository.reserveUse(secret.hash(), now);
+
+    const other = new LocalNodeRegistrationCodeRepository(
+      new EmbeddedLocalDatabase(),
+    );
+
+    await Promise.all([
+      other.releaseUse(code.getId()),
+      repository.reserveUse(secret.hash(), now),
+    ]);
+
+    expect((await repository.findAll())[0].toPrimitives().usesLeft).toBe(1);
+  });
+
   it('should give a released use back', async () => {
     const code = issue(1);
 

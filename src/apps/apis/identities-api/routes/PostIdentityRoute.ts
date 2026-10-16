@@ -18,6 +18,7 @@ import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 import { PostIdentityBody } from '../bodies/PostIdentityBody';
 import { IdentityCreationIsRefusedOnThisNodeError } from '../errors/IdentityCreationIsRefusedOnThisNodeError';
 import IdentityAdmissionSourceRateLimiter from '../IdentityAdmissionSourceRateLimiter';
+import IdentityCreationQueue from '../IdentityCreationQueue';
 import IdentityNetworkAdmissionRateLimiter from '../IdentityNetworkAdmissionRateLimiter';
 import IdentityPublishRateLimiter from '../IdentityPublishRateLimiter';
 import { PostIdentityRequest } from '../requests/PostIdentityRequest';
@@ -54,6 +55,10 @@ export class PostIdentityRoute extends Route {
     NodeRegistrationAdmitter,
   );
 
+  private readonly creationQueue = this.get<IdentityCreationQueue>(
+    IdentityCreationQueue,
+  );
+
   private async admitRegistration(
     message: IdentityPublishMessage,
     httpRequest: Request,
@@ -75,6 +80,59 @@ export class PostIdentityRoute extends Route {
         error instanceof NodeRegistrationCodeIsNotValidError
       ) {
         throw new IdentityCreationIsRefusedOnThisNodeError(error.message);
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Whether a failed creation left the identity unsaved. A failure after the
+   * save (charge, event publish) still created it, and a failing check is
+   * treated as created, so the code use stays spent either way.
+   */
+  private async isStillNotCreated(
+    message: IdentityPublishMessage,
+  ): Promise<boolean> {
+    try {
+      return await this.creationDetector.isCreation(
+        new IdentityCreationDetectorMessage(message.identity),
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private async admitAndPublish(
+    message: IdentityPublishMessage,
+    body: PostIdentityBody,
+    httpRequest: Request,
+    response: Response,
+  ): Promise<Response> {
+    const reservation = await this.admitRegistration(message, httpRequest);
+
+    try {
+      await this.rateLimiter.consume(new IdentityId(body.id));
+      await this.networkAdmissionRateLimiter.consume(body.networks);
+
+      const candidate = await this.identityPublisher.publish(message);
+      const viewModel = new IdentityViewModel(
+        candidate.getIdentity(),
+        candidate.getExternalIdentifier(),
+      );
+
+      return response
+        .status(HttpRouteStatusEnum.OK)
+        .send(viewModel.toResource());
+    } catch (error: unknown) {
+      if (await this.isStillNotCreated(message)) {
+        await this.registrationAdmitter.release(reservation);
+      }
+
+      if (error instanceof InsufficientIdentityAdmissionProofError) {
+        return response
+          .status(HttpRouteStatusEnum.BAD_REQUEST)
+          .json(new InsufficientAdmissionProofViewModel(error).toResource());
       }
 
       throw error;
@@ -107,31 +165,9 @@ export class PostIdentityRoute extends Route {
         new IdentityId(body.id),
       );
     }
-    const reservation = await this.admitRegistration(message, httpRequest);
 
-    try {
-      await this.rateLimiter.consume(new IdentityId(body.id));
-      await this.networkAdmissionRateLimiter.consume(body.networks);
-
-      const candidate = await this.identityPublisher.publish(message);
-      const viewModel = new IdentityViewModel(
-        candidate.getIdentity(),
-        candidate.getExternalIdentifier(),
-      );
-
-      return response
-        .status(HttpRouteStatusEnum.OK)
-        .send(viewModel.toResource());
-    } catch (error: unknown) {
-      await this.registrationAdmitter.release(reservation);
-
-      if (error instanceof InsufficientIdentityAdmissionProofError) {
-        return response
-          .status(HttpRouteStatusEnum.BAD_REQUEST)
-          .json(new InsufficientAdmissionProofViewModel(error).toResource());
-      }
-
-      throw error;
-    }
+    return this.creationQueue.run(message.identity.getId(), () =>
+      this.admitAndPublish(message, body, httpRequest, response),
+    );
   }
 }

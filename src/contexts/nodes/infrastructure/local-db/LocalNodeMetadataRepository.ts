@@ -90,18 +90,32 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     };
   }
 
-  private async loadOrCreateMetadata(): Promise<LocalNodeMetadataDocument> {
-    const storedMetadata = await this.findMetadata();
+  // Every write of the node metadata, generation included, runs in this
+  // section, so a read-modify-write never reverts another and two first loads
+  // never generate two node ids. Sections do not nest.
+  private async exclusively<T>(action: () => Promise<T>): Promise<T> {
+    return this.database.exclusively(
+      LocalNodeMetadataRepository.NAMESPACE,
+      action,
+    );
+  }
 
-    if (storedMetadata) {
-      return storedMetadata;
-    }
-
+  /** Generates and saves the metadata of a new node; run inside `exclusively`. */
+  private async createMetadata(): Promise<LocalNodeMetadataDocument> {
     const generatedMetadata = this.metadataMapper.generate();
 
     await this.persistMetadata(generatedMetadata);
 
     return generatedMetadata;
+  }
+
+  private async loadOrCreateMetadata(): Promise<LocalNodeMetadataDocument> {
+    return (
+      (await this.findMetadata()) ??
+      this.exclusively(
+        async () => (await this.findMetadata()) ?? this.createMetadata(),
+      )
+    );
   }
 
   private async persistMetadata(
@@ -112,6 +126,23 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
       LocalNodeMetadataRepository.LOCAL_NODE_ID,
       metadata,
     );
+  }
+
+  /** Applies `change` to the stored node and saves it; run inside `exclusively`. */
+  private async changeMetadata(
+    metadata: LocalNodeMetadataDocument,
+    change: (node: Node) => Promise<void> | void,
+  ): Promise<Node> {
+    const node = this.nodeFromMetadata(metadata);
+
+    await change(node);
+
+    const changedMetadata = this.metadataMapper.toDocument(node);
+
+    await this.persistMetadata(changedMetadata);
+    this.latestSavedMetadata = changedMetadata;
+
+    return node;
   }
 
   private buildNetworkConfigs(node: Node): IPFSNetworkConfig[] {
@@ -225,28 +256,32 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     return NodeRegistrationMode.fromPrimitives(metadata.registrationMode);
   }
 
-  public async saveLocalNode(node: Node): Promise<void> {
-    const metadata = this.metadataMapper.toDocument(node);
+  public async updateLocalNode(
+    change: (node: Node) => Promise<void> | void,
+  ): Promise<Node> {
+    const node = await this.exclusively(async () =>
+      this.changeMetadata(
+        (await this.findMetadata()) ?? (await this.createMetadata()),
+        change,
+      ),
+    );
 
-    await this.persistMetadata(metadata);
-    this.latestSavedMetadata = metadata;
     this.syncRuntimeNetworksInBackground();
+
+    return node;
   }
 
-  public async loadStoppedLocalNode(): Promise<Node> {
-    const storedMetadata = await this.findMetadata();
+  public async updateStoppedLocalNode(
+    change: (node: Node) => Promise<void> | void,
+  ): Promise<Node> {
+    return this.exclusively(async () => {
+      const storedMetadata = await this.findMetadata();
 
-    if (!storedMetadata) {
-      throw new LocalNodeNotFoundError();
-    }
+      if (!storedMetadata) {
+        throw new LocalNodeNotFoundError();
+      }
 
-    return this.nodeFromMetadata(storedMetadata);
-  }
-
-  public async saveStoppedLocalNode(node: Node): Promise<void> {
-    const metadata = this.metadataMapper.toDocument(node);
-
-    await this.persistMetadata(metadata);
-    this.latestSavedMetadata = metadata;
+      return this.changeMetadata(storedMetadata, change);
+    });
   }
 }

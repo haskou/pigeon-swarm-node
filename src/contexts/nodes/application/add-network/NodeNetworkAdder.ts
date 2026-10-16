@@ -1,25 +1,23 @@
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 
 import { Node } from '../../domain/Node';
-import NodeLoaderService from '../../domain/services/NodeLoaderService';
-import NodeSaverService from '../../domain/services/NodeSaverService';
+import NodeRepository from '../../domain/repositories/NodeRepository';
 import { NodeNetworkAdderMessage } from './messages/NodeNetworkAdderMessage';
 import { NodePublicNetworkAdderMessage } from './messages/NodePublicNetworkAdderMessage';
 
 export default class NodeNetworkAdder {
   constructor(
-    private readonly loader: NodeLoaderService,
-    private readonly saver: NodeSaverService,
+    private readonly nodes: NodeRepository,
     private readonly eventPublisher: DomainEventPublisher,
   ) {}
 
   private async saveNetwork(
     message: NodeNetworkAdderMessage | NodePublicNetworkAdderMessage,
   ): Promise<Node> {
-    const node = await this.loader.loadNode();
-    node.addNetwork(message.network);
+    const node = await this.nodes.updateLocalNode((latest) =>
+      latest.addNetwork(message.network),
+    );
 
-    await this.saver.saveNode(node);
     await this.eventPublisher.publish(node.pullDomainEvents());
 
     return node;

@@ -1,35 +1,36 @@
 import { NodeRegistrationModeChangerMessage } from '@app/contexts/nodes/application/change-registration-mode/messages/NodeRegistrationModeChangerMessage';
 import NodeRegistrationModeChanger from '@app/contexts/nodes/application/change-registration-mode/NodeRegistrationModeChanger';
 import { NodeRegistrationModeWasChanged } from '@app/contexts/nodes/domain/events/NodeRegistrationModeWasChanged';
-import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
-import NodeSaverService from '@app/contexts/nodes/domain/services/NodeSaverService';
+import { Node } from '@app/contexts/nodes/domain/Node';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { LocalDomainEventPublisher } from '@app/shared/infrastructure/messageBus/LocalDomainEventPublisher';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { NodeMother } from '../../../../mothers/NodeMother';
 
 describe('NodeRegistrationModeChanger', () => {
-  let loader: MockProxy<NodeLoaderService>;
-  let saver: MockProxy<NodeSaverService>;
+  let nodes: MockProxy<NodeRepository>;
   let eventPublisher: MockProxy<LocalDomainEventPublisher>;
   let changer: NodeRegistrationModeChanger;
+  let node: Node;
 
   beforeEach(() => {
-    loader = mock<NodeLoaderService>();
-    saver = mock<NodeSaverService>();
+    node = new NodeMother().build();
+    nodes = mock<NodeRepository>();
+    nodes.updateLocalNode.mockImplementation(async (change) => {
+      await change(node);
+
+      return node;
+    });
     eventPublisher = mock<LocalDomainEventPublisher>();
-    changer = new NodeRegistrationModeChanger(loader, saver, eventPublisher);
+    changer = new NodeRegistrationModeChanger(nodes, eventPublisher);
   });
 
-  it('should change, save and announce the registration mode', async () => {
-    const node = new NodeMother().build();
-
-    loader.loadNode.mockResolvedValue(node);
-
+  it('should change and announce the registration mode of the latest node', async () => {
     await changer.change(new NodeRegistrationModeChangerMessage('codes'));
 
+    expect(nodes.updateLocalNode).toHaveBeenCalledTimes(1);
     expect(node.toPrimitives().registrationMode).toBe('codes');
-    expect(saver.saveNode).toHaveBeenCalledWith(node);
     expect(eventPublisher.publishLocally).toHaveBeenCalledWith([
       expect.any(NodeRegistrationModeWasChanged),
     ]);

@@ -171,6 +171,7 @@ export default class Definitions {
   private communityMembershipRequestId: string | undefined;
   private communityRoleId: string | undefined;
   private concurrentCallResponses: RestResponse[] = [];
+  private concurrentResponses: RestResponse[] = [];
   private formData: FormData | undefined;
   private headers: Record<string, string> = {};
   private identityKeyPair: KeyPair | undefined;
@@ -1382,8 +1383,9 @@ export default class Definitions {
     );
     this.attachCommunityModerationLog(method, path, signerKeyPair, createdAt);
 
+    const declaredBodyHash = this.declaredBodyHashOf(method, path);
     const signedRequestPayload = SignedHttpRequestSignature.signingContent({
-      body: this.getCurrentRequestBody(),
+      body: declaredBodyHash ?? this.getCurrentRequestBody(),
       method,
       path,
       timestamp: Number(timestamp),
@@ -1394,6 +1396,25 @@ export default class Definitions {
     this.headers['x-signature'] = signerKeyPair
       .sign(signedRequestPayload)
       .valueOf();
+    delete this.headers['x-body-hash'];
+
+    if (declaredBodyHash) {
+      this.headers['x-body-hash'] = declaredBodyHash;
+    }
+  }
+
+  /**
+   * A block list upload signs the hash of the exact body bytes, declared in
+   * `X-Body-Hash`, so the node authenticates it before reading the body.
+   */
+  private declaredBodyHashOf(method: string, path: string): string | undefined {
+    if (method !== 'PUT' || path.replace(/\/$/, '') !== '/node/blocks') {
+      return undefined;
+    }
+
+    return createHash('sha256')
+      .update(JSON.stringify(this.body ? JSON.parse(this.body) : {}))
+      .digest('hex');
   }
 
   private async ensureBlockSourcePublisherKeyPair(): Promise<KeyPair> {
@@ -1533,6 +1554,7 @@ export default class Definitions {
     this.communityRecordSequences.clear();
     this.communityRoleId = undefined;
     this.concurrentCallResponses = [];
+    this.concurrentResponses = [];
     this.formData = undefined;
     this.headers = {};
     this.identityKeyPair = undefined;
@@ -5085,6 +5107,16 @@ export default class Definitions {
     );
   }
 
+  @given('another identity signs the node blocks request claiming to be me')
+  public async anotherIdentitySignsTheNodeBlocksRequestClaimingToBeMe(): Promise<void> {
+    await this.signCurrentRequest(
+      'PUT',
+      '/node/blocks/',
+      String(Date.now()),
+      await this.ensureOtherIdentityKeyPair(),
+    );
+  }
+
   @given('another identity signs the current node network request')
   public async anotherIdentitySignsTheCurrentNodeNetworkRequest(): Promise<void> {
     const keyPair = await this.ensureOtherIdentityKeyPair();
@@ -6110,6 +6142,28 @@ export default class Definitions {
     );
 
     this.rememberCreatedIdentityFromResponse();
+  }
+
+  @when('I POST to {string} {int} times concurrently')
+  public async iPOSTToTimesConcurrently(
+    path: string,
+    times: number,
+  ): Promise<void> {
+    this.concurrentResponses = await Promise.all(
+      Array.from({ length: times }, () =>
+        this.restClient.post(path, this.getPostBody(), this.getPostHeaders()),
+      ),
+    );
+  }
+
+  @then('every concurrent response code is equal to {int}')
+  public everyConcurrentResponseCodeIsEqualTo(statusCode: number): void {
+    expect(
+      this.concurrentResponses.map((response) => response.status),
+    ).to.deep.equal(
+      this.concurrentResponses.map(() => statusCode),
+      JSON.stringify(this.concurrentResponses.map(({ data }) => data)),
+    );
   }
 
   @when('I POST to the current IPFS network')

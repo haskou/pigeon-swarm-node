@@ -6,6 +6,7 @@ import { Request } from 'express';
 import { IdentityIsBlockedOnThisNodeError } from './errors/IdentityIsBlockedOnThisNodeError';
 import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';
 import { SignedHttpRequestVerifier } from './SignedHttpRequestVerifier';
+import { SignedRequestBodyHash } from './SignedRequestBodyHash';
 import { assertSignedRequestTimestampIsFresh } from './SignedRequestFreshness';
 import { signedRequestReplayGuard } from './SignedRequestReplayGuard';
 
@@ -33,16 +34,41 @@ export default class SignedHttpRequestAuthenticator {
     }
   }
 
+  private async admit(
+    request: Request,
+    identityId: IdentityId,
+    signature: Signature,
+    timestamp: string,
+  ): Promise<void> {
+    assertSignedRequestTimestampIsFresh(timestamp);
+    this.assertIsNotReplayed(request, identityId, signature);
+    await this.assertIsNotBlocked(identityId);
+  }
+
   /** Verifies the request signature and refuses identities blocked on this node (403012). */
   public async authenticate(request: Request): Promise<IdentityId> {
     const { identityId, signature, timestamp } =
       this.verifier.verifySignature(request);
 
-    assertSignedRequestTimestampIsFresh(timestamp);
-    this.assertIsNotReplayed(request, identityId, signature);
-    await this.assertIsNotBlocked(identityId);
+    await this.admit(request, identityId, signature, timestamp);
 
     return identityId;
+  }
+
+  /**
+   * Authenticates a request from its headers alone: the signature covers the
+   * declared `X-Body-Hash` instead of the body, so no body byte is read. The
+   * caller must only accept a body that matches the returned hash.
+   */
+  public async authenticateDeclaredBody(
+    request: Request,
+  ): Promise<{ bodyHash: SignedRequestBodyHash; identityId: IdentityId }> {
+    const { bodyHash, identityId, signature, timestamp } =
+      this.verifier.verifyDeclaredBodySignature(request);
+
+    await this.admit(request, identityId, signature, timestamp);
+
+    return { bodyHash, identityId };
   }
 
   public async assertIsNotBlocked(identityId: IdentityId): Promise<void> {

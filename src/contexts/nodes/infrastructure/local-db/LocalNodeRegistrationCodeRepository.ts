@@ -11,49 +11,18 @@ import { LocalNodeRegistrationCodeDocument } from './documents/LocalNodeRegistra
 export default class LocalNodeRegistrationCodeRepository extends NodeRegistrationCodeRepository {
   private static readonly NAMESPACE = 'node_registration_codes';
 
-  // One write queue per database: a use is read, spent and saved without any
-  // other write in between, so two requests cannot both spend the last use.
-  private static readonly writeQueuesByDatabase = new WeakMap<
-    EmbeddedLocalDatabase,
-    Promise<void>
-  >();
-
   constructor(private readonly database: EmbeddedLocalDatabase) {
     super();
   }
 
+  // A use is read, spent and saved without any other code write in between,
+  // through any handle on this database, so two requests cannot both spend
+  // the last use.
   private async serialized<T>(action: () => Promise<T>): Promise<T> {
-    const previous =
-      LocalNodeRegistrationCodeRepository.writeQueuesByDatabase.get(
-        this.database,
-      ) ?? Promise.resolve();
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const tail = previous.then(() => gate);
-
-    LocalNodeRegistrationCodeRepository.writeQueuesByDatabase.set(
-      this.database,
-      tail,
+    return this.database.exclusively(
+      LocalNodeRegistrationCodeRepository.NAMESPACE,
+      action,
     );
-    await previous;
-
-    try {
-      return await action();
-    } finally {
-      release();
-
-      if (
-        LocalNodeRegistrationCodeRepository.writeQueuesByDatabase.get(
-          this.database,
-        ) === tail
-      ) {
-        LocalNodeRegistrationCodeRepository.writeQueuesByDatabase.delete(
-          this.database,
-        );
-      }
-    }
   }
 
   private isDocument(

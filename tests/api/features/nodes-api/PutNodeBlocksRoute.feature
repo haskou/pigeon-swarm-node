@@ -85,6 +85,31 @@ Feature: Put node blocks
     When I PUT "/node/blocks/"
     Then response code is equal to 401
 
+  Scenario: A forged owner id with a bad signature is refused before the body is read
+    Given the node block list byte limit is 1024
+    And I set a node block list body of 2048 bytes
+    And another identity signs the node blocks request claiming to be me
+    When I PUT "/node/blocks/"
+    Then response code is equal to 401
+    And response body should contain "401020"
+
+  Scenario: A declared body hash the signature does not cover is refused
+    Given I set a node block list body version 1 blocking "other"
+    And I sign a PUT request to "/node/blocks/"
+    And I set header "x-body-hash" to "0000000000000000000000000000000000000000000000000000000000000000"
+    When I PUT "/node/blocks/"
+    Then response code is equal to 401
+    And response body should contain "401020"
+
+  Scenario: A signed body that is not a block list document is a bad request
+    Given I set json body
+      """
+      {"type":"pigeon-node-block-list","unexpected":true}
+      """
+    And I sign a PUT request to "/node/blocks/"
+    When I PUT "/node/blocks/"
+    Then response code is equal to 400
+
   Scenario: A blocked identity is refused on signed reads and realtime tickets until unblocked
     Given I set a node block list body version 1 blocking "other"
     And I sign a PUT request to "/node/blocks/"
@@ -136,7 +161,7 @@ Feature: Put node blocks
     When I POST to "/realtime/v1/tickets"
     Then response code is equal to 201
 
-  Scenario: A request claiming the owner with a bad signature is refused before validation
+  Scenario: A body that does not match the signed body hash is refused before parsing
     Given I set a node block list body version 1 blocking "other"
     And I sign a PUT request to "/node/blocks/"
     And I set a node block list body of 512 bytes

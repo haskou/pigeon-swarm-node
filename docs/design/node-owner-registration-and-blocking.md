@@ -66,6 +66,13 @@ Both tools reuse the existing node owner unchanged:
   current owner can name the next one.
 - **Unclaimed nodes.** Both tools need an owner and use the strict owner check
   (`assertOwnerCanManageNode`). An unclaimed node is open and blocks nobody.
+- **Concurrent owner writes.** Every change to `node_metadata` (owner,
+  registration mode, relay configuration, networks, owner reset) goes through
+  `NodeRepository.updateLocalNode` (or `updateStoppedLocalNode` for host
+  commands). It loads the latest node, applies the change and saves it inside
+  one section per local database (`EmbeddedLocalDatabase.exclusively`), so two
+  concurrent writes never revert each other. Generating the metadata of a new
+  node runs in the same section, so concurrent first loads keep one node id.
 
 ### Owner loss and reset
 
@@ -185,8 +192,15 @@ https://<ui-origin>/register#node=<encodeURIComponent(node endpoint)>&code=<code
   then the publish limiter and the network admission limiter. Refused attempts
   therefore never consume the shared limits honest users depend on.
 - A code use is reserved atomically before publishing and released if
-  publishing fails, so a failed proof never burns a use and two concurrent
-  requests cannot both spend the last one.
+  publishing fails while the identity is still not held, so a failed proof
+  never burns a use and a failure after the save (charge, event publish) never
+  makes a creation free. Reserve and release
+  run in one section per local database (`EmbeddedLocalDatabase.exclusively`),
+  so concurrent requests on any number of repository handles cannot spend more
+  than `maxUses`.
+- Requests that create the same identity run one after the other on the node
+  (`IdentityCreationQueue`): the first creates it and spends one use, the next
+  ones find the identity already stored and spend none.
 - Refusal: `403` with new code `403011`, message "Identity creation on this
   node is closed" or "needs a valid registration code". One code for missing,
   unknown, expired and used-up codes, so a caller learns nothing about which
@@ -303,9 +317,19 @@ signed by the owner identity:
   64 MiB, about 500k Ed25519 PEM ids at ~120 B each) bounds the bytes read for
   one document. It defends a node against a hostile peer exhausting its
   memory and CPU while parsing, not against database growth. For
-  `PUT /node/blocks` it is the request body limit, and a non-owner
-  `X-Identity-Id` or a stale timestamp is rejected before any body byte is
-  buffered. For adopted lists it is the streamed download limit.
+  `PUT /node/blocks` it is the request body limit. For adopted lists it is the
+  streamed download limit.
+- `PUT /node/blocks` is authenticated before any body byte is read. The client
+  sends `X-Body-Hash`, the lowercase hex SHA-256 of the exact body bytes, and
+  signs the canonical request with that hash string as its body. The node
+  verifies the signature, freshness, replay, block list and owner from the
+  headers alone, so a forged `X-Identity-Id` naming the owner gets `401`
+  without the node buffering anything. Holding the single upload slot, it then
+  streams the body, hashing as it reads, stops at `NODE_BLOCK_LIST_MAX_BYTES`
+  (`413`) or after `NODE_BLOCK_LIST_BODY_TIMEOUT_MS` (default 2 minutes,
+  `408`), and parses JSON only once the bytes hash to `X-Body-Hash` (`401`
+  otherwise). A failed, slow or aborted body frees the slot at once and its
+  response closes the connection, so a slow client cannot hold uploads back.
 - The document carries no reasons. A published list must not become a place
   for accusations or personal data; any note stays in the owner's client.
 - The identity id is the public key, so anyone can verify the document from
