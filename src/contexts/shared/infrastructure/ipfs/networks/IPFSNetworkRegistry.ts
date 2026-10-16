@@ -206,7 +206,6 @@ export default class IPFSNetworkRegistry {
   }
 
   private logPrivateRelayServerState(
-    networkId: string,
     relayOptions:
       | {
           announceAddresses?: string[];
@@ -217,15 +216,14 @@ export default class IPFSNetworkRegistry {
   ): void {
     if (!relayOptions) {
       Kernel.logger.info(
-        `Private IPFS relay server disabled: networkId=${networkId}` +
-          ` reason="${this.getPrivateRelayDisabledReason()}"`,
+        `Private IPFS relay server disabled: reason="${this.getPrivateRelayDisabledReason()}"`,
       );
 
       return;
     }
 
     Kernel.logger.info(
-      `Private IPFS relay server enabled: networkId=${networkId}` +
+      'Private IPFS relay server enabled:' +
         ` listenAddresses="${relayOptions.listenAddresses.join(',')}"` +
         ` announceAddresses="${(relayOptions.announceAddresses || []).join(',')}"` +
         ` relayDataLimitBytes=${relayOptions.relayDataLimitBytes}`,
@@ -340,7 +338,7 @@ export default class IPFSNetworkRegistry {
     if (key) {
       const relaySettings = this.getRelaySettings();
       const relayOptions = this.getPrivateRelayListenAddresses(config.getId());
-      this.logPrivateRelayServerState(config.getId(), relayOptions);
+      this.logPrivateRelayServerState(relayOptions);
       const connection = await PrivateIPFS.create({
         key,
         manualRelayMultiaddrs: relaySettings.manualRelayMultiaddrs,

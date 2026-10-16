@@ -346,7 +346,6 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     Kernel.logger.warn(
       `Private IPFS relay record ${operation} has no public IPFS peers:` +
-        ` networkId=${network.getId()}` +
         ` publicPeerId=${publicConnection.getPeerId()}` +
         ' reason="The relay record cannot leave local storage without public IPFS peers."',
     );
@@ -403,10 +402,7 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     this.dialFailureWarningKeys.add(warningKey);
     Kernel.logger.warn(
-      `Private IPFS relay record dial failed: networkId=${network.getId()}` +
-        ` peerId=${relayRecord.peerId}` +
-        ` multiaddr="${multiaddr}"` +
-        ` error=${errorClass}`,
+      `Private IPFS relay record dial failed: error=${errorClass}`,
     );
   }
 
@@ -445,8 +441,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     this.forgetRelayPublisherPeer(network.getId(), relayRecord.peerId);
     this.forgetActiveRelayRecord(network.getId());
     Kernel.logger.warn(
-      `Private IPFS relay cached record invalidated: networkId=${network.getId()}` +
-        ` peerId=${relayRecord.peerId}` +
+      'Private IPFS relay cached record invalidated:' +
         ` attempts=${PrivateNetworkRelayRecordDirectory.maxCachedRelayRecordDialFailures}`,
     );
   }
@@ -483,9 +478,7 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     this.pubSubRelayInfoKeys.add(infoKey);
     Kernel.logger.info(
-      `Private IPFS relay pubsub record discovered: networkId=${network.getId()}` +
-        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
-        ` peerId=${relayRecord.peerId}` +
+      'Private IPFS relay pubsub record discovered:' +
         ` publicPeers=${publicConnection.getPeers().length}`,
     );
   }
@@ -503,9 +496,7 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     this.connectedRelayInfoKeys.add(infoKey);
     Kernel.logger.info(
-      `Private IPFS relay record connected: networkId=${network.getId()}` +
-        ` peerId=${relayRecord.peerId}` +
-        ` multiaddr="${multiaddr}" peers=${network.getPeers().length}`,
+      `Private IPFS relay record connected: peers=${network.getPeers().length}`,
     );
   }
 
@@ -790,8 +781,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       );
     } catch (error) {
       Kernel.logger.debug(
-        `Private IPFS relay record cache save skipped: networkId=${network.getId()}` +
-          ` error=${errorClassName(error)}`,
+        `Private IPFS relay record cache save skipped: error=${errorClassName(error)}`,
       );
     }
   }
@@ -849,9 +839,8 @@ export default class PrivateNetworkRelayRecordDirectory {
       if (!this.cachedRelayInfoKeys.has(infoKey)) {
         this.cachedRelayInfoKeys.add(infoKey);
         Kernel.logger.info(
-          `Private IPFS relay cached record found: networkId=${network.getId()}` +
-            ` peerId=${relayRecord.peerId}` +
-            ` multiaddrs="${relayRecord.multiaddrs.join(',')}"`,
+          'Private IPFS relay cached record found:' +
+            ` multiaddrs=${relayRecord.multiaddrs.length}`,
         );
       }
 
@@ -868,8 +857,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       return false;
     } catch (error) {
       Kernel.logger.debug(
-        `Private IPFS relay cached record discovery skipped: networkId=${network.getId()}` +
-          ` error=${errorClassName(error)}`,
+        `Private IPFS relay cached record discovery skipped: error=${errorClassName(error)}`,
       );
 
       return false;
@@ -945,10 +933,7 @@ export default class PrivateNetworkRelayRecordDirectory {
         return;
       }
 
-      Kernel.logger.debug(
-        `Private IPFS relay record request received: networkId=${network.getId()}` +
-          ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}`,
-      );
+      Kernel.logger.debug('Private IPFS relay record request received');
 
       await publicConnection.publishPubSub(
         this.getRelayRecordTopic(network),
@@ -972,8 +957,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       return true;
     } catch (error) {
       Kernel.logger.debug(
-        `Private IPFS relay pubsub record publication skipped: networkId=${network.getId()}` +
-          ` error=${errorClassName(error)}`,
+        `Private IPFS relay pubsub record publication skipped: error=${errorClassName(error)}`,
       );
 
       return false;
@@ -1016,8 +1000,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     network: IPFSNetwork,
   ): Promise<void> {
     Kernel.logger.debug(
-      `Private IPFS relay record requested: networkId=${network.getId()}` +
-        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+      'Private IPFS relay record requested:' +
         ` publicPeers=${publicConnection.getPeers().length}`,
     );
     await publicConnection.publishPubSub(
@@ -1068,10 +1051,7 @@ export default class PrivateNetworkRelayRecordDirectory {
   ): Promise<string[]> {
     const routingKey = PrivateNetworkRelayRecordCodec.lookupKey(network);
 
-    Kernel.logger.debug(
-      `Private IPFS relay record provider lookup started: networkId=${network.getId()}` +
-        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}`,
-    );
+    Kernel.logger.debug('Private IPFS relay record provider lookup started');
     const providerMultiaddrs = (
       await publicConnection.findRecordProviderMultiaddrs(routingKey)
     ).slice(0, 2);
@@ -1079,8 +1059,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     this.lastProviderCounts[network.getId()] = providerMultiaddrs.length;
 
     Kernel.logger.debug(
-      `Private IPFS relay record provider lookup completed: networkId=${network.getId()}` +
-        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
+      'Private IPFS relay record provider lookup completed:' +
         ` providers=${providerMultiaddrs.length}`,
     );
 
@@ -1115,8 +1094,7 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     if (!peerId) {
       Kernel.logger.debug(
-        `Private IPFS relay provider ignored: networkId=${network.getId()}` +
-          ` multiaddr="${multiaddr}" reason="Missing peer ID."`,
+        'Private IPFS relay provider ignored: reason="Missing peer ID."',
       );
 
       return undefined;
@@ -1139,8 +1117,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       };
     } catch {
       Kernel.logger.debug(
-        `Private IPFS relay provider ignored: networkId=${network.getId()}` +
-          ` reason="Invalid relay record."`,
+        'Private IPFS relay provider ignored: reason="Invalid relay record."',
       );
 
       return undefined;
@@ -1156,15 +1133,10 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     try {
       await publicConnection.dial(multiaddr, providerDial.signal);
-      Kernel.logger.debug(
-        `Private IPFS relay record provider connected: networkId=${network.getId()}` +
-          ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
-          ` multiaddr="${multiaddr}"`,
-      );
+      Kernel.logger.debug('Private IPFS relay record provider connected');
     } catch (error: unknown) {
       Kernel.logger.debug(
-        `Private IPFS relay record provider dial skipped: networkId=${network.getId()}` +
-          ` multiaddr="${multiaddr}" error=${errorClassName(error)}`,
+        `Private IPFS relay record provider dial skipped: error=${errorClassName(error)}`,
       );
     } finally {
       clearTimeout(providerDial.timeout);
@@ -1183,11 +1155,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     const dialKey = `${network.getId()}:${relayRecord.peerId}:${multiaddr}`;
 
     if (this.activePrivateRelayDialKeys.has(dialKey)) {
-      Kernel.logger.debug(
-        `Private IPFS relay record dial already in progress: networkId=${network.getId()}` +
-          ` peerId=${relayRecord.peerId}` +
-          ` multiaddr="${multiaddr}"`,
-      );
+      Kernel.logger.debug('Private IPFS relay record dial already in progress');
 
       return false;
     }
@@ -1195,11 +1163,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     this.activePrivateRelayDialKeys.add(dialKey);
     const dialAbort = this.createPrivateRelayDialAbortSignal();
 
-    Kernel.logger.debug(
-      `Private IPFS relay record dialing: networkId=${network.getId()}` +
-        ` peerId=${relayRecord.peerId}` +
-        ` multiaddr="${multiaddr}"`,
-    );
+    Kernel.logger.debug('Private IPFS relay record dialing');
 
     try {
       await network.dial(multiaddr, dialAbort.signal);
@@ -1266,10 +1230,8 @@ export default class PrivateNetworkRelayRecordDirectory {
       if (!this.isListeningThroughRelay(network, multiaddr)) {
         await network.listen(circuitRelayMultiaddr);
         Kernel.logger.info(
-          `Private IPFS relay record listening through relay: networkId=${network.getId()}` +
-            ` peerId=${relayRecord.peerId}` +
-            ` multiaddr="${circuitRelayMultiaddr}"` +
-            ` localMultiaddrs="${network.getMultiaddrs().join(',')}"`,
+          'Private IPFS relay record listening through relay:' +
+            ` localMultiaddrs=${network.getMultiaddrs().length}`,
         );
       }
 
@@ -1351,11 +1313,7 @@ export default class PrivateNetworkRelayRecordDirectory {
           continue;
         }
 
-        Kernel.logger.info(
-          `Private IPFS relay mesh peer connected: networkId=${network.getId()}` +
-            ` peerId=${relayRecord.peerId}` +
-            ` multiaddr="${multiaddr}"`,
-        );
+        Kernel.logger.info('Private IPFS relay mesh peer connected');
         delete this.relayPublisherPeerObservedAt[
           `${network.getId()}:${relayRecord.peerId}`
         ];
@@ -1394,9 +1352,7 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     this.discoveredRelayInfoKeys.add(infoKey);
     Kernel.logger.info(
-      `Private IPFS relay mesh dial deferred to chosen peer:` +
-        ` networkId=${network.getId()}` +
-        ` chosenDialer=${relayRecord.peerId}` +
+      'Private IPFS relay mesh dial deferred to chosen peer:' +
         ` fallbackDialAfterMs=${PrivateNetworkRelayRecordDirectory.meshFallbackDialDelayMs}`,
     );
   }
@@ -1412,8 +1368,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       : Boolean(this.findActiveRelayRecord(network));
 
     Kernel.logger.info(
-      `Private IPFS relay record discovery pass:` +
-        ` networkId=${network.getId()}` +
+      'Private IPFS relay record discovery pass:' +
         ` phase=${phase}` +
         ` providers=${providers ?? this.lastProviderCounts[network.getId()] ?? 0}` +
         ` publicPeers=${publicPeers ?? 0}` +
@@ -1508,8 +1463,7 @@ export default class PrivateNetworkRelayRecordDirectory {
         }
 
         Kernel.logger.warn(
-          `Private IPFS relay record publication crashed: networkId=${networkId}` +
-            ` error=${errorClassName(error)}`,
+          `Private IPFS relay record publication crashed: error=${errorClassName(error)}`,
         );
         this.schedulePublicationRetry(
           network,
@@ -1559,8 +1513,7 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     if (multiaddrs.length === 0) {
       Kernel.logger.warn(
-        `Private IPFS relay record not published: networkId=${network.getId()}` +
-          ' reason="No dialable relay multiaddr available."',
+        'Private IPFS relay record not published: reason="No dialable relay multiaddr available."',
       );
 
       return undefined;
@@ -1583,8 +1536,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       };
     } catch {
       Kernel.logger.warn(
-        `Private IPFS relay record not published: networkId=${network.getId()}` +
-          ' reason="Relay record exceeds the envelope limits."',
+        'Private IPFS relay record not published: reason="Relay record exceeds the envelope limits."',
       );
 
       return undefined;
@@ -1640,18 +1592,13 @@ export default class PrivateNetworkRelayRecordDirectory {
 
       if (!providerAnnounced) {
         Kernel.logger.warn(
-          `Private IPFS relay record not published: networkId=${network.getId()}` +
-            ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
-            ' reason="The DHT provider announcement failed."',
+          'Private IPFS relay record not published: reason="The DHT provider announcement failed."',
         );
 
         return false;
       }
 
-      Kernel.logger.debug(
-        `Private IPFS relay record provider announced: networkId=${network.getId()}` +
-          ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}`,
-      );
+      Kernel.logger.debug('Private IPFS relay record provider announced');
 
       if (!shouldContinue()) {
         return false;
@@ -1659,27 +1606,22 @@ export default class PrivateNetworkRelayRecordDirectory {
 
       if (!published) {
         Kernel.logger.warn(
-          `Private IPFS relay record not published: networkId=${network.getId()}` +
-            ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
-            ' reason="No publication channel succeeded."',
+          'Private IPFS relay record not published: reason="No publication channel succeeded."',
         );
 
         return false;
       }
 
       Kernel.logger.debug(
-        `Private IPFS relay record published: networkId=${network.getId()}` +
-          ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}` +
-          ` peerId=${relayRecord.peerId}` +
+        'Private IPFS relay record published:' +
           ` publicPeers=${publicConnection.getPeers().length}` +
-          ` multiaddrs="${relayRecord.multiaddrs.join(',')}"`,
+          ` multiaddrs=${relayRecord.multiaddrs.length}`,
       );
 
       return true;
     } catch (error) {
       Kernel.logger.warn(
-        `Private IPFS relay record publication failed: networkId=${network.getId()}` +
-          ` error=${errorClassName(error)}`,
+        `Private IPFS relay record publication failed: error=${errorClassName(error)}`,
       );
 
       return false;
@@ -1721,10 +1663,9 @@ export default class PrivateNetworkRelayRecordDirectory {
     this.publicationIntervals[networkId] = publicationInterval;
   }
 
-  private logPublicationDisabled(networkId: string): void {
+  private logPublicationDisabled(): void {
     Kernel.logger.info(
-      `Private IPFS relay record publication disabled: networkId=${networkId}` +
-        ' reason="Disabled by node relay configuration."',
+      'Private IPFS relay record publication disabled: reason="Disabled by node relay configuration."',
     );
   }
 
@@ -1737,15 +1678,11 @@ export default class PrivateNetworkRelayRecordDirectory {
       this.activeDiscoveryGenerations.get(networkId) ?? Symbol();
     this.activeDiscoveryGenerations.set(networkId, generation);
 
-    Kernel.logger.info(
-      `Private IPFS relay record discovery started: networkId=${networkId}` +
-        ` fingerprint=${PrivateNetworkRelayRecordCodec.fingerprint(network)}`,
-    );
+    Kernel.logger.info('Private IPFS relay record discovery started');
 
     this.discover(network, sharedPrivateKey).catch((error: unknown) => {
       Kernel.logger.debug(
-        `Private IPFS relay record initial discovery crashed: networkId=${networkId}` +
-          ` error=${errorClassName(error)}`,
+        `Private IPFS relay record initial discovery crashed: error=${errorClassName(error)}`,
       );
     });
     this.scheduleInitialDiscoveryRetry(network, sharedPrivateKey, generation);
@@ -1760,8 +1697,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       }
       this.discover(network, sharedPrivateKey).catch((error: unknown) => {
         Kernel.logger.debug(
-          `Private IPFS relay record discovery refresh crashed: networkId=${networkId}` +
-            ` error=${errorClassName(error)}`,
+          `Private IPFS relay record discovery refresh crashed: error=${errorClassName(error)}`,
         );
       });
     }, this.settings.getDiscoveryIntervalMs());
@@ -1798,8 +1734,8 @@ export default class PrivateNetworkRelayRecordDirectory {
 
     if (unboundedDelay > maximumDelayMs) {
       Kernel.logger.debug(
-        `Private IPFS relay initial discovery retries handed over to the interval:` +
-          ` networkId=${networkId} attempts=${attempt}`,
+        'Private IPFS relay initial discovery retries handed over to the interval:' +
+          ` attempts=${attempt}`,
       );
 
       return;
@@ -1823,8 +1759,8 @@ export default class PrivateNetworkRelayRecordDirectory {
       this.discover(network, sharedPrivateKey)
         .catch((error: unknown) => {
           Kernel.logger.debug(
-            `Private IPFS relay record initial discovery retry crashed:` +
-              ` networkId=${networkId} error=${errorClassName(error)}`,
+            'Private IPFS relay record initial discovery retry crashed:' +
+              ` error=${errorClassName(error)}`,
           );
         })
         .finally(() => {
@@ -1839,16 +1775,15 @@ export default class PrivateNetworkRelayRecordDirectory {
     timeout.unref?.();
     this.discoveryRetryTimeouts[networkId] = timeout;
     Kernel.logger.debug(
-      `Private IPFS relay discovery retry scheduled:` +
-        ` networkId=${networkId} attempt=${attempt + 1}` +
+      'Private IPFS relay discovery retry scheduled:' +
+        ` attempt=${attempt + 1}` +
         ` nextRetryMs=${unboundedDelay}`,
     );
   }
 
-  private logDiscoveryDisabled(networkId: string): void {
+  private logDiscoveryDisabled(): void {
     Kernel.logger.info(
-      `Private IPFS relay record discovery disabled: networkId=${networkId}` +
-        ' reason="Disabled by node relay configuration."',
+      'Private IPFS relay record discovery disabled: reason="Disabled by node relay configuration."',
     );
   }
 
@@ -2016,11 +1951,11 @@ export default class PrivateNetworkRelayRecordDirectory {
     }
 
     if (!options.publicationEnabled && relayOptions) {
-      this.logPublicationDisabled(networkId);
+      this.logPublicationDisabled();
     }
 
     if (!options.discoveryEnabled) {
-      this.logDiscoveryDisabled(networkId);
+      this.logDiscoveryDisabled();
 
       return;
     }

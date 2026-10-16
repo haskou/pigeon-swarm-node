@@ -322,7 +322,7 @@ async function startIsolatedNodes(
   await waitFor(
     () =>
       nodes.every((node) =>
-        /Started private network "two-real-node-e2e" with Peer ID: ([A-Za-z0-9]+)/.test(
+        /Started private network with Peer ID: ([A-Za-z0-9]+)/.test(
           node.stdout.join(''),
         ),
       ),
@@ -341,9 +341,7 @@ async function startIsolatedNodes(
     (node) =>
       node.stdout
         .join('')
-        .match(
-          /Started private network "two-real-node-e2e" with Peer ID: ([A-Za-z0-9]+)/,
-        )?.[1],
+        .match(/Started private network with Peer ID: ([A-Za-z0-9]+)/)?.[1],
   );
   assert.ok(peers.every(Boolean));
   for (const [index, node] of nodes.entries()) {

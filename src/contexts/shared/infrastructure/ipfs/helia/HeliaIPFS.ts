@@ -149,7 +149,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
       heliaCore,
       networkName,
       record.multiaddrs,
-      `public relay record peerId="${record.peerId}"`,
+      record.peerId,
     );
   }
 
@@ -157,7 +157,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     heliaCore: HeliaInstance,
     networkName: string,
     multiaddrs: string[],
-    source: string,
+    relayPeerId: string,
   ): Promise<void> {
     const dialer = heliaCore.libp2p as unknown as {
       dial?: (address: unknown) => Promise<unknown>;
@@ -177,21 +177,19 @@ export abstract class HeliaIPFS implements IPFSConnection {
           await connectedDialer.dial(
             await heliaRuntimeAdapter.createMultiaddr(address),
           );
-          const dialKey = `${networkName}:${source}`;
+          const dialKey = `${networkName}:${relayPeerId}`;
 
           if (!HeliaIPFS.successfulPublicRelayDials.has(dialKey)) {
             HeliaIPFS.successfulPublicRelayDials.add(dialKey);
-            Kernel.logger.info(
-              `Private network "${networkName}" connected to ${source} "${address}"`,
-            );
+            Kernel.logger.info('Private network connected to a public relay');
           } else {
             Kernel.logger.debug(
-              `Private network "${networkName}" already connected to ${source} "${address}"`,
+              'Private network already connected to a public relay',
             );
           }
         } catch (error: unknown) {
           Kernel.logger.debug(
-            `Private network "${networkName}" failed to connect to ${source} "${address}": error=${errorClassName(error)}`,
+            `Private network failed to connect to a public relay: error=${errorClassName(error)}`,
           );
         }
       }),
@@ -261,7 +259,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
     });
 
     Kernel.logger.info(
-      `Started private network "${networkName}" with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
+      `Started private network with Peer ID: ${heliaCore.libp2p.peerId.toString()}`,
     );
 
     if (options.publicRelayDiscoveryEnabled) {
@@ -1410,7 +1408,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
       void Promise.resolve(listener(peerId)).catch((error: unknown) => {
         Kernel.logger.warn(
-          `IPFS peer connection listener failed: peerId=${peerId} error=${errorClassName(error)}`,
+          `IPFS peer connection listener failed: error=${errorClassName(error)}`,
         );
       });
 
@@ -1426,7 +1424,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
       void Promise.resolve(listener(peerId)).catch((error: unknown) => {
         Kernel.logger.warn(
-          `IPFS peer disconnection listener failed: peerId=${peerId} error=${errorClassName(error)}`,
+          `IPFS peer disconnection listener failed: error=${errorClassName(error)}`,
         );
       });
     });

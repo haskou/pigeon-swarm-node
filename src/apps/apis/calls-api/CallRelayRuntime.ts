@@ -70,13 +70,11 @@ export default class CallRelayRuntime implements Runtime {
     try {
       await this.discovery.publishConnection(network, record.toPrimitives());
       Kernel.logger.debug(
-        `Call relay record published: networkId=${network.getId()}` +
-          ` urls="${record.toPrimitives().urls.join(',')}"`,
+        `Call relay record published: urls=${record.toPrimitives().urls.length}`,
       );
     } catch (error: unknown) {
       Kernel.logger.warn(
-        `Call relay record publication failed: networkId=${network.getId()}` +
-          ` error=${errorClassName(error)}`,
+        `Call relay record publication failed: error=${errorClassName(error)}`,
       );
     }
   }
@@ -193,8 +191,7 @@ export default class CallRelayRuntime implements Runtime {
     this.networkRegistry.onNetworkRegistered((network) =>
       this.startOnNetwork(network).catch((error: unknown) => {
         Kernel.logger.warn(
-          `Call relay discovery startup failed: networkId=${network.getId()}` +
-            ` error=${errorClassName(error)}`,
+          `Call relay discovery startup failed: error=${errorClassName(error)}`,
         );
       }),
     );

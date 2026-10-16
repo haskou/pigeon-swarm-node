@@ -41,8 +41,7 @@ export default class OrbitDBReplicatedStateRuntime {
       }
 
       Kernel.logger.warn(
-        `OrbitDB replicated state registration degraded: networkId=${networkId}` +
-          ` error=${errorClassName(error)}` +
+        `OrbitDB replicated state registration degraded: error=${errorClassName(error)}` +
           ' recovery=reconcile-on-peer-head-exchange',
       );
     }
@@ -83,8 +82,7 @@ export default class OrbitDBReplicatedStateRuntime {
     });
     await stores.startSynchronization();
     Kernel.logger.info(
-      `OrbitDB private network stores registered: networkId=${networkId}` +
-        ` peerId=${localPeerId}`,
+      `OrbitDB private network stores registered: peerId=${localPeerId}`,
     );
   }
 
@@ -100,7 +98,7 @@ export default class OrbitDBReplicatedStateRuntime {
         await this.registerNetwork(network);
       } catch (error: unknown) {
         Kernel.logger.error(
-          `OrbitDB replicated state network registration failed: networkId=${network.getId()} error=${errorClassName(error)}`,
+          `OrbitDB replicated state network registration failed: error=${errorClassName(error)}`,
         );
       }
     });

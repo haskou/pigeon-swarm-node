@@ -104,8 +104,7 @@ export class OrbitDBPrivateNetworkStores {
       const transient = isOrbitDBTransientBlockError(error);
 
       Kernel.logger[transient ? 'debug' : 'warn']?.(
-        `OrbitDB private network store sync error handled: networkId=${networkId}` +
-          ` store=${store}` +
+        `OrbitDB private network store sync error handled: store=${store}` +
           ` transient=${transient}` +
           ` error=${errorClassName(error)}`,
       );
@@ -135,8 +134,7 @@ export class OrbitDBPrivateNetworkStores {
     this.registerSyncErrorLogger(networkId, 'keyvalue/heads', heads);
 
     Kernel.logger.debug?.(
-      `OrbitDB private network stores opened: networkId=${networkId}` +
-        ` peerId=${network.getPeerId()}`,
+      `OrbitDB private network stores opened: peerId=${network.getPeerId()}`,
     );
 
     return new OrbitDBPrivateNetworkStores({

@@ -383,12 +383,12 @@ describe('PrivateIPFS', () => {
       expect(mockCreateHelia).toHaveBeenCalledTimes(2);
     });
 
-    it('should log the network name and peer id', async () => {
+    it('should log the local peer id without the network name', async () => {
       const Kernel = (await import('@haskou/ddd-kernel')).default;
 
       await PrivateIPFS.create(defaultOptions);
 
-      expect(Kernel.logger.info).toHaveBeenCalledWith(
+      expect(Kernel.logger.info).not.toHaveBeenCalledWith(
         expect.stringContaining('test-network'),
       );
       expect(Kernel.logger.info).toHaveBeenCalledWith(

@@ -124,7 +124,7 @@ export class PublicRelayRecordDiscovery {
         return;
       } catch (error: unknown) {
         Kernel.logger.debug(
-          `Public relay record dial failed peerId="${record.peerId}" address="${address}" error=${errorClassName(error)}`,
+          `Public relay record dial failed: error=${errorClassName(error)}`,
         );
       }
     }
