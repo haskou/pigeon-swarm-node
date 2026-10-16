@@ -54,8 +54,7 @@ describe('PublicHttpGetter', () => {
   beforeEach(() => {
     guard = mock<PublicUrlGuard>();
     guard.resolve.mockImplementation(async (target) => ({
-      address: '127.0.0.1',
-      family: 4,
+      addresses: [{ address: '127.0.0.1', family: 4 }],
       url: new URL(target.toString()),
     }));
     getter = new PublicHttpGetter(guard);
@@ -72,6 +71,35 @@ describe('PublicHttpGetter', () => {
     expect(result.statusCode).toBe(200);
     expect(result.body.toString()).toBe('{"ok":true}');
     expect(guard.resolve).toHaveBeenCalledWith(url());
+  });
+
+  it('should fall back to the next checked address when one does not connect', async () => {
+    handler = (_request, response): void => {
+      response.setHeader('content-type', 'application/json');
+      response.end('{"ok":true}');
+    };
+    guard.resolve.mockImplementation(async (target) => ({
+      addresses: [
+        { address: '::1', family: 6 },
+        { address: '127.0.0.1', family: 4 },
+      ],
+      url: new URL(target.toString()),
+    }));
+
+    const result = await getter.get(url(), options());
+
+    expect(result.body.toString()).toBe('{"ok":true}');
+  });
+
+  it('should fail when none of the checked addresses connects', async () => {
+    guard.resolve.mockImplementation(async (target) => ({
+      addresses: [{ address: '::1', family: 6 }],
+      url: new URL(target.toString()),
+    }));
+
+    await expect(getter.get(url(), options())).rejects.toThrow(
+      PublicHttpFetchError,
+    );
   });
 
   it('should abort a streamed body as soon as it passes the limit', async () => {

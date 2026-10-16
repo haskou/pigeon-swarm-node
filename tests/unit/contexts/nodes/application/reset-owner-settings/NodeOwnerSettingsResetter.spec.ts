@@ -12,6 +12,7 @@ import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConf
 import { NoNodeBlocks } from '@app/contexts/nodes/domain/NoNodeBlocks';
 import { NodeBlockListVersion } from '@app/contexts/nodes/domain/value-objects/NodeBlockListVersion';
 import { NodeBlockSourceOrigin } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceOrigin';
+import { NodeBlockSourceVersionFloor } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceVersionFloor';
 import { NodeRegistrationCodeSecret } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationCodeSecret';
 import { NodeRegistrationMode } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationMode';
 import LocalNodeBlockExceptionsRepository from '@app/contexts/nodes/infrastructure/local-db/LocalNodeBlockExceptionsRepository';
@@ -132,6 +133,7 @@ describe('NodeOwnerSettingsResetter', () => {
       new IdentityId(publisherKeyPair.toPrimitives().publicKey),
       new NodeBlockSourceOrigin('https://publisher.example'),
       false,
+      new NodeBlockSourceVersionFloor(0),
     );
 
     publisher = source.getOwnerIdentityId();
@@ -139,7 +141,7 @@ describe('NodeOwnerSettingsResetter', () => {
       new NodeBlockListMother(publisherKeyPair)
         .withVersion(2)
         .blockingIdentities([listed, await NodeBlockListMother.identityId()])
-        .build(),
+        .primitives(),
       new Timestamp(1),
     );
     source.approve(
@@ -192,6 +194,9 @@ describe('NodeOwnerSettingsResetter', () => {
       NodeBlockPublication.unpublished(),
     );
     await expect(sourceRepository.findAll()).resolves.toEqual([]);
+    await expect(sourceRepository.versionFloor(publisher)).resolves.toEqual(
+      new NodeBlockSourceVersionFloor(2),
+    );
     await expect(exceptionsRepository.find()).resolves.toEqual(
       NodeBlockEntries.none(),
     );

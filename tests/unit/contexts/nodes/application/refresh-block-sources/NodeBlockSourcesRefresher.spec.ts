@@ -1,6 +1,6 @@
 import NodeBlockSourcesRefresher from '@app/contexts/nodes/application/refresh-block-sources/NodeBlockSourcesRefresher';
 import { NodeBlockSourceFetchFailedError } from '@app/contexts/nodes/domain/errors/NodeBlockSourceFetchFailedError';
-import { NodeBlockList } from '@app/contexts/nodes/domain/NodeBlockList';
+import { NodeBlockListPrimitives } from '@app/contexts/nodes/domain/NodeBlockListPrimitives';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
 import { NodeBlockSourceFetchLimits } from '@app/contexts/nodes/domain/NodeBlockSourceFetchLimits';
 import NodeBlockSourceRepository from '@app/contexts/nodes/domain/repositories/NodeBlockSourceRepository';
@@ -8,6 +8,7 @@ import NodeBlockListDownloader from '@app/contexts/nodes/domain/services/NodeBlo
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { NodeBlockSourceFetchOutcome } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceFetchOutcome';
 import { NodeBlockSourceOrigin } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceOrigin';
+import { NodeBlockSourceVersionFloor } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceVersionFloor';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Duration, Timestamp } from '@haskou/value-objects';
@@ -27,17 +28,18 @@ describe('NodeBlockSourcesRefresher', () => {
   let refresher: NodeBlockSourcesRefresher;
   let stored: NodeBlockSource;
 
-  const list = (signer: KeyPair, version: number): NodeBlockList =>
+  const list = (signer: KeyPair, version: number): NodeBlockListPrimitives =>
     new NodeBlockListMother(signer)
       .withVersion(version)
       .blockingIdentities([blocked])
-      .build();
+      .primitives();
 
   const adopted = (autoApply = false): NodeBlockSource =>
     NodeBlockSource.adopt(
       new IdentityId(publisher.toPrimitives().publicKey),
       origin,
       autoApply,
+      new NodeBlockSourceVersionFloor(0),
     );
 
   const copy = (source: NodeBlockSource): NodeBlockSource =>

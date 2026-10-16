@@ -34,13 +34,13 @@ import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNe
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
 import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
 import NodeOwnerSettingsResetter from '@app/contexts/nodes/application/reset-owner-settings/NodeOwnerSettingsResetter';
-import { NodeBlockList } from '@app/contexts/nodes/domain/NodeBlockList';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
 import NodeBlockListRepository from '@app/contexts/nodes/domain/repositories/NodeBlockListRepository';
 import NodeBlockSourceRepository from '@app/contexts/nodes/domain/repositories/NodeBlockSourceRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
 import { NodeBlockSourceOrigin } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceOrigin';
+import { NodeBlockSourceVersionFloor } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceVersionFloor';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import Ed25519PrivateDeviceCredentialCodec from '@app/contexts/private-authorization/infrastructure/crypto/Ed25519PrivateDeviceCredentialCodec';
@@ -1431,15 +1431,16 @@ export default class Definitions {
       new IdentityId(unsigned.ownerIdentityId),
       new NodeBlockSourceOrigin('https://publisher.example'),
       autoApply,
+      new NodeBlockSourceVersionFloor(0),
     );
 
     source.receive(
-      NodeBlockList.fromPrimitives({
+      {
         ...unsigned,
         identitySignature: publisher
           .sign(`pigeon:node-block-list:v1\n${canonicalize(unsigned)}`)
           .valueOf(),
-      }),
+      },
       Timestamp.now(),
     );
     await Kernel.di

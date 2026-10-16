@@ -53,9 +53,9 @@ describe('HttpNodeBlockListDownloader', () => {
       statusCode: 200,
     });
 
-    const list = await downloader.download(origin);
+    const document = await downloader.download(origin);
 
-    expect(list.toPrimitives()).toEqual(mother.primitives());
+    expect(document).toEqual(mother.primitives());
     expect(getter.get).toHaveBeenCalledWith(
       new URL('https://publisher.example/node/blocks/published'),
       expect.objectContaining({
@@ -104,23 +104,30 @@ describe('HttpNodeBlockListDownloader', () => {
     expect(await outcomeOf()).toEqual(NodeBlockSourceFetchOutcome.UNREACHABLE);
   });
 
-  it('should report a body that is not a block list as an invalid document', async () => {
-    getter.get.mockResolvedValueOnce({
-      body: Buffer.from('not json'),
-      redirectLocation: undefined,
-      statusCode: 200,
-    });
-    getter.get.mockResolvedValueOnce({
-      body: Buffer.from(JSON.stringify({ version: 'one' })),
+  it.each(['not json', '[1]', '"list"', 'null'])(
+    'should report the body %s, which is not a JSON object, as an invalid document',
+    async (body) => {
+      getter.get.mockResolvedValue({
+        body: Buffer.from(body),
+        redirectLocation: undefined,
+        statusCode: 200,
+      });
+
+      expect(await outcomeOf()).toEqual(
+        NodeBlockSourceFetchOutcome.INVALID_DOCUMENT,
+      );
+    },
+  );
+
+  it('should leave validating the entries to the source, after its signer, version and signature checks', async () => {
+    const unvalidated = { blockedIdentityIds: ['not-an-identity-id'] };
+
+    getter.get.mockResolvedValue({
+      body: Buffer.from(JSON.stringify(unvalidated)),
       redirectLocation: undefined,
       statusCode: 200,
     });
 
-    expect(await outcomeOf()).toEqual(
-      NodeBlockSourceFetchOutcome.INVALID_DOCUMENT,
-    );
-    expect(await outcomeOf()).toEqual(
-      NodeBlockSourceFetchOutcome.INVALID_DOCUMENT,
-    );
+    await expect(downloader.download(origin)).resolves.toEqual(unvalidated);
   });
 });

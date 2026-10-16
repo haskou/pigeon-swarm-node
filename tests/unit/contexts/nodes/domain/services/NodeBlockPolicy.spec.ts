@@ -8,6 +8,7 @@ import NodeBlockEnforcer from '@app/contexts/nodes/domain/services/NodeBlockEnfo
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
 import { NodeBlockSourceOrigin } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceOrigin';
+import { NodeBlockSourceVersionFloor } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceVersionFloor';
 import { NodePeerId } from '@app/contexts/nodes/domain/value-objects/NodePeerId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
@@ -47,9 +48,10 @@ describe('NodeBlockPolicy', () => {
       mother.ownerIdentityId(),
       new NodeBlockSourceOrigin('https://publisher.example'),
       true,
+      new NodeBlockSourceVersionFloor(0),
     );
 
-    source.receive(mother.build(), Timestamp.now());
+    source.receive(mother.primitives(), Timestamp.now());
 
     return source;
   };

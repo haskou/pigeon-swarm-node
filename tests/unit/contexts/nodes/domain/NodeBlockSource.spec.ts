@@ -1,11 +1,12 @@
 import { NodeBlockEntriesAreNotListedBySourceError } from '@app/contexts/nodes/domain/errors/NodeBlockEntriesAreNotListedBySourceError';
 import { NodeBlockSourceVersionHasChangedError } from '@app/contexts/nodes/domain/errors/NodeBlockSourceVersionHasChangedError';
 import { NodeBlockEntries } from '@app/contexts/nodes/domain/NodeBlockEntries';
-import { NodeBlockList } from '@app/contexts/nodes/domain/NodeBlockList';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
+import { NodeBlockListPrimitives } from '@app/contexts/nodes/domain/NodeBlockListPrimitives';
 import { NodeBlockListVersion } from '@app/contexts/nodes/domain/value-objects/NodeBlockListVersion';
 import { NodeBlockSourceFetchOutcome } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceFetchOutcome';
 import { NodeBlockSourceOrigin } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceOrigin';
+import { NodeBlockSourceVersionFloor } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceVersionFloor';
 import { NodePeerId } from '@app/contexts/nodes/domain/value-objects/NodePeerId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
@@ -24,17 +25,24 @@ describe('NodeBlockSource', () => {
   let a: IdentityId;
   let b: IdentityId;
 
-  const list = (version: number, identityIds: IdentityId[]): NodeBlockList =>
+  const list = (
+    version: number,
+    identityIds: IdentityId[],
+  ): NodeBlockListPrimitives =>
     new NodeBlockListMother(publisher)
       .withVersion(version)
       .blockingIdentities(identityIds)
-      .build();
+      .primitives();
 
-  const source = (autoApply = false): NodeBlockSource =>
+  const source = (
+    autoApply = false,
+    floor = new NodeBlockSourceVersionFloor(0),
+  ): NodeBlockSource =>
     NodeBlockSource.adopt(
       new IdentityId(publisher.toPrimitives().publicKey),
       origin,
       autoApply,
+      floor,
     );
 
   const values = (entries: NodeBlockEntries): string[] =>
@@ -68,7 +76,7 @@ describe('NodeBlockSource', () => {
       new NodeBlockListMother(publisher)
         .blockingIdentities([a, b])
         .blockingNodePeers([NODE_PEER_ID_A])
-        .build(),
+        .primitives(),
       at,
     );
     adopted.approve(
@@ -158,13 +166,26 @@ describe('NodeBlockSource', () => {
     expect(values(adopted.pending())).toEqual([a.valueOf()]);
   });
 
-  it('should approve everything pending when autoApply is turned on', () => {
+  it('should keep pending entries pending when autoApply is turned on', () => {
     const adopted = source();
 
     adopted.receive(list(1, [a]), at);
     adopted.reconfigure(origin, true);
 
-    expect(values(adopted.applied())).toEqual([a.valueOf()]);
+    expect(adopted.applied().count()).toBe(0);
+    expect(values(adopted.pending())).toEqual([a.valueOf()]);
+  });
+
+  it('should refuse a version at or below the floor it was adopted with', () => {
+    const adopted = source(true, new NodeBlockSourceVersionFloor(2));
+
+    expect(adopted.receive(list(2, [a]), at)).toEqual(
+      NodeBlockSourceFetchOutcome.NOT_NEWER,
+    );
+    expect(adopted.receive(list(3, [a]), at)).toEqual(
+      NodeBlockSourceFetchOutcome.ACCEPTED,
+    );
+    expect(adopted.toPrimitives().versionFloor).toBe(3);
   });
 
   it('should keep the last valid list when a version is not newer', () => {
@@ -187,7 +208,7 @@ describe('NodeBlockSource', () => {
     const impostor = new NodeBlockListMother(await KeyPair.generate())
       .withVersion(9)
       .blockingIdentities([b])
-      .build();
+      .primitives();
 
     adopted.receive(list(1, [a]), at);
 
@@ -199,12 +220,10 @@ describe('NodeBlockSource', () => {
 
   it('should keep the last valid list when the signature does not verify', () => {
     const adopted = source(true);
-    const forged = NodeBlockList.fromPrimitives({
-      ...new NodeBlockListMother(publisher)
-        .blockingIdentities([a])
-        .primitives(),
+    const forged = {
+      ...new NodeBlockListMother(publisher).blockingIdentities([a]).primitives(),
       version: 5,
-    });
+    };
 
     adopted.receive(list(1, [a]), at);
 
@@ -212,6 +231,59 @@ describe('NodeBlockSource', () => {
       NodeBlockSourceFetchOutcome.INVALID_SIGNATURE,
     );
     expect(adopted.toPrimitives().list?.version).toBe(1);
+  });
+
+  describe('before validating any entry', () => {
+    const unparseable = (mother: NodeBlockListMother): NodeBlockListPrimitives => {
+      mother.blockedIdentityIds = ['not-an-identity-id'];
+
+      return mother.primitives();
+    };
+
+    it('should refuse another signer', async () => {
+      const impostor = unparseable(
+        new NodeBlockListMother(await KeyPair.generate()).withVersion(9),
+      );
+
+      expect(source().receive(impostor, at)).toEqual(
+        NodeBlockSourceFetchOutcome.WRONG_SIGNER,
+      );
+    });
+
+    it('should refuse a version that is not newer', () => {
+      const adopted = source(false, new NodeBlockSourceVersionFloor(4));
+
+      expect(
+        adopted.receive(
+          unparseable(new NodeBlockListMother(publisher).withVersion(4)),
+          at,
+        ),
+      ).toEqual(NodeBlockSourceFetchOutcome.NOT_NEWER);
+    });
+
+    it('should refuse a signature that does not verify', () => {
+      const forged = {
+        ...unparseable(new NodeBlockListMother(publisher)),
+        version: 2,
+      };
+
+      expect(source().receive(forged, at)).toEqual(
+        NodeBlockSourceFetchOutcome.INVALID_SIGNATURE,
+      );
+    });
+  });
+
+  it('should refuse a document the publisher signed with invalid entries', () => {
+    const adopted = source(true);
+    const mother = new NodeBlockListMother(publisher);
+
+    mother.blockedIdentityIds = ['not-an-identity-id'];
+
+    expect(adopted.receive(mother.primitives(), at)).toEqual(
+      NodeBlockSourceFetchOutcome.INVALID_DOCUMENT,
+    );
+    expect(adopted.toPrimitives().list).toBeNull();
+    expect(adopted.toPrimitives().versionFloor).toBe(0);
   });
 
   it('should record fetch diagnostics without changing the list', () => {

@@ -6,6 +6,7 @@ import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
 import NodeBlockSourceRepository from '@app/contexts/nodes/domain/repositories/NodeBlockSourceRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { NodeBlockSourceOrigin } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceOrigin';
+import { NodeBlockSourceVersionFloor } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceVersionFloor';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
@@ -53,13 +54,14 @@ describe('NodeBlockSourceEntriesApprover', () => {
       new IdentityId(publisher.toPrimitives().publicKey),
       new NodeBlockSourceOrigin('https://publisher.example'),
       false,
+      new NodeBlockSourceVersionFloor(0),
     );
     source.receive(
       new NodeBlockListMother(publisher)
         .withVersion(4)
         .blockingIdentities([a, b])
         .blockingNodePeers([NODE_PEER_ID_A])
-        .build(),
+        .primitives(),
       new Timestamp(1),
     );
     repository = mock<NodeBlockSourceRepository>();

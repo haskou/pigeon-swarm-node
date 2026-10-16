@@ -72,6 +72,29 @@ describe('PublicUrlGuard', () => {
     expect(() => new PublicUrlGuard().parse(url)).toThrow(UrlIsNotPublicError);
   });
 
+  it.each([
+    'http://[2001:db8::1]/',
+    'http://[100::1]/',
+    'http://[::7f00:1]/',
+    'http://[::808:808]/',
+    'http://[::ffff:0:7f00:1]/',
+    'http://[0:0:0:0:0:ffff:7f00:1]/',
+    'http://[0:0:0:0:0:0:0:1]/',
+  ])(
+    'rejects the documentation, discard, IPv4-compatible or translated IPv6 address %s',
+    (url) => {
+      expect(() => new PublicUrlGuard().parse(url)).toThrow(
+        UrlIsNotPublicError,
+      );
+    },
+  );
+
+  it('accepts an IPv4-mapped IPv6 literal of a public address', () => {
+    expect(new PublicUrlGuard().parse('https://[::ffff:8.8.8.8]/').hostname).toBe(
+      '[::ffff:808:808]',
+    );
+  });
+
   it('accepts a public IPv6 literal', () => {
     expect(
       new PublicUrlGuard().parse('https://[2606:4700::1111]/').hostname,
@@ -108,19 +131,19 @@ describe('PublicUrlGuard', () => {
     ).rejects.toThrow(UrlIsNotPublicError);
   });
 
-  it('resolves public addresses', async () => {
+  it('resolves every public address, in the resolver order', async () => {
     mockedLookup.mockResolvedValue([
-      {
-        address: '93.184.216.34',
-        family: 4,
-      },
+      { address: '93.184.216.34', family: 4 },
+      { address: '2606:4700::1111', family: 6 },
     ] as never);
 
     await expect(
       new PublicUrlGuard().resolve('https://example.com/article'),
     ).resolves.toMatchObject({
-      address: '93.184.216.34',
-      family: 4,
+      addresses: [
+        { address: '93.184.216.34', family: 4 },
+        { address: '2606:4700::1111', family: 6 },
+      ],
     });
   });
 });
