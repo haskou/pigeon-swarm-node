@@ -1,5 +1,5 @@
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import { IdentitySignature, KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityNotFoundError } from '../../../../../../src/contexts/identities/domain/errors/IdentityNotFoundError';
@@ -55,10 +55,9 @@ describe('IpfsIdentityRepository', () => {
     );
     const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
     const previousIdentityExternalIdentifier: string | undefined = undefined;
-    const nonce = new IdentityAdmissionProof(
-      identityId.valueOf(),
-      [networkId],
-    ).mine();
+    const nonce = new IdentityAdmissionProof(identityId.valueOf(), [
+      networkId,
+    ]).mine();
 
     const signaturePayload = {
       admissionNonce: nonce,
@@ -82,7 +81,9 @@ describe('IpfsIdentityRepository', () => {
 
     return Identity.fromPrimitives({
       ...signaturePayload,
-      signature: keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
+      signature: keyPair
+        .sign(IdentitySignature.signingContent(signaturePayload))
+        .valueOf(),
     });
   }
 

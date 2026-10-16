@@ -27,7 +27,7 @@ import {
 /**
  * Pins the device sealed-secret entry signature (#488) against a real node:
  * the preimage and signatures are rebuilt from
- * tests/fixtures/device-sealed-secret-vectors.json with node:crypto only, the
+ * @haskou/pigeon-swarm-crypto/vectors/device-sealed-secret.json with node:crypto only, the
  * vector bundle is accepted over HTTP, and the fixture's rejected bundles plus a
  * flipped signature byte are refused. Sealed secrets are node-local storage
  * (docs/design/device-sealed-secrets.md), so there is no second node to assert.
@@ -103,7 +103,7 @@ type SignedCall = {
 
 const vectors = JSON.parse(
   readFileSync(
-    path.join(__dirname, '../../fixtures/device-sealed-secret-vectors.json'),
+    require.resolve('@haskou/pigeon-swarm-crypto/vectors/device-sealed-secret.json'),
     'utf8',
   ),
 ) as SealedSecretVectors;

@@ -81,7 +81,7 @@ type SignedCall = {
 
 const vectors = JSON.parse(
   readFileSync(
-    path.join(__dirname, '../../fixtures/signed-http-request-vectors.json'),
+    require.resolve('@haskou/pigeon-swarm-crypto/vectors/signed-http-request.json'),
     'utf8',
   ),
 ) as SignedRequestVectors;

@@ -2,7 +2,6 @@ import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/do
 import { DeviceAuthorizationTransitionPrimitives } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionPrimitives';
 import { PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 type Vectors = {
   cases: {
@@ -22,10 +21,7 @@ type Vectors = {
 
 const vectors = JSON.parse(
   readFileSync(
-    join(
-      __dirname,
-      '../../../../fixtures/device-authorization-transition-vectors.json',
-    ),
+    require.resolve('@haskou/pigeon-swarm-crypto/vectors/device-authorization-transition.json'),
     'utf8',
   ),
 ) as Vectors;

@@ -11,7 +11,6 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { KeyPair, PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 type KeyRole = 'candidate' | 'identity' | 'owner' | 'recovery';
 
@@ -63,7 +62,7 @@ interface Vectors {
 
 const vectors = JSON.parse(
   readFileSync(
-    join(__dirname, '../../../../fixtures/device-sealed-secret-vectors.json'),
+    require.resolve('@haskou/pigeon-swarm-crypto/vectors/device-sealed-secret.json'),
     'utf8',
   ),
 ) as Vectors;

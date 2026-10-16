@@ -1,7 +1,6 @@
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
 import KeychainSignatureDomainService from '@app/contexts/keychains/domain/services/KeychainSignatureDomainService';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 type Vectors = {
   accepted: {
@@ -23,7 +22,7 @@ type Vectors = {
 
 const vectors = JSON.parse(
   readFileSync(
-    join(__dirname, '../../../../fixtures/keychain-signature-vectors.json'),
+    require.resolve('@haskou/pigeon-swarm-crypto/vectors/keychain-signature.json'),
     'utf8',
   ),
 ) as Vectors;

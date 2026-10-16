@@ -1,4 +1,5 @@
 import { SignedRequestReplayGuard } from '@app/apps/apis/shared/SignedRequestReplayGuard';
+import { SignedHttpRequestSignature } from '@haskou/pigeon-swarm-crypto';
 
 describe('SignedRequestReplayGuard', () => {
   it('rejects a repeated signature for the same identity', () => {
@@ -25,7 +26,7 @@ describe('SignedRequestReplayGuard', () => {
     const guard = new SignedRequestReplayGuard();
 
     guard.accept('identity', 'signature');
-    now.mockReturnValue(SignedRequestReplayGuard.MAX_CLOCK_SKEW_MS * 2 + 1);
+    now.mockReturnValue(SignedHttpRequestSignature.REPLAY_WINDOW_MS + 1);
 
     expect(guard.accept('identity', 'signature')).toBe(true);
 

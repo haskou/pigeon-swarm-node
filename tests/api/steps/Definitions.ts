@@ -1,7 +1,6 @@
 import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
 import IdentityAdmissionSourceRateLimiter from '@app/apps/apis/identities-api/IdentityAdmissionSourceRateLimiter';
 import { PrivateAuthorizationRequestBodyLimit } from '@app/apps/apis/private-authorization-api/routes/PrivateAuthorizationRequestBodyLimit';
-import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import PigeonApplication from '@app/apps/PigeonApplication';
 import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
@@ -56,6 +55,8 @@ import {
   KeyPair,
   PrivateGenesisSignature,
   PrivateKey,
+  SignedHttpRequestBody,
+  SignedHttpRequestSignature,
 } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp, assert } from '@haskou/value-objects';
 import canonicalize from 'canonicalize';
@@ -392,7 +393,7 @@ export default class Definitions {
     return identityId ?? this.ownerIdentityId;
   }
 
-  private getCurrentRequestBody(): unknown {
+  private getCurrentRequestBody(): SignedHttpRequestBody {
     if (this.binaryBody) {
       return this.binaryBody;
     }
@@ -1368,18 +1369,18 @@ export default class Definitions {
       createdAt,
     );
     this.attachCommunityModerationLog(method, path, signerKeyPair, createdAt);
-    const verifier = new SignedHttpRequestVerifier();
-    const signedRequestPayload = verifier.getCanonicalPayload(
+
+    const signedRequestPayload = SignedHttpRequestSignature.signingContent({
+      body: this.getCurrentRequestBody(),
       method,
       path,
-      timestamp,
-      this.getCurrentRequestBody(),
-    );
+      timestamp: Number(timestamp),
+    });
 
     this.headers['x-identity-id'] = signerIdentityId?.valueOf() || '';
     this.headers['x-timestamp'] = timestamp;
     this.headers['x-signature'] = signerKeyPair
-      .sign(JSON.stringify(signedRequestPayload))
+      .sign(signedRequestPayload)
       .valueOf();
   }
 
@@ -2144,18 +2145,16 @@ export default class Definitions {
     const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}${suffix}`;
     await this.signCurrentRequest('GET', path);
     const timestamp = this.headers['x-timestamp'] as string;
-    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
-      'GET',
+    const payload = SignedHttpRequestSignature.signingContent({
+      body: this.getCurrentRequestBody(),
+      method: 'GET',
       path,
-      timestamp,
-      this.getCurrentRequestBody(),
-    );
+      timestamp: Number(timestamp),
+    });
     this.headers['x-device-credential'] = new IdentityId(
       device.toPrimitives().publicKey,
     ).valueOf();
-    this.headers['x-device-signature'] = device
-      .sign(JSON.stringify(payload))
-      .valueOf();
+    this.headers['x-device-signature'] = device.sign(payload).valueOf();
   }
 
   private async signDeviceAuthorizationRecoveryRequest(
@@ -2166,15 +2165,15 @@ export default class Definitions {
     const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}${suffix}`;
     await this.signCurrentRequest('GET', path);
     const timestamp = this.headers['x-timestamp'] as string;
-    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
-      'GET',
+    const payload = SignedHttpRequestSignature.signingContent({
+      body: this.getCurrentRequestBody(),
+      method: 'GET',
       path,
-      timestamp,
-      this.getCurrentRequestBody(),
-    );
+      timestamp: Number(timestamp),
+    });
     const recoveryAuthority = await this.ensureIdentityRecoveryKeyPair();
     this.headers['x-recovery-signature'] = recoveryAuthority
-      .sign(JSON.stringify(payload))
+      .sign(payload)
       .valueOf();
   }
 
@@ -2237,19 +2236,17 @@ export default class Definitions {
     const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}/devices`;
     await this.signCurrentRequest('GET', path);
     const timestamp = this.headers['x-timestamp'] as string;
-    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
-      'GET',
+    const payload = SignedHttpRequestSignature.signingContent({
+      body: this.getCurrentRequestBody(),
+      method: 'GET',
       path,
-      timestamp,
-      this.getCurrentRequestBody(),
-    );
+      timestamp: Number(timestamp),
+    });
     const device = await this.ensureIdentityDeviceOwnerKeyPair();
     this.headers['x-device-credential'] = new IdentityId(
       device.toPrimitives().publicKey,
     ).valueOf();
-    this.headers['x-device-signature'] = device
-      .sign(JSON.stringify(payload))
-      .valueOf();
+    this.headers['x-device-signature'] = device.sign(payload).valueOf();
   }
 
   @given('I set an unsigned sealed secret bundle body')
@@ -2291,19 +2288,17 @@ export default class Definitions {
     const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}/sealed-secrets`;
     await this.signCurrentRequest('GET', path);
     const timestamp = this.headers['x-timestamp'] as string;
-    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
-      'GET',
+    const payload = SignedHttpRequestSignature.signingContent({
+      body: this.getCurrentRequestBody(),
+      method: 'GET',
       path,
-      timestamp,
-      this.getCurrentRequestBody(),
-    );
+      timestamp: Number(timestamp),
+    });
     const device = await this.ensureIdentityDeviceOwnerKeyPair();
     this.headers['x-device-credential'] = new IdentityId(
       device.toPrimitives().publicKey,
     ).valueOf();
-    this.headers['x-device-signature'] = device
-      .sign(JSON.stringify(payload))
-      .valueOf();
+    this.headers['x-device-signature'] = device.sign(payload).valueOf();
   }
 
   @given('I sign the current sealed secret bundle request')
@@ -2312,19 +2307,17 @@ export default class Definitions {
     const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}/sealed-secrets`;
     await this.signCurrentRequest('PUT', path);
     const timestamp = this.headers['x-timestamp'] as string;
-    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
-      'PUT',
+    const payload = SignedHttpRequestSignature.signingContent({
+      body: this.getCurrentRequestBody(),
+      method: 'PUT',
       path,
-      timestamp,
-      this.getCurrentRequestBody(),
-    );
+      timestamp: Number(timestamp),
+    });
     const device = await this.ensureIdentityDeviceOwnerKeyPair();
     this.headers['x-device-credential'] = new IdentityId(
       device.toPrimitives().publicKey,
     ).valueOf();
-    this.headers['x-device-signature'] = device
-      .sign(JSON.stringify(payload))
-      .valueOf();
+    this.headers['x-device-signature'] = device.sign(payload).valueOf();
   }
 
   @when('I PUT the current sealed secret bundle')

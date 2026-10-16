@@ -1,11 +1,13 @@
 import { DeviceAuthorizationRequestAuthenticator } from '@app/apps/apis/identity-devices-api/DeviceAuthorizationRequestAuthenticator';
-import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  KeyPair,
+  SignedHttpRequestSignature,
+} from '@haskou/pigeon-swarm-crypto';
 import { Request } from 'express';
 
 describe(DeviceAuthorizationRequestAuthenticator.name, () => {
@@ -23,17 +25,17 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
     );
     const timestamp = String(Date.now());
     const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}`;
-    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
-      'GET',
+    const payload = SignedHttpRequestSignature.signingContent({
+      body: undefined,
+      method: 'GET',
       path,
-      timestamp,
-      undefined,
-    );
+      timestamp: Number(timestamp),
+    });
     const headers: Record<string, string | undefined> = {
       'x-device-credential': new IdentityId(
         device.toPrimitives().publicKey,
       ).valueOf(),
-      'x-device-signature': device.sign(JSON.stringify(payload)).valueOf(),
+      'x-device-signature': device.sign(payload).valueOf(),
       'x-timestamp': timestamp,
     };
     const request = {
@@ -73,14 +75,14 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
     source.headers['x-device-credential'] = undefined;
     source.headers['x-device-signature'] = undefined;
     const timestamp = source.headers['x-timestamp'] as string;
-    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
-      source.request.method,
-      source.request.path,
-      timestamp,
-      source.request.body,
-    );
+    const payload = SignedHttpRequestSignature.signingContent({
+      body: source.request.body,
+      method: source.request.method,
+      path: source.request.path,
+      timestamp: Number(timestamp),
+    });
     source.headers['x-recovery-signature'] = recoveryAuthority
-      .sign(JSON.stringify(payload))
+      .sign(payload)
       .valueOf();
 
     expect(() =>
@@ -163,16 +165,16 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
           recoveryAuthority.toPrimitives().publicKey,
         ),
       );
-      const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
-        source.request.method,
-        source.request.path,
-        source.headers['x-timestamp'] as string,
-        source.request.body,
-      );
+      const payload = SignedHttpRequestSignature.signingContent({
+        body: source.request.body,
+        method: source.request.method,
+        path: source.request.path,
+        timestamp: Number(source.headers['x-timestamp'] as string),
+      });
       source.headers['x-device-credential'] = undefined;
       source.headers['x-device-signature'] = undefined;
       source.headers['x-recovery-signature'] = recoveryAuthority
-        .sign(JSON.stringify(payload))
+        .sign(payload)
         .valueOf();
 
       return { ...source, authorization };

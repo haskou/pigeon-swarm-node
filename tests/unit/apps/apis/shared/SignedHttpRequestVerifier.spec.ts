@@ -3,7 +3,10 @@ import {
   SignedHttpRequestVerifier,
 } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  KeyPair,
+  SignedHttpRequestSignature,
+} from '@haskou/pigeon-swarm-crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('SignedHttpRequestVerifier', () => {
@@ -13,13 +16,13 @@ describe('SignedHttpRequestVerifier', () => {
     const timestamp = Date.now();
     const path = `/keychains/${encodeURIComponent(identityId.valueOf())}`;
     const verifier = new SignedHttpRequestVerifier();
-    const canonicalPayload = verifier.getCanonicalPayload(
-      'GET',
+    const canonicalPayload = SignedHttpRequestSignature.signingContent({
+      body: {},
+      method: 'GET',
       path,
-      timestamp,
-      {},
-    );
-    const signature = keyPair.sign(JSON.stringify(canonicalPayload)).valueOf();
+      timestamp: Number(timestamp),
+    });
+    const signature = keyPair.sign(canonicalPayload).valueOf();
     const request: MockProxy<SignedHttpRequest> = mock<SignedHttpRequest>();
     const headers: Record<string, string> = {
       'x-identity-id': identityId.valueOf(),
@@ -34,8 +37,8 @@ describe('SignedHttpRequestVerifier', () => {
       (header: string) => headers[header.toLowerCase()],
     );
 
-    expect(verifier.verifySignature(request).identityId.isEqual(identityId)).toBe(
-      true,
-    );
+    expect(
+      verifier.verifySignature(request).identityId.isEqual(identityId),
+    ).toBe(true);
   });
 });

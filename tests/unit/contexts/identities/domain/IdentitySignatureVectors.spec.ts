@@ -8,7 +8,6 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { KeyPair, PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 type Vectors = {
   cases: {
@@ -39,7 +38,7 @@ type Vectors = {
 
 const vectors = JSON.parse(
   readFileSync(
-    join(__dirname, '../../../../fixtures/identity-signature-vectors.json'),
+    require.resolve('@haskou/pigeon-swarm-crypto/vectors/identity-signature.json'),
     'utf8',
   ),
 ) as Vectors;
@@ -71,7 +70,11 @@ describe('Identity self-signature vectors', () => {
 
     it('keeps the pinned preimage keys in alphabetical order', () => {
       for (const { derived } of vectors.cases) {
-        const keys = Object.keys(JSON.parse(derived.signingPayload));
+        const keys = Object.keys(
+          JSON.parse(
+            derived.signingPayload.replace('pigeon:identity:v1\n', ''),
+          ),
+        );
 
         expect(keys).toEqual(
           SIGNING_FIELDS.filter((field) => keys.includes(field)),

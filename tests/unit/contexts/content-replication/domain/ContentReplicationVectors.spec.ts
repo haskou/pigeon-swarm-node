@@ -1,7 +1,6 @@
 import { ContentReplication } from '@app/contexts/content-replication/domain/ContentReplication';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 interface Vector {
   name: string;
@@ -12,7 +11,7 @@ interface Vector {
 
 const fixture = JSON.parse(
   readFileSync(
-    join(__dirname, '../../../../fixtures/content-replication-vectors.json'),
+    require.resolve('@haskou/pigeon-swarm-crypto/vectors/content-replication.json'),
     'utf8',
   ),
 ) as { recordId: string; vectors: Vector[] };

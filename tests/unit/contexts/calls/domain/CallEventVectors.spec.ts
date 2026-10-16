@@ -5,7 +5,6 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import canonicalize from 'canonicalize';
 import { createHash, createPublicKey, verify } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 interface Vector {
   derived: {
@@ -28,7 +27,7 @@ interface Vectors {
 
 const vectors = JSON.parse(
   readFileSync(
-    join(__dirname, '../../../../fixtures/call-event-vectors.json'),
+    require.resolve('@haskou/pigeon-swarm-crypto/vectors/call-event.json'),
     'utf8',
   ),
 ) as Vectors;
