@@ -156,6 +156,7 @@ package "nodes" {
     abstract class NodeBlocks {
       +acceptsReplacement(list: NodeBlockList): boolean
       +blocksIdentity(identityId: IdentityId): boolean
+      +toSigned(): SignedNodeBlockList | undefined
     }
 
     class NodeBlockList {
@@ -164,7 +165,20 @@ package "nodes" {
       -blockedIdentityIds: IdentityId[]
       -blockedNodePeerIds: NodePeerId[]
       -identitySignature: Signature
+      +{static} fromSigned(signed: SignedNodeBlockList): NodeBlockList
     }
+
+    class SignedNodeBlockList {
+      -content: Buffer
+      -identitySignature: Signature
+      +isSignedBy(identityId: IdentityId): boolean
+    }
+
+    note right of SignedNodeBlockList
+      Canonical JSON bytes without the signature;
+      signed as "pigeon:node-block-list:v1\n" + bytes,
+      verified before any byte is parsed.
+    end note
 
     class NoNodeBlocks
 
@@ -189,7 +203,7 @@ package "nodes" {
       -list: NodeBlocks
       -approved: NodeBlockEntries
       -lastFetch: NodeBlockSourceFetch
-      +receive(list: NodeBlockList, at: Timestamp): NodeBlockSourceFetchOutcome
+      +receive(signed: SignedNodeBlockList, at: Timestamp): NodeBlockSourceFetchOutcome
       +fetchFailed(outcome: NodeBlockSourceFetchOutcome, at: Timestamp): void
       +approveAll(version: NodeBlockListVersion): void
       +approve(version: NodeBlockListVersion, entries: NodeBlockEntries): void
@@ -241,7 +255,7 @@ package "nodes" {
     }
 
     class NodeBlockListDownloader <abstract> {
-      +download(origin: NodeBlockSourceOrigin): Promise<NodeBlockList>
+      +download(origin: NodeBlockSourceOrigin): Promise<SignedNodeBlockList>
     }
 
     class NodeBlockPolicy {
@@ -260,6 +274,8 @@ package "nodes" {
 
     NodeBlockList --|> NodeBlocks
     NoNodeBlocks --|> NodeBlocks
+    NodeBlockList ..> SignedNodeBlockList
+    NodeBlockSource ..> SignedNodeBlockList
     NodeBlockList --> NodePeerId
     NoNodeBlockSourceFetch --|> NodeBlockSourceFetch
     RecordedNodeBlockSourceFetch --|> NodeBlockSourceFetch

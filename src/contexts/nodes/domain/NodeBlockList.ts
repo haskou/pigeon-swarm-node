@@ -6,19 +6,19 @@ import canonicalize from 'canonicalize';
 import { InvalidNodeBlockListError } from './errors/InvalidNodeBlockListError';
 import { NodeBlockListPrimitives } from './NodeBlockListPrimitives';
 import { NodeBlocks } from './NodeBlocks';
+import { SignedNodeBlockList } from './SignedNodeBlockList';
 import { NodeBlockListVersion } from './value-objects/NodeBlockListVersion';
 import { NodePeerId } from './value-objects/NodePeerId';
 
 /**
  * The owner-signed list of identities and nodes this node blocks. Anyone can
- * verify it from `ownerIdentityId` alone: the signature covers
- * `"pigeon:node-block-list:v1\n"` followed by the canonical JSON (RFC 8785) of
- * the document without `identitySignature`. Both arrays are sorted ascending
- * by code unit and unique, so one set of entries has one signed form.
+ * verify it from `ownerIdentityId` alone: the signature covers its signed
+ * form (see `SignedNodeBlockList`), the canonical JSON (RFC 8785) of the
+ * document without `identitySignature`. Both arrays are sorted ascending by
+ * code unit and unique, so one set of entries has one signed form.
  */
 export class NodeBlockList extends NodeBlocks {
   private static readonly TYPE = 'pigeon-node-block-list';
-  private static readonly SIGNING_DOMAIN = 'pigeon:node-block-list:v1\n';
 
   private readonly blockedIdentityIdValues: Set<string>;
 
@@ -58,41 +58,45 @@ export class NodeBlockList extends NodeBlocks {
     return values.map((value) => new NodePeerId(value));
   }
 
-  /** Only the signed fields, so an unvalidated document is never canonicalized whole. */
-  private static signedContentOf(primitives: NodeBlockListPrimitives): string {
-    const canonical = canonicalize({
-      blockedIdentityIds: primitives.blockedIdentityIds,
-      blockedNodePeerIds: primitives.blockedNodePeerIds,
-      issuedAt: primitives.issuedAt,
-      ownerIdentityId: primitives.ownerIdentityId,
-      type: primitives.type,
-      version: primitives.version,
-    });
+  private static parse(
+    content: Buffer,
+  ): Omit<NodeBlockListPrimitives, 'identitySignature'> {
+    let document: unknown;
+
+    try {
+      document = JSON.parse(content.toString('utf8'));
+    } catch {
+      throw new InvalidNodeBlockListError('document must be JSON');
+    }
 
     assert(
-      canonical !== undefined,
-      new InvalidNodeBlockListError('document cannot be canonicalized'),
+      typeof document === 'object' &&
+        document !== null &&
+        !Array.isArray(document),
+      new InvalidNodeBlockListError('document must be a JSON object'),
     );
 
-    return `${NodeBlockList.SIGNING_DOMAIN}${canonical}`;
+    // Every field is validated by fromPrimitives and the canonical form check.
+    return document as Omit<NodeBlockListPrimitives, 'identitySignature'>;
   }
 
   /**
-   * Whether `identityId` signed `primitives`, checked before any entry is
-   * validated so an unsigned document costs no more than one verification.
+   * Opens bytes whose signature the caller already checked against the
+   * pinned identity, and keeps them only in their canonical form, so the
+   * list kept is exactly the one that was signed.
    */
-  public static isSignedBy(
-    primitives: NodeBlockListPrimitives,
-    identityId: IdentityId,
-  ): boolean {
-    try {
-      return identityId.isValidSignature(
-        NodeBlockList.signedContentOf(primitives),
-        new Signature(primitives.identitySignature),
-      );
-    } catch {
-      return false;
-    }
+  public static fromSigned(signed: SignedNodeBlockList): NodeBlockList {
+    const list = NodeBlockList.fromPrimitives({
+      ...NodeBlockList.parse(signed.getContent()),
+      identitySignature: signed.getIdentitySignature().valueOf(),
+    });
+
+    assert(
+      list.toSigned().isEqual(signed),
+      new InvalidNodeBlockListError('document must be in canonical form'),
+    );
+
+    return list;
   }
 
   public static fromPrimitives(
@@ -130,6 +134,24 @@ export class NodeBlockList extends NodeBlocks {
     );
   }
 
+  private unsignedPrimitives(): Omit<
+    NodeBlockListPrimitives,
+    'identitySignature'
+  > {
+    return {
+      blockedIdentityIds: this.blockedIdentityIds.map((identityId) =>
+        identityId.valueOf(),
+      ),
+      blockedNodePeerIds: this.blockedNodePeerIds.map((peerId) =>
+        peerId.valueOf(),
+      ),
+      issuedAt: this.issuedAt.valueOf(),
+      ownerIdentityId: this.ownerIdentityId.valueOf(),
+      type: NodeBlockList.TYPE,
+      version: this.version.valueOf(),
+    };
+  }
+
   /**
    * A newer version from the same owner, or any list from a new owner: the
    * storer has already checked that `list` is signed by the current owner, so
@@ -154,8 +176,12 @@ export class NodeBlockList extends NodeBlocks {
     return [...this.blockedNodePeerIds];
   }
 
+  public getVersion(): NodeBlockListVersion {
+    return this.version;
+  }
+
   public hasValidSignature(): boolean {
-    return NodeBlockList.isSignedBy(this.toPrimitives(), this.ownerIdentityId);
+    return this.toSigned().isSignedBy(this.ownerIdentityId);
   }
 
   public isVersion(version: NodeBlockListVersion): boolean {
@@ -168,17 +194,22 @@ export class NodeBlockList extends NodeBlocks {
 
   public toPrimitives(): NodeBlockListPrimitives {
     return {
-      blockedIdentityIds: this.blockedIdentityIds.map((identityId) =>
-        identityId.valueOf(),
-      ),
-      blockedNodePeerIds: this.blockedNodePeerIds.map((peerId) =>
-        peerId.valueOf(),
-      ),
+      ...this.unsignedPrimitives(),
       identitySignature: this.identitySignature.valueOf(),
-      issuedAt: this.issuedAt.valueOf(),
-      ownerIdentityId: this.ownerIdentityId.valueOf(),
-      type: NodeBlockList.TYPE,
-      version: this.version.valueOf(),
     };
+  }
+
+  public toSigned(): SignedNodeBlockList {
+    const content = canonicalize(this.unsignedPrimitives());
+
+    assert(
+      content !== undefined,
+      new InvalidNodeBlockListError('document cannot be canonicalized'),
+    );
+
+    return new SignedNodeBlockList(
+      Buffer.from(content, 'utf8'),
+      this.identitySignature,
+    );
   }
 }

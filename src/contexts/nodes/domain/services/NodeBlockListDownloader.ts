@@ -1,13 +1,14 @@
-import { NodeBlockListPrimitives } from '../NodeBlockListPrimitives';
+import { SignedNodeBlockList } from '../SignedNodeBlockList';
 import { NodeBlockSourceOrigin } from '../value-objects/NodeBlockSourceOrigin';
 
 /**
- * Downloads the document a source publishes. It judges neither the signer,
- * the version, the signature nor the entries; that is the source's job, in
- * that order. Throws `NodeBlockSourceFetchFailedError`.
+ * Downloads the bytes a source publishes and their signature, unparsed. It
+ * judges neither the signature, the document, the signer nor the version;
+ * that is the source's job, in that order. Throws
+ * `NodeBlockSourceFetchFailedError`.
  */
 export default abstract class NodeBlockListDownloader {
   public abstract download(
     origin: NodeBlockSourceOrigin,
-  ): Promise<NodeBlockListPrimitives>;
+  ): Promise<SignedNodeBlockList>;
 }

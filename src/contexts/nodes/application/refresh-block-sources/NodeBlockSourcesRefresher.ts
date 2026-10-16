@@ -1,12 +1,12 @@
 import { Timestamp } from '@haskou/value-objects';
 
 import { NodeBlockSourceFetchFailedError } from '../../domain/errors/NodeBlockSourceFetchFailedError';
-import { NodeBlockListPrimitives } from '../../domain/NodeBlockListPrimitives';
 import { NodeBlockSource } from '../../domain/NodeBlockSource';
 import { NodeBlockSourceFetchLimits } from '../../domain/NodeBlockSourceFetchLimits';
 import NodeBlockSourceRepository from '../../domain/repositories/NodeBlockSourceRepository';
 import NodeBlockListDownloader from '../../domain/services/NodeBlockListDownloader';
 import NodeBlockPolicy from '../../domain/services/NodeBlockPolicy';
+import { SignedNodeBlockList } from '../../domain/SignedNodeBlockList';
 import { NodeBlockSourceFetchOutcome } from '../../domain/value-objects/NodeBlockSourceFetchOutcome';
 
 /**
@@ -25,7 +25,7 @@ export default class NodeBlockSourcesRefresher {
 
   private async download(
     source: NodeBlockSource,
-  ): Promise<NodeBlockListPrimitives | NodeBlockSourceFetchOutcome> {
+  ): Promise<SignedNodeBlockList | NodeBlockSourceFetchOutcome> {
     try {
       return await this.downloader.download(source.getOrigin());
     } catch (error) {
@@ -39,7 +39,7 @@ export default class NodeBlockSourcesRefresher {
 
   private async record(
     fetched: NodeBlockSource,
-    result: NodeBlockListPrimitives | NodeBlockSourceFetchOutcome,
+    result: SignedNodeBlockList | NodeBlockSourceFetchOutcome,
     at: Timestamp,
   ): Promise<void> {
     const ownerIdentityId = fetched.getOwnerIdentityId();

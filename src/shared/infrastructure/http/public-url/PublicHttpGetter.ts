@@ -177,7 +177,12 @@ export default class PublicHttpGetter {
 
       response.destroy();
 
-      return { body: Buffer.alloc(0), redirectLocation, statusCode };
+      return {
+        body: Buffer.alloc(0),
+        headers: response.headers,
+        redirectLocation,
+        statusCode,
+      };
     }
 
     try {
@@ -190,6 +195,7 @@ export default class PublicHttpGetter {
 
     return {
       body: await this.readBody(response, options.maxBytes),
+      headers: response.headers,
       redirectLocation: undefined,
       statusCode,
     };

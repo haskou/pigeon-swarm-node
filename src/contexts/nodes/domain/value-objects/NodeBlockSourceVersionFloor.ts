@@ -1,6 +1,7 @@
 import { assert, Integer } from '@haskou/value-objects';
 
 import { InvalidNodeBlockListVersionError } from '../errors/InvalidNodeBlockListVersionError';
+import { NodeBlockListVersion } from './NodeBlockListVersion';
 
 /**
  * The highest list version this node ever accepted from a publisher, 0 when
@@ -17,12 +18,7 @@ export class NodeBlockSourceVersionFloor extends Integer {
     );
   }
 
-  /** Whether `version`, still unvalidated, is a safe integer above the floor. */
-  public admits(version: unknown): boolean {
-    return (
-      typeof version === 'number' &&
-      Number.isSafeInteger(version) &&
-      version > this.valueOf()
-    );
+  public admits(version: NodeBlockListVersion): boolean {
+    return version.isGreaterThan(this);
   }
 }

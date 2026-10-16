@@ -5,13 +5,13 @@ import { NodeBlockEntriesAreNotListedBySourceError } from './errors/NodeBlockEnt
 import { NodeBlockSourceVersionHasChangedError } from './errors/NodeBlockSourceVersionHasChangedError';
 import { NodeBlockEntries } from './NodeBlockEntries';
 import { NodeBlockList } from './NodeBlockList';
-import { NodeBlockListPrimitives } from './NodeBlockListPrimitives';
 import { NodeBlocks } from './NodeBlocks';
 import { NodeBlockSourceFetch } from './NodeBlockSourceFetch';
 import { NodeBlockSourcePrimitives } from './NodeBlockSourcePrimitives';
 import { NoNodeBlocks } from './NoNodeBlocks';
 import { NoNodeBlockSourceFetch } from './NoNodeBlockSourceFetch';
 import { RecordedNodeBlockSourceFetch } from './RecordedNodeBlockSourceFetch';
+import { SignedNodeBlockList } from './SignedNodeBlockList';
 import { NodeBlockListVersion } from './value-objects/NodeBlockListVersion';
 import { NodeBlockSourceFetchOutcome } from './value-objects/NodeBlockSourceFetchOutcome';
 import { NodeBlockSourceOrigin } from './value-objects/NodeBlockSourceOrigin';
@@ -19,26 +19,16 @@ import { NodeBlockSourceVersionFloor } from './value-objects/NodeBlockSourceVers
 
 /**
  * Another owner's published block list that this node's owner adopted. It is
- * pinned to the publisher's identity: a fetched document replaces the kept one
- * only when that identity signed it and its version is above the highest one
- * ever accepted from it, even before the source was last removed, so a
- * hijacked origin, a replayed old version or an unreachable host keeps the
- * last valid list. The signer, version and signature are checked before any
- * entry is validated. Entries the publisher adds wait for the owner's approval
- * unless `autoApply` was on when the list arrived; entries it drops stop
- * applying on the next fetch.
+ * pinned to the publisher's identity: a fetched list replaces the kept one
+ * only when that identity signed its exact bytes, it names that identity as
+ * owner and its version is above the highest one ever accepted from it, even
+ * before the source was last removed, so a hijacked origin, a replayed old
+ * version or an unreachable host keeps the last valid list. The signature is
+ * checked before a single byte is parsed. Entries the publisher adds wait for
+ * the owner's approval unless `autoApply` was on when the list arrived;
+ * entries it drops stop applying on the next fetch.
  */
 export class NodeBlockSource {
-  private static validated(
-    document: NodeBlockListPrimitives,
-  ): NodeBlockList | undefined {
-    try {
-      return NodeBlockList.fromPrimitives(document);
-    } catch {
-      return undefined;
-    }
-  }
-
   public static adopt(
     ownerIdentityId: IdentityId,
     origin: NodeBlockSourceOrigin,
@@ -88,23 +78,34 @@ export class NodeBlockSource {
     return NodeBlockEntries.of(this.list);
   }
 
-  /** Signer, version and signature first, so an unsigned document's entries are never validated. */
-  private refusalOf(
-    document: NodeBlockListPrimitives,
-  ): NodeBlockSourceFetchOutcome | undefined {
-    if (document.ownerIdentityId !== this.ownerIdentityId.valueOf()) {
-      return NodeBlockSourceFetchOutcome.WRONG_SIGNER;
-    }
-
-    if (!this.floor.admits(document.version)) {
-      return NodeBlockSourceFetchOutcome.NOT_NEWER;
-    }
-
-    if (!NodeBlockList.isSignedBy(document, this.ownerIdentityId)) {
+  /**
+   * The list `signed` holds, or why it cannot replace the kept one. The
+   * signature over the raw bytes is checked before any byte is parsed.
+   */
+  private acceptable(
+    signed: SignedNodeBlockList,
+  ): NodeBlockList | NodeBlockSourceFetchOutcome {
+    if (!signed.isSignedBy(this.ownerIdentityId)) {
       return NodeBlockSourceFetchOutcome.INVALID_SIGNATURE;
     }
 
-    return undefined;
+    let list: NodeBlockList;
+
+    try {
+      list = NodeBlockList.fromSigned(signed);
+    } catch {
+      return NodeBlockSourceFetchOutcome.INVALID_DOCUMENT;
+    }
+
+    if (!list.getOwnerIdentityId().isEqual(this.ownerIdentityId)) {
+      return NodeBlockSourceFetchOutcome.WRONG_SIGNER;
+    }
+
+    if (!this.floor.admits(list.getVersion())) {
+      return NodeBlockSourceFetchOutcome.NOT_NEWER;
+    }
+
+    return list;
   }
 
   private assertIsLatestVersion(version: NodeBlockListVersion): void {
@@ -129,32 +130,33 @@ export class NodeBlockSource {
     this.autoApply = autoApply;
   }
 
-  /** Keeps `document` only if the pinned identity signed it with a version above the floor. */
+  /**
+   * Keeps `signed` only if the pinned identity signed its bytes, they hold a
+   * valid list naming that identity, and its version is above the floor.
+   */
   public receive(
-    document: NodeBlockListPrimitives,
+    signed: SignedNodeBlockList,
     at: Timestamp,
   ): NodeBlockSourceFetchOutcome {
-    const refusal = this.refusalOf(document);
-    const list = refusal ? undefined : NodeBlockSource.validated(document);
-    const outcome =
-      refusal ??
-      (list
-        ? NodeBlockSourceFetchOutcome.ACCEPTED
-        : NodeBlockSourceFetchOutcome.INVALID_DOCUMENT);
+    const list = this.acceptable(signed);
 
-    this.lastFetch = new RecordedNodeBlockSourceFetch(at, outcome);
+    if (!(list instanceof NodeBlockList)) {
+      this.lastFetch = new RecordedNodeBlockSourceFetch(at, list);
 
-    if (!list) {
-      return outcome;
+      return list;
     }
 
+    this.lastFetch = new RecordedNodeBlockSourceFetch(
+      at,
+      NodeBlockSourceFetchOutcome.ACCEPTED,
+    );
     this.list = list;
-    this.floor = new NodeBlockSourceVersionFloor(document.version);
+    this.floor = new NodeBlockSourceVersionFloor(list.getVersion());
     this.approved = this.autoApply
       ? this.listed()
       : this.approved.intersection(this.listed());
 
-    return outcome;
+    return NodeBlockSourceFetchOutcome.ACCEPTED;
   }
 
   /** Records a failed fetch; the kept list stays as it was. */

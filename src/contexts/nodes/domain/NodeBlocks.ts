@@ -3,6 +3,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import type { NodeBlockList } from './NodeBlockList';
 
 import { NodeBlockListPrimitives } from './NodeBlockListPrimitives';
+import { SignedNodeBlockList } from './SignedNodeBlockList';
 import { NodeBlockListVersion } from './value-objects/NodeBlockListVersion';
 import { NodePeerId } from './value-objects/NodePeerId';
 
@@ -14,4 +15,5 @@ export abstract class NodeBlocks {
   public abstract getBlockedNodePeerIds(): NodePeerId[];
   public abstract isVersion(version: NodeBlockListVersion): boolean;
   public abstract toPrimitives(): NodeBlockListPrimitives | undefined;
+  public abstract toSigned(): SignedNodeBlockList | undefined;
 }
