@@ -1,3 +1,4 @@
+import type { OrbitDBDatabase } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBDatabase';
 import type { Multiaddr } from '@multiformats/multiaddr';
 
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
@@ -30,6 +31,7 @@ import { Libp2pPubSubNode } from '@app/shared/infrastructure/pubsub/libp2p/Libp2
 import Kernel from '@haskou/ddd-kernel';
 import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
 import { generateKeyPairSync } from 'crypto';
+import { EventEmitter } from 'events';
 import * as fs from 'fs/promises';
 import { mock } from 'jest-mock-extended';
 import os from 'os';
@@ -266,6 +268,35 @@ describe('Network log privacy with the real logger', () => {
     ).run();
 
     expectNotLogged([NETWORK_ID, NETWORK_NAME]);
+  });
+
+  it('does not log the network when a replicated head cache reconciliation fails', async () => {
+    const events = new EventEmitter();
+    let failing = false;
+    const heads = mock<OrbitDBDatabase>({
+      all: () =>
+        failing
+          ? Promise.reject(new Error(`head cache ${NETWORK_ID} unavailable`))
+          : Promise.resolve([]),
+      events,
+    });
+    const registry = new OrbitDBReplicatedStateRegistry();
+
+    await registry.register(
+      NETWORK_ID,
+      mock<OrbitDBPrivateNetworkStores>({ heads }),
+    );
+    failing = true;
+    events.emit('join', REMOTE_PEER_ID, [{ hash: 'remote-head' }]);
+    await flushPromises();
+    await flushPromises();
+
+    expect(captured).toContainEqual(
+      expect.objectContaining({
+        message: expect.stringContaining('OrbitDB head reconciliation failed'),
+      }),
+    );
+    expectNotLogged([NETWORK_ID, REMOTE_PEER_ID]);
   });
 
   it('does not log a remote public relay peer or its address when dialing it fails', async () => {
