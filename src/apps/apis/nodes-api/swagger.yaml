@@ -574,13 +574,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeResource'
         '409':
-          description: The current owner did not sign the request.
+          description: The current owner did not sign the request, or the identity id is not the canonical encoding of a usable Ed25519 key (code `InvalidNodeOwnerIdentityIdError`).
   /node/registration/:
     put:
       tags:
         - nodes
       summary: Put local node registration mode
-      description: Sets whether new identities may be created through this node. `open` (default) lets anyone who pays the admission proof create one, `codes` requires a registration code and `closed` refuses every creation, the owner's included. Only creation through this node is gated; updates, republishing a held identity and login never are. Requires a signed request from the current node owner.
+      description: Sets whether new identities may be created through this node. `open` (default) lets anyone who pays the admission proof create one, `codes` requires a registration code and `closed` refuses every creation, the owner's included. Only creation through this node, by `POST /identities` or by `PUT /identities/{identityId}` for an identity it does not hold yet, is gated; updates, republishing a held identity and login never are. Requires a signed request from the current node owner.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'

@@ -51,8 +51,8 @@ owner**.
 Both tools reuse the existing node owner unchanged:
 
 - **Definition.** `Node` holds an optional `owner: IdentityId`
-  (`src/contexts/nodes/domain/Node.ts:34`), with `hasOwner` and `isOwnedBy`
-  (`Node.ts:107-113`). It is stored in the local embedded database, in the
+  (`src/contexts/nodes/domain/Node.ts:40`), with `hasOwner` and `isOwnedBy`
+  (`Node.ts:167-173`). It is stored in the local embedded database, in the
   `node_metadata` document with the node id, networks and relay configuration
   (`LocalNodeMetadataRepository.ts:15-16,59-83`). It is never replicated.
 - **Authentication.** Owner-only routes extend `NodeOwnerRouteSupport`
@@ -62,8 +62,12 @@ Both tools reuse the existing node owner unchanged:
   else `403010`. `X-Identity-Id` is the identity's public key, so the owner is
   verified without any lookup.
 - **Rotation.** `PUT /node/owner` (`PutNodeOwnerRoute.ts:24-39`) through
-  `Node.assignOwner` (`Node.ts:78-90`). Once the node is claimed, only the
-  current owner can name the next one.
+  `Node.assignOwner` (`Node.ts:85-99`). Once the node is claimed, only the
+  current owner can name the next one. The new owner must be the one canonical
+  encoding of a usable Ed25519 key (`IdentityId.isCanonicalKey`): an alias DER
+  prefix, a re-encoded base64, a small-order or an off-curve point is refused
+  with `409` `InvalidNodeOwnerIdentityIdError`, since no identity could sign
+  for it or it would not compare equal to the key that signs.
 - **Unclaimed nodes.** Both tools need an owner and use the strict owner check
   (`assertOwnerCanManageNode`). An unclaimed node is open and blocks nobody.
 - **Concurrent owner writes.** Every change to `node_metadata` (owner,
@@ -87,7 +91,8 @@ the host while the node is stopped.
   local exceptions and the publication setting. The new owner is written in the
   same metadata write that drops the old one, so the node is never unclaimed
   and no other identity can claim it. The command refuses, before opening the
-  database, a missing or invalid identity id, and refuses the current owner.
+  database, a missing identity id or one that is not a canonical usable key,
+  and refuses the current owner.
   Networks, mailboxes, private blobs, the node id and the libp2p peer key stay.
   So do the version floors of adopted publishers (the highest version this
   node ever accepted from each one): they are anti-rollback state, not owner
@@ -186,11 +191,15 @@ https://<ui-origin>/register#node=<encodeURIComponent(node endpoint)>&code=<code
 ### Enforcement
 
 - The newcomer's client sends `X-Registration-Code` with `POST /identities`.
-  The record format does not change.
-- **Order in `POST /identities`** (`PostIdentityRoute.ts:46-48`): the per-address
-  limiter first, so codes cannot be guessed fast; then the registration check;
-  then the publish limiter and the network admission limiter. Refused attempts
-  therefore never consume the shared limits honest users depend on.
+  The record format does not change. A `PUT /identities/{identityId}` for an
+  identity this node does not hold yet creates it here too, so it takes the
+  same header and passes the same check: both routes publish through
+  `IdentityCreationGate`.
+- **Order in `POST /identities` and `PUT /identities/{identityId}`**: the
+  per-address limiter first, so codes cannot be guessed fast; then the
+  registration check; then the publish limiter and the network admission
+  limiter. Refused attempts therefore never consume the shared limits honest
+  users depend on.
 - A code use is reserved atomically before publishing and released if
   publishing fails while the identity is still not held, so a failed proof
   never burns a use and a failure after the save (charge, event publish) never
@@ -198,9 +207,9 @@ https://<ui-origin>/register#node=<encodeURIComponent(node endpoint)>&code=<code
   run in one section per local database (`EmbeddedLocalDatabase.exclusively`),
   so concurrent requests on any number of repository handles cannot spend more
   than `maxUses`.
-- Requests that create the same identity run one after the other on the node
-  (`IdentityCreationQueue`): the first creates it and spends one use, the next
-  ones find the identity already stored and spend none.
+- Publications of one identity, `POST` or `PUT`, run one after the other on
+  the node (`IdentityCreationGate`): the first creates it and spends one use,
+  the next ones find the identity already stored and spend none.
 - Refusal: `403` with new code `403011`, message "Identity creation on this
   node is closed" or "needs a valid registration code". One code for missing,
   unknown, expired and used-up codes, so a caller learns nothing about which

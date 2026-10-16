@@ -1,6 +1,7 @@
 import { PutIdentityBody } from '@app/apps/apis/identities-api/bodies/PutIdentityBody';
 import { IdentityCreationIsRefusedOnThisNodeError } from '@app/apps/apis/identities-api/errors/IdentityCreationIsRefusedOnThisNodeError';
 import IdentityAdmissionSourceRateLimiter from '@app/apps/apis/identities-api/IdentityAdmissionSourceRateLimiter';
+import IdentityCreationGate from '@app/apps/apis/identities-api/IdentityCreationGate';
 import IdentityNetworkAdmissionRateLimiter from '@app/apps/apis/identities-api/IdentityNetworkAdmissionRateLimiter';
 import IdentityPublishRateLimiter from '@app/apps/apis/identities-api/IdentityPublishRateLimiter';
 import { PutIdentityRoute } from '@app/apps/apis/identities-api/routes/PutIdentityRoute';
@@ -70,11 +71,13 @@ describe('PutIdentityRoute', () => {
 
     const services = new Map<unknown, unknown>([
       [IdentityAdmissionSourceRateLimiter, mock()],
-      [IdentityCreationDetector, creationDetector],
+      [
+        IdentityCreationGate,
+        new IdentityCreationGate(creationDetector, registrationAdmitter),
+      ],
       [IdentityNetworkAdmissionRateLimiter, mock()],
       [IdentityPublishRateLimiter, mock()],
       [IdentityPublisher, publisher],
-      [NodeRegistrationAdmitter, registrationAdmitter],
       [SignedHttpRequestAuthenticator, authenticator],
     ]);
     new Kernel({

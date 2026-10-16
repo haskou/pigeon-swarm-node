@@ -1,6 +1,8 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { StringValueObject } from '@haskou/value-objects';
 
+import { IdentityIdMother } from '../../../../mothers/IdentityIdMother';
+
 const rawKey = 'MCowBQYDK2VwAyEANHSu7gNCaXDe+hzph8c3HomozCnC/LdXe13/WpeIaVM=';
 const pemKey = `-----BEGIN PUBLIC KEY-----\n${rawKey}\n-----END PUBLIC KEY-----\n`;
 
@@ -44,5 +46,18 @@ describe('IdentityId', () => {
 
       expect(fromRaw.valueOf()).toBe(fromPem.valueOf());
     });
+  });
+
+  describe('isCanonicalKey', () => {
+    it('should accept a generated Ed25519 key', () => {
+      expect(IdentityIdMother.canonical().isCanonicalKey()).toBe(true);
+    });
+
+    it.each(IdentityIdMother.forged())(
+      'should refuse an id with %s',
+      (_case, forged: IdentityId) => {
+        expect(forged.isCanonicalKey()).toBe(false);
+      },
+    );
   });
 });

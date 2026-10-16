@@ -87,6 +87,12 @@ paths:
           required: true
           schema:
             type: string
+        - in: header
+          name: X-Registration-Code
+          required: false
+          description: Registration code issued by the node owner. Needed only when the PUT creates an identity this node does not hold yet while the node's registration mode is `codes`.
+          schema:
+            type: string
       requestBody:
         required: true
         content:
@@ -106,6 +112,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/InsufficientAdmissionProofResource'
+        '403':
+          description: Identity creation refused by this node's registration control (code 403011), exactly as for POST /identities/ - a PUT for an identity this node does not hold yet creates it. The signing identity is blocked on this node (code 403012).
         '429':
           description: Identity publication rate limit exceeded (code 429040). Identity admission network quota exceeded (code 429041, off by default). Identity admission rate limit per client address exceeded (code 429042).
 components:
