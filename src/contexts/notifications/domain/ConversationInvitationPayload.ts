@@ -39,8 +39,8 @@ export class ConversationInvitationPayload {
     return NotificationId.invitation(
       this.inviterIdentityId.valueOf(),
       this.recipientIdentityId.valueOf(),
-      this.conversationId.valueOf(),
       this.nonce.valueOf(),
+      this.conversationId.valueOf(),
     );
   }
 

@@ -1,8 +1,8 @@
-import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
+import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { NotificationReplicationLimits } from '@app/contexts/notifications/domain/NotificationReplicationLimits';
-import NotificationInvitationMutationPolicy from '@app/contexts/notifications/infrastructure/orbitdb/policies/NotificationInvitationMutationPolicy';
 import { NotificationId } from '@app/contexts/notifications/domain/value-objects/NotificationId';
+import NotificationInvitationMutationPolicy from '@app/contexts/notifications/infrastructure/orbitdb/policies/NotificationInvitationMutationPolicy';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
@@ -72,8 +72,8 @@ describe('NotificationInvitationMutationPolicy', () => {
       id: NotificationId.invitation(
         base.inviterIdentityId as string,
         base.recipientIdentityId as string,
-        base.subjectId as string,
         base.nonce as string,
+        base.subjectId as string,
       ).valueOf(),
       scopeType: 'notification_invitation',
       ...base,
@@ -133,6 +133,7 @@ describe('NotificationInvitationMutationPolicy', () => {
       const value = record({ type });
 
       delete value.subjectId;
+
       if (type === 'community_invitation') delete value.encryptedKey;
 
       expect(() => policy.expectationOf(value)).toThrow(
@@ -163,7 +164,7 @@ describe('NotificationInvitationMutationPolicy', () => {
       };
 
       return {
-        id: NotificationId.groupInvitation(
+        id: NotificationId.invitation(
           base.inviterIdentityId as string,
           base.recipientIdentityId as string,
           base.nonce as string,
@@ -198,8 +199,8 @@ describe('NotificationInvitationMutationPolicy', () => {
         id: NotificationId.invitation(
           inviter,
           recipient,
-          subjectId,
           NONCE,
+          subjectId,
         ).valueOf(),
       };
 
@@ -228,8 +229,8 @@ describe('NotificationInvitationMutationPolicy', () => {
             id: NotificationId.invitation(
               inviter,
               recipient,
-              'group:hidden',
               NONCE,
+              'group:hidden',
             ).valueOf(),
           }),
         ),

@@ -187,19 +187,11 @@ export default class NotificationInvitationMutationPolicy extends PublicMutation
       const inviterIdentityId = new IdentityId(
         record.inviterIdentityId as string,
       ).valueOf();
-      const id = (
-        group
-          ? NotificationId.groupInvitation(
-              inviterIdentityId,
-              record.recipientIdentityId as string,
-              record.nonce as string,
-            )
-          : NotificationId.invitation(
-              inviterIdentityId,
-              record.recipientIdentityId as string,
-              record.subjectId as string,
-              record.nonce as string,
-            )
+      const id = NotificationId.invitation(
+        inviterIdentityId,
+        record.recipientIdentityId as string,
+        record.nonce as string,
+        group ? undefined : (record.subjectId as string),
       ).valueOf();
 
       if (record.id !== id) throw new InvalidPublicMutationError();

@@ -83,18 +83,11 @@ describe('Notification vectors', () => {
           }),
         ).toBe(derived.idPreimage);
         expect(
-          (group
-            ? NotificationId.groupInvitation(
-                payload.inviterIdentityId,
-                payload.recipientIdentityId,
-                payload.nonce,
-              )
-            : NotificationId.invitation(
-                payload.inviterIdentityId,
-                payload.recipientIdentityId,
-                payload.subjectId,
-                payload.nonce,
-              )
+          NotificationId.invitation(
+            payload.inviterIdentityId,
+            payload.recipientIdentityId,
+            payload.nonce,
+            group ? undefined : payload.subjectId,
           ).valueOf(),
         ).toBe(derived.payload.id);
         expect(derived.payload.id).toBe(

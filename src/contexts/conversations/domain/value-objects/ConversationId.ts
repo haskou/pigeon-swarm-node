@@ -1,20 +1,22 @@
+import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject } from '@haskou/value-objects';
-import { createHash } from 'crypto';
 
 export class ConversationId extends StringValueObject {
+  /**
+   * One-to-one id (`CommitmentId.oneToOneConversation`): it commits to both
+   * participants and the network, in either order.
+   */
   public static deterministic(
     first: { valueOf(): string },
     second: { valueOf(): string },
     network: { valueOf(): string },
   ): ConversationId {
-    const [firstParticipant, secondParticipant] = [
-      first.valueOf(),
-      second.valueOf(),
-    ].sort();
-    const hash = createHash('sha256')
-      .update(`${firstParticipant}:${secondParticipant}:${network.valueOf()}`)
-      .digest('hex');
-
-    return new ConversationId(`one-to-one:${hash}`);
+    return new ConversationId(
+      CommitmentId.oneToOneConversation(
+        first.valueOf(),
+        second.valueOf(),
+        network.valueOf(),
+      ),
+    );
   }
 }

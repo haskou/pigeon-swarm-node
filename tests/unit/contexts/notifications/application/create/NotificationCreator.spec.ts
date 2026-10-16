@@ -122,7 +122,7 @@ describe('NotificationCreator', () => {
     );
 
     expect(notification.toPrimitives()).toEqual({
-      id: NotificationId.groupInvitation(signer.id, RECIPIENT, NONCE).valueOf(),
+      id: NotificationId.invitation(signer.id, RECIPIENT, NONCE).valueOf(),
       payload: {
         encryptedConversationKey: 'sealed-group-letter',
         inviterIdentityId: signer.id,
