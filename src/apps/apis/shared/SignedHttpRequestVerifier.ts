@@ -1,9 +1,10 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import {
-  canonicalSignedRequestPayload,
-  SignedRequestPayload,
-} from '@app/contexts/shared/domain/value-objects/SignedRequestPayload';
-import { PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
+  PublicKey,
+  Signature,
+  SignedHttpRequestBody,
+  SignedHttpRequestSignature,
+} from '@haskou/pigeon-swarm-crypto';
 
 import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';
 import { MissingSignedRequestHeaderError } from './errors/MissingSignedRequestHeaderError';
@@ -12,16 +13,6 @@ import { SignedHttpRequest } from './SignedHttpRequest';
 export type { SignedHttpRequest } from './SignedHttpRequest';
 
 export class SignedHttpRequestVerifier {
-  private getCanonicalTimestamp(timestamp: number | string): number {
-    const canonicalTimestamp = Number(timestamp);
-
-    if (!Number.isInteger(canonicalTimestamp)) {
-      throw new InvalidSignedRequestError();
-    }
-
-    return canonicalTimestamp;
-  }
-
   public getRequiredHeader(request: SignedHttpRequest, header: string): string {
     const value = request.header(header);
     const normalizedValue = Array.isArray(value) ? value[0] : value;
@@ -33,47 +24,52 @@ export class SignedHttpRequestVerifier {
     return normalizedValue;
   }
 
-  public getCanonicalPayload(
-    method: string,
-    path: string,
-    timestamp: number | string,
-    body: unknown,
-  ): SignedRequestPayload {
-    return canonicalSignedRequestPayload(
-      method,
-      path,
-      this.getCanonicalTimestamp(timestamp),
-      body,
-    );
+  /**
+   * Verifies that `key` signed the request at `timestamp` with `signature`,
+   * which must be the single canonical encoding of the signature bytes.
+   */
+  public verifyWith(
+    request: SignedHttpRequest,
+    timestamp: string,
+    signature: string,
+    key: PublicKey,
+  ): Signature {
+    try {
+      const parsed = new Signature(signature);
+      SignedHttpRequestSignature.verify(
+        {
+          body: request.body as SignedHttpRequestBody,
+          method: request.method,
+          path: request.path,
+          timestamp: Number(timestamp),
+        },
+        parsed,
+        key,
+      );
+
+      return parsed;
+    } catch {
+      throw new InvalidSignedRequestError();
+    }
   }
 
   public verifySignature(request: SignedHttpRequest): {
     identityId: IdentityId;
+    signature: Signature;
     timestamp: string;
   } {
     const identityId = new IdentityId(
       this.getRequiredHeader(request, 'x-identity-id'),
     );
     const timestamp = this.getRequiredHeader(request, 'x-timestamp');
-    const signature = new Signature(
-      this.getRequiredHeader(request, 'x-signature'),
-    );
-    const payload = this.getCanonicalPayload(
-      request.method,
-      request.path,
+    const signature = this.verifyWith(
+      request,
       timestamp,
-      request.body,
-    );
-    const isValid = PublicKey.fromPEM(identityId.toString()).isValidSignature(
-      JSON.stringify(payload),
-      signature,
+      this.getRequiredHeader(request, 'x-signature'),
+      PublicKey.fromPEM(identityId.toString()),
     );
 
-    if (!isValid) {
-      throw new InvalidSignedRequestError();
-    }
-
-    return { identityId, timestamp };
+    return { identityId, signature, timestamp };
   }
 
   public verify(request: SignedHttpRequest): IdentityId {

@@ -1,10 +1,15 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  KeyPair,
+  SignedHttpRequestBody,
+  SignedHttpRequestSignature,
+} from '@haskou/pigeon-swarm-crypto';
 import { Request } from 'express';
 import { mock, MockProxy } from 'jest-mock-extended';
+
+import { SignatureMother } from '../../../mothers/SignatureMother';
 
 async function buildSignedRequest(
   method: string,
@@ -13,15 +18,15 @@ async function buildSignedRequest(
   const keyPair = await KeyPair.generate();
   const identityId = new IdentityId(keyPair.toPrimitives().publicKey);
   const timestamp = String(Date.now());
-  const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
+  const payload = SignedHttpRequestSignature.signingContent({
+    body: body as SignedHttpRequestBody,
     method,
-    '/resource',
-    timestamp,
-    body,
-  );
+    path: '/resource',
+    timestamp: Number(timestamp),
+  });
   const headers: Record<string, string> = {
     'x-identity-id': identityId.toString(),
-    'x-signature': keyPair.sign(JSON.stringify(payload)).valueOf(),
+    'x-signature': keyPair.sign(payload).valueOf(),
     'x-timestamp': timestamp,
   };
 
@@ -51,6 +56,25 @@ describe('SignedHttpRequestAuthenticator', () => {
     await expect(authenticator.authenticate(request)).rejects.toThrow(
       'Invalid signed request.',
     );
+  });
+
+  it('rejects a replay that re-encodes the signature without changing its bytes', async () => {
+    const request = await buildSignedRequest('POST', { value: 1 });
+    const reencoded = SignatureMother.reencoded(
+      String(request.header('x-signature')),
+    );
+
+    await authenticator.authenticate(request);
+
+    await expect(
+      authenticator.authenticate({
+        ...request,
+        header: (name: string) =>
+          name.toLowerCase() === 'x-signature'
+            ? reencoded
+            : request.header(name),
+      } as unknown as Request),
+    ).rejects.toThrow('Invalid signed request.');
   });
 
   it('allows identical safe requests inside the same millisecond', async () => {

@@ -1,6 +1,6 @@
 import { InvalidSignedRequestError } from '@app/apps/apis/shared/errors/InvalidSignedRequestError';
 import { assertSignedRequestTimestampIsFresh } from '@app/apps/apis/shared/SignedRequestFreshness';
-import { SignedRequestReplayGuard } from '@app/apps/apis/shared/SignedRequestReplayGuard';
+import { SignedHttpRequestSignature } from '@haskou/pigeon-swarm-crypto';
 
 describe('assertSignedRequestTimestampIsFresh', () => {
   const now = 1_800_000_000_000;
@@ -20,7 +20,7 @@ describe('assertSignedRequestTimestampIsFresh', () => {
   });
 
   it('accepts a timestamp exactly at the clock-skew bound in either direction', () => {
-    const skew = SignedRequestReplayGuard.MAX_CLOCK_SKEW_MS;
+    const skew = SignedHttpRequestSignature.MAX_CLOCK_SKEW_MS;
 
     expect(() =>
       assertSignedRequestTimestampIsFresh(String(now - skew)),
@@ -33,11 +33,11 @@ describe('assertSignedRequestTimestampIsFresh', () => {
   it.each([
     [
       'one millisecond past the bound',
-      now - SignedRequestReplayGuard.MAX_CLOCK_SKEW_MS - 1,
+      now - SignedHttpRequestSignature.MAX_CLOCK_SKEW_MS - 1,
     ],
     [
       'one millisecond beyond the future bound',
-      now + SignedRequestReplayGuard.MAX_CLOCK_SKEW_MS + 1,
+      now + SignedHttpRequestSignature.MAX_CLOCK_SKEW_MS + 1,
     ],
     ['a timestamp from the distant past', 0],
   ])('rejects %s', (_label, timestamp) => {

@@ -37,19 +37,23 @@ export function bodyHashOf(body: SignedRequestBody): string {
   return createHash('sha256').update(bytes).digest('hex');
 }
 
-/** JSON.stringify of bodyHash, method (upper-cased), path, timestamp (a JSON number), in this order. */
+/**
+ * `pigeon:signed-http-request:v1\n` followed by JSON.stringify of bodyHash,
+ * method (upper-cased), path and timestamp (a JSON number), in this sorted
+ * order, which is the canonical JSON form.
+ */
 export function signingContentOf(
   method: string,
   requestPath: string,
   timestamp: number,
   body: SignedRequestBody,
 ): string {
-  return JSON.stringify({
+  return `pigeon:signed-http-request:v1\n${JSON.stringify({
     bodyHash: bodyHashOf(body),
     method: method.toUpperCase(),
     path: requestPath,
     timestamp,
-  });
+  })}`;
 }
 
 /** Ed25519 over utf8(content), standard base64 with padding. */
@@ -165,9 +169,10 @@ export async function publishIdentityWithKeys(
     { 'content-type': 'application/json' },
     JSON.stringify({
       ...signaturePayload,
+      // Keys are declared sorted, so JSON.stringify is the canonical JSON form.
       signature: ed25519Sign(
         keys.identity.privateKeyPem,
-        JSON.stringify(signaturePayload),
+        `pigeon:identity:v1\n${JSON.stringify(signaturePayload)}`,
       ),
     }),
   );

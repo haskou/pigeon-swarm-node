@@ -91,7 +91,7 @@ the generation and the revision it was made for, so the node cannot splice
 entries across generations or identities.
 
 Byte-exact vectors for this preimage and its signature are in
-[`tests/fixtures/device-sealed-secret-vectors.json`](../../tests/fixtures/device-sealed-secret-vectors.json).
+`@haskou/pigeon-swarm-crypto/vectors/device-sealed-secret.json`.
 The `DeviceSealedSecretVectors` unit spec checks them against the domain code.
 `tests/e2e/real-transport/device-sealed-secret-bundle.ts` rebuilds them with
 `node:crypto` only and submits them to a real node. The node must accept the
@@ -106,8 +106,8 @@ revoked device holds `identityKeyPair` and an identity-signed check would add
 no protection. Recovery proof (`X-Recovery-Signature`) is rejected on these
 routes. Recovery has its own flow.
 
-Both routes check that `X-Timestamp` is within ±30 s (the shared
-`SignedRequestReplayGuard.MAX_CLOCK_SKEW_MS`). `PUT` also consumes the
+Both routes check that `X-Timestamp` is within ±30 s
+(`SignedHttpRequestSignature.isFresh` from `@haskou/pigeon-swarm-crypto`). `PUT` also consumes the
 request signature in the replay guard. `GET` is safe and not replay-guarded.
 Existing device-proof routes are unchanged, to avoid friction.
 

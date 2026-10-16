@@ -1,17 +1,23 @@
 import 'reflect-metadata';
 import 'module-alias/register';
-import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { ConversationOperationAction } from '@app/contexts/conversations/domain/value-objects/ConversationOperationAction';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  IdentitySignature,
+  KeychainSignature,
+  KeyPair,
+  SignedHttpRequestBody,
+  SignedHttpRequestSignature,
+} from '@haskou/pigeon-swarm-crypto';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { randomBytes, generateKeyPairSync } from 'crypto';
 import fs from 'fs-extra';
 import path from 'path';
 import WebSocket from 'ws';
 
+import { mineAdmissionNonce } from '../../support/mineAdmissionNonce';
 import {
   callIdOf,
   mutationOf,
@@ -19,7 +25,6 @@ import {
   signCallStart,
 } from '../../support/signCall';
 import { signConversationOperation } from '../../support/signConversationOperation';
-import { mineAdmissionNonce } from '../../support/mineAdmissionNonce';
 import {
   signNotificationInvitation,
   signNotificationState,
@@ -237,6 +242,7 @@ async function main(): Promise<void> {
       },
       nodeAIdentity,
     );
+
     if (call.id !== callIdOf(nodeAIdentity.id, callNonce))
       throw new Error('The node must derive the call id from the signed nonce');
     await waitForCallParticipantConnection(
@@ -466,7 +472,9 @@ async function publishIdentity(
   };
   const body = {
     ...signaturePayload,
-    signature: keyPair.sign(JSON.stringify(signaturePayload)).valueOf(),
+    signature: keyPair
+      .sign(IdentitySignature.signingContent(signaturePayload))
+      .valueOf(),
   };
   const response = await request<IdentityResponse>(
     node,
@@ -516,7 +524,7 @@ async function updateIdentity(
   const body = {
     ...signaturePayload,
     signature: identity.keyPair
-      .sign(JSON.stringify(signaturePayload))
+      .sign(IdentitySignature.signingContent(signaturePayload))
       .valueOf(),
   };
   const response = await request<IdentityResponse>(
@@ -564,7 +572,7 @@ async function publishKeychain(
   const body = {
     ...bodyWithoutSignature,
     signature: identity.keyPair
-      .sign(JSON.stringify(signaturePayload))
+      .sign(KeychainSignature.signingContent(signaturePayload))
       .valueOf(),
   };
   const response = await request<KeychainResponse>(
@@ -1114,14 +1122,14 @@ function signRequest(
   timestamp: string,
   body: unknown,
 ): string {
-  const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
+  const payload = SignedHttpRequestSignature.signingContent({
+    body: body as SignedHttpRequestBody,
     method,
-    requestPath,
-    timestamp,
-    body,
-  );
+    path: requestPath,
+    timestamp: Number(timestamp),
+  });
 
-  return keyPair.sign(JSON.stringify(payload)).valueOf();
+  return keyPair.sign(payload).valueOf();
 }
 
 async function waitFor(

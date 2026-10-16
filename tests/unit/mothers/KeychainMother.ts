@@ -1,6 +1,10 @@
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { KeyPair, Signature } from '@haskou/pigeon-swarm-crypto';
+import {
+  KeyPair,
+  KeychainSignature,
+  Signature,
+} from '@haskou/pigeon-swarm-crypto';
 import { PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 export class KeychainMother {
@@ -31,7 +35,8 @@ export class KeychainMother {
   public withPreviousKeychainExternalIdentifier(
     previousKeychainExternalIdentifier: string | undefined,
   ): this {
-    this.previousKeychainExternalIdentifier = previousKeychainExternalIdentifier;
+    this.previousKeychainExternalIdentifier =
+      previousKeychainExternalIdentifier;
 
     return this;
   }
@@ -48,7 +53,9 @@ export class KeychainMother {
   }
 
   public signature(): Signature {
-    return this.keyPair.sign(JSON.stringify(this.unsignedPrimitives()));
+    return this.keyPair.sign(
+      KeychainSignature.signingContent(this.unsignedPrimitives()),
+    );
   }
 
   public primitives(): PrimitiveOf<Keychain> {

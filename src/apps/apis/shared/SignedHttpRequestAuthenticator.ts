@@ -1,5 +1,6 @@
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { Request } from 'express';
 
 import { IdentityIsBlockedOnThisNodeError } from './errors/IdentityIsBlockedOnThisNodeError';
@@ -14,7 +15,11 @@ export default class SignedHttpRequestAuthenticator {
 
   constructor(private readonly blockPolicy: NodeBlockPolicy) {}
 
-  private assertIsNotReplayed(request: Request, identityId: IdentityId): void {
+  private assertIsNotReplayed(
+    request: Request,
+    identityId: IdentityId,
+    signature: Signature,
+  ): void {
     if (
       SignedHttpRequestAuthenticator.SAFE_METHODS.has(
         request.method.toUpperCase(),
@@ -23,19 +28,18 @@ export default class SignedHttpRequestAuthenticator {
       return;
     }
 
-    const signature = this.verifier.getRequiredHeader(request, 'x-signature');
-
-    if (!signedRequestReplayGuard.accept(identityId.toString(), signature)) {
+    if (!signedRequestReplayGuard.accept(identityId, signature)) {
       throw new InvalidSignedRequestError();
     }
   }
 
   /** Verifies the request signature and refuses identities blocked on this node (403012). */
   public async authenticate(request: Request): Promise<IdentityId> {
-    const { identityId, timestamp } = this.verifier.verifySignature(request);
+    const { identityId, signature, timestamp } =
+      this.verifier.verifySignature(request);
 
     assertSignedRequestTimestampIsFresh(timestamp);
-    this.assertIsNotReplayed(request, identityId);
+    this.assertIsNotReplayed(request, identityId, signature);
     await this.assertIsNotBlocked(identityId);
 
     return identityId;

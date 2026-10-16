@@ -1,6 +1,9 @@
-import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  KeyPair,
+  SignedHttpRequestBody,
+  SignedHttpRequestSignature,
+} from '@haskou/pigeon-swarm-crypto';
 import assert from 'node:assert/strict';
 import { ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -79,17 +82,17 @@ function signedHeaders(
   body: unknown,
 ): Record<string, string> {
   const timestamp = String(Date.now());
-  const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
+  const payload = SignedHttpRequestSignature.signingContent({
+    body: body as SignedHttpRequestBody,
     method,
-    requestPath,
-    timestamp,
-    body,
-  );
+    path: requestPath,
+    timestamp: Number(timestamp),
+  });
 
   return {
     'content-type': 'application/json',
     'x-identity-id': new IdentityId(keyPair.toPrimitives().publicKey).valueOf(),
-    'x-signature': keyPair.sign(JSON.stringify(payload)).valueOf(),
+    'x-signature': keyPair.sign(payload).valueOf(),
     'x-timestamp': timestamp,
   };
 }

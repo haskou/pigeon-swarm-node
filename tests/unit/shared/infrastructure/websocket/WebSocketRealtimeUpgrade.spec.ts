@@ -1,4 +1,3 @@
-import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import {
   REALTIME_PROTOCOL_VERSION,
@@ -7,7 +6,10 @@ import {
 } from '@app/shared/infrastructure/websocket/RealtimeTicketStore';
 import { webSocketEventHub } from '@app/shared/infrastructure/websocket/WebSocketEventHub';
 import { WebSocketRealtimeServer } from '@app/shared/infrastructure/websocket/WebSocketRealtimeServer';
-import { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  KeyPair,
+  SignedHttpRequestSignature,
+} from '@haskou/pigeon-swarm-crypto';
 import { createServer, Server } from 'http';
 import { AddressInfo } from 'net';
 import WebSocket from 'ws';
@@ -67,16 +69,16 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
   ): Promise<Record<string, string>> {
     const keyPair = await KeyPair.generate();
     const timestamp = String(Date.now());
-    const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
-      'GET',
-      requestPath,
-      timestamp,
-      {},
-    );
+    const payload = SignedHttpRequestSignature.signingContent({
+      body: {},
+      method: 'GET',
+      path: requestPath,
+      timestamp: Number(timestamp),
+    });
 
     return {
       identityId: new IdentityId(keyPair.toPrimitives().publicKey).valueOf(),
-      signature: keyPair.sign(JSON.stringify(payload)).valueOf(),
+      signature: keyPair.sign(payload).valueOf(),
       timestamp,
     };
   }

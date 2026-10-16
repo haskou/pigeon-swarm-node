@@ -1,6 +1,9 @@
-import { SignedHttpRequestVerifier } from '@app/apps/apis/shared/SignedHttpRequestVerifier';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import type { KeyPair } from '@haskou/pigeon-swarm-crypto';
+import {
+  type KeyPair,
+  type SignedHttpRequestBody,
+  SignedHttpRequestSignature,
+} from '@haskou/pigeon-swarm-crypto';
 import assert from 'node:assert/strict';
 import WebSocket from 'ws';
 
@@ -20,16 +23,16 @@ export async function issueRealtimeTicket(
 ): Promise<string> {
   const identityId = new IdentityId(keyPair.toPrimitives().publicKey).valueOf();
   const timestamp = String(Date.now());
-  const payload = new SignedHttpRequestVerifier().getCanonicalPayload(
-    'POST',
-    TICKETS_PATH,
-    timestamp,
-    {},
-  );
+  const payload = SignedHttpRequestSignature.signingContent({
+    body: {} as SignedHttpRequestBody,
+    method: 'POST',
+    path: TICKETS_PATH,
+    timestamp: Number(timestamp),
+  });
   const response = await fetch(`${node.baseUrl}${TICKETS_PATH}`, {
     headers: {
       'x-identity-id': identityId,
-      'x-signature': keyPair.sign(JSON.stringify(payload)).valueOf(),
+      'x-signature': keyPair.sign(payload).valueOf(),
       'x-timestamp': timestamp,
     },
     method: 'POST',

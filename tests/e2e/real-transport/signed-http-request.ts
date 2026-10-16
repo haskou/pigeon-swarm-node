@@ -81,7 +81,7 @@ type SignedCall = {
 
 const vectors = JSON.parse(
   readFileSync(
-    path.join(__dirname, '../../fixtures/signed-http-request-vectors.json'),
+    require.resolve('@haskou/pigeon-swarm-crypto/vectors/signed-http-request.json'),
     'utf8',
   ),
 ) as SignedRequestVectors;
@@ -109,7 +109,7 @@ function assertVectorsReproduce(): void {
 
     assert.equal(content, vector.derived.signingContent, vector.name);
     assert.deepEqual(
-      JSON.parse(content),
+      JSON.parse(content.slice(content.indexOf('\n') + 1)),
       vector.derived.canonicalPayload,
       `${vector.name} canonical payload`,
     );

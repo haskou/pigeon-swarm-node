@@ -180,7 +180,7 @@ paths:
           required: true
           schema:
             type: string
-          description: Device signature over the canonical request payload (method, path, timestamp and body hash).
+          description: Device signature over the signed HTTP request content (pigeon:signed-http-request:v1 domain, then the canonical method, path, timestamp and body hash).
       requestBody:
         required: true
         content:
@@ -233,7 +233,7 @@ paths:
           required: true
           schema:
             type: string
-          description: Device signature over the canonical request payload (method, path, timestamp and body hash).
+          description: Device signature over the signed HTTP request content (pigeon:signed-http-request:v1 domain, then the canonical method, path, timestamp and body hash).
       responses:
         '200':
           description: The caller's entry of the stored generation.

@@ -17,7 +17,6 @@ import { Timestamp } from '@haskou/value-objects';
 import canonicalize from 'canonicalize';
 import { createHash, createPublicKey, verify } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 interface Vectors {
   cases: {
@@ -46,10 +45,7 @@ interface Vectors {
 
 const vectors = JSON.parse(
   readFileSync(
-    join(
-      __dirname,
-      '../../../../fixtures/community-moderation-log-vectors.json',
-    ),
+    require.resolve('@haskou/pigeon-swarm-crypto/vectors/community-moderation-log.json'),
     'utf8',
   ),
 ) as Vectors;

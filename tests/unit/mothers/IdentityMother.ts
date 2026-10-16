@@ -62,7 +62,7 @@ export class IdentityMother {
   public timestamp: Timestamp = new Timestamp(1773848829055);
 
   public signature: Signature = new Signature(
-    'wCPbroLcA588ZrZgDcGixu5HCeeqlkSbgsi9YCtKsnsrlS5qCNkamXbrk8ktXD1FK29GAci803HFeTYySbCbAQ==',
+    '+Fp2knEBO7c4XRpCVecRX/kEJhuEsLJc3yGQ46oPmM4Ne2Ea6F6O8gyyDZBLEJJulQsfzIYsYq2AmF/3pXhIBw==',
   );
 
   public admissionNonce: string | undefined = '241347';

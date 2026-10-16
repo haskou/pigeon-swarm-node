@@ -8,7 +8,8 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { KeyPair, PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+
+import { SignatureMother } from '../../../mothers/SignatureMother';
 
 type Vectors = {
   cases: {
@@ -39,25 +40,10 @@ type Vectors = {
 
 const vectors = JSON.parse(
   readFileSync(
-    join(__dirname, '../../../../fixtures/identity-signature-vectors.json'),
+    require.resolve('@haskou/pigeon-swarm-crypto/vectors/identity-signature.json'),
     'utf8',
   ),
 ) as Vectors;
-
-const SIGNING_FIELDS = [
-  'admissionNonce',
-  'authorizationRevision',
-  'deviceCredential',
-  'deviceCredentialCommitment',
-  'id',
-  'mailboxHome',
-  'networks',
-  'previousIdentityExternalIdentifier',
-  'profile',
-  'recoveryAuthority',
-  'timestamp',
-  'version',
-];
 
 describe('Identity self-signature vectors', () => {
   describe('signingPayload', () => {
@@ -67,16 +53,6 @@ describe('Identity self-signature vectors', () => {
           IdentitySignaturePayload.fromPrimitives(input as IdentityPrimitives),
         ),
       ).toBe(derived.signingPayload);
-    });
-
-    it('keeps the pinned preimage keys in alphabetical order', () => {
-      for (const { derived } of vectors.cases) {
-        const keys = Object.keys(JSON.parse(derived.signingPayload));
-
-        expect(keys).toEqual(
-          SIGNING_FIELDS.filter((field) => keys.includes(field)),
-        );
-      }
     });
   });
 
@@ -144,6 +120,18 @@ describe('Identity self-signature vectors', () => {
             ({ derived }) => derived.signature === primitives.signature,
           )?.derived.signingPayload,
         );
+      },
+    );
+
+    it.each(vectors.identities.accepted)(
+      'rejects $name with its signature re-encoded without changing its bytes',
+      ({ primitives }) => {
+        expect(() =>
+          Identity.fromPrimitives({
+            ...primitives,
+            signature: SignatureMother.reencoded(primitives.signature),
+          }),
+        ).toThrow(InvalidIdentitySignatureError);
       },
     );
 

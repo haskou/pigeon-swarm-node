@@ -14,7 +14,6 @@ import {
   verify,
 } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 interface VectorKey {
   identityId: string;
@@ -82,7 +81,7 @@ interface Vectors {
 
 const vectors = JSON.parse(
   readFileSync(
-    join(__dirname, '../../../../../fixtures/community-operation-vectors.json'),
+    require.resolve('@haskou/pigeon-swarm-crypto/vectors/community-operation.json'),
     'utf8',
   ),
 ) as Vectors;
