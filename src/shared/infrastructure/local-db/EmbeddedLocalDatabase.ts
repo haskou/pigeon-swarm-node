@@ -1,3 +1,4 @@
+import { KeyedSerialQueue } from '@app/shared/infrastructure/concurrency/KeyedSerialQueue';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import Kernel from '@haskou/ddd-kernel';
 import { Level } from 'level';
@@ -23,6 +24,9 @@ export default class EmbeddedLocalDatabase {
     string,
     Level<string, Record<string, unknown>>
   >();
+
+  // Keyed by path, like `databases`: every handle on one database shares them.
+  private static readonly exclusiveSections = new KeyedSerialQueue();
 
   private readonly database: Level<string, Record<string, unknown>>;
   private readonly databasePath: string;
@@ -171,6 +175,21 @@ export default class EmbeddedLocalDatabase {
 
         return id ? this.delete(namespace, id) : Promise.resolve();
       }),
+    );
+  }
+
+  /**
+   * Runs `action` with no other section of the same `scope` on this database
+   * in between, whichever handle opened it, so a read-modify-write is atomic.
+   * Sections on one scope must not nest.
+   */
+  public async exclusively<T>(
+    scope: string,
+    action: () => Promise<T>,
+  ): Promise<T> {
+    return EmbeddedLocalDatabase.exclusiveSections.run(
+      `${this.databasePath}\n${scope}`,
+      action,
     );
   }
 
