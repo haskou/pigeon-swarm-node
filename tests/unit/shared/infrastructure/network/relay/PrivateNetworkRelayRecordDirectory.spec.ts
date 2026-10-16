@@ -193,6 +193,44 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     );
   });
 
+  it('should not publish a relay record that exceeds the envelope limits', async () => {
+    const directory = createDirectory(localDatabase);
+    const publicConnection = mock<IPFSConnection>();
+    const network = privateNetwork(privateKey());
+
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPub1icPeer']);
+    publicConnection.provideRecord.mockResolvedValue(true);
+    publicConnection.publishPubSub.mockResolvedValue(undefined);
+    publicConnection.waitForPeers.mockResolvedValue(true);
+    Reflect.set(
+      directory,
+      'getPublicConnection',
+      jest.fn().mockResolvedValue(publicConnection),
+    );
+
+    await expect(
+      directory.publish(
+        network,
+        {
+          announceAddresses: Array.from(
+            { length: 33 },
+            (_, index) =>
+              `/dns4/relay-${index}.example.com/tcp/4181/p2p/12D3KooWRe1ay`,
+          ),
+          listenAddresses: ['/ip4/0.0.0.0/tcp/4181'],
+          relayDataLimitBytes: 67_108_864,
+        },
+        mock(),
+      ),
+    ).resolves.toBe(false);
+
+    expect(publicConnection.publishPubSub).not.toHaveBeenCalled();
+    expect(publicConnection.provideRecord).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('Relay record exceeds the envelope limits.'),
+    );
+  });
+
   it('should stop answering relay record requests after publication stops', async () => {
     const directory = createDirectory(localDatabase);
     const publicConnection = mock<IPFSConnection>();
@@ -606,6 +644,44 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     );
     expect(publicConnection.dial).not.toHaveBeenCalled();
     expect(publicConnection.publishPubSub).not.toHaveBeenCalled();
+  });
+
+  it('should skip routed providers whose relay record cannot be sealed', async () => {
+    const directory = createDirectory(localDatabase);
+    const privateConnection = mock<IPFSConnection>();
+    const network = privateNetwork(
+      privateKey(),
+      privateConnection,
+      '12D3KooWLeaf',
+    );
+    const publicConnection = mock<IPFSConnection>();
+    const invalidProviderMultiaddr =
+      '/dns4/relay.example.com/tcp/4181/p2p/not-a-peer-id_0';
+
+    privateConnection.getMultiaddrs.mockReturnValue([]);
+    privateConnection.getPeers.mockReturnValue([]);
+    privateConnection.listen.mockResolvedValue(undefined);
+    publicConnection.dial.mockResolvedValue(undefined);
+    publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([
+      invalidProviderMultiaddr,
+    ]);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPub1icPeer']);
+    publicConnection.publishPubSub.mockResolvedValue(undefined);
+    publicConnection.subscribePubSub.mockResolvedValue(undefined);
+    publicConnection.waitForPeers.mockResolvedValue(true);
+    Reflect.set(
+      directory,
+      'getPublicConnection',
+      jest.fn().mockResolvedValue(publicConnection),
+    );
+
+    await expect(directory.discover(network, mock())).resolves.toBeUndefined();
+
+    expect(privateConnection.dial).not.toHaveBeenCalled();
+    expect(publicConnection.dial).toHaveBeenCalledWith(
+      invalidProviderMultiaddr,
+      expect.any(AbortSignal),
+    );
   });
 
   it('should keep one active circuit relay while it remains connected', async () => {
