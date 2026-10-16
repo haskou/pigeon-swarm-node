@@ -106,8 +106,8 @@ revoked device holds `identityKeyPair` and an identity-signed check would add
 no protection. Recovery proof (`X-Recovery-Signature`) is rejected on these
 routes. Recovery has its own flow.
 
-Both routes check that `X-Timestamp` is within ±30 s (the shared
-`SignedRequestReplayGuard.MAX_CLOCK_SKEW_MS`). `PUT` also consumes the
+Both routes check that `X-Timestamp` is within ±30 s
+(`SignedHttpRequestSignature.isFresh` from `@haskou/pigeon-swarm-crypto`). `PUT` also consumes the
 request signature in the replay guard. `GET` is safe and not replay-guarded.
 Existing device-proof routes are unchanged, to avoid friction.
 

@@ -60,7 +60,10 @@ X-Signature: <signature>
 
 Implemented:
 
-- canonical request payload: method, path, timestamp and body hash
+- canonical request payload: method, path, timestamp and body hash, built by
+  `SignedHttpRequestSignature` from `@haskou/pigeon-swarm-crypto`; the signed
+  bytes are `utf8("pigeon:signed-http-request:v1\n")` followed by the RFC 8785
+  canonical JSON of that payload
 - canonical payload `timestamp` is a JSON number; HTTP headers carry it as text
 - timestamp freshness validation with a 30 second maximum clock skew
 - replay rejection: a mutating (non-GET/HEAD/OPTIONS) signed request whose
@@ -69,7 +72,7 @@ Implemented:
 - Cucumber scenarios for invalid and stale signed requests
 
 Byte-exact vectors for the canonical request payload and its Ed25519 signature
-are in [`tests/fixtures/signed-http-request-vectors.json`](../tests/fixtures/signed-http-request-vectors.json),
+are in `@haskou/pigeon-swarm-crypto/vectors/signed-http-request.json`,
 checked by the `SignedHttpRequestVectors` unit spec. They cover a lowercase
 method, a request without a body, and a raw binary body, and they require that a
 changed path, method, body or timestamp is rejected.
@@ -744,8 +747,8 @@ rebuilds the record from the request and the node's own state, and the signature
 only verifies if the client signed exactly those bytes. A call, a participant
 state or an end that no admitted record supports does not exist on any node.
 Byte-exact vectors live in
-[`tests/fixtures/call-event-vectors.json`](../tests/fixtures/call-event-vectors.json)
-and are checked by the `CallEventVectors` unit spec.
+`@haskou/pigeon-swarm-crypto/vectors/call-event.json` and are checked by the
+`CallEventVectors` unit spec.
 
 | Record             | id                                       | Author          | Written by                                                                                                                                   |
 | ------------------ | ---------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1996,7 +1999,7 @@ scopeType: "content_replication", sizeBytes }`, with `scopeType` exactly
   and without a size cap
 
 Byte-exact vectors (ids, digests and signing content) are in
-`tests/fixtures/content-replication-vectors.json`.
+`@haskou/pigeon-swarm-crypto/vectors/content-replication.json`.
 
 ### Withdraw content replication
 
@@ -2277,10 +2280,17 @@ material. They never contain encrypted private keys, protected root-key
 envelopes, password KDF parameters, device unlock secrets or recovery secrets.
 Identity payloads containing those fields are rejected.
 
-The identity self-signature preimage (`IdentitySignatureDomainService`) and its
+The identity self-signature covers `utf8("pigeon:identity:v1\n")` followed by
+the RFC 8785 canonical JSON of the identity signature payload, built by
+`IdentitySignature` from `@haskou/pigeon-swarm-crypto`. The preimage and its
 signature are pinned byte for byte in
-[`tests/fixtures/identity-signature-vectors.json`](../tests/fixtures/identity-signature-vectors.json),
-checked by the `IdentitySignatureVectors` unit spec.
+`@haskou/pigeon-swarm-crypto/vectors/identity-signature.json`, checked by the
+`IdentitySignatureVectors` unit spec.
+
+Identities, keychains and signed records created before
+`@haskou/pigeon-swarm-crypto` 6.0.0 signed without these domain prefixes. They
+are rejected and are not migrated: wipe `PIGEON_LOCAL_DB_PATH` on the node and
+the browser storage on the client, then create a new identity.
 
 ### Get identity
 
@@ -2525,9 +2535,10 @@ Implemented:
 - persist metadata in OrbitDB replicated metadata
 - publish keychain announcement through the domain event publisher
 
-`signature` is the owner identity key's base64 Ed25519 signature over the UTF-8
-bytes of compact JSON with exactly these keys in this order, without a domain
-prefix:
+`signature` is the owner identity key's base64 Ed25519 signature, built by
+`KeychainSignature` from `@haskou/pigeon-swarm-crypto`, over
+`utf8("pigeon:keychain:v1\n")` followed by the RFC 8785 canonical JSON of
+exactly these keys:
 
 ```json
 {
@@ -2541,9 +2552,11 @@ prefix:
 
 `ownerIdentityId` is the identity id without PEM headers, taken from the signed
 request. `previousKeychainExternalIdentifier` is omitted when it is `null`.
-Byte-exact vectors (signing payload, signature and rejected replays) are in
-[`tests/fixtures/keychain-signature-vectors.json`](../tests/fixtures/keychain-signature-vectors.json),
-checked by the `KeychainSignatureVectors` unit spec.
+Byte-exact vectors (signing payload, signature and rejected replays, including
+signatures without the domain and signatures replayed from the identity and
+signed-HTTP domains) are in
+`@haskou/pigeon-swarm-crypto/vectors/keychain-signature.json`, checked by the
+`KeychainSignatureVectors` unit spec.
 
 ### Get current keychain
 
@@ -2802,7 +2815,7 @@ record with `id`, and sends `participantIds: ["<B>"]` (or both), `networkId`,
 
 Fixed, byte-exact test vectors (keys, ids, digests, signing content, signatures)
 live in
-[`tests/fixtures/conversation-operation-vectors.json`](../tests/fixtures/conversation-operation-vectors.json);
+`@haskou/pigeon-swarm-crypto/vectors/conversation-operation.json`;
 a unit spec recomputes every value with the real domain code, so a client signer can
 assert it reproduces them. Only the 1:1 genesis cases are admitted. The group
 genesis and the member and admin cases are the records older nodes accepted;
@@ -3018,7 +3031,7 @@ characters of `sha256(JSON.stringify(["channel" | "role", communityId,
 authorIdentityId, operation.createdAt]))`.
 
 Fixed, reproducible vectors for the genesis and `member_joined` operations live in
-[`tests/fixtures/community-operation-vectors.json`](../tests/fixtures/community-operation-vectors.json).
+`@haskou/pigeon-swarm-crypto/vectors/community-operation.json`.
 Per case they give the inputs (`networkId`, community nonce, owner, `createdAt`,
 `parents`, `args`, a deterministic ed25519 test key) and every derived value:
 `communityId`, the canonical payload and its `digest`, the `recordId`,
@@ -3746,7 +3759,7 @@ details it computes from the request, and the entry is only admitted when they
 match what was signed and the actor holds the permission for the action.
 Byte-exact entries (id preimage, payload, digest, signing content and
 signature) are in
-[`tests/fixtures/community-moderation-log-vectors.json`](../tests/fixtures/community-moderation-log-vectors.json),
+`@haskou/pigeon-swarm-crypto/vectors/community-moderation-log.json`,
 checked by the `CommunityModerationLogVectors` unit spec.
 
 | Route                                                  | action                                                         | target                          | details                                                                                                                                                                     |
@@ -5985,7 +5998,7 @@ envelope. Credentials and signatures use their API string representation
 without decoding or normalization. Byte-exact vectors for enrollment,
 revocation (plain and compromised) and recovery (with and without
 `compromisedCredentials`) are in
-[`tests/fixtures/device-authorization-transition-vectors.json`](../tests/fixtures/device-authorization-transition-vectors.json),
+`@haskou/pigeon-swarm-crypto/vectors/device-authorization-transition.json`,
 checked by the `DeviceAuthorizationTransitionVectors` unit spec.
 
 A recovery may carry `compromisedCredentials`, a list of one to 32
@@ -6130,7 +6143,7 @@ head commitments or decrypted material. Recipients verify `signature` against
 
 Byte-exact vectors for the entry preimage, its Ed25519 signature, credential
 normalization and accepted or rejected bundles are in
-[`tests/fixtures/device-sealed-secret-vectors.json`](../tests/fixtures/device-sealed-secret-vectors.json),
+`@haskou/pigeon-swarm-crypto/vectors/device-sealed-secret.json`,
 checked by the `DeviceSealedSecretVectors` unit spec against the domain code.
 `tests/e2e/real-transport/device-sealed-secret-bundle.ts`
 (`yarn test:e2e:real-transport:sealed-secret-bundle`) rebuilds the preimages
