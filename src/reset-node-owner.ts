@@ -16,8 +16,10 @@ async function run(): Promise<void> {
 
     application.loadEnvironmentVariables();
     await application.dependencyInjection();
-    process.stdout.write(await application.resetNodeOwner(newOwner));
-    process.exit(0);
+    const report = await application.resetNodeOwner(newOwner);
+
+    // Exits once the report is flushed, so a piped report is not cut short.
+    process.stdout.write(report, () => process.exit(0));
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     const hint =
@@ -25,8 +27,9 @@ async function run(): Promise<void> {
         ? '\nStop the node, then run yarn node:reset-owner again.'
         : '';
 
-    process.stderr.write(`Owner reset failed: ${message}${hint}\n`);
-    process.exit(1);
+    process.stderr.write(`Owner reset failed: ${message}${hint}\n`, () =>
+      process.exit(1),
+    );
   }
 }
 
