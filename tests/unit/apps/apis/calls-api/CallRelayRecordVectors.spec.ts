@@ -1,6 +1,7 @@
 import { CallRelayRecordPrimitives } from '@app/apps/apis/calls-api/CallRelayRecordPrimitives';
 import CallRelayRecordSigner from '@app/apps/apis/calls-api/CallRelayRecordSigner';
 import { Libp2pPrivateKeyLike } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/relay-records.json';
 import {
   createPrivateKey,
   createPublicKey,
@@ -8,17 +9,15 @@ import {
   sign,
   verify,
 } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 // Jest cannot load the ESM-only @libp2p/crypto, so the adapter is backed by
-// node:crypto Ed25519 over the fixture key. The signer under test still builds
-// the canonical payload, the pool proof and the lifetime and peer id checks.
+// node:crypto Ed25519 over the shared library vector key. The signer under test
+// still drives the library signature and the lifetime and peer id checks.
 jest.mock(
   '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter',
   () => {
-    const fixture = jest.requireActual<Vectors>(
-      '../../../../fixtures/call-relay-record-vectors.json',
+    const fixture = jest.requireActual<typeof vectors>(
+      '@haskou/pigeon-swarm-crypto/vectors/relay-records.json',
     );
     const relay = fixture.keys.relay;
 
@@ -54,43 +53,32 @@ jest.mock(
   },
 );
 
-interface Vectors {
-  cases: {
-    derived: {
-      canonicalPayload: string;
-      poolSignature: string;
-      record: CallRelayRecordPrimitives;
-      signature: string;
-    };
-    input: {
-      expiresAt: number;
-      issuedAt: number;
-      urls: string[];
-      version: 1 | 2;
-    };
-    name: string;
-  }[];
-  keys: {
-    relay: {
-      peerId: string;
-      privateKeyPem: string;
-      publicKey: string;
-      publicKeyPem: string;
-    };
+type CallRelayVector = {
+  derived: {
+    canonicalPayload: string;
+    poolSignature: string;
+    record: CallRelayRecordPrimitives;
+    signature: string;
   };
-  sharedSecret: string;
-  verifiedAt: number;
-}
-
-const vectors = JSON.parse(
-  readFileSync(
-    join(__dirname, '../../../../fixtures/call-relay-record-vectors.json'),
-    'utf8',
-  ),
-) as Vectors;
-const cases = vectors.cases.map((vector) => [vector.name, vector] as const);
-const v1 = vectors.cases.find((vector) => vector.input.version === 1)!;
-const v2 = vectors.cases.find((vector) => vector.input.version === 2)!;
+  input: {
+    expiresAt: number;
+    issuedAt: number;
+    urls: string[];
+    version: 1 | 2;
+  };
+  name: string;
+};
+const callCases = vectors.cases as CallRelayVector[];
+const cases = callCases.map((vector) => [vector.name, vector] as const);
+const invalidCases = (
+  vectors.invalidCallRecords as {
+    name: string;
+    record: CallRelayRecordPrimitives;
+    sharedSecret: string;
+  }[]
+).map((vector) => [vector.name, vector] as const);
+const v1 = callCases.find((vector) => vector.input.version === 1)!;
+const v2 = callCases.find((vector) => vector.input.version === 2)!;
 
 describe('Call relay record vectors', () => {
   const signer = new CallRelayRecordSigner();
@@ -196,5 +184,11 @@ describe('Call relay record vectors', () => {
         poolSignature: v1.derived.poolSignature,
       }),
     ).resolves.toBe(false);
+  });
+
+  it.each(invalidCases)('rejects the %s vector', async (_name, vector) => {
+    await expect(accepts(vector.record, vector.sharedSecret)).resolves.toBe(
+      false,
+    );
   });
 });

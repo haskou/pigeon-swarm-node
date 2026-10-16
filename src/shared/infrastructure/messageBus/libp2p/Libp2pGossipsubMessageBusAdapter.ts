@@ -107,7 +107,7 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
 
     await network.subscribePubSub(topic, async (payload) => {
       const message = JSON.parse(
-        this.codec.decode(payload, network),
+        this.codec.decode(payload, network, topic),
       ) as Message;
 
       if (message.type !== bindingKey) {
@@ -213,12 +213,14 @@ export default class Libp2pGossipsubAdapter implements MessageBusAdapter {
       if (networks.length > 0) {
         await Promise.all(
           domainEvents.flatMap((event) =>
-            this.networksForEvent(event).map((network) =>
-              network.publishPubSub(
-                this.networkTopic(event.eventName(), network),
-                this.codec.encode(event.decode(), network),
-              ),
-            ),
+            this.networksForEvent(event).map((network) => {
+              const topic = this.networkTopic(event.eventName(), network);
+
+              return network.publishPubSub(
+                topic,
+                this.codec.encode(event.decode(), network, topic),
+              );
+            }),
           ),
         );
 

@@ -5,7 +5,7 @@ import {
   defaultRelayRuntimeSettings,
   RelayRuntimeSettings,
 } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
-import { createHmac } from 'crypto';
+import { TurnRestCredential } from '@haskou/pigeon-swarm-crypto';
 
 import { CallIceServerDiagnostics } from './CallIceServerDiagnostics';
 import { CallTurnSharedSecret } from './CallTurnSharedSecret';
@@ -144,15 +144,12 @@ export class CallIceServerConfig {
         this.values.turnCredentialTtlSeconds,
         now,
       );
-    const username = `${expiresAt}:${identityId.valueOf()}`;
-    const credential = createHmac('sha1', this.values.turnSharedSecret)
-      .update(username)
-      .digest('base64');
 
-    return {
-      credential,
-      username,
-    };
+    return TurnRestCredential.issue(
+      this.values.turnSharedSecret,
+      expiresAt,
+      identityId.valueOf(),
+    );
   }
 
   private getTurnUrls(connectedRelayTurnUrls: string[]): string[] {

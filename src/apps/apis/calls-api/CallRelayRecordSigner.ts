@@ -2,52 +2,13 @@ import {
   libp2pKeyAdapter,
   Libp2pPrivateKeyLike,
 } from '@app/contexts/shared/infrastructure/ipfs/networks/adapters/Libp2pKeyAdapter';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { CallRelayRecordSignature } from '@haskou/pigeon-swarm-crypto';
 
 import { CallRelayRecord } from './CallRelayRecord';
 import { CallRelayRecordPrimitives } from './CallRelayRecordPrimitives';
 import { CallRelayRecordPayload } from './types/CallRelayRecordPayload';
 
 export default class CallRelayRecordSigner {
-  private static readonly encoder = new TextEncoder();
-
-  private canonicalPayload(payload: CallRelayRecordPayload): string {
-    return JSON.stringify({
-      expiresAt: payload.expiresAt,
-      issuedAt: payload.issuedAt,
-      peerId: payload.peerId,
-      publicKey: payload.publicKey,
-      role: payload.role,
-      urls: [...payload.urls].sort(),
-      version: payload.version,
-    });
-  }
-
-  private createPoolSignature(
-    payload: CallRelayRecordPayload,
-    sharedSecret: string,
-  ): string {
-    return createHmac('sha256', sharedSecret)
-      .update(this.canonicalPayload(payload))
-      .digest('base64url');
-  }
-
-  private isPoolSignatureValid(
-    payload: CallRelayRecordPayload &
-      Pick<CallRelayRecordPrimitives, 'poolSignature'>,
-    sharedSecret: string,
-  ): boolean {
-    const expected = Buffer.from(
-      this.createPoolSignature(payload, sharedSecret),
-      'base64url',
-    );
-    const received = Buffer.from(payload.poolSignature, 'base64url');
-
-    return (
-      expected.length === received.length && timingSafeEqual(expected, received)
-    );
-  }
-
   private async buildPayload(
     payload: Omit<CallRelayRecordPayload, 'peerId' | 'publicKey'>,
     privateKey: Libp2pPrivateKeyLike,
@@ -61,51 +22,22 @@ export default class CallRelayRecordSigner {
     };
   }
 
-  private isLifetimeValid(
-    payload: CallRelayRecordPayload,
-    now: number,
-  ): boolean {
-    return (
-      Number.isSafeInteger(payload.issuedAt) &&
-      Number.isSafeInteger(payload.expiresAt) &&
-      payload.issuedAt >= 0 &&
-      payload.issuedAt < payload.expiresAt &&
-      payload.expiresAt > now
-    );
-  }
-
-  private isVersionProofValid(
-    payload: CallRelayRecordPayload &
-      Pick<CallRelayRecordPrimitives, 'poolSignature'>,
-    sharedSecret: string,
-  ): boolean {
-    if (payload.version === 2) return payload.poolSignature === '';
-
-    return (
-      payload.version === 1 && this.isPoolSignatureValid(payload, sharedSecret)
-    );
-  }
-
   public async sign(
     payload: Omit<CallRelayRecordPayload, 'peerId' | 'publicKey'>,
     privateKey: Libp2pPrivateKeyLike,
     sharedSecret: string,
   ): Promise<CallRelayRecord> {
     const completePayload = await this.buildPayload(payload, privateKey);
+    const poolSignature = CallRelayRecordSignature.poolSignature(
+      completePayload,
+      sharedSecret,
+    );
     const signature = await privateKey.sign(
-      CallRelayRecordSigner.encoder.encode(
-        this.canonicalPayload(completePayload),
-      ),
+      CallRelayRecordSignature.signingBytes(completePayload),
     );
 
     return new CallRelayRecord(
-      {
-        ...completePayload,
-        poolSignature:
-          completePayload.version === 2
-            ? ''
-            : this.createPoolSignature(completePayload, sharedSecret),
-      },
+      { ...completePayload, poolSignature },
       Buffer.from(signature).toString('base64url'),
     );
   }
@@ -117,23 +49,25 @@ export default class CallRelayRecordSigner {
     sharedSecret: string,
     now: number = Date.now(),
   ): Promise<boolean> {
-    if (!this.isLifetimeValid(payload, now)) {
+    if (payload.expiresAt <= now) {
       return false;
     }
 
-    if (!this.isVersionProofValid(payload, sharedSecret)) return false;
+    try {
+      CallRelayRecordSignature.verify(
+        payload,
+        payload.poolSignature,
+        signature,
+        sharedSecret,
+      );
+    } catch {
+      return false;
+    }
 
     const publicKey = await libp2pKeyAdapter.publicKeyFromProtobuf(
       Buffer.from(payload.publicKey, 'base64url'),
     );
 
-    if (libp2pKeyAdapter.peerIdFromPublicKey(publicKey) !== payload.peerId) {
-      return false;
-    }
-
-    return publicKey.verify(
-      CallRelayRecordSigner.encoder.encode(this.canonicalPayload(payload)),
-      Buffer.from(signature, 'base64url'),
-    );
+    return libp2pKeyAdapter.peerIdFromPublicKey(publicKey) === payload.peerId;
   }
 }

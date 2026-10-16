@@ -12,6 +12,8 @@ export class CallRelayConfiguration {
   private static readonly DEFAULT_RECORD_TTL_MS = 10 * 60 * 1000;
   private static readonly DEFAULT_TURN_TRANSPORTS = ['udp', 'tcp'];
 
+  private readonly turnSharedSecret: CallTurnSharedSecret;
+
   public static fromEnvironment(
     environment: CallIceServerEnvironment = pigeonEnvironment(),
     relaySettings: RelayRuntimeSettings = defaultRelayRuntimeSettings(),
@@ -29,7 +31,11 @@ export class CallRelayConfiguration {
   public constructor(
     private readonly environment: CallIceServerEnvironment,
     private readonly relaySettings: RelayRuntimeSettings,
-  ) {}
+  ) {
+    this.turnSharedSecret = CallTurnSharedSecret.fromEnvironment(
+      environment.CALLS_TURN_SHARED_SECRET,
+    );
+  }
 
   private splitEnvironmentList(value: string | undefined): string[] {
     return (value || '')
@@ -71,15 +77,11 @@ export class CallRelayConfiguration {
   }
 
   public getTurnSharedSecret(): string {
-    return CallTurnSharedSecret.fromEnvironment(
-      this.environment.CALLS_TURN_SHARED_SECRET,
-    ).getValue();
+    return this.turnSharedSecret.getValue();
   }
 
   public hasTurnSharedSecret(): boolean {
-    return CallTurnSharedSecret.fromEnvironment(
-      this.environment.CALLS_TURN_SHARED_SECRET,
-    ).isConfigured();
+    return this.turnSharedSecret.isConfigured();
   }
 
   public canPublishLocalRelay(): boolean {

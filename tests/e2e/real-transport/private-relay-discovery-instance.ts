@@ -591,7 +591,7 @@ async function subscribePubSub(command: Command): Promise<void> {
   await getNetwork().subscribePubSub(topic, async (message) => {
     const decoded =
       command.encrypted === true
-        ? new PubSubNetworkMessageCodec().decode(message, getNetwork())
+        ? new PubSubNetworkMessageCodec().decode(message, getNetwork(), topic)
         : message;
     if (decoded === payload) {
       emit('pubsub-received', {
@@ -622,11 +622,11 @@ async function publishPubSub(command: Command): Promise<void> {
 
   const encoded =
     command.encrypted === true
-      ? new PubSubNetworkMessageCodec().encode(payload, getNetwork())
+      ? new PubSubNetworkMessageCodec().encode(payload, getNetwork(), topic)
       : payload;
   if (
     command.encrypted === true &&
-    (encoded === payload || JSON.parse(encoded).encrypted !== true)
+    (encoded === payload || JSON.parse(encoded).version !== 2)
   ) {
     throw new Error('Call signalling must use an encrypted network envelope.');
   }
@@ -734,7 +734,10 @@ async function stopResources(): Promise<void> {
     }
   }
   if (errors.length > 0) {
-    throw new AggregateError(errors, 'Relay instance resource shutdown failed.');
+    throw new AggregateError(
+      errors,
+      'Relay instance resource shutdown failed.',
+    );
   }
 }
 

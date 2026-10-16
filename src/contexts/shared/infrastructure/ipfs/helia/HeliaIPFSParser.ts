@@ -1,5 +1,4 @@
-import { PrivateKey as NetworkPrivateKey } from '@haskou/pigeon-swarm-crypto';
-import { createHash, createPrivateKey } from 'node:crypto';
+import { PrivateKey, PrivateNetworkKeys } from '@haskou/pigeon-swarm-crypto';
 
 import {
   heliaRuntimeAdapter,
@@ -90,20 +89,6 @@ export class HeliaIPFSParser {
     );
   }
 
-  private static extractPskSeed(key: NetworkPrivateKey): Uint8Array {
-    const keyObject = createPrivateKey(key.valueOf());
-    const jwk = keyObject.export({ format: 'jwk' }) as { d: string };
-
-    return new Uint8Array(Buffer.from(jwk.d, 'base64url'));
-  }
-
-  private static toSwarmPsk(seed: Uint8Array): Uint8Array {
-    const pskHex = createHash('sha256').update(seed).digest('hex');
-    const swarmKey = `/key/swarm/psk/1.0.0/\n/base16/\n${pskHex}`;
-
-    return new Uint8Array(Buffer.from(swarmKey));
-  }
-
   public static isInMemoryStorageLocation(storageLocation: string): boolean {
     return (
       storageLocation === 'memory' || storageLocation.startsWith('memory/')
@@ -159,7 +144,7 @@ export class HeliaIPFSParser {
 
   public static async parsePrivateLibp2pConfig(
     options: IPFSOptions,
-    networkKey: NetworkPrivateKey,
+    networkKey: PrivateKey,
   ): Promise<Libp2pDefaults> {
     const parsedOptions = await HeliaIPFSParser.parseOptions(options, {
       persistentDatastore: false,
@@ -177,9 +162,7 @@ export class HeliaIPFSParser {
     privateLibp2pConfig.privateKey = parsedOptions.libp2p.privateKey;
     privateLibp2pConfig.connectionProtector =
       await heliaRuntimeAdapter.createPreSharedKey({
-        psk: HeliaIPFSParser.toSwarmPsk(
-          HeliaIPFSParser.extractPskSeed(networkKey),
-        ),
+        psk: PrivateNetworkKeys.swarmKey(networkKey),
       });
 
     return heliaRuntimeAdapter.withBootstrapRelays(

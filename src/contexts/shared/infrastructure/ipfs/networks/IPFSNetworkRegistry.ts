@@ -11,7 +11,8 @@ import {
   relayRuntimeSettingsKey,
 } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
 import Kernel from '@haskou/ddd-kernel';
-import { createHash, createPrivateKey } from 'crypto';
+import { PrivateKey } from '@haskou/pigeon-swarm-crypto';
+import { createHash } from 'crypto';
 import * as fs from 'fs/promises';
 
 import { IPFSNetworkNotFoundError } from '../errors/IPFSNetworkNotFoundError';
@@ -311,26 +312,19 @@ export default class IPFSNetworkRegistry {
       throw new Error('Shared peer private key must be Ed25519.');
     }
 
-    const privateKeyBytes = privateKey.raw.subarray(0, 32);
-    const publicKeyBytes =
-      privateKey.raw.length >= 64
-        ? privateKey.raw.subarray(32, 64)
-        : privateKey.publicKey.raw;
+    const sharedPeerPrivateKey = PrivateKey.fromSeed(
+      privateKey.raw.subarray(0, 32),
+    );
 
-    const keyObject = createPrivateKey({
-      format: 'jwk',
-      key: {
-        crv: 'Ed25519',
-        d: Buffer.from(privateKeyBytes).toString('base64url'),
-        kty: 'OKP',
-        x: Buffer.from(publicKeyBytes).toString('base64url'),
-      },
-    });
+    if (
+      !Buffer.from(sharedPeerPrivateKey.getPublicKey().toRaw()).equals(
+        privateKey.publicKey.raw,
+      )
+    ) {
+      throw new Error('Shared peer private key does not match its public key.');
+    }
 
-    state.sharedPeerPrivateKeyPem = keyObject.export({
-      format: 'pem',
-      type: 'pkcs8',
-    }) as string;
+    state.sharedPeerPrivateKeyPem = sharedPeerPrivateKey.valueOf();
 
     return state.sharedPeerPrivateKeyPem;
   }

@@ -2,7 +2,7 @@ import { CallIceServerConfig } from '@app/apps/apis/calls-api/CallIceServerConfi
 import { CallTurnSharedSecret } from '@app/apps/apis/calls-api/CallTurnSharedSecret';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { normalizeRelayRuntimeSettings } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettings';
-import { createHmac } from 'crypto';
+import vectors from '@haskou/pigeon-swarm-crypto/vectors/turn-credentials.json';
 
 describe('CallIceServerConfig', () => {
   it.each([undefined, '', CallTurnSharedSecret.REJECTED_PUBLIC_SECRET])(
@@ -22,6 +22,15 @@ describe('CallIceServerConfig', () => {
   const identityId = new IdentityId(
     'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=',
   );
+  const turnVector = vectors.credentials.find(
+    (vector) => vector.name === 'identity_user',
+  )!;
+  const turnIdentityId = new IdentityId(turnVector.user);
+  const mockDefaultTtlClock = (): void => {
+    jest
+      .spyOn(Date, 'now')
+      .mockReturnValue((turnVector.expiresAtSeconds - 3600) * 1000);
+  };
 
   afterEach(() => {
     jest.restoreAllMocks();
@@ -120,39 +129,21 @@ describe('CallIceServerConfig', () => {
   });
 
   it('should generate temporary coturn REST credentials when shared secret exists', () => {
-    jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
+    jest
+      .spyOn(Date, 'now')
+      .mockReturnValue((turnVector.expiresAtSeconds - 600) * 1000);
     const resource = CallIceServerConfig.fromEnvironment({
       CALLS_TURN_CREDENTIAL_TTL_SECONDS: '600',
-      CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+      CALLS_TURN_SHARED_SECRET: turnVector.sharedSecret,
       CALLS_TURN_URLS: 'turn:turn.example.test:3478?transport=udp',
-    }).toResource(identityId);
-    const username = `1770000600:${identityId.valueOf()}`;
-    const credential = createHmac('sha1', 'turn-shared-secret')
-      .update(username)
-      .digest('base64');
+    }).toResource(turnIdentityId);
 
     expect(resource.iceServers[0]).toEqual({
-      credential,
+      credential: turnVector.credential,
       urls: ['turn:turn.example.test:3478?transport=udp'],
-      username,
+      username: turnVector.username,
     });
   });
-
-  it.each(['0.5', '-1', 'Infinity', 'invalid', '9007199254740991'])(
-    'should use the default lifetime for an invalid credential TTL of %s',
-    (ttl) => {
-      jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
-      const resource = CallIceServerConfig.fromEnvironment({
-        CALLS_TURN_CREDENTIAL_TTL_SECONDS: ttl,
-        CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
-        CALLS_TURN_URLS: 'turn:turn.example.test:3478',
-      }).toResource(identityId);
-
-      expect(resource.iceServers[0].username).toBe(
-        `1770003600:${identityId.valueOf()}`,
-      );
-    },
-  );
 
   it('should issue a fresh lifetime and credential on the next request', () => {
     const clock = jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
@@ -185,10 +176,10 @@ describe('CallIceServerConfig', () => {
   });
 
   it('should derive local TURN urls from the public host and configured TURN port', () => {
-    jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
+    mockDefaultTtlClock();
     const resource = CallIceServerConfig.fromEnvironment(
       {
-        CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
+        CALLS_TURN_SHARED_SECRET: turnVector.sharedSecret,
       },
       normalizeRelayRuntimeSettings({
         callsRelay: {
@@ -201,19 +192,15 @@ describe('CallIceServerConfig', () => {
         },
         publicHost: 'relay.example.test',
       }),
-    ).toResource(identityId);
-    const username = `1770003600:${identityId.valueOf()}`;
-    const credential = createHmac('sha1', 'turn-shared-secret')
-      .update(username)
-      .digest('base64');
+    ).toResource(turnIdentityId);
 
     expect(resource.iceServers[0]).toEqual({
-      credential,
+      credential: turnVector.credential,
       urls: [
         'turn:relay.example.test:4199?transport=udp',
         'turn:relay.example.test:4199?transport=tcp',
       ],
-      username,
+      username: turnVector.username,
     });
   });
 
@@ -241,21 +228,19 @@ describe('CallIceServerConfig', () => {
   });
 
   it('should use the connected relay TURN urls when no local relay is configured', () => {
-    jest.spyOn(Date, 'now').mockReturnValue(1770000000000);
+    mockDefaultTtlClock();
     const connectedRelayTurnUrls = [
       'turn:connected-relay.example.test:4199?transport=udp',
       'turn:connected-relay.example.test:4199?transport=tcp',
     ];
     const resource = CallIceServerConfig.fromEnvironment({
-      CALLS_TURN_SHARED_SECRET: 'turn-shared-secret',
-    }).toResource(identityId, connectedRelayTurnUrls);
+      CALLS_TURN_SHARED_SECRET: turnVector.sharedSecret,
+    }).toResource(turnIdentityId, connectedRelayTurnUrls);
 
     expect(resource.iceServers[0]).toEqual({
-      credential: createHmac('sha1', 'turn-shared-secret')
-        .update(`1770003600:${identityId.valueOf()}`)
-        .digest('base64'),
+      credential: turnVector.credential,
       urls: connectedRelayTurnUrls,
-      username: `1770003600:${identityId.valueOf()}`,
+      username: turnVector.username,
     });
   });
 

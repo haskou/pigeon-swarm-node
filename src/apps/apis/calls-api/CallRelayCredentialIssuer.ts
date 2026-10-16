@@ -1,4 +1,4 @@
-import { createHmac } from 'crypto';
+import { TurnRestCredential } from '@haskou/pigeon-swarm-crypto';
 
 import { FederatedTurnCredential } from './types/FederatedTurnCredential';
 
@@ -29,18 +29,17 @@ export default class CallRelayCredentialIssuer {
   ): FederatedTurnCredential {
     if (!secret || urls.length === 0 || urls.length > 8)
       throw new Error('TURN credential request rejected');
+    const subject = TurnRestCredential.peerSubject(secret, peer);
+
     this.consumeQuota(peer, now);
-    const subject = createHmac('sha256', secret)
-      .update('pigeon.turn.subject.v2\0')
-      .update(peer)
-      .digest('hex')
-      .slice(0, 32);
-    const username = `${Math.floor(now / 1000) + 600}:${subject}`;
 
     return {
-      credential: createHmac('sha1', secret).update(username).digest('base64'),
+      ...TurnRestCredential.issue(
+        secret,
+        Math.floor(now / 1000) + 600,
+        subject,
+      ),
       urls,
-      username,
     };
   }
 }
