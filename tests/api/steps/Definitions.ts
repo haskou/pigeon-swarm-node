@@ -1383,8 +1383,9 @@ export default class Definitions {
     );
     this.attachCommunityModerationLog(method, path, signerKeyPair, createdAt);
 
+    const declaredBodyHash = this.declaredBodyHashOf(method, path);
     const signedRequestPayload = SignedHttpRequestSignature.signingContent({
-      body: this.getCurrentRequestBody(),
+      body: declaredBodyHash ?? this.getCurrentRequestBody(),
       method,
       path,
       timestamp: Number(timestamp),
@@ -1395,6 +1396,25 @@ export default class Definitions {
     this.headers['x-signature'] = signerKeyPair
       .sign(signedRequestPayload)
       .valueOf();
+    delete this.headers['x-body-hash'];
+
+    if (declaredBodyHash) {
+      this.headers['x-body-hash'] = declaredBodyHash;
+    }
+  }
+
+  /**
+   * A block list upload signs the hash of the exact body bytes, declared in
+   * `X-Body-Hash`, so the node authenticates it before reading the body.
+   */
+  private declaredBodyHashOf(method: string, path: string): string | undefined {
+    if (method !== 'PUT' || path.replace(/\/$/, '') !== '/node/blocks') {
+      return undefined;
+    }
+
+    return createHash('sha256')
+      .update(JSON.stringify(this.body ? JSON.parse(this.body) : {}))
+      .digest('hex');
   }
 
   private async ensureBlockSourcePublisherKeyPair(): Promise<KeyPair> {
@@ -5084,6 +5104,16 @@ export default class Definitions {
       'PUT',
       '/node/blocks/',
       String(Date.now() - 31_000),
+    );
+  }
+
+  @given('another identity signs the node blocks request claiming to be me')
+  public async anotherIdentitySignsTheNodeBlocksRequestClaimingToBeMe(): Promise<void> {
+    await this.signCurrentRequest(
+      'PUT',
+      '/node/blocks/',
+      String(Date.now()),
+      await this.ensureOtherIdentityKeyPair(),
     );
   }
 
