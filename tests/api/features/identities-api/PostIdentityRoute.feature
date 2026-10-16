@@ -280,6 +280,40 @@ Feature: Post identity route
       { "codes": [{ "maxUses": 2, "usesLeft": 1 }] }
       """
 
+  Scenario: Concurrent creations of one identity spend one registration code use
+    Given the local node has no owner and no networks
+    And I sign the current node owner request
+    When I PUT "/node/owner/"
+    Then response code is equal to 200
+
+    Given I set json body
+      """
+      { "mode": "codes" }
+      """
+    And I sign a PUT request to "/node/registration/"
+    When I PUT "/node/registration/"
+    Then response code is equal to 200
+
+    Given I set a registration code body with 3 uses expiring in 1 days
+    And I sign a POST request to "/node/registration-codes/"
+    When I POST to "/node/registration-codes/"
+    Then response code is equal to 201
+    And I remember the issued registration code
+    And I clear request headers
+    And the current node has a test network with id "123e4567-e89b-12d3-a456-426614174987" and name "registration-network-87"
+    And I set a client-signed identity body with name "twin" and handle "twin"
+    And I send the remembered registration code
+    When I POST to "/identities/" 3 times concurrently
+    Then every concurrent response code is equal to 200
+
+    Given I sign a GET request to "/node/registration-codes/"
+    When I GET "/node/registration-codes/"
+    Then response code is equal to 200
+    And response data should match partially
+      """
+      { "codes": [{ "maxUses": 3, "usesLeft": 2 }] }
+      """
+
   Scenario: Refuse identity creation without a registration code
     Given the local node has no owner and no networks
     And I sign the current node owner request

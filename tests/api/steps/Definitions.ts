@@ -171,6 +171,7 @@ export default class Definitions {
   private communityMembershipRequestId: string | undefined;
   private communityRoleId: string | undefined;
   private concurrentCallResponses: RestResponse[] = [];
+  private concurrentResponses: RestResponse[] = [];
   private formData: FormData | undefined;
   private headers: Record<string, string> = {};
   private identityKeyPair: KeyPair | undefined;
@@ -1533,6 +1534,7 @@ export default class Definitions {
     this.communityRecordSequences.clear();
     this.communityRoleId = undefined;
     this.concurrentCallResponses = [];
+    this.concurrentResponses = [];
     this.formData = undefined;
     this.headers = {};
     this.identityKeyPair = undefined;
@@ -6110,6 +6112,28 @@ export default class Definitions {
     );
 
     this.rememberCreatedIdentityFromResponse();
+  }
+
+  @when('I POST to {string} {int} times concurrently')
+  public async iPOSTToTimesConcurrently(
+    path: string,
+    times: number,
+  ): Promise<void> {
+    this.concurrentResponses = await Promise.all(
+      Array.from({ length: times }, () =>
+        this.restClient.post(path, this.getPostBody(), this.getPostHeaders()),
+      ),
+    );
+  }
+
+  @then('every concurrent response code is equal to {int}')
+  public everyConcurrentResponseCodeIsEqualTo(statusCode: number): void {
+    expect(
+      this.concurrentResponses.map((response) => response.status),
+    ).to.deep.equal(
+      this.concurrentResponses.map(() => statusCode),
+      JSON.stringify(this.concurrentResponses.map(({ data }) => data)),
+    );
   }
 
   @when('I POST to the current IPFS network')
