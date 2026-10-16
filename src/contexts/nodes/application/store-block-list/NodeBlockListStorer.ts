@@ -10,15 +10,13 @@ import NodeLoaderService from '../../domain/services/NodeLoaderService';
 import { NodeBlockListStorerMessage } from './messages/NodeBlockListStorerMessage';
 
 export default class NodeBlockListStorer {
-  private storing: Promise<void> = Promise.resolve();
-
   constructor(
     private readonly loader: NodeLoaderService,
     private readonly repository: NodeBlockListRepository,
     private readonly policy: NodeBlockPolicy,
   ) {}
 
-  private async storeInOrder(list: NodeBlockList): Promise<void> {
+  private async storeChecked(list: NodeBlockList): Promise<void> {
     const node = await this.loader.loadNode();
 
     assert(
@@ -38,19 +36,13 @@ export default class NodeBlockListStorer {
     );
 
     await this.repository.saveLocal(list);
-    await this.policy.replace(list, node);
   }
 
   /** Stores a newer list signed by the current owner; one store at a time, so versions never go back. */
   public async store(
     message: NodeBlockListStorerMessage,
   ): Promise<NodeBlockList> {
-    const stored = this.storing.then(() =>
-      this.storeInOrder(message.blockList),
-    );
-
-    this.storing = stored.catch((): void => undefined);
-    await stored;
+    await this.policy.change(() => this.storeChecked(message.blockList));
 
     return message.blockList;
   }

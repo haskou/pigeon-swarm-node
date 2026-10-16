@@ -3,13 +3,22 @@ import { LocalNodeNotFoundError } from '@app/contexts/nodes/domain/errors/LocalN
 import { NodeIsAlreadyOwnedByThisIdentityError } from '@app/contexts/nodes/domain/errors/NodeIsAlreadyOwnedByThisIdentityError';
 import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from '@app/contexts/nodes/domain/errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
 import { Node } from '@app/contexts/nodes/domain/Node';
+import { NodeBlockEntries } from '@app/contexts/nodes/domain/NodeBlockEntries';
+import { NodeBlockPublication } from '@app/contexts/nodes/domain/NodeBlockPublication';
+import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
 import { NodeRegistrationCode } from '@app/contexts/nodes/domain/NodeRegistrationCode';
 import { NodeRegistrationCodeLimits } from '@app/contexts/nodes/domain/NodeRegistrationCodeLimits';
 import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
 import { NoNodeBlocks } from '@app/contexts/nodes/domain/NoNodeBlocks';
+import { NodeBlockListVersion } from '@app/contexts/nodes/domain/value-objects/NodeBlockListVersion';
+import { NodeBlockSourceOrigin } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceOrigin';
+import { NodeBlockSourceVersionFloor } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceVersionFloor';
 import { NodeRegistrationCodeSecret } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationCodeSecret';
 import { NodeRegistrationMode } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationMode';
+import LocalNodeBlockExceptionsRepository from '@app/contexts/nodes/infrastructure/local-db/LocalNodeBlockExceptionsRepository';
 import LocalNodeBlockListRepository from '@app/contexts/nodes/infrastructure/local-db/LocalNodeBlockListRepository';
+import LocalNodeBlockPublicationRepository from '@app/contexts/nodes/infrastructure/local-db/LocalNodeBlockPublicationRepository';
+import LocalNodeBlockSourceRepository from '@app/contexts/nodes/infrastructure/local-db/LocalNodeBlockSourceRepository';
 import LocalNodeMetadataRepository from '@app/contexts/nodes/infrastructure/local-db/LocalNodeMetadataRepository';
 import LocalNodeRegistrationCodeRepository from '@app/contexts/nodes/infrastructure/local-db/LocalNodeRegistrationCodeRepository';
 import LocalNodeMetadataMapper from '@app/contexts/nodes/infrastructure/local-db/mappers/LocalNodeMetadataMapper';
@@ -42,6 +51,10 @@ describe('NodeOwnerSettingsResetter', () => {
   let nodeRepository: LocalNodeMetadataRepository;
   let registrationCodeRepository: LocalNodeRegistrationCodeRepository;
   let blockListRepository: LocalNodeBlockListRepository;
+  let publicationRepository: LocalNodeBlockPublicationRepository;
+  let sourceRepository: LocalNodeBlockSourceRepository;
+  let exceptionsRepository: LocalNodeBlockExceptionsRepository;
+  let publisher: IdentityId;
   let resetter: NodeOwnerSettingsResetter;
   let ownerKeyPair: KeyPair;
   let owner: IdentityId;
@@ -81,10 +94,16 @@ describe('NodeOwnerSettingsResetter', () => {
       database,
     );
     blockListRepository = new LocalNodeBlockListRepository(database);
+    publicationRepository = new LocalNodeBlockPublicationRepository(database);
+    sourceRepository = new LocalNodeBlockSourceRepository(database);
+    exceptionsRepository = new LocalNodeBlockExceptionsRepository(database);
     resetter = new NodeOwnerSettingsResetter(
       nodeRepository,
       registrationCodeRepository,
       blockListRepository,
+      publicationRepository,
+      sourceRepository,
+      exceptionsRepository,
     );
 
     ownerKeyPair = await KeyPair.generate();
@@ -106,6 +125,33 @@ describe('NodeOwnerSettingsResetter', () => {
         .blockingIdentities([await NodeBlockListMother.identityId()])
         .build(),
     );
+    await publicationRepository.save(new NodeBlockPublication(true));
+
+    const publisherKeyPair = await KeyPair.generate();
+    const listed = await NodeBlockListMother.identityId();
+    const source = NodeBlockSource.adopt(
+      new IdentityId(publisherKeyPair.toPrimitives().publicKey),
+      new NodeBlockSourceOrigin('https://publisher.example'),
+      false,
+      new NodeBlockSourceVersionFloor(0),
+    );
+
+    publisher = source.getOwnerIdentityId();
+    source.receive(
+      new NodeBlockListMother(publisherKeyPair)
+        .withVersion(2)
+        .blockingIdentities([listed, await NodeBlockListMother.identityId()])
+        .signed(),
+      new Timestamp(1),
+    );
+    source.approve(
+      new NodeBlockListVersion(2),
+      new NodeBlockEntries([listed], []),
+    );
+    await sourceRepository.save(source);
+    await exceptionsRepository.save(
+      new NodeBlockEntries([await NodeBlockListMother.identityId()], []),
+    );
     await database.save('identities', 'someone', { name: 'kept' });
     await setImmediate();
     networkRegistry.initialize.mockClear();
@@ -124,7 +170,7 @@ describe('NodeOwnerSettingsResetter', () => {
     await fs.rm(databasePath, { force: true, recursive: true });
   });
 
-  it('should install the new owner and clear the registration mode and codes and the own block list', async () => {
+  it('should install the new owner and clear the registration mode and codes, the own block list, publication, adopted sources and exceptions', async () => {
     const cleared = await resetter.reset(newOwner);
 
     expect(cleared.map((setting) => setting.valueOf())).toEqual([
@@ -132,6 +178,9 @@ describe('NodeOwnerSettingsResetter', () => {
       'registration mode codes (now open)',
       '2 registration codes',
       'own block list version 4 (1 identity, 0 nodes)',
+      'block list publication (now off)',
+      `block source ${publisher.valueOf()} at https://publisher.example (1 applied, 1 pending)`,
+      'block exceptions (1 identity, 0 nodes)',
     ]);
     expect((await storedMetadata())?.owner).toBe(newOwner.valueOf());
     await expect(
@@ -140,6 +189,16 @@ describe('NodeOwnerSettingsResetter', () => {
     await expect(registrationCodeRepository.findAll()).resolves.toEqual([]);
     await expect(blockListRepository.findLocal()).resolves.toBeInstanceOf(
       NoNodeBlocks,
+    );
+    await expect(publicationRepository.find()).resolves.toEqual(
+      NodeBlockPublication.unpublished(),
+    );
+    await expect(sourceRepository.findAll()).resolves.toEqual([]);
+    await expect(sourceRepository.versionFloor(publisher)).resolves.toEqual(
+      new NodeBlockSourceVersionFloor(2),
+    );
+    await expect(exceptionsRepository.find()).resolves.toEqual(
+      NodeBlockEntries.none(),
     );
   });
 
@@ -172,14 +231,21 @@ describe('NodeOwnerSettingsResetter', () => {
   it('should refuse the identity that already owns the node and change nothing', async () => {
     const before = await storedMetadata();
 
-    await expect(resetter.reset(new IdentityId(owner.valueOf()))).rejects.toThrow(
-      NodeIsAlreadyOwnedByThisIdentityError,
-    );
+    await expect(
+      resetter.reset(new IdentityId(owner.valueOf())),
+    ).rejects.toThrow(NodeIsAlreadyOwnedByThisIdentityError);
 
     await expect(storedMetadata()).resolves.toEqual(before);
     await expect(registrationCodeRepository.findAll()).resolves.toHaveLength(2);
     await expect(blockListRepository.findLocal()).resolves.not.toBeInstanceOf(
       NoNodeBlocks,
+    );
+    await expect(publicationRepository.find()).resolves.toEqual(
+      new NodeBlockPublication(true),
+    );
+    await expect(sourceRepository.findAll()).resolves.toHaveLength(1);
+    await expect(exceptionsRepository.find()).resolves.not.toEqual(
+      NodeBlockEntries.none(),
     );
   });
 

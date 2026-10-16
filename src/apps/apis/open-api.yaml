@@ -264,6 +264,20 @@ paths:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1relay-configuration~1'
   /node/blocks/:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1blocks~1'
+  /node/blocks/publication/:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1blocks~1publication~1'
+  /node/blocks/published/:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1blocks~1published~1'
+  /node/block-sources/:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1block-sources~1'
+  /node/block-sources/{ownerIdentityId}:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1block-sources~1{ownerIdentityId}'
+  /node/block-sources/{ownerIdentityId}/pending:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1block-sources~1{ownerIdentityId}~1pending'
+  /node/block-sources/{ownerIdentityId}/approvals:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1block-sources~1{ownerIdentityId}~1approvals'
+  /node/block-exceptions/:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1block-exceptions~1'
   /node/diagnostics/:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1diagnostics~1'
   /node/networks/:

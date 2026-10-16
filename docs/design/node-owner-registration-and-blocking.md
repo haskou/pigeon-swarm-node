@@ -1,8 +1,8 @@
 # Node owner registration control and blocking (optional)
 
 Status: design for issue #384, decisions confirmed by the owner. Built:
-registration control (delivery step 1), local blocking (slice 2) and the host
-owner reset `yarn node:reset-owner` (slice 4). The
+registration control (delivery step 1), local blocking (slice 2), sharing
+(slice 3) and the host owner reset `yarn node:reset-owner` (slice 4). The
 price-based
 admission model stays the default, and every node stays open unless its owner
 changes that. A node owner gets two optional, local tools:
@@ -82,6 +82,11 @@ the host while the node is stopped.
   and no other identity can claim it. The command refuses, before opening the
   database, a missing or invalid identity id, and refuses the current owner.
   Networks, mailboxes, private blobs, the node id and the libp2p peer key stay.
+  So do the version floors of adopted publishers (the highest version this
+  node ever accepted from each one): they are anti-rollback state, not owner
+  settings, and they hold only public publisher ids and version numbers.
+  Clearing them would let a stale or captured old list of a publisher roll
+  blocks back once the new owner adopts it again.
   The command opens the same local database, whose lock (`level`,
   `EmbeddedLocalDatabase.ts:3`) makes it fail while the node is running.
 - **Full reset.** Delete the local database folder, `PIGEON_LOCAL_DB_PATH`
@@ -310,20 +315,38 @@ signed by the owner identity:
 
 - **Publishing.** The owner turns on publication with owner-signed
   `PUT /node/blocks/publication { "published": true }`. The node then serves
-  the stored document verbatim at public `GET /node/blocks/published`. It is
-  off by default, because a published list reveals whom this owner blocked.
+  public `GET /node/blocks/published`: the body is exactly the signed content,
+  the RFC 8785 canonical JSON of the stored document without
+  `identitySignature`, and the signature travels in the `X-Identity-Signature`
+  response header. It is off by default, because a published list reveals
+  whom this owner blocked.
 - **Adopting.** Another node's owner adds a source with owner-signed
   `PUT /node/block-sources/{ownerIdentityId} { "origin": "https://..." }`. That
-  node periodically fetches `GET {origin}/node/blocks/published` and keeps the
-  response only if:
-  - the signature verifies against the **pinned** `ownerIdentityId`;
-  - the version is higher than the last one kept, so a served old version
-    cannot roll blocks back;
-  - it fits in `NODE_BLOCK_LIST_MAX_BYTES`, enforced while streaming.
+  node periodically fetches `GET {origin}/node/blocks/published`, reading at
+  most `NODE_BLOCK_LIST_MAX_BYTES` while streaming, and judges the response in
+  this order, recording the first failure as the fetch outcome:
+  1. the header signature verifies against the **pinned** `ownerIdentityId`
+     over `"pigeon:node-block-list:v1\n"` + the raw body bytes, before any
+     byte is parsed (`invalid-signature`, also for a missing or malformed
+     header);
+  2. the bytes parse as a valid block list and are already in canonical
+     form, so the signed bytes and the kept document cannot differ
+     (`invalid-document`);
+  3. the document names the pinned identity as its owner (`wrong-signer`);
+  4. the version is higher than any this node ever accepted from that
+     publisher, even before the source was removed or the owner settings were
+     reset, so a served old version cannot roll blocks back (`not-newer`).
 
   An unreachable source or an invalid response keeps the last valid version.
-  Outbound requests reuse the private-address guard used for link previews
-  (`LinkPreviewUrlGuard.ts`).
+  Verifying first means an unauthenticated server never reaches the JSON
+  parser with bytes the pinned publisher did not sign.
+  Floors only rise and no API lowers them. Whoever holds the publisher key
+  can therefore publish a huge version and freeze that publisher on every
+  subscriber; that key could already publish any list, so subscribers that
+  stop trusting it remove the source. Only deleting the local database clears
+  the floors, and with them this rollback protection.
+  Outbound requests go through the shared public-address guard also used for
+  link previews (`src/shared/infrastructure/http/public-url/PublicUrlGuard.ts`).
 
 - **Review queue (default).** Entries a source adds are **pending**: they have
   no effect until this node's owner approves them. The owner approves all
@@ -331,7 +354,8 @@ signed by the owner identity:
   Auto-apply would let a publisher silently block this node's users or cut it
   off from its peers, so it is not the default.
 - **Auto-apply (opt-in per source).** The owner may turn on `autoApply` for a
-  source they fully trust; its added entries then take effect on fetch.
+  source they fully trust; entries added by lists fetched from then on take
+  effect on fetch. Turning it on approves nothing already pending.
 - **Removals** by a source take effect on fetch in both modes: they only lift
   blocks. An owner who wants to keep such a block adds the entry to their own
   list.
@@ -344,9 +368,10 @@ signed by the owner identity:
 - **No consensus.** Lists are never gossiped or merged into shared state. Each
   node decides whose lists to trust, one owner identity at a time.
 - **Publisher owner change.** After a rotation or reset, the publisher's new
-  documents are signed by another identity. Subscribers reject them and keep
-  the last valid version until their owner pins the new identity. A new owner
-  therefore cannot silently take over other nodes' block decisions.
+  documents are signed by another identity. Their signature does not verify
+  against the pinned identity, so subscribers record `invalid-signature` and
+  keep the last valid version until their owner pins the new identity. A new
+  owner therefore cannot silently take over other nodes' block decisions.
 - **Local owner change.** This node's stored list survives an owner change: it
   still blocks what the previous owner blocked, and only the new owner can
   replace it, with a version higher than the stored one. The current owner is

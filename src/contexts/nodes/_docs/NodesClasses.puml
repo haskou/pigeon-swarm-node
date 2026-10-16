@@ -156,6 +156,7 @@ package "nodes" {
     abstract class NodeBlocks {
       +acceptsReplacement(list: NodeBlockList): boolean
       +blocksIdentity(identityId: IdentityId): boolean
+      +toSigned(): SignedNodeBlockList | undefined
     }
 
     class NodeBlockList {
@@ -164,7 +165,20 @@ package "nodes" {
       -blockedIdentityIds: IdentityId[]
       -blockedNodePeerIds: NodePeerId[]
       -identitySignature: Signature
+      +{static} fromSigned(signed: SignedNodeBlockList): NodeBlockList
     }
+
+    class SignedNodeBlockList {
+      -content: Buffer
+      -identitySignature: Signature
+      +isSignedBy(identityId: IdentityId): boolean
+    }
+
+    note right of SignedNodeBlockList
+      Canonical JSON bytes without the signature;
+      signed as "pigeon:node-block-list:v1\n" + bytes,
+      verified before any byte is parsed.
+    end note
 
     class NoNodeBlocks
 
@@ -177,23 +191,101 @@ package "nodes" {
       +enforce(blocks: NodeBlocks, node: Node): Promise<void>
     }
 
+    class NodeBlockEntries {
+      -identityIds: IdentityId[]
+      -nodePeerIds: NodePeerId[]
+    }
+
+    class NodeBlockSource {
+      -ownerIdentityId: IdentityId
+      -origin: NodeBlockSourceOrigin
+      -autoApply: boolean
+      -list: NodeBlocks
+      -approved: NodeBlockEntries
+      -lastFetch: NodeBlockSourceFetch
+      +receive(signed: SignedNodeBlockList, at: Timestamp): NodeBlockSourceFetchOutcome
+      +fetchFailed(outcome: NodeBlockSourceFetchOutcome, at: Timestamp): void
+      +approveAll(version: NodeBlockListVersion): void
+      +approve(version: NodeBlockListVersion, entries: NodeBlockEntries): void
+      +pending(): NodeBlockEntries
+      +applied(): NodeBlockEntries
+    }
+
+    note right of NodeBlockSource
+      Pinned to the publisher's identity.
+      Keeps only a newer list signed by it;
+      anything else keeps the last valid one.
+      Added entries stay pending unless autoApply;
+      removals apply on fetch.
+    end note
+
+    abstract class NodeBlockSourceFetch
+    class NoNodeBlockSourceFetch
+    class RecordedNodeBlockSourceFetch {
+      -at: Timestamp
+      -outcome: NodeBlockSourceFetchOutcome
+    }
+
+    class NodeBlockPublication {
+      -published: boolean
+    }
+
+    class NodeBlockSourceFetchLimits {
+      -interval: Duration
+      -maxBytes: number
+      -timeout: Duration
+    }
+
+    class NodeBlockSourceRepository <abstract> {
+      +findAll(): Promise<NodeBlockSource[]>
+      +find(ownerIdentityId: IdentityId): Promise<NodeBlockSource>
+      +exists(ownerIdentityId: IdentityId): Promise<boolean>
+      +save(source: NodeBlockSource): Promise<void>
+      +delete(ownerIdentityId: IdentityId): Promise<void>
+    }
+
+    class NodeBlockExceptionsRepository <abstract> {
+      +find(): Promise<NodeBlockEntries>
+      +save(exceptions: NodeBlockEntries): Promise<void>
+    }
+
+    class NodeBlockPublicationRepository <abstract> {
+      +find(): Promise<NodeBlockPublication>
+      +save(publication: NodeBlockPublication): Promise<void>
+    }
+
+    class NodeBlockListDownloader <abstract> {
+      +download(origin: NodeBlockSourceOrigin): Promise<SignedNodeBlockList>
+    }
+
     class NodeBlockPolicy {
       +load(): Promise<void>
-      +replace(blocks: NodeBlocks, node: Node): Promise<void>
+      +change<T>(mutation: () => Promise<T>): Promise<T>
       +ownerChanged(node: Node): Promise<void>
       +isIdentityBlocked(identityId: IdentityId): Promise<boolean>
     }
 
     note right of NodeBlockPolicy
-      Caches the owner's list in memory.
-      An unclaimed node blocks nobody;
-      the current owner is never blocked.
+      Caches the effective set in memory:
+      own list plus each source's applied entries
+      minus local exceptions. An unclaimed node
+      blocks nobody; the current owner is never blocked.
     end note
 
     NodeBlockList --|> NodeBlocks
     NoNodeBlocks --|> NodeBlocks
+    NodeBlockList ..> SignedNodeBlockList
+    NodeBlockSource ..> SignedNodeBlockList
     NodeBlockList --> NodePeerId
+    NoNodeBlockSourceFetch --|> NodeBlockSourceFetch
+    RecordedNodeBlockSourceFetch --|> NodeBlockSourceFetch
+    NodeBlockSource --> NodeBlocks
+    NodeBlockSource --> NodeBlockEntries
+    NodeBlockSource --> NodeBlockSourceFetch
+    NodeBlockSourceRepository o--> NodeBlockSource
     NodeBlockPolicy --> NodeBlockListRepository
+    NodeBlockPolicy --> NodeBlockSourceRepository
+    NodeBlockPolicy --> NodeBlockExceptionsRepository
     NodeBlockPolicy --> NodeBlockEnforcer
   }
 
@@ -347,6 +439,70 @@ package "nodes" {
     NodeBlockListStorer --> NodeBlockListRepository
     NodeBlockListStorer --> NodeBlockPolicy
     NodeBlockListFinder --> NodeBlockListRepository
+
+    class NodeBlockSourceAdopter {
+      +adopt(message: NodeBlockSourceAdopterMessage): Promise<NodeBlockSource>
+    }
+
+    class NodeBlockSourceRemover {
+      +remove(message: NodeBlockSourceRemoverMessage): Promise<void>
+    }
+
+    class NodeBlockSourceEntriesApprover {
+      +approve(message: NodeBlockSourceEntriesApproverMessage): Promise<NodeBlockSource>
+    }
+
+    class NodeBlockSourcesRefresher {
+      +refresh(now: Timestamp): Promise<void>
+    }
+
+    class NodeBlockSourcesFinder {
+      +find(): Promise<NodeBlockSource[]>
+    }
+
+    class NodeBlockSourceFinder {
+      +find(message: NodeBlockSourceFinderMessage): Promise<NodeBlockSource>
+    }
+
+    class NodeBlockExceptionsUpdater {
+      +update(message: NodeBlockExceptionsUpdaterMessage): Promise<NodeBlockEntries>
+    }
+
+    class NodeBlockExceptionsFinder {
+      +find(): Promise<NodeBlockEntries>
+    }
+
+    class NodeBlockListPublicationUpdater {
+      +update(message: NodeBlockListPublicationUpdaterMessage): Promise<NodeBlockPublication>
+    }
+
+    class NodeBlockListPublicationFinder {
+      +find(): Promise<NodeBlockPublication>
+    }
+
+    class PublishedNodeBlockListFinder {
+      +find(): Promise<NodeBlocks>
+    }
+
+    NodeBlockSourceAdopter --> NodeBlockSourceRepository
+    NodeBlockSourceAdopter --> NodeBlockPolicy
+    NodeBlockSourceRemover --> NodeBlockSourceRepository
+    NodeBlockSourceRemover --> NodeBlockPolicy
+    NodeBlockSourceEntriesApprover --> NodeBlockSourceRepository
+    NodeBlockSourceEntriesApprover --> NodeBlockPolicy
+    NodeBlockSourcesRefresher --> NodeBlockSourceRepository
+    NodeBlockSourcesRefresher --> NodeBlockListDownloader
+    NodeBlockSourcesRefresher --> NodeBlockSourceFetchLimits
+    NodeBlockSourcesRefresher --> NodeBlockPolicy
+    NodeBlockSourcesFinder --> NodeBlockSourceRepository
+    NodeBlockSourceFinder --> NodeBlockSourceRepository
+    NodeBlockExceptionsUpdater --> NodeBlockExceptionsRepository
+    NodeBlockExceptionsUpdater --> NodeBlockPolicy
+    NodeBlockExceptionsFinder --> NodeBlockExceptionsRepository
+    NodeBlockListPublicationUpdater --> NodeBlockPublicationRepository
+    NodeBlockListPublicationFinder --> NodeBlockPublicationRepository
+    PublishedNodeBlockListFinder --> NodeBlockPublicationRepository
+    PublishedNodeBlockListFinder --> NodeBlockListRepository
   }
 
   package "infrastructure" {
@@ -397,7 +553,16 @@ package "nodes" {
     InMemoryNodeNetworkSynchronizationMonitor ..|> NodeNetworkSynchronizationMonitor
     CommunityRepositoryNodeCommunityStateDigester ..|> NodeCommunityStateDigester
     class LocalNodeBlockListRepository
+    class LocalNodeBlockSourceRepository
+    class LocalNodeBlockExceptionsRepository
+    class LocalNodeBlockPublicationRepository
+    class HttpNodeBlockListDownloader
     class RuntimeNodeBlockEnforcer
+
+    note right of HttpNodeBlockListDownloader
+      Public HTTPS only, through PublicHttpGetter:
+      no redirects, streamed byte limit, one deadline.
+    end note
 
     note right of RuntimeNodeBlockEnforcer
       Closes blocked identities' sockets and
@@ -405,6 +570,10 @@ package "nodes" {
     end note
 
     LocalNodeBlockListRepository ..|> NodeBlockListRepository
+    LocalNodeBlockSourceRepository ..|> NodeBlockSourceRepository
+    LocalNodeBlockExceptionsRepository ..|> NodeBlockExceptionsRepository
+    LocalNodeBlockPublicationRepository ..|> NodeBlockPublicationRepository
+    HttpNodeBlockListDownloader ..|> NodeBlockListDownloader
     RuntimeNodeBlockEnforcer ..|> NodeBlockEnforcer
   }
 }

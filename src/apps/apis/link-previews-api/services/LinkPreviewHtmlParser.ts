@@ -1,5 +1,6 @@
+import PublicUrlGuard from '@app/shared/infrastructure/http/public-url/PublicUrlGuard';
+
 import { LinkPreviewResource } from '../resources/LinkPreviewResource';
-import { LinkPreviewUrlGuard } from './LinkPreviewUrlGuard';
 
 export class LinkPreviewHtmlParser {
   private decodeHtml(value: string): string {
@@ -33,7 +34,7 @@ export class LinkPreviewHtmlParser {
   private async safeAbsoluteImage(
     image: string | undefined,
     finalUrl: URL,
-    urlGuard: LinkPreviewUrlGuard,
+    urlGuard: PublicUrlGuard,
   ): Promise<string | undefined> {
     if (!image) {
       return undefined;
@@ -54,7 +55,7 @@ export class LinkPreviewHtmlParser {
     finalUrl: URL;
     html: string;
     originalUrl: URL;
-    urlGuard: LinkPreviewUrlGuard;
+    urlGuard: PublicUrlGuard;
   }): Promise<LinkPreviewResource> {
     const title =
       this.matchMeta(params.html, 'og:title') ?? this.matchTitle(params.html);

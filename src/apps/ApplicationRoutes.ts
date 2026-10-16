@@ -82,10 +82,15 @@ import { PostMailboxAckRoute } from '@app/apps/apis/mailboxes-api/routes/PostMai
 import { PostMailboxEnvelopeRoute } from '@app/apps/apis/mailboxes-api/routes/PostMailboxEnvelopeRoute';
 import { PostMailboxReaderRoute } from '@app/apps/apis/mailboxes-api/routes/PostMailboxReaderRoute';
 import { PutMailboxRoute } from '@app/apps/apis/mailboxes-api/routes/PutMailboxRoute';
+import { DeleteNodeBlockSourceRoute } from '@app/apps/apis/nodes-api/routes/DeleteNodeBlockSourceRoute';
 import { DeleteNodeDiagnosticsRoute } from '@app/apps/apis/nodes-api/routes/DeleteNodeDiagnosticsRoute';
 import { DeleteNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/DeleteNodeNetworkRoute';
 import { DeleteNodeRegistrationCodeRoute } from '@app/apps/apis/nodes-api/routes/DeleteNodeRegistrationCodeRoute';
 import { GetClientContractRoute } from '@app/apps/apis/nodes-api/routes/GetClientContractRoute';
+import { GetNodeBlockExceptionsRoute } from '@app/apps/apis/nodes-api/routes/GetNodeBlockExceptionsRoute';
+import { GetNodeBlockPublicationRoute } from '@app/apps/apis/nodes-api/routes/GetNodeBlockPublicationRoute';
+import { GetNodeBlockSourcePendingRoute } from '@app/apps/apis/nodes-api/routes/GetNodeBlockSourcePendingRoute';
+import { GetNodeBlockSourcesRoute } from '@app/apps/apis/nodes-api/routes/GetNodeBlockSourcesRoute';
 import { GetNodeBlocksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeBlocksRoute';
 import { GetNodeDiagnosticsRoute } from '@app/apps/apis/nodes-api/routes/GetNodeDiagnosticsRoute';
 import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNetworksRoute';
@@ -93,9 +98,14 @@ import { GetNodeRegistrationCodesRoute } from '@app/apps/apis/nodes-api/routes/G
 import { GetNodeRelayConfigurationRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRelayConfigurationRoute';
 import { GetNodeRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRoute';
 import { GetPeersRoute } from '@app/apps/apis/nodes-api/routes/GetPeersRoute';
+import { GetPublishedNodeBlocksRoute } from '@app/apps/apis/nodes-api/routes/GetPublishedNodeBlocksRoute';
+import { PostNodeBlockSourceApprovalRoute } from '@app/apps/apis/nodes-api/routes/PostNodeBlockSourceApprovalRoute';
 import { PostNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodeNetworkRoute';
 import { PostNodePublicNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodePublicNetworkRoute';
 import { PostNodeRegistrationCodeRoute } from '@app/apps/apis/nodes-api/routes/PostNodeRegistrationCodeRoute';
+import { PutNodeBlockExceptionsRoute } from '@app/apps/apis/nodes-api/routes/PutNodeBlockExceptionsRoute';
+import { PutNodeBlockPublicationRoute } from '@app/apps/apis/nodes-api/routes/PutNodeBlockPublicationRoute';
+import { PutNodeBlockSourceRoute } from '@app/apps/apis/nodes-api/routes/PutNodeBlockSourceRoute';
 import { PutNodeBlocksRoute } from '@app/apps/apis/nodes-api/routes/PutNodeBlocksRoute';
 import { PutNodeDiagnosticsRoute } from '@app/apps/apis/nodes-api/routes/PutNodeDiagnosticsRoute';
 import { PutNodeOwnerRoute } from '@app/apps/apis/nodes-api/routes/PutNodeOwnerRoute';
@@ -205,6 +215,16 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PutNodeRelayConfigurationRoute,
   GetNodeBlocksRoute,
   PutNodeBlocksRoute,
+  GetNodeBlockPublicationRoute,
+  PutNodeBlockPublicationRoute,
+  GetPublishedNodeBlocksRoute,
+  GetNodeBlockSourcesRoute,
+  PutNodeBlockSourceRoute,
+  DeleteNodeBlockSourceRoute,
+  GetNodeBlockSourcePendingRoute,
+  PostNodeBlockSourceApprovalRoute,
+  GetNodeBlockExceptionsRoute,
+  PutNodeBlockExceptionsRoute,
   PutNodeDiagnosticsRoute,
   GetNodeDiagnosticsRoute,
   DeleteNodeDiagnosticsRoute,

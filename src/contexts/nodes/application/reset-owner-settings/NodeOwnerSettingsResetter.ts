@@ -1,5 +1,8 @@
 import { IdentityId } from '../../../shared/domain/value-objects/IdentityId';
+import NodeBlockExceptionsRepository from '../../domain/repositories/NodeBlockExceptionsRepository';
 import NodeBlockListRepository from '../../domain/repositories/NodeBlockListRepository';
+import NodeBlockPublicationRepository from '../../domain/repositories/NodeBlockPublicationRepository';
+import NodeBlockSourceRepository from '../../domain/repositories/NodeBlockSourceRepository';
 import NodeOwnerSettingsReset from '../../domain/repositories/NodeOwnerSettingsReset';
 import NodeRegistrationCodeRepository from '../../domain/repositories/NodeRegistrationCodeRepository';
 import NodeRepository from '../../domain/repositories/NodeRepository';
@@ -17,11 +20,20 @@ export default class NodeOwnerSettingsResetter {
     private readonly nodes: NodeRepository,
     private readonly registrationCodes: NodeRegistrationCodeRepository,
     private readonly blockLists: NodeBlockListRepository,
+    private readonly blockPublication: NodeBlockPublicationRepository,
+    private readonly blockSources: NodeBlockSourceRepository,
+    private readonly blockExceptions: NodeBlockExceptionsRepository,
   ) {}
 
   /** Every owner-settings store besides the node's own owner and registration mode. */
   private resets(): NodeOwnerSettingsReset[] {
-    return [this.registrationCodes, this.blockLists];
+    return [
+      this.registrationCodes,
+      this.blockLists,
+      this.blockPublication,
+      this.blockSources,
+      this.blockExceptions,
+    ];
   }
 
   /**
