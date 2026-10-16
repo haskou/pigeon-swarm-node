@@ -1,20 +1,18 @@
+import NodeRepository from '../../domain/repositories/NodeRepository';
 import NodeBlockPolicy from '../../domain/services/NodeBlockPolicy';
-import NodeLoaderService from '../../domain/services/NodeLoaderService';
-import NodeSaverService from '../../domain/services/NodeSaverService';
 import { NodeOwnerAssignerMessage } from './messages/NodeOwnerAssignerMessage';
 
 export default class NodeOwnerAssigner {
   constructor(
-    private readonly loader: NodeLoaderService,
-    private readonly saver: NodeSaverService,
+    private readonly nodes: NodeRepository,
     private readonly blockPolicy: NodeBlockPolicy,
   ) {}
 
   public async assignOwner(message: NodeOwnerAssignerMessage): Promise<void> {
-    const node = await this.loader.loadNode();
-    node.assignOwner(message.owner, message.authenticatedIdentityId);
+    const node = await this.nodes.updateLocalNode((latest) =>
+      latest.assignOwner(message.owner, message.authenticatedIdentityId),
+    );
 
-    await this.saver.saveNode(node);
     await this.blockPolicy.ownerChanged(node);
   }
 }

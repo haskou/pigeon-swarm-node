@@ -66,6 +66,13 @@ Both tools reuse the existing node owner unchanged:
   current owner can name the next one.
 - **Unclaimed nodes.** Both tools need an owner and use the strict owner check
   (`assertOwnerCanManageNode`). An unclaimed node is open and blocks nobody.
+- **Concurrent owner writes.** Every change to `node_metadata` (owner,
+  registration mode, relay configuration, networks, owner reset) goes through
+  `NodeRepository.updateLocalNode` (or `updateStoppedLocalNode` for host
+  commands). It loads the latest node, applies the change and saves it inside
+  one section per local database (`EmbeddedLocalDatabase.exclusively`), so two
+  concurrent writes never revert each other. Generating the metadata of a new
+  node runs in the same section, so concurrent first loads keep one node id.
 
 ### Owner loss and reset
 
@@ -185,8 +192,13 @@ https://<ui-origin>/register#node=<encodeURIComponent(node endpoint)>&code=<code
   then the publish limiter and the network admission limiter. Refused attempts
   therefore never consume the shared limits honest users depend on.
 - A code use is reserved atomically before publishing and released if
-  publishing fails, so a failed proof never burns a use and two concurrent
-  requests cannot both spend the last one.
+  publishing fails, so a failed proof never burns a use. Reserve and release
+  run in one section per local database (`EmbeddedLocalDatabase.exclusively`),
+  so concurrent requests on any number of repository handles cannot spend more
+  than `maxUses`.
+- Requests that create the same identity run one after the other on the node
+  (`IdentityCreationQueue`): the first creates it and spends one use, the next
+  ones find the identity already stored and spend none.
 - Refusal: `403` with new code `403011`, message "Identity creation on this
   node is closed" or "needs a valid registration code". One code for missing,
   unknown, expired and used-up codes, so a caller learns nothing about which

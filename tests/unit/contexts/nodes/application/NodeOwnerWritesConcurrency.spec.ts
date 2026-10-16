@@ -1,14 +1,12 @@
-import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNetworkAdder';
 import { NodeNetworkAdderMessage } from '@app/contexts/nodes/application/add-network/messages/NodeNetworkAdderMessage';
-import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
+import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNetworkAdder';
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
-import NodeRegistrationModeChanger from '@app/contexts/nodes/application/change-registration-mode/NodeRegistrationModeChanger';
+import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
 import { NodeRegistrationModeChangerMessage } from '@app/contexts/nodes/application/change-registration-mode/messages/NodeRegistrationModeChangerMessage';
-import NodeRelayConfigurationUpdater from '@app/contexts/nodes/application/update-relay-configuration/NodeRelayConfigurationUpdater';
+import NodeRegistrationModeChanger from '@app/contexts/nodes/application/change-registration-mode/NodeRegistrationModeChanger';
 import { NodeRelayConfigurationUpdaterMessage } from '@app/contexts/nodes/application/update-relay-configuration/messages/NodeRelayConfigurationUpdaterMessage';
+import NodeRelayConfigurationUpdater from '@app/contexts/nodes/application/update-relay-configuration/NodeRelayConfigurationUpdater';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
-import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
-import NodeSaverService from '@app/contexts/nodes/domain/services/NodeSaverService';
 import LocalNodeMetadataRepository from '@app/contexts/nodes/infrastructure/local-db/LocalNodeMetadataRepository';
 import LocalNodeMetadataMapper from '@app/contexts/nodes/infrastructure/local-db/mappers/LocalNodeMetadataMapper';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -81,13 +79,11 @@ describe('Concurrent node owner writes', () => {
 
     await Promise.all([
       new NodeRegistrationModeChanger(
-        new NodeLoaderService(modeRepository),
-        new NodeSaverService(modeRepository),
+        modeRepository,
         mock<LocalDomainEventPublisher>(),
       ).change(new NodeRegistrationModeChangerMessage('codes')),
       new NodeRelayConfigurationUpdater(
-        new NodeLoaderService(relayRepository),
-        new NodeSaverService(relayRepository),
+        relayRepository,
         mock<DomainEventPublisher>(),
       ).update(
         new NodeRelayConfigurationUpdaterMessage({
@@ -95,13 +91,11 @@ describe('Concurrent node owner writes', () => {
         }),
       ),
       new NodeOwnerAssigner(
-        new NodeLoaderService(ownerRepository),
-        new NodeSaverService(ownerRepository),
+        ownerRepository,
         mock<NodeBlockPolicy>(),
       ).assignOwner(new NodeOwnerAssignerMessage(owner, owner)),
       new NodeNetworkAdder(
-        new NodeLoaderService(networkRepository),
-        new NodeSaverService(networkRepository),
+        networkRepository,
         mock<DomainEventPublisher>(),
       ).addNetwork(
         new NodeNetworkAdderMessage(networkId.valueOf(), 'concurrent'),
@@ -126,8 +120,6 @@ describe('Concurrent node owner writes', () => {
     );
 
     expect(new Set(ids).size).toBe(1);
-    expect(
-      (await freshRepository().loadLocalNodeId()).valueOf(),
-    ).toBe(ids[0]);
+    expect((await freshRepository().loadLocalNodeId()).valueOf()).toBe(ids[0]);
   });
 });

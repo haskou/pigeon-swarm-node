@@ -1,25 +1,22 @@
 import { LocalDomainEventPublisher } from '@app/shared/infrastructure/messageBus/LocalDomainEventPublisher';
 
 import { Node } from '../../domain/Node';
-import NodeLoaderService from '../../domain/services/NodeLoaderService';
-import NodeSaverService from '../../domain/services/NodeSaverService';
+import NodeRepository from '../../domain/repositories/NodeRepository';
 import { NodeRegistrationModeChangerMessage } from './messages/NodeRegistrationModeChangerMessage';
 
 export default class NodeRegistrationModeChanger {
   constructor(
-    private readonly loader: NodeLoaderService,
-    private readonly saver: NodeSaverService,
+    private readonly nodes: NodeRepository,
     private readonly eventPublisher: LocalDomainEventPublisher,
   ) {}
 
   public async change(
     message: NodeRegistrationModeChangerMessage,
   ): Promise<Node> {
-    const node = await this.loader.loadNode();
+    const node = await this.nodes.updateLocalNode((latest) =>
+      latest.changeRegistrationMode(message.registrationMode),
+    );
 
-    node.changeRegistrationMode(message.registrationMode);
-
-    await this.saver.saveNode(node);
     // The mode is local node configuration: never gossiped nor pushed to clients.
     await this.eventPublisher.publishLocally(node.pullDomainEvents());
 

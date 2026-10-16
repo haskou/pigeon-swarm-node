@@ -35,6 +35,7 @@ describe('LocalNodeMetadataRepository', () => {
 
   beforeEach(() => {
     database = mock<EmbeddedLocalDatabase>();
+    database.exclusively.mockImplementation(async (_scope, action) => action());
     networkRegistry = mock<IPFSNetworkRegistry>();
     repository = new LocalNodeMetadataRepository(
       database,
@@ -42,6 +43,15 @@ describe('LocalNodeMetadataRepository', () => {
       new LocalNodeMetadataMapper(),
     );
   });
+
+  /** Stores `node`, then saves it again through an update that changes nothing. */
+  const resave = async (node: Node): Promise<Node> => {
+    database.findOne.mockResolvedValueOnce(
+      new LocalNodeMetadataMapper().toDocument(node),
+    );
+
+    return repository.updateLocalNode(() => undefined);
+  };
 
   const createNetworkMock = (mother: NetworkMother): IPFSNetwork => {
     const network = mother.build();
@@ -191,7 +201,54 @@ describe('LocalNodeMetadataRepository', () => {
     });
   });
 
-  describe('saveLocalNode', () => {
+  describe('updateLocalNode', () => {
+    it('should apply the change to the stored node and save it inside the node metadata section', async () => {
+      const owner = new IdentityMother().id;
+
+      database.findOne.mockResolvedValueOnce({
+        _id: 'local',
+        networks: {},
+        nodeId: canonicalNodeId,
+        registrationMode: 'open',
+        relayConfiguration: defaultRelayConfiguration,
+      });
+      networkRegistry.getAll.mockReturnValue([]);
+
+      const node = await repository.updateLocalNode((latest) =>
+        latest.assignOwner(owner, owner),
+      );
+
+      expect(node.toPrimitives().owner).toBe(owner.valueOf());
+      expect(database.exclusively).toHaveBeenCalledWith(
+        'node_metadata',
+        expect.any(Function),
+      );
+      expect(database.save).toHaveBeenCalledWith(
+        'node_metadata',
+        'local',
+        expect.objectContaining({ owner: owner.valueOf() }),
+      );
+    });
+
+    it('should save nothing when the change fails', async () => {
+      const expectedError = new Error('rejected');
+
+      database.findOne.mockResolvedValueOnce({
+        _id: 'local',
+        networks: {},
+        nodeId: canonicalNodeId,
+        registrationMode: 'open',
+        relayConfiguration: defaultRelayConfiguration,
+      });
+
+      await expect(
+        repository.updateLocalNode(() => {
+          throw expectedError;
+        }),
+      ).rejects.toThrow(expectedError);
+      expect(database.save).not.toHaveBeenCalled();
+    });
+
     it('should persist metadata and register missing networks in background', async () => {
       const desiredPrivateNetworkMother = new NetworkMother()
         .withId(privateNetworkId)
@@ -211,7 +268,7 @@ describe('LocalNodeMetadataRepository', () => {
 
       networkRegistry.getAll.mockReturnValue([]);
 
-      await repository.saveLocalNode(node);
+      await resave(node);
 
       expect(database.save).toHaveBeenCalledWith(
         'node_metadata',
@@ -255,7 +312,7 @@ describe('LocalNodeMetadataRepository', () => {
       networkRegistry.getAll.mockReturnValue([]);
       networkRegistry.register.mockReturnValue(delayedRegistration.promise);
 
-      await expect(repository.saveLocalNode(node)).resolves.toBeUndefined();
+      await expect(resave(node)).resolves.toBeInstanceOf(Node);
       expect(database.save).toHaveBeenCalled();
       expect(networkRegistry.register).toHaveBeenCalledTimes(1);
 
@@ -304,8 +361,8 @@ describe('LocalNodeMetadataRepository', () => {
       networkRegistry.initialize.mockReturnValue(delayedInitialization.promise);
       networkRegistry.getAll.mockReturnValue([]);
 
-      await repository.saveLocalNode(firstNode);
-      await repository.saveLocalNode(latestNode);
+      await resave(firstNode);
+      await resave(latestNode);
 
       delayedInitialization.resolve(undefined);
       await flushPromises();
@@ -336,7 +393,7 @@ describe('LocalNodeMetadataRepository', () => {
       );
       networkRegistry.getAll.mockReturnValue([obsoleteNetwork]);
 
-      await repository.saveLocalNode(node);
+      await resave(node);
 
       await flushPromises();
       expect(networkRegistry.removeNetwork).toHaveBeenCalledWith(
@@ -369,7 +426,7 @@ describe('LocalNodeMetadataRepository', () => {
         createNetworkMock(currentNetworkMother),
       ]);
 
-      await repository.saveLocalNode(node);
+      await resave(node);
 
       await flushPromises();
       expect(networkRegistry.removeNetwork).toHaveBeenCalledWith(
@@ -400,7 +457,7 @@ describe('LocalNodeMetadataRepository', () => {
         createNetworkMock(networkMother),
       ]);
 
-      await repository.saveLocalNode(node);
+      await resave(node);
 
       await flushPromises();
       expect(networkRegistry.removeNetwork).not.toHaveBeenCalled();
@@ -433,7 +490,7 @@ describe('LocalNodeMetadataRepository', () => {
       networkRegistry.configureRelaySettings.mockReturnValue(true);
       networkRegistry.getAll.mockReturnValue([createNetworkMock(networkMother)]);
 
-      await repository.saveLocalNode(node);
+      await resave(node);
       await flushPromises();
 
       expect(networkRegistry.removeNetwork).toHaveBeenCalledWith(
