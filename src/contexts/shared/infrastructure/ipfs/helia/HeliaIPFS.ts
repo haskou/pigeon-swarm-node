@@ -876,9 +876,7 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
       childCids = await heliaRuntimeAdapter.decodeDagPbLinks(block);
     } catch {
-      Kernel.logger.debug?.(
-        `Skipped IPFS DAG traversal for block deletion: ${cidKey}`,
-      );
+      Kernel.logger.debug?.('Skipped IPFS DAG traversal for block deletion');
 
       return [];
     }
