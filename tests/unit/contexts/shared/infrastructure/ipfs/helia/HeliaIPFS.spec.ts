@@ -65,7 +65,9 @@ describe('HeliaIPFS', () => {
       }),
     );
     await new Promise((resolve) => setImmediate(resolve));
-    expect(log).toHaveBeenCalledWith('IPFS pubsub handler failed: SyntaxError');
+    expect(log).toHaveBeenCalledWith(
+      'IPFS pubsub handler failed: error=SyntaxError',
+    );
     expect(JSON.stringify(log.mock.calls)).not.toContain('PRIVATE-');
     listener(
       new CustomEvent('message', {

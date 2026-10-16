@@ -1,3 +1,4 @@
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import Kernel from '@haskou/ddd-kernel';
 
 import { Libp2pPubSubNode } from './Libp2pPubSubNode';
@@ -103,9 +104,7 @@ export class PublicRelayPeerAnnouncer {
         return;
       } catch (error: unknown) {
         this.debug(
-          `Public relay peer dial failed peerId="${announcement.peerId}" address="${address}" error="${String(
-            error,
-          )}"`,
+          `Public relay peer dial failed peerId="${announcement.peerId}" address="${address}" error=${errorClassName(error)}`,
         );
       }
     }
@@ -145,7 +144,9 @@ export class PublicRelayPeerAnnouncer {
     await node.services.pubsub.subscribe(PublicRelayPeerAnnouncer.topic);
     const listener = (event: PubSubEvent): void => {
       this.handleEvent(node, event).catch((error: unknown) => {
-        this.debug(`Public relay peer announcement failed: ${String(error)}`);
+        this.debug(
+          `Public relay peer announcement failed: error=${errorClassName(error)}`,
+        );
       });
     };
 
@@ -160,7 +161,7 @@ export class PublicRelayPeerAnnouncer {
     this.interval = setInterval(() => {
       this.publish(node).catch((error: unknown) => {
         this.debug(
-          `Public relay peer announcement publish failed: ${String(error)}`,
+          `Public relay peer announcement publish failed: error=${errorClassName(error)}`,
         );
       });
     }, PublicRelayPeerAnnouncer.intervalMs);

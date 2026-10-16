@@ -6,6 +6,7 @@ import { Libp2pPrivateKeyLike } from '@app/contexts/shared/infrastructure/ipfs/n
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { PublicIPFS } from '@app/contexts/shared/infrastructure/ipfs/networks/PublicIPFS';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import Kernel from '@haskou/ddd-kernel';
 import { PrivateNetworkRelayRecord } from '@haskou/pigeon-swarm-crypto';
 import * as fs from 'fs/promises';
@@ -393,8 +394,8 @@ export default class PrivateNetworkRelayRecordDirectory {
     multiaddr: string,
     error: unknown,
   ): void {
-    const message = String(error);
-    const warningKey = `${network.getId()}:${relayRecord.peerId}:${multiaddr}:${message}`;
+    const errorClass = errorClassName(error);
+    const warningKey = `${network.getId()}:${relayRecord.peerId}:${multiaddr}:${errorClass}`;
 
     if (this.dialFailureWarningKeys.has(warningKey)) {
       return;
@@ -405,7 +406,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       `Private IPFS relay record dial failed: networkId=${network.getId()}` +
         ` peerId=${relayRecord.peerId}` +
         ` multiaddr="${multiaddr}"` +
-        ` error=${message}`,
+        ` error=${errorClass}`,
     );
   }
 
@@ -790,7 +791,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     } catch (error) {
       Kernel.logger.debug(
         `Private IPFS relay record cache save skipped: networkId=${network.getId()}` +
-          ` error=${String(error)}`,
+          ` error=${errorClassName(error)}`,
       );
     }
   }
@@ -868,7 +869,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     } catch (error) {
       Kernel.logger.debug(
         `Private IPFS relay cached record discovery skipped: networkId=${network.getId()}` +
-          ` error=${String(error)}`,
+          ` error=${errorClassName(error)}`,
       );
 
       return false;
@@ -972,7 +973,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     } catch (error) {
       Kernel.logger.debug(
         `Private IPFS relay pubsub record publication skipped: networkId=${network.getId()}` +
-          ` error=${String(error)}`,
+          ` error=${errorClassName(error)}`,
       );
 
       return false;
@@ -1163,7 +1164,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     } catch (error: unknown) {
       Kernel.logger.debug(
         `Private IPFS relay record provider dial skipped: networkId=${network.getId()}` +
-          ` multiaddr="${multiaddr}" error=${String(error)}`,
+          ` multiaddr="${multiaddr}" error=${errorClassName(error)}`,
       );
     } finally {
       clearTimeout(providerDial.timeout);
@@ -1508,7 +1509,7 @@ export default class PrivateNetworkRelayRecordDirectory {
 
         Kernel.logger.warn(
           `Private IPFS relay record publication crashed: networkId=${networkId}` +
-            ` error=${String(error)}`,
+            ` error=${errorClassName(error)}`,
         );
         this.schedulePublicationRetry(
           network,
@@ -1678,7 +1679,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     } catch (error) {
       Kernel.logger.warn(
         `Private IPFS relay record publication failed: networkId=${network.getId()}` +
-          ` error=${String(error)}`,
+          ` error=${errorClassName(error)}`,
       );
 
       return false;
@@ -1744,7 +1745,7 @@ export default class PrivateNetworkRelayRecordDirectory {
     this.discover(network, sharedPrivateKey).catch((error: unknown) => {
       Kernel.logger.debug(
         `Private IPFS relay record initial discovery crashed: networkId=${networkId}` +
-          ` error=${String(error)}`,
+          ` error=${errorClassName(error)}`,
       );
     });
     this.scheduleInitialDiscoveryRetry(network, sharedPrivateKey, generation);
@@ -1760,7 +1761,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       this.discover(network, sharedPrivateKey).catch((error: unknown) => {
         Kernel.logger.debug(
           `Private IPFS relay record discovery refresh crashed: networkId=${networkId}` +
-            ` error=${String(error)}`,
+            ` error=${errorClassName(error)}`,
         );
       });
     }, this.settings.getDiscoveryIntervalMs());
@@ -1823,7 +1824,7 @@ export default class PrivateNetworkRelayRecordDirectory {
         .catch((error: unknown) => {
           Kernel.logger.debug(
             `Private IPFS relay record initial discovery retry crashed:` +
-              ` networkId=${networkId} error=${String(error)}`,
+              ` networkId=${networkId} error=${errorClassName(error)}`,
           );
         })
         .finally(() => {

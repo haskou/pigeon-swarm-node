@@ -1,3 +1,4 @@
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import Kernel from '@haskou/ddd-kernel';
 
 import { HeliaInstance, ParsedCidLike } from './adapters/HeliaRuntimeAdapter';
@@ -23,14 +24,6 @@ export default class HeliaPinningStrategy {
 
   private cacheKey(cid: ParsedCidLike): string {
     return cid.toString();
-  }
-
-  /**
-   * Error messages from Helia can embed content identifiers, so only the
-   * error class name reaches the log.
-   */
-  private errorName(error: unknown): string {
-    return error instanceof Error ? error.name : typeof error;
   }
 
   private async ensurePinnedNow(
@@ -59,7 +52,7 @@ export default class HeliaPinningStrategy {
       this.debug('Pinned IPFS content for local availability');
     } catch (error) {
       this.debug(
-        `Skipped IPFS content pinning for local availability: error=${this.errorName(error)}`,
+        `Skipped IPFS content pinning for local availability: error=${errorClassName(error)}`,
       );
 
       throw error;
@@ -113,7 +106,7 @@ export default class HeliaPinningStrategy {
       this.debug('Unpinned IPFS content before local removal');
     } catch (error) {
       this.debug(
-        `Skipped IPFS content unpinning before local removal: error=${this.errorName(error)}`,
+        `Skipped IPFS content unpinning before local removal: error=${errorClassName(error)}`,
       );
     }
   }

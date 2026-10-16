@@ -1,6 +1,7 @@
 import CallEventAttestor from '@app/contexts/calls/application/attest-event/CallEventAttestor';
 import { CallStartedEvent } from '@app/contexts/calls/domain/events/CallStartedEvent';
 import PushNotificationDispatcher from '@app/contexts/push-notifications/application/send/PushNotificationDispatcher';
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
 import Kernel from '@haskou/ddd-kernel';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
@@ -28,7 +29,7 @@ export default class SendPushNotificationWhenCallStarted extends SendPushNotific
       .then((attested) => attested && super.handler(attested))
       .catch((error) => {
         Kernel.logger.warn?.(
-          `Call start push failed: callId=${event.aggregateId} error=${String(error)}`,
+          `Call start push failed: error=${errorClassName(error)}`,
         );
       });
 

@@ -4,6 +4,7 @@ import InMemoryCallSignalDeliveryRepository from '@app/contexts/calls/infrastruc
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { Runtime } from '@app/shared/infrastructure/lifecycle/Runtime';
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import Kernel from '@haskou/ddd-kernel';
 import { Timestamp } from '@haskou/value-objects';
 
@@ -67,7 +68,7 @@ export default class CallSignalDeliveryMaintenanceRuntime implements Runtime {
     } catch (error: unknown) {
       minimumDelayMs = CallSignalDeliveryMaintenanceRuntime.FAILURE_BACKOFF_MS;
       Kernel.logger.warn(
-        `Call signal delivery maintenance failed: ${String(error)}`,
+        `Call signal delivery maintenance failed: error=${errorClassName(error)}`,
       );
     } finally {
       this.maintenanceRunning = false;

@@ -1,4 +1,5 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import Kernel from '@haskou/ddd-kernel';
 import { Constructor } from '@haskou/ddd-kernel/domain';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
@@ -85,12 +86,18 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
     );
   }
 
-  private recordHandlerError(queueName: string, error: unknown): void {
-    const message = error instanceof Error ? error.message : String(error);
-
-    Kernel.logger.error(message);
+  private recordHandlerError(
+    queueName: string,
+    bindingKey: string,
+    error: unknown,
+  ): void {
+    Kernel.logger.error(
+      `Dropped in-memory event: event=${bindingKey} consumer=${queueName} error=${errorClassName(error)}`,
+    );
     this.ensureQueue(queueName);
-    MemoryMessageBusAdapter.errorMemoryMessages[queueName].push(message);
+    MemoryMessageBusAdapter.errorMemoryMessages[queueName].push(
+      error instanceof Error ? error.message : String(error),
+    );
   }
 
   private async handleQueuedMessage(
@@ -109,7 +116,7 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
     try {
       await handler(this.toDomainEvent(message, DomainEventInstance));
     } catch (error: unknown) {
-      this.recordHandlerError(queueName, error);
+      this.recordHandlerError(queueName, bindingKey, error);
     }
   }
 

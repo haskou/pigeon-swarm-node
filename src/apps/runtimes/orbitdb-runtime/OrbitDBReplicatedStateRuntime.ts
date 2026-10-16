@@ -4,6 +4,7 @@ import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networ
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { isOrbitDBTransientBlockError } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBTransientBlockError';
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import Kernel from '@haskou/ddd-kernel';
 
 import { RegisteredOrbitDBNetwork } from './RegisteredOrbitDBNetwork';
@@ -41,7 +42,7 @@ export default class OrbitDBReplicatedStateRuntime {
 
       Kernel.logger.warn(
         `OrbitDB replicated state registration degraded: networkId=${networkId}` +
-          ` error=${String(error)}` +
+          ` error=${errorClassName(error)}` +
           ' recovery=reconcile-on-peer-head-exchange',
       );
     }
@@ -99,7 +100,7 @@ export default class OrbitDBReplicatedStateRuntime {
         await this.registerNetwork(network);
       } catch (error: unknown) {
         Kernel.logger.error(
-          `OrbitDB replicated state network registration failed: networkId=${network.getId()} error=${String(error)}`,
+          `OrbitDB replicated state network registration failed: networkId=${network.getId()} error=${errorClassName(error)}`,
         );
       }
     });

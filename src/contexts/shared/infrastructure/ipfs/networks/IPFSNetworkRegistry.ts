@@ -1,6 +1,7 @@
 import type { RelayRuntimeSettingsInput } from '@app/shared/infrastructure/network/relay/RelayRuntimeSettingsInput';
 
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import PrivateNetworkRelayRecordDirectory, {
   PrivateRelayListenOptions,
 } from '@app/shared/infrastructure/network/relay/PrivateNetworkRelayRecordDirectory';
@@ -413,7 +414,7 @@ export default class IPFSNetworkRegistry {
       for (const listener of state.relaySettingsListeners) {
         Promise.resolve(listener(relaySettings)).catch((error: unknown) => {
           Kernel.logger.warn(
-            `Relay settings listener failed: ${String(error)}`,
+            `Relay settings listener failed: error=${errorClassName(error)}`,
           );
         });
       }

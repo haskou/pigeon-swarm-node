@@ -1,4 +1,5 @@
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
+import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import Kernel from '@haskou/ddd-kernel';
 
 import { OrbitDBDocumentDeduplicator } from './OrbitDBDocumentDeduplicator';
@@ -243,7 +244,7 @@ export class OrbitDBHeadIndex<TDocument extends object> {
       .then(() => this.removePendingRecord(key, record))
       .catch((error) => {
         Kernel.logger.warn?.(
-          `OrbitDB head index record refresh failed: key=${key} error=${String(error)}`,
+          `OrbitDB head index record refresh failed: error=${errorClassName(error)}`,
         );
       });
 
