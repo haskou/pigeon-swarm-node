@@ -4,9 +4,11 @@ import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authoriz
 import { PrivateAuthorizationCheckpoint } from '@app/contexts/private-authorization/domain/PrivateAuthorizationCheckpoint';
 import { PrivateProtectedMlsState } from '@app/contexts/private-authorization/domain/value-objects/PrivateProtectedMlsState';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { PrivateGenesisSignature } from '@haskou/pigeon-swarm-crypto';
+import {
+  PrivateGenesisSignature,
+  StateDigest,
+} from '@haskou/pigeon-swarm-crypto';
 import { Buffer } from 'buffer';
-import { createHash } from 'crypto';
 
 interface VerifiedGenesisRecord {
   headHash: string;
@@ -22,10 +24,6 @@ interface VerifiedGenesisRecord {
 }
 
 export default class PrivateGenesisVerifier extends PrivateGenesisAuthenticator {
-  private hash(value: string | Buffer): string {
-    return createHash('sha256').update(value).digest('base64url');
-  }
-
   private parse(signedJson: string): Record<string, unknown> {
     const value = JSON.parse(signedJson) as unknown;
 
@@ -37,7 +35,7 @@ export default class PrivateGenesisVerifier extends PrivateGenesisAuthenticator 
   }
 
   private protectedStateHash(protectedMlsState: string): string {
-    return this.hash(
+    return StateDigest.ofBytes(
       new PrivateProtectedMlsState(protectedMlsState).toBuffer(),
     );
   }
@@ -94,7 +92,7 @@ export default class PrivateGenesisVerifier extends PrivateGenesisAuthenticator 
           headHash: verified.headHash,
           scopeId: verified.scopeId,
         }),
-        genesisHash: this.hash(canonical),
+        genesisHash: StateDigest.ofBytes(Buffer.from(canonical, 'utf8')),
       };
     } catch {
       throw new InvalidPrivateAuthorizationError();

@@ -1,4 +1,4 @@
-import { createHash } from 'crypto';
+import { SHA256Hash } from '@haskou/pigeon-swarm-crypto';
 import { Request } from 'express';
 
 import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';
@@ -27,7 +27,6 @@ export class SignedRequestBodyReader {
     }
 
     const { promise, reject, resolve } = Promise.withResolvers<Buffer>();
-    const hash = createHash('sha256');
     const chunks: Buffer[] = [];
     let receivedBytes = 0;
     let settled = false;
@@ -66,15 +65,18 @@ export class SignedRequestBodyReader {
         return;
       }
 
-      hash.update(chunk);
       chunks.push(chunk);
     });
     request.once('end', () =>
-      settle(() =>
-        declaredHash.isEqual(new SignedRequestBodyHash(hash.digest('hex')))
-          ? resolve(Buffer.concat(chunks, receivedBytes))
-          : reject(new InvalidSignedRequestError()),
-      ),
+      settle(() => {
+        const body = Buffer.concat(chunks, receivedBytes);
+
+        return declaredHash.isEqual(
+          new SignedRequestBodyHash(SHA256Hash.from(body).valueOf()),
+        )
+          ? resolve(body)
+          : reject(new InvalidSignedRequestError());
+      }),
     );
     request.on('error', (error: Error) => settle(() => reject(error)));
     request.once('close', () =>

@@ -1038,9 +1038,7 @@ export default class Definitions {
           args: {
             identityId: actorIdentityId,
             method: 'invite_link',
-            reference: createHash('sha256')
-              .update(`pigeon:community-invite-reference:v1\n${decoded(match)}`)
-              .digest('base64url'),
+            reference: new CommunityInviteToken(decoded(match)).toReference(),
           },
         }),
       ],

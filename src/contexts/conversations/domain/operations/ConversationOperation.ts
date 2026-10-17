@@ -243,7 +243,14 @@ export class ConversationOperation {
     return this.action.isGenesis();
   }
 
+  /**
+   * A JSON copy: the primitives are plain JSON, and `StateDigest` digests only
+   * plain objects of this realm, which `structuredClone` does not return under
+   * a sandboxed realm such as Jest's.
+   */
   public toPrimitives(): ConversationOperationPrimitives {
-    return structuredClone(this.primitives);
+    return JSON.parse(
+      JSON.stringify(this.primitives),
+    ) as ConversationOperationPrimitives;
   }
 }
