@@ -31,8 +31,16 @@ relay addresses are discovered by the production relay directory.
 | Staggered startup | A starts before B; B starts its directory with its public libp2p transport stopped | No pre-discovery pubsub delivery; restoring B's public transport allows A/B to connect |
 | New publisher | C joins only after A/B exchange traffic | All three private pairs connect without restarting A/B discovery or injecting C's private address |
 | Repeated partitions | Both C links are closed, twice | Fresh signalling and full OrbitDB documents arrive after each recovery |
-| Public outage and initiator failure | All public libp2p transports stop; the lexicographically first private peer rejects outbound directory dials; both its links close | Public peer counts remain zero, the rejected-dial counter increases, and the other peers recover both private paths using cached records |
-| Process restart | C exits completely and reopens the same test storage in a new process | Same private peer ID, different PID, full mesh and new traffic after restart |
+| Public outage and initiator failure | All public libp2p transports stop and later restart with the pubsub topics they had before, as after a real network outage; the lexicographically first private peer rejects outbound directory dials; both its links close | Public peer counts remain zero, the rejected-dial counter increases, and the other peers recover both private paths using cached records |
+| Process restart | C exits completely and reopens the same test storage in a new process on a new private port | Same private peer ID, different PID, full mesh and new traffic after restart |
+
+Stopping a libp2p node makes gossipsub forget its subscriptions, while the relay
+directory subscribes to each record topic only once per public connection. The
+harness (`RealTransportPublicNetworkSwitch`) therefore restores the topics when
+it restarts a public transport. Without that, A and B stop receiving relay
+records after the outage. After C restarts, a peer chosen to dial C keeps
+dialling C's old private address, and that pair only recovers through C's
+45-second fallback dial.
 
 Signalling uses `CallSignalSentEvent`, `PubSubTopicResolver` and
 `PubSubNetworkMessageCodec` from production. Each transmission carries a fresh

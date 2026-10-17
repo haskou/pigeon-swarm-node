@@ -28,7 +28,7 @@ describe('RealTransportPublicNetworkSwitch', () => {
 
       return Promise.resolve();
     });
-    libp2p.start.mockResolvedValue(undefined);
+    libp2p.start.mockImplementation(() => Promise.resolve());
     Reflect.set(libp2p, 'services', { pubsub });
 
     return { libp2p, pubsub };
