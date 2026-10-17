@@ -38,7 +38,6 @@ import NodeOwnerSettingsResetter from '@app/contexts/nodes/application/reset-own
 import { NodeBlockEntries } from '@app/contexts/nodes/domain/NodeBlockEntries';
 import { NodeBlockList } from '@app/contexts/nodes/domain/NodeBlockList';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
-import { NoNodeBlocks } from '@app/contexts/nodes/domain/NoNodeBlocks';
 import NodeBlockExceptionsRepository from '@app/contexts/nodes/domain/repositories/NodeBlockExceptionsRepository';
 import NodeBlockListRepository from '@app/contexts/nodes/domain/repositories/NodeBlockListRepository';
 import NodeBlockSourceRepository from '@app/contexts/nodes/domain/repositories/NodeBlockSourceRepository';
@@ -1816,13 +1815,13 @@ export default class Definitions {
       });
   }
 
-  @then('the node has no stored own block list')
-  public async theNodeHasNoStoredOwnBlockList(): Promise<void> {
+  @then('the node keeps its own block list')
+  public async theNodeKeepsItsOwnBlockList(): Promise<void> {
     expect(
       await Kernel.di
         .getService<NodeBlockListRepository>(NodeBlockListRepository)
         .findLocal(),
-    ).to.be.instanceOf(NoNodeBlocks);
+    ).to.be.instanceOf(NodeBlockList);
   }
 
   /** Runs the startup purge, then reloads blocks, as a restart does. */
