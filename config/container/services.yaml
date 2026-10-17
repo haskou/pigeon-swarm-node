@@ -629,6 +629,13 @@ services:
       - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
       - '@contexts/identities/domain/repositories/IdentityRepository'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
+  contexts/communities/application/admit-invitation/CommunityInvitationAdmitter:
+    class: >-
+      /contexts/communities/application/admit-invitation/CommunityInvitationAdmitter
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+      - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/communities/application/apply-private-control/PrivateCommunityControlApplier:
     class: >-
       /contexts/communities/application/apply-private-control/PrivateCommunityControlApplier
@@ -666,6 +673,14 @@ services:
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
       - >-
         @contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder
+  contexts/communities/application/claim-invitation/CommunityInvitationClaimer:
+    class: >-
+      /contexts/communities/application/claim-invitation/CommunityInvitationClaimer
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+      - >-
+        @contexts/communities/domain/repositories/CommunityInvitationClaimRepository
   contexts/communities/application/create-channel/CommunityTextChannelCreator:
     class: >-
       /contexts/communities/application/create-channel/CommunityTextChannelCreator
@@ -689,6 +704,15 @@ services:
     arguments:
       - '@contexts/communities/domain/repositories/CommunityRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/communities/application/create-invitation/CommunityInvitationCreator:
+    class: >-
+      /contexts/communities/application/create-invitation/CommunityInvitationCreator
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+      - '@shared/infrastructure/messageBus/DomainEventPublisher'
+      - >-
+        @contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder
   contexts/communities/application/create-role/CommunityRoleCreator:
     class: /contexts/communities/application/create-role/CommunityRoleCreator
     arguments:
@@ -763,6 +787,20 @@ services:
   contexts/communities/application/find-community/CommunityFinder:
     class: /contexts/communities/application/find-community/CommunityFinder
     arguments:
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+  contexts/communities/application/find-invitation-claims/CommunityInvitationClaimsFinder:
+    class: >-
+      /contexts/communities/application/find-invitation-claims/CommunityInvitationClaimsFinder
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+      - >-
+        @contexts/communities/domain/repositories/CommunityInvitationClaimRepository
+  contexts/communities/application/find-invitations/CommunityInvitationsFinder:
+    class: >-
+      /contexts/communities/application/find-invitations/CommunityInvitationsFinder
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
       - '@contexts/communities/domain/repositories/CommunityRepository'
   contexts/communities/application/find-membership-requests/CommunityMembershipRequestsFinder:
     class: >-
@@ -850,6 +888,12 @@ services:
       - >-
         @contexts/communities/domain/repositories/CommunityChannelMessagePinRepository
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/communities/application/preview-invitation/CommunityInvitationPreviewer:
+    class: >-
+      /contexts/communities/application/preview-invitation/CommunityInvitationPreviewer
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
   contexts/communities/application/publish-mls-record/MLSRecordPublisher:
     class: /contexts/communities/application/publish-mls-record/MLSRecordPublisher
     arguments:
@@ -898,6 +942,15 @@ services:
       - >-
         @contexts/communities/domain/repositories/CommunityMembershipRequestRepository
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/communities/application/revoke-invitation/CommunityInvitationRevoker:
+    class: >-
+      /contexts/communities/application/revoke-invitation/CommunityInvitationRevoker
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+      - '@shared/infrastructure/messageBus/DomainEventPublisher'
+      - >-
+        @contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder
   contexts/communities/application/search-channel-messages/CommunityChannelMessageSearchFinder:
     class: >-
       /contexts/communities/application/search-channel-messages/CommunityChannelMessageSearchFinder

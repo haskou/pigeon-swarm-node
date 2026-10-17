@@ -447,6 +447,11 @@ export class Community extends AggregateRoot {
     this.createAccessValidator().assertCanViewModerationLog(identityId);
   }
 
+  /** Claims name who asks to join: only those who may admit read them. */
+  public viewInvitationClaims(identityId: IdentityId): void {
+    this.createAccessValidator().assertCanManageMembers(identityId);
+  }
+
   /** Whether `actor` may author a moderation log entry for `action`. */
   public assertCanRecordModerationAction(
     actor: IdentityId,
