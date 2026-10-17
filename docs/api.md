@@ -211,8 +211,18 @@ unknown fields are rejected.
 `payloadDigest` is `StateDigest.of(payload)` from `@haskou/pigeon-swarm-crypto`:
 `base64url(sha256(utf8(canonicalize(payload))))` of a plain JSON object, pinned
 by `@haskou/pigeon-swarm-crypto/vectors/commitment-ids.json` (`stateDigest`). A
-payload that is not a plain object, carries a non-finite number or nests deeper
-than 64 levels has no digest and is rejected (`InvalidPublicMutationError`).
+payload that is not a plain object or carries a non-finite number has no digest
+and is rejected (`InvalidPublicMutationError`).
+
+Depth limit: the payload object itself is depth 0, and every value inside an
+object or an array is one level deeper than that object or array. A payload
+whose deepest value is at depth 64 is digested. A payload with any value at
+depth 65 or deeper has no digest and is rejected (`InvalidPublicMutationError`).
+For example, `{"a":1}` has depth 1 and `{"a":[{}]}` has depth 2. The same digest
+and limit give community and conversation operations their ids. Their `args` sit
+at depth 1 of the digested operation, so the operation limits below refuse
+`args` deeper than 63 levels (`args` itself being depth 0) before any digest is
+taken.
 
 `author.authorizationRevision` is a non-negative safe integer: the `revision` of
 the identity's device-authorization chain (`GET /identity-devices/authorization`)
@@ -3113,9 +3123,12 @@ signature only verifies if the client signed exactly that.
 exactly 2 entries. A 1:1 is immutable: it accepts its genesis and refuses every
 other operation. Calls authorize against the participants of the signed genesis.
 
-**Limits.** `args` is at most 4096 bytes of JSON. A genesis beyond it answers `409`
-with code `ConversationOperationLimitExceededError` (`Conversation operation limit
-exceeded`) and stores nothing.
+**Limits.** `args` is at most 4096 bytes of JSON and nests at most 63 levels
+below itself (the depth rule of `payloadDigest`, with `args` at depth 0; `args`
+is one level below the digested operation, which can hold depth 64). A genesis
+beyond either limit answers `409` with code
+`ConversationOperationLimitExceededError` (`Conversation operation limit
+exceeded`) and stores nothing. A replicated record beyond them is refused.
 
 **Errors.** A body whose signed `operation` (or, on community routes, `operation` /
 `moderationLog`) is missing, not an object or lacks `createdAt`, `parents` or `mutation`
@@ -3327,12 +3340,16 @@ again at that point, so concurrent conflicting changes converge on every node:
 for example a role grant by a member that a concurrent ban ordered earlier is
 skipped. The last member leaving deletes the community and nothing revives it.
 
-Limits: `args` is at most 4096 bytes of JSON and an identity signs at most 1000
-operations per community. Both are decided from the signed operation and its
-causal past, so every node agrees. A route that would exceed either answers `409`
-with code `CommunityOperationLimitExceededError` (`Community operation limit
-exceeded`) and stores nothing. An operation another author signed concurrently
-beyond that quota is skipped by the fold on every node without any error.
+Limits: `args` is at most 4096 bytes of JSON and nests at most 63 levels below
+itself (the depth rule of `payloadDigest`, with `args` at depth 0; `args` is one
+level below the digested operation, which can hold depth 64), and an identity
+signs at most 1000 operations per community. All three are decided from the
+signed operation and its causal past, so every node agrees. A route that would
+exceed any of them answers `409` with code `CommunityOperationLimitExceededError`
+(`Community operation limit exceeded`) and stores nothing. A replicated record
+beyond the argument limits is refused. An operation another author signed
+concurrently beyond that quota is skipped by the fold on every node without any
+error.
 
 | Route                                                                                                                  | action                        | `args`                                                                                    |
 | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------- |
