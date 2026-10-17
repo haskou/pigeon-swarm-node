@@ -337,6 +337,49 @@ describe(DeviceAuthorizationTransitionLog.name, () => {
     expect(disclosure.getTransitions()).toHaveLength(3);
   });
 
+  it('names the recovery authority of the identity', async () => {
+    const { genesis, log } = await retiredPhoneLog();
+
+    expect(
+      log.getRecoveryAuthority().isEqual(genesis.getRecoveryAuthority()),
+    ).toBe(true);
+  });
+
+  it('records the recovery authority of the identity as a reader', async () => {
+    const { genesis, log } = await retiredPhoneLog();
+
+    expect(log.records(genesis.getRecoveryAuthority())).toBe(true);
+  });
+
+  it('does not record another recovery authority as a reader', async () => {
+    const { log } = await retiredPhoneLog();
+    const other = await KeyPair.generate();
+
+    expect(
+      log.records(RecoveryAuthority.fromString(other.toPrimitives().publicKey)),
+    ).toBe(false);
+  });
+
+  it('records a device authorized at the head or removed after it was authorized', async () => {
+    const { laptop, log, phone } = await retiredPhoneLog();
+
+    expect(log.records(credentialOf(laptop))).toBe(true);
+    expect(log.records(credentialOf(phone))).toBe(true);
+  });
+
+  it('does not record a device in no replayed state', async () => {
+    const { log } = await retiredPhoneLog();
+    const stranger = await KeyPair.generate();
+
+    expect(log.records(credentialOf(stranger))).toBe(false);
+  });
+
+  it('does not record a device whose states a recovery discarded', async () => {
+    const { log, owner } = await recoveredLog();
+
+    expect(log.records(credentialOf(owner))).toBe(false);
+  });
+
   it('refuses a log without a replayed state', () => {
     expect(() => new DeviceAuthorizationTransitionLog([], [], [], [])).toThrow(
       InvalidDeviceAuthorizationTransitionError,

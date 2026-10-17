@@ -63,6 +63,23 @@ Feature: Device sealed secret route
     Then response code is equal to 401
     And response body should contain "401020"
 
+  Scenario: Refuse a sealed secret publish and delivery with an expired timestamp
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "sealed-secret-network"
+    And I set a client-signed identity body with name "sealed stale" and handle "sealed-stale"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given requests are signed 61 seconds ago
+    And I set a sealed secret bundle body for my device with generation 1
+    And I sign the current sealed secret bundle request
+    When I PUT the current sealed secret bundle
+    Then response code is equal to 401
+    And response body should contain "401020"
+    Given I sign the current sealed secret delivery request
+    When I GET the current sealed secret delivery
+    Then response code is equal to 401
+    And response body should contain "401020"
+
   Scenario: Hand over the sealed root when a device retires itself
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "sealed-secret-network"

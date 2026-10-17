@@ -1,4 +1,6 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import { signedRequestReplayGuard } from '@app/apps/apis/shared/SignedRequestReplayGuard';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import {
@@ -49,12 +51,22 @@ function withHeader(request: Request, header: string, value: string): Request {
 
 describe('SignedHttpRequestAuthenticator', () => {
   let blockPolicy: MockProxy<NodeBlockPolicy>;
+  let identityRepository: MockProxy<IdentityRepository>;
   let authenticator: SignedHttpRequestAuthenticator;
 
   beforeEach(() => {
     blockPolicy = mock<NodeBlockPolicy>();
     blockPolicy.isIdentityBlocked.mockResolvedValue(false);
-    authenticator = new SignedHttpRequestAuthenticator(blockPolicy);
+    identityRepository = mock<IdentityRepository>();
+    identityRepository.holds.mockResolvedValue(true);
+    authenticator = new SignedHttpRequestAuthenticator(
+      blockPolicy,
+      identityRepository,
+    );
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   it('rejects a replayed state-changing request', async () => {
@@ -104,6 +116,64 @@ describe('SignedHttpRequestAuthenticator', () => {
     await authenticator.authenticate(request);
 
     await expect(authenticator.authenticate(request)).resolves.toBeDefined();
+  });
+
+  it('records a state-changing request from an identity this node holds in the shared slots', async () => {
+    const accept = jest.spyOn(signedRequestReplayGuard, 'accept');
+    const acceptFromStranger = jest.spyOn(
+      signedRequestReplayGuard,
+      'acceptFromStranger',
+    );
+    const request = await buildSignedRequest('POST', { value: 1 });
+
+    const identityId = await authenticator.authenticate(request);
+
+    expect(identityRepository.holds).toHaveBeenCalledWith(identityId);
+    expect(accept).toHaveBeenCalledTimes(1);
+    expect(acceptFromStranger).not.toHaveBeenCalled();
+  });
+
+  it('records a state-changing request from an identity this node does not hold in the stranger share', async () => {
+    identityRepository.holds.mockResolvedValue(false);
+    const accept = jest.spyOn(signedRequestReplayGuard, 'accept');
+    const acceptFromStranger = jest.spyOn(
+      signedRequestReplayGuard,
+      'acceptFromStranger',
+    );
+
+    await authenticator.authenticate(
+      await buildSignedRequest('POST', { value: 1 }),
+    );
+
+    expect(acceptFromStranger).toHaveBeenCalledTimes(1);
+    expect(accept).not.toHaveBeenCalled();
+  });
+
+  it('refuses a stranger once strangers fill their share but still admits a held identity', async () => {
+    identityRepository.holds.mockResolvedValue(false);
+    jest
+      .spyOn(signedRequestReplayGuard, 'acceptFromStranger')
+      .mockReturnValue(false);
+
+    await expect(
+      authenticator.authenticate(
+        await buildSignedRequest('POST', { value: 1 }),
+      ),
+    ).rejects.toThrow('Invalid signed request.');
+
+    identityRepository.holds.mockResolvedValue(true);
+
+    await expect(
+      authenticator.authenticate(
+        await buildSignedRequest('POST', { value: 1 }),
+      ),
+    ).resolves.toBeDefined();
+  });
+
+  it('looks up no identity for a safe request', async () => {
+    await authenticator.authenticate(await buildSignedRequest('GET', {}));
+
+    expect(identityRepository.holds).not.toHaveBeenCalled();
   });
 
   it('refuses an identity blocked on this node with 403012', async () => {

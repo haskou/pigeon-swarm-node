@@ -2,13 +2,10 @@ import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import DeviceAuthorizationFinder from '@app/contexts/identity-devices/application/find/DeviceAuthorizationFinder';
 import { DeviceAuthorizationFindMessage } from '@app/contexts/identity-devices/application/find/messages/DeviceAuthorizationFindMessage';
-import { DeviceAuthorizationTransitionLogFindMessage } from '@app/contexts/identity-devices/application/find/messages/DeviceAuthorizationTransitionLogFindMessage';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
-import { DeviceAuthorizationTransitionDisclosure } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionDisclosure';
 import { DeviceAuthorizationTransitionLog } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionLog';
 import { DeviceAuthorizationNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceAuthorizationNotFoundError';
 import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
-import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
@@ -61,18 +58,9 @@ describe(DeviceAuthorizationFinder.name, () => {
     ).rejects.toThrow(DeviceAuthorizationNotFoundError);
   });
 
-  it('discloses the transition log to its reader after a revision', async () => {
-    const { authorization, repository } = await fixture();
+  it('finds the transition log of an identity', async () => {
+    const { message, repository } = await fixture();
     const log = mock<DeviceAuthorizationTransitionLog>();
-    const disclosure = mock<DeviceAuthorizationTransitionDisclosure>();
-    const disclosedAfter = mock<DeviceAuthorizationTransitionDisclosure>();
-    const message = new DeviceAuthorizationTransitionLogFindMessage(
-      authorization.getIdentityId(),
-      authorization.getRecoveryAuthority(),
-      new DeviceAuthorizationRevision(2),
-    );
-    log.disclosedTo.mockReturnValue(disclosure);
-    disclosure.after.mockReturnValue(disclosedAfter);
     repository.requireTransitionLog.mockResolvedValue(log);
 
     const result = await new DeviceAuthorizationFinder(
@@ -82,25 +70,17 @@ describe(DeviceAuthorizationFinder.name, () => {
     expect(repository.requireTransitionLog).toHaveBeenCalledWith(
       message.identityId,
     );
-    expect(log.disclosedTo).toHaveBeenCalledWith(message.reader);
-    expect(disclosure.after).toHaveBeenCalledWith(message.after);
-    expect(result).toBe(disclosedAfter);
+    expect(result).toBe(log);
   });
 
   it('rejects a transition log read for an identity without authorization', async () => {
-    const { authorization, repository } = await fixture();
+    const { message, repository } = await fixture();
     repository.requireTransitionLog.mockRejectedValue(
       new DeviceAuthorizationNotFoundError(),
     );
 
     await expect(
-      new DeviceAuthorizationFinder(repository).findTransitionLog(
-        new DeviceAuthorizationTransitionLogFindMessage(
-          authorization.getIdentityId(),
-          authorization.getRecoveryAuthority(),
-          DeviceAuthorizationRevision.initial(),
-        ),
-      ),
+      new DeviceAuthorizationFinder(repository).findTransitionLog(message),
     ).rejects.toThrow(DeviceAuthorizationNotFoundError);
   });
 });
