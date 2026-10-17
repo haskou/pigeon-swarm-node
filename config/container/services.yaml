@@ -1187,6 +1187,7 @@ services:
   contexts/communities/infrastructure/orbitdb/policies/CommunityOperationMutationPolicy:
     class: >-
       /contexts/communities/infrastructure/orbitdb/policies/CommunityOperationMutationPolicy
+    arguments: []
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/communities/infrastructure/orbitdb/policies/MLSRecordMutationPolicy:
     class: >-
