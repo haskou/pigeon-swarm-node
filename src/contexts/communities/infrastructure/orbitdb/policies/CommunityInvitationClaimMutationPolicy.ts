@@ -1,9 +1,12 @@
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationFrontier } from '@app/contexts/public-mutations/domain/PublicMutationFrontier';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain/PublicMutationRecordShape';
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
-import { PublicMutationExpectation } from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
+import PublicMutationVerifier, {
+  PublicMutationExpectation,
+} from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 import { ShortLivedLookup } from '@app/contexts/public-mutations/infrastructure/ShortLivedLookup';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
@@ -52,6 +55,7 @@ export default class CommunityInvitationClaimMutationPolicy extends PublicMutati
     /** Reads the public store directly: the policy runs inside the community storage lock. */
     private readonly communityRepository: OrbitDBCommunityRepository,
     private readonly registry: OrbitDBReplicatedStateRegistry,
+    private readonly verifier: PublicMutationVerifier,
   ) {
     super();
   }
@@ -76,12 +80,34 @@ export default class CommunityInvitationClaimMutationPolicy extends PublicMutati
       });
   }
 
+  /** Whether the joiner's device signed `document`, valid or not. */
+  private async isGenuine(document: Record<string, unknown>): Promise<boolean> {
+    const proof = PublicMutationRecord.proofOf(document);
+    const payload = PublicMutationRecord.payloadOf(document);
+
+    if (!proof) return false;
+
+    try {
+      await this.verifier.verify(proof, {
+        ...this.expectationOf(payload),
+        payload,
+      });
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /**
-   * Refuses a second claim under the same id. The stored claim itself is
-   * admitted again on every read, so a record with its very proof passes.
+   * Refuses a claim whose content differs from a claim its joiner already
+   * signed under the same id. The gate hands policies the payload only, so
+   * the same claim signed again passes; its proofs do not depend on the
+   * frontier, so it changes nothing. A stored record its joiner did not sign
+   * is ignored: anyone could plant one to block a claim.
    */
   private async assertFirstWrite(record: Record<string, unknown>) {
-    const digest = PublicMutationRecord.proofOf(record)?.digest();
+    const digest = PublicMutationProof.digestOf(record);
     // Claims of this very collection: `queryDocuments` would admit each of
     // them again through this policy and recurse.
     const stored = await this.registry.queryUnadmittedDocuments(
@@ -89,15 +115,17 @@ export default class CommunityInvitationClaimMutationPolicy extends PublicMutati
       (document) =>
         document.scopeType === this.scopeType && document.id === record.id,
     );
+    const others = stored.filter(
+      (document) =>
+        PublicMutationProof.digestOf(
+          PublicMutationRecord.payloadOf(document),
+        ) !== digest,
+    );
+    const genuine = await Promise.all(
+      others.map((document) => this.isGenuine(document)),
+    );
 
-    if (
-      stored.some(
-        (document) =>
-          PublicMutationRecord.proofOf(document)?.digest() !== digest,
-      )
-    ) {
-      throw new InvalidPublicMutationError();
-    }
+    if (genuine.includes(true)) throw new InvalidPublicMutationError();
   }
 
   public expectationOf(

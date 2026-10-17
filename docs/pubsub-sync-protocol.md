@@ -406,7 +406,9 @@ voids an operation; the fold does, over the stored set.
 A joiner asks for admission with a `community_invitation_claim` record in the
 `requests` store (`scopeType: "community_invitation_claim"`, id
 `invitation-claim:<invitationId>:<identityId>`, author the joiner, signed
-`frontier`). It is write-once: the policy refuses a second write of the same id.
+`frontier`). It is write-once: the policy refuses a claim whose content differs
+from one its joiner already signed under the same id, and ignores stored
+records under that id that the joiner did not sign.
 It carries the possession and consent proofs, which name one joiner, and no
 authority; no join references it. A node stores it only when `identityId` is
 canonical, the invitation is in the community folded at the claim's frontier

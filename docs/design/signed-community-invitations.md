@@ -246,9 +246,11 @@ a claim only when all of these hold:
 The claim does not check expiry, because there is no deterministic clock to
 check it against. Expiry is enforced at admission.
 
-A claim is written once: the policy refuses another write to the same id.
-The proofs do not depend on the frontier, so a claim signed again at another
-frontier could change nothing.
+A claim is written once: the policy refuses a claim whose content differs from
+a claim its joiner already signed under the same id. The same claim signed
+again passes, because its proofs do not depend on the frontier and it can
+change nothing. A stored record under that id that its joiner did not sign is
+ignored, so nobody can plant one to block a claim.
 
 A claim names its joiner, its invitation and its community, and the
 `requests` store replicates it to every node of the network. Every node

@@ -2,10 +2,14 @@ import { CommunityInvitationClaim } from '@app/contexts/communities/domain/entit
 import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
 import { CommunityOperation } from '@app/contexts/communities/domain/operations/CommunityOperation';
 import { CommunityStateFold } from '@app/contexts/communities/domain/operations/CommunityStateFold';
+import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
 import CommunityInvitationClaimMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInvitationClaimMutationPolicy';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
+import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
+import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
+import { PublicMutationGate } from '@app/contexts/public-mutations/infrastructure/PublicMutationGate';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import {
@@ -32,8 +36,10 @@ import {
 } from '../../../domain/operations/CommunityOperationFixtures';
 
 describe('CommunityInvitationClaimMutationPolicy', () => {
+  let authorization: MockProxy<PublicMutationAuthorAuthorization>;
   let communityRepository: MockProxy<OrbitDBCommunityRepository>;
   let registry: MockProxy<OrbitDBReplicatedStateRegistry>;
+  let verifier: PublicMutationVerifier;
   let policy: CommunityInvitationClaimMutationPolicy;
   const created = genesis();
   const invited = invitation([created]);
@@ -59,11 +65,13 @@ describe('CommunityInvitationClaimMutationPolicy', () => {
   async function signed(
     record: Record<string, unknown>,
     sequence = 0,
+    author = record.identityId as string,
   ): Promise<Record<string, unknown>> {
     return PublicMutationRecord.withProof(
       record,
       await signedMutation({
-        identityId: record.identityId as string,
+        frontier: ['A'.repeat(43)],
+        identityId: author,
         kind: 'put',
         payload: record,
         recordId: record.id as string,
@@ -94,9 +102,13 @@ describe('CommunityInvitationClaimMutationPolicy', () => {
     communityRepository = mock<OrbitDBCommunityRepository>();
     registry = mock<OrbitDBReplicatedStateRegistry>();
     registry.queryUnadmittedDocuments.mockResolvedValue([]);
+    authorization = mock<PublicMutationAuthorAuthorization>();
+    authorization.isAuthorized.mockResolvedValue(true);
+    verifier = new PublicMutationVerifier(authorization);
     policy = new CommunityInvitationClaimMutationPolicy(
       communityRepository,
       registry,
+      verifier,
     );
     withOperations([created, invited.operation]);
   });
@@ -227,26 +239,66 @@ describe('CommunityInvitationClaimMutationPolicy', () => {
       );
       await expect(permit(claimOf(bob, personal))).resolves.toBeUndefined();
     });
+  });
 
-    it('admits the stored claim again with its very proof', async () => {
-      const stored = await signed(claimOf(alice));
-      registry.queryUnadmittedDocuments.mockResolvedValue([stored]);
+  describe('through the public mutation gate', () => {
+    let gate: PublicMutationGate;
 
-      await expect(permit(stored)).resolves.toBeUndefined();
+    function holding(...documents: Record<string, unknown>[]): void {
+      registry.queryUnadmittedDocuments.mockResolvedValue(documents);
+    }
+
+    function accepts(record: Record<string, unknown>): Promise<boolean> {
+      return gate.accepts('requests', record);
+    }
+
+    beforeEach(() => {
+      gate = new PublicMutationGate(verifier, [policy]);
     });
 
-    it('rejects a second write to a stored claim', async () => {
+    it('admits a genuine first claim on a node that holds it and judges it again', async () => {
       const stored = await signed(claimOf(alice));
-      const rewrite = await signed(claimOf(alice), 1);
-      registry.queryUnadmittedDocuments.mockResolvedValue([stored]);
+      holding(stored);
 
-      await expect(permit(rewrite)).rejects.toThrow(InvalidPublicMutationError);
+      await expect(accepts(stored)).resolves.toBe(true);
       expect(
         registry.queryUnadmittedDocuments.mock.calls[0][1]({
           id: stored.id,
           scopeType: 'community_invitation_claim',
         }),
       ).toBe(true);
+    });
+
+    it('admits the same claim signed again, which changes nothing', async () => {
+      holding(await signed(claimOf(alice)));
+
+      await expect(accepts(await signed(claimOf(alice), 1))).resolves.toBe(
+        true,
+      );
+    });
+
+    it('refuses a later claim that differs from a genuine stored claim', async () => {
+      const later = await signed(
+        { ...claimOf(alice), communityId: CommunityId.generate().valueOf() },
+        1,
+      );
+
+      await expect(accepts(later)).resolves.toBe(true);
+
+      holding(await signed(claimOf(alice)));
+
+      await expect(accepts(later)).resolves.toBe(false);
+    });
+
+    it('ignores a stored claim under the same id that its joiner did not sign', async () => {
+      const planted = await signed(
+        { ...claimOf(alice), consent: claimOf(bob).consent },
+        0,
+        mallory.valueOf(),
+      );
+      holding(planted, PublicMutationRecord.payloadOf(planted));
+
+      await expect(accepts(await signed(claimOf(alice)))).resolves.toBe(true);
     });
   });
 });

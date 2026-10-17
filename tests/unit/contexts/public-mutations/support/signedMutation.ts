@@ -5,6 +5,7 @@ let device: KeyPair | undefined;
 
 /** Builds a structurally valid, device-signed proof for repository tests. */
 export async function signedMutation(options: {
+  frontier?: string[];
   identityId: string;
   kind: 'put' | 'delete';
   payload?: Record<string, unknown>;
@@ -19,6 +20,7 @@ export async function signedMutation(options: {
       deviceCredential: device.toPrimitives().publicKey,
       identityId: options.identityId,
     },
+    ...(options.frontier ? { frontier: options.frontier } : {}),
     kind: options.kind,
     operationId: `op-${options.store}-${options.sequence}`.padEnd(22, '0'),
     payloadDigest: PublicMutationProof.digestOf(options.payload ?? {}),

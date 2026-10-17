@@ -1171,6 +1171,7 @@ services:
     arguments:
       - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy:
     class: >-

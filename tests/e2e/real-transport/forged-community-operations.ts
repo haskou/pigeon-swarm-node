@@ -156,10 +156,16 @@ async function open(replica: Replica): Promise<void> {
   );
   const repository = new OrbitDBCommunityRepository(registry, guard);
 
+  const verifier = new PublicMutationVerifier(authorization);
+
   registry.addMutationGate(
-    new PublicMutationGate(new PublicMutationVerifier(authorization), [
+    new PublicMutationGate(verifier, [
       new CommunityOperationMutationPolicy(),
-      new CommunityInvitationClaimMutationPolicy(repository, registry),
+      new CommunityInvitationClaimMutationPolicy(
+        repository,
+        registry,
+        verifier,
+      ),
     ]),
   );
   replica.registry = registry;
@@ -718,13 +724,13 @@ async function forgedInvitations(owner: CommunityOperationSigner) {
 
     assert.deepEqual(
       stored.map((document) =>
-        PublicMutationRecord.proofOf(document)?.digest(),
+        PublicMutationProof.digestOf(PublicMutationRecord.payloadOf(document)),
       ),
-      [claimed.proof.digest()],
-      `${replica.name} must keep the first claim of the joiner only`,
+      [PublicMutationProof.digestOf(claimPayload)],
+      `${replica.name} must keep the one claim of the joiner unchanged`,
     );
   }
-  console.log('PASS a second claim with another proof is refused');
+  console.log('PASS the same claim signed again changes nothing');
 
   stage = 'genuine admission replicates';
   await submit(second, id, manager, 'MEMBER_JOINED', {
