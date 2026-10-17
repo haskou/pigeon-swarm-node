@@ -3,6 +3,7 @@ import { assert, Timestamp } from '@haskou/value-objects';
 
 import { Community } from '../Community';
 import { CommunityChannelPermissions } from '../entities/channels/CommunityChannelPermissions';
+import { CommunityInvitation } from '../entities/invitations/CommunityInvitation';
 import { CommunityProfile } from '../entities/profile/CommunityProfile';
 import { CommunitySettings } from '../entities/profile/CommunitySettings';
 import { InvalidCommunityOperationError } from '../errors/InvalidCommunityOperationError';
@@ -44,9 +45,18 @@ import { CommunityOperationRebase } from './CommunityOperationRebase';
  * - role_deleted: roleId
  * - member_roles_updated: identityId, roleIds
  * - member_banned, member_unbanned, member_kicked, member_left: identityId
- * - member_joined: identityId, method, reference? (only for `approval` and
- *   `invitation`: the id of the signed record that allows it; for
- *   `invite_link`: the invite reference of the token, never the token)
+ * - member_joined: identityId, method, and per method: reference (only for
+ *   `approval`: the id of the accepted membership request); invitationId,
+ *   possession, consent (only for `invitation`: see `CommunityInvitation`)
+ * - invitation_created: invitationKey, maxUses, expiresAt, invitee?
+ * - invitation_revoked: invitationId
+ *
+ * Every identity id, the author's included, must be canonical
+ * (`IdentityId.isCanonicalKey`), so equal ids always mean equal keys.
+ *
+ * The rules of an invitation that are facts of the causal past (liveness,
+ * proofs, window, uses) are not checked here but by `CommunityStateFold`
+ * against the state of that past, so they never depend on the linear state.
  */
 export class CommunityOperationApplier {
   private static readonly HANDLERS: Record<
@@ -74,6 +84,16 @@ export class CommunityOperationApplier {
       op,
       args,
     ) => CommunityOperationApplier.updateProfile(community, op, args),
+    [CommunityOperationAction.INVITATION_CREATED.valueOf()]: (
+      community,
+      op,
+    ) => {
+      CommunityInvitation.fromOperation(op);
+      community.assertCanCreateInvite(op.getAuthorIdentityId());
+    },
+    // A revoker needs its authority at the revocation's parents only.
+    [CommunityOperationAction.INVITATION_REVOKED.valueOf()]: (_, op) =>
+      CommunityOperationApplier.invitationIdOf(op, ['invitationId']),
     [CommunityOperationAction.MEMBER_BANNED.valueOf()]: (community, op) =>
       community.banMember(
         op.getAuthorIdentityId(),
@@ -106,12 +126,59 @@ export class CommunityOperationApplier {
       CommunityOperationApplier.updateRole(community, op, args),
   };
 
+  private static readonly JOIN_ARGUMENTS: Record<string, string[]> = {
+    [CommunityJoinMethod.ADDED.valueOf()]: ['identityId', 'method'],
+    [CommunityJoinMethod.APPROVAL.valueOf()]: [
+      'identityId',
+      'method',
+      'reference',
+    ],
+    [CommunityJoinMethod.AUTOMATIC.valueOf()]: ['identityId', 'method'],
+    [CommunityJoinMethod.INVITATION.valueOf()]: [
+      'consent',
+      'identityId',
+      'invitationId',
+      'method',
+      'possession',
+    ],
+  };
+
+  /** An identity argument; refused unless canonical. */
+  private static identity(value: string): IdentityId {
+    const identityId = new IdentityId(value);
+
+    assert(identityId.isCanonicalKey(), new InvalidCommunityOperationError());
+
+    return identityId;
+  }
+
   private static member(operation: CommunityOperation): IdentityId {
-    return new IdentityId(
+    return CommunityOperationApplier.identity(
       new CommunityOperationArgumentReader(operation.getArguments(), [
         'identityId',
       ]).string('identityId'),
     );
+  }
+
+  /**
+   * The `invitationId` of an operation whose arguments are exactly `keys`:
+   * the digest of an `invitation_created`.
+   */
+  private static invitationIdOf(
+    operation: CommunityOperation,
+    keys: string[],
+  ): string {
+    const invitationId = new CommunityOperationArgumentReader(
+      operation.getArguments(),
+      keys,
+    ).string('invitationId');
+
+    assert(
+      CommunityOperation.DIGEST.test(invitationId),
+      new InvalidCommunityOperationError(),
+    );
+
+    return invitationId;
   }
 
   private static updateProfile(
@@ -301,7 +368,7 @@ export class CommunityOperationApplier {
 
     community.assignRoles(
       operation.getAuthorIdentityId(),
-      new IdentityId(reader.string('identityId')),
+      CommunityOperationApplier.identity(reader.string('identityId')),
       reader
         .stringArray('roleIds')
         .map((roleId) => new CommunityRoleId(roleId)),
@@ -325,29 +392,39 @@ export class CommunityOperationApplier {
     community: Community,
     operation: CommunityOperation,
   ): void {
-    const reader = new CommunityOperationArgumentReader(
-      operation.getArguments(),
-      ['identityId', 'method'],
-      ['reference'],
-    );
-    const method = new CommunityJoinMethod(reader.string('method'));
+    const args = operation.getArguments();
+    const method =
+      typeof args.method === 'string' &&
+      Object.hasOwn(CommunityOperationApplier.JOIN_ARGUMENTS, args.method)
+        ? new CommunityJoinMethod(args.method)
+        : undefined;
 
-    assert(
-      (reader.optionalString('reference') !== undefined) ===
-        method.requiresReference(),
-      new InvalidCommunityOperationError(),
-    );
+    assert(method, new InvalidCommunityOperationError());
+
+    const keys = CommunityOperationApplier.JOIN_ARGUMENTS[method.valueOf()];
+    const reader = new CommunityOperationArgumentReader(args, keys);
+
+    if (method.isEqual(CommunityJoinMethod.INVITATION)) {
+      CommunityOperationApplier.invitationIdOf(operation, keys);
+      reader.string('possession');
+      reader.string('consent');
+    } else if (method.requiresReference()) {
+      reader.string('reference');
+    }
 
     community.joinAs(
       operation.getAuthorIdentityId(),
-      new IdentityId(reader.string('identityId')),
+      CommunityOperationApplier.identity(reader.string('identityId')),
       method,
     );
   }
 
   /** Builds the community a genesis operation creates. */
   public static create(operation: CommunityOperation): Community {
-    assert(operation.isGenesis(), new InvalidCommunityOperationError());
+    assert(
+      operation.isGenesis() && operation.getAuthorIdentityId().isCanonicalKey(),
+      new InvalidCommunityOperationError(),
+    );
 
     const reader = new CommunityOperationArgumentReader(
       operation.getArguments(),
@@ -403,6 +480,7 @@ export class CommunityOperationApplier {
     assert(
       handler &&
         !operation.isGenesis() &&
+        operation.getAuthorIdentityId().isCanonicalKey() &&
         operation.getCommunityId().isEqual(community.getId()) &&
         operation.getNetworkId().isEqual(community.getNetworkId()),
       new InvalidCommunityOperationError(),

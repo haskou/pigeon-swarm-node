@@ -6,6 +6,7 @@ import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { CommunityAccessValidator } from './asserts/CommunityAccessValidator';
 import { CommunityOwnerValidator } from './asserts/CommunityOwnerValidator';
+import { CommunityPermissionValidator } from './asserts/CommunityPermissionValidator';
 import { CommunityChannelMessageMentions } from './CommunityChannelMessageMentions';
 import { CommunityChannelPermissions } from './entities/channels/CommunityChannelPermissions';
 import { CommunityChannels } from './entities/channels/CommunityChannels';
@@ -22,6 +23,7 @@ import { CommunityChannelMessagePayload } from './entities/messages/CommunityCha
 import { CommunityChannelMessageReaction } from './entities/messages/CommunityChannelMessageReaction';
 import { CommunityProfile } from './entities/profile/CommunityProfile';
 import { CommunitySettings } from './entities/profile/CommunitySettings';
+import { CommunityInvitationUnusableError } from './errors/CommunityInvitationUnusableError';
 import { CommunityOwnerCannotBeKickedError } from './errors/CommunityOwnerCannotBeKickedError';
 import { CommunityOwnerCannotLeaveError } from './errors/CommunityOwnerCannotLeaveError';
 import { CommunityOwnerMismatchError } from './errors/CommunityOwnerMismatchError';
@@ -203,9 +205,11 @@ export class Community extends AggregateRoot {
   }
 
   /**
-   * Applies a member join authored by `author`. The join reference (invite,
-   * invitation or request record) is verified when the operation is admitted;
-   * here only the community state decides whether the author may join.
+   * Applies a member join authored by `author`. A request record or an
+   * invitation is verified when the operation is admitted; here only the
+   * community state decides whether the author may join the member. An
+   * invitation admits only an identity that is not a member yet, so a second
+   * admission of the same joiner changes nothing.
    */
   public joinAs(
     author: IdentityId,
@@ -220,6 +224,9 @@ export class Community extends AggregateRoot {
 
     if (method.isEqual(CommunityJoinMethod.ADDED)) {
       validator.assertCanManageMembers(author);
+    } else if (method.isEqual(CommunityJoinMethod.INVITATION)) {
+      validator.assertCanManageMembers(author);
+      assert(!this.isMember(member), new CommunityInvitationUnusableError());
     } else if (method.isEqual(CommunityJoinMethod.APPROVAL)) {
       validator.assertCanApproveMembers(author);
     } else if (method.isEqual(CommunityJoinMethod.AUTOMATIC)) {
@@ -736,6 +743,27 @@ export class Community extends AggregateRoot {
     return this.membership.isMember(identityId);
   }
 
+  public isBanned(identityId: IdentityId): boolean {
+    return this.membership.isBanned(identityId);
+  }
+
+  public getMemberIds(): IdentityId[] {
+    return this.membership.getMemberIds();
+  }
+
+  /** Whether `identityId` is the owner, or a member whose roles grant it. */
+  public holds(
+    identityId: IdentityId,
+    permission: CommunityPermission,
+  ): boolean {
+    return CommunityPermissionValidator.hasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      identityId,
+      permission,
+    );
+  }
+
   public findIdentityUpdateRecipientsFor(identityId: IdentityId): IdentityId[] {
     return this.membership
       .getMemberIds()
@@ -790,8 +818,6 @@ export class Community extends AggregateRoot {
     author: IdentityId,
     request: CommunityMembershipRequest,
   ): void {
-    const validator = this.createAccessValidator();
-
     if (request.isPending()) {
       if (!request.getCreatorIdentityId().isEqual(author)) {
         throw new CommunityRequestActorMismatchError();

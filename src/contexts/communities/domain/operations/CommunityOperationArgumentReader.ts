@@ -31,6 +31,16 @@ export class CommunityOperationArgumentReader {
     return value;
   }
 
+  public integer(key: string): number {
+    const value = this.args[key];
+
+    if (typeof value !== 'number' || !Number.isSafeInteger(value)) {
+      throw new InvalidCommunityOperationError();
+    }
+
+    return value;
+  }
+
   public optionalBoolean(key: string): boolean | undefined {
     return this.args[key] === undefined ? undefined : this.boolean(key);
   }

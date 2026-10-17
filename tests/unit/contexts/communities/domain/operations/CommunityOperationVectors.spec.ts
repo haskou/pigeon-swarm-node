@@ -1,6 +1,6 @@
 import { CommunityOperation } from '@app/contexts/communities/domain/operations/CommunityOperation';
+import { CommunityStateFold } from '@app/contexts/communities/domain/operations/CommunityStateFold';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
 import { CommunityOperationAction } from '@app/contexts/communities/domain/value-objects/CommunityOperationAction';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -66,15 +66,6 @@ interface Vectors {
     string,
     { communityId: string; communityIdPreimage: string }
   >;
-  inviteToken: {
-    communityId: string;
-    creatorIdentityId: string;
-    expiresAt: number;
-    maxUses: number;
-    nonce: string;
-    reference: string;
-    token: string;
-  };
   keys: Record<string, VectorKey>;
   networkId: string;
 }
@@ -137,77 +128,64 @@ describe('Community operation vectors', () => {
     }
   });
 
-  it('derives the invite token from its limits and the reference an invite_link signs', () => {
-    const {
-      communityId,
-      creatorIdentityId,
-      expiresAt,
-      maxUses,
-      nonce,
-      reference,
-      token,
-    } = vectors.inviteToken;
-    const joined = vectors.cases.find(
-      ({ name }) => name === 'member_joined_invite_link',
+  it('chains the invitation, its admission and a later join to the earlier digests', () => {
+    const byName = Object.fromEntries(
+      vectors.cases.map((vector) => [vector.name, vector]),
     );
+    const genesis = byName.genesis.derived.digest;
+    const created = byName.invitation_created.derived.digest;
+    const admitted = byName.member_joined_invitation.derived.digest;
 
-    expect(
-      digestOfText(
-        JSON.stringify([
-          communityId,
-          creatorIdentityId,
-          nonce,
-          maxUses,
-          expiresAt,
-        ]),
-      ),
-    ).toBe(token);
-    expect(
-      CommunityInviteToken.derive(
-        communityId,
-        creatorIdentityId,
-        nonce,
-        maxUses,
-        expiresAt,
-      ).valueOf(),
-    ).toBe(token);
-    expect(digestOfText(`pigeon:community-invite-reference:v1\n${token}`)).toBe(
-      reference,
+    expect(byName.invitation_created.derived.payload.parents).toEqual([
+      genesis,
+    ]);
+    expect(byName.member_joined_invitation.derived.payload.parents).toEqual([
+      created,
+    ]);
+    expect(byName.member_joined_invitation.input.args.invitationId).toBe(
+      created,
     );
-    expect(new CommunityInviteToken(token).toReference()).toBe(reference);
-    expect(joined?.input.args.reference).toBe(reference);
-    expect(joined!.input.createdAt).toBeLessThan(expiresAt);
-    expect(JSON.stringify(joined)).not.toContain(token);
-  });
-
-  it('derives an invite token without expiry from a null expiresAt', () => {
-    const { communityId, creatorIdentityId, maxUses, nonce } =
-      vectors.inviteToken;
-
     expect(
-      CommunityInviteToken.derive(
-        communityId,
-        creatorIdentityId,
-        nonce,
-        maxUses,
-      ).valueOf(),
-    ).toBe(
-      digestOfText(
-        JSON.stringify([communityId, creatorIdentityId, nonce, maxUses, null]),
-      ),
+      byName.member_joined_added_two_parents.derived.payload.parents,
+    ).toEqual([genesis, admitted].sort());
+    expect(byName.member_joined_added_two_parents.input.parents).toEqual(
+      [genesis, admitted].sort().reverse(),
     );
   });
 
-  it('chains the parents of each member_joined to the earlier digests', () => {
-    const [genesis, , joined, added] = vectors.cases;
+  it('folds the chain into a community that admitted the invitee once', () => {
+    const chain = [
+      'genesis',
+      'invitation_created',
+      'member_joined_invitation',
+      'member_joined_added_two_parents',
+    ].map((name) =>
+      CommunityOperation.fromPrimitives(
+        vectors.cases.find((vector) => vector.name === name)!.derived.payload,
+      ),
+    );
+    const state = CommunityStateFold.fold(chain);
+    const created = chain[1].getHash();
 
-    expect(joined.derived.payload.parents).toEqual([genesis.derived.digest]);
-    expect(added.derived.payload.parents).toEqual(
-      [genesis.derived.digest, joined.derived.digest].sort(),
+    expect(state.skipped).toEqual([]);
+    expect(
+      state.community
+        ?.getMemberIds()
+        .map((id) => id.valueOf())
+        .sort(),
+    ).toEqual(
+      [vectors.keys.member, vectors.keys.other, vectors.keys.owner]
+        .map(({ identityId }) => identityId)
+        .sort(),
     );
-    expect(added.input.parents).toEqual(
-      [genesis.derived.digest, joined.derived.digest].sort().reverse(),
+    expect(state.invitations.find(created)?.getInvitationKey()).toBe(
+      chain[1].toPrimitives().args.invitationKey,
     );
+    expect(
+      state.invitations
+        .find(created)
+        ?.hasJoined(new IdentityId(vectors.keys.member.identityId)),
+    ).toBe(true);
   });
 
   describe.each(vectors.cases)('$name', (vector) => {

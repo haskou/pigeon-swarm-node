@@ -160,7 +160,7 @@ async function open(replica: Replica): Promise<void> {
 
   registry.addMutationGate(
     new PublicMutationGate(new PublicMutationVerifier(authorization), [
-      new CommunityOperationMutationPolicy(registry),
+      new CommunityOperationMutationPolicy(),
     ]),
   );
   replica.repository = new OrbitDBCommunityRepository(

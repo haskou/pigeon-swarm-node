@@ -33,12 +33,14 @@ interface CommunityOperationAttributes {
  * operations back to the creator without trusting the author's devices.
  */
 export class CommunityOperation {
-  private static readonly DIGEST = /^[A-Za-z0-9_-]{43}$/;
   private static readonly MAX_PARENTS = 64;
   private static readonly IDENTITY_SIGNING_CONTEXT =
     'pigeon:community-operation:v1\n';
 
   public static readonly SCOPE_TYPE = 'community_operation';
+
+  /** An operation digest: unpadded base64url SHA-256. */
+  public static readonly DIGEST = /^[A-Za-z0-9_-]{43}$/;
 
   private readonly hash: string;
 
