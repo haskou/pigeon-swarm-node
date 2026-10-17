@@ -1,10 +1,13 @@
 import { SignedRequestReplayGuard } from '@app/apps/apis/shared/SignedRequestReplayGuard';
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import {
   KeyPair,
   Signature,
   SignedHttpRequestSignature,
 } from '@haskou/pigeon-swarm-crypto';
+
+import { IdentityIdMother } from '../../../mothers/IdentityIdMother';
 
 const SIGNATURE_BYTES = 64;
 
@@ -42,6 +45,36 @@ describe('SignedRequestReplayGuard', () => {
 
     expect(guard.accept(attacker, signatureOf(0))).toBe(true);
   });
+
+  it('rejects a repeated signature when the same key signs as a device', () => {
+    const guard = new SignedRequestReplayGuard();
+
+    guard.accept(identity, signatureOf(0));
+
+    expect(
+      guard.accept(DeviceCredential.fromIdentityId(identity), signatureOf(0)),
+    ).toBe(false);
+  });
+
+  it.each(IdentityIdMother.aliases())(
+    'rejects a repeated signature that names the key by %s',
+    (_encoding, aliasOf: (of: IdentityId) => IdentityId) => {
+      const guard = new SignedRequestReplayGuard();
+
+      guard.accept(identity, signatureOf(0));
+
+      expect(guard.accept(aliasOf(identity), signatureOf(0))).toBe(false);
+    },
+  );
+
+  it.each(IdentityIdMother.aliases())(
+    'rejects a signer named by %s even on its first signature',
+    (_encoding, aliasOf: (of: IdentityId) => IdentityId) => {
+      const guard = new SignedRequestReplayGuard();
+
+      expect(guard.accept(aliasOf(identity), signatureOf(0))).toBe(false);
+    },
+  );
 
   it('keeps live entries and fails closed at capacity instead of evicting them', () => {
     const guard = new SignedRequestReplayGuard();

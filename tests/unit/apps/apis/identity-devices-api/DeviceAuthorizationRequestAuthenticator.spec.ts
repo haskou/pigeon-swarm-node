@@ -10,10 +10,19 @@ import {
 } from '@haskou/pigeon-swarm-crypto';
 import { Request } from 'express';
 
+import { IdentityIdMother } from '../../../mothers/IdentityIdMother';
 import { SignatureMother } from '../../../mothers/SignatureMother';
 
 describe(DeviceAuthorizationRequestAuthenticator.name, () => {
-  async function fixture(deviceInput?: KeyPair) {
+  const STALE = SignedHttpRequestSignature.REPLAY_WINDOW_MS;
+  const ENTRY_POINTS = [
+    'authenticate',
+    'authenticateReader',
+    'authenticateCurrentDevice',
+  ] as const;
+  const RECOVERY_ENTRY_POINTS = ['authenticate', 'authenticateReader'] as const;
+
+  async function fixture(deviceInput?: KeyPair, signedAt = Date.now()) {
     const device = deviceInput ?? (await KeyPair.generate());
     const identity = await KeyPair.generate();
     const identityId = new IdentityId(identity.toPrimitives().publicKey);
@@ -25,7 +34,7 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
         (await KeyPair.generate()).toPrimitives().publicKey,
       ),
     );
-    const timestamp = String(Date.now());
+    const timestamp = String(signedAt);
     const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}`;
     const payload = SignedHttpRequestSignature.signingContent({
       body: undefined,
@@ -49,6 +58,120 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
 
     return { authorization, headers, request };
   }
+
+  async function recoveryProof(signedAt = Date.now()) {
+    const recoveryAuthority = await KeyPair.generate();
+    const source = await fixture(undefined, signedAt);
+    const authorization = DeviceAuthorization.genesis(
+      source.authorization.getIdentityId(),
+      source.authorization.getNetworkIds(),
+      source.authorization.getCredentials()[0],
+      RecoveryAuthority.fromString(recoveryAuthority.toPrimitives().publicKey),
+    );
+    const payload = SignedHttpRequestSignature.signingContent({
+      body: source.request.body,
+      method: source.request.method,
+      path: source.request.path,
+      timestamp: Number(source.headers['x-timestamp'] as string),
+    });
+    source.headers['x-device-credential'] = undefined;
+    source.headers['x-device-signature'] = undefined;
+    source.headers['x-recovery-signature'] = recoveryAuthority
+      .sign(payload)
+      .valueOf();
+
+    return { ...source, authorization };
+  }
+
+  it.each(ENTRY_POINTS)(
+    'refuses a replayed device proof to %s',
+    async (entryPoint) => {
+      const { authorization, request } = await fixture();
+      new DeviceAuthorizationRequestAuthenticator()[entryPoint](
+        request,
+        authorization,
+      );
+
+      expect(() =>
+        new DeviceAuthorizationRequestAuthenticator()[entryPoint](
+          request,
+          authorization,
+        ),
+      ).toThrow('Invalid signed request.');
+    },
+  );
+
+  it.each(ENTRY_POINTS)(
+    'refuses a stale device proof to %s',
+    async (entryPoint) => {
+      const { authorization, request } = await fixture(
+        undefined,
+        Date.now() - STALE,
+      );
+
+      expect(() =>
+        new DeviceAuthorizationRequestAuthenticator()[entryPoint](
+          request,
+          authorization,
+        ),
+      ).toThrow('Invalid signed request.');
+    },
+  );
+
+  it.each(RECOVERY_ENTRY_POINTS)(
+    'refuses a replayed recovery proof to %s',
+    async (entryPoint) => {
+      const { authorization, request } = await recoveryProof();
+      new DeviceAuthorizationRequestAuthenticator()[entryPoint](
+        request,
+        authorization,
+      );
+
+      expect(() =>
+        new DeviceAuthorizationRequestAuthenticator()[entryPoint](
+          request,
+          authorization,
+        ),
+      ).toThrow('Invalid signed request.');
+    },
+  );
+
+  it.each(RECOVERY_ENTRY_POINTS)(
+    'refuses a stale recovery proof to %s',
+    async (entryPoint) => {
+      const { authorization, request } = await recoveryProof(
+        Date.now() - STALE,
+      );
+
+      expect(() =>
+        new DeviceAuthorizationRequestAuthenticator()[entryPoint](
+          request,
+          authorization,
+        ),
+      ).toThrow('Invalid signed request.');
+    },
+  );
+
+  it.each(IdentityIdMother.aliases())(
+    'refuses a replayed device proof that names its key by %s',
+    async (_encoding, aliasOf: (of: IdentityId) => IdentityId) => {
+      const { authorization, headers, request } = await fixture();
+      new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+        request,
+        authorization,
+      );
+      headers['x-device-credential'] = aliasOf(
+        new IdentityId(String(headers['x-device-credential'])),
+      ).valueOf();
+
+      expect(() =>
+        new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+          request,
+          authorization,
+        ),
+      ).toThrow('Invalid signed request.');
+    },
+  );
 
   it('rejects requests without a current-device or recovery proof', async () => {
     const { authorization, headers, request } = await fixture();
@@ -170,32 +293,6 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
   });
 
   describe('authenticateReader', () => {
-    async function recoveryReader() {
-      const recoveryAuthority = await KeyPair.generate();
-      const source = await fixture();
-      const authorization = DeviceAuthorization.genesis(
-        source.authorization.getIdentityId(),
-        source.authorization.getNetworkIds(),
-        source.authorization.getCredentials()[0],
-        RecoveryAuthority.fromString(
-          recoveryAuthority.toPrimitives().publicKey,
-        ),
-      );
-      const payload = SignedHttpRequestSignature.signingContent({
-        body: source.request.body,
-        method: source.request.method,
-        path: source.request.path,
-        timestamp: Number(source.headers['x-timestamp'] as string),
-      });
-      source.headers['x-device-credential'] = undefined;
-      source.headers['x-device-signature'] = undefined;
-      source.headers['x-recovery-signature'] = recoveryAuthority
-        .sign(payload)
-        .valueOf();
-
-      return { ...source, authorization };
-    }
-
     it('identifies a signing device the head no longer authorizes', async () => {
       const removed = await KeyPair.generate();
       const authorized = await fixture();
@@ -216,7 +313,7 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
     });
 
     it('identifies the recovery authority of the identity', async () => {
-      const { authorization, request } = await recoveryReader();
+      const { authorization, request } = await recoveryProof();
 
       const reader =
         new DeviceAuthorizationRequestAuthenticator().authenticateReader(
@@ -233,7 +330,7 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
     });
 
     it('rejects a recovery signature from another authority', async () => {
-      const { request } = await recoveryReader();
+      const { request } = await recoveryProof();
       const other = await fixture();
 
       expect(() =>

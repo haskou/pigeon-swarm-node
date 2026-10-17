@@ -68,7 +68,10 @@ Implemented:
 - timestamp freshness validation with a 30 second maximum clock skew
 - replay rejection: a mutating (non-GET/HEAD/OPTIONS) signed request whose
   identity and signature were already accepted inside the freshness window is
-  rejected with `401`; the guard is in-memory and per node
+  rejected with `401`; the guard is in-memory and per node. A device proof
+  (`X-Device-Signature`) or recovery proof (`X-Recovery-Signature`) is fresh
+  and one-use on every method, `GET` included: a client signs each such
+  request anew (see _Identity device authorization_)
 - `X-Identity-Id` must be the one canonical encoding of a usable Ed25519 key
   (PEM armour and whitespace are ignored). An alias encoding of the signing key,
   such as another DER prefix byte or base64 padding bits that decode to the
@@ -6095,6 +6098,16 @@ signature against its recovery authority before returning the checkpoint. A
 missing, mixed, malformed, invalid, revoked or unrelated proof returns the same
 generic `401` without revealing which check failed.
 
+Every device or recovery proof, on these reads as on the sealed-secret routes,
+must carry an `X-Timestamp` within 30 seconds of the node clock and is accepted
+once: the node remembers each accepted proof signature for its 60 second
+validity window, keyed by the raw bytes of the signing key, and refuses a second
+request with the same signature, including one that names the same key in
+another encoding, with `401` code `401020`. A device credential that is not the
+one canonical encoding of an Ed25519 key is refused the same way. A client never
+resends a captured or earlier request: it signs each read and write with a new
+timestamp. Like the identity replay guard, the record is in-memory and per node.
+
 List the currently authorized device credentials with:
 
 ```http
@@ -6286,7 +6299,9 @@ generation published after its revocation. Both routes use device proof only,
 checked against the current authorization head: `X-Timestamp`,
 `X-Device-Credential` and `X-Device-Signature`. The identity signature
 (`X-Identity-Id`, `X-Signature`) and `X-Recovery-Signature` are not accepted.
-`X-Timestamp` must be within 30 seconds of the node clock.
+`X-Timestamp` must be within 30 seconds of the node clock, and each device
+signature is accepted once (see _Identity device authorization_): a replayed request
+returns `401` code `401020`.
 
 Publish a generation with:
 
@@ -6355,8 +6370,9 @@ X-Device-Credential: <device credential>
 X-Device-Signature: <signature>
 ```
 
-Freshness and device proof are checked as for `PUT`, and a revoked or unknown
-credential returns `401`. The route is not replay-guarded. No stored bundle, or
+Freshness, device proof and the one-use rule are checked as for `PUT`, so a
+replayed read returns `401` code `401020`, and a revoked or unknown credential
+returns `401`. No stored bundle, or
 no entry for the caller, returns `404`. A device added after the last publish
 has no entry until the owner republishes.
 

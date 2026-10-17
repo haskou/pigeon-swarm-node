@@ -1,6 +1,4 @@
-import { InvalidSignedRequestError } from '@app/apps/apis/shared/errors/InvalidSignedRequestError';
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import { signedRequestReplayGuard } from '@app/apps/apis/shared/SignedRequestReplayGuard';
 import DeviceAuthorizationFinder from '@app/contexts/identity-devices/application/find/DeviceAuthorizationFinder';
 import DeviceSealedSecretFinder from '@app/contexts/identity-devices/application/find/DeviceSealedSecretFinder';
 import { DeviceAuthorizationFindMessage } from '@app/contexts/identity-devices/application/find/messages/DeviceAuthorizationFindMessage';
@@ -11,7 +9,6 @@ import { InvalidDeviceSealedSecretBundleError } from '@app/contexts/identity-dev
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
-import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { Request, Response } from 'express';
 import {
   Body,
@@ -70,15 +67,6 @@ export class DeviceSealedSecretRoute extends Route {
         authorization,
       );
     await this.signedRequestAuthenticator.assertIsNotBlocked(target);
-    // authenticateCurrentDevice accepted only the canonical encoding.
-    const signature = request.header('x-device-signature');
-
-    if (
-      signature === undefined ||
-      !signedRequestReplayGuard.accept(target, new Signature(signature))
-    ) {
-      throw new InvalidSignedRequestError();
-    }
 
     try {
       await this.publisher.publish(

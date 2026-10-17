@@ -2393,6 +2393,41 @@ export default class Definitions {
     });
   }
 
+  @given(
+    'I set a sealed secret bundle body for my device with generation {int}',
+  )
+  public async iSetASealedSecretBundleBodyForMyDeviceWithGeneration(
+    generation: number,
+  ): Promise<void> {
+    const device = await this.ensureIdentityDeviceOwnerKeyPair();
+    const credential = DeviceCredential.fromString(
+      device.toPrimitives().publicKey,
+    ).toWire();
+    const sealedSecret = 'c2VhbGVk';
+    const signature = device.sign(
+      DeviceSealedSecretBundle.signingPayload({
+        authorizationRevision: 0,
+        generation,
+        identityId: (this.ownerIdentityId as IdentityId).valueOf(),
+        publisherCredential: credential,
+        recipientCredential: credential,
+        sealedSecret,
+      }),
+    );
+
+    this.body = JSON.stringify({
+      authorizationRevision: 0,
+      entries: [
+        {
+          recipientCredential: credential,
+          sealedSecret,
+          signature: signature.valueOf(),
+        },
+      ],
+      generation,
+    });
+  }
+
   @given('I sign the current sealed secret delivery request')
   public async iSignTheCurrentSealedSecretDeliveryRequest(): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;
