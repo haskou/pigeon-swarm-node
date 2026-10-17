@@ -74,8 +74,9 @@ export class NodeBlockSource {
     private lastFetch: NodeBlockSourceFetch,
   ) {}
 
+  /** The kept list's entries a node can enforce; its signed bytes stay verbatim. */
   private listed(): NodeBlockEntries {
-    return NodeBlockEntries.of(this.list);
+    return NodeBlockEntries.of(this.list).canonical();
   }
 
   /**
@@ -196,6 +197,19 @@ export class NodeBlockSource {
   /** Entries this source currently makes the node block. */
   public applied(): NodeBlockEntries {
     return this.approved;
+  }
+
+  /**
+   * Drops approvals stored before identity ids had to be canonical and
+   * returns how many were dropped.
+   */
+  public dropNonCanonicalApprovals(): number {
+    const approved = this.approved.canonical();
+    const dropped = this.approved.count() - approved.count();
+
+    this.approved = approved;
+
+    return dropped;
   }
 
   public wasFetchedBefore(threshold: Timestamp): boolean {

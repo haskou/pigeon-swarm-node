@@ -1,3 +1,4 @@
+import { NonCanonicalIdentityIdError } from '@app/apps/apis/shared/errors/NonCanonicalIdentityIdError';
 import { NodeBlockListStorerMessage } from '@app/contexts/nodes/application/store-block-list/messages/NodeBlockListStorerMessage';
 import NodeBlockListStorer from '@app/contexts/nodes/application/store-block-list/NodeBlockListStorer';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
@@ -20,7 +21,8 @@ import { NodeBlocksViewModel } from '../view-model/NodeBlocksViewModel';
 /**
  * The preflight authenticates the owner before reading the signed body and
  * returns it parsed, so this route only validates the document before storing
- * it.
+ * it. A list blocking an identity id that is not the canonical encoding of a
+ * key is refused (400080): no request can be made under such an id.
  */
 @JsonController('/node/blocks')
 export class PutNodeBlocksRoute extends Route {
@@ -63,17 +65,25 @@ export class PutNodeBlocksRoute extends Route {
     const body = await this.validBody(
       await this.preflight.read(request, response),
     );
-    const blockList = await this.storer.store(
-      new NodeBlockListStorerMessage({
-        blockedIdentityIds: body.blockedIdentityIds,
-        blockedNodePeerIds: body.blockedNodePeerIds,
-        identitySignature: body.identitySignature,
-        issuedAt: body.issuedAt,
-        ownerIdentityId: body.ownerIdentityId,
-        type: body.type,
-        version: body.version,
-      }),
-    );
+    const message = new NodeBlockListStorerMessage({
+      blockedIdentityIds: body.blockedIdentityIds,
+      blockedNodePeerIds: body.blockedNodePeerIds,
+      identitySignature: body.identitySignature,
+      issuedAt: body.issuedAt,
+      ownerIdentityId: body.ownerIdentityId,
+      type: body.type,
+      version: body.version,
+    });
+
+    if (
+      !message.blockList
+        .getBlockedIdentityIds()
+        .every((identityId) => identityId.isCanonicalKey())
+    ) {
+      throw new NonCanonicalIdentityIdError();
+    }
+
+    const blockList = await this.storer.store(message);
 
     return response
       .status(HttpRouteStatusEnum.OK)

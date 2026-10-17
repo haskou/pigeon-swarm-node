@@ -287,6 +287,45 @@ describe('Node', () => {
     );
   });
 
+  describe('clearNonCanonicalOwner', () => {
+    it.each(IdentityIdMother.forged())(
+      'should leave the node unowned when its stored owner is %s',
+      (_case, forged: IdentityId) => {
+        const stored = Node.fromPrimitives({
+          ...primitives,
+          owner: forged.valueOf(),
+        });
+
+        expect(stored.clearNonCanonicalOwner()).toBe(true);
+        expect(stored.hasOwner()).toBe(false);
+        expect(stored.toPrimitives()).toEqual({
+          ...primitives,
+          owner: undefined,
+        });
+      },
+    );
+
+    it('should keep a canonical owner', () => {
+      const owner = generateIdentityId();
+      const stored = Node.fromPrimitives({
+        ...primitives,
+        owner: owner.valueOf(),
+      });
+      const before = stored.toPrimitives();
+
+      expect(stored.clearNonCanonicalOwner()).toBe(false);
+      expect(stored.isOwnedBy(owner)).toBe(true);
+      expect(stored.toPrimitives()).toEqual(before);
+    });
+
+    it('should leave an unowned node unchanged', () => {
+      const unowned = Node.fromPrimitives({ ...primitives, owner: undefined });
+
+      expect(unowned.clearNonCanonicalOwner()).toBe(false);
+      expect(unowned.hasOwner()).toBe(false);
+    });
+  });
+
   describe('updateRelayConfiguration', () => {
     it('should update relay configuration and record a domain event', () => {
       const relayConfiguration = NodeRelayConfiguration.fromPrimitives({

@@ -13,8 +13,10 @@ import NodeLoaderService from './NodeLoaderService';
  * entries in memory: the owner's own list, plus what each adopted source
  * applies minus the owner's local exceptions. An unclaimed node blocks
  * nobody and the current owner is never blocked, even if listed; this node's
- * own peer id is ignored by the enforcer. Every change to those inputs runs
- * through `change`, one at a time, and is enforced before it resolves.
+ * own peer id is ignored by the enforcer. Identity ids that are not the
+ * canonical encoding of a usable key are never enforced, wherever they were
+ * stored. Every change to those inputs runs through `change`, one at a time,
+ * and is enforced before it resolves.
  */
 export default class NodeBlockPolicy {
   private entries?: Promise<NodeBlockEntries>;
@@ -41,7 +43,7 @@ export default class NodeBlockPolicy {
       )
       .without(exceptions);
 
-    return NodeBlockEntries.of(own).union(adopted);
+    return NodeBlockEntries.of(own).union(adopted).canonical();
   }
 
   private currentEntries(): Promise<NodeBlockEntries> {

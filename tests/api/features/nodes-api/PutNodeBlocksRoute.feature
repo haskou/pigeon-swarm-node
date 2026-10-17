@@ -256,3 +256,41 @@ Feature: Put node blocks
       | encoding                        |
       | an alias DER prefix             |
       | a non-canonical base64 encoding |
+
+  Scenario Outline: The owner cannot block an identity under <encoding> of its key
+    Given I set a node block list body version 1 blocking the other identity under "<encoding>" of its key
+    And I sign a PUT request to "/node/blocks/"
+    When I PUT "/node/blocks/"
+    Then response code is equal to 400
+    And response body should contain "400080"
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |
+
+  Scenario Outline: A restart purges a block exception and a source approval stored under <encoding> of a key
+    Given the node follows a block source whose version 1 blocks the other identity
+    And the node stored the other identity under "<encoding>" of its key as a block exception and a source approval
+    When the node restarts
+    Then the stored block exception and source approval name only the canonical other identity id
+    When I GET "/node/"
+    Then response code is equal to 200
+    And response body should contain "owner"
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |
+
+  Scenario Outline: A restart leaves unowned a node whose owner was stored under <encoding> of its key
+    Given the local node owner was stored under "<encoding>" of my key
+    When the node restarts
+    And I GET "/node/"
+    Then response code is equal to 200
+    And response body should not contain "owner"
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |

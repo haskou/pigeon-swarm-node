@@ -15,6 +15,7 @@ import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
+import { IdentityIdMother } from '../../../../mothers/IdentityIdMother';
 import {
   NODE_PEER_ID_A,
   NODE_PEER_ID_B,
@@ -134,6 +135,42 @@ describe('NodeBlockPolicy', () => {
 
     expect(ids(identityIds)).toEqual([blocked.valueOf()]);
     expect(peerIds.map((peerId) => peerId.valueOf())).toEqual([NODE_PEER_ID_A]);
+  });
+
+  it('should never enforce a non-canonical identity id the own list or a stored approval names', async () => {
+    const listed = await NodeBlockListMother.identityId();
+    const approved = await NodeBlockListMother.identityId();
+    const publisher = await KeyPair.generate();
+    const source = await adoptedSource(publisher, [approved], []);
+
+    repository.findLocal.mockResolvedValue(
+      new NodeBlockListMother(owner)
+        .blockingIdentities([blocked, IdentityIdMother.aliasPrefix(listed)])
+        .build(),
+    );
+    sources.findAll.mockResolvedValue([
+      NodeBlockSource.fromPrimitives({
+        ...source.toPrimitives(),
+        approved: {
+          identityIds: [
+            approved.valueOf(),
+            IdentityIdMother.reencoded(approved).valueOf(),
+          ],
+          nodePeerIds: [],
+        },
+      }),
+    ]);
+    loader.loadNode.mockResolvedValue(
+      new NodeMother().withOwner(ownerId).build(),
+    );
+
+    await policy.load();
+
+    const [identityIds] = enforcer.enforce.mock.calls[0];
+
+    expect(ids(identityIds).sort()).toEqual(
+      [blocked.valueOf(), approved.valueOf()].sort(),
+    );
   });
 
   it('should load the stored list once', async () => {

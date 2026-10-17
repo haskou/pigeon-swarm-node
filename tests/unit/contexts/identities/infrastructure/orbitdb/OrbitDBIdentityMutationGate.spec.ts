@@ -2,11 +2,13 @@ import { Identity } from '@app/contexts/identities/domain/Identity';
 import IdentityRecordAdmissionDomainService from '@app/contexts/identities/domain/services/IdentityRecordAdmissionDomainService';
 import IpfsIdentityMapper from '@app/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import { OrbitDBIdentityMutationGate } from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMutationGate';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { mock } from 'jest-mock-extended';
 import { createHash } from 'node:crypto';
 
+import { IdentityIdMother } from '../../../../mothers/IdentityIdMother';
 import { SignedIdentityMother } from '../../../../mothers/SignedIdentityMother';
 
 describe('OrbitDBIdentityMutationGate', () => {
@@ -228,6 +230,20 @@ describe('OrbitDBIdentityMutationGate', () => {
       gate.acceptsHead('identity-handle:victim', record),
     ).resolves.toBe(false);
   });
+
+  it.each(IdentityIdMother.aliases())(
+    'should never admit a record or head of an identity signed under %s of its key',
+    async (_, aliasOf) => {
+      const signer = await SignedIdentityMother.create();
+      const aliasId = aliasOf(new IdentityId(signer.id)).valueOf();
+      const record = await metadata(signer.build({ id: aliasId }));
+
+      await expect(gate.accepts('identities', record)).resolves.toBe(false);
+      await expect(
+        gate.acceptsHead(`identity:${aliasId}`, record),
+      ).resolves.toBe(false);
+    },
+  );
 
   it('should accept heads it does not govern', async () => {
     await expect(gate.acceptsHead('keychain:owner', {})).resolves.toBe(true);

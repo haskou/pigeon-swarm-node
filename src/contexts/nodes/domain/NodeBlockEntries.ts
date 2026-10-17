@@ -79,6 +79,17 @@ export class NodeBlockEntries {
     );
   }
 
+  /**
+   * Only the identity ids that are the canonical encoding of a usable key: no
+   * request can be made under any other id, so blocking one enforces nothing.
+   */
+  public canonical(): NodeBlockEntries {
+    return new NodeBlockEntries(
+      this.getIdentityIds().filter((id) => id.isCanonicalKey()),
+      this.getNodePeerIds(),
+    );
+  }
+
   public count(): number {
     return this.identityIds.size + this.nodePeerIds.size;
   }
