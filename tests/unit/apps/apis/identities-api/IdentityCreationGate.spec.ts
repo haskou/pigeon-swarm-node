@@ -8,11 +8,19 @@ import { NodeRegistrationReservation } from '@app/contexts/nodes/application/adm
 import { NodeRegistrationCodeIsNotValidError } from '@app/contexts/nodes/domain/errors/NodeRegistrationCodeIsNotValidError';
 import { NodeRegistrationCodeId } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationCodeId';
 import { mock, MockProxy } from 'jest-mock-extended';
-import { setImmediate } from 'timers/promises';
+import { setImmediate, setTimeout } from 'timers/promises';
 
 import { IdentityIdMother } from '../../../mothers/IdentityIdMother';
 
 const REGISTRATION_CODE = 'code';
+
+const withinASecond = async <T>(pending: Promise<T>): Promise<T> =>
+  Promise.race([
+    pending,
+    setTimeout(1000, undefined, { ref: false }).then((): never => {
+      throw new Error('Still waiting after a second');
+    }),
+  ]);
 
 describe('IdentityCreationGate', () => {
   let creationDetector: MockProxy<IdentityCreationDetector>;
@@ -108,5 +116,27 @@ describe('IdentityCreationGate', () => {
     expect(registrationAdmitter.admit).toHaveBeenLastCalledWith(
       new NodeRegistrationAdmitterMessage(false, REGISTRATION_CODE),
     );
+  });
+
+  it('should refuse at once a publication of an identity nested in its own publication and keep serving it', async () => {
+    const nestedPublish = jest.fn();
+    creationDetector.isCreation.mockResolvedValue(false);
+
+    await gate.publish(identity, REGISTRATION_CODE, async () => {
+      await expect(
+        withinASecond(gate.publish(identity, REGISTRATION_CODE, nestedPublish)),
+      ).rejects.toThrow(
+        'A serial section cannot be entered again from inside itself.',
+      );
+    });
+
+    expect(nestedPublish).not.toHaveBeenCalled();
+    await expect(
+      withinASecond(
+        gate.publish(identity, REGISTRATION_CODE, () =>
+          Promise.resolve('next'),
+        ),
+      ),
+    ).resolves.toBe('next');
   });
 });

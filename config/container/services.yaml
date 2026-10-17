@@ -2645,6 +2645,9 @@ services:
       /contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy
     arguments: []
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
+  shared/infrastructure/concurrency/KeyedSerialSectionIsNestedError:
+    class: /shared/infrastructure/concurrency/KeyedSerialSectionIsNestedError
+    arguments: []
   shared/infrastructure/errors/CustomHttpError: '@shared/infrastructure/errors/security/UserHasNotPermissionError'
   shared/infrastructure/errors/HandlerNotFoundError:
     class: /shared/infrastructure/errors/HandlerNotFoundError
@@ -2724,9 +2727,6 @@ services:
     arguments: []
   shared/infrastructure/local-db/LocalDatabaseIsLockedError:
     class: /shared/infrastructure/local-db/LocalDatabaseIsLockedError
-    arguments: []
-  shared/infrastructure/local-db/LocalDatabaseSectionIsNestedError:
-    class: /shared/infrastructure/local-db/LocalDatabaseSectionIsNestedError
     arguments: []
   shared/infrastructure/logs/WinstonLogger:
     class: /shared/infrastructure/logs/WinstonLogger

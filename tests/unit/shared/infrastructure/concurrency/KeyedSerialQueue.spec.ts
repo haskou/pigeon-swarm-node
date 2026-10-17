@@ -1,4 +1,13 @@
 import { KeyedSerialQueue } from '@app/shared/infrastructure/concurrency/KeyedSerialQueue';
+import { setTimeout } from 'timers/promises';
+
+const withinASecond = async <T>(pending: Promise<T>): Promise<T> =>
+  Promise.race([
+    pending,
+    setTimeout(1000, undefined, { ref: false }).then((): never => {
+      throw new Error('Still waiting after a second');
+    }),
+  ]);
 
 describe('KeyedSerialQueue', () => {
   const tick = async (): Promise<void> => {
@@ -60,5 +69,52 @@ describe('KeyedSerialQueue', () => {
       }),
     ).rejects.toThrow('failed');
     await expect(queue.run('key', async () => 'next')).resolves.toBe('next');
+  });
+
+  it('should refuse at once an action run on its key from inside an action on that key, naming no key', async () => {
+    const queue = new KeyedSerialQueue();
+    const nested = jest.fn();
+
+    await queue.run('identity-123', async () => {
+      await expect(
+        withinASecond(queue.run('identity-123', nested)),
+      ).rejects.toMatchObject({
+        message: 'A serial section cannot be entered again from inside itself.',
+      });
+    });
+
+    expect(nested).not.toHaveBeenCalled();
+    await expect(
+      withinASecond(queue.run('identity-123', () => Promise.resolve('free'))),
+    ).resolves.toBe('free');
+  });
+
+  it('should let an action on another key run inside an action', async () => {
+    const queue = new KeyedSerialQueue();
+
+    await expect(
+      withinASecond(
+        queue.run('outer', () =>
+          queue.run('inner', () => Promise.resolve('inner')),
+        ),
+      ),
+    ).resolves.toBe('inner');
+  });
+
+  it('should queue, not refuse, work an action started that runs on its key after the action ended', async () => {
+    const queue = new KeyedSerialQueue();
+    const { promise: ended, resolve: end } = Promise.withResolvers<void>();
+    const enter = (): Promise<string> =>
+      queue.run('key', () => Promise.resolve('queued'));
+    let later!: Promise<string>;
+
+    await queue.run('key', () => {
+      later = ended.then(enter);
+
+      return Promise.resolve();
+    });
+    end();
+
+    await expect(withinASecond(later)).resolves.toBe('queued');
   });
 });
