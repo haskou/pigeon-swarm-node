@@ -35,8 +35,8 @@ export class IdentityIdMother {
   }
 
   /** The key bytes of a real key behind another DER prefix byte. */
-  public static aliasPrefix(): IdentityId {
-    const der = Buffer.from(IdentityIdMother.canonical().valueOf(), 'base64');
+  public static aliasPrefix(of: IdentityId): IdentityId {
+    const der = Buffer.from(of.valueOf(), 'base64');
     der[0] = SET_TAG;
 
     return new IdentityId(der.toString('base64'));
@@ -47,8 +47,8 @@ export class IdentityIdMother {
    * 60-character body carries 4 data bits and 2 padding bits, so changing
    * only the padding bits decodes to equal bytes.
    */
-  public static reencoded(): IdentityId {
-    const body = IdentityIdMother.canonical().valueOf();
+  public static reencoded(of: IdentityId): IdentityId {
+    const body = of.valueOf();
     const index = body.length - 2;
     const value = BASE64_ALPHABET.indexOf(body[index]);
     const padding = value % PADDING_VALUES;
@@ -57,6 +57,17 @@ export class IdentityIdMother {
     return new IdentityId(
       `${body.slice(0, index)}${BASE64_ALPHABET[reencoded]}${body.slice(index + 1)}`,
     );
+  }
+
+  /** Other ids for a real key, under which its signatures still verify. */
+  public static aliases(): [string, (of: IdentityId) => IdentityId][] {
+    return [
+      ['an alias DER prefix', (of) => IdentityIdMother.aliasPrefix(of)],
+      [
+        'a non-canonical base64 encoding',
+        (of) => IdentityIdMother.reencoded(of),
+      ],
+    ];
   }
 
   /** The neutral point, which any signature verifies against. */
@@ -71,8 +82,12 @@ export class IdentityIdMother {
 
   public static forged(): [string, IdentityId][] {
     return [
-      ['an alias DER prefix', IdentityIdMother.aliasPrefix()],
-      ['a non-canonical base64 encoding', IdentityIdMother.reencoded()],
+      ...IdentityIdMother.aliases().map(
+        ([encoding, aliasOf]): [string, IdentityId] => [
+          encoding,
+          aliasOf(IdentityIdMother.canonical()),
+        ],
+      ),
       ['a small-order point', IdentityIdMother.smallOrder()],
       ['an off-curve point', IdentityIdMother.offCurve()],
     ];

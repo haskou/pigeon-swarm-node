@@ -101,6 +101,7 @@ import {
   signNotificationInvitation,
   signNotificationState,
 } from '../../support/signNotification';
+import { IdentityIdMother } from '../../unit/mothers/IdentityIdMother';
 import IPFSDefinition from './IPFSDefinition';
 import RestClient from './RestClient';
 import { RestResponse } from './RestResponse';
@@ -290,10 +291,11 @@ export default class Definitions {
     handle: string,
     version: number = 1,
     previousIdentityExternalIdentifier: string | undefined = undefined,
+    identityId: IdentityId | undefined = undefined,
   ): Promise<void> {
     const keyPair = await this.ensureIdentityKeyPair();
     const recoveryKeyPair = await this.ensureIdentityRecoveryKeyPair();
-    const ownerIdentityId = this.ownerIdentityId as IdentityId;
+    const ownerIdentityId = identityId ?? (this.ownerIdentityId as IdentityId);
     const deviceCredential = DeviceCredential.fromString(
       (await this.ensureIdentityDeviceOwnerKeyPair()).toPrimitives().publicKey,
     );
@@ -412,6 +414,16 @@ export default class Definitions {
     identityId: IdentityId | undefined,
   ): IdentityId | undefined {
     return identityId ?? this.ownerIdentityId;
+  }
+
+  private aliasOf(identityId: IdentityId, encoding: string): IdentityId {
+    const aliasOf = new Map(IdentityIdMother.aliases()).get(encoding);
+
+    if (!aliasOf) {
+      throw new Error(`Unknown identity id encoding: ${encoding}`);
+    }
+
+    return aliasOf(identityId);
   }
 
   private getCurrentRequestBody(): SignedHttpRequestBody {
@@ -4905,6 +4917,29 @@ export default class Definitions {
       version,
       version === 1 ? undefined : this.publishedGenesisExternalIdentifier,
     );
+  }
+
+  @given('I set my identity record under {string} of my key')
+  public async iSetMyIdentityRecordUnderAnAliasOfMyKey(
+    encoding: string,
+  ): Promise<void> {
+    await this.ensureIdentityKeyPair();
+    await this.buildClientSignedIdentityBody(
+      'Alias Identity',
+      'alias-identity',
+      1,
+      undefined,
+      this.aliasOf(this.ownerIdentityId as IdentityId, encoding),
+    );
+  }
+
+  /** Rewrites only the header: the signature does not cover `X-Identity-Id`. */
+  @given('the request names its signer by {string} of its key')
+  public theRequestNamesItsSignerByAnAliasOfItsKey(encoding: string): void {
+    this.headers['x-identity-id'] = this.aliasOf(
+      new IdentityId(this.headers['x-identity-id']),
+      encoding,
+    ).valueOf();
   }
 
   @when('a stranger replays my public identity record')
