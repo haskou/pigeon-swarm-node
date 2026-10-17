@@ -54,6 +54,15 @@ It keeps the node id, networks, relay configuration, identities, content and key
 
 To start over instead, stop the node and delete the `PIGEON_LOCAL_DB_PATH` folder. The node then starts with a new node id and no owner, networks, relay configuration or other local data, while the IPFS peer key under `IPFS_STORAGE_PATH` survives. Such a node is unclaimed, like a new installation: claim it with `PUT /node/owner` before anyone else can reach the API.
 
+## Upgrading from Alias Identity Ids
+
+Nodes that ran before identity ids had to be canonical may hold alias ids (a DER prefix with a different first byte, or base64 with non-zero padding bits). Such an id is refused on every signed route and in block lists, and it cannot be stored again. On each start, before the API listens, the node purges alias ids from its local exceptions and from adopted block sources, and it logs only counts: `Purged non-canonical identity ids: ownerCleared=<bool> removedEntries=<n>`.
+
+- If the node owner was stored under an alias, the purge clears the owner and the node starts unclaimed. Its first signed `PUT /node/owner` then claims it. To keep the current owner instead, stop the node and run `yarn node:reset-owner <canonical owner identity id>` before starting the upgraded node, as described above.
+- If the node's own signed block list names an alias, the list is kept and enforced locally but is not published. Re-sign it with a higher version to publish it again.
+
+The full upgrade behaviour is described in [docs/design/node-owner-registration-and-blocking.md](design/node-owner-registration-and-blocking.md). No endpoint or response shape changed; requests that use an alias id now get `401` with code `401020` or `400` with code `400080`, as described in [api.md](api.md).
+
 ## Frontend Static Assets
 
 The backend can serve static files from the root `public/` directory. This is
