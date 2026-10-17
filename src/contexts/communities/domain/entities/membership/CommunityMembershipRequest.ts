@@ -14,34 +14,6 @@ import { CommunityRequestType } from '../../value-objects/CommunityRequestType';
 import { CommunityMembershipRequestTimestamps } from './CommunityMembershipRequestTimestamps';
 
 export class CommunityMembershipRequest extends AggregateRoot {
-  public static invitation(
-    communityId: CommunityId,
-    creatorIdentityId: IdentityId,
-    identityId: IdentityId,
-    createdAt: Timestamp,
-    ownerIdentityId: IdentityId = creatorIdentityId,
-  ): CommunityMembershipRequest {
-    const request = new CommunityMembershipRequest(
-      CommunityRequestId.derive(
-        communityId.valueOf(),
-        CommunityRequestType.INVITATION,
-        creatorIdentityId.valueOf(),
-        identityId.valueOf(),
-        createdAt.valueOf(),
-      ),
-      communityId,
-      CommunityRequestType.INVITATION,
-      CommunityRequestStatus.PENDING,
-      creatorIdentityId,
-      identityId,
-      CommunityMembershipRequestTimestamps.at(createdAt),
-    );
-
-    request.recordCreated(ownerIdentityId);
-
-    return request;
-  }
-
   public static request(
     communityId: CommunityId,
     requesterIdentityId: IdentityId,
@@ -51,7 +23,6 @@ export class CommunityMembershipRequest extends AggregateRoot {
     const request = new CommunityMembershipRequest(
       CommunityRequestId.derive(
         communityId.valueOf(),
-        CommunityRequestType.REQUEST,
         requesterIdentityId.valueOf(),
         requesterIdentityId.valueOf(),
         createdAt.valueOf(),
@@ -106,13 +77,8 @@ export class CommunityMembershipRequest extends AggregateRoot {
     actorIdentityId: IdentityId,
     ownerIdentityId: IdentityId,
   ): void {
-    const canAcceptInvitation =
-      this.type.isInvitation() && this.identityId.isEqual(actorIdentityId);
-    const canAcceptRequest =
-      this.type.isRequest() && ownerIdentityId.isEqual(actorIdentityId);
-
     assert(
-      canAcceptInvitation || canAcceptRequest,
+      ownerIdentityId.isEqual(actorIdentityId),
       new CommunityRequestActorMismatchError(),
     );
   }
@@ -121,19 +87,11 @@ export class CommunityMembershipRequest extends AggregateRoot {
     actorIdentityId: IdentityId,
     ownerIdentityId: IdentityId,
   ): void {
-    const canDeclineInvitation =
-      this.type.isInvitation() &&
-      (this.identityId.isEqual(actorIdentityId) ||
-        this.creatorIdentityId.isEqual(actorIdentityId));
-    const canDeclineRequest =
-      this.type.isRequest() &&
-      (this.identityId.isEqual(actorIdentityId) ||
-        ownerIdentityId.isEqual(actorIdentityId));
+    const canDecline =
+      this.identityId.isEqual(actorIdentityId) ||
+      ownerIdentityId.isEqual(actorIdentityId);
 
-    assert(
-      canDeclineInvitation || canDeclineRequest,
-      new CommunityRequestActorMismatchError(),
-    );
+    assert(canDecline, new CommunityRequestActorMismatchError());
   }
 
   private eventAttributes(ownerIdentityId?: IdentityId) {
@@ -237,10 +195,6 @@ export class CommunityMembershipRequest extends AggregateRoot {
 
   public isAccepted(): boolean {
     return this.status.isAccepted();
-  }
-
-  public isInvitation(): boolean {
-    return this.type.isInvitation();
   }
 
   public isRequest(): boolean {

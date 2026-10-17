@@ -5,6 +5,7 @@ import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/Or
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 
 import { Community } from '../../domain/Community';
+import { CommunityInvitations } from '../../domain/entities/invitations/CommunityInvitations';
 import { CommunityNotFoundError } from '../../domain/errors/CommunityNotFoundError';
 import { CommunityOperation } from '../../domain/operations/CommunityOperation';
 import { CommunityOperationLimits } from '../../domain/operations/CommunityOperationLimits';
@@ -148,7 +149,6 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       : this.stateOf(id.valueOf(), records);
   }
 
-  /** Every community whose operations are cached locally, newest first. */
   /** Fails with the limit error a client can show, before the write is refused deeper down. */
   private assertWithinQuota(
     communityId: string,
@@ -177,6 +177,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     );
   }
 
+  /** Every community whose operations are cached locally, newest first. */
   private cachedCommunities(): Community[] {
     return this.registry
       .findCachedHeadsByPrefix(OrbitDBCommunityRepository.HEAD_PREFIX)
@@ -227,14 +228,14 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
   }
 
   /**
-   * The community as it was at `frontier`: the fold of exactly the operations
-   * in the causal past of those heads. A head this node does not hold yet makes
+   * The state as it was at `frontier`: the fold of exactly the operations in
+   * the causal past of those heads. A head this node does not hold yet makes
    * the lookup fail, so the record is retried once the operations replicated.
    */
-  public async requireAtFrontier(
+  public async requireStateAtFrontier(
     id: CommunityId,
     frontier: string[],
-  ): Promise<Community> {
+  ): Promise<{ community: Community; invitations: CommunityInvitations }> {
     const records = await this.operationIndex.findRecords(this.headKey(id));
     const state = CommunityStateFold.fold(
       CommunityStateFold.closureOf(
@@ -246,7 +247,26 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
 
     if (!community) throw new CommunityNotFoundError();
 
-    return this.copyOf(community);
+    return { community, invitations: state.invitations };
+  }
+
+  /** The community as it was at `frontier` (see `requireStateAtFrontier`). */
+  public async requireAtFrontier(
+    id: CommunityId,
+    frontier: string[],
+  ): Promise<Community> {
+    return this.copyOf(
+      (await this.requireStateAtFrontier(id, frontier)).community,
+    );
+  }
+
+  /** The invitations of an active community; none for any other. */
+  public async findInvitations(id: CommunityId): Promise<CommunityInvitations> {
+    const state = await this.findState(id);
+
+    return state && this.activeCommunityOf(state)
+      ? state.invitations
+      : CommunityInvitations.EMPTY;
   }
 
   /** The operations nobody built on yet: the parents of the next operation. */

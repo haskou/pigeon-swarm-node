@@ -6,12 +6,12 @@ import { assert, PrimitiveOf, Timestamp } from '@haskou/value-objects';
 
 import { CommunityAccessValidator } from './asserts/CommunityAccessValidator';
 import { CommunityOwnerValidator } from './asserts/CommunityOwnerValidator';
+import { CommunityPermissionValidator } from './asserts/CommunityPermissionValidator';
 import { CommunityChannelMessageMentions } from './CommunityChannelMessageMentions';
 import { CommunityChannelPermissions } from './entities/channels/CommunityChannelPermissions';
 import { CommunityChannels } from './entities/channels/CommunityChannels';
 import { CommunityTextChannel } from './entities/channels/CommunityTextChannel';
 import { CommunityVoiceChannel } from './entities/channels/CommunityVoiceChannel';
-import { CommunityInvite } from './entities/invites/CommunityInvite';
 import { CommunityMembership } from './entities/membership/CommunityMembership';
 import { CommunityMembershipRequest } from './entities/membership/CommunityMembershipRequest';
 import { CommunityRole } from './entities/membership/CommunityRole';
@@ -23,6 +23,7 @@ import { CommunityChannelMessagePayload } from './entities/messages/CommunityCha
 import { CommunityChannelMessageReaction } from './entities/messages/CommunityChannelMessageReaction';
 import { CommunityProfile } from './entities/profile/CommunityProfile';
 import { CommunitySettings } from './entities/profile/CommunitySettings';
+import { CommunityInvitationUnusableError } from './errors/CommunityInvitationUnusableError';
 import { CommunityOwnerCannotBeKickedError } from './errors/CommunityOwnerCannotBeKickedError';
 import { CommunityOwnerCannotLeaveError } from './errors/CommunityOwnerCannotLeaveError';
 import { CommunityOwnerMismatchError } from './errors/CommunityOwnerMismatchError';
@@ -34,8 +35,6 @@ import { CommunityChannelMessageWasSentEvent } from './events/CommunityChannelMe
 import { CommunityChannelWasCreatedEvent } from './events/CommunityChannelWasCreatedEvent';
 import { CommunityChannelWasDeletedEvent } from './events/CommunityChannelWasDeletedEvent';
 import { CommunityChannelWasRenamedEvent } from './events/CommunityChannelWasRenamedEvent';
-import { CommunityInviteWasAcceptedEvent } from './events/CommunityInviteWasAcceptedEvent';
-import { CommunityInviteWasCreatedEvent } from './events/CommunityInviteWasCreatedEvent';
 import { CommunityMemberWasAddedEvent } from './events/CommunityMemberWasAddedEvent';
 import { CommunityMemberWasLeftEvent } from './events/CommunityMemberWasLeftEvent';
 import { CommunityWasCreatedEvent } from './events/CommunityWasCreatedEvent';
@@ -49,8 +48,6 @@ import { CommunityChannelName } from './value-objects/CommunityChannelName';
 import { CommunityChannelType } from './value-objects/CommunityChannelType';
 import { CommunityDescription } from './value-objects/CommunityDescription';
 import { CommunityId } from './value-objects/CommunityId';
-import { CommunityInviteMaxUses } from './value-objects/CommunityInviteMaxUses';
-import { CommunityInviteNonce } from './value-objects/CommunityInviteNonce';
 import { CommunityJoinMethod } from './value-objects/CommunityJoinMethod';
 import { CommunityModerationAction } from './value-objects/CommunityModerationAction';
 import { CommunityName } from './value-objects/CommunityName';
@@ -183,19 +180,6 @@ export class Community extends AggregateRoot {
     );
   }
 
-  private assertInvitationResolvedByParty(
-    author: IdentityId,
-    request: CommunityMembershipRequest,
-  ): void {
-    const isInvitee = request.getIdentityId().isEqual(author);
-    const isCreatorWithdrawing =
-      request.isDeclined() && request.getCreatorIdentityId().isEqual(author);
-
-    if (!isInvitee && !isCreatorWithdrawing) {
-      throw new CommunityRequestActorMismatchError();
-    }
-  }
-
   private assertRequestResolvedByAuthorized(
     author: IdentityId,
     request: CommunityMembershipRequest,
@@ -221,9 +205,11 @@ export class Community extends AggregateRoot {
   }
 
   /**
-   * Applies a member join authored by `author`. The join reference (invite,
-   * invitation or request record) is verified when the operation is admitted;
-   * here only the community state decides whether the author may join.
+   * Applies a member join authored by `author`. A request record or an
+   * invitation is verified when the operation is admitted; here only the
+   * community state decides whether the author may join the member. An
+   * invitation admits only an identity that is not a member yet, so a second
+   * admission of the same joiner changes nothing.
    */
   public joinAs(
     author: IdentityId,
@@ -238,6 +224,9 @@ export class Community extends AggregateRoot {
 
     if (method.isEqual(CommunityJoinMethod.ADDED)) {
       validator.assertCanManageMembers(author);
+    } else if (method.isEqual(CommunityJoinMethod.INVITATION)) {
+      validator.assertCanManageMembers(author);
+      assert(!this.isMember(member), new CommunityInvitationUnusableError());
     } else if (method.isEqual(CommunityJoinMethod.APPROVAL)) {
       validator.assertCanApproveMembers(author);
     } else if (method.isEqual(CommunityJoinMethod.AUTOMATIC)) {
@@ -250,79 +239,13 @@ export class Community extends AggregateRoot {
     this.join(member);
   }
 
-  public createInvite(
-    actor: IdentityId,
-    nonce: CommunityInviteNonce,
-    createdAt: Timestamp,
-    expiresAt?: Timestamp,
-    maxUses?: CommunityInviteMaxUses,
-  ): CommunityInvite {
-    this.createAccessValidator().assertCanCreateInvite(actor);
-
-    const invite = CommunityInvite.create(
-      this.id,
-      actor,
-      nonce,
-      createdAt,
-      expiresAt,
-      maxUses,
-    );
-    this.record(
-      new CommunityInviteWasCreatedEvent(invite.getToken().valueOf(), {
-        communityId: this.id.valueOf(),
-        invite: invite.toPrimitives(),
-        networkId: this.networkId.valueOf(),
-      }),
-    );
-
-    return invite;
-  }
-
-  public acceptInvite(
-    member: IdentityId,
-    acceptedInvite: CommunityInvite,
-  ): void {
-    this.record(
-      new CommunityInviteWasAcceptedEvent(acceptedInvite.getToken().valueOf(), {
-        communityId: this.id.valueOf(),
-        identityId: member.valueOf(),
-        invite: acceptedInvite.toPrimitives(),
-        networkId: this.networkId.valueOf(),
-      }),
-    );
-    this.join(member);
-  }
-
-  public inviteMember(
-    actor: IdentityId,
-    invitedIdentityId: IdentityId,
-    createdAt: Timestamp,
-  ): CommunityMembershipRequest {
-    this.createAccessValidator().assertCanCreateInvite(actor);
-
-    return CommunityMembershipRequest.invitation(
-      this.id,
-      actor,
-      invitedIdentityId,
-      createdAt,
-      this.ownerIdentityId,
-    );
-  }
-
   public acceptMembershipRequest(
     actor: IdentityId,
     membershipRequest: CommunityMembershipRequest,
     updatedAt: Timestamp,
   ): void {
-    if (membershipRequest.isRequest()) {
-      this.createAccessValidator().assertCanApproveMembers(actor);
-    }
-
-    membershipRequest.accept(
-      actor,
-      membershipRequest.isRequest() ? actor : this.ownerIdentityId,
-      updatedAt,
-    );
+    this.createAccessValidator().assertCanApproveMembers(actor);
+    membershipRequest.accept(actor, actor, updatedAt);
     this.join(membershipRequest.getIdentityId());
   }
 
@@ -339,15 +262,8 @@ export class Community extends AggregateRoot {
     membershipRequest: CommunityMembershipRequest,
     updatedAt: Timestamp,
   ): void {
-    if (membershipRequest.isRequest()) {
-      this.createAccessValidator().assertCanRejectMembers(actor);
-    }
-
-    membershipRequest.decline(
-      actor,
-      membershipRequest.isRequest() ? actor : this.ownerIdentityId,
-      updatedAt,
-    );
+    this.createAccessValidator().assertCanRejectMembers(actor);
+    membershipRequest.decline(actor, actor, updatedAt);
   }
 
   public sendChannelMessage(
@@ -529,6 +445,11 @@ export class Community extends AggregateRoot {
 
   public viewModerationLog(identityId: IdentityId): void {
     this.createAccessValidator().assertCanViewModerationLog(identityId);
+  }
+
+  /** Claims name who asks to join: only those who may admit read them. */
+  public viewInvitationClaims(identityId: IdentityId): void {
+    this.createAccessValidator().assertCanManageMembers(identityId);
   }
 
   /** Whether `actor` may author a moderation log entry for `action`. */
@@ -827,6 +748,27 @@ export class Community extends AggregateRoot {
     return this.membership.isMember(identityId);
   }
 
+  public isBanned(identityId: IdentityId): boolean {
+    return this.membership.isBanned(identityId);
+  }
+
+  public getMemberIds(): IdentityId[] {
+    return this.membership.getMemberIds();
+  }
+
+  /** Whether `identityId` is the owner, or a member whose roles grant it. */
+  public holds(
+    identityId: IdentityId,
+    permission: CommunityPermission,
+  ): boolean {
+    return CommunityPermissionValidator.hasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      identityId,
+      permission,
+    );
+  }
+
   public findIdentityUpdateRecipientsFor(identityId: IdentityId): IdentityId[] {
     return this.membership
       .getMemberIds()
@@ -881,21 +823,12 @@ export class Community extends AggregateRoot {
     author: IdentityId,
     request: CommunityMembershipRequest,
   ): void {
-    const validator = this.createAccessValidator();
-
     if (request.isPending()) {
       if (!request.getCreatorIdentityId().isEqual(author)) {
         throw new CommunityRequestActorMismatchError();
       }
 
-      if (request.isInvitation()) validator.assertCanCreateInvite(author);
-      else this.requestMembership(author);
-
-      return;
-    }
-
-    if (request.isInvitation()) {
-      this.assertInvitationResolvedByParty(author, request);
+      this.requestMembership(author);
 
       return;
     }

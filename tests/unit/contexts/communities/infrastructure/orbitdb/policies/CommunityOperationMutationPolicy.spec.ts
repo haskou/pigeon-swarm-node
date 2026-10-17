@@ -1,56 +1,30 @@
-import { InvalidCommunityOperationError } from '@app/contexts/communities/domain/errors/InvalidCommunityOperationError';
+import { CommunityInvitationUnusableError } from '@app/contexts/communities/domain/errors/CommunityInvitationUnusableError';
 import { CommunityOperation } from '@app/contexts/communities/domain/operations/CommunityOperation';
 import { CommunityOperationAction } from '@app/contexts/communities/domain/value-objects/CommunityOperationAction';
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 import CommunityOperationMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityOperationMutationPolicy';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
-import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import { mock } from 'jest-mock-extended';
-import { createHash } from 'node:crypto';
 
-import { cryptoVectors } from '../../../../../../support/cryptoVectors';
 import {
+  admission,
   alice,
   ban,
   communityId,
   genesis,
   identitySignatureOf,
+  invitation,
+  invitationFieldsOf,
   join,
   mallory,
-  networkId,
   operation,
   owner,
 } from '../../../domain/operations/CommunityOperationFixtures';
 
-const { reference: REFERENCE, token: TOKEN } = cryptoVectors<{
-  inviteToken: { reference: string; token: string };
-}>('community-operation').inviteToken;
-const invite = {
-  communityId: communityId.valueOf(),
-  createdAt: 1,
-  creatorIdentityId: owner.valueOf(),
-  id: TOKEN,
-  maxUses: 1,
-  nonce: 'nonce-0123456789abcdef',
-  scopeType: 'community_invite',
-  token: TOKEN,
-};
-const use = {
-  communityId: communityId.valueOf(),
-  id: `invite-use:${TOKEN}:${alice.valueOf()}`,
-  identityId: alice.valueOf(),
-  scopeType: 'community_invite_use',
-  token: TOKEN,
-};
-
 describe('CommunityOperationMutationPolicy', () => {
-  let registry: ReturnType<typeof mock<OrbitDBReplicatedStateRegistry>>;
   let policy: CommunityOperationMutationPolicy;
 
   beforeEach(() => {
-    registry = mock<OrbitDBReplicatedStateRegistry>();
-    registry.queryDocuments.mockResolvedValue([]);
-    policy = new CommunityOperationMutationPolicy(registry);
+    policy = new CommunityOperationMutationPolicy();
   });
 
   function record(op: CommunityOperation): Record<string, unknown> {
@@ -63,20 +37,6 @@ describe('CommunityOperationMutationPolicy', () => {
       op.getAuthorIdentityId().valueOf(),
       false,
     );
-  }
-
-  function request(
-    overrides: Record<string, unknown>,
-  ): Record<string, unknown> {
-    return {
-      communityId: communityId.valueOf(),
-      id: 'request-1',
-      identityId: alice.valueOf(),
-      scopeType: 'community_membership_request',
-      status: 'accepted',
-      type: 'request',
-      ...overrides,
-    };
   }
 
   describe('expectationOf', () => {
@@ -230,13 +190,10 @@ describe('CommunityOperationMutationPolicy', () => {
       await expect(admit(forgedJoin)).rejects.toThrow();
     });
 
-    describe('join references', () => {
-      const SELF_JOIN_METHODS = ['invitation', 'invite_link'];
-
+    describe('joins', () => {
       function approvedJoin(
         method: string,
         reference?: string,
-        createdAt = 1,
       ): [CommunityOperation, CommunityOperation] {
         const created = genesis();
 
@@ -244,144 +201,62 @@ describe('CommunityOperationMutationPolicy', () => {
           created,
           operation(
             CommunityOperationAction.MEMBER_JOINED,
-            SELF_JOIN_METHODS.includes(method) ? alice : owner,
+            owner,
             {
               identityId: alice.valueOf(),
               method,
               ...(reference === undefined ? {} : { reference }),
             },
             [created],
-            createdAt,
           ),
         ];
       }
 
-      it('admits an approval that points at an accepted request', async () => {
+      it('admits an approval from the operations alone, without reading any request', async () => {
         const [created, approval] = approvedJoin('approval', 'request-1');
 
-        registry.queryDocuments.mockResolvedValue([request({})]);
         await admit(created);
 
         await expect(admit(approval)).resolves.toBeUndefined();
-        expect(registry.queryDocuments).toHaveBeenCalledWith(
-          'requests',
-          expect.any(Function),
-          [networkId.valueOf()],
-        );
       });
 
-      it.each([
-        ['no record at all', []],
-        ['a pending request', [request({ status: 'pending' })]],
-        [
-          'a request of somebody else',
-          [request({ identityId: mallory.valueOf() })],
-        ],
-        ['a request of another community', [request({ communityId: 'other' })]],
-        [
-          'an invitation instead of a request',
-          [request({ type: 'invitation' })],
-        ],
-        [
-          'a record of another kind',
-          [request({ scopeType: 'community_invite' })],
-        ],
-      ])('refuses an approval referencing %s', async (_name, records) => {
-        const [created, approval] = approvedJoin('approval', 'request-1');
+      it('admits an admission under an invitation of its causal past', async () => {
+        const created = genesis();
+        const invited = invitation([created]);
 
-        registry.queryDocuments.mockResolvedValue(records);
         await admit(created);
+        await admit(invited.operation);
 
-        await expect(admit(approval)).rejects.toThrow();
+        await expect(
+          admit(admission([invited.operation], invited, alice)),
+        ).resolves.toBeUndefined();
       });
 
-      it('admits an invitation that points at an accepted invitation', async () => {
-        const [created, invitation] = approvedJoin('invitation', 'request-1');
+      it('refuses an admission whose possession proof is not by the invitation key', async () => {
+        const created = genesis();
+        const invited = invitation([created]);
+        const other = invitation([created], owner, {}, 1, 'other');
 
-        registry.queryDocuments.mockResolvedValue([
-          request({ type: 'invitation' }),
-        ]);
         await admit(created);
+        await admit(invited.operation);
 
-        await expect(admit(invitation)).resolves.toBeUndefined();
+        await expect(
+          admit(
+            admission([invited.operation], invited, alice, owner, 2, {
+              possession: other.key.signPossession(
+                invitationFieldsOf(invited.operation, alice),
+              ),
+            }),
+          ),
+        ).rejects.toBeInstanceOf(CommunityInvitationUnusableError);
       });
 
-      it('admits an invite link only when the invite and its use are both signed', async () => {
-        const [created, viaLink] = approvedJoin('invite_link', REFERENCE);
+      it('refuses a join by the removed invite_link method', async () => {
+        const [created, removed] = approvedJoin('invite_link', 'request-1');
 
         await admit(created);
-        registry.queryDocuments.mockResolvedValue([invite]);
 
-        await expect(admit(viaLink)).rejects.toThrow();
-
-        registry.queryDocuments.mockResolvedValue([invite, use]);
-
-        await expect(admit(viaLink)).resolves.toBeUndefined();
-      });
-
-      it('refuses an invite link that signs the invite token itself', async () => {
-        const [created, viaLink] = approvedJoin('invite_link', TOKEN);
-
-        await admit(created);
-        registry.queryDocuments.mockResolvedValue([invite, use]);
-
-        await expect(admit(viaLink)).rejects.toThrow();
-      });
-
-      it('refuses an invite link whose invite names a token that is not 32 canonical bytes', async () => {
-        const malformed = 'token-1';
-        const [created, viaLink] = approvedJoin(
-          'invite_link',
-          createHash('sha256')
-            .update(`pigeon:community-invite-reference:v1\n${malformed}`)
-            .digest('base64url'),
-        );
-
-        await admit(created);
-        registry.queryDocuments.mockResolvedValue([
-          { ...invite, id: malformed, token: malformed },
-          {
-            ...use,
-            id: `invite-use:${malformed}:${alice.valueOf()}`,
-            token: malformed,
-          },
-        ]);
-
-        await expect(admit(viaLink)).rejects.toThrow(
-          InvalidCommunityOperationError,
-        );
-      });
-
-      it("refuses an invite link redeemed by another member's use", async () => {
-        const [created, viaLink] = approvedJoin('invite_link', REFERENCE);
-
-        await admit(created);
-        registry.queryDocuments.mockResolvedValue([
-          invite,
-          {
-            ...use,
-            id: `invite-use:${TOKEN}:${mallory.valueOf()}`,
-            identityId: mallory.valueOf(),
-          },
-        ]);
-
-        await expect(admit(viaLink)).rejects.toThrow();
-      });
-
-      it('refuses an invite link joined at or after the invite expiry', async () => {
-        const expiring = { ...invite, expiresAt: 10 };
-        const [created, beforeExpiry] = approvedJoin(
-          'invite_link',
-          REFERENCE,
-          9,
-        );
-        const [, atExpiry] = approvedJoin('invite_link', REFERENCE, 10);
-
-        await admit(created);
-        registry.queryDocuments.mockResolvedValue([expiring, use]);
-
-        await expect(admit(beforeExpiry)).resolves.toBeUndefined();
-        await expect(admit(atExpiry)).rejects.toThrow();
+        await expect(admit(removed)).rejects.toThrow();
       });
 
       it('refuses a join that skips the reference its method requires', async () => {

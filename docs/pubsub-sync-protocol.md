@@ -359,7 +359,8 @@ nonce)` is computed, so the id is bound to its creator. Actions are
 `community_created`, `community_updated`, `channel_created`, `channel_renamed`,
 `channel_deleted`, `channel_permissions_updated`, `role_created`, `role_updated`,
 `role_deleted`, `member_roles_updated`, `member_joined`, `member_left`,
-`member_kicked`, `member_banned` and `member_unbanned`. `createdAt` is metadata,
+`member_kicked`, `member_banned`, `member_unbanned`, `invitation_created` and
+`invitation_revoked`. `createdAt` is metadata,
 except that channel and role ids are derived from `(communityId, author,
 createdAt)`.
 
@@ -374,20 +375,50 @@ operation to the state of its causal past in a per-community ledger and refuses 
 when the author lacked the permission at that point of history. A
 `member_joined` needs evidence: `added` requires manage-members, `approval`
 requires approve-members, `automatic` requires auto-join, and self-join methods
-require author == member. Methods `approval`, `invitation` and `invite_link` carry
-a `reference` that must resolve to signed `requests` records: an accepted
-`community_membership_request` of the right type for the member, or a
-`community_invite` plus the `community_invite_use` record of the member. An
-`invite_link` reference is the invite reference
-`base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + token)))`,
-never the token, because every member reads the operations; the use record names
-the token whose reference it is. An `invite_link` join is refused once the
-invite has expired at the operation's signer-chosen `createdAt`. Replicas do not
-cap `maxUses`: the joins have no single order, so a fold cap would let any token
-holder evict an honest member with a backdated join. Every member can read the
-token, so a backdated or malicious join past `maxUses` or `expiresAt` cannot be
-refuted until joins prove possession without revealing the token (#550).
-Invites cannot be revoked yet. An
+require author == member. `approval` carries a `reference` that must resolve to
+the accepted `community_membership_request` of the member in the signed
+`requests` records. Method `invitation` is signed by the admitter, a member
+with manage-members, and carries `{identityId, invitationId, possession,
+consent}`: the digest of an `invitation_created` operation in its causal past, a
+possession proof signed by that invitation's key and a consent proof signed by
+the joiner's identity key. The ledger refuses it unless the invitation is live
+in its causal past (not revoked, its issuer's `create_invites` not cut,
+`maxUses` not reached), `createdAt` lies within the invitation's window, the
+joiner is not banned, a member or already admitted under it, and the joiner is
+the `invitee` when one is named. It reads no `requests` record, so admission
+depends only on operations and every replica stores the same set whatever the
+arrival order. `invitation_created` (args `expiresAt`, `invitationKey`,
+`maxUses`, `invitee?`) needs create-invites; its id is the operation digest and
+the secret behind `invitationKey` never leaves the joiner's client.
+`invitation_revoked` (arg `invitationId`) is signed by the issuer or a member
+with manage-members, is permanent and never evicts anyone. Every identity id in
+an operation, author and arguments, must be canonical
+(`IdentityId.isCanonicalKey()`), so equal strings mean equal keys.
+
+The fold applies an authority cut graph to invitations and admissions: a kick,
+ban, leave or role change that cuts a member's permission voids the member's
+operations that are concurrent with it and that need that permission, unless the
+cut itself is void. Concurrency is judged on the causal graph, cuts are grouped
+into strongly connected components and visited in topological order, so every
+replica decides alike. Revocations and bans are never voided. The ledger never
+voids an operation; the fold does, over the stored set.
+
+A joiner asks for admission with a `community_invitation_claim` record in the
+`requests` store (`scopeType: "community_invitation_claim"`, id
+`invitation-claim:<invitationId>:<identityId>`, author the joiner, signed
+`frontier`). It is write-once: the policy refuses a claim whose content differs
+from one its joiner already signed under the same id, and ignores stored
+records under that id that the joiner did not sign.
+It carries the possession and consent proofs, which name one joiner, and no
+authority; no join references it. A node stores it only when `identityId` is
+canonical, the invitation is in the community folded at the claim's frontier
+and live there, the proofs verify, and the joiner is neither banned nor a
+member. Like every `requests` record it replicates to all nodes of the network,
+so an operator learns who asked to join which community. Admissions can overshoot
+`maxUses` by one `maxUses` per mutually concurrent branch; this accepted residual
+is never repaired and evicts nobody. An admission counts toward the operation
+quota of its admitter, its author, like every operation.
+An
 operation with an unknown parent or unreplicated evidence is not stored; its head
 is demoted and re-admitted when the evidence replicates (see
 [readmission](#readmission-of-rejected-records)).
@@ -506,7 +537,7 @@ of carried caps are in `docs/design/causal-device-authorization.md`.
 
 Residual: community **operations** are evaluated against the state folded from
 their causal past, but the permissions of channel messages, pins, reactions,
-invites, membership requests and polls are evaluated against the community
+membership requests and polls are evaluated against the community
 state folded at admission, not at a causal frontier. A later demotion can
 therefore still make a node refuse such a record that another node admitted
 earlier.
@@ -596,18 +627,12 @@ authorizationRevision }` and an
 - `notificationSettings` documents (public scopes only) are governed the same way
   with `scopeType: "notification_settings"`; the author must be the settings
   owner (`identityId`) and the record id is `<identityId>:<scopeKey>`.
-- `requests` documents are governed with three scope types.
-  `community_invite` (author = `creatorIdentityId`; id = token =
-  `base64url(sha256(JSON([communityId, creatorIdentityId, nonce, maxUses, expiresAt ?? null])))`,
-  so the token commits to the invite limits; immutable),
-  `community_invite_use` (author = the acceptor, id
-  `invite-use:<token>:<identityId>`; refused once the invite has expired at
-  `usedAt`; `maxUses` is checked only by the accepting node's API) and
-  `community_membership_request` (id derived from community, type, creator,
-  identity and `createdAt`; creator and identity are immutable, the status moves
-  from `pending` to `accepted`/`declined` by the authorised party: invitee,
-  creator, moderator/owner or the requester). Heads are index wrappers under
-  collection `requests`; community deletion writes no unsigned tombstones.
+- `requests` documents are governed with scope type
+  `community_membership_request` (id derived from community, creator, identity
+  and `createdAt` with type `request`; creator and identity are immutable, the
+  status moves from `pending` to `accepted`/`declined` by the authorised party:
+  moderator/owner or the requester). Heads are index wrappers under collection
+  `requests`; community deletion writes no unsigned tombstones.
 - `mlsRecords` documents are governed with scope type `community_mls`
   (record id `community:<community>:mls:<recordId>` where `recordId` is
   `base64url(sha256(canonicalize({epoch, groupId, kind, payload,
@@ -647,12 +672,8 @@ target.id, createdAt]))`, immutable (tombstones are always rejected; the
   unsigned per-community tombstones on community deletion are gone). Admission
   checks the derived id and that the actor holds the permission for the action
   in the current community (channels, roles, bans, kicks with manage members,
-  invites, request decisions, owner for profile updates, message author or
+  invitations, request decisions, owner for profile updates, message author or
   manage messages for message deletions). Heads are index wrappers under collection `moderationLogs`.
-  An `invite_link_created` `target.id` is the invite reference, never the token
-  (see `docs/api.md`); the node builds it on `POST .../invites`, while
-  admission cannot tell a reference from a token, so a creator replicating its
-  own token there only leaks an invite it could share anyway.
 - Every node verifies on write, on replicated read, on head hydration and on the
   persisted head cache: signature, scope binding, the device in the identity's
   device authorization chain at the claimed revision, and the community permission (pin needs
@@ -668,7 +689,7 @@ target.id, createdAt]))`, immutable (tombstones are always rejected; the
   the node cannot sign on behalf of users.
 - Limits: device authorization is evaluated at the revision the proof claims
   ([Causal device authorization](#causal-device-authorization)), but community
-  permissions of these records (pin, reaction, moderation log, invite, request,
+  permissions of these records (pin, reaction, moderation log, request,
   poll, channel message) are still evaluated against the community state folded
   at admission, not at a causal frontier, so records of a member who later lost
   the permission stop being admitted. A head rejected

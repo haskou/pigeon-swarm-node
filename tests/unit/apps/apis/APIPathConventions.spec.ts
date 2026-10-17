@@ -33,6 +33,7 @@ const singularSegments: Record<string, true> = {
   draft: true,
   favorite: true,
   frontier: true,
+  'invitation-preview': true,
   ipfs: true,
   library: true,
   mls: true,
@@ -45,6 +46,7 @@ const singularSegments: Record<string, true> = {
   registration: true,
   'relay-configuration': true,
   'replication-status': true,
+  revocation: true,
   saved: true,
   thread: true,
   'vapid-public-key': true,
@@ -82,10 +84,7 @@ const exceptions: Record<string, string> = {
   'GET /calls/history': 'static segment beside {callId}',
   'GET /calls/ice-servers': 'static segment beside {callId}',
   'GET /communities/discover': 'verb beside {communityId}',
-  'GET /communities/invites/{inviteToken}':
-    'static segment beside {communityId}',
   'POST /calls/{callId}/participants/me/heartbeat': 'verb',
-  'POST /communities/invites/{inviteToken}/accept': 'verb',
   'POST /communities/{communityId}/channels/text':
     'static segment beside {channelId}',
   'POST /communities/{communityId}/channels/voice':

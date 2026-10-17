@@ -64,7 +64,6 @@ export default class CommunityMembershipRequestMutationPolicy extends PublicMuta
     try {
       return CommunityRequestId.derive(
         communityId,
-        request.getType(),
         creatorIdentityId,
         identityId,
         createdAt,

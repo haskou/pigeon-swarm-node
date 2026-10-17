@@ -34,7 +34,7 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
   const ownerIdentityId = new IdentityId(
     'MCowBQYDK2VwAyEAj3dYus5qe3I0IrvPl/oEM+678lbO9+1vzJSlXnlb0v4=',
   );
-  const invitedIdentityId = new IdentityId(
+  const requesterIdentityId = new IdentityId(
     'MCowBQYDK2VwAyEARcVr0970Zu0KPAIPEEvpy9RjsnM05VnDmccfWloMx8k=',
   );
   const heads = new Map<string, Record<string, unknown>>();
@@ -92,10 +92,9 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
   });
 
   it('should save and query community membership requests', async () => {
-    const request = CommunityMembershipRequest.invitation(
+    const request = CommunityMembershipRequest.request(
       communityId,
-      ownerIdentityId,
-      invitedIdentityId,
+      requesterIdentityId,
       createdAt,
       ownerIdentityId,
     );
@@ -104,10 +103,10 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     await flushBackgroundTasks();
 
     const byId = await store.requireById(request.getId());
-    const byIdentity = await store.findByIdentity(invitedIdentityId);
+    const byIdentity = await store.findByIdentity(requesterIdentityId);
     const byCommunityAndIdentity = await store.findByCommunityAndIdentity(
       communityId,
-      invitedIdentityId,
+      requesterIdentityId,
     );
     const byCommunity = await store.findByCommunities([communityId]);
 
@@ -118,10 +117,9 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
   });
 
   it('does not project a membership request when its document write fails', async () => {
-    const request = CommunityMembershipRequest.invitation(
+    const request = CommunityMembershipRequest.request(
       communityId,
-      ownerIdentityId,
-      invitedIdentityId,
+      requesterIdentityId,
       createdAt,
       ownerIdentityId,
     );
@@ -135,24 +133,25 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     await expect(store.requireById(request.getId())).rejects.toBeInstanceOf(
       CommunityRequestNotFoundError,
     );
-    await expect(store.findByIdentity(invitedIdentityId)).resolves.toEqual([]);
+    await expect(store.findByIdentity(requesterIdentityId)).resolves.toEqual(
+      [],
+    );
     expect(
       heads.has(`community-membership-request:${request.getId().valueOf()}`),
     ).toBe(false);
   });
 
   it('keeps the previous state when a resolution write fails', async () => {
-    const request = CommunityMembershipRequest.invitation(
+    const request = CommunityMembershipRequest.request(
       communityId,
-      ownerIdentityId,
-      invitedIdentityId,
+      requesterIdentityId,
       createdAt,
       ownerIdentityId,
     );
     await store.save(request, await proofOf(request));
     await flushBackgroundTasks();
     request.accept(
-      invitedIdentityId,
+      ownerIdentityId,
       ownerIdentityId,
       new Timestamp(createdAt.valueOf() + 1),
     );
@@ -169,10 +168,9 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
   });
 
   it('should find membership requests from fresh heads when identity indexes lag', async () => {
-    const request = CommunityMembershipRequest.invitation(
+    const request = CommunityMembershipRequest.request(
       communityId,
-      ownerIdentityId,
-      invitedIdentityId,
+      requesterIdentityId,
       createdAt,
       ownerIdentityId,
     );
@@ -184,10 +182,10 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     });
     await store.save(request, await proofOf(request));
     heads.delete(
-      `community-membership-request-identity-index:${invitedIdentityId.valueOf()}`,
+      `community-membership-request-identity-index:${requesterIdentityId.valueOf()}`,
     );
 
-    const byIdentity = await store.findByIdentity(invitedIdentityId);
+    const byIdentity = await store.findByIdentity(requesterIdentityId);
 
     expect(byIdentity.map((item) => item.getId().valueOf())).toEqual([
       request.getId().valueOf(),
@@ -195,10 +193,9 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
   });
 
   it('should find cached membership request heads from another repository when indexes lag', async () => {
-    const request = CommunityMembershipRequest.invitation(
+    const request = CommunityMembershipRequest.request(
       communityId,
-      ownerIdentityId,
-      invitedIdentityId,
+      requesterIdentityId,
       createdAt,
       ownerIdentityId,
     );
@@ -210,7 +207,7 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     });
     await store.save(request, await proofOf(request));
     heads.delete(
-      `community-membership-request-identity-index:${invitedIdentityId.valueOf()}`,
+      `community-membership-request-identity-index:${requesterIdentityId.valueOf()}`,
     );
     const replicatedStore = new OrbitDBCommunityMembershipRequestRepository(
       registry,
@@ -218,35 +215,10 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
       publicStorageGuard(),
     );
 
-    const byIdentity = await replicatedStore.findByIdentity(invitedIdentityId);
+    const byIdentity =
+      await replicatedStore.findByIdentity(requesterIdentityId);
 
     expect(byIdentity.map((item) => item.getId().valueOf())).toEqual([
-      request.getId().valueOf(),
-    ]);
-  });
-
-  it('should find membership requests from fresh heads by creator when identity indexes lag', async () => {
-    const request = CommunityMembershipRequest.invitation(
-      communityId,
-      ownerIdentityId,
-      invitedIdentityId,
-      createdAt,
-      ownerIdentityId,
-    );
-
-    await registry.putHead(`community:${communityId.valueOf()}`, {
-      id: communityId.valueOf(),
-      networkId: 'network-1',
-      ownerIdentityId: ownerIdentityId.valueOf(),
-    });
-    await store.save(request, await proofOf(request));
-    heads.delete(
-      `community-membership-request-identity-index:${ownerIdentityId.valueOf()}`,
-    );
-
-    const byCreator = await store.findByIdentity(ownerIdentityId);
-
-    expect(byCreator.map((item) => item.getId().valueOf())).toEqual([
       request.getId().valueOf(),
     ]);
   });

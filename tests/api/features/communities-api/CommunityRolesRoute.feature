@@ -16,13 +16,12 @@ Feature: Community roles API
     When I POST a role to the current community
     Then response code is equal to 200
     And I remember the current community role
-    And I set a community member body for another identity
-    And I sign the current community member request
-    When I POST to the current community members
+    And the community member signs the current community join request
+    When I POST to request joining the current community
     Then response code is equal to 200
     And I remember the current community membership request
     And I set an accepted community membership request body
-    And the community member signs the current membership request update
+    And I sign the current membership request update
     When I PATCH the current community membership request
     Then response code is equal to 200
     And I set community member roles body with the current role

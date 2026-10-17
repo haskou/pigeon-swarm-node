@@ -8,10 +8,14 @@ import { CommunityOperationAction } from '@app/contexts/communities/domain/value
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 
 import {
+  admission,
   alice,
+  bob,
   communityId,
   genesis,
+  invitation,
   join,
+  leave,
   operation,
   owner,
 } from './CommunityOperationFixtures';
@@ -36,7 +40,11 @@ function moderated(): {
   const role = operation(
     CommunityOperationAction.ROLE_CREATED,
     owner,
-    { name: 'builder', permissions: ['manage_channels'], roleId },
+    {
+      name: 'builder',
+      permissions: ['manage_channels', 'manage_members'],
+      roleId,
+    },
     [joinedAlice],
     3,
   );
@@ -353,6 +361,55 @@ describe('Community operation limits', () => {
 
       expect(ledger.has(flood[flood.length - 1])).toBe(true);
       expect(CommunityStateFold.fold([...base, ...flood]).skipped).toEqual([]);
+    });
+
+    it('counts an admission toward its admitter, so an admitter at its quota admits no one', () => {
+      const { base, channelId, tip } = moderated();
+      const invited = invitation([tip], owner, {}, 10);
+      const flood = chain(alice, channelId, invited.operation, roomAfter(base));
+      const last = flood[flood.length - 1];
+      const ledger = new CommunityOperationLedger();
+
+      [...base, invited.operation, ...flood].forEach((operation) =>
+        ledger.admit(operation),
+      );
+
+      expect(() =>
+        ledger.admit(admission([last], invited, bob, alice, 2_000)),
+      ).toThrow(CommunityOperationLimitExceededError);
+      expect(() =>
+        ledger.admit(admission([last], invited, bob, owner, 2_000)),
+      ).not.toThrow();
+    });
+
+    it('charges sibling admissions of one joiner to their admitter, never to the joiner', () => {
+      const { base, tip } = moderated();
+      const invited = invitation([tip], owner, {}, 10);
+      const admissions = Array.from({ length: QUOTA + EXCESS }, (_, index) =>
+        admission([invited.operation], invited, bob, alice, 2_000 + index),
+      );
+      const left = leave(admissions, bob);
+      const operations = [...base, invited.operation, ...admissions, left];
+      const ledger = new CommunityOperationLedger();
+
+      [...base, invited.operation, ...admissions].forEach((operation) =>
+        ledger.admit(operation),
+      );
+
+      expect(() => ledger.admit(left)).not.toThrow();
+
+      const state = CommunityStateFold.fold(operations);
+      const surplus = CommunityStateFold.orderOf(operations)
+        .filter((operation) => operation.getAuthorIdentityId().isEqual(alice))
+        .slice(QUOTA)
+        .map((operation) => operation.getHash());
+
+      expect(surplus).toHaveLength(EXCESS);
+      expect(state.skipped).toEqual(expect.arrayContaining(surplus));
+      expect(state.skipped).not.toContain(left.getHash());
+      expect(state.community?.toPrimitives().memberIds).not.toContain(
+        bob.valueOf(),
+      );
     });
   });
 

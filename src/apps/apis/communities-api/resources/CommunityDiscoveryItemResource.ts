@@ -9,7 +9,7 @@ export interface CommunityDiscoveryItemResource {
   id: string;
   memberCount: number;
   membershipRequest?: CommunityMembershipRequestResource;
-  membershipStatus: 'invited' | 'member' | 'none' | 'requested';
+  membershipStatus: 'member' | 'none' | 'requested';
   name: string;
   networkId: string;
   ownerIdentityId: string;

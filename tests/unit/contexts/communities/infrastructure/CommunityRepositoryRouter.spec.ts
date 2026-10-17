@@ -1,4 +1,5 @@
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityInvitations } from '@app/contexts/communities/domain/entities/invitations/CommunityInvitations';
 import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
 import { CommunityOperation } from '@app/contexts/communities/domain/operations/CommunityOperation';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -25,6 +26,7 @@ describe('CommunityRepositoryRouter', () => {
       findByMember: jest.fn().mockResolvedValue([]),
       findDiscoverable: jest.fn().mockResolvedValue([]),
       findFrontier: jest.fn().mockResolvedValue(['head']),
+      findInvitations: jest.fn(),
       findOperations: jest.fn(),
       save: jest.fn(),
     } as unknown as jest.Mocked<OrbitDBCommunityRepository>;
@@ -143,6 +145,20 @@ describe('CommunityRepositoryRouter', () => {
       'after',
       2,
     );
+  });
+
+  it('knows no invitation of a protected scope and the public ones otherwise', async () => {
+    const invitations = {} as CommunityInvitations;
+    publicRepository.findInvitations.mockResolvedValue(invitations);
+
+    await expect(router.findInvitations(id)).resolves.toBe(
+      CommunityInvitations.EMPTY,
+    );
+    expect(publicRepository.findInvitations).not.toHaveBeenCalled();
+
+    authorizationRepository.hasScope.mockResolvedValue(false);
+
+    await expect(router.findInvitations(id)).resolves.toBe(invitations);
   });
 
   it('reports the replicated frontiers of a network from the public store', async () => {

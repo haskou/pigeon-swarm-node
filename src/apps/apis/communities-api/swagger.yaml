@@ -117,7 +117,7 @@ paths:
       tags:
         - communities
       summary: Accept or decline a community invitation or join request
-      description: Invited identities can accept or decline invitations. Community owners or members with approve/reject member permissions can accept or decline join requests. Accepted requests add the target identity to memberIds.
+      description: Community owners or members with approve/reject member permissions can accept or decline join requests. Accepted requests add the target identity to memberIds.
       parameters:
         - in: path
           name: requestId
@@ -190,7 +190,7 @@ paths:
       tags:
         - communities
       summary: Get the operation frontier of a community
-      description: Returns the sorted digests of the signed community operations no other operation names as parent. A client signs its next community operation with them as parents. Any authenticated identity can read it because a non-member signs the member_joined operation of a join, an invite link or an accepted invitation. The digests are ids of immutable records already replicated to every peer of the network.
+      description: Returns the sorted digests of the signed community operations no other operation names as parent. A client signs its next community operation with them as parents. Any authenticated identity can read it because a non-member signs the member_joined operation of a join. The digests are ids of immutable records already replicated to every peer of the network.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - $ref: '#/components/parameters/XIdentityId'
@@ -210,7 +210,7 @@ paths:
       tags:
         - communities
       summary: List the signed operations of a community
-      description: Members only, like GET /communities/{communityId}. Returns every stored community operation that passed verification, including the ones the fold skipped, verbatim and sorted by digest ascending (code-unit order). Each carries the identitySignature of its author, so a member replays roles and memberships back to the creator and verifies every author itself (it authorizes community MLS commits and welcomes). Read the next page with after = the digest of the last operation while a page holds limit operations. Every member reads what an operation signs, so member_banned and member_kicked name the moderator as authorIdentityId (hiding it needs a protocol change), and an invite_link member_joined carries the invite reference, never the invite token. A page is selected by record id and only its operations are decoded; selecting it still compares the ids of every stored operation.
+      description: Members only, like GET /communities/{communityId}. Returns every stored community operation that passed verification, including the ones the fold skipped, verbatim and sorted by digest ascending (code-unit order). Each carries the identitySignature of its author, so a member replays roles and memberships back to the creator and verifies every author itself (it authorizes community MLS commits and welcomes). Read the next page with after = the digest of the last operation while a page holds limit operations. Every member reads what an operation signs, so member_banned and member_kicked name the moderator as authorIdentityId (hiding it needs a protocol change), and an invitation member_joined carries the invitation id and the possession and consent proofs of one joiner, never the link secret. A page is selected by record id and only its operations are decoded; selecting it still compares the ids of every stored operation.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: query
@@ -240,12 +240,204 @@ paths:
           description: limit is not an integer from 1 to 500, or after is not a 43-char base64url digest (code 400060).
         '409':
           description: The community is unknown to the node (CommunityNotFoundError) or the authenticated identity is not a member (CommunityMemberNotFoundError).
+  /communities/{communityId}/invitations:
+    post:
+      tags:
+        - communities
+      summary: Create a signed community invitation
+      description: Requires create_invites. The body carries the invitation_created operation and its moderation log entry. invitationKey is the public key derived from the link secret; the secret never reaches the node. maxUses is 1 to 100 (exactly 1 with invitee) and expiresAt is at most 30 days after the operation createdAt. The invitation id is the operation digest.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityInvitationBody'
+      responses:
+        '200':
+          description: Invitation created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityInvitationResource'
+        '401':
+          description: Missing or invalid request signature.
+        '409':
+          description: A domain error, such as the author lacking create_invites or a rejected operation.
+    get:
+      tags:
+        - communities
+      summary: List community invitations
+      description: Members only. Every invitation of the community as its folded operations state it, with uses, revocation and liveness.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Community invitations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityInvitationsResource'
+        '401':
+          description: Missing or invalid request signature.
+        '409':
+          description: The community is unknown to the node or the authenticated identity is not a member.
+  /communities/{communityId}/invitation-preview:
+    get:
+      tags:
+        - communities
+      summary: Preview a community invitation
+      description: Unsigned, so a link holder previews before it has an identity. The invitation key, the public key derived from the link secret, travels as Authorization Bearer, never in the URL. A missing or malformed key, an unknown key and an unusable invitation are all answered exactly like an unknown community.
+      security:
+        - InvitationKey: []
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+      responses:
+        '200':
+          description: The invitation preview.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityInvitationPreviewResource'
+        '404':
+          description: Community not found (also for a missing, malformed, unknown or unusable invitation key).
+  /communities/{communityId}/invitations/{invitationId}/claims:
+    post:
+      tags:
+        - communities
+      summary: Claim a community invitation
+      description: Signed by the joiner. Stores a write-once claim in the requests store that asks for admission and carries no authority. The mutation signs the claim payload (communityId, consent, id, identityId, invitationId, possession, scopeType community_invitation_claim) with record id invitation-claim:<invitationId>:<identityId> and a signed community frontier.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: invitationId
+          required: true
+          schema:
+            type: string
+          description: Invitation id, the digest of its invitation_created operation.
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityInvitationClaimBody'
+      responses:
+        '200':
+          description: Claim stored.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityInvitationClaimResource'
+        '401':
+          description: Missing or invalid request signature.
+        '409':
+          description: CommunityInvitationNotFoundError, CommunityInvitationUnusableError, or CommunityInvitationAlreadyClaimedError when the identity already claimed this invitation.
+  /communities/{communityId}/invitation-claims:
+    get:
+      tags:
+        - communities
+      summary: List pending community invitation claims
+      description: Requires manage_members. Returns the claims that are still pending, so an admitter can admit them.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      responses:
+        '200':
+          description: Pending claims.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityInvitationClaimsResource'
+        '401':
+          description: Missing or invalid request signature.
+        '409':
+          description: The community is unknown to the node or the authenticated identity lacks manage_members.
+  /communities/{communityId}/invitations/{invitationId}/admissions:
+    post:
+      tags:
+        - communities
+      summary: Admit a claimant under an invitation
+      description: Requires manage_members. The operation is member_joined with args consent, identityId, invitationId, method invitation and possession, copied from the claim. The author is the admitter and the join counts toward the admitter's operation quota, like every operation of its author; the founder is exempt.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: invitationId
+          required: true
+          schema:
+            type: string
+          description: Invitation id, the digest of its invitation_created operation.
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityInvitationAdmissionBody'
+      responses:
+        '200':
+          description: Identity admitted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityResource'
+        '401':
+          description: Missing or invalid request signature.
+        '409':
+          description: CommunityInvitationNotFoundError, CommunityInvitationUnusableError, or another domain error such as a missing manage_members.
+  /communities/{communityId}/invitations/{invitationId}/revocation:
+    post:
+      tags:
+        - communities
+      summary: Revoke a community invitation
+      description: Signed by the invitation issuer or by a member with manage_members. The operation is invitation_revoked with args invitationId. Revocation is permanent and never evicts an admitted member.
+      parameters:
+        - $ref: '#/components/parameters/CommunityId'
+        - in: path
+          name: invitationId
+          required: true
+          schema:
+            type: string
+          description: Invitation id, the digest of its invitation_created operation.
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityInvitationRevocationBody'
+      responses:
+        '200':
+          description: Invitation revoked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityInvitationResource'
+        '401':
+          description: Missing or invalid request signature.
+        '409':
+          description: CommunityInvitationNotFoundError or another domain error such as an invitation already revoked.
   /communities/{communityId}/moderation-logs:
     get:
       tags:
         - communities
       summary: List community moderation log entries
-      description: 'Requires manage_members. Returns OrbitDB replicated audit entries for administrative actions such as role changes, channel changes, invitations, membership decisions, bans, and moderated message deletes. An invite_link_created entry names the invite by its reference base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken))), never by the token, because manage_members does not grant create_invites. Entries are immutable and not migrated, so invite_link_created entries recorded before this rule still carry the raw token.'
+      description: 'Requires manage_members. Returns OrbitDB replicated audit entries for administrative actions such as role changes, channel changes, invitations, membership decisions, bans, and moderated message deletes.'
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: query
@@ -290,31 +482,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityMembersResource'
-    post:
-      tags:
-        - communities
-      summary: Invite an identity to a private community
-      description: Only the community owner or members with create_invites can create direct membership invitations. The invited identity is not added to memberIds until they accept the invitation.
-      parameters:
-        - $ref: '#/components/parameters/CommunityId'
-        - $ref: '#/components/parameters/XIdentityId'
-        - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XSignature'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PostCommunityMemberBody'
-      responses:
-        '200':
-          description: Pending invitation created.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommunityMembershipRequestResource'
-        '409':
-          description: Authenticated identity does not have create_invites.
   /communities/{communityId}/members/{identityId}/roles:
     put:
       tags:
@@ -352,7 +519,7 @@ paths:
       tags:
         - communities
       summary: Ban an identity from a community
-      description: Requires ban_members. Banned identities cannot request to join or accept invite links.
+      description: Requires ban_members. Banned identities cannot request to join.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - $ref: '#/components/parameters/XIdentityId'
@@ -559,83 +726,6 @@ paths:
                 $ref: '#/components/schemas/CommunityResource'
         '409':
           description: Authenticated identity cannot manage members, target is not a member, or target is the owner.
-  /communities/{communityId}/invites:
-    post:
-      tags:
-        - communities
-      summary: Create a private community invite link token
-      description: Only the community owner or a member with create_invites can create invite link tokens. The token is bearer-style; anyone with a valid token can accept it with their signed identity.  The invite carries no key material; group encryption keys are negotiated by members over MLS.
-      parameters:
-        - $ref: '#/components/parameters/CommunityId'
-        - $ref: '#/components/parameters/XIdentityId'
-        - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XSignature'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PostCommunityInviteBody'
-      responses:
-        '200':
-          description: Invite token created.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommunityInviteResource'
-        '409':
-          description: Authenticated identity is not the community owner or the invite body is invalid.
-  /communities/invites/{inviteToken}:
-    get:
-      tags:
-        - communities
-      summary: Read a private community invite link token
-      description: Returns public community metadata for frontend invite links. This endpoint is intentionally unsigned so users without an identity can preview/create an account before accepting. The invite token remains a bearer secret.
-      parameters:
-        - in: path
-          name: inviteToken
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Invite metadata.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommunityInviteDetailsResource'
-        '409':
-          description: Invite token was not found, expired, or has no uses left.
-  /communities/invites/{inviteToken}/accept:
-    post:
-      tags:
-        - communities
-      summary: Accept a private community invite link token
-      description: The authenticated identity consumes the bearer invite token and joins the linked community. The backend does not receive or decrypt community keys.
-      parameters:
-        - in: path
-          name: inviteToken
-          required: true
-          schema:
-            type: string
-        - $ref: '#/components/parameters/XIdentityId'
-        - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XSignature'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PostCommunityInviteAcceptBody'
-      responses:
-        '200':
-          description: Invite accepted and community updated.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommunityResource'
-        '409':
-          description: Invite token was not found, expired, or has no uses left.
   /communities/{communityId}/channels:
     get:
       tags:
@@ -1284,6 +1374,11 @@ paths:
         '409':
           description: Authenticated identity is not a member, the channel does not exist, or the message does not exist.
 components:
+  securitySchemes:
+    InvitationKey:
+      type: http
+      scheme: bearer
+      description: The public invitation key derived from the link secret, base64url, 20 to 128 characters.
   parameters:
     CommunityId:
       in: path
@@ -1508,7 +1603,7 @@ components:
           enum:
             - channel
             - community
-            - invite
+            - invitation
             - member
             - membership_request
             - message
@@ -1524,7 +1619,7 @@ components:
         - channel_renamed
         - community_updated
         - invitation_created
-        - invite_link_created
+        - invitation_revoked
         - member_banned
         - member_kicked
         - member_roles_updated
@@ -1585,7 +1680,6 @@ components:
         membershipStatus:
           type: string
           enum:
-            - invited
             - member
             - none
             - requested
@@ -1598,7 +1692,7 @@ components:
             - public
     PatchCommunityMembershipRequestBody:
       type: object
-      description: The mutation signs the stored request document (same fields, new status and updatedAt) in store requests, recordId = request id, sequence above the previous one. Signer is the invitee (accept/decline an invitation), the creator (decline an invitation), a moderator or the owner (resolve a request) or the requester (decline own request). operation is required when status is accepted and signs member_joined with args identityId = request.identityId, method = approval for a request or invitation for an invitation, reference = requestId; it is not sent when declining.
+      description: The mutation signs the stored request document (same fields, new status and updatedAt) in store requests, recordId = request id, sequence above the previous one. Signer is a moderator or the owner (resolve a request) or the requester (decline own request). operation is required when status is accepted and signs member_joined with args identityId = request.identityId, method = approval, reference = requestId; it is not sent when declining.
       required:
         - status
         - updatedAt
@@ -1642,7 +1736,6 @@ components:
         type:
           type: string
           enum:
-            - invitation
             - request
         status:
           type: string
@@ -1726,41 +1819,6 @@ components:
           description: Role ids that can see and access the channel. Use everyone for all members.
           items:
             type: string
-    CommunityInviteResource:
-      type: object
-      required:
-        - inviteToken
-        - communityId
-        - maxUses
-        - uses
-      properties:
-        inviteToken:
-          type: string
-        communityId:
-          type: string
-        expiresAt:
-          type: integer
-        maxUses:
-          type: integer
-        uses:
-          type: integer
-    CommunityInviteDetailsResource:
-      allOf:
-        - $ref: '#/components/schemas/CommunityInviteResource'
-        - type: object
-          required:
-            - communityName
-            - networkId
-          properties:
-            communityAvatar:
-              type: string
-            communityBanner:
-              type: string
-            communityName:
-              type: string
-            networkId:
-              type: string
-              description: Network the community belongs to. The invited identity needs it to build the signed member_joined operation.
     CommunityChannelsResource:
       type: object
       required:
@@ -2097,66 +2155,6 @@ components:
         autoJoinEnabled:
           type: boolean
           description: Set true to let any non-banned identity join without owner approval.
-    PostCommunityMemberBody:
-      type: object
-      description: The mutation signs a community_membership_request document of type invitation (creator = actor, identityId = invitee, status pending, updatedAt = createdAt). Its id is the first 24 hex chars of sha256(JSON.stringify([communityId, type, creatorIdentityId, identityId, createdAt])).
-      required:
-        - identityId
-        - createdAt
-        - mutation
-        - moderationLog
-      properties:
-        moderationLog:
-          $ref: '#/components/schemas/CommunityModerationLogBody'
-        createdAt:
-          type: integer
-          minimum: 0
-        mutation:
-          $ref: '#/components/schemas/SignedPublicMutation'
-        identityId:
-          type: string
-    PostCommunityInviteBody:
-      type: object
-      description: The mutation signs a community_invite document in store requests whose id and token are base64url(sha256(JSON.stringify([communityId, creatorIdentityId, nonce, maxUses, expiresAt ?? null]))), so the token commits to the invite limits and no replica can rewrite them. Signer is the creator. maxUses is enforced only by the accepting node's API; replicas never cap uses or joins, so partitioned accepts, a malicious node or a backdated usedAt/createdAt can exceed maxUses or expiresAt unrefuted until joins prove token possession (#550). Invites cannot be revoked; tokens derived without their limits no longer validate, so communities with such invite_link joins must be recreated.
-      required:
-        - nonce
-        - createdAt
-        - mutation
-        - moderationLog
-      properties:
-        moderationLog:
-          $ref: '#/components/schemas/CommunityModerationLogBody'
-        nonce:
-          type: string
-          minLength: 16
-          maxLength: 128
-        createdAt:
-          type: integer
-          minimum: 0
-        mutation:
-          $ref: '#/components/schemas/SignedPublicMutation'
-        expiresAt:
-          type: integer
-          description: Optional millisecond timestamp after which the invite cannot be accepted.
-        maxUses:
-          type: integer
-          minimum: 1
-          default: 1
-    PostCommunityInviteAcceptBody:
-      type: object
-      description: "The mutation signs a community_invite_use document {communityId, id 'invite-use:<token>:<identityId>', identityId, token, usedAt} in store requests, admitted only while the invite has not expired at usedAt. Signer is the acceptor. operation signs member_joined with args identityId = acceptor, method = invite_link, reference = base64url(sha256(utf8(\"pigeon:community-invite-reference:v1\\n\" + inviteToken))), never the token itself, because every member reads the operation; it is only admitted by a node that also holds the signed invite and the use record of a token with that reference, while the invite has not expired at the operation's createdAt. Expiry is judged at the signer-chosen usedAt and createdAt, so a backdated signature passes it. This node refuses the accept once the invite has maxUses recorded uses; replicas never cap maxUses."
-      required:
-        - operation
-        - usedAt
-        - mutation
-      properties:
-        operation:
-          $ref: '#/components/schemas/CommunityOperationBody'
-        usedAt:
-          type: integer
-          minimum: 0
-        mutation:
-          $ref: '#/components/schemas/SignedPublicMutation'
     PostCommunityJoinRequestBody:
       type: object
       description: The mutation signs a community_membership_request document of type request (creator = identity = requester, status pending, updatedAt = createdAt). For autoJoinEnabled communities acceptedAt, acceptedMutation and operation are required; acceptedMutation signs the same document with status accepted, updatedAt = acceptedAt and sequence + 1, signed by the requester, and operation signs member_joined with args identityId = requester, method = automatic and no reference.
@@ -2324,9 +2322,174 @@ components:
           description: Sorted by digest ascending.
           items:
             $ref: '#/components/schemas/CommunityOperationRecord'
+    PostCommunityInvitationBody:
+      type: object
+      required:
+        - expiresAt
+        - invitationKey
+        - maxUses
+        - moderationLog
+        - operation
+      properties:
+        expiresAt:
+          type: integer
+          minimum: 0
+        invitationKey:
+          type: string
+          description: Raw Ed25519 public key in canonical base64url derived from the link secret.
+        invitee:
+          type: string
+          description: Optional canonical identity id; only that identity can join. Requires maxUses 1.
+        maxUses:
+          type: integer
+          minimum: 1
+          maximum: 100
+        moderationLog:
+          $ref: '#/components/schemas/CommunityModerationLogBody'
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
+    PostCommunityInvitationClaimBody:
+      type: object
+      required:
+        - consent
+        - mutation
+        - possession
+      properties:
+        consent:
+          type: string
+          description: Signature by the joiner's identity key under pigeon:community-invitation-consent:v1.
+        possession:
+          type: string
+          description: Signature by the invitation key under pigeon:community-invitation-possession:v1.
+        mutation:
+          $ref: '#/components/schemas/SignedPublicMutation'
+    PostCommunityInvitationAdmissionBody:
+      type: object
+      required:
+        - consent
+        - identityId
+        - operation
+        - possession
+      properties:
+        consent:
+          type: string
+        identityId:
+          type: string
+        possession:
+          type: string
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
+    PostCommunityInvitationRevocationBody:
+      type: object
+      required:
+        - moderationLog
+        - operation
+      properties:
+        moderationLog:
+          $ref: '#/components/schemas/CommunityModerationLogBody'
+        operation:
+          $ref: '#/components/schemas/CommunityOperationBody'
+    CommunityInvitationResource:
+      type: object
+      required:
+        - createdAt
+        - expiresAt
+        - id
+        - invitationKey
+        - issuerIdentityId
+        - live
+        - maxUses
+        - revoked
+        - uses
+      properties:
+        createdAt:
+          type: integer
+        expiresAt:
+          type: integer
+        id:
+          type: string
+        invitationKey:
+          type: string
+        invitee:
+          type: string
+        issuerIdentityId:
+          type: string
+        live:
+          type: boolean
+        maxUses:
+          type: integer
+        revoked:
+          type: boolean
+        uses:
+          type: integer
+    CommunityInvitationsResource:
+      type: object
+      required:
+        - invitations
+      properties:
+        invitations:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityInvitationResource'
+    CommunityInvitationPreviewResource:
+      type: object
+      description: Only what a link holder needs to decide and to sign its proofs.
+      required:
+        - communityId
+        - communityName
+        - expiresAt
+        - invitationId
+        - networkId
+      properties:
+        communityAvatar:
+          type: string
+        communityBanner:
+          type: string
+        communityId:
+          type: string
+        communityName:
+          type: string
+        expiresAt:
+          type: integer
+        invitationId:
+          type: string
+        networkId:
+          type: string
+    CommunityInvitationClaimResource:
+      type: object
+      required:
+        - communityId
+        - consent
+        - id
+        - identityId
+        - invitationId
+        - possession
+      properties:
+        communityId:
+          type: string
+        consent:
+          type: string
+        id:
+          type: string
+          description: invitation-claim:<invitationId>:<identityId>
+        identityId:
+          type: string
+        invitationId:
+          type: string
+        possession:
+          type: string
+    CommunityInvitationClaimsResource:
+      type: object
+      required:
+        - claims
+      properties:
+        claims:
+          type: array
+          items:
+            $ref: '#/components/schemas/CommunityInvitationClaimResource'
     CommunityModerationLogBody:
       type: object
-      description: 'Client-signed moderation log entry, kept as the audit trail beside the signed community operation (separate signature, separate store). The mutation signs {action, actorIdentityId, communityId, createdAt, details, id, scopeType ''community_moderation_log'', target {id, type}} in store moderationLogs, recordId = id, sequence 0, signer = the acting moderator. id is the first 24 hex chars of sha256(JSON.stringify([communityId, actorIdentityId, action, target.type, target.id, createdAt])). For channel and role creation target.id is the channel/role id derived from the operation createdAt, not from this createdAt. For invite_link_created target.id is the invite reference base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken))), never the token.'
+      description: "Client-signed moderation log entry, kept as the audit trail beside the signed community operation (separate signature, separate store). The mutation signs {action, actorIdentityId, communityId, createdAt, details, id, scopeType 'community_moderation_log', target {id, type}} in store moderationLogs, recordId = id, sequence 0, signer = the acting moderator. id is the first 24 hex chars of sha256(JSON.stringify([communityId, actorIdentityId, action, target.type, target.id, createdAt])). For channel and role creation target.id is the channel/role id derived from the operation createdAt, not from this createdAt."
       required:
         - createdAt
         - mutation
@@ -2573,7 +2736,7 @@ components:
           items:
             type: string
             pattern: '^[A-Za-z0-9_-]{43}$'
-          description: Digests of the community operations observed when signing, strictly ascending. Required, and only allowed, on records scoped to a community (channel messages and their reactions and pins, invites, membership requests, moderation log, MLS records, polls); the record's permission is judged against the community folded at exactly this frontier. Read it from GET /communities/{id}/frontier before signing.
+          description: Digests of the community operations observed when signing, strictly ascending. Required, and only allowed, on records scoped to a community (channel messages and their reactions and pins, membership requests, moderation log, MLS records, polls); the record's permission is judged against the community folded at exactly this frontier. Read it from GET /communities/{id}/frontier before signing.
         predecessor:
           type: string
           nullable: true

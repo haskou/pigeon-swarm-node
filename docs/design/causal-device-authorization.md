@@ -24,10 +24,10 @@ recomputed whenever a record is admitted or read, so:
 
 | Check | Evaluated against | Causal? |
 | --- | --- | --- |
-| Community operation permission (`CommunityOperationLedger.admit`) | `CommunityStateFold` of `closureOf(parents)`; unknown parents are refused | yes |
+| Community operation permission (`CommunityOperationLedger.admit`) | `CommunityStateFold` of `closureOf(parents)`; unknown parents are refused. The fold then voids invitations and invitation admissions whose author's permission a standing cut removes outside their causal past (`CommunityAuthorityCuts`, see `signed-community-invitations.md`) | yes |
 | Conversation operation permission (`ConversationOperationApplier.create`) | the genesis alone; a 1:1 accepts no other operation, and the group member and admin operations are refused since D15 | yes |
 | Device authorization of **every** signed record, operations included | the current head of the author's identity | **no** |
-| Community / conversation permission of non-operation records (community channel messages, pins and reactions, moderation log, invites, polls, calls) | the current folded community or conversation state | no, evaluated at admission (see [Residuals](#residuals)) |
+| Community / conversation permission of non-operation records (community channel messages, pins and reactions, moderation log, membership requests, polls, calls) | the current folded community or conversation state | no, evaluated at admission (see [Residuals](#residuals)) |
 
 Operation ledgers are in memory; after a restart they are rebuilt by the
 registry replaying the stored records, whatever the order. Unknown parents are
@@ -287,6 +287,12 @@ local secrets. A revoked device reads up to the group that removed it. See
   removed later can still sign a record that claims an older frontier, which no
   node can tell apart from honest late delivery without a trusted clock. It is
   the same family as the compromised-device window tracked in #386.
+- **Backdated community operations of a removed member (#543).** A member
+  removed later can still sign an operation whose parents predate its
+  removal; the ledger admits it at that causal past. The authority cut voids
+  such invitations and invitation admissions. Every other operation that
+  needs a permission (channels, roles, kicks, `added`) is still decided by
+  the linear fold alone until #543 voids them with the same cut graph.
 - **Recovery is the explicit hard cut.** It discards the pre-checkpoint chain,
   so records signed by pre-recovery devices become unverifiable and are
   refused. This fails closed on purpose: recovery is what an owner does after

@@ -1,8 +1,12 @@
 import { assert } from '@haskou/value-objects';
 
 import { Community } from '../Community';
+import { CommunityInvitation } from '../entities/invitations/CommunityInvitation';
+import { CommunityInvitations } from '../entities/invitations/CommunityInvitations';
 import { InvalidCommunityOperationError } from '../errors/InvalidCommunityOperationError';
+import { CommunityAuthorityCuts } from './CommunityAuthorityCuts';
 import { CommunityOperation } from './CommunityOperation';
+import { CommunityOperationAncestry } from './CommunityOperationAncestry';
 import { CommunityOperationApplier } from './CommunityOperationApplier';
 import { CommunityOperationLimits } from './CommunityOperationLimits';
 import { CommunityOperationRebase } from './CommunityOperationRebase';
@@ -20,9 +24,14 @@ import { CommunityState } from './CommunityState';
  * state it applies to (see `CommunityOperationRebase`), so it changes only
  * what its author changed and concurrent changes to the rest are kept.
  *
- * An identity other than the founder (the genesis author) signs a bounded number of operations per
- * community: the ones ordered after its quota are skipped, whether or not they
- * were permitted.
+ * An identity other than the founder (the genesis author) signs a bounded
+ * number of operations per community: the ones ordered after its quota are
+ * skipped, whether or not they were permitted.
+ *
+ * Invitations and admissions are also judged by the authority cuts of the
+ * whole set (see `CommunityAuthorityCuts`): a void one is skipped, and an
+ * invitation whose issuer a standing cut outside its closure took
+ * `create_invites` from is cut for every later admission.
  */
 export class CommunityStateFold {
   /** Operations whose parents are all known, deduplicated by digest. */
@@ -97,35 +106,65 @@ export class CommunityStateFold {
   }
 
   /**
+   * The state folded from the causal past of `operation`, remembered in
+   * `pasts` per set of parents and shared by the operations built on it.
+   */
+  private static pastOf(
+    ordered: CommunityOperation[],
+    operation: CommunityOperation,
+    pasts: Map<string, CommunityState>,
+  ): CommunityState {
+    const parents = operation.getParents();
+    const key = [...parents].sort().join(' ');
+    let past = pasts.get(key);
+
+    if (!past) {
+      past = CommunityStateFold.foldOf(
+        CommunityStateFold.closureOf(ordered, parents),
+        pasts,
+      );
+      pasts.set(key, past);
+    }
+
+    return past;
+  }
+
+  /**
    * The community the author of a concurrent whole value saw when signing it
    * on top of its parents; none for any other operation, which is built on
-   * the state it applies to or has nothing concurrent to keep. `pasts`
-   * remembers it per set of parents, shared by the operations built on it.
+   * the state it applies to or has nothing concurrent to keep.
    */
   private static baseOf(
     ordered: CommunityOperation[],
     operation: CommunityOperation,
     concurrent: boolean,
-    pasts: Map<string, Community | undefined>,
+    pasts: Map<string, CommunityState>,
   ): Community | undefined {
-    if (!concurrent || !CommunityOperationRebase.rebases(operation)) {
-      return undefined;
-    }
+    return concurrent && CommunityOperationRebase.rebases(operation)
+      ? CommunityStateFold.pastOf(ordered, operation, pasts).community
+      : undefined;
+  }
 
-    const parents = operation.getParents();
-    const key = [...parents].sort().join(' ');
+  /**
+   * Whether `operation` is void by the authority cuts: an invitation or an
+   * admission a standing cut reaches, or an admission under a void
+   * invitation.
+   */
+  private static isVoid(
+    operation: CommunityOperation,
+    cuts: CommunityAuthorityCuts,
+    byHash: Map<string, CommunityOperation>,
+  ): boolean {
+    if (cuts.isVoid(operation)) return true;
 
-    if (!pasts.has(key)) {
-      pasts.set(
-        key,
-        CommunityStateFold.foldOf(
-          CommunityStateFold.closureOf(ordered, parents),
-          pasts,
-        ).community,
-      );
-    }
+    const { invitationId } = operation.getArguments();
+    const invitation =
+      CommunityInvitation.isAdmission(operation) &&
+      typeof invitationId === 'string'
+        ? byHash.get(invitationId)
+        : undefined;
 
-    return pasts.get(key);
+    return !!invitation && cuts.isVoid(invitation);
   }
 
   /** `community` after `operation`; throws when it is not permitted. */
@@ -155,40 +194,63 @@ export class CommunityStateFold {
 
   private static foldOf(
     operations: CommunityOperation[],
-    pasts: Map<string, Community | undefined>,
+    pasts: Map<string, CommunityState>,
   ): CommunityState {
     const ordered = CommunityStateFold.orderOf(operations);
+    const byHash = new Map(
+      ordered.map((operation) => [operation.getHash(), operation]),
+    );
+    const cuts = new CommunityAuthorityCuts(
+      ordered,
+      new CommunityOperationAncestry(ordered),
+      (operation) =>
+        CommunityAuthorityCuts.takenBy(
+          CommunityStateFold.pastOf(ordered, operation, pasts).community,
+          operation,
+        ),
+    );
     const skipped: string[] = [];
     const withinQuota = CommunityStateFold.quotaOf(ordered);
     const heads = new Set<string>();
     let community: Community | undefined;
+    let invitations = CommunityInvitations.EMPTY;
     let deleted = false;
 
     for (const operation of ordered) {
       const concurrent = CommunityStateFold.advance(heads, operation);
+      let applied = false;
 
-      if (!withinQuota(operation) || deleted) {
-        skipped.push(operation.getHash());
-        continue;
+      if (
+        withinQuota(operation) &&
+        !deleted &&
+        !CommunityStateFold.isVoid(operation, cuts, byHash)
+      ) {
+        try {
+          community = CommunityStateFold.next(
+            community,
+            operation,
+            CommunityStateFold.baseOf(ordered, operation, concurrent, pasts),
+          );
+          community.pullDomainEvents();
+          deleted = !community.hasMembers();
+          applied = true;
+        } catch {
+          applied = false;
+        }
       }
 
-      try {
-        community = CommunityStateFold.next(
-          community,
-          operation,
-          CommunityStateFold.baseOf(ordered, operation, concurrent, pasts),
-        );
-        community.pullDomainEvents();
-        deleted = !community.hasMembers();
-      } catch {
-        skipped.push(operation.getHash());
-      }
+      if (!applied) skipped.push(operation.getHash());
+
+      invitations = invitations.after(operation, applied);
     }
 
     return {
       community,
       deleted,
       frontier: CommunityStateFold.frontierOf(ordered),
+      invitations: invitations.cutWhere((invitation) =>
+        cuts.cutsIssuerOf(invitation),
+      ),
       skipped,
     };
   }

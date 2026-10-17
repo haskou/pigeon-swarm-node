@@ -13,19 +13,6 @@ describe('CommunityMembershipRequest', () => {
     'MCowBQYDK2VwAyEAMQ/tsR2Zc/+lWaGwtUAk2CUOjMyVw8hRlaxSzu9smrA=',
   );
 
-  it('lets an invited identity accept an invitation', () => {
-    const request = CommunityMembershipRequest.invitation(
-      communityId,
-      ownerIdentityId,
-      memberIdentityId,
-      at,
-    );
-
-    request.accept(memberIdentityId, ownerIdentityId, at);
-
-    expect(request.toPrimitives().status).toBe('accepted');
-  });
-
   it('lets the community owner accept a join request', () => {
     const request = CommunityMembershipRequest.request(
       communityId,
@@ -52,15 +39,14 @@ describe('CommunityMembershipRequest', () => {
     );
   });
 
-  it('rejects accepting an invitation by a different identity', () => {
-    const request = CommunityMembershipRequest.invitation(
+  it('rejects accepting a join request by a non-owner', () => {
+    const request = CommunityMembershipRequest.request(
       communityId,
-      ownerIdentityId,
       memberIdentityId,
       at,
     );
 
-    expect(() => request.accept(ownerIdentityId, ownerIdentityId, at)).toThrow(
+    expect(() => request.accept(memberIdentityId, ownerIdentityId, at)).toThrow(
       'Identity cannot resolve this community membership request',
     );
   });

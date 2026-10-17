@@ -282,9 +282,7 @@ services:
     class: /apps/initializers/public-mutations/CommunityGovernanceMutationPolicies
     arguments:
       - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy
-      - >-
-        @contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityInvitationClaimMutationPolicy
       - >-
         @contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy
       - >-
@@ -631,12 +629,12 @@ services:
       - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
       - '@contexts/identities/domain/repositories/IdentityRepository'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
-  contexts/communities/application/accept-invite/CommunityInviteAccepter:
-    class: /contexts/communities/application/accept-invite/CommunityInviteAccepter
+  contexts/communities/application/admit-invitation/CommunityInvitationAdmitter:
+    class: >-
+      /contexts/communities/application/admit-invitation/CommunityInvitationAdmitter
     arguments:
       - '@contexts/communities/application/find-community/CommunityFinder'
       - '@contexts/communities/domain/repositories/CommunityRepository'
-      - '@contexts/communities/domain/repositories/CommunityInviteRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
   contexts/communities/application/apply-private-control/PrivateCommunityControlApplier:
     class: >-
@@ -675,6 +673,14 @@ services:
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
       - >-
         @contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder
+  contexts/communities/application/claim-invitation/CommunityInvitationClaimer:
+    class: >-
+      /contexts/communities/application/claim-invitation/CommunityInvitationClaimer
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+      - >-
+        @contexts/communities/domain/repositories/CommunityInvitationClaimRepository
   contexts/communities/application/create-channel/CommunityTextChannelCreator:
     class: >-
       /contexts/communities/application/create-channel/CommunityTextChannelCreator
@@ -698,11 +704,12 @@ services:
     arguments:
       - '@contexts/communities/domain/repositories/CommunityRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
-  contexts/communities/application/create-invite/CommunityInviteCreator:
-    class: /contexts/communities/application/create-invite/CommunityInviteCreator
+  contexts/communities/application/create-invitation/CommunityInvitationCreator:
+    class: >-
+      /contexts/communities/application/create-invitation/CommunityInvitationCreator
     arguments:
       - '@contexts/communities/application/find-community/CommunityFinder'
-      - '@contexts/communities/domain/repositories/CommunityInviteRepository'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
       - >-
         @contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder
@@ -781,11 +788,20 @@ services:
     class: /contexts/communities/application/find-community/CommunityFinder
     arguments:
       - '@contexts/communities/domain/repositories/CommunityRepository'
-  contexts/communities/application/find-invite/CommunityInviteDetailsFinder:
-    class: /contexts/communities/application/find-invite/CommunityInviteDetailsFinder
+  contexts/communities/application/find-invitation-claims/CommunityInvitationClaimsFinder:
+    class: >-
+      /contexts/communities/application/find-invitation-claims/CommunityInvitationClaimsFinder
     arguments:
       - '@contexts/communities/application/find-community/CommunityFinder'
-      - '@contexts/communities/domain/repositories/CommunityInviteRepository'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+      - >-
+        @contexts/communities/domain/repositories/CommunityInvitationClaimRepository
+  contexts/communities/application/find-invitations/CommunityInvitationsFinder:
+    class: >-
+      /contexts/communities/application/find-invitations/CommunityInvitationsFinder
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
   contexts/communities/application/find-membership-requests/CommunityMembershipRequestsFinder:
     class: >-
       /contexts/communities/application/find-membership-requests/CommunityMembershipRequestsFinder
@@ -811,15 +827,6 @@ services:
     arguments:
       - '@contexts/communities/application/find-community/CommunityFinder'
       - '@contexts/communities/domain/repositories/CommunityRepository'
-  contexts/communities/application/invite-member/CommunityMemberInviter:
-    class: /contexts/communities/application/invite-member/CommunityMemberInviter
-    arguments:
-      - '@contexts/communities/application/find-community/CommunityFinder'
-      - >-
-        @contexts/communities/domain/repositories/CommunityMembershipRequestRepository
-      - '@shared/infrastructure/messageBus/DomainEventPublisher'
-      - >-
-        @contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder
   contexts/communities/application/kick-member/CommunityMemberKicker:
     class: /contexts/communities/application/kick-member/CommunityMemberKicker
     arguments:
@@ -881,6 +888,12 @@ services:
       - >-
         @contexts/communities/domain/repositories/CommunityChannelMessagePinRepository
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/communities/application/preview-invitation/CommunityInvitationPreviewer:
+    class: >-
+      /contexts/communities/application/preview-invitation/CommunityInvitationPreviewer
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
   contexts/communities/application/publish-mls-record/MLSRecordPublisher:
     class: /contexts/communities/application/publish-mls-record/MLSRecordPublisher
     arguments:
@@ -929,6 +942,15 @@ services:
       - >-
         @contexts/communities/domain/repositories/CommunityMembershipRequestRepository
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+  contexts/communities/application/revoke-invitation/CommunityInvitationRevoker:
+    class: >-
+      /contexts/communities/application/revoke-invitation/CommunityInvitationRevoker
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
+      - '@contexts/communities/domain/repositories/CommunityRepository'
+      - '@shared/infrastructure/messageBus/DomainEventPublisher'
+      - >-
+        @contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder
   contexts/communities/application/search-channel-messages/CommunityChannelMessageSearchFinder:
     class: >-
       /contexts/communities/application/search-channel-messages/CommunityChannelMessageSearchFinder
@@ -997,8 +1019,8 @@ services:
     @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessagePinRepository
   contexts/communities/domain/repositories/CommunityChannelMessageRepository: >-
     @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessageRepository
-  contexts/communities/domain/repositories/CommunityInviteRepository: >-
-    @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInviteRepository
+  contexts/communities/domain/repositories/CommunityInvitationClaimRepository: >-
+    @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInvitationClaimRepository
   contexts/communities/domain/repositories/CommunityMembershipRequestRepository: >-
     @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityMembershipRequestRepository
   contexts/communities/domain/repositories/CommunityMessageReactionRepository: >-
@@ -1066,15 +1088,14 @@ services:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - >-
         @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessageIndex
-  contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInviteRepository:
+  contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInvitationClaimRepository:
     class: >-
-      /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInviteRepository
+      /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInvitationClaimRepository
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
-      - >-
-        @contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityInviteMapper
       - '@contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard'
-    parent: contexts/communities/domain/repositories/CommunityInviteRepository
+    parent: >-
+      contexts/communities/domain/repositories/CommunityInvitationClaimRepository
   contexts/communities/infrastructure/orbitdb/OrbitDBCommunityMembershipRequestRepository:
     class: >-
       /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityMembershipRequestRepository
@@ -1122,10 +1143,6 @@ services:
     class: >-
       /contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityChannelMessageReactionMapper
     arguments: []
-  contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityInviteMapper:
-    class: >-
-      /contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityInviteMapper
-    arguments: []
   contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMembershipRequestMapper:
     class: >-
       /contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityMembershipRequestMapper
@@ -1148,18 +1165,13 @@ services:
     arguments:
       - '@contexts/communities/domain/repositories/CommunityRepository'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
-  contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy:
+  contexts/communities/infrastructure/orbitdb/policies/CommunityInvitationClaimMutationPolicy:
     class: >-
-      /contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy
+      /contexts/communities/infrastructure/orbitdb/policies/CommunityInvitationClaimMutationPolicy
     arguments:
       - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
-    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
-  contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy:
-    class: >-
-      /contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy
-    arguments:
-      - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
-      - '@contexts/communities/domain/repositories/CommunityInviteRepository'
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/public-mutations/domain/services/PublicMutationVerifier'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy:
     class: >-
@@ -1176,8 +1188,7 @@ services:
   contexts/communities/infrastructure/orbitdb/policies/CommunityOperationMutationPolicy:
     class: >-
       /contexts/communities/infrastructure/orbitdb/policies/CommunityOperationMutationPolicy
-    arguments:
-      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+    arguments: []
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/communities/infrastructure/orbitdb/policies/MLSRecordMutationPolicy:
     class: >-

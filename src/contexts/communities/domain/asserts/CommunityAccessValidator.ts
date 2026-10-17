@@ -11,7 +11,6 @@ import { CommunityChannelMessageAuthorMismatchError } from '../errors/CommunityC
 import { CommunityChannelNotFoundError } from '../errors/CommunityChannelNotFoundError';
 import { CommunityMemberBannedError } from '../errors/CommunityMemberBannedError';
 import { CommunityMemberNotFoundError } from '../errors/CommunityMemberNotFoundError';
-import { CommunityRequestActorMismatchError } from '../errors/CommunityRequestActorMismatchError';
 import { CommunityChannelId } from '../value-objects/CommunityChannelId';
 import { CommunityModerationAction } from '../value-objects/CommunityModerationAction';
 import { CommunityPermission } from '../value-objects/CommunityPermission';
@@ -61,30 +60,18 @@ export class CommunityAccessValidator {
   }
 
   /**
-   * Requests are decided by moderators; invitations by the invited identity,
-   * or (declines only) by whoever may create invitations.
+   * Issuers revoke their own invitations (they hold `create_invites`);
+   * `manage_members` holders revoke any invitation.
    */
-  private assertCanRecordMembershipRequestDecision(
-    actor: IdentityId,
-    accepted: boolean,
-    details: Record<string, unknown>,
-  ): void {
-    if (details.type === 'request') {
-      if (accepted) {
-        this.assertCanApproveMembers(actor);
-      } else {
-        this.assertCanRejectMembers(actor);
-      }
+  private assertCanRevokeInvitation(actor: IdentityId): void {
+    const canManageMembers = CommunityPermissionValidator.hasPermission(
+      this.ownerIdentityId,
+      this.membership,
+      actor,
+      CommunityPermission.MANAGE_MEMBERS,
+    );
 
-      return;
-    }
-
-    if (details.identityId === actor.valueOf()) {
-      return;
-    }
-
-    assert(!accepted, new CommunityRequestActorMismatchError());
-    this.assertCanCreateInvite(actor);
+    if (!canManageMembers) this.assertCanCreateInvite(actor);
   }
 
   public assertIsMember(identityId: IdentityId): void {
@@ -228,15 +215,16 @@ export class CommunityAccessValidator {
       [CommunityModerationAction.COMMUNITY_UPDATED.valueOf()]: () =>
         CommunityOwnerValidator.assertIsOwner(this.ownerIdentityId, actor),
       [CommunityModerationAction.INVITATION_CREATED.valueOf()]: createInvite,
-      [CommunityModerationAction.INVITE_LINK_CREATED.valueOf()]: createInvite,
+      [CommunityModerationAction.INVITATION_REVOKED.valueOf()]: () =>
+        this.assertCanRevokeInvitation(actor),
       [CommunityModerationAction.MEMBER_BANNED.valueOf()]: banMembers,
       [CommunityModerationAction.MEMBER_KICKED.valueOf()]: manageMembers,
       [CommunityModerationAction.MEMBER_ROLES_UPDATED.valueOf()]: manageRoles,
       [CommunityModerationAction.MEMBER_UNBANNED.valueOf()]: banMembers,
       [CommunityModerationAction.MEMBERSHIP_REQUEST_ACCEPTED.valueOf()]: () =>
-        this.assertCanRecordMembershipRequestDecision(actor, true, details),
+        this.assertCanApproveMembers(actor),
       [CommunityModerationAction.MEMBERSHIP_REQUEST_DECLINED.valueOf()]: () =>
-        this.assertCanRecordMembershipRequestDecision(actor, false, details),
+        this.assertCanRejectMembers(actor),
       [CommunityModerationAction.MESSAGE_DELETED.valueOf()]: () =>
         this.assertCanRecordMessageDeletion(
           actor,

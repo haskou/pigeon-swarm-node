@@ -7,6 +7,8 @@ const communityOperationActions = {
   CHANNEL_RENAMED: 'channel_renamed',
   COMMUNITY_CREATED: 'community_created',
   COMMUNITY_UPDATED: 'community_updated',
+  INVITATION_CREATED: 'invitation_created',
+  INVITATION_REVOKED: 'invitation_revoked',
   MEMBER_BANNED: 'member_banned',
   MEMBER_JOINED: 'member_joined',
   MEMBER_KICKED: 'member_kicked',
@@ -42,6 +44,14 @@ export class CommunityOperationAction extends Enum<string> {
 
   public static readonly COMMUNITY_UPDATED = new CommunityOperationAction(
     communityOperationActions.COMMUNITY_UPDATED,
+  );
+
+  public static readonly INVITATION_CREATED = new CommunityOperationAction(
+    communityOperationActions.INVITATION_CREATED,
+  );
+
+  public static readonly INVITATION_REVOKED = new CommunityOperationAction(
+    communityOperationActions.INVITATION_REVOKED,
   );
 
   public static readonly MEMBER_BANNED = new CommunityOperationAction(

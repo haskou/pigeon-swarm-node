@@ -5,7 +5,6 @@ const communityJoinMethods = {
   APPROVAL: 'approval',
   AUTOMATIC: 'automatic',
   INVITATION: 'invitation',
-  INVITE_LINK: 'invite_link',
 } as const;
 
 export class CommunityJoinMethod extends Enum<string> {
@@ -24,14 +23,12 @@ export class CommunityJoinMethod extends Enum<string> {
     communityJoinMethods.AUTOMATIC,
   );
 
-  /** The identity accepts a direct invitation addressed to it. */
+  /**
+   * A member with manage-members permission admits the claim of an identity
+   * that holds an invitation link and consents to join.
+   */
   public static readonly INVITATION = new CommunityJoinMethod(
     communityJoinMethods.INVITATION,
-  );
-
-  /** The identity redeems an invite link. */
-  public static readonly INVITE_LINK = new CommunityJoinMethod(
-    communityJoinMethods.INVITE_LINK,
   );
 
   public getValues(): string[] {
@@ -40,19 +37,11 @@ export class CommunityJoinMethod extends Enum<string> {
 
   /** Whether the joining identity signs its own join. */
   public isSelfJoin(): boolean {
-    return (
-      this.isEqual(CommunityJoinMethod.AUTOMATIC) ||
-      this.isEqual(CommunityJoinMethod.INVITATION) ||
-      this.isEqual(CommunityJoinMethod.INVITE_LINK)
-    );
+    return this.isEqual(CommunityJoinMethod.AUTOMATIC);
   }
 
   /** Whether a signed record outside the operation log must allow the join. */
   public requiresReference(): boolean {
-    return (
-      this.isEqual(CommunityJoinMethod.APPROVAL) ||
-      this.isEqual(CommunityJoinMethod.INVITATION) ||
-      this.isEqual(CommunityJoinMethod.INVITE_LINK)
-    );
+    return this.isEqual(CommunityJoinMethod.APPROVAL);
   }
 }

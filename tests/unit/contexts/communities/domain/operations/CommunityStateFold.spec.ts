@@ -5,14 +5,22 @@ import { CommunityOperationAction } from '@app/contexts/communities/domain/value
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 
 import {
+  admission,
   alice,
+  assignRoles,
   ban,
+  bob,
   communityId,
   genesis,
+  Invitation,
+  invitation,
   join,
+  kick,
   mallory,
   operation,
   owner,
+  revoke,
+  role,
 } from './CommunityOperationFixtures';
 
 function stateOf(operations: CommunityOperation[]) {
@@ -409,29 +417,176 @@ describe('CommunityStateFold', () => {
     );
   });
 
-  it('never skips a concurrent invite link join, so no token holder can evict a member', () => {
-    const viaLink = (member: typeof alice, parents: CommunityOperation[]) =>
-      operation(
-        CommunityOperationAction.MEMBER_JOINED,
-        member,
-        {
-          identityId: member.valueOf(),
-          method: 'invite_link',
-          reference: 'invite-reference-0000000000000000000000000',
-        },
-        parents,
-      );
+  describe('invitations', () => {
     const created = genesis();
-    const aliceJoin = viaLink(alice, [created]);
-    const malloryJoin = viaLink(mallory, [created]);
-    const operations = [created, aliceJoin, malloryJoin];
-    const expected = stateOf(operations);
+    const managers = role([created], ['create_invites', 'manage_members'], 2);
+    const malloryJoins = join([managers], mallory);
+    const base = assignRoles([malloryJoins], mallory, [managers], owner, 3);
+    const history = [created, managers, malloryJoins, base];
 
-    expect(expected.community!.memberIds).toEqual(
-      expect.arrayContaining([alice.valueOf(), mallory.valueOf()]),
-    );
-    expect(expected.skipped).toEqual([]);
-    for (let seed = 1; seed <= 20; seed++)
-      expect(stateOf(shuffled(operations, seed))).toEqual(expected);
+    function invitationIn(
+      operations: CommunityOperation[],
+      invited: Invitation,
+    ) {
+      const state = CommunityStateFold.fold(operations);
+      const read = state.invitations.find(invited.operation.getHash());
+
+      return read && state.community
+        ? read.toPrimitives(state.community)
+        : undefined;
+    }
+
+    function expectConverges(operations: CommunityOperation[]) {
+      const expected = stateOf(operations);
+
+      for (let seed = 1; seed <= 20; seed++) {
+        expect(stateOf(shuffled(operations, seed))).toEqual(expected);
+      }
+
+      return expected;
+    }
+
+    it('admits concurrent admissions under one invitation on every replica', () => {
+      const invited = invitation([base], owner, {}, 10);
+      const admitted = [alice, bob].map((joiner) =>
+        admission([invited.operation], invited, joiner, owner, 11),
+      );
+      const operations = [...history, invited.operation, ...admitted];
+      const expected = expectConverges(operations);
+
+      expect(expected.community!.memberIds).toEqual(
+        expect.arrayContaining([alice.valueOf(), bob.valueOf()]),
+      );
+      expect(expected.skipped).toEqual([]);
+      expect(invitationIn(operations, invited)).toMatchObject({
+        live: true,
+        uses: 2,
+      });
+    });
+
+    it('keeps concurrent admissions beyond maxUses and closes the invitation', () => {
+      const invited = invitation([base], owner, { maxUses: 1 }, 10);
+      const admitted = [alice, bob].map((joiner) =>
+        admission([invited.operation], invited, joiner, owner, 11),
+      );
+      const operations = [...history, invited.operation, ...admitted];
+
+      expect(expectConverges(operations).community!.memberIds).toEqual(
+        expect.arrayContaining([alice.valueOf(), bob.valueOf()]),
+      );
+      expect(invitationIn(operations, invited)).toMatchObject({
+        live: false,
+        uses: 2,
+      });
+    });
+
+    it('counts one joiner admitted twice concurrently as one use and skips the second join', () => {
+      const invited = invitation([base], owner, {}, 10);
+      const byOwner = admission([invited.operation], invited, alice, owner, 11);
+      const byMallory = admission(
+        [invited.operation],
+        invited,
+        alice,
+        mallory,
+        12,
+      );
+      const operations = [...history, invited.operation, byOwner, byMallory];
+      const expected = expectConverges(operations);
+
+      expect(expected.skipped).toHaveLength(1);
+      expect(invitationIn(operations, invited)?.uses).toBe(1);
+    });
+
+    it('keeps an admission concurrent with the revocation of its invitation', () => {
+      const invited = invitation([base], owner, {}, 10);
+      const admitted = admission(
+        [invited.operation],
+        invited,
+        alice,
+        owner,
+        11,
+      );
+      const revoked = revoke([invited.operation], invited, mallory);
+      const operations = [...history, invited.operation, admitted, revoked];
+
+      expect(expectConverges(operations).community!.memberIds).toContain(
+        alice.valueOf(),
+      );
+      expect(invitationIn(operations, invited)).toMatchObject({
+        live: false,
+        revoked: true,
+      });
+    });
+
+    it('voids the invitation and admissions of an issuer kicked concurrently', () => {
+      const invited = invitation([base], mallory, {}, 10);
+      const admitted = admission(
+        [invited.operation],
+        invited,
+        alice,
+        mallory,
+        11,
+      );
+      const kicked = kick([base], mallory, owner, 12);
+      const operations = [...history, invited.operation, admitted, kicked];
+      const expected = expectConverges(operations);
+
+      expect(expected.community!.memberIds).not.toContain(alice.valueOf());
+      expect(expected.skipped).toEqual(
+        expect.arrayContaining([
+          invited.operation.getHash(),
+          admitted.getHash(),
+        ]),
+      );
+      expect(invitationIn(operations, invited)).toBeUndefined();
+    });
+
+    it('voids an admission of an owner invitation by an admitter kicked concurrently', () => {
+      const invited = invitation([base], owner, {}, 10);
+      const admitted = admission(
+        [invited.operation],
+        invited,
+        alice,
+        mallory,
+        11,
+      );
+      const kicked = kick([invited.operation], mallory, owner, 12);
+      const operations = [...history, invited.operation, admitted, kicked];
+      const expected = expectConverges(operations);
+
+      expect(expected.community!.memberIds).not.toContain(alice.valueOf());
+      expect(expected.skipped).toContain(admitted.getHash());
+      expect(invitationIn(operations, invited)).toMatchObject({
+        live: true,
+        uses: 1,
+      });
+    });
+
+    it('keeps what an issuer admitted before its kick and closes its invitation for good', () => {
+      const invited = invitation([base], mallory, {}, 10);
+      const admitted = admission(
+        [invited.operation],
+        invited,
+        alice,
+        mallory,
+        11,
+      );
+      const kicked = kick([admitted], mallory, owner, 12);
+      const readded = join([kicked], mallory);
+      const promoted = assignRoles([readded], mallory, [managers], owner, 13);
+      const operations = [
+        ...history,
+        invited.operation,
+        admitted,
+        kicked,
+        readded,
+        promoted,
+      ];
+
+      expect(expectConverges(operations).community!.memberIds).toEqual(
+        expect.arrayContaining([alice.valueOf(), mallory.valueOf()]),
+      );
+      expect(invitationIn(operations, invited)?.live).toBe(false);
+    });
   });
 });

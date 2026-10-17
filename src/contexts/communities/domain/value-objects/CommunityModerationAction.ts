@@ -7,7 +7,7 @@ const communityModerationActions = {
   CHANNEL_RENAMED: 'channel_renamed',
   COMMUNITY_UPDATED: 'community_updated',
   INVITATION_CREATED: 'invitation_created',
-  INVITE_LINK_CREATED: 'invite_link_created',
+  INVITATION_REVOKED: 'invitation_revoked',
   MEMBER_BANNED: 'member_banned',
   MEMBER_KICKED: 'member_kicked',
   MEMBER_ROLES_UPDATED: 'member_roles_updated',
@@ -46,8 +46,8 @@ export class CommunityModerationAction extends Enum<string> {
     communityModerationActions.INVITATION_CREATED,
   );
 
-  public static readonly INVITE_LINK_CREATED = new CommunityModerationAction(
-    communityModerationActions.INVITE_LINK_CREATED,
+  public static readonly INVITATION_REVOKED = new CommunityModerationAction(
+    communityModerationActions.INVITATION_REVOKED,
   );
 
   public static readonly MEMBER_BANNED = new CommunityModerationAction(

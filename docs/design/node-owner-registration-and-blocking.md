@@ -182,7 +182,7 @@ additions, device transitions, login and every other route are never gated.
   `{ "maxUses": 1, "expiresAt": <ms> }` and returns
   `{ "id", "code", "maxUses", "expiresAt" }`. The code appears only in this
   response.
-  - `maxUses` defaults to `1`. Multi-use codes suit an invite link shared with
+  - `maxUses` defaults to `1`. Multi-use codes suit a link shared with
     a group, at a higher cost if leaked.
   - `expiresAt` is required and at most `NODE_REGISTRATION_CODE_MAX_TTL_DAYS`
     (default `30`) ahead. `maxUses` is at most
@@ -197,8 +197,6 @@ additions, device transitions, login and every other route are never gated.
 - **Uses are counted on this node only.** That is safe because the code only
   gates creation through this node. No other node checks it, and the identity
   record does not carry it, so no replica has to agree on the remaining uses.
-  Replicated community invites need that agreement (`api.md`, "Create community
-  invite link token"); registration codes do not.
 
 ### Registration link
 
@@ -213,7 +211,7 @@ https://<ui-origin>/register#node=<encodeURIComponent(node endpoint)>&code=<code
   HTTP on loopback, without credentials, query or fragment).
 - The code travels in the fragment, so it never reaches the UI host's logs or
   a `Referer` header. The UI removes the fragment from the address bar as soon
-  as it reads it, as it does for community invites.
+  as it reads it, as it does for community invitations.
 - Opening the link selects that node and starts identity creation with the
   code already filled in: no node URL to type, no code to copy. If the browser
   already has an identity on another node, the UI asks before switching.

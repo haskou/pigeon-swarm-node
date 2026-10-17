@@ -11,7 +11,6 @@ import CommunityFinder from '@app/contexts/communities/application/find-communit
 import { CommunityOperation } from '@app/contexts/communities/domain/operations/CommunityOperation';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { CommunityInviteToken } from '@app/contexts/communities/domain/value-objects/CommunityInviteToken';
 import { CommunityModerationLogId } from '@app/contexts/communities/domain/value-objects/CommunityModerationLogId';
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
@@ -63,6 +62,9 @@ import { DataTable, setDefaultTimeout } from '@cucumber/cucumber';
 import { Kernel } from '@haskou/ddd-kernel';
 import {
   CommitmentId,
+  CommunityInvitationConsent,
+  CommunityInvitationFields,
+  CommunityInvitationKey,
   IdentitySignature,
   KeychainSignature,
   KeyPair,
@@ -196,7 +198,12 @@ export default class Definitions {
   private communityThreadRootMessageId: string | undefined;
   private communityMessageCreatedAt = 0;
   private communityId: string | undefined;
-  private communityInviteToken: string | undefined;
+  private communityInvitationId: string | undefined;
+  private communityInvitationKey: CommunityInvitationKey | undefined;
+  private communityInvitationProofs:
+    { consent: string; possession: string } | undefined;
+
+  private lastCommunityOperationHash: string | undefined;
   private communityMembershipRequestId: string | undefined;
   private communityRoleId: string | undefined;
   private concurrentCallResponses: RestResponse[] = [];
@@ -488,6 +495,7 @@ export default class Definitions {
     keyPair: KeyPair,
     sequence?: number,
     store = 'requests',
+    frontier?: string[],
   ): Record<string, unknown> {
     const recordId = String(payload.id);
     const next = sequence ?? this.communityRecordSequences.get(recordId) ?? 0;
@@ -498,6 +506,7 @@ export default class Definitions {
         deviceCredential: identityId,
         identityId,
       },
+      ...(frontier ? { frontier } : {}),
       kind: 'put',
       operationId: `api-community-${next}-${recordId}`
         .replace(/[^A-Za-z0-9]/g, '')
@@ -523,7 +532,6 @@ export default class Definitions {
   }
 
   private communityRequestPayload(
-    type: 'invitation' | 'request',
     creatorIdentityId: string,
     identityId: string,
     createdAt: number,
@@ -536,7 +544,7 @@ export default class Definitions {
       creatorIdentityId,
       id: CommitmentId.communityRequest(
         communityId,
-        type,
+        'request',
         creatorIdentityId,
         identityId,
         createdAt,
@@ -544,7 +552,7 @@ export default class Definitions {
       identityId,
       scopeType: 'community_membership_request',
       status: 'pending',
-      type,
+      type: 'request',
       updatedAt: createdAt,
     };
   }
@@ -623,6 +631,27 @@ export default class Definitions {
       createdAt,
     ).valueOf();
     const rules: [string, RegExp, (match: RegExpExecArray) => Log][] = [
+      [
+        'POST',
+        /^\/communities\/[^/]+\/invitations$/,
+        () => ({
+          action: 'invitation_created',
+          details: { expiresAt: body.expiresAt, maxUses: body.maxUses },
+          target: {
+            id: String(this.lastCommunityOperationHash),
+            type: 'invitation',
+          },
+        }),
+      ],
+      [
+        'POST',
+        /^\/communities\/[^/]+\/invitations\/([^/]+)\/revocation$/,
+        (match) => ({
+          action: 'invitation_revoked',
+          details: {},
+          target: { id: decodeURIComponent(match[1]), type: 'invitation' },
+        }),
+      ],
       [
         'POST',
         /^\/communities\/[^/]+\/channels\/(text|voice)$/,
@@ -720,45 +749,6 @@ export default class Definitions {
           action: 'member_kicked',
           details: {},
           target: member(decodeURIComponent(match[1])),
-        }),
-      ],
-      [
-        'POST',
-        /^\/communities\/[^/]+\/invites$/,
-        () => ({
-          action: 'invite_link_created',
-          details: {
-            expiresAt: body.expiresAt,
-            maxUses: body.maxUses,
-          },
-          target: {
-            id: CommunityInviteToken.derive(
-              communityId,
-              actorIdentityId,
-              text.nonce,
-              (body.maxUses as number | undefined) ?? 1,
-              body.expiresAt as number | undefined,
-            ).toReference(),
-            type: 'invite',
-          },
-        }),
-      ],
-      [
-        'POST',
-        /^\/communities\/[^/]+\/members$/,
-        () => ({
-          action: 'invitation_created',
-          details: { identityId: body.identityId },
-          target: {
-            id: CommitmentId.communityRequest(
-              communityId,
-              'invitation',
-              actorIdentityId,
-              text.identityId,
-              Number(body.createdAt),
-            ),
-            type: 'membership_request',
-          },
         }),
       ],
       [
@@ -904,6 +894,41 @@ export default class Definitions {
     ][] = [
       [
         'POST',
+        /^\/communities\/[^/]+\/invitations$/,
+        () => ({
+          action: 'invitation_created',
+          args: optional({
+            expiresAt: body.expiresAt,
+            invitationKey: body.invitationKey,
+            invitee: body.invitee,
+            maxUses: body.maxUses,
+          }),
+        }),
+      ],
+      [
+        'POST',
+        /^\/communities\/[^/]+\/invitations\/([^/]+)\/revocation$/,
+        (match) => ({
+          action: 'invitation_revoked',
+          args: { invitationId: decoded(match) },
+        }),
+      ],
+      [
+        'POST',
+        /^\/communities\/[^/]+\/invitations\/([^/]+)\/admissions$/,
+        (match) => ({
+          action: 'member_joined',
+          args: {
+            consent: body.consent,
+            identityId: body.identityId,
+            invitationId: decoded(match),
+            method: 'invitation',
+            possession: body.possession,
+          },
+        }),
+      ],
+      [
+        'POST',
         /^\/communities\/[^/]+\/channels\/(text|voice)$/,
         (match) => ({
           action: 'channel_created',
@@ -1038,18 +1063,6 @@ export default class Definitions {
       ],
       [
         'POST',
-        /^\/communities\/invites\/([^/]+)\/accept$/,
-        (match) => ({
-          action: 'member_joined',
-          args: {
-            identityId: actorIdentityId,
-            method: 'invite_link',
-            reference: new CommunityInviteToken(decoded(match)).toReference(),
-          },
-        }),
-      ],
-      [
-        'POST',
         /^\/community-membership-requests$/,
         () => ({
           action: 'member_joined',
@@ -1070,8 +1083,7 @@ export default class Definitions {
                 action: 'member_joined',
                 args: {
                   identityId: request.identityId,
-                  method:
-                    request.type === 'request' ? 'approval' : 'invitation',
+                  method: 'approval',
                   reference: request.id,
                 },
               }
@@ -1193,6 +1205,7 @@ export default class Definitions {
       },
     });
 
+    this.lastCommunityOperationHash = signed.operation.getHash();
     this.body = JSON.stringify({ ...body, operation: signed.body });
   }
 
@@ -1660,7 +1673,6 @@ export default class Definitions {
     this.communityChannelMessageId = undefined;
     this.communityThreadRootMessageId = undefined;
     this.communityId = undefined;
-    this.communityInviteToken = undefined;
     this.communityMembershipRequestId = undefined;
     this.communityMembershipRequest = undefined;
     this.communityRecordSequences.clear();
@@ -3108,108 +3120,6 @@ export default class Definitions {
     this.communityId = this.response.data.id;
   }
 
-  @given('I set a community member body for another identity')
-  public async iSetACommunityMemberBodyForAnotherIdentity(): Promise<void> {
-    await this.ensureOtherIdentityKeyPair();
-
-    this.body = JSON.stringify({
-      identityId: this.otherIdentityId?.valueOf(),
-    });
-  }
-
-  @given('I set a community invite body')
-  public iSetACommunityInviteBody(): void {
-    this.body = JSON.stringify({
-      maxUses: 1,
-    });
-  }
-
-  @given('I set an expired community invite body')
-  public iSetAnExpiredCommunityInviteBody(): void {
-    this.body = JSON.stringify({
-      expiresAt: Date.now() - 1_000,
-      maxUses: 1,
-    });
-  }
-
-  @given('I sign the current community member request')
-  public async iSignTheCurrentCommunityMemberRequest(): Promise<void> {
-    if (!this.communityId) {
-      throw new Error('Community must be created first.');
-    }
-
-    const keyPair = await this.ensureIdentityKeyPair();
-    const body = JSON.parse(this.body ?? '{}');
-    const createdAt = Date.now();
-    const payload = this.communityRequestPayload(
-      'invitation',
-      String(this.ownerIdentityId?.valueOf()),
-      body.identityId,
-      createdAt,
-    );
-
-    this.body = JSON.stringify({
-      ...body,
-      createdAt,
-      mutation: this.signCommunityRecord(payload, keyPair),
-    });
-    await this.signCurrentRequest(
-      'POST',
-      `/communities/${this.communityId}/members`,
-    );
-  }
-
-  @given('I sign the current community invite request')
-  public async iSignTheCurrentCommunityInviteRequest(): Promise<void> {
-    if (!this.communityId) {
-      throw new Error('Community must be created first.');
-    }
-
-    const keyPair = await this.ensureIdentityKeyPair();
-    const creatorIdentityId = String(this.ownerIdentityId?.valueOf());
-    const body = JSON.parse(this.body ?? '{}');
-    const nonce = randomUUID().replace(/-/g, '');
-    const createdAt = Date.now();
-    const token = CommunityInviteToken.derive(
-      this.communityId,
-      creatorIdentityId,
-      nonce,
-      body.maxUses,
-      body.expiresAt,
-    ).valueOf();
-    const payload = {
-      communityId: this.communityId,
-      createdAt,
-      creatorIdentityId,
-      ...(body.expiresAt !== undefined && { expiresAt: body.expiresAt }),
-      id: token,
-      maxUses: body.maxUses,
-      nonce,
-      scopeType: 'community_invite',
-      token,
-    };
-
-    this.body = JSON.stringify({
-      ...body,
-      createdAt,
-      mutation: this.signCommunityRecord(payload, keyPair),
-      nonce,
-    });
-    await this.signCurrentRequest(
-      'POST',
-      `/communities/${this.communityId}/invites`,
-    );
-  }
-
-  @given('I remember the current community invite')
-  public iRememberTheCurrentCommunityInvite(): void {
-    if (!this.response?.data?.inviteToken) {
-      throw new Error('Community invite token not found.');
-    }
-
-    this.communityInviteToken = this.response.data.inviteToken;
-  }
-
   @given('I remember the current community membership request')
   public iRememberTheCurrentCommunityMembershipRequest(): void {
     if (!this.response?.data?.id) {
@@ -3318,6 +3228,141 @@ export default class Definitions {
     await this.signCurrentRequest(
       'POST',
       `/communities/${this.communityId}/bans`,
+    );
+  }
+
+  @given('I set a community invitation body with {int} uses')
+  public iSetACommunityInvitationBodyWithUses(maxUses: number): void {
+    const { key } = CommunityInvitationKey.generate();
+
+    this.communityInvitationKey = key;
+    this.body = JSON.stringify({
+      expiresAt: Date.now() + 86_400_000,
+      invitationKey: key.publicKey(),
+      maxUses,
+    });
+  }
+
+  @given('I sign the current community invitation request')
+  public async iSignTheCurrentCommunityInvitationRequest(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/${this.communityId}/invitations`,
+    );
+  }
+
+  @given('I remember the current community invitation')
+  public iRememberTheCurrentCommunityInvitation(): void {
+    if (!this.response?.data?.id) {
+      throw new Error('Community invitation response id not found.');
+    }
+
+    this.communityInvitationId = this.response.data.id;
+  }
+
+  @given('I sign the current community invitations request')
+  public async iSignTheCurrentCommunityInvitationsRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/invitations`,
+    );
+  }
+
+  @given('I sign the current community invitation claims request')
+  public async iSignTheCurrentCommunityInvitationClaimsRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/invitation-claims`,
+    );
+  }
+
+  /** The other identity proves it holds the link and consents to join. */
+  @given('the other identity signs a claim of the current community invitation')
+  public async theOtherIdentitySignsAClaimOfTheCurrentCommunityInvitation(): Promise<void> {
+    if (
+      !this.communityId ||
+      !this.communityInvitationId ||
+      !this.communityInvitationKey
+    ) {
+      throw new Error('Community invitation must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+    const identityId = String(this.otherIdentityId?.valueOf());
+    const fields: CommunityInvitationFields = {
+      communityId: this.communityId,
+      identityId,
+      invitationId: this.communityInvitationId,
+      networkId: String(this.currentNetworkId),
+    };
+    const proofs = {
+      consent: CommunityInvitationConsent.sign(
+        fields,
+        new PrivateKey(keyPair.toPrimitives().privateKey),
+      ),
+      possession: this.communityInvitationKey.signPossession(fields),
+    };
+    const payload = {
+      communityId: this.communityId,
+      ...proofs,
+      id: `invitation-claim:${this.communityInvitationId}:${identityId}`,
+      identityId,
+      invitationId: this.communityInvitationId,
+      scopeType: 'community_invitation_claim',
+    };
+
+    this.communityInvitationProofs = proofs;
+    this.body = JSON.stringify({
+      ...proofs,
+      mutation: this.signCommunityRecord(
+        payload,
+        keyPair,
+        undefined,
+        'requests',
+        await this.communityFrontier(this.communityId),
+      ),
+    });
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/${this.communityId}/invitations/${encodeURIComponent(this.communityInvitationId)}/claims`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('I sign the admission of the other identity to the current community')
+  public async iSignTheAdmissionOfTheOtherIdentityToTheCurrentCommunity(): Promise<void> {
+    if (!this.communityInvitationId || !this.communityInvitationProofs) {
+      throw new Error('Community invitation must be claimed first.');
+    }
+
+    this.body = JSON.stringify({
+      ...this.communityInvitationProofs,
+      identityId: this.otherIdentityId?.valueOf(),
+    });
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/${this.communityId}/invitations/${encodeURIComponent(this.communityInvitationId)}/admissions`,
+    );
+  }
+
+  @given('I sign the revocation of the current community invitation')
+  public async iSignTheRevocationOfTheCurrentCommunityInvitation(): Promise<void> {
+    if (!this.communityInvitationId) {
+      throw new Error('Community invitation must be created first.');
+    }
+
+    this.body = '{}';
+    await this.signCurrentRequest(
+      'POST',
+      `/communities/${this.communityId}/invitations/${encodeURIComponent(this.communityInvitationId)}/revocation`,
     );
   }
 
@@ -3516,39 +3561,6 @@ export default class Definitions {
     );
   }
 
-  @given(
-    'the community member signs the current community invite accept request',
-  )
-  public async theCommunityMemberSignsTheCurrentCommunityInviteAcceptRequest(): Promise<void> {
-    if (!this.communityInviteToken || !this.communityId) {
-      throw new Error('Community invite must be created first.');
-    }
-
-    const keyPair = await this.ensureOtherIdentityKeyPair();
-    const identityId = String(this.otherIdentityId?.valueOf());
-    const usedAt = Date.now();
-    const payload = {
-      communityId: this.communityId,
-      id: `invite-use:${this.communityInviteToken}:${identityId}`,
-      identityId,
-      scopeType: 'community_invite_use',
-      token: this.communityInviteToken,
-      usedAt,
-    };
-
-    this.body = JSON.stringify({
-      mutation: this.signCommunityRecord(payload, keyPair),
-      usedAt,
-    });
-    await this.signCurrentRequest(
-      'POST',
-      `/communities/invites/${this.communityInviteToken}/accept`,
-      String(Date.now()),
-      keyPair,
-      this.otherIdentityId,
-    );
-  }
-
   @given('the community member signs the current community join request')
   public async theCommunityMemberSignsTheCurrentCommunityJoinRequest(): Promise<void> {
     if (!this.communityId) {
@@ -3559,7 +3571,6 @@ export default class Definitions {
     const identityId = String(this.otherIdentityId?.valueOf());
     const createdAt = Date.now();
     const payload = this.communityRequestPayload(
-      'request',
       identityId,
       identityId,
       createdAt,
@@ -7034,32 +7045,6 @@ export default class Definitions {
     );
   }
 
-  @when('I POST to the current community members')
-  public async iPOSTToTheCurrentCommunityMembers(): Promise<void> {
-    if (!this.communityId) {
-      throw new Error('Community must be created first.');
-    }
-
-    this.response = await this.restClient.post(
-      `/communities/${this.communityId}/members`,
-      this.body && JSON.parse(this.body),
-      { headers: this.headers },
-    );
-  }
-
-  @when('I POST to the current community invites')
-  public async iPOSTToTheCurrentCommunityInvites(): Promise<void> {
-    if (!this.communityId) {
-      throw new Error('Community must be created first.');
-    }
-
-    this.response = await this.restClient.post(
-      `/communities/${this.communityId}/invites`,
-      this.body && JSON.parse(this.body),
-      { headers: this.headers },
-    );
-  }
-
   @when('I POST a role to the current community')
   public async iPOSTARoleToTheCurrentCommunity(): Promise<void> {
     if (!this.communityId) {
@@ -7096,6 +7081,84 @@ export default class Definitions {
 
     this.response = await this.restClient.post(
       `/communities/${this.communityId}/bans`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I POST an invitation to the current community')
+  public async iPOSTAnInvitationToTheCurrentCommunity(): Promise<void> {
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/invitations`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I GET the current community invitations')
+  public async iGETTheCurrentCommunityInvitations(): Promise<void> {
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/invitations`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the current community invitation claims')
+  public async iGETTheCurrentCommunityInvitationClaims(): Promise<void> {
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/invitation-claims`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the current community invitation preview with the {word} key')
+  public async iGETTheCurrentCommunityInvitationPreviewWithTheKey(
+    which: string,
+  ): Promise<void> {
+    const keys: Record<string, () => string> = {
+      invitation: () => String(this.communityInvitationKey?.publicKey()),
+      malformed: () => 'not a key',
+      unknown: () => CommunityInvitationKey.generate().key.publicKey(),
+    };
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/invitation-preview`,
+      { Authorization: `Bearer ${keys[which]()}` },
+    );
+  }
+
+  @when('I GET the current community invitation preview without a key')
+  public async iGETTheCurrentCommunityInvitationPreviewWithoutAKey(): Promise<void> {
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/invitation-preview`,
+      {},
+    );
+  }
+
+  @when(
+    'the other identity POSTs the claim of the current community invitation',
+  )
+  public async theOtherIdentityPOSTsTheClaimOfTheCurrentCommunityInvitation(): Promise<void> {
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/invitations/${encodeURIComponent(String(this.communityInvitationId))}/claims`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I POST the admission of the other identity to the current community')
+  public async iPOSTTheAdmissionOfTheOtherIdentityToTheCurrentCommunity(): Promise<void> {
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/invitations/${encodeURIComponent(String(this.communityInvitationId))}/admissions`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I POST the revocation of the current community invitation')
+  public async iPOSTTheRevocationOfTheCurrentCommunityInvitation(): Promise<void> {
+    this.response = await this.restClient.post(
+      `/communities/${this.communityId}/invitations/${encodeURIComponent(String(this.communityInvitationId))}/revocation`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
@@ -7178,30 +7241,6 @@ export default class Definitions {
 
     this.response = await this.restClient.post(
       '/community-membership-requests',
-      this.body && JSON.parse(this.body),
-      { headers: this.headers },
-    );
-  }
-
-  @when('I GET the current community invite')
-  public async iGETTheCurrentCommunityInvite(): Promise<void> {
-    if (!this.communityInviteToken) {
-      throw new Error('Community invite must be created first.');
-    }
-
-    this.response = await this.restClient.get(
-      `/communities/invites/${this.communityInviteToken}`,
-    );
-  }
-
-  @when('I POST to accept the current community invite')
-  public async iPOSTToAcceptTheCurrentCommunityInvite(): Promise<void> {
-    if (!this.communityInviteToken) {
-      throw new Error('Community invite must be created first.');
-    }
-
-    this.response = await this.restClient.post(
-      `/communities/invites/${this.communityInviteToken}/accept`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
@@ -7910,17 +7949,6 @@ export default class Definitions {
 
     expect(JSON.stringify(this.response.data)).to.not.contain(
       this.otherIdentityId.valueOf(),
-    );
-  }
-
-  @then('response body should not contain the current community invite token')
-  public responseBodyShouldNotContainTheCurrentCommunityInviteToken(): void {
-    if (!this.communityInviteToken) {
-      throw new Error('Community invite must be created first.');
-    }
-
-    expect(JSON.stringify(this.response.data)).to.not.contain(
-      this.communityInviteToken,
     );
   }
 
