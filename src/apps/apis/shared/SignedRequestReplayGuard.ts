@@ -21,7 +21,13 @@ export class SignedRequestReplayGuard {
   private static readonly MAX_ENTRIES = 100_000;
   private static readonly SLOTS_PER_SIGNER = 1_000;
   private static readonly STRANGER_SLOTS = 10_000;
-  private static readonly STRANGER_SLOTS_PER_SOURCE = 1_000;
+  /**
+   * A fortieth of the stranger share, so filling it takes 40 client addresses
+   * (or IPv6 /64s), while one address still has room for its identity
+   * creations (30 a minute by default) and for many clients behind one
+   * carrier NAT or proxy.
+   */
+  private static readonly STRANGER_SLOTS_PER_SOURCE = 250;
 
   private readonly entryBySignature = new Map<
     string,
@@ -149,7 +155,8 @@ export class SignedRequestReplayGuard {
    * such as a key creating its identity here, sent from `clientAddress`. Such
    * signers share a bounded part of the guard, of which each client address
    * holds a bounded part, and are refused once either is full. The address is
-   * kept in memory for the validity window only.
+   * kept in memory only, with its entry: an expired entry is dropped when the
+   * guard next records a signature.
    */
   public acceptFromStranger(
     signer: PublicKey,

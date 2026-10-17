@@ -5,12 +5,18 @@ import { RestResponse } from './RestResponse';
 import { RestResponseData } from './RestResponseData';
 
 export default class RestClient {
+  private static clients = 0;
   private readonly baseUrl: string;
+  private readonly clientAddress: string;
   public bearerToken: string | null = null;
 
   constructor() {
     const port = process.env.API_PORT || '8081';
     this.baseUrl = `http://localhost:${port}`;
+    const client = RestClient.clients++;
+    // One address per client from the 198.18.0.0/15 benchmarking range; the
+    // node trusts it because API_TRUST_PROXY is loopback in the API suite.
+    this.clientAddress = `198.18.${Math.floor(client / 256) % 256}.${client % 256}`;
   }
 
   private getHeaders(input: RestHeaders = {}): Record<string, string> {
@@ -19,6 +25,7 @@ export default class RestClient {
     ) as Record<string, string>;
 
     return {
+      'X-Forwarded-For': this.clientAddress,
       ...(this.bearerToken
         ? { Authorization: `Bearer ${this.bearerToken}` }
         : {}),
