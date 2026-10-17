@@ -3,6 +3,7 @@ import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NodeRegistrationMode } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationMode';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
@@ -249,6 +250,12 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     const metadata = await this.loadOrCreateMetadata();
 
     return new NodeId(metadata.nodeId);
+  }
+
+  public async isLocalNodeOwnedBy(identityId: IdentityId): Promise<boolean> {
+    return this.nodeFromMetadata(await this.loadOrCreateMetadata()).isOwnedBy(
+      identityId,
+    );
   }
 
   public async loadLocalNodeRegistrationMode(): Promise<NodeRegistrationMode> {

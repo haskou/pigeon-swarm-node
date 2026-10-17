@@ -1,3 +1,4 @@
+import { IdentityId } from '../../../shared/domain/value-objects/IdentityId';
 import { NodeId } from '../../../shared/domain/value-objects/NodeId';
 import { Node } from '../Node';
 import { NodeRegistrationMode } from '../value-objects/NodeRegistrationMode';
@@ -6,6 +7,11 @@ export default abstract class NodeRepository {
   public abstract loadLocalNodeId(): Promise<NodeId>;
   public abstract loadLocalNode(): Promise<Node>;
   public abstract loadLocalNodeRegistrationMode(): Promise<NodeRegistrationMode>;
+  /**
+   * Whether the identity owns the local node as it is stored, read without
+   * syncing the runtime networks so it is cheap enough to ask per request.
+   */
+  public abstract isLocalNodeOwnedBy(identityId: IdentityId): Promise<boolean>;
   /**
    * Loads the latest local node, applies `change` and saves it, with no other
    * update of the local node in between, so concurrent owner writes never

@@ -1,5 +1,8 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import { signedRequestReplayGuard } from '@app/apps/apis/shared/SignedRequestReplayGuard';
+import {
+  SignedRequestReplayGuard,
+  signedRequestReplayGuard,
+} from '@app/apps/apis/shared/SignedRequestReplayGuard';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
@@ -192,10 +195,16 @@ describe('SignedHttpRequestAuthenticator', () => {
   });
 
   it('admits the node owner it does not hold while strangers flood their share', async () => {
-    const now = jest
-      .spyOn(Date, 'now')
-      .mockReturnValue(
-        Date.now() - 2 * SignedHttpRequestSignature.REPLAY_WINDOW_MS,
+    const guard = new SignedRequestReplayGuard();
+    jest
+      .spyOn(signedRequestReplayGuard, 'accept')
+      .mockImplementation((signer, signature) =>
+        guard.accept(signer, signature),
+      );
+    jest
+      .spyOn(signedRequestReplayGuard, 'acceptFromStranger')
+      .mockImplementation((signer, signature, clientAddress) =>
+        guard.acceptFromStranger(signer, signature, clientAddress),
       );
     const strangers = await Promise.all(
       Array.from(
@@ -206,7 +215,7 @@ describe('SignedHttpRequestAuthenticator', () => {
     );
     strangers.forEach((stranger, signer) =>
       Array.from({ length: SLOTS_PER_SIGNER }).forEach((_, index) =>
-        signedRequestReplayGuard.acceptFromStranger(
+        guard.acceptFromStranger(
           stranger,
           signatureOf(index),
           `198.51.100.${signer}`,
@@ -228,8 +237,6 @@ describe('SignedHttpRequestAuthenticator', () => {
       'Invalid signed request.',
     );
     await expect(authenticator.authenticate(owner)).resolves.toBeDefined();
-
-    now.mockRestore();
   });
 
   it('records the node owner it does not hold in the shared slots while replicated state is not open', async () => {

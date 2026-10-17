@@ -1,4 +1,5 @@
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
@@ -20,6 +21,7 @@ export default class SignedHttpRequestAuthenticator {
   constructor(
     private readonly blockPolicy: NodeBlockPolicy,
     private readonly identityRepository: IdentityRepository,
+    private readonly nodes: NodeRepository,
   ) {}
 
   /**
@@ -39,9 +41,22 @@ export default class SignedHttpRequestAuthenticator {
   }
 
   /**
-   * Records a state-changing request once, after every other check passed. An
-   * identity this node does not hold, such as one creating itself here, only
-   * gets a slot in the share of the replay guard kept for strangers.
+   * Whether this node serves the signer: it holds the identity, or the
+   * identity owns the node, so the owner can manage the node even when its
+   * identity lives elsewhere or the replicated state is not open yet.
+   */
+  private async serves(identityId: IdentityId): Promise<boolean> {
+    return (
+      (await this.holds(identityId)) ||
+      this.nodes.isLocalNodeOwnedBy(identityId)
+    );
+  }
+
+  /**
+   * Records a state-changing request once, after every other check passed. A
+   * signer this node does not serve, such as an identity creating itself
+   * here, only gets a slot in the share of the replay guard kept for
+   * strangers, charged to its client address.
    */
   private async assertIsNotReplayed(
     request: Request,
@@ -56,9 +71,13 @@ export default class SignedHttpRequestAuthenticator {
       return;
     }
 
-    const accepted = (await this.holds(identityId))
+    const accepted = (await this.serves(identityId))
       ? signedRequestReplayGuard.accept(identityId, signature)
-      : signedRequestReplayGuard.acceptFromStranger(identityId, signature);
+      : signedRequestReplayGuard.acceptFromStranger(
+          identityId,
+          signature,
+          request.ip ?? 'unknown',
+        );
 
     if (!accepted) {
       throw new InvalidSignedRequestError();

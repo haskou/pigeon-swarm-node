@@ -77,18 +77,45 @@ Implemented:
   request can therefore be accepted once more on another node, or once more on
   the same node after a restart; clients never resend a request they already
   sent
-- a request takes a replay slot only after every other check passed: an
-  identity request after its signature, freshness and block checks, a device
-  or recovery proof only once the device is authorized or the key is the
-  recovery authority of the identity. A request refused before that point
-  leaves no record behind
+- a request takes a replay slot only after its signature, freshness and block
+  checks passed: an identity request then, a device or recovery proof only once
+  the device is authorized or the key is the recovery authority of the
+  identity. A request refused before that point leaves no record behind. A
+  check that runs after authentication keeps the slot: a node owner route that
+  refuses a key with `403` code `403010`, and a `PUT /node/blocks` body that
+  does not hash to `X-Body-Hash`. Both signatures were valid and fresh, so
+  keeping them refuses a resend of the same signed headers, and the slot counts
+  against the signing key only
 - the guard is bounded and fails closed: each signing key holds at most 1,000
-  live entries, identities this node does not hold (such as one creating itself
-  here, or any identity while the node has not opened its replicated state)
-  share 10,000, and the whole guard holds 100,000. A full share refuses
-  new signatures with `401` code `401020` instead of evicting live entries, so
-  a key or a crowd of self-made keys cannot fill the guard for the identities
-  and devices this node serves, nor flush an intercepted signature out of it
+  live entries and the whole guard holds 100,000. The node serves a key when it
+  holds its identity or the identity owns the node (read from the local node
+  metadata, so an owner whose identity lives on another node, or an owner
+  while the replicated state is not open, is served too). Every other key is a
+  stranger: an identity creating itself here, an identity held elsewhere, and
+  any identity but the owner while the node has not opened its replicated
+  state. Strangers share 10,000 entries, of which one client address holds at
+  most 1,000 (IPv6 counts per /64, IPv4-mapped addresses as IPv4; the address
+  is the socket address unless `API_TRUST_PROXY` names a reverse proxy, so a
+  proxy the node is not told about puts every stranger on one address). The
+  address is kept in memory for the 60 second window only
+- a full share refuses new signatures with `401` code `401020` instead of
+  evicting live entries, until entries of that share expire (at most 60
+  seconds). A stranger refused this way, such as a client creating its
+  identity, retries with a newly signed request after that. One source of
+  self-made keys therefore fills only its own part of the stranger share; the
+  identities and devices this node serves and its owner keep their slots, and
+  no live entry is flushed, so an intercepted signature stays refused
+- served keys have no per-address limit: they are bounded per key, the node
+  admits them (registration mode and owner admission), a blocked key is refused
+  before it takes a slot, and clients behind one address (carrier NAT, a shared
+  proxy) must not lock each other out. Many served identities together can
+  still fill the 100,000 entries (100 identities at 1,000 requests a minute
+  each); the owner answers that by blocking them
+- a signed identity `GET` takes no slot, and neither does the transitions read
+  of a key that was never authorized (see _Identity device authorization_):
+  replaying either inside the window only returns again what that key may
+  read, at most the public recovery lineage, so the guard is kept for state
+  changes and for device and recovery proofs
 - `X-Identity-Id` must be the one canonical encoding of a usable Ed25519 key
   (PEM armour and whitespace are ignored). An alias encoding of the signing key,
   such as another DER prefix byte or base64 padding bits that decode to the
