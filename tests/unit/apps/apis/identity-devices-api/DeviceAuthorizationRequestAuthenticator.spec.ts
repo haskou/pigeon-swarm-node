@@ -166,21 +166,42 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
   );
 
   it.each(IdentityIdMother.aliases())(
-    'refuses a replayed device proof that names its key by %s',
+    'reads a device proof that names its key by %s as a key the log does not record',
     async (_encoding, aliasOf: (of: IdentityId) => IdentityId) => {
       const { authorization, headers, request } = await fixture();
+      const log = logOf(authorization);
       new DeviceAuthorizationRequestAuthenticator().authenticateReader(
         request,
-        logOf(authorization),
+        log,
       );
+      headers['x-device-credential'] = aliasOf(
+        new IdentityId(String(headers['x-device-credential'])),
+      ).valueOf();
+      const accept = jest.spyOn(signedRequestReplayGuard, 'accept');
+
+      const reader =
+        new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+          request,
+          log,
+        );
+
+      expect(log.records(reader)).toBe(false);
+      expect(accept).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(IdentityIdMother.aliases())(
+    'refuses a device proof that names an authorized key by %s',
+    async (_encoding, aliasOf: (of: IdentityId) => IdentityId) => {
+      const { authorization, headers, request } = await fixture();
       headers['x-device-credential'] = aliasOf(
         new IdentityId(String(headers['x-device-credential'])),
       ).valueOf();
 
       expect(() =>
-        new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+        new DeviceAuthorizationRequestAuthenticator().authenticate(
           request,
-          logOf(authorization),
+          authorization,
         ),
       ).toThrow('Invalid signed request.');
     },

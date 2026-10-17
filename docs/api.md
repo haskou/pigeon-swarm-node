@@ -68,10 +68,26 @@ Implemented:
 - timestamp freshness validation with a 30 second maximum clock skew
 - replay rejection: a mutating (non-GET/HEAD/OPTIONS) signed request whose
   identity and signature were already accepted inside the freshness window is
-  rejected with `401`; the guard is in-memory and per node. A device proof
-  (`X-Device-Signature`) or recovery proof (`X-Recovery-Signature`) is fresh
-  and one-use on every method, `GET` included: a client signs each such
-  request anew (see _Identity device authorization_)
+  rejected with `401`. A device proof (`X-Device-Signature`) or recovery proof
+  (`X-Recovery-Signature`) is fresh and one-use on every method, `GET`
+  included: a client signs each such request anew (see _Identity device
+  authorization_)
+- the replay guard is in-memory and per node: it remembers each accepted
+  signature for its 60 second validity window. Within that window a signed
+  request can therefore be accepted once more on another node, or once more on
+  the same node after a restart; clients never resend a request they already
+  sent
+- a request takes a replay slot only after every other check passed: an
+  identity request after its signature, freshness and block checks, a device
+  or recovery proof only once the device is authorized or the key is the
+  recovery authority of the identity. A request refused before that point
+  leaves no record behind
+- the guard is bounded and fails closed: each signing key holds at most 1,000
+  live entries, identities this node does not hold (such as one creating itself
+  here) share 10,000, and the whole guard holds 100,000. A full share refuses
+  new signatures with `401` code `401020` instead of evicting live entries, so
+  a key or a crowd of self-made keys cannot fill the guard for the identities
+  and devices this node serves, nor flush an intercepted signature out of it
 - `X-Identity-Id` must be the one canonical encoding of a usable Ed25519 key
   (PEM armour and whitespace are ignored). An alias encoding of the signing key,
   such as another DER prefix byte or base64 padding bits that decode to the
@@ -6129,9 +6145,13 @@ once: the node remembers each accepted proof signature for its 60 second
 validity window, keyed by the raw bytes of the signing key, and refuses a second
 request with the same signature, including one that names the same key in
 another encoding, with `401` code `401020`. A device credential that is not the
-one canonical encoding of an Ed25519 key is refused the same way. A client never
+one canonical encoding of an Ed25519 key is refused the same way. A proof takes
+its replay slot only once the device is authorized or the key is the recovery
+authority, so a key that was never authorized records nothing. A client never
 resends a captured or earlier request: it signs each read and write with a new
-timestamp. Like the identity replay guard, the record is in-memory and per node.
+timestamp. Like the identity replay guard, the record is in-memory and per
+node, so within the 60 second window a proof can be accepted once more on
+another node, or once more on the same node after a restart.
 
 List the currently authorized device credentials with:
 
@@ -6159,9 +6179,13 @@ must match the requested identity and exactly one complete device or recovery
 proof is required) with one difference: the device credential does not have to
 be authorized at the head. A device that was just removed proves possession of
 its key and reads the transitions up to its removal, so it can verify the
-removal itself instead of trusting a node's `401`. Authentication runs before
-the query is parsed, and every authentication failure is the same generic
-`401` (`401020`).
+removal itself instead of trusting a node's `401`. The recovery authority and
+a device some replayed state authorized take a replay slot, so a replayed read
+of theirs is refused. Any other key is still checked for its signature and
+freshness but takes no slot: it only reads the public recovery lineage
+described below, so a key that was never authorized cannot fill the guard.
+Authentication runs before the query is parsed, and every authentication
+failure is the same generic `401` (`401020`).
 
 The response is `{ concurrentRecoveries, identityId, recoveries, transitions }`.
 Every entry is a stored transition in exactly the primitives

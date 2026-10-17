@@ -1,3 +1,4 @@
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Signature } from '@haskou/pigeon-swarm-crypto';
@@ -15,13 +16,21 @@ export default class SignedHttpRequestAuthenticator {
   private static readonly SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
   private readonly verifier = new SignedHttpRequestVerifier();
 
-  constructor(private readonly blockPolicy: NodeBlockPolicy) {}
+  constructor(
+    private readonly blockPolicy: NodeBlockPolicy,
+    private readonly identityRepository: IdentityRepository,
+  ) {}
 
-  private assertIsNotReplayed(
+  /**
+   * Records a state-changing request once, after every other check passed. An
+   * identity this node does not hold, such as one creating itself here, only
+   * gets a slot in the share of the replay guard kept for strangers.
+   */
+  private async assertIsNotReplayed(
     request: Request,
     identityId: IdentityId,
     signature: Signature,
-  ): void {
+  ): Promise<void> {
     if (
       SignedHttpRequestAuthenticator.SAFE_METHODS.has(
         request.method.toUpperCase(),
@@ -30,7 +39,11 @@ export default class SignedHttpRequestAuthenticator {
       return;
     }
 
-    if (!signedRequestReplayGuard.accept(identityId, signature)) {
+    const accepted = (await this.identityRepository.holds(identityId))
+      ? signedRequestReplayGuard.accept(identityId, signature)
+      : signedRequestReplayGuard.acceptFromStranger(identityId, signature);
+
+    if (!accepted) {
       throw new InvalidSignedRequestError();
     }
   }
@@ -42,8 +55,8 @@ export default class SignedHttpRequestAuthenticator {
     timestamp: string,
   ): Promise<void> {
     assertSignedRequestTimestampIsFresh(timestamp);
-    this.assertIsNotReplayed(request, identityId, signature);
     await this.assertIsNotBlocked(identityId);
+    await this.assertIsNotReplayed(request, identityId, signature);
   }
 
   /** Verifies the request signature and refuses identities blocked on this node (403012). */

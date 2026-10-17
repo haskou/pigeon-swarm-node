@@ -1,7 +1,4 @@
-import { DeviceAuthorizationTransitionLogFindMessage } from '@app/contexts/identity-devices/application/find/messages/DeviceAuthorizationTransitionLogFindMessage';
-import { DeviceAuthorizationTransitionReader } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionReader';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { assert } from '@haskou/value-objects';
 
 import { InvalidDeviceAuthorizationTransitionLogRequestError } from '../errors/InvalidDeviceAuthorizationTransitionLogRequestError';
@@ -9,11 +6,7 @@ import { InvalidDeviceAuthorizationTransitionLogRequestError } from '../errors/I
 export class GetDeviceAuthorizationTransitionLogRequest {
   private static readonly REVISION_PATTERN = /^(0|[1-9]\d*)$/;
 
-  public constructor(
-    private readonly identityId: IdentityId,
-    private readonly reader: DeviceAuthorizationTransitionReader,
-    private readonly after: unknown,
-  ) {}
+  public constructor(private readonly after: unknown) {}
 
   /** A non-negative decimal safe integer without leading zeros. */
   private afterRevision(): DeviceAuthorizationRevision {
@@ -31,13 +24,10 @@ export class GetDeviceAuthorizationTransitionLogRequest {
     return new DeviceAuthorizationRevision(Number(after));
   }
 
-  public getMessage(): DeviceAuthorizationTransitionLogFindMessage {
-    return new DeviceAuthorizationTransitionLogFindMessage(
-      this.identityId,
-      this.reader,
-      this.after === undefined
-        ? DeviceAuthorizationRevision.initial()
-        : this.afterRevision(),
-    );
+  /** The revision the reader already verified; the whole log when absent. */
+  public getAfter(): DeviceAuthorizationRevision {
+    return this.after === undefined
+      ? DeviceAuthorizationRevision.initial()
+      : this.afterRevision();
   }
 }

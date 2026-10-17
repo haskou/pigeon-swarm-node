@@ -57,6 +57,24 @@ export class DeviceAuthorizationTransitionLog {
     );
   }
 
+  /** The recovery authority of the identity; a recovery keeps it. */
+  public getRecoveryAuthority(): RecoveryAuthority {
+    return this.states[0].getRecoveryAuthority();
+  }
+
+  /**
+   * Whether the reader is the recovery authority of the identity or a device
+   * some replayed state authorized, removed since or not. Any other key reads
+   * at most the public recovery lineage.
+   */
+  public records(reader: DeviceAuthorizationTransitionReader): boolean {
+    if (reader instanceof RecoveryAuthority) {
+      return reader.isEqual(this.getRecoveryAuthority());
+    }
+
+    return this.states.some((state) => state.isAuthorized(reader));
+  }
+
   /**
    * The recovery authority of the identity reads everything and any other
    * authority nothing. Every device reads the recovery lineage, so one whose
