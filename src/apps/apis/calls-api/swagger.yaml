@@ -110,32 +110,6 @@ paths:
           description: Call record rate limit exceeded (code 429021). Only an end about to be stored is charged.
         '503':
           description: Replicated state not ready (code 503020). The node holds the start of the call, or the authenticated identity's own participant record of it, but has not admitted it yet, or has not replayed the call history yet (at most 60 s), for example right after it restarted. Retry.
-  /calls/ice-servers:
-    get:
-      tags:
-        - calls
-      summary: Get ICE servers for WebRTC calls
-      description: Returns the node-configured TURN server when this node exposes a calls relay. Otherwise it returns TURN URLs only from signed call relay records whose peer is a currently connected circuit relay; unrelated or disconnected relay records are ignored. Local temporary credentials require a private CALLS_TURN_SHARED_SECRET matching the local coturn server. Private-network v2 relays issue their own credentials over an authenticated encrypted stream, so different deployments keep independent secrets. Missing or known public local secrets disable local credential issuance and relay publication, but do not prevent fetching credentials from eligible v2 owners. Explicit static credentials remain supported for local TURN URLs only. The default response uses iceTransportPolicy all so clients can fall back to direct ICE candidates when an advertised TURN service is unreachable. Operators may explicitly configure relay only after verifying coturn reachability. Nodes with local TURN URLs and a private shared secret publish signed call relay records through the IPFS pubsub network. Local requests issue a fresh lifetime; remote v2 credentials are reused until thirty seconds before their ten-minute expiry while connection eligibility is rechecked; clients must fetch again before ICE restart and never cache temporary credentials beyond the Unix expiry in the username. V1 shared pools require the same secret on every selected server. V2 issuance is limited per peer and globally and credentials are never published through gossip. Rotate environment secrets with a coordinated issuer and coturn restart; seamless rotation is not guaranteed. Newer issuedAt replaces older relay URLs even when the new record expires sooner.
-      responses:
-        '200':
-          description: ICE server configuration for the authenticated client.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CallIceServersResource'
-  /calls/history:
-    get:
-      tags:
-        - calls
-      summary: List conversation call history for the authenticated identity
-      description: Requires current conversation membership. Community voice-channel histories are not exposed.
-      responses:
-        '200':
-          description: Conversation call history for a currently authorized participant.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CallHistoryResource'
   /calls/{callId}/participants:
     post:
       tags:
@@ -188,8 +162,7 @@ paths:
           description: Call record rate limit exceeded (code 429021). Only a leave about to be stored is charged.
         '503':
           description: Replicated state not ready (code 503020). The node holds the start of the call but has not admitted it yet, or has not replayed the call history yet (at most 60 s), for example right after it restarted. Retry.
-  /calls/{callId}/participants/me/heartbeat:
-    post:
+    patch:
       tags:
         - calls
       summary: Refresh the authenticated participant heartbeat
@@ -202,7 +175,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PostCallParticipantHeartbeatBody'
+              $ref: '#/components/schemas/PatchCallParticipantBody'
       responses:
         '204':
           description: Participant heartbeat recorded. No response body.
@@ -237,6 +210,32 @@ paths:
           description: Signal payload exceeds 64 KiB.
         '503':
           description: Replicated state not ready (code 503020). The node holds the start of the call, or the sender's or recipient's own participant record of it, but has not admitted it yet, or has not replayed the call history yet (at most 60 s), for example right after it restarted. Retry.
+  /call-ice-servers:
+    get:
+      tags:
+        - calls
+      summary: Get ICE servers for WebRTC calls
+      description: Returns the node-configured TURN server when this node exposes a calls relay. Otherwise it returns TURN URLs only from signed call relay records whose peer is a currently connected circuit relay; unrelated or disconnected relay records are ignored. Local temporary credentials require a private CALLS_TURN_SHARED_SECRET matching the local coturn server. Private-network v2 relays issue their own credentials over an authenticated encrypted stream, so different deployments keep independent secrets. Missing or known public local secrets disable local credential issuance and relay publication, but do not prevent fetching credentials from eligible v2 owners. Explicit static credentials remain supported for local TURN URLs only. The default response uses iceTransportPolicy all so clients can fall back to direct ICE candidates when an advertised TURN service is unreachable. Operators may explicitly configure relay only after verifying coturn reachability. Nodes with local TURN URLs and a private shared secret publish signed call relay records through the IPFS pubsub network. Local requests issue a fresh lifetime; remote v2 credentials are reused until thirty seconds before their ten-minute expiry while connection eligibility is rechecked; clients must fetch again before ICE restart and never cache temporary credentials beyond the Unix expiry in the username. V1 shared pools require the same secret on every selected server. V2 issuance is limited per peer and globally and credentials are never published through gossip. Rotate environment secrets with a coordinated issuer and coturn restart; seamless rotation is not guaranteed. Newer issuedAt replaces older relay URLs even when the new record expires sooner.
+      responses:
+        '200':
+          description: ICE server configuration for the authenticated client.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallIceServersResource'
+  /past-calls:
+    get:
+      tags:
+        - calls
+      summary: List conversation call history for the authenticated identity
+      description: Requires current conversation membership. Community voice-channel histories are not exposed.
+      responses:
+        '200':
+          description: Conversation call history for a currently authorized participant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CallHistoryResource'
 components:
   parameters:
     CallId:
@@ -255,7 +254,7 @@ components:
         type: string
         pattern: '^Bearer [A-Za-z0-9_-]{20,128}$'
   schemas:
-    PostCallParticipantHeartbeatBody:
+    PatchCallParticipantBody:
       type: object
       required:
         - mediaConnections

@@ -493,7 +493,7 @@ paths:
       tags:
         - nodes
       summary: Add local node network
-      description: Unsigned while the node has no owner; signed by the owner once claimed.
+      description: Unsigned while the node has no owner; signed by the owner once claimed. Omit `id` to let the node generate one, and omit `key` to create a public network (a client creating the node's public network sends `{"name":"public"}`). A node can only have one public network.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -513,6 +513,8 @@ paths:
                 $ref: '#/components/schemas/NetworksResource'
         '403':
           description: The authenticated identity is not the node owner. A write still in flight when the node changes hands is refused the same way.
+        '409':
+          description: The node already has a public network.
   /node/networks/{networkId}:
     delete:
       tags:
@@ -539,27 +541,6 @@ paths:
           description: The authenticated identity is not the node owner. A write still in flight when the node changes hands is refused the same way.
         '409':
           description: The network does not exist in the local node.
-  /node/networks/public:
-    post:
-      tags:
-        - nodes
-      summary: Add generated public node network
-      description: Creates a public network with a backend-generated network id and the fixed name `public`. Unsigned while the node has no owner; signed by the owner once claimed. A node can only have one public network.
-      parameters:
-        - $ref: '#/components/parameters/XIdentityId'
-        - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XSignature'
-      responses:
-        '200':
-          description: Public network added.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/NetworksResource'
-        '403':
-          description: The authenticated identity is not the node owner. A write still in flight when the node changes hands is refused the same way.
-        '409':
-          description: The node already has a public network.
   /node/owner:
     put:
       tags:
@@ -1003,11 +984,11 @@ components:
     NetworkResource:
       type: object
       required:
-        - id
         - name
       properties:
         id:
           type: string
+          description: Optional network id. The node generates one when omitted.
         name:
           type: string
         key:
@@ -1174,11 +1155,11 @@ components:
     PeerNetworkResource:
       type: object
       required:
-        - id
         - name
       properties:
         id:
           type: string
+          description: Optional network id. The node generates one when omitted.
         name:
           type: string
     ConnectedIpfsPeerNetworkResource:
@@ -1351,11 +1332,11 @@ components:
     PostNodeNetworkBody:
       type: object
       required:
-        - id
         - name
       properties:
         id:
           type: string
+          description: Optional network id. The node generates one when omitted.
         name:
           type: string
         key:

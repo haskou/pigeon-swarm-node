@@ -11,7 +11,7 @@ import {
   Res,
 } from 'routing-controllers';
 
-import { DeleteCommunityMemberKickBody } from '../bodies/DeleteCommunityMemberKickBody';
+import { DeleteCommunityMemberByIdBody } from '../bodies/DeleteCommunityMemberByIdBody';
 import { CommunityViewModel } from '../view-model/CommunityViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
@@ -21,11 +21,11 @@ export class DeleteCommunityMemberByIdRoute extends CommunityRouteSupport {
     CommunityMemberKicker,
   );
 
-  @Delete('/:communityId/members/:identityId/kick')
+  @Delete('/:communityId/members/:identityId')
   public async kickMember(
     @Param('communityId') communityId: string,
     @Param('identityId') identityId: string,
-    @Body() body: DeleteCommunityMemberKickBody,
+    @Body() body: DeleteCommunityMemberByIdBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {

@@ -39,11 +39,11 @@ Feature: Signed operation body validation
     When I DELETE "/communities/123e4567-e89b-12d3-a456-426614174001/members/me"
     Then response code is equal to 400
 
-  Scenario: DELETE /communities/{id}/members/{sub}/kick without operation
+  Scenario: DELETE /communities/{id}/members/{sub} without operation
     Given I register a test IPFS network "api-operation-validation-network"
     And I set json body
       """
       {}
       """
-    When I DELETE "/communities/123e4567-e89b-12d3-a456-426614174001/members/123e4567-e89b-12d3-a456-426614174002/kick"
+    When I DELETE "/communities/123e4567-e89b-12d3-a456-426614174001/members/123e4567-e89b-12d3-a456-426614174002"
     Then response code is equal to 400

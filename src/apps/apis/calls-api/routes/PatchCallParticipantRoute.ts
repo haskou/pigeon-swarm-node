@@ -5,25 +5,25 @@ import {
   Body,
   JsonController,
   Param,
-  Post,
+  Patch,
   Req,
   Res,
 } from 'routing-controllers';
 
-import { PostCallParticipantHeartbeatBody } from '../bodies/PostCallParticipantHeartbeatBody';
+import { PatchCallParticipantBody } from '../bodies/PatchCallParticipantBody';
 import { CallRouteSupport } from './CallRouteSupport';
 
 @JsonController('/calls')
-export class PostCallParticipantHeartbeatRoute extends CallRouteSupport {
+export class PatchCallParticipantRoute extends CallRouteSupport {
   private readonly recorder = this.get<CallParticipantHeartbeatRecorder>(
     CallParticipantHeartbeatRecorder,
   );
 
-  @Post('/:callId/participants/me/heartbeat')
+  @Patch('/:callId/participants/me')
   public async heartbeat(
     @Param('callId') callId: string,
     @Body({ options: { limit: '32kb' } })
-    body: PostCallParticipantHeartbeatBody,
+    body: PatchCallParticipantBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {

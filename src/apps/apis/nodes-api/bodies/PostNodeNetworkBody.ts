@@ -1,9 +1,10 @@
 import { IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class PostNodeNetworkBody {
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  public readonly id: string;
+  public readonly id?: string;
 
   @IsString()
   @IsNotEmpty()

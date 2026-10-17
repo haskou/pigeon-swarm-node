@@ -26,7 +26,7 @@ Feature: Get sticker user library route
     When I POST to "/stickers/packs"
     Then response code is equal to 200
     Given I sign the current used sticker request
-    When I POST the current sticker as used
+    When I PUT the current sticker usage
     Then response code is equal to 200
     Given I sign the current sticker library request
     When I GET my sticker library

@@ -176,7 +176,7 @@ async function heartbeat(
   identity: IdentityFixture,
   callId: string,
 ): Promise<void> {
-  const endpoint = `/calls/${callId}/participants/me/heartbeat`;
+  const endpoint = `/calls/${callId}/participants/me`;
   const body: { mediaConnections: unknown[] } = { mediaConnections: [] };
   const response = await timedFetch(
     `heartbeat of call ${callId}`,
@@ -186,9 +186,9 @@ async function heartbeat(
       body: JSON.stringify(body),
       headers: {
         'content-type': 'application/json',
-        ...signHeaders(identity, 'POST', endpoint, body),
+        ...signHeaders(identity, 'PATCH', endpoint, body),
       },
-      method: 'POST',
+      method: 'PATCH',
     },
   );
   assert.equal(response.status, 204, 'Heartbeat must return no live snapshot');
@@ -513,7 +513,7 @@ async function main(): Promise<void> {
     const channel = await request<{ id: string }>(
       nodes[0],
       'POST',
-      `/communities/${community.id}/channels/voice`,
+      `/communities/${community.id}/channels`,
       {
         moderationLog: {
           createdAt: channelCreatedAt,
@@ -526,6 +526,7 @@ async function main(): Promise<void> {
         },
         name: 'voice',
         operation: channelOperation.body,
+        type: 'voice',
       },
       identities[0],
     );

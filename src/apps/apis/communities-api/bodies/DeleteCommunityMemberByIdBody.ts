@@ -1,13 +1,10 @@
 import { Type } from 'class-transformer';
-import { IsObject, IsString, ValidateNested } from 'class-validator';
+import { IsObject, ValidateNested } from 'class-validator';
 
 import { CommunityModerationLogBody } from './CommunityModerationLogBody';
 import { CommunityOperationBody } from './CommunityOperationBody';
 
-export class PostCommunityTextChannelBody {
-  @IsString()
-  public readonly name: string;
-
+export class DeleteCommunityMemberByIdBody {
   @IsObject()
   @Type(() => CommunityModerationLogBody)
   @ValidateNested()

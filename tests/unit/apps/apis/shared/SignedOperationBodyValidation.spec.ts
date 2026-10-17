@@ -2,15 +2,14 @@ import { CommunityRoleBody } from '@app/apps/apis/communities-api/bodies/Communi
 import { DeleteCommunityBanBody } from '@app/apps/apis/communities-api/bodies/DeleteCommunityBanBody';
 import { DeleteCommunityChannelBody } from '@app/apps/apis/communities-api/bodies/DeleteCommunityChannelBody';
 import { DeleteCommunityMemberBody } from '@app/apps/apis/communities-api/bodies/DeleteCommunityMemberBody';
-import { DeleteCommunityMemberKickBody } from '@app/apps/apis/communities-api/bodies/DeleteCommunityMemberKickBody';
+import { DeleteCommunityMemberByIdBody } from '@app/apps/apis/communities-api/bodies/DeleteCommunityMemberByIdBody';
 import { DeleteCommunityRoleBody } from '@app/apps/apis/communities-api/bodies/DeleteCommunityRoleBody';
 import { PatchCommunityBody } from '@app/apps/apis/communities-api/bodies/PatchCommunityBody';
 import { PatchCommunityChannelBody } from '@app/apps/apis/communities-api/bodies/PatchCommunityChannelBody';
 import { PatchCommunityChannelPermissionsBody } from '@app/apps/apis/communities-api/bodies/PatchCommunityChannelPermissionsBody';
 import { PostCommunityBanBody } from '@app/apps/apis/communities-api/bodies/PostCommunityBanBody';
 import { PostCommunityBody } from '@app/apps/apis/communities-api/bodies/PostCommunityBody';
-import { PostCommunityTextChannelBody } from '@app/apps/apis/communities-api/bodies/PostCommunityTextChannelBody';
-import { PostCommunityVoiceChannelBody } from '@app/apps/apis/communities-api/bodies/PostCommunityVoiceChannelBody';
+import { PostCommunityChannelBody } from '@app/apps/apis/communities-api/bodies/PostCommunityChannelBody';
 import { PutCommunityMemberRolesBody } from '@app/apps/apis/communities-api/bodies/PutCommunityMemberRolesBody';
 import { PostConversationBody } from '@app/apps/apis/conversations-api/bodies/PostConversationBody';
 import { plainToInstance } from 'class-transformer';
@@ -23,8 +22,8 @@ const operationCases: [string, BodyClass, string[]][] = [
   ['PostCommunityBody', PostCommunityBody, ['operation']],
   ['DeleteCommunityMemberBody', DeleteCommunityMemberBody, ['operation']],
   [
-    'DeleteCommunityMemberKickBody',
-    DeleteCommunityMemberKickBody,
+    'DeleteCommunityMemberByIdBody',
+    DeleteCommunityMemberByIdBody,
     ['operation', 'moderationLog'],
   ],
   [
@@ -60,14 +59,9 @@ const operationCases: [string, BodyClass, string[]][] = [
     ['operation', 'moderationLog'],
   ],
   [
-    'PostCommunityTextChannelBody',
-    PostCommunityTextChannelBody,
-    ['operation', 'moderationLog'],
-  ],
-  [
-    'PostCommunityVoiceChannelBody',
-    PostCommunityVoiceChannelBody,
-    ['operation', 'moderationLog'],
+    'PostCommunityChannelBody',
+    PostCommunityChannelBody,
+    ['operation', 'moderationLog', 'type'],
   ],
   [
     'PutCommunityMemberRolesBody',
@@ -99,6 +93,19 @@ describe('Signed operation body validation', () => {
       expect(errors.map((error) => error.property)).toContain('operation');
     },
   );
+
+  it('rejects a community channel of an unknown type', async () => {
+    const errors = await validate(
+      plainToInstance(PostCommunityChannelBody, {
+        moderationLog: {},
+        name: 'general',
+        operation: {},
+        type: 'stage',
+      }),
+    );
+
+    expect(errors.map((error) => error.property)).toContain('type');
+  });
 
   it('rejects a conversation operation missing its mutation', async () => {
     const errors = await validate(

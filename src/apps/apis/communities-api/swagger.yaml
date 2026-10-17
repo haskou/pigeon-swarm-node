@@ -44,7 +44,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityResource'
-  /communities/discover:
+  /discoverable-communities:
     get:
       tags:
         - communities
@@ -694,7 +694,7 @@ paths:
                 $ref: '#/components/schemas/CommunityResource'
         '409':
           description: Authenticated identity is not a community member or is the community owner.
-  /communities/{communityId}/members/{identityId}/kick:
+  /communities/{communityId}/members/{identityId}:
     delete:
       tags:
         - communities
@@ -716,7 +716,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DeleteCommunityMemberKickBody'
+              $ref: '#/components/schemas/DeleteCommunityMemberByIdBody'
       responses:
         '200':
           description: Member removed from the community.
@@ -746,12 +746,11 @@ paths:
                 $ref: '#/components/schemas/CommunityChannelsResource'
         '409':
           description: Community not found, or the authenticated identity is not a member (CommunityNotFoundError, CommunityMemberNotFoundError).
-  /communities/{communityId}/channels/text:
     post:
       tags:
         - communities
-      summary: Create a private community text channel
-      description: Requires manage_channels.
+      summary: Create a private community channel
+      description: Requires manage_channels. `type` selects a text or a voice channel. Voice channel presence is derived from active calls scoped to that channel.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - $ref: '#/components/parameters/XIdentityId'
@@ -762,40 +761,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PostCommunityTextChannelBody'
+              $ref: '#/components/schemas/PostCommunityChannelBody'
       responses:
         '200':
-          description: Text channel created.
+          description: Channel created.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CommunityTextChannelResource'
-        '409':
-          description: Authenticated identity does not have manage_channels.
-  /communities/{communityId}/channels/voice:
-    post:
-      tags:
-        - communities
-      summary: Create a private community voice channel
-      description: Requires manage_channels. Voice channel presence is derived from active calls scoped to that channel.
-      parameters:
-        - $ref: '#/components/parameters/CommunityId'
-        - $ref: '#/components/parameters/XIdentityId'
-        - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XSignature'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PostCommunityVoiceChannelBody'
-      responses:
-        '200':
-          description: Voice channel created.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommunityVoiceChannelResource'
+                oneOf:
+                  - $ref: '#/components/schemas/CommunityTextChannelResource'
+                  - $ref: '#/components/schemas/CommunityVoiceChannelResource'
         '409':
           description: Authenticated identity does not have manage_channels.
   /communities/{communityId}/channels/{channelId}:
@@ -2216,7 +2191,7 @@ components:
       properties:
         operation:
           $ref: '#/components/schemas/CommunityOperationBody'
-    DeleteCommunityMemberKickBody:
+    DeleteCommunityMemberByIdBody:
       type: object
       description: Kicking signs member_kicked with args identityId = the target identity from the path, and records a member_kicked moderation log entry (target member = the path identity, details {}).
       required:
@@ -2514,12 +2489,13 @@ components:
           type: string
         reason:
           type: string
-    PostCommunityTextChannelBody:
+    PostCommunityChannelBody:
       type: object
       required:
         - operation
         - name
         - moderationLog
+        - type
       properties:
         operation:
           $ref: '#/components/schemas/CommunityOperationBody'
@@ -2528,20 +2504,11 @@ components:
         name:
           type: string
           maxLength: 80
-    PostCommunityVoiceChannelBody:
-      type: object
-      required:
-        - operation
-        - name
-        - moderationLog
-      properties:
-        operation:
-          $ref: '#/components/schemas/CommunityOperationBody'
-        moderationLog:
-          $ref: '#/components/schemas/CommunityModerationLogBody'
-        name:
+        type:
           type: string
-          maxLength: 80
+          enum:
+            - text
+            - voice
     PatchCommunityChannelBody:
       type: object
       required:

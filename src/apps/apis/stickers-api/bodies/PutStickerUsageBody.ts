@@ -1,6 +1,6 @@
 import { IsInt, IsObject, Min } from 'class-validator';
 
-export class PostUsedStickerBody {
+export class PutStickerUsageBody {
   @IsInt()
   @Min(0)
   public readonly usedAt: number;

@@ -116,7 +116,7 @@ paths:
       tags:
         - stickers
       summary: Add a sticker to a pack
-      description: Sticker assets must already be uploaded as public IPFS bytes with POST /ipfs/public. This endpoint stores metadata and validates size and dimensions.
+      description: Sticker assets must already be uploaded as public IPFS bytes with POST /ipfs/contents. This endpoint stores metadata and validates size and dimensions.
       security:
         - signedRequest: []
       parameters:
@@ -293,8 +293,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StickerUserLibraryResource'
-  /stickers/packs/{packId}/stickers/{stickerId}/used:
-    post:
+  /stickers/packs/{packId}/stickers/{stickerId}/usage:
+    put:
       tags:
         - stickers
       summary: Record a sticker usage in the authenticated recent stickers
@@ -311,7 +311,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PostUsedStickerBody'
+              $ref: '#/components/schemas/PutStickerUsageBody'
       responses:
         '200':
           description: Sticker library updated.
@@ -407,7 +407,7 @@ components:
             - video
         assetCid:
           type: string
-          description: CID returned by POST /ipfs/public.
+          description: CID returned by POST /ipfs/contents.
           example: bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq
         contentType:
           type: string
@@ -497,7 +497,7 @@ components:
           minimum: 0
         mutation:
           $ref: '#/components/schemas/SignedPublicMutation'
-    PostUsedStickerBody:
+    PutStickerUsageBody:
       type: object
       description: mutation is a put proof (store stickerUserLibraries, recordId recent:<identityId>:<packId>:<stickerId>) over {id, identityId, packId, stickerId, usedAt, scopeType sticker_recent}.
       required:
