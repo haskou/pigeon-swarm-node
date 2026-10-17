@@ -26,6 +26,8 @@ import path from 'path';
 import fs from 'fs-extra';
 import readline from 'readline';
 
+import { RealTransportPublicNetworkSwitch } from './RealTransportPublicNetworkSwitch';
+
 const ROLE = requiredEnv('PRIVATE_RELAY_DISCOVERY_E2E_INSTANCE_ROLE') as
   'leaf' | 'relay';
 const NETWORK_ID = requiredEnv('PRIVATE_RELAY_DISCOVERY_E2E_NETWORK_ID');
@@ -59,6 +61,7 @@ let network: IPFSNetwork | undefined;
 let directory: PrivateNetworkRelayRecordDirectory | undefined;
 let localDatabase: EmbeddedLocalDatabase | undefined;
 let publicDirectoryConnection: IPFSConnection | undefined;
+let publicNetworkSwitch: RealTransportPublicNetworkSwitch | undefined;
 let publicDirectoryPrivateKey: Libp2pPrivateKeyLike | undefined;
 let orbitdb: OrbitDBInstance | undefined;
 let documents: OrbitDBDatabase | undefined;
@@ -219,7 +222,7 @@ async function startRelay(): Promise<void> {
   );
 
   if (process.env.PRIVATE_RELAY_DISCOVERY_E2E_DELAY_PUBLIC_NETWORK === 'true') {
-    await getPublicDirectoryConnection().getHeliaCore().libp2p.stop();
+    await getPublicNetworkSwitch().disable();
     getDirectory().start(
       getNetwork(),
       relayOptions,
@@ -421,14 +424,14 @@ async function setPublicNetwork(command: Command): Promise<void> {
   const enabled = command.enabled === true;
   const connection = getPublicDirectoryConnection();
   if (enabled) {
-    await connection.getHeliaCore().libp2p.start();
+    await getPublicNetworkSwitch().enable();
     if (!(await connection.waitForPeers(WAIT_TIMEOUT_MS))) {
       throw new Error(
         'Public transport restarted without recovering public peers.',
       );
     }
   } else {
-    await connection.getHeliaCore().libp2p.stop();
+    await getPublicNetworkSwitch().disable();
   }
   emit('public-network-state', {
     requestId,
@@ -771,6 +774,14 @@ function getPublicDirectoryConnection(): IPFSConnection {
   }
 
   return publicDirectoryConnection;
+}
+
+function getPublicNetworkSwitch(): RealTransportPublicNetworkSwitch {
+  publicNetworkSwitch ??= new RealTransportPublicNetworkSwitch(
+    getPublicDirectoryConnection().getHeliaCore().libp2p,
+  );
+
+  return publicNetworkSwitch;
 }
 
 function requiredEnv(name: string): string {

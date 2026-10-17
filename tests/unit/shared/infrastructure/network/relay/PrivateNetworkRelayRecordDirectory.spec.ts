@@ -684,6 +684,55 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     );
   });
 
+  it('should log only the error class when a provider dial is skipped', async () => {
+    const directory = createDirectory(localDatabase);
+    const privateConnection = mock<IPFSConnection>();
+    const network = privateNetwork(
+      privateKey(),
+      privateConnection,
+      '12D3KooWLeaf',
+    );
+    const publicConnection = mock<IPFSConnection>();
+    const selfProviderMultiaddr = '/ip4/127.0.0.1/tcp/4001/p2p/not-a-peer-id_0';
+    const selfDialError = new Error('Can not dial self');
+
+    selfDialError.name = 'InvalidPeerIdError';
+    privateConnection.getMultiaddrs.mockReturnValue([]);
+    privateConnection.getPeers.mockReturnValue([]);
+    privateConnection.listen.mockResolvedValue(undefined);
+    publicConnection.dial.mockRejectedValue(selfDialError);
+    publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([
+      selfProviderMultiaddr,
+    ]);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPub1icPeer']);
+    publicConnection.publishPubSub.mockResolvedValue(undefined);
+    publicConnection.subscribePubSub.mockResolvedValue(undefined);
+    publicConnection.waitForPeers.mockResolvedValue(true);
+    Reflect.set(
+      directory,
+      'getPublicConnection',
+      jest.fn().mockResolvedValue(publicConnection),
+    );
+
+    await directory.discover(network, mock());
+
+    const loggedLines = [
+      ...logger.debug.mock.calls,
+      ...logger.info.mock.calls,
+      ...logger.warn.mock.calls,
+      ...logger.error.mock.calls,
+    ].map((args) => args.map(String).join(' '));
+
+    expect(logger.debug).toHaveBeenCalledWith(
+      'Private IPFS relay record provider dial skipped: error=InvalidPeerIdError',
+    );
+    expect(
+      loggedLines.filter(
+        (line) => line.includes('127.0.0.1') || line.includes('not-a-peer-id'),
+      ),
+    ).toEqual([]);
+  });
+
   it('should keep one active circuit relay while it remains connected', async () => {
     const directory = createDirectory(localDatabase);
     const privateConnection = mock<IPFSConnection>();
