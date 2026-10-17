@@ -73,9 +73,6 @@
     "test:integration:causal-device-authorization": "tsx -r tsconfig-paths/register tests/e2e/real-transport/two-node-causal-device-authorization.ts",
     "test:integration:call-privacy:browser": "tsx -r tsconfig-paths/register tests/e2e/real-transport/two-node-call-privacy-browser.ts"
   },
-  "engines": {
-    "node": ">=24.22.0"
-  },
   "keywords": [],
   "author": "",
   "license": "SEE LICENSE IN LICENSE",

@@ -137,7 +137,7 @@ yarn typecheck
 yarn test:scheduler
 ```
 
-Development and CI require Node 24.22.0 or later (`engines` in `package.json`).
+Jest needs Node 24.22.0 or later; CI pins it in `.github/actions/setup-workspace`.
 Earlier Node 24 releases ship a V8 whose Sparkplug baseline compiler can make a
 garbage collection crash a jest worker with SIGSEGV in an unrelated suite
 ([nodejs/node#62393](https://github.com/nodejs/node/issues/62393)); 24.22.0
