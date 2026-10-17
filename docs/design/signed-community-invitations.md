@@ -441,7 +441,10 @@ operation is admitted. An admission does not need a full fold of its past.
 ## Authority cuts (#543)
 
 The fold applies one rule to every operation whose author needs a permission
-or membership, not only to invitations.
+or membership, not only to invitations. Bans and revocations are the
+exceptions: the rule never removes them (see
+[Retroactive reach](#retroactive-reach) and
+[For invitations](#for-invitations)).
 
 ### Void operations
 
@@ -505,10 +508,11 @@ parents, and voids all of them. This reach is retroactive by design:
 - A member also cuts itself by leaving. A `create_invites` holder that leaves
   with old parents voids its own invitations since then, and the admissions
   under them, although it could not kick those joiners.
-- Once #543 extends voiding to every operation, the reach covers bans and
-  kicks. A ban concurrent with a standing cut of its moderator is then void,
-  which readmits the banned member without an unban (see
-  [Residuals](#residuals)).
+- Bans fail closed. The cut rule never removes a ban from the folded state,
+  so cutting a moderator never readmits a member it banned. The linear fold
+  alone decides bans, as today. A ban that a standing cut reaches still cuts
+  nothing in the graph, so a removed moderator's backdated bans void nobody's
+  acts.
 - Without the cut, a backdated operation already takes effect where the
   fold's linear order places it among the operations it is concurrent with.
   The cut replaces that order with one rule.
@@ -542,8 +546,8 @@ member who leaves the fold loses their MLS leaves, as on any removal (UI
 
 Slice 2 builds the cut graph and voids invitations and admissions with it.
 #543's own change voids every other operation that needs a permission
-(channels, roles, bans, kicks, `added`) with the same graph. Until then, the
-linear fold alone decides those operations.
+(channels, roles, kicks, `added`) with the same graph, never bans. Until
+then, the linear fold alone decides those operations.
 
 ## Revocation
 
@@ -658,6 +662,7 @@ to every member:
 | Backdate an invitation, admission or cut after removal or demotion | former issuer or manager                | void once the removal is known                                                                   | authority cut; void operations cut nothing; ledger refusal when the removal is in the causal past |
 | Answer a removal with a backdated cut of the remover               | removed manager                         | both lose the permission; the remover's concurrent acts are void; impossible against the founder | mutual cuts stand ([residual](#residuals))                                                        |
 | Revoke with parents from before a removal                          | former issuer or manager                | closes invitations it could revoke before the removal; evicts nobody                             | revocations are never void ([residual](#residuals))                                               |
+| Readmit a banned member by cutting its moderator                   | member who can cut                      | prevented                                                                                        | bans fail closed; the cut rule never removes a ban                                                |
 | Present another encoding of a proof                                | anyone                                  | refused                                                                                          | strict signature decoding; no rule keys on signature bytes                                        |
 | Issue, admit or revoke with a stolen device                        | device thief                            | bounded by `compromisedSince`; replicas can diverge until #541                                   | causal device authorization; #541                                                                 |
 | Serve forged, aliased or over-limit admissions to a client         | malicious node                          | prevented                                                                                        | the client fold checks canonical ids, the proofs and the admission rules                          |
@@ -726,8 +731,8 @@ order because each one depends on the one before it:
      - unit specs for every rule and negative case, including alias ids for
        a joiner, a banned member and a repeated use, a `maxUses` above 100,
        an `invitee` mismatch, and the quota of a joiner and of an admitter;
-     - the cut graph: mutual cuts, a removed member's backdated cuts, the
-       founder's cuts, and a revocation after removal;
+     - the cut graph: mutual cuts, a removed member's backdated cuts and
+       bans, the founder's cuts, and a revocation after removal;
      - the crypto vectors;
      - a forged-operations integration test;
      - real-transport end-to-end tests for backdating, partition and heal,
@@ -800,9 +805,8 @@ community id or an address.
   and both lose the permission. A member that leaves with old parents voids
   its own invitations and the admissions under them. Only the founder's cuts
   cannot be answered.
-- When #543 extends voiding to bans, a ban made concurrently with a standing
-  cut of its moderator becomes void and readmits its target without an
-  unban. #543 has to bound this before it lands.
+- The `invitee` of a bound link tells every member which identity the issuer
+  invited, before that identity joins and even if it never does.
 - A removed issuer or manager can still revoke, with parents from before its
   removal, any invitation it could revoke there.
 - Expiry follows the admitter's clock.
