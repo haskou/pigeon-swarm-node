@@ -264,3 +264,59 @@ Feature: Node block sharing
       | encoding                        |
       | an alias DER prefix             |
       | a non-canonical base64 encoding |
+
+  Scenario Outline: The owner cannot remove a source named by <encoding> of its key
+    Given the node follows an auto-applied block source whose version 1 blocks the other identity
+    And the block source publisher is named by "<encoding>" of its key
+    And I sign a DELETE request to the block source path ""
+    When I send the DELETE to the block source path ""
+    Then response code is equal to 400
+    And response body should contain "400080"
+
+    Given another identity signs a GET request to "/conversations/"
+    When I GET "/conversations/"
+    Then response code is equal to 403
+    And response body should contain "403012"
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |
+
+  Scenario Outline: The owner cannot read the pending entries of a source named by <encoding> of its key
+    Given the node follows a block source whose version 1 blocks the other identity
+    And the block source publisher is named by "<encoding>" of its key
+    And I sign a GET request to the block source path "/pending"
+    When I send the GET to the block source path "/pending"
+    Then response code is equal to 400
+    And response body should contain "400080"
+    And response body should not contain the other identity id
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |
+
+  Scenario Outline: A non-owner naming a source by an alias is refused as a non-owner on <method> <suffix>
+    Given the node follows a block source whose version 1 blocks the other identity
+    And the block source publisher is named by "an alias DER prefix" of its key
+    And another identity signs a <method> request to the block source path "<suffix>"
+    When I send the <method> to the block source path "<suffix>"
+    Then response code is equal to 403
+    And response body should contain "403010"
+
+    Examples:
+      | method | suffix   |
+      | DELETE |          |
+      | GET    | /pending |
+
+  Scenario Outline: A canonical id of a source the node does not follow is not found on <method> <suffix>
+    Given I sign a <method> request to the block source path "<suffix>"
+    When I send the <method> to the block source path "<suffix>"
+    Then response code is equal to 409
+    And response body should contain "NodeBlockSourceNotFoundError"
+
+    Examples:
+      | method | suffix   |
+      | DELETE |          |
+      | GET    | /pending |

@@ -275,6 +275,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NodeBlockSourcesResource'
+        '400':
+          description: ownerIdentityId is not the canonical encoding of a usable key (code 400080), checked after the owner; nothing is removed.
         '403':
           description: The authenticated identity is not the node owner (code 403010). A write still in flight when the node changes hands is refused the same way.
         '409':
@@ -312,6 +314,8 @@ paths:
                     type: array
                     items:
                       type: string
+        '400':
+          description: ownerIdentityId is not the canonical encoding of a usable key (code 400080), checked after the owner; no source is read.
         '403':
           description: The authenticated identity is not the node owner (code 403010).
         '409':

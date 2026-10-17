@@ -1,3 +1,4 @@
+import { NonCanonicalIdentityIdError } from '@app/apps/apis/shared/errors/NonCanonicalIdentityIdError';
 import NodeBlockSourcesFinder from '@app/contexts/nodes/application/find-block-sources/NodeBlockSourcesFinder';
 import { NodeBlockSourceRemoverMessage } from '@app/contexts/nodes/application/remove-block-source/messages/NodeBlockSourceRemoverMessage';
 import NodeBlockSourceRemover from '@app/contexts/nodes/application/remove-block-source/NodeBlockSourceRemover';
@@ -8,6 +9,10 @@ import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
 import { NodeBlockSourcesViewModel } from '../view-model/NodeBlockSourcesViewModel';
 import { NodeOwnerRouteSupport } from './NodeOwnerRouteSupport';
 
+/**
+ * A path naming an identity id that is not the canonical encoding of a key is
+ * refused (400080) once the owner is authenticated, before anything is removed.
+ */
 @JsonController('/node/block-sources')
 export class DeleteNodeBlockSourceRoute extends NodeOwnerRouteSupport {
   private readonly remover = this.get<NodeBlockSourceRemover>(
@@ -24,9 +29,15 @@ export class DeleteNodeBlockSourceRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.writeAsNodeOwner(request, () =>
-      this.remover.remove(new NodeBlockSourceRemoverMessage(ownerIdentityId)),
-    );
+    await this.writeAsNodeOwner(request, async () => {
+      const message = new NodeBlockSourceRemoverMessage(ownerIdentityId);
+
+      if (!message.ownerIdentityId.isCanonicalKey()) {
+        throw new NonCanonicalIdentityIdError();
+      }
+
+      await this.remover.remove(message);
+    });
 
     return response
       .status(HttpRouteStatusEnum.OK)
