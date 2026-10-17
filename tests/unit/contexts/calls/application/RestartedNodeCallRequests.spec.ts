@@ -52,7 +52,6 @@ const notReady = {
  */
 describe('join and heartbeat against a restarted node', () => {
   const networkId = '550e8400-e29b-41d4-a716-446655440031';
-  const conversationId = 'one-to-one:restarted-node-spec';
   let caller: CallSigner;
   let callee: CallSigner;
   let authorizationLoaded: boolean;
@@ -79,12 +78,17 @@ describe('join and heartbeat against a restarted node', () => {
     jest.useRealTimers();
   });
 
+  /** Each call has its own conversation, so no call supersedes another. */
   function liveCall(): LiveCall {
+    const seed = String(++nonceSeed).padStart(8, '0');
     const start = signCallStart({
       networkId,
-      nonce: `restarted-node-nonce-${String(++nonceSeed).padStart(8, '0')}`,
+      nonce: `restarted-node-nonce-${seed}`,
       participantIds: [caller.id, callee.id].sort(),
-      scope: { conversationId, type: 'conversation' },
+      scope: {
+        conversationId: `one-to-one:restarted-node-spec-${seed}`,
+        type: 'conversation',
+      },
       signer: caller,
       startedAt: Date.now(),
     });
