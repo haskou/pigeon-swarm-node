@@ -58,8 +58,8 @@ Verified on node `origin/main` 4ac225d6 and UI `origin/main` dc951247.
 ## Goals
 
 1. Any member whose roles grant `create_invites` can issue an invitation.
-   The issuer signs it. It carries `maxUses` and an expiry of at most 30
-   days.
+   The issuer signs it. It carries `maxUses`, at most 100, and an expiry of at
+   most 30 days, and it can be bound to one identity.
 2. Every replica and every client fold checks each join made through an
    invitation for:
    - the issuer's signature;
@@ -69,7 +69,8 @@ Verified on node `origin/main` 4ac225d6 and UI `origin/main` dc951247.
    - expiry;
    - the use count;
    - the joiner's consent;
-   - possession of the link.
+   - possession of the link;
+   - canonical identity ids.
 
    All of these are decided from signed operations alone.
 
@@ -91,7 +92,7 @@ Verified on node `origin/main` 4ac225d6 and UI `origin/main` dc951247.
    only rule that can undo an admission is the authority cut of #543 (see
    [Authority cuts](#authority-cuts-543)).
 6. One mechanism, and the link stays a single copy-paste link. Single-use
-   links replace direct invitations.
+   links, optionally bound to one identity, replace direct invitations.
 
 Non-goals:
 
@@ -129,6 +130,27 @@ add anyone with `added`, so admitting gives a manager no new power.
 
 ## Data model
 
+### Canonical identity ids
+
+The node's `IdentityId.isEqual` compares encodings, and the communities rules
+compare identity ids that way. `PublicKey.isValidSignature` decodes keys
+leniently, so a signature by one key also verifies under re-encoded aliases
+of that key (`tests/unit/mothers/IdentityIdMother.ts`, `aliases()`). Without
+a check, a banned identity could join under an alias, and one identity could
+use an invitation once per alias.
+
+- Every identity id in a community operation must be canonical
+  (`IdentityId.isCanonicalKey()`): its author and every identity argument, in
+  every operation type. The ledger refuses an operation that names a
+  non-canonical id, and every fold, node and client, skips it.
+- The claim policy refuses a claim whose `identityId` is not canonical.
+- The proof classes decode keys strictly, so a consent checked against an
+  alias fails on its own.
+
+With every compared id canonical, equal strings mean equal keys. The ban,
+membership, one-use-per-identity and distinct-joiner rules therefore compare
+keys.
+
 ### `invitation_created` operation
 
 The author must be a member whose roles grant `create_invites`. The ledger
@@ -138,8 +160,9 @@ fold checks it again against the linear state, as for every operation.
 | Argument        | Type    | Rule                                                                                                                                                       |
 | --------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `invitationKey` | string  | Raw Ed25519 public key in canonical base64url (43 characters). Refused unless strict crypto decoding accepts it as a valid key that is not of small order. |
-| `maxUses`       | integer | `>= 1`.                                                                                                                                                    |
+| `maxUses`       | integer | `1 <= maxUses <= 100` (`MAX_INVITATION_USES`). Exactly 1 when `invitee` is set.                                                                            |
 | `expiresAt`     | integer | Unix milliseconds. Required: `createdAt < expiresAt <= createdAt + 30 days` (2 592 000 000 ms).                                                            |
+| `invitee`       | string  | Optional. A canonical identity id. Only that identity can join through the invitation.                                                                     |
 
 - The **invitation id** is the operation digest (`getHash()`), the
   `<digest>` in `community:<communityId>:op:<digest>`.
@@ -159,7 +182,8 @@ fold checks it again against the linear state, as for every operation.
   liveness rule 3). An issuer therefore gains nothing that it could not get by
   issuing the invitation later.
 
-- The UI proposes 7 days and lets the issuer pick up to 30.
+- The UI proposes 7 days and lets the issuer pick up to 30, and up to 100
+  uses. It can bind a single-use link to a contact.
 
 ### `invitation_revoked` operation
 
@@ -186,9 +210,16 @@ fold checks it again against the linear state, as for every operation.
 | `consent`      | Signed by the joiner's identity key.                                                    |
 
 The author is the admitter: a member whose roles grant `manage_members`. The
-joiner does not sign this operation; its consent is the embedded proof. The
-arguments are two ids and two signatures, well within
-`CommunityOperationLimits.MAX_ARGUMENT_BYTES`.
+joiner does not sign this operation; its consent is the embedded proof.
+
+- The admission counts toward the joiner's operation quota
+  (`MAX_OPERATIONS_PER_AUTHOR`), not the admitter's. It is the joiner's join,
+  made with the joiner's consent, as a self-join is today. Link holders
+  therefore cannot spend a manager's quota, however many identities they
+  create. Every other operation still counts toward its author, and the
+  founder stays exempt.
+- The arguments are about 400 bytes as `MAX_ARGUMENT_BYTES` measures them
+  (`JSON.stringify`), well under its 4 096.
 
 ### `community_invitation_claim` record
 
@@ -204,6 +235,8 @@ no admission depends on which records a node holds. Its proofs name one
 joiner, so a node operator who reads it can admit nobody else. A node stores
 a claim only when all of these hold:
 
+- `identityId` is canonical, and is the invitation's `invitee` when the
+  invitation names one;
 - the invitation is in the community folded at the claim's frontier;
 - the proofs verify;
 - the invitation is live at that frontier (see
@@ -212,6 +245,15 @@ a claim only when all of these hold:
 
 The claim does not check expiry, because there is no deterministic clock to
 check it against. Expiry is enforced at admission.
+
+A claim is written once: the policy refuses another write to the same id.
+The proofs do not depend on the frontier, so a claim signed again at another
+frontier could change nothing.
+
+A claim names its joiner, its invitation and its community, and the
+`requests` store replicates it to every node of the network. Every node
+operator therefore learns who asked to join which community (see
+[Residuals](#residuals)).
 
 ## Link format
 
@@ -224,10 +266,31 @@ check it against. Expiry is enforced at admission.
   (`history.replaceState`). It keeps the secret in session-scoped storage
   only until the claim is signed, which may happen after sign-in or identity
   creation.
-- The node never receives the secret. The preview uses the derived public
-  key, and the claim carries signatures.
+- The node never receives the secret. The preview sends the derived public
+  key in a header (see [Preview](#preview)), and the claim carries
+  signatures.
 - `communityId` scopes the key lookup. It reveals nothing to anyone who does
   not already hold the secret.
+
+## Preview
+
+`GET /communities/{communityId}/invitation-preview` is unsigned, so a joiner
+can preview before signing in or creating an identity.
+
+- The client sends the derived key as `Authorization: Bearer <invitationKey>`,
+  never in the URL, so the key stays out of access logs, as mailbox
+  capabilities do (`MailboxRouteSupport`).
+- The node finds the invitation through an index of invitation keys. An
+  unknown key, or an invitation that is not live at the node's frontier or
+  has expired by the node's clock, gets the same `404` as an unknown
+  community.
+- The response holds only `communityId`, `networkId`, `communityName`,
+  `communityAvatar`, `communityBanner`, `invitationId` and `expiresAt`. The
+  joiner needs `networkId` and `invitationId` to sign its proofs.
+- It holds no issuer, invitee, use count, member, peer id or address, and
+  nothing that is not already in the community's operations.
+- Members read every invitation key in the operations, so they can preview
+  any invitation. They already see all of its fields.
 
 ## Proofs
 
@@ -240,9 +303,17 @@ different domains:
 | `possession` | `pigeon:community-invitation-possession:v1\n` + the body | invitation key (derived from the secret) | the invitation's `invitationKey` |
 | `consent`    | `pigeon:community-invitation-consent:v1\n` + the body    | the joiner's identity key                | `identityId`                     |
 
-- Signatures are Ed25519 with strict verification
-  (`PublicKey.isValidSignature`) and canonical base64url encoding (86
-  characters).
+- Signatures are Ed25519. A signature must be 86 characters of unpadded
+  base64url that decode to 64 bytes and encode back to the same string, and
+  verification refuses `S >= L` (RFC 8032). `PublicKey.isValidSignature` is
+  not enough: it decodes with `Buffer.from(signature, 'base64')`, which
+  accepts both alphabets, padding and stray characters.
+- Keys decode strictly. `invitationKey` must be a canonical key that is not
+  of small order, and `identityId` must be canonical (see
+  [Canonical identity ids](#canonical-identity-ids)).
+- No rule keys on signature bytes: uses count identities, and claims are
+  keyed by invitation and identity. Another valid encoding of a proof, if one
+  existed, would admit nobody new.
 - A possession proof read from an operation or a claim can admit only the
   same identity, under the same invitation, community and network. It cannot
   be replayed for anyone else, and one identity counts once per invitation.
@@ -258,7 +329,8 @@ different domains:
 compatibility readers. It reuses these 7.0.0 primitives:
 
 - `PrivateKey.fromSeed`;
-- `PublicKey.fromRaw` and `PublicKey.isValidSignature` (strict);
+- the strict key decoding behind `PublicKey.fromRaw`
+  (`publicKeyToStrictBytes`);
 - `CanonicalJson`;
 - `CommunityOperationSignature`;
 - `PublicMutationSignature`.
@@ -276,14 +348,20 @@ It adds:
 2. `CommunityInvitationPossession` and `CommunityInvitationConsent`. Each
    provides `contentOf(fields)`, `sign(fields, key)` and
    `verify(fields, signature, publicKeyOrIdentityId)`, using the domains
-   above.
+   above. `verify` decodes the signature and the key strictly (see
+   [Proofs](#proofs)) and never calls `PublicKey.isValidSignature`.
 3. Vectors that the node and UI specs both consume:
    - secret → seed → public key;
    - fields → each preimage → each signature.
 
-   Negative vectors cover a non-canonical secret, a small-order or
-   non-canonical key, a signature under the other domain, and a swapped
-   identity, invitation or network.
+   Negative vectors cover:
+   - a non-canonical secret;
+   - a small-order or non-canonical invitation key;
+   - an alias of the joiner's identity id;
+   - a signature in the standard alphabet, with padding, with a stray
+     character, of the wrong length, or with `S >= L`;
+   - a signature under the other domain;
+   - a swapped identity, invitation or network.
 
 It removes `CommitmentId.communityInviteToken` and `CommunityInviteReference`.
 
@@ -304,10 +382,11 @@ Invitation `I` is **live** in a set of operations `S` when all of these hold:
 
 1. `I` is in `S`, and its author held `create_invites` in `past(I)`.
 2. No `invitation_revoked` of `I` is in `S`.
-3. No operation in `S` outside `closure(I)` cuts `create_invites` of the
-   issuer of `I`. Once the issuer loses `create_invites` or membership after
-   issuing, or concurrently with issuing, the invitation is dead for every
-   later admission. That stays true even if the issuer is promoted again.
+3. No cut outside `closure(I)` that stands in `S` (see
+   [Standing cuts](#standing-cuts)) cuts `create_invites` of the issuer of
+   `I`. Once the issuer loses `create_invites` or membership after issuing,
+   or concurrently with issuing, the invitation is dead for every later
+   admission. That stays true even if the issuer is promoted again.
 4. `uses(I, S) < maxUses`. Here `uses(I, S)` is the number of distinct
    joiners that have an admission under `I` in `S` that is valid by these
    rules at its own causal past. Admissions that the fold later skips or
@@ -320,12 +399,13 @@ of these hold:
 2. `invitationId` names an `invitation_created` of the same community that
    is live in `closure(A)`.
 3. `possession` verifies against `invitationKey`.
-4. `consent` verifies against `identityId`.
+4. `identityId` is canonical, and `consent` verifies against it.
 5. `closure(A)` holds no valid admission of `identityId` under the same
    invitation. Each identity can use an invitation once, even after leaving
    or being kicked.
 6. `I.createdAt <= A.createdAt <= I.expiresAt`.
 7. `identityId` is neither banned nor a member in `past(A)`.
+8. If `I` names an `invitee`, `identityId` is that invitee.
 
 Where each check runs:
 
@@ -337,9 +417,10 @@ Where each check runs:
 - **Fold, node and client**:
   - Rules 1 and 7 are checked again against the linear state, as for every
     operation, so a joiner banned concurrently stays out.
-  - Rules 2 to 6 are facts of `A`'s causal past and are never re-evaluated
-    against the linear state. A revocation, other uses or the passage of time
-    can therefore never skip an admission that was valid at its position.
+  - Rules 2 to 6 and 8 are facts of `A`'s causal past and are never
+    re-evaluated against the linear state. A revocation, other uses or the
+    passage of time can therefore never skip an admission that was valid at
+    its position.
   - The fold applies the [authority cut](#authority-cuts-543) to the
     invitation and to the admission.
   - The client fold evaluates all of this itself, so a malicious node cannot
@@ -360,32 +441,95 @@ operation is admitted. An admission does not need a full fold of its past.
 ## Authority cuts (#543)
 
 The fold applies one rule to every operation whose author needs a permission
-or membership, not only to invitations:
+or membership, not only to invitations.
+
+### Void operations
 
 - Two operations are **concurrent** when neither is in the other's closure.
-- An operation `O` by `X` that needs permission `P` is **void** when the
-  folded set holds an operation concurrent with `O` that cuts `P` of `X`.
-- A void operation changes nothing in the folded state. Operations that
-  depended on it are re-authorized linearly as usual. For example, a joiner
-  whose admission is void is not a member, so their operations are skipped.
-- The ledger never applies this rule, because it depends on operations
-  outside the causal past. The fold applies it over the stored set. A replica
-  that has not yet received the cut applies `O` until the cut arrives.
+- A **cut** is an operation that cuts a permission of a member (see
+  [Admission algorithm](#admission-algorithm)): a kick, a ban, a leave or a
+  role change.
+- An operation `O` by `X` that needs permission `P` is **void** in a set `S`
+  when a cut that stands in `S` is concurrent with `O` and cuts `P` of `X`.
+- A void operation changes nothing in the folded state, and **it cuts
+  nothing**. Operations that depended on it are re-authorized linearly as
+  usual. For example, a joiner whose admission is void is not a member, so
+  their operations are skipped.
+- The ledger never voids an operation, because that depends on operations
+  outside its causal past. The fold applies the rule over the stored set. A
+  replica that has not yet received a cut applies `O` until the cut arrives.
+  Where the ledger counts cuts inside a causal past (liveness rule 3), it
+  counts only the cuts that stand in that past.
 
-For invitations:
+### Standing cuts
 
-- An invitation whose issuer's `create_invites` is cut concurrently is void,
-  and so is every admission under it.
-- An admission whose admitter's `manage_members` is cut concurrently is void.
+Whether a cut is void depends on other cuts, which may themselves be void.
+The fold decides it in a fixed order, so every replica decides it the same
+way:
+
+1. Build a graph over the cuts in `S`, with an edge from `D` to `E` when `D`
+   and `E` are concurrent and `D` cuts the permission that `E` needs of its
+   author.
+2. Group the cuts into strongly connected components, and visit the
+   components in topological order.
+3. A cut is void when an edge reaches it from a standing cut in an earlier
+   component. Every other cut stands. Cuts in the same cycle never void each
+   other.
+
+So:
+
+- **A removed member cannot undo its removal.** Its backdated cuts are
+  concurrent with its removal, which reaches them, so they are void and cut
+  nothing. The one exception is a cut of its remover, which forms a cycle
+  with the removal.
+- **Mutual cuts all stand.** When manager `A` kicks `X` and `X` kicks `A`
+  concurrently, both lose `manage_members`, and the acts of each that are
+  concurrent with the other's kick are void. No replica can tell which kick
+  came first. Letting both fall would keep `X`, together with every other cut
+  it made. A third manager or the founder restores whoever should stay.
+- **The founder's cuts can never be answered.** The founder holds every
+  permission by ownership, and can be neither kicked, banned nor made to
+  leave while others remain (`Community.ts`). No cut reaches the founder's
+  cuts.
+
+### Retroactive reach
+
+A cut sits where its author places it. A cutter that chooses old parents
+makes its cut concurrent with every act of the cut member since those
+parents, and voids all of them. This reach is retroactive by design:
+
+- Every member who can cut someone has it, that is every holder of
+  `manage_members` or `manage_roles`. A removed manager gains it over its
+  remover through a mutual cut, so it can void its remover's acts since the
+  parents it chooses.
+- A member also cuts itself by leaving. A `create_invites` holder that leaves
+  with old parents voids its own invitations since then, and the admissions
+  under them, although it could not kick those joiners.
+- Once #543 extends voiding to every operation, the reach covers bans and
+  kicks. A ban concurrent with a standing cut of its moderator is then void,
+  which readmits the banned member without an unban (see
+  [Residuals](#residuals)).
+- Without the cut, a backdated operation already takes effect where the
+  fold's linear order places it among the operations it is concurrent with.
+  The cut replaces that order with one rule.
+
+### For invitations
+
+- An invitation whose issuer's `create_invites` is cut by a concurrent
+  standing cut is void, and so is every admission under it.
+- An admission whose admitter's `manage_members` is cut by a concurrent
+  standing cut is void.
 - A removed or demoted member's backdated invitation or admission is
   concurrent with the removal, so it is void on every replica once the
   removal arrives. When the removal is already in the operation's causal
   past, the ledger refuses the operation outright (admission rule 1 and
   liveness rule 3).
 - **Revocations are never void.** A revocation only closes an invitation.
-  Voiding it would reopen an invitation that an authorized member closed. The
-  most a concurrently removed revoker can do is close a link that the issuer
-  can issue again.
+  Voiding it would reopen a link that an authorized member closed. A revoker
+  needs its authority only at the revocation's parents. A removed issuer or
+  manager can therefore still revoke, with parents from before its removal,
+  any invitation it could revoke there. That closes links and evicts nobody,
+  and the issuer or a manager can issue a new link.
 - The ledger's refusals stand. An operation the ledger refused at its causal
   past is never stored, so a later cut cannot revive it.
 
@@ -396,9 +540,10 @@ triggers this, and such a member could remove the joiner directly anyway. A
 member who leaves the fold loses their MLS leaves, as on any removal (UI
 `docs/mls-group-encryption.md`, "Who commits", Remove).
 
-The same rule applies to every other operation that needs a permission
-(channels, roles, bans, kicks, `added`). Its implementation and specs belong
-to #543.
+Slice 2 builds the cut graph and voids invitations and admissions with it.
+#543's own change voids every other operation that needs a permission
+(channels, roles, bans, kicks, `added`) with the same graph. Until then, the
+linear fold alone decides those operations.
 
 ## Revocation
 
@@ -426,9 +571,9 @@ These statements hold for honest admitters:
    repaired.** This happens during a partition, or between admitting devices
    that have not synced. Each admission sees fewer than `maxUses` uses in its
    own past, so `k` mutually concurrent branches admit at most `k * maxUses`
-   identities. An exact limit would need either a total order (consensus) or
-   eviction by use count. #550 rules out eviction, and eviction would also
-   undo honest joins and churn MLS after every heal.
+   identities, with `maxUses` at most 100. An exact limit would need either a
+   total order (consensus) or eviction by use count. #550 rules out eviction,
+   and eviction would also undo honest joins and churn MLS after every heal.
 3. **Revocation holds** for every admission that has the revocation in its
    past.
 4. **Expiry follows the admitter's clock**, through the signed `createdAt`,
@@ -438,13 +583,16 @@ These statements hold for honest admitters:
    - bypass revocation or expiry;
    - choose a position in the history;
    - evict anyone;
-   - enroll an identity without that identity's consent.
+   - enroll an identity without that identity's consent;
+   - spend a manager's operation quota;
+   - join through a link bound to another identity.
 
    The most they can do is submit one claim per identity and invitation, and
    join while the invitation is live.
 
-6. **A removed or demoted issuer or admitter cannot act by backdating.** Their
-   acts are void everywhere once the removal is known (see
+6. **A removed or demoted issuer or admitter cannot act by backdating.** Its
+   invitations and admissions are void everywhere once the removal is known.
+   Only its revocations stay valid (see
    [Authority cuts](#authority-cuts-543)).
 7. **A malicious manager can ignore any of these limits** while it is a
    manager. It can already add anyone with `added`, so this is no new power.
@@ -467,12 +615,12 @@ These statements hold for honest admitters:
 `GET /communities/{communityId}/operations` returns the operations verbatim
 to every member:
 
-| Operation                        | Visible to every member                                      |
-| -------------------------------- | ------------------------------------------------------------ |
-| `invitation_created`             | issuer, `invitationKey`, `maxUses`, `expiresAt`, `createdAt` |
-| `member_joined` (`invitation`)   | admitter, joiner, `invitationId`, `possession`, `consent`    |
-| `invitation_revoked`             | revoker, `invitationId`                                      |
-| `member_banned`, `member_kicked` | moderator                                                    |
+| Operation                        | Visible to every member                                                 |
+| -------------------------------- | ----------------------------------------------------------------------- |
+| `invitation_created`             | issuer, `invitationKey`, `maxUses`, `expiresAt`, `createdAt`, `invitee` |
+| `member_joined` (`invitation`)   | admitter, joiner, `invitationId`, `possession`, `consent`               |
+| `invitation_revoked`             | revoker, `invitationId`                                                 |
+| `member_banned`, `member_kicked` | moderator                                                               |
 
 - No secret, bearer token or anything that lets someone claim an invitation
   appears in any operation, record, response or log.
@@ -489,27 +637,35 @@ to every member:
 
 ## Threats
 
-| Threat                                                        | Actor                                   | Outcome                                                                           | Mechanism                                                                             |
-| ------------------------------------------------------------- | --------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Read the link secret from replicated records, an API or logs  | node operator, member, network observer | prevented                                                                         | only the public key and joiner-bound proofs leave the joiner's client                 |
-| Read the secret from the UI host or `Referer`                 | UI host operator                        | prevented                                                                         | browsers do not send fragments; the UI removes the fragment from the address bar      |
-| Use a token from records stored before the cutover            | node operator                           | grants nothing                                                                    | the cutover refuses every old scope and join method                                   |
-| Join without the link                                         | outsider                                | prevented                                                                         | possession proof                                                                      |
-| Replay a possession proof for another identity                | anyone who reads operations or claims   | prevented                                                                         | the proof binds identity, invitation, community and network                           |
-| Enroll an identity without its consent                        | link holder                             | prevented                                                                         | consent proof                                                                         |
-| Join after revocation or expiry, or exceed `maxUses`          | link holder                             | prevented                                                                         | the admitter chooses position and `createdAt`; the checks run at the admission's past |
-| Extend an invitation's life                                   | issuer                                  | at most 30 days from its `createdAt`; ends when the issuer loses `create_invites` | expiry bound, admission rule 6, liveness rule 3                                       |
-| Overshoot `maxUses` through concurrent admissions             | honest admitters across a partition     | possible, at most `k * maxUses`                                                   | stated limit; no eviction by use count                                                |
-| Evict a member with a backdated join                          | link holder                             | prevented                                                                         | link holders sign no operations; use count and revocation never evict                 |
-| Forge an invitation                                           | member without `create_invites`         | prevented                                                                         | permission checked at `past(I)` and in the fold                                       |
-| Revoke another issuer's invitation                            | `create_invites` holder                 | prevented                                                                         | only the issuer and `manage_members` holders revoke                                   |
-| Backdate an invitation or admission after removal or demotion | former issuer or manager                | void once the removal is known                                                    | authority cut; ledger refusal when the removal is in the causal past                  |
-| Issue, admit or revoke with a stolen device                   | device thief                            | bounded by `compromisedSince`; replicas can diverge until #541                    | causal device authorization; #541                                                     |
-| Serve forged or over-limit admissions to a client             | malicious node                          | prevented                                                                         | the client fold verifies the proofs and the admission rules                           |
-| Ignore limits or revocation                                   | malicious manager                       | not prevented, no new power                                                       | `added` already exists                                                                |
-| Flood claims                                                  | link holder with many identities        | bounded by the cost of creating identities; one claim per identity and invitation | residual                                                                              |
-| Publish a weak (small-order) invitation key                   | malicious issuer                        | refused                                                                           | strict key decoding; an issuer could publish the secret anyway                        |
-| Link leaked by its holder (chat, screenshot)                  | whoever sees the link                   | can join while the invitation is live                                             | revocation, expiry of at most 30 days, `maxUses`; inherent to bearer links            |
+| Threat                                                             | Actor                                   | Outcome                                                                                          | Mechanism                                                                                         |
+| ------------------------------------------------------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Read the link secret from replicated records, an API or logs       | node operator, member, network observer | prevented                                                                                        | only the public key and joiner-bound proofs leave the joiner's client                             |
+| Read the secret from the UI host or `Referer`                      | UI host operator                        | prevented                                                                                        | browsers do not send fragments; the UI removes the fragment from the address bar                  |
+| Read an invitation key from access logs                            | proxy or node operator                  | prevented                                                                                        | the preview sends the key in a header                                                             |
+| Use a token from records stored before the cutover                 | node operator                           | grants nothing                                                                                   | the cutover refuses every old scope and join method                                               |
+| Join without the link                                              | outsider                                | prevented                                                                                        | possession proof                                                                                  |
+| Replay a possession proof for another identity                     | anyone who reads operations or claims   | prevented                                                                                        | the proof binds identity, invitation, community and network                                       |
+| Join under an alias id while banned, or use an invitation twice    | banned identity, member, malicious node | prevented                                                                                        | canonical ids in every operation and claim; strict key decoding                                   |
+| Join through a link bound to another identity                      | link holder                             | prevented                                                                                        | `invitee`, checked by the claim policy, the ledger and every fold                                 |
+| Enroll an identity without its consent                             | link holder                             | prevented                                                                                        | consent proof                                                                                     |
+| Join after revocation or expiry, or exceed `maxUses`               | link holder                             | prevented                                                                                        | the admitter chooses position and `createdAt`; the checks run at the admission's past             |
+| Spend a manager's operation quota through claims                   | link holder with many identities        | prevented                                                                                        | admissions count toward their joiner                                                              |
+| Extend an invitation's life                                        | issuer                                  | at most 30 days from its `createdAt`; ends when the issuer loses `create_invites`                | expiry bound, admission rule 6, liveness rule 3                                                   |
+| Overshoot `maxUses` through concurrent admissions                  | honest admitters across a partition     | possible, at most `k * maxUses` with `maxUses <= 100`                                            | stated limit; no eviction by use count                                                            |
+| Evict a member with a backdated join                               | link holder                             | prevented                                                                                        | link holders sign no operations; use count and revocation never evict                             |
+| Forge an invitation                                                | member without `create_invites`         | prevented                                                                                        | permission checked at `past(I)` and in the fold                                                   |
+| Revoke another issuer's invitation                                 | `create_invites` holder                 | prevented                                                                                        | only the issuer and `manage_members` holders revoke                                               |
+| Backdate an invitation, admission or cut after removal or demotion | former issuer or manager                | void once the removal is known                                                                   | authority cut; void operations cut nothing; ledger refusal when the removal is in the causal past |
+| Answer a removal with a backdated cut of the remover               | removed manager                         | both lose the permission; the remover's concurrent acts are void; impossible against the founder | mutual cuts stand ([residual](#residuals))                                                        |
+| Revoke with parents from before a removal                          | former issuer or manager                | closes invitations it could revoke before the removal; evicts nobody                             | revocations are never void ([residual](#residuals))                                               |
+| Present another encoding of a proof                                | anyone                                  | refused                                                                                          | strict signature decoding; no rule keys on signature bytes                                        |
+| Issue, admit or revoke with a stolen device                        | device thief                            | bounded by `compromisedSince`; replicas can diverge until #541                                   | causal device authorization; #541                                                                 |
+| Serve forged, aliased or over-limit admissions to a client         | malicious node                          | prevented                                                                                        | the client fold checks canonical ids, the proofs and the admission rules                          |
+| Ignore limits or revocation                                        | malicious manager                       | not prevented, no new power                                                                      | `added` already exists                                                                            |
+| Flood claims                                                       | link holder with many identities        | bounded by the cost of creating identities; one claim per identity and invitation                | [residual](#residuals)                                                                            |
+| Learn which identity asks to join which community                  | node operator                           | possible                                                                                         | claims replicate through the `requests` store ([residual](#residuals))                            |
+| Publish a weak (small-order) invitation key                        | malicious issuer                        | refused                                                                                          | strict key decoding; an issuer could publish the secret anyway                                    |
+| Link leaked by its holder (chat, screenshot)                       | whoever sees the link                   | can join while the invitation is live, unless it names an `invitee`                              | revocation, expiry of at most 30 days, `maxUses`, `invitee`; inherent to bearer links             |
 
 ## Changes at implementation
 
@@ -519,17 +675,21 @@ order because each one depends on the one before it:
 1. **Crypto 8.0.0** (`@haskou/pigeon-swarm-crypto`, `feat/` branch released
    through `releases`):
    - `CommunityInvitationKey`, `CommunityInvitationPossession` and
-     `CommunityInvitationConsent`;
-   - the vectors;
+     `CommunityInvitationConsent`, with strict signature and key decoding;
+   - the vectors, negative ones included;
    - removal of `CommitmentId.communityInviteToken` and
      `CommunityInviteReference`.
 2. **Node** (#545, #550, invitation part of #543).
    - Operations:
-     - add `invitation_created`, `invitation_revoked`, and `member_joined`
-       with method `invitation`, with the rules above in the applier, the
+     - add `invitation_created` (with `MAX_INVITATION_USES` and `invitee`),
+       `invitation_revoked`, and `member_joined` with method `invitation`,
+       with the rules above in the applier, the ledger and the fold;
+     - refuse non-canonical identity ids in every community operation, in the
        ledger and the fold;
-     - add the authority cut to the fold;
-     - add the `community_invitation_claim` policy.
+     - count each invitation admission toward its joiner's quota;
+     - add the cut graph to the fold and void invitations and admissions
+       with it;
+     - add the write-once `community_invitation_claim` policy.
    - Removals:
      - the `invite_link` method and the old self-signed `invitation` method;
      - `assertJoinReference`;
@@ -543,8 +703,8 @@ order because each one depends on the one before it:
      - `POST /communities/{communityId}/invitations`: a signed
        `invitation_created`;
      - `GET /communities/{communityId}/invitations`: members only;
-     - `GET /communities/{communityId}/invitation-keys/{invitationKey}`: the
-       unsigned preview;
+     - `GET /communities/{communityId}/invitation-preview`: unsigned, with
+       the key in the `Authorization` header (see [Preview](#preview));
      - `POST /communities/{communityId}/invitations/{invitationId}/claims`;
      - `GET /communities/{communityId}/invitation-claims`: `manage_members`
        only;
@@ -557,13 +717,17 @@ order because each one depends on the one before it:
      - `POST /communities/{communityId}/members` (direct invitation).
    - Docs to update:
      - `docs/api.md`;
-     - `docs/pubsub-sync-protocol.md`, for the operations, the authority cut
-       and the claim scope;
+     - `docs/pubsub-sync-protocol.md`, for the operations, canonical ids, the
+       authority cut and the claim scope;
      - the swagger;
      - the invites line of `node-owner-registration-and-blocking.md`;
      - the table row and the #543 residual of `causal-device-authorization.md`.
    - Tests:
-     - unit specs for every rule and negative case;
+     - unit specs for every rule and negative case, including alias ids for
+       a joiner, a banned member and a repeated use, a `maxUses` above 100,
+       an `invitee` mismatch, and the quota of a joiner and of an admitter;
+     - the cut graph: mutual cuts, a removed member's backdated cuts, the
+       founder's cuts, and a revocation after removal;
      - the crypto vectors;
      - a forged-operations integration test;
      - real-transport end-to-end tests for backdating, partition and heal,
@@ -578,24 +742,30 @@ community id or an address.
 - **`CommunityAuthority`.** `JOIN_METHODS` drops `invite_link`. The
   `invitation` method requires `manage_members` and is no longer a self-join
   (`selfJoin: false`). `mayJoin` applies the admission rules at the join's
-  causal past, using the same vectors as the node.
+  causal past, using the same vectors as the node. Every operation that
+  names a non-canonical identity id is skipped, using the crypto's strict key
+  decoding.
 - **`CommunityOperationFold`.** Add the new operations, the cut sets, the
-  evaluation at each admission's causal past (a port of the node's `pasts`)
-  and the authority cut.
+  evaluation at each admission's causal past (a port of the node's `pasts`),
+  the cut graph and the voiding of invitations and admissions. An admission
+  counts toward its joiner's quota.
 - **Creating a link.** Generate the secret and sign `invitation_created`.
-  The expiry defaults to 7 days, and the issuer can pick up to 30. Then build
-  the fragment link. The secret is never sent.
-- **Opening a link.** Parse and strip the fragment, preview by key, sign the
-  claim, then wait for admission and the MLS welcome. The UI shows that it is
-  waiting for a community manager.
+  The expiry defaults to 7 days, and the issuer can pick up to 30 days and up
+  to 100 uses. The issuer can bind a single-use link to a contact
+  (`invitee`). Then build the fragment link. The secret is never sent.
+- **Opening a link.** Parse and strip the fragment, preview with the key in
+  the `Authorization` header, sign the claim, then wait for admission and the
+  MLS welcome. The UI shows that it is waiting for a community manager.
 - **Admitter.** A manager's client admits pending claims automatically, in
-  the same loop that reconciles MLS adds.
+  the same loop that reconciles MLS adds. It skips every claim that is not
+  valid at its own frontier, including claims with non-canonical ids.
 - **Invitation list and revocation.** The list is shown to issuers and
   managers. Each issuer can revoke their own invitations, and managers can
   revoke any invitation.
 - **Direct invitations.** Remove the direct invitation flow: the invitation
   type in `MembershipRequestCard`, `workspaceNotificationState` and
-  `PigeonCommunitiesApi`. A single-use link replaces it.
+  `PigeonCommunitiesApi`. A single-use link, optionally bound to a contact,
+  replaces it.
 - **Moderation log.** Entries name the invitation id.
 - **Removed code.** Remove `CommitmentId.communityInviteToken`,
   `CommunityInviteReference` and the `/invite/community/<token>` route, and
@@ -616,20 +786,33 @@ community id or an address.
 
 ## Residuals
 
-- Members see the issuer, admitter and revoker of every invitation, and the
-  moderator of every ban and kick, because every client fold must verify
-  authors.
+- Members see the issuer, admitter, revoker and invitee of every invitation,
+  and the moderator of every ban and kick, because every client fold must
+  verify authors.
+- Every node operator of the network reads the claims in the `requests`
+  store, so it learns which identity asked to join which community, through
+  which invitation.
 - Concurrent admissions overshoot `maxUses` by at most a factor of the number
   of concurrent branches, and the overshoot is never repaired.
-- The authority cut removes honest admissions made concurrently with the
-  demotion of their admitter or issuer.
+- Cuts reach back as far as their author chooses. A cut voids every
+  concurrent act of the cut member, including honest admissions made during
+  a partition. A removed manager can answer its remover with a mutual cut,
+  and both lose the permission. A member that leaves with old parents voids
+  its own invitations and the admissions under them. Only the founder's cuts
+  cannot be answered.
+- When #543 extends voiding to bans, a ban made concurrently with a standing
+  cut of its moderator becomes void and readmits its target without an
+  unban. #543 has to bound this before it lands.
+- A removed issuer or manager can still revoke, with parents from before its
+  removal, any invitation it could revoke there.
 - Expiry follows the admitter's clock.
 - Stolen-device acts can split replicas until #541 is fixed.
 - A joiner needs an online manager. Today a joiner already needs one for the
   MLS welcome, but now the joiner does not appear in the member list until a
   manager admits them.
-- Every admission counts toward its admitter's per-author operation quota
-  (`MAX_OPERATIONS_PER_AUTHOR`, 1000). The founder is exempt.
+- A `create_invites` holder can make managers' clients admit up to 100
+  joiners per invitation it issues, with identities it creates. Revoking its
+  invitations or removing its `create_invites` stops this (liveness rule 3).
 - Claims cannot be withdrawn, and joiners who create many identities can
   flood claims.
 - The operations endpoint still scans the whole community per page.
