@@ -316,3 +316,19 @@ Feature: Put node blocks
       | encoding                        |
       | an alias DER prefix             |
       | a non-canonical base64 encoding |
+
+  Scenario Outline: A restart keeps enforcing the canonical entries of an own block list that also names an alias of a key by <encoding>
+    Given the node stored its own block list version 1 blocking the other identity and the other identity under "<encoding>" of its key
+    When the node restarts
+    Then the node keeps its own block list
+    Given another identity signs a GET request to "/conversations"
+    When I GET "/conversations"
+    Then response code is equal to 403
+    And response body should contain "403012"
+    When I GET "/node/published-blocks"
+    Then response code is equal to 404
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |

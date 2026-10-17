@@ -1,6 +1,7 @@
 import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
 import IdentityAdmissionSourceRateLimiter from '@app/apps/apis/identities-api/IdentityAdmissionSourceRateLimiter';
 import { PrivateAuthorizationRequestBodyLimit } from '@app/apps/apis/private-authorization-api/routes/PrivateAuthorizationRequestBodyLimit';
+import IdentityMutationGateInitializer from '@app/apps/initializers/identities/IdentityMutationGateInitializer';
 import NonCanonicalIdentityIdsPurgeInitializer from '@app/apps/initializers/nodes/NonCanonicalIdentityIdsPurgeInitializer';
 import PigeonApplication from '@app/apps/PigeonApplication';
 import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime';
@@ -136,6 +137,10 @@ async function startApplication(
   ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
 
   await started.dependencyInjection();
+  // Production boot runs this initializer before the server starts. Without it
+  // the harness would admit records production refuses, e.g. replicated
+  // identity records under an alias id.
+  await started.runInitializers(IdentityMutationGateInitializer);
 
   try {
     await started.runServer();
@@ -1566,6 +1571,7 @@ export default class Definitions {
     owner: string,
     signer: string,
     encoding?: string,
+    extraAliasEncoding?: string,
   ): Promise<void> {
     const identities: Record<string, () => Promise<KeyPair>> = {
       other: () => this.ensureOtherIdentityKeyPair(),
@@ -1576,6 +1582,14 @@ export default class Definitions {
         (await identities[name]()).toPrimitives().publicKey,
       ).valueOf();
     const blockedNames = blocked === 'nobody' ? [] : blocked.split(',');
+    const extraAliasIds = extraAliasEncoding
+      ? [
+          this.aliasOf(
+            new IdentityId(await publicKeyOf('other')),
+            extraAliasEncoding,
+          ).valueOf(),
+        ]
+      : [];
     const blockedIdentityIds = (
       await Promise.all(
         blockedNames.map(async (name) => {
@@ -1586,7 +1600,9 @@ export default class Definitions {
           ).valueOf();
         }),
       )
-    ).sort();
+    )
+      .concat(extraAliasIds)
+      .sort();
     const unsigned = {
       blockedIdentityIds,
       blockedNodePeerIds: [] as string[],
@@ -1805,6 +1821,30 @@ export default class Definitions {
       'other',
       'owner',
       'owner',
+      encoding,
+    );
+    await Kernel.di
+      .getService<EmbeddedLocalDatabase>(EmbeddedLocalDatabase)
+      .save('node_block_list', 'local', {
+        _id: 'local',
+        blockList: JSON.parse(String(this.body)),
+      });
+  }
+
+  /** Stores the owner-signed list naming the other identity and its alias, as an upgraded node holds it. */
+  @given(
+    'the node stored its own block list version {int} blocking the other identity and the other identity under {string} of its key',
+  )
+  public async theNodeStoredMixedOwnBlockList(
+    version: number,
+    encoding: string,
+  ): Promise<void> {
+    await this.setNodeBlockListBody(
+      version,
+      'other',
+      'owner',
+      'owner',
+      undefined,
       encoding,
     );
     await Kernel.di
