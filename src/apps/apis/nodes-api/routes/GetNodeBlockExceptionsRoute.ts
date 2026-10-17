@@ -12,7 +12,7 @@ export class GetNodeBlockExceptionsRoute extends NodeOwnerRouteSupport {
     NodeBlockExceptionsFinder,
   );
 
-  @Get('/')
+  @Get()
   public async getExceptions(
     @Req() request: Request,
     @Res() response: Response,

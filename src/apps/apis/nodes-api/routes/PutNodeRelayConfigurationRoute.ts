@@ -13,7 +13,7 @@ export class PutNodeRelayConfigurationRoute extends NodeOwnerRouteSupport {
   private readonly updater: NodeRelayConfigurationUpdater =
     this.get<NodeRelayConfigurationUpdater>(NodeRelayConfigurationUpdater);
 
-  @Put('/')
+  @Put()
   public async putRelayConfiguration(
     @Body() body: PutNodeRelayConfigurationBody,
     @Req() request: Request,

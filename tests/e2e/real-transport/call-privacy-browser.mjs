@@ -69,7 +69,7 @@ try {
           time: Date.now(),
           status: response.status(),
         });
-      if (response.status() >= 400 && pathname.startsWith('/calls/'))
+      if (response.status() >= 400 && pathname.startsWith('/calls'))
         observation.errors.push({ path: pathname, status: response.status() });
     });
     page.on('websocket', (socket) =>
@@ -227,12 +227,10 @@ try {
     JSON.stringify(
       observations.map((entry) => ({
         starts: entry.starts.map((call) => call.id),
-        lastSnapshots: entry.snapshots
-          .slice(-3)
-          .map((call) => ({
-            id: call.id,
-            participantCount: call.participants.length,
-          })),
+        lastSnapshots: entry.snapshots.slice(-3).map((call) => ({
+          id: call.id,
+          participantCount: call.participants.length,
+        })),
         heartbeatStatuses: entry.heartbeats.map(
           (heartbeat) => heartbeat.status,
         ),

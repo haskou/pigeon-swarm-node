@@ -10,8 +10,8 @@ import WebSocket from 'ws';
 import type { NodeRuntime } from './two-real-node-gossipsub';
 
 export const REALTIME_PROTOCOL_VERSION = 'pigeon-realtime.v1';
-export const REALTIME_WS_PATH = '/realtime/v1';
-const TICKETS_PATH = '/realtime/v1/tickets';
+export const REALTIME_WS_PATH = '/realtime';
+const TICKETS_PATH = '/realtime/tickets';
 
 export function ticketProtocols(ticket: string): string[] {
   return [REALTIME_PROTOCOL_VERSION, `ticket.${ticket}`];

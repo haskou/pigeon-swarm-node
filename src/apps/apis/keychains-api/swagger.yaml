@@ -6,7 +6,7 @@ info:
 tags:
   - name: keychains
 paths:
-  /keychains/:
+  /keychains:
     post:
       tags:
         - keychains

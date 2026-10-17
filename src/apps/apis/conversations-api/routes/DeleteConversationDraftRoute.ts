@@ -6,7 +6,7 @@ import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
 
-@JsonController('/conversations')
+@JsonController('/conversation-drafts')
 export class DeleteConversationDraftRoute extends Route {
   private readonly authenticator = this.get<SignedHttpRequestAuthenticator>(
     SignedHttpRequestAuthenticator,
@@ -16,7 +16,7 @@ export class DeleteConversationDraftRoute extends Route {
     ConversationDraftDeleter,
   );
 
-  @Delete('/me/drafts/:draftKey')
+  @Delete('/:draftKey')
   public async deleteDraft(
     @Param('draftKey') draftKey: string,
     @Req() request: Request,

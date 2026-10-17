@@ -8,7 +8,7 @@ Feature: Post community text channel API
     And I register a test IPFS network "communities-api-channel-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community text channel body
@@ -24,7 +24,7 @@ Feature: Post community text channel API
     And I register a test IPFS network "communities-api-owner-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community text channel body

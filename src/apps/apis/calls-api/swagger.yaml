@@ -6,7 +6,7 @@ info:
 tags:
   - name: calls
 paths:
-  /calls/:
+  /calls:
     get:
       tags:
         - calls

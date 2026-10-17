@@ -16,7 +16,7 @@ import {
 import { PutConversationDraftBody } from '../bodies/PutConversationDraftBody';
 import { ConversationDraftResource } from '../resources/ConversationDraftResource';
 
-@JsonController('/conversations')
+@JsonController('/conversation-drafts')
 export class PutConversationDraftRoute extends Route {
   private readonly authenticator = this.get<SignedHttpRequestAuthenticator>(
     SignedHttpRequestAuthenticator,
@@ -26,7 +26,7 @@ export class PutConversationDraftRoute extends Route {
     ConversationDraftSaver,
   );
 
-  @Put('/me/drafts/:draftKey')
+  @Put('/:draftKey')
   public async saveDraft(
     @Param('draftKey') draftKey: string,
     @Body() body: PutConversationDraftBody,

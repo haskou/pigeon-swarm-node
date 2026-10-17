@@ -496,15 +496,15 @@ fetch, and other responsible nodes with room still hold the replica.
 
 - The upload endpoint (`POST /ipfs/public`) no longer announces replication.
   Replication registration is a second request,
-  `PUT /ipfs/replication/{cid}` (or equivalent) with `{networkId, context,
+  `PUT /ipfs/replications/{cid}` (or equivalent) with `{networkId, context,
   sizeBytes, mutation}` after the client has the CID. For public uploads of an
   unpublished identity (avatar before the identity is published, which the
   API explicitly supports) the client registers after publishing the identity;
   until then the content lives on the uploading node only.
-- `GET /ipfs/{cid}`: `Content-Type`/`Content-Disposition` become the sniffed
+- `GET /ipfs/contents/{cid}`: `Content-Type`/`Content-Disposition` become the sniffed
   type or `application/octet-stream` + `attachment`; clients that need the
   original filename get it from signed records, not from this endpoint.
-- `GET /ipfs/replication/status`: `releasableCount` and known-replica fields
+- `GET /ipfs/replication-status`: `releasableCount` and known-replica fields
   are removed. Update `docs/api.md`, swagger and `docs/pubsub-sync-protocol.md`.
 
 ### Tests required

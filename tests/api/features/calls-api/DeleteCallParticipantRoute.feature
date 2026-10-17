@@ -8,7 +8,7 @@ Feature: Leave call participant
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And I remember the current call
     And the other identity signs the current call leave request
@@ -23,7 +23,7 @@ Feature: Leave call participant
     And I have published a keychain for the authenticated identity
     And I set a group capability call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And I remember the current call
     And I present the group call capability
@@ -50,7 +50,7 @@ Feature: Leave call participant
     And I have published a keychain for the authenticated identity
     And I set a group capability call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And I remember the current call
     And the other identity signs the current call join request
@@ -73,7 +73,7 @@ Feature: Leave call participant
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And I remember the current call
     And call requests are sent without a mutation

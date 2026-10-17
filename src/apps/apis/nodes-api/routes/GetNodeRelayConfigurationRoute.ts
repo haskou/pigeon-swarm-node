@@ -7,7 +7,7 @@ import { NodeOwnerRouteSupport } from './NodeOwnerRouteSupport';
 
 @JsonController('/node/relay-configuration')
 export class GetNodeRelayConfigurationRoute extends NodeOwnerRouteSupport {
-  @Get('/')
+  @Get()
   public async getRelayConfiguration(
     @Req() request: Request,
     @Res() response: Response,

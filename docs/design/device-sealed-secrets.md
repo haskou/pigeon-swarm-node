@@ -170,7 +170,7 @@ recipientCredential, sealedSecret, signature }`.
 The response never includes other devices' entries, the authorized-device
 list, the head commitments, or any decrypted material.
 
-### Hand-over at retirement (`POST /identity-devices/transitions`)
+### Hand-over at retirement (`POST /identity-devices/{identityId}/transitions`)
 
 A device that forgets itself cannot rely on a remaining device being online to
 publish the next generation, and once its own revocation lands it can no

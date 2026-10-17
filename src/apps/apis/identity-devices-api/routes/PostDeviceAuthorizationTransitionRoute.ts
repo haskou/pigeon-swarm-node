@@ -10,10 +10,11 @@ import { InvalidDeviceSealedSecretBundleError } from '@app/contexts/identity-dev
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Response } from 'express';
-import { Body, JsonController, Post, Res } from 'routing-controllers';
+import { Body, JsonController, Param, Post, Res } from 'routing-controllers';
 
 import { PostDeviceAuthorizationTransitionBody } from '../bodies/PostDeviceAuthorizationTransitionBody';
 import DeviceAuthorizationTransitionRateLimiter from '../DeviceAuthorizationTransitionRateLimiter';
+import { DeviceAuthorizationTransitionIdentityMismatchError } from '../errors/DeviceAuthorizationTransitionIdentityMismatchError';
 import { InvalidDeviceSealedSecretBundleRequestError } from '../errors/InvalidDeviceSealedSecretBundleRequestError';
 import { PostDeviceAuthorizationTransitionRequest } from '../requests/PostDeviceAuthorizationTransitionRequest';
 import { DeviceAuthorizationTransitionResource } from '../resources/DeviceAuthorizationTransitionResource';
@@ -113,8 +114,9 @@ export class PostDeviceAuthorizationTransitionRoute extends Route {
     }
   }
 
-  @Post('/transitions')
+  @Post('/:identityId/transitions')
   public async apply(
+    @Param('identityId') identityId: string,
     @Body({
       options: { limit: '1mb' },
       validate: { forbidNonWhitelisted: true, whitelist: true },
@@ -122,6 +124,10 @@ export class PostDeviceAuthorizationTransitionRoute extends Route {
     body: PostDeviceAuthorizationTransitionBody,
     @Res() response: Response,
   ): Promise<Response> {
+    if (identityId !== body.identityId) {
+      throw new DeviceAuthorizationTransitionIdentityMismatchError();
+    }
+
     const request = new PostDeviceAuthorizationTransitionRequest(body);
     const message = request.getMessage();
 

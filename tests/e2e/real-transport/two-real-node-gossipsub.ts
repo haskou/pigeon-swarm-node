@@ -232,7 +232,7 @@ async function main(): Promise<void> {
     const call = await request<CallResponse>(
       nodeA,
       'POST',
-      '/calls/',
+      '/calls',
       {
         conversationId: conversation.id,
         mutation: mutationOf(signedStart.proof),
@@ -413,7 +413,7 @@ async function stopNode(node: NodeRuntime): Promise<void> {
 }
 
 /**
- * `POST /node/networks/` answers as soon as the network is saved; the runtime
+ * `POST /node/networks` answers as soon as the network is saved; the runtime
  * network and its replicated stores open in the background (#187). A write
  * that needs replicated state, such as the first identity publication that
  * provisions its device authorization, is answered `503020` until then, so
@@ -423,13 +423,13 @@ async function addPrivateNetwork(
   node: NodeRuntime,
   networkKey: string,
 ): Promise<void> {
-  await request(node, 'POST', '/node/networks/', {
+  await request(node, 'POST', '/node/networks', {
     id: NETWORK_ID,
     key: networkKey,
     name: NETWORK_NAME,
   });
   await waitFor(async () => {
-    const peers = await request<PeersResponse>(node, 'GET', '/peers/');
+    const peers = await request<PeersResponse>(node, 'GET', '/peers');
 
     return peers.networkSynchronization.networks.some(
       (network) => network.id === NETWORK_ID,
@@ -479,7 +479,7 @@ async function publishIdentity(
   const response = await request<IdentityResponse>(
     node,
     'POST',
-    '/identities/',
+    '/identities',
     body,
   );
 
@@ -578,7 +578,7 @@ async function publishKeychain(
   const response = await request<KeychainResponse>(
     node,
     'POST',
-    '/keychains/',
+    '/keychains',
     body,
     identity,
   );
@@ -618,7 +618,7 @@ async function runNotificationLifecycle(
     await request(
       nodeA,
       'POST',
-      '/notifications/',
+      '/notifications',
       { ...body, mutation: undefined },
       inviter,
     );
@@ -633,7 +633,7 @@ async function runNotificationLifecycle(
   const created = await request<{ id: string }>(
     nodeA,
     'POST',
-    '/notifications/',
+    '/notifications',
     body,
     inviter,
   );
@@ -647,7 +647,7 @@ async function runNotificationLifecycle(
       await request<{ results?: { id: string; state: string }[] }>(
         nodeB,
         'GET',
-        '/notifications/',
+        '/notifications',
         undefined,
         recipient,
       )
@@ -716,7 +716,7 @@ async function createOneToOneConversation(
   return request<ConversationResponse>(
     node,
     'POST',
-    '/conversations/',
+    '/conversations',
     body,
     owner,
   );
@@ -778,7 +778,7 @@ async function waitForConversation(
     const response = await requestMaybe<ConversationListResponse>(
       node,
       'GET',
-      `/conversations/?limit=30`,
+      `/conversations?limit=30`,
       undefined,
       identity,
     );

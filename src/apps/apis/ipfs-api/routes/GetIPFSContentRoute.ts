@@ -10,7 +10,7 @@ import { Get, JsonController, Param, Res } from 'routing-controllers';
 export class GetIPFSContentRoute extends Route {
   private readonly getter = this.get<ContentGetter>(ContentGetter);
 
-  @Get('/:cid')
+  @Get('/contents/:cid')
   public async request(
     @Param('cid') cid: string,
     @Res() response: Response,

@@ -12,7 +12,7 @@ export class PostNodePublicNetworkRoute extends NodeOwnerRouteSupport {
   private readonly adder: NodeNetworkAdder =
     this.get<NodeNetworkAdder>(NodeNetworkAdder);
 
-  @Post('/')
+  @Post()
   public async addPublicNetwork(
     @Req() request: Request,
     @Res() response: Response,

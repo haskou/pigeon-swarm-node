@@ -3,11 +3,11 @@ Feature: Put node relay configuration
   Scenario: Get default relay configuration as the owner
     Given the local node has no owner and no networks
     And I sign the current node owner request
-    When I PUT "/node/owner/"
+    When I PUT "/node/owner"
     Then response code is equal to 200
 
     Given I sign the current node relay configuration query
-    When I GET "/node/relay-configuration/"
+    When I GET "/node/relay-configuration"
     Then response code is equal to 200
     And response data should match partially
       """
@@ -30,7 +30,7 @@ Feature: Put node relay configuration
   Scenario: Replace relay configuration as the owner
     Given the local node has no owner and no networks
     And I sign the current node owner request
-    When I PUT "/node/owner/"
+    When I PUT "/node/owner"
     Then response code is equal to 200
 
     Given I set json body
@@ -57,7 +57,7 @@ Feature: Put node relay configuration
       }
       """
     And I sign the current node relay configuration request
-    When I PUT "/node/relay-configuration/"
+    When I PUT "/node/relay-configuration"
     Then response code is equal to 200
     And response data should match partially
       """
@@ -101,7 +101,7 @@ Feature: Put node relay configuration
         }
       }
       """
-    When I PUT "/node/relay-configuration/"
+    When I PUT "/node/relay-configuration"
     Then response code is equal to 200
     And response data should match partially
       """
@@ -122,7 +122,7 @@ Feature: Put node relay configuration
   Scenario: Reject relay configuration changes from a non-owner
     Given the local node has no owner and no networks
     And I sign the current node owner request
-    When I PUT "/node/owner/"
+    When I PUT "/node/owner"
     Then response code is equal to 200
 
     Given I set json body
@@ -141,5 +141,5 @@ Feature: Put node relay configuration
       }
       """
     And another identity signs the current node relay configuration request
-    When I PUT "/node/relay-configuration/"
+    When I PUT "/node/relay-configuration"
     Then response code is equal to 403

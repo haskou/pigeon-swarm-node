@@ -6,7 +6,7 @@ info:
 tags:
   - name: presence
 paths:
-  /presence/:
+  /presence:
     get:
       tags:
         - presence

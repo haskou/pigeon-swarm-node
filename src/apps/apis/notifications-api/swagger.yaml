@@ -6,7 +6,7 @@ info:
 tags:
   - name: notifications
 paths:
-  /notifications/:
+  /notifications:
     get:
       tags:
         - notifications

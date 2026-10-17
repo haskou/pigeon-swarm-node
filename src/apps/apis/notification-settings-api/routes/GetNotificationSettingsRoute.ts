@@ -17,7 +17,7 @@ export class GetNotificationSettingsRoute extends Route {
     NotificationSettingsFinder,
   );
 
-  @Get('/')
+  @Get()
   public async getSettings(
     @Req() request: Request,
     @Res() response: Response,

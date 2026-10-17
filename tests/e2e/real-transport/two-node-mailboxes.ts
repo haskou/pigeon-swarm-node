@@ -161,7 +161,7 @@ async function acknowledge(
  */
 async function waitForPeers(node: NodeRuntime): Promise<void> {
   await waitFor(async () => {
-    const peers = await request<PeersResponse>(node, 'GET', '/peers/');
+    const peers = await request<PeersResponse>(node, 'GET', '/peers');
 
     return peers.networkSynchronization.networks.some(
       (network) =>

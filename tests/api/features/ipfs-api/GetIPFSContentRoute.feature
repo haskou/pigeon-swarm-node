@@ -13,7 +13,7 @@ Feature: Get IPFS content route
       }
       """
     And CID "bagaaierasords4njcts6vs7qvdjfcvgnume4hqohf65zsfguprqphs3icwea" has been created
-    When I GET "/ipfs/bagaaierasords4njcts6vs7qvdjfcvgnume4hqohf65zsfguprqphs3icwea"
+    When I GET "/ipfs/contents/bagaaierasords4njcts6vs7qvdjfcvgnume4hqohf65zsfguprqphs3icwea"
     Then response code is equal to 200
     And response data should match exactly
       """
@@ -24,7 +24,7 @@ Feature: Get IPFS content route
 
   Scenario: Return not found when CID does not exist in any network
     Given I am an anonymous user
-    When I GET "/ipfs/bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"
+    When I GET "/ipfs/contents/bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"
     Then response code is equal to 404
     And response data should match exactly
       """

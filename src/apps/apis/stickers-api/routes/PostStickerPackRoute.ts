@@ -12,7 +12,7 @@ import { StickerRouteSupport } from './StickerRouteSupport';
 export class PostStickerPackRoute extends StickerRouteSupport {
   private readonly creator = this.get<StickerPackCreator>(StickerPackCreator);
 
-  @Post('/')
+  @Post()
   public async createStickerPack(
     @Body() body: PostStickerPackBody,
     @Req() request: Request,

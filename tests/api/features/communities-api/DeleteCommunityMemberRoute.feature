@@ -8,7 +8,7 @@ Feature: Delete community member API
     And I register a test IPFS network "communities-api-leave-member-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community member body for another identity
@@ -34,7 +34,7 @@ Feature: Delete community member API
     And I register a test IPFS network "communities-api-owner-leave-member-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community invite body
@@ -71,7 +71,7 @@ Feature: Delete community member API
     And I register a test IPFS network "communities-api-owner-leave-with-members-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community member body for another identity

@@ -61,7 +61,7 @@ describe('HttpNodeBlockListDownloader', () => {
 
     expect(downloaded.isEqual(signed)).toBe(true);
     expect(getter.get).toHaveBeenCalledWith(
-      new URL('https://publisher.example/node/blocks/published'),
+      new URL('https://publisher.example/node/published-blocks'),
       expect.objectContaining({
         accept: 'application/json',
         expectedContentType: 'application/json',

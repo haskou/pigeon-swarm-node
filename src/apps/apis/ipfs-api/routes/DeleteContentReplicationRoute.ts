@@ -24,7 +24,7 @@ export class DeleteContentReplicationRoute extends Route {
     ContentReplicationUnregistrar,
   );
 
-  @Delete('/replication/:cid')
+  @Delete('/replications/:cid')
   public async request(
     @Param('cid') cid: string,
     @Body() body: DeleteContentReplicationBody,

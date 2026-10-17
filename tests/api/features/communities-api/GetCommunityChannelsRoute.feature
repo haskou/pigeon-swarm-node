@@ -8,7 +8,7 @@ Feature: Get community channels API
     And I register a test IPFS network "communities-api-channel-threads-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community text channel body
@@ -36,7 +36,7 @@ Feature: Get community channels API
     And I register a test IPFS network "communities-api-deleted-channel-threads-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community text channel body
@@ -67,7 +67,7 @@ Feature: Get community channels API
     Given I register a test IPFS network "communities-api-voice-presence-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community voice channel body
@@ -77,7 +77,7 @@ Feature: Get community channels API
     And I remember the current community voice channel
     And I set a community channel call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And I remember the current call
     And I sign the current community channels request

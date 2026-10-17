@@ -16,7 +16,7 @@ Feature: Post keychain route
       }
       """
     And I sign the current keychain publication request
-    When I POST to "/keychains/"
+    When I POST to "/keychains"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | version | 1 |

@@ -11,7 +11,7 @@ import { CallRouteSupport } from './CallRouteSupport';
 export class PostCallRoute extends CallRouteSupport {
   private readonly starter = this.get<CallStarter>(CallStarter);
 
-  @Post('/')
+  @Post()
   public async startCall(
     @Body() body: PostCallBody,
     @Req() request: Request,

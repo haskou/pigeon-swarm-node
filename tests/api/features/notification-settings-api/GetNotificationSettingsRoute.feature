@@ -1,11 +1,11 @@
-Feature: GET /notification-settings/
+Feature: GET /notification-settings
 
   Background:
     Given I register a test IPFS network "notification-settings-api-network"
 
   Scenario: List authenticated identity notification settings
     Given I sign the current notification settings request
-    When I GET "/notification-settings/"
+    When I GET "/notification-settings"
     Then response code is equal to 200
     And response data should match partially
       """

@@ -16,7 +16,7 @@ export class GetNotificationsRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  @Get('/')
+  @Get()
   public async getNotifications(
     @QueryParam('limit') limit: string | undefined,
     @QueryParam('beforeNotificationId')

@@ -7,7 +7,7 @@ describe('NodeBlockSourceOrigin', () => {
 
     expect(origin.valueOf()).toBe('https://node.example:8443');
     expect(origin.publishedListUrl().toString()).toBe(
-      'https://node.example:8443/node/blocks/published',
+      'https://node.example:8443/node/published-blocks',
     );
   });
 
@@ -15,7 +15,7 @@ describe('NodeBlockSourceOrigin', () => {
     'http://node.example',
     'ftp://node.example',
     'https://user:secret@node.example',
-    'https://node.example/node/blocks/published',
+    'https://node.example/node/published-blocks',
     'https://node.example/?a=1',
     'https://node.example/#x',
     'https://node.example?',

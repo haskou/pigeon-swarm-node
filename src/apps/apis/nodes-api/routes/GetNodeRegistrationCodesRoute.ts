@@ -12,7 +12,7 @@ export class GetNodeRegistrationCodesRoute extends NodeOwnerRouteSupport {
     NodeRegistrationCodesFinder,
   );
 
-  @Get('/')
+  @Get()
   public async getRegistrationCodes(
     @Req() request: Request,
     @Res() response: Response,

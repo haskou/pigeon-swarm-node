@@ -84,7 +84,7 @@ export class PostIdentityRoute extends Route {
     }
   }
 
-  @Post('/')
+  @Post()
   public async createIdentity(
     @Body({
       options: { limit: '10mb' },

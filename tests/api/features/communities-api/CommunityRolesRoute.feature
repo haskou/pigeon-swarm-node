@@ -8,7 +8,7 @@ Feature: Community roles API
     And I register a test IPFS network "communities-api-roles-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community administrator role body
@@ -42,7 +42,7 @@ Feature: Community roles API
     And I register a test IPFS network "communities-api-channel-permissions-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community administrator role body
@@ -66,7 +66,7 @@ Feature: Community roles API
     And I register a test IPFS network "communities-api-role-lifecycle-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community administrator role body

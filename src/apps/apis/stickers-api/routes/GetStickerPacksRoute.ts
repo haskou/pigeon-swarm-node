@@ -12,7 +12,7 @@ import { StickerRouteSupport } from './StickerRouteSupport';
 export class GetStickerPacksRoute extends StickerRouteSupport {
   private readonly finder = this.get<StickerPacksFinder>(StickerPacksFinder);
 
-  @Get('/')
+  @Get()
   public async getStickerPacks(
     @QueryParam('ownerIdentityId') ownerIdentityId: string | undefined,
     @Res() response: Response,

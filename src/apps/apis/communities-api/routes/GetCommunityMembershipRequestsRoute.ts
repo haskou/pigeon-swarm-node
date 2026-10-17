@@ -7,13 +7,13 @@ import { Get, JsonController, Req, Res } from 'routing-controllers';
 import { CommunityMembershipRequestsViewModel } from '../view-model/CommunityMembershipRequestsViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
-@JsonController('/communities')
+@JsonController('/community-membership-requests')
 export class GetCommunityMembershipRequestsRoute extends CommunityRouteSupport {
   private readonly finder = this.get<CommunityMembershipRequestsFinder>(
     CommunityMembershipRequestsFinder,
   );
 
-  @Get('/membership-requests')
+  @Get()
   public async getMembershipRequests(
     @Req() request: Request,
     @Res() response: Response,

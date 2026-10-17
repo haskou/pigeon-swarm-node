@@ -18,7 +18,7 @@ export class GetNodeBlockSourcePendingRoute extends NodeOwnerRouteSupport {
     NodeBlockSourceFinder,
   );
 
-  @Get('/:ownerIdentityId/pending')
+  @Get('/:ownerIdentityId/pending-entries')
   public async getPending(
     @Param('ownerIdentityId') ownerIdentityId: string,
     @Req() request: Request,

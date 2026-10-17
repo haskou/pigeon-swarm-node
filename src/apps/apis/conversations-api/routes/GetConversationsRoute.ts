@@ -16,7 +16,7 @@ export class GetConversationsRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  @Get('/')
+  @Get()
   public async getConversations(
     @QueryParam('limit') limit: string | undefined,
     @QueryParam('beforeConversationId')

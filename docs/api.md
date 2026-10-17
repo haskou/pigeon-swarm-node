@@ -160,7 +160,7 @@ every vector's `signingContent` and signature byte for byte with `node:crypto`
 only (body hash, key order, Ed25519 from the fixture key), without the node's
 canonicalization code. It then publishes an identity for the fixture key,
 re-signs the same request shapes with a fresh `Date.now()` timestamp and sends
-them to real signed endpoints: a body-less `GET /notification-settings/`, a
+them to real signed endpoints: a body-less `GET /notification-settings`, a
 JSON `POST /private-blobs` and a raw binary `POST /ipfs/public` with the
 vector's bytes. All are accepted. The fixed vector timestamp, a timestamp
 outside the window in either direction, a JSON or binary body changed after
@@ -278,12 +278,61 @@ This applies to:
 
 Header values such as `X-Identity-Id` are not URL encoded.
 
+## Path conventions
+
+Every route follows one convention, checked by the `APIPathConventions` unit
+spec against the route handlers and the OpenAPI documents:
+
+- **Nouns.** A segment names a resource, never an action: search is a `query`
+  parameter on the collection, and a state change is a write to the resource.
+- **Plural collections.** A collection is plural and its items are keyed by a
+  parameter: `/communities/{communityId}`. A static segment never sits beside
+  that parameter, so a collection the caller owns is a kebab-case resource of
+  its own, such as `/community-drafts` or `/community-membership-requests`.
+- **Singletons.** A resource that exists once in its parent is singular and
+  never keyed by a parameter: `/node` and its `owner`, `registration`,
+  `relay-configuration` and `diagnostics`, a community `frontier` and `mls`
+  group, a channel `draft`, a message `pin` and `thread`, a sticker pack
+  `saved` mark, a sticker `favorite` mark, the sticker `library`,
+  `/client-contract`, `/ipfs/replication-status` and
+  `/push/vapid-public-key`. The namespaces `/ipfs`, `/push`, `/realtime` and
+  `/private-authorization` are singletons too.
+- **`me`.** `me` stands for the authenticated identity only as the item of a
+  collection keyed by identity: `members/me`, `participants/me`, `votes/me`,
+  `presence/me`. Anything else the caller owns is its own collection.
+- **No verbs.** No segment is an action such as `search`, `join`, `accept`,
+  `publish` or `send`.
+- **No version segment.** Paths carry no `v1`; a protocol version belongs in
+  the protocol, such as the `pigeon-realtime.v1` WebSocket subprotocol.
+- **No trailing slash.** Routing is strict: `/calls/` is not `/calls` and
+  answers `404`. A signed path is the route path exactly, with no trailing
+  slash.
+
+Documented exceptions, kept until issue #606 reshapes them:
+
+| Route                                                         | Exception                                |
+| ------------------------------------------------------------- | ---------------------------------------- |
+| `DELETE /communities/{communityId}/members/{identityId}/kick` | Verb                                     |
+| `POST /polls/{pollId}/close`                                  | Verb                                     |
+| `POST /calls/{callId}/participants/me/heartbeat`              | Verb                                     |
+| `POST /stickers/packs/{packId}/stickers/{stickerId}/used`     | Verb                                     |
+| `POST /mailboxes/{mailboxId}/ack`                             | Verb                                     |
+| `POST /push/test`                                             | Verb                                     |
+| `POST /communities/invites/{inviteToken}/accept`              | Verb                                     |
+| `GET /communities/discover`                                   | Verb beside `{communityId}`              |
+| `GET /communities/invites/{inviteToken}`                      | Static segment beside `{communityId}`    |
+| `GET /calls/history`, `GET /calls/ice-servers`                | Static segment beside `{callId}`         |
+| `POST /communities/{communityId}/channels/text` and `/voice`  | Static segment beside `{channelId}`      |
+| `POST /node/networks/public`                                  | Static segment beside `{networkId}`      |
+| `GET` and `PUT /node/blocks/publication`                      | Singleton beside the `blocks` collection |
+| `POST /ipfs/public`                                           | Adjective                                |
+
 ## Realtime WebSocket API
 
 Realtime events are exposed through a WebSocket upgrade endpoint:
 
 ```http
-GET /realtime/v1
+GET /realtime
 ```
 
 This endpoint is also listed in OpenAPI so Swagger consumers can discover the
@@ -324,20 +373,20 @@ Clients fetch a single-use ticket with a signed request
 and present it in a WebSocket subprotocol instead of a query string:
 
 ```http
-POST /realtime/v1/tickets
+POST /realtime/tickets
 X-Identity-Id: <identityId>
 X-Timestamp: <timestamp>
 X-Signature: <signature>
 ```
 
-The signed canonical request is `POST /realtime/v1/tickets` with body `{}`,
+The signed canonical request is `POST /realtime/tickets` with body `{}`,
 prefixed by `ROUTE_PREFIX` when configured. The response is
 `201 {"ticket": "<base64url>", "expiresAt": <epochMs>}` with
-`Cache-Control: no-store`. Connect to `/realtime/v1` (prefixed by
+`Cache-Control: no-store`. Connect to `/realtime` (prefixed by
 `ROUTE_PREFIX` when configured) with both subprotocols:
 
 ```ts
-const socket = new WebSocket('ws://localhost:8080/realtime/v1', [
+const socket = new WebSocket('ws://localhost:8080/realtime', [
   'pigeon-realtime.v1',
   `ticket.${ticket}`,
 ]);
@@ -508,7 +557,7 @@ Domain event payload:
 
 Implemented:
 
-- require a single-use ticket on the `/realtime/v1` WebSocket upgrade
+- require a single-use ticket on the `/realtime` WebSocket upgrade
 - accept the ticket in the `Sec-WebSocket-Protocol` header for browser and non-browser clients
 - push domain events after they have been published by the local node
 - deliver identity events to the matching identity connection;
@@ -1938,7 +1987,7 @@ are not gated.
 Block entries are canonical identity ids compared as strings, so an id that is
 not the one canonical encoding of a usable key never reaches the list. A signed
 request naming one in `X-Identity-Id` gets `401` code `401020` (see
-_Authentication_). `POST /identities`, `POST /identity-devices/transitions` and
+_Authentication_). `POST /identities`, `POST /identity-devices/{identityId}/transitions` and
 `/identity-devices/{identityId}/sealed-secrets`, which check the block list for
 a record or path id, answer `400` code `400080` for such an id instead.
 `PUT /node/blocks`, `PUT /node/block-exceptions`,
@@ -1946,7 +1995,7 @@ a record or path id, answer `400` code `400080` for such an id instead.
 `POST /node/block-sources/{ownerIdentityId}/approvals` answer `400` code
 `400080`, before anything is stored, for a body or path naming such an id;
 `DELETE /node/block-sources/{ownerIdentityId}` and
-`GET /node/block-sources/{ownerIdentityId}/pending` answer it for such a path
+`GET /node/block-sources/{ownerIdentityId}/pending-entries` answer it for such a path
 id once the owner is authenticated, before any source is read or removed.
 A fetched block source keeps its signed `list` verbatim, so it may still name
 one, but such an id is never pending, approved or enforced. At start, before
@@ -2046,7 +2095,7 @@ Entries a source adds stay pending until the owner approves them. Entries a
 source removes stop applying on the next fetch, in both modes. Removing a
 source removes its effect at once.
 
-Every route below except `GET /node/blocks/published` is owner-signed:
+Every route below except `GET /node/published-blocks` is owner-signed:
 
 - a non-owner gets `403` with code `403010`;
 - a domain refusal gets `409` with the error class name as `code`.
@@ -2064,7 +2113,7 @@ Turns publication of the own list on or off. It is off by default. Returns
 shape.
 
 ```http
-GET /node/blocks/published
+GET /node/published-blocks
 ```
 
 Public. Returns the stored own block list as the exact bytes its owner signed:
@@ -2095,7 +2144,7 @@ PUT /node/block-sources/{ownerIdentityId}
 ```
 
 Adopts the list that `ownerIdentityId` publishes at
-`{origin}/node/blocks/published`, or changes an adopted source's `origin` or
+`{origin}/node/published-blocks`, or changes an adopted source's `origin` or
 `autoApply`. Changing the origin keeps the pin and the last valid version.
 Turning `autoApply` on approves nothing already pending; it applies the lists
 fetched from then on. Pending entries are approved only naming the version
@@ -2253,7 +2302,7 @@ Implemented:
 
 - publish public content to every configured IPFS network
 - NOT announce replication: after the identity is published, the owner registers
-  the CID with `PUT /ipfs/replication/{cid}`
+  the CID with `PUT /ipfs/replications/{cid}`
 - accept raw request bytes instead of wrapping the content in JSON/base64
 - store the binary bytes directly in IPFS
 - limit content size to 50 MiB
@@ -2262,7 +2311,7 @@ Implemented:
 ### Get public IPFS content
 
 ```http
-GET /ipfs/{cid}
+GET /ipfs/contents/{cid}
 ```
 
 For CIDs uploaded with `POST /ipfs/public`, the response body is the original
@@ -2291,7 +2340,7 @@ Unknown CIDs return `404` with body `{ "error": "CID not found in any network" }
 ### Register content replication
 
 ```http
-PUT /ipfs/replication/{cid}
+PUT /ipfs/replications/{cid}
 ```
 
 Requires signed request headers. Call it only after the identity is published
@@ -2346,7 +2395,7 @@ scopeType: "content_replication", sizeBytes }`, with `scopeType` exactly
 - the budget bounds what is registered at one time, not total disk: the
   selection is recomputed every maintenance run, so new registrations can
   defer a CID held before, and withdrawing then re-registering frees budget
-  while bytes already fetched are never removed. `GET /ipfs/{cid}` still
+  while bytes already fetched are never removed. `GET /ipfs/contents/{cid}` still
   fetches any CID on demand, deferred ones included, without authentication
   and without a size cap
 
@@ -2356,7 +2405,7 @@ Byte-exact vectors (ids, digests and signing content) are in
 ### Withdraw content replication
 
 ```http
-DELETE /ipfs/replication/{cid}
+DELETE /ipfs/replications/{cid}
 ```
 
 Same body with `kind: "delete"` and a tombstone payload `{ cid, id, networkId,
@@ -2370,7 +2419,7 @@ identities are never removed.
 ### Get content replication status
 
 ```http
-GET /ipfs/replication/status
+GET /ipfs/replication-status
 ```
 
 Requires signed request headers. Reports a precomputed local summary; it does
@@ -2647,10 +2696,10 @@ the browser storage on the client, then create a new identity.
 ### Get identity
 
 ```http
-GET /identities/{reference}
+GET /identities/{identityId}
 ```
 
-`reference` is a percent-encoded identity id or a lowercase profile handle
+`identityId` is a percent-encoded identity id or a lowercase profile handle
 without `@`. Identity ids must use `encodeURIComponent(identityId)`.
 
 A handle resolves to its owner only: among identities whose latest version
@@ -3196,9 +3245,9 @@ rosters live in MLS on the clients (D15).
 ### Conversation drafts
 
 ```http
-GET /conversations/me/drafts
-PUT /conversations/me/drafts/{draftKey}
-DELETE /conversations/me/drafts/{draftKey}
+GET /conversation-drafts
+PUT /conversation-drafts/{draftKey}
+DELETE /conversation-drafts/{draftKey}
 ```
 
 `draftKey` is opaque: the client derives it as
@@ -3360,23 +3409,23 @@ beyond the argument limits is refused. An operation another author signed
 concurrently beyond that quota is skipped by the fold on every node without any
 error.
 
-| Route                                                                                                                  | action                        | `args`                                                                                    |
-| ---------------------------------------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------- |
-| `POST /communities`                                                                                                    | `community_created`           | `{nonce, name, description, visibility, discoverable, autoJoinEnabled, avatar?, banner?}` |
-| `PATCH /communities/{id}`                                                                                              | `community_updated`           | `{name, description, avatar?, banner?, discoverable?, autoJoinEnabled?}`                  |
-| `POST .../channels/text`, `.../channels/voice`                                                                         | `channel_created`             | `{channelId, name, type}`                                                                 |
-| `PATCH .../channels/{channelId}`                                                                                       | `channel_renamed`             | `{channelId, name}`                                                                       |
-| `DELETE .../channels/{channelId}`                                                                                      | `channel_deleted`             | `{channelId}`                                                                             |
-| `PATCH .../channels/{channelId}/permissions`                                                                           | `channel_permissions_updated` | `{channelId, visibleRoleIds}`                                                             |
-| `POST .../roles`                                                                                                       | `role_created`                | `{roleId, name, permissions}`                                                             |
-| `PATCH .../roles/{roleId}`                                                                                             | `role_updated`                | `{roleId, name, permissions}`                                                             |
-| `DELETE .../roles/{roleId}`                                                                                            | `role_deleted`                | `{roleId}`                                                                                |
-| `PUT .../members/{identityId}/roles`                                                                                   | `member_roles_updated`        | `{identityId, roleIds}`                                                                   |
-| `POST .../bans`                                                                                                        | `member_banned`               | `{identityId}`                                                                            |
-| `DELETE .../bans/{identityId}`                                                                                         | `member_unbanned`             | `{identityId}`                                                                            |
-| `DELETE .../members/{identityId}/kick`                                                                                 | `member_kicked`               | `{identityId}`                                                                            |
-| `DELETE .../members/me`                                                                                                | `member_left`                 | `{identityId}`                                                                            |
-| `POST .../join-requests` (auto-join), `PATCH .../membership-requests/{id}` (accept), `POST .../invites/{token}/accept` | `member_joined`               | `{identityId, method, reference?}`                                                        |
+| Route                                                                                                                                      | action                        | `args`                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- | ----------------------------------------------------------------------------------------- |
+| `POST /communities`                                                                                                                        | `community_created`           | `{nonce, name, description, visibility, discoverable, autoJoinEnabled, avatar?, banner?}` |
+| `PATCH /communities/{id}`                                                                                                                  | `community_updated`           | `{name, description, avatar?, banner?, discoverable?, autoJoinEnabled?}`                  |
+| `POST .../channels/text`, `.../channels/voice`                                                                                             | `channel_created`             | `{channelId, name, type}`                                                                 |
+| `PATCH .../channels/{channelId}`                                                                                                           | `channel_renamed`             | `{channelId, name}`                                                                       |
+| `DELETE .../channels/{channelId}`                                                                                                          | `channel_deleted`             | `{channelId}`                                                                             |
+| `PATCH .../channels/{channelId}/permissions`                                                                                               | `channel_permissions_updated` | `{channelId, visibleRoleIds}`                                                             |
+| `POST .../roles`                                                                                                                           | `role_created`                | `{roleId, name, permissions}`                                                             |
+| `PATCH .../roles/{roleId}`                                                                                                                 | `role_updated`                | `{roleId, name, permissions}`                                                             |
+| `DELETE .../roles/{roleId}`                                                                                                                | `role_deleted`                | `{roleId}`                                                                                |
+| `PUT .../members/{identityId}/roles`                                                                                                       | `member_roles_updated`        | `{identityId, roleIds}`                                                                   |
+| `POST .../bans`                                                                                                                            | `member_banned`               | `{identityId}`                                                                            |
+| `DELETE .../bans/{identityId}`                                                                                                             | `member_unbanned`             | `{identityId}`                                                                            |
+| `DELETE .../members/{identityId}/kick`                                                                                                     | `member_kicked`               | `{identityId}`                                                                            |
+| `DELETE .../members/me`                                                                                                                    | `member_left`                 | `{identityId}`                                                                            |
+| `POST /community-membership-requests` (auto-join), `PATCH /community-membership-requests/{id}` (accept), `POST .../invites/{token}/accept` | `member_joined`               | `{identityId, method, reference?}`                                                        |
 
 `member_joined` carries `method` `added`, `approval`, `invitation`, `invite_link` or
 `automatic`, and `reference` exactly for `approval`, `invitation` and
@@ -3567,7 +3616,7 @@ Implemented:
 - default `discoverable` to `true`; set it to `false` to hide the community
   from `GET /communities/discover`
 - default `autoJoinEnabled` to `false`; set it to `true` to let any non-banned
-  identity join through `POST /communities/{communityId}/join-requests`
+  identity join through `POST /community-membership-requests`
   without owner approval
 - default `visibility` to `private`
 - accept `visibility: "public"` to create a plaintext community whose text
@@ -3765,10 +3814,11 @@ Implemented:
 ### Request community membership
 
 ```http
-POST /communities/{communityId}/join-requests
+POST /community-membership-requests
 ```
 
-Request body: `{ "createdAt", "mutation", "acceptedAt"?, "acceptedMutation"?, "operation"? }`.
+Request body: `{ "communityId", "createdAt", "mutation", "acceptedAt"?, "acceptedMutation"?, "operation"? }`.
+`communityId` names the community to join.
 `mutation` signs a `community_membership_request` document of type `request`
 (creator = identity = requester, `status: "pending"`, `updatedAt = createdAt`).
 The id is the first 24 hex chars of
@@ -3793,7 +3843,7 @@ Implemented:
 ### List community membership requests
 
 ```http
-GET /communities/membership-requests
+GET /community-membership-requests
 ```
 
 Implemented:
@@ -3807,7 +3857,7 @@ Implemented:
 ### Accept or decline community membership request
 
 ```http
-PATCH /communities/membership-requests/{requestId}
+PATCH /community-membership-requests/{requestId}
 ```
 
 Request:
@@ -4150,7 +4200,7 @@ checked by the `CommunityModerationLogVectors` unit spec.
 | `DELETE .../members/{identityId}/kick`                 | `member_kicked`                                                | member, `identityId`            | `{}`                                                                                                                                                                        |
 | `POST .../invites`                                     | `invite_link_created`                                          | invite, invite reference        | `{expiresAt, maxUses}`                                                                                                                                                      |
 | `POST .../members`                                     | `invitation_created`                                           | membership_request, request id  | `{identityId}` (the invited identity)                                                                                                                                       |
-| `PATCH /communities/membership-requests/{requestId}`   | `membership_request_accepted` or `membership_request_declined` | membership_request, `requestId` | `{identityId, type}` of the request                                                                                                                                         |
+| `PATCH /community-membership-requests/{requestId}`     | `membership_request_accepted` or `membership_request_declined` | membership_request, `requestId` | `{identityId, type}` of the request                                                                                                                                         |
 | `DELETE .../channels/{channelId}/messages/{messageId}` | `message_deleted`                                              | message, `messageId`            | `{channelId, targetMessageAuthorId}`                                                                                                                                        |
 
 Channel and role creation derive the id from the `createdAt` of the signed
@@ -4845,7 +4895,7 @@ Implemented:
 ### Community channel drafts
 
 ```http
-GET /communities/me/drafts
+GET /community-drafts
 PUT /communities/{communityId}/channels/{channelId}/draft
 DELETE /communities/{communityId}/channels/{channelId}/draft
 ```
@@ -5003,12 +5053,12 @@ Implemented:
 ### Search public channel messages
 
 ```http
-GET /communities/{communityId}/channels/{channelId}/messages/search?query=pigeon&limit=20
+GET /communities/{communityId}/channels/{channelId}/messages?query=pigeon&limit=20
 ```
 
-The request is signed as
-`GET /communities/{communityId}/channels/{channelId}/messages/search`; query
-string values are not part of the signed path.
+Search is the channel message list filtered by `query`. The request is signed
+as `GET /communities/{communityId}/channels/{channelId}/messages`; query string
+values are not part of the signed path.
 
 Implemented:
 
@@ -5017,18 +5067,21 @@ Implemented:
 - only work for `visibility: "public"` communities
 - search `plaintextPayload`; private encrypted messages are not searchable by
   the backend
-- return the same `CommunityChannelMessagesResource` shape as the normal list
-  endpoint
+- return the same `CommunityChannelMessagesResource` shape as the normal list,
+  with no `polls`; `beforeMessageId` is ignored
 - `limit` accepts 1 to 50 (default 20)
 
 ### Search public community messages
 
 ```http
-GET /communities/{communityId}/messages/search?query=pigeon&limit=20
+GET /communities/{communityId}/messages?query=pigeon&limit=20
 ```
 
-The request is signed as `GET /communities/{communityId}/messages/search`;
-query string values are not part of the signed path.
+Community messages are listed per channel, so this collection is read only
+through a search: `query` is required, and a request without it is refused with
+`400` (code `400100`). The request is signed as
+`GET /communities/{communityId}/messages`; query string values are not part of
+the signed path.
 
 Implemented:
 
@@ -5465,7 +5518,7 @@ messages".
 ### List notification settings
 
 ```http
-GET /notification-settings/
+GET /notification-settings
 ```
 
 Requires signed request headers. Returns only the authenticated identity's
@@ -5857,7 +5910,7 @@ GET /stickers/packs/{packId}
 ### Get my sticker library
 
 ```http
-GET /stickers/me
+GET /stickers/library
 ```
 
 Requires signed HTTP headers. Returns the authenticated identity sticker
@@ -6061,7 +6114,7 @@ member list.
 ### Create poll
 
 ```http
-POST /polls/
+POST /polls
 ```
 
 Requires signed HTTP headers. Polls are public replicated records (store
@@ -6283,7 +6336,7 @@ failure is the same generic `401` (`401020`).
 
 The response is `{ concurrentRecoveries, identityId, recoveries, transitions }`.
 Every entry is a stored transition in exactly the primitives
-`POST /identity-devices/transitions` accepted, including `proofOfPossession`
+`POST /identity-devices/{identityId}/transitions` accepted, including `proofOfPossession`
 and `signature`; the node never re-signs or rewrites one and serves only
 records its replay accepted. `recoveries` is the recovery lineage of the
 replay base (oldest first, empty before the first recovery),
@@ -6318,8 +6371,11 @@ and its single-node threat model are in
 Submit an enrollment, revocation or recovery operation to:
 
 ```http
-POST /identity-devices/transitions
+POST /identity-devices/{identityId}/transitions
 ```
+
+The path `identityId` must equal the transition's `identityId`; a mismatch is
+refused with `400` (code `400090`) before the transition is read further.
 
 Every transition binds the identity, recovery epoch, operation UUID, exact
 predecessor and next revision, operation kind, target public credential and its
@@ -6554,7 +6610,7 @@ Sealed secrets are node-local, so there is no second-node assertion.
 
 A remaining device need not be online when another device forgets itself. The
 retiring device therefore publishes the next generation together with its own
-revocation, on `POST /identity-devices/transitions`:
+revocation, on `POST /identity-devices/{identityId}/transitions`:
 
 ```json
 {

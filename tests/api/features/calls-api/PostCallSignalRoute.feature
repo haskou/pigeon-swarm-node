@@ -8,7 +8,7 @@ Feature: Send call signal
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And I remember the current call
     And I set a call signal body for the other identity
@@ -22,7 +22,7 @@ Feature: Send call signal
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And I remember the current call
     And I set a call signal body for an unrelated identity

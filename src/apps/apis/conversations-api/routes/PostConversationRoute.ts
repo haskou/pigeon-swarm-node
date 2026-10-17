@@ -17,7 +17,7 @@ export class PostConversationRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  @Post('/')
+  @Post()
   public async createConversation(
     @Body() body: PostConversationBody,
     @Req() request: Request,

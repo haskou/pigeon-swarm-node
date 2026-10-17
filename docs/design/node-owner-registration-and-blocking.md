@@ -265,7 +265,7 @@ While the identity is blocked, this node:
   route can forget it;
 - refuses records it authored that are submitted through this node's API
   without a request signature (`POST /identities` with its id,
-  `POST /identity-devices/transitions`, record-signed conversation routes).
+  `POST /identity-devices/{identityId}/transitions`, record-signed conversation routes).
   `POST /identities` skips the check only for a record whose content id this
   node already stores locally for that identity; a copy fetchable from a peer
   does not count. A replay of the public record from `GET /identities/:id` then
@@ -298,7 +298,7 @@ on the id alone, so it reveals nothing about the list.
 `POST /node/block-sources/{ownerIdentityId}/approvals` refuse a body or path
 naming such an id with `400` code `400080` before anything is stored, so no
 owner write can add an alias. `DELETE /node/block-sources/{ownerIdentityId}`
-and `GET /node/block-sources/{ownerIdentityId}/pending` refuse such a path id
+and `GET /node/block-sources/{ownerIdentityId}/pending-entries` refuse such a path id
 the same way once the owner is authenticated, before any source is read or
 removed, so an alias is never answered as a missing source. A source list is
 kept with the bytes its publisher signed, so an alias it names stays in `list`,
@@ -419,14 +419,14 @@ signed by the owner identity:
 
 - **Publishing.** The owner turns on publication with owner-signed
   `PUT /node/blocks/publication { "published": true }`. The node then serves
-  public `GET /node/blocks/published`: the body is exactly the signed content,
+  public `GET /node/published-blocks`: the body is exactly the signed content,
   the RFC 8785 canonical JSON of the stored document without
   `identitySignature`, and the signature travels in the `X-Identity-Signature`
   response header. It is off by default, because a published list reveals
   whom this owner blocked.
 - **Adopting.** Another node's owner adds a source with owner-signed
   `PUT /node/block-sources/{ownerIdentityId} { "origin": "https://..." }`. That
-  node periodically fetches `GET {origin}/node/blocks/published`, reading at
+  node periodically fetches `GET {origin}/node/published-blocks`, reading at
   most `NODE_BLOCK_LIST_MAX_BYTES` while streaming, and judges the response in
   this order, recording the first failure as the fetch outcome:
   1. the header signature verifies against the **pinned** `ownerIdentityId`
@@ -496,7 +496,7 @@ signed by the owner identity:
 ## What other nodes see
 
 - `GET /node` shows the registration mode.
-- `GET /node/blocks/published` exists only when the owner publishes.
+- `GET /node/published-blocks` exists only when the owner publishes.
 - A blocked node sees its connections refused.
 - Nothing else: no heartbeat field, no replicated record, no protocol change.
 

@@ -8,7 +8,7 @@ Feature: Start calls
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | status     | active       |
@@ -19,7 +19,7 @@ Feature: Start calls
     And I have published a keychain for the authenticated identity
     And I set a group capability call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | status     | active           |
@@ -30,7 +30,7 @@ Feature: Start calls
     Given I register a test IPFS network "api-calls-community-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community voice channel body
@@ -40,7 +40,7 @@ Feature: Start calls
     And I remember the current community voice channel
     And I set a community channel call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | status     | active            |
@@ -54,7 +54,7 @@ Feature: Start calls
     Given I register a test IPFS network "api-calls-community-extra-invitee-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community voice channel body
@@ -64,7 +64,7 @@ Feature: Start calls
     And I remember the current community voice channel
     And I set a community channel call body with an outside invitee
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | status     | active            |
@@ -75,7 +75,7 @@ Feature: Start calls
     Given I register a test IPFS network "api-calls-community-reuse-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community member body for another identity
@@ -94,11 +94,11 @@ Feature: Start calls
     And I remember the current community voice channel
     And I set a community channel call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And I remember the current call
     And the community member signs the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And response body should contain the current call
     And the other identity signs the current call join request
@@ -113,7 +113,7 @@ Feature: Start calls
     Given I register a test IPFS network "api-calls-community-concurrent-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community member body for another identity
@@ -141,5 +141,5 @@ Feature: Start calls
     And I set a conversation call body
     And call requests are sent without a mutation
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 400

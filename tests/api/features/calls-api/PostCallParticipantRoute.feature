@@ -8,7 +8,7 @@ Feature: Join call participant
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And I remember the current call
     And the other identity signs the current call join request
@@ -22,7 +22,7 @@ Feature: Join call participant
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And I remember the current call
     And the other identity signs the current call join request
@@ -37,7 +37,7 @@ Feature: Join call participant
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And I remember the current call
     And the other identity signs the current call join request
@@ -53,7 +53,7 @@ Feature: Join call participant
     And I have created a one-to-one conversation
     And I set a conversation call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And I remember the current call
     And call requests are sent without a mutation
@@ -65,7 +65,7 @@ Feature: Join call participant
     Given I register a test IPFS network "api-calls-community-replay-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community member body for another identity
@@ -84,7 +84,7 @@ Feature: Join call participant
     And I remember the current community voice channel
     And I set a community channel call body
     And I sign the current call start request
-    When I POST to "/calls/"
+    When I POST to "/calls"
     Then response code is equal to 200
     And I remember the current call
     And the other identity signs the current call join request

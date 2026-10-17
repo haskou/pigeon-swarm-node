@@ -165,7 +165,7 @@ export async function publishIdentityWithKeys(
   const response = await fetchJson(
     node,
     'POST',
-    '/identities/',
+    '/identities',
     { 'content-type': 'application/json' },
     JSON.stringify({
       ...signaturePayload,

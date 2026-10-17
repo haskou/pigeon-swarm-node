@@ -3,16 +3,16 @@ Feature: Node block sharing
   Background:
     Given the local node has no owner and no networks
     And I sign the current node owner request
-    When I PUT "/node/owner/"
+    When I PUT "/node/owner"
     Then response code is equal to 200
 
   Scenario: The own block list is served only while it is published
     Given I set a node block list body version 1 blocking "other"
-    And I sign a PUT request to "/node/blocks/"
-    When I PUT "/node/blocks/"
+    And I sign a PUT request to "/node/blocks"
+    When I PUT "/node/blocks"
     Then response code is equal to 200
 
-    When I GET "/node/blocks/published"
+    When I GET "/node/published-blocks"
     Then response code is equal to 404
     And response body should contain "404040"
 
@@ -28,7 +28,7 @@ Feature: Node block sharing
       {"published": true}
       """
 
-    When I GET "/node/blocks/published" as binary
+    When I GET "/node/published-blocks" as binary
     Then response code is equal to 200
     And the response is the stored node block list as signed canonical bytes
 
@@ -40,7 +40,7 @@ Feature: Node block sharing
     When I PUT "/node/blocks/publication"
     Then response code is equal to 200
 
-    When I GET "/node/blocks/published"
+    When I GET "/node/published-blocks"
     Then response code is equal to 404
 
   Scenario: The owner adopts a source and lists it
@@ -77,12 +77,12 @@ Feature: Node block sharing
       """
       {}
       """
-    And another identity signs a POST request to "/realtime/v1/tickets"
-    When I POST to "/realtime/v1/tickets"
+    And another identity signs a POST request to "/realtime/tickets"
+    When I POST to "/realtime/tickets"
     Then response code is equal to 201
 
-    Given I sign a GET request to the block source path "/pending"
-    When I send the GET to the block source path "/pending"
+    Given I sign a GET request to the block source path "/pending-entries"
+    When I send the GET to the block source path "/pending-entries"
     Then response code is equal to 200
     And response body should contain the other identity id
 
@@ -95,8 +95,8 @@ Feature: Node block sharing
       {"version": 1, "pendingCount": 0, "appliedCount": 1}
       """
 
-    Given another identity signs a GET request to "/conversations/"
-    When I GET "/conversations/"
+    Given another identity signs a GET request to "/conversations"
+    When I GET "/conversations"
     Then response code is equal to 403
     And response body should contain "403012"
 
@@ -110,8 +110,8 @@ Feature: Node block sharing
 
   Scenario: An auto-applied source blocks at once and removing it unblocks at once
     Given the node follows an auto-applied block source whose version 1 blocks the other identity
-    And another identity signs a GET request to "/conversations/"
-    When I GET "/conversations/"
+    And another identity signs a GET request to "/conversations"
+    When I GET "/conversations"
     Then response code is equal to 403
     And response body should contain "403012"
 
@@ -123,8 +123,8 @@ Feature: Node block sharing
       """
       {}
       """
-    And another identity signs a POST request to "/realtime/v1/tickets"
-    When I POST to "/realtime/v1/tickets"
+    And another identity signs a POST request to "/realtime/tickets"
+    When I POST to "/realtime/tickets"
     Then response code is equal to 201
 
   Scenario: A local exception overrides adopted lists
@@ -139,14 +139,14 @@ Feature: Node block sharing
       """
       {}
       """
-    And another identity signs a POST request to "/realtime/v1/tickets"
-    When I POST to "/realtime/v1/tickets"
+    And another identity signs a POST request to "/realtime/tickets"
+    When I POST to "/realtime/tickets"
     Then response code is equal to 201
 
   Scenario: A local exception does not override the own list
     Given I set a node block list body version 1 blocking "other"
-    And I sign a PUT request to "/node/blocks/"
-    When I PUT "/node/blocks/"
+    And I sign a PUT request to "/node/blocks"
+    When I PUT "/node/blocks"
     Then response code is equal to 200
 
     Given I set a block exceptions body excepting the other identity
@@ -154,8 +154,8 @@ Feature: Node block sharing
     When I PUT "/node/block-exceptions"
     Then response code is equal to 200
 
-    Given another identity signs a GET request to "/conversations/"
-    When I GET "/conversations/"
+    Given another identity signs a GET request to "/conversations"
+    When I GET "/conversations"
     Then response code is equal to 403
     And response body should contain "403012"
 
@@ -213,8 +213,8 @@ Feature: Node block sharing
       """
       {}
       """
-    And another identity signs a POST request to "/realtime/v1/tickets"
-    When I POST to "/realtime/v1/tickets"
+    And another identity signs a POST request to "/realtime/tickets"
+    When I POST to "/realtime/tickets"
     Then response code is equal to 201
 
     Examples:
@@ -235,8 +235,8 @@ Feature: Node block sharing
       """
       {}
       """
-    And another identity signs a POST request to "/realtime/v1/tickets"
-    When I POST to "/realtime/v1/tickets"
+    And another identity signs a POST request to "/realtime/tickets"
+    When I POST to "/realtime/tickets"
     Then response code is equal to 201
 
     Examples:
@@ -273,8 +273,8 @@ Feature: Node block sharing
     Then response code is equal to 400
     And response body should contain "400080"
 
-    Given another identity signs a GET request to "/conversations/"
-    When I GET "/conversations/"
+    Given another identity signs a GET request to "/conversations"
+    When I GET "/conversations"
     Then response code is equal to 403
     And response body should contain "403012"
 
@@ -286,8 +286,8 @@ Feature: Node block sharing
   Scenario Outline: The owner cannot read the pending entries of a source named by <encoding> of its key
     Given the node follows a block source whose version 1 blocks the other identity
     And the block source publisher is named by "<encoding>" of its key
-    And I sign a GET request to the block source path "/pending"
-    When I send the GET to the block source path "/pending"
+    And I sign a GET request to the block source path "/pending-entries"
+    When I send the GET to the block source path "/pending-entries"
     Then response code is equal to 400
     And response body should contain "400080"
     And response body should not contain the other identity id
@@ -306,9 +306,9 @@ Feature: Node block sharing
     And response body should contain "403010"
 
     Examples:
-      | method | suffix   |
-      | DELETE |          |
-      | GET    | /pending |
+      | method | suffix           |
+      | DELETE |                  |
+      | GET    | /pending-entries |
 
   Scenario Outline: A canonical id of a source the node does not follow is not found on <method> <suffix>
     Given I sign a <method> request to the block source path "<suffix>"
@@ -317,6 +317,6 @@ Feature: Node block sharing
     And response body should contain "NodeBlockSourceNotFoundError"
 
     Examples:
-      | method | suffix   |
-      | DELETE |          |
-      | GET    | /pending |
+      | method | suffix           |
+      | DELETE |                  |
+      | GET    | /pending-entries |

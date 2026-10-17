@@ -6,7 +6,7 @@ info:
 tags:
   - name: notification-settings
 paths:
-  /notification-settings/:
+  /notification-settings:
     get:
       tags:
         - notification-settings

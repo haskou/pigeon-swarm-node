@@ -8,7 +8,7 @@ Feature: Post community channel message API
     And I register a test IPFS network "communities-api-message-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community text channel body
@@ -31,7 +31,7 @@ Feature: Post community channel message API
     And I register a test IPFS network "communities-api-public-message-network"
     And I set a public community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community text channel body
@@ -65,13 +65,17 @@ Feature: Post community channel message API
     When I search messages from the current community
     Then response code is equal to 200
     And response body should contain "plain public searchable community message"
+    And I sign the current community message search request
+    When I GET messages from the current community without a query
+    Then response code is equal to 400
+    And response body should contain "400100"
 
   Scenario: Owner sends a message mentioning everyone
     Given I am an anonymous user
     And I register a test IPFS network "communities-api-message-mentions-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community text channel body

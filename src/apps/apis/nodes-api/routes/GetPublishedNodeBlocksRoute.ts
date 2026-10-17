@@ -12,7 +12,7 @@ import { NodeBlockListIsNotPublishedError } from '../errors/NodeBlockListIsNotPu
  * signature in `X-Identity-Signature`, so a subscriber verifies the bytes
  * before parsing them.
  */
-@JsonController('/node/blocks/published')
+@JsonController('/node/published-blocks')
 export class GetPublishedNodeBlocksRoute extends Route {
   private static readonly SIGNATURE_HEADER = 'X-Identity-Signature';
 
@@ -20,7 +20,7 @@ export class GetPublishedNodeBlocksRoute extends Route {
     PublishedNodeBlockListFinder,
   );
 
-  @Get('/')
+  @Get()
   public async getPublished(@Res() response: Response): Promise<Response> {
     const signed = (await this.finder.find()).toSigned();
 

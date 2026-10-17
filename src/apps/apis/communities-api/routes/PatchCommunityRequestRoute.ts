@@ -15,13 +15,13 @@ import { PatchCommunityMembershipRequestBody } from '../bodies/PatchCommunityMem
 import { CommunityMembershipRequestViewModel } from '../view-model/CommunityMembershipRequestViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
-@JsonController('/communities')
+@JsonController('/community-membership-requests')
 export class PatchCommunityRequestRoute extends CommunityRouteSupport {
   private readonly updater = this.get<CommunityMembershipRequestUpdater>(
     CommunityMembershipRequestUpdater,
   );
 
-  @Patch('/membership-requests/:requestId')
+  @Patch('/:requestId')
   public async updateMembershipRequest(
     @Param('requestId') requestId: string,
     @Body() body: PatchCommunityMembershipRequestBody,

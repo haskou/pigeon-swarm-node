@@ -12,7 +12,7 @@ export class GetNodeBlockSourcesRoute extends NodeOwnerRouteSupport {
     NodeBlockSourcesFinder,
   );
 
-  @Get('/')
+  @Get()
   public async getSources(
     @Req() request: Request,
     @Res() response: Response,

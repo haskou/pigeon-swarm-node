@@ -19,7 +19,7 @@ export class PostPollRoute extends PollRouteSupport {
     PollTimelineMessageRegistrar,
   );
 
-  @Post('/')
+  @Post()
   public async createPoll(
     @Body({ validate: { forbidNonWhitelisted: true, whitelist: true } })
     body: PostPollBody,

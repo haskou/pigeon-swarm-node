@@ -388,10 +388,10 @@ export default class Definitions {
         'Test Identity',
         'test-identity',
       );
-      await this.signCurrentRequest('POST', '/identities/');
+      await this.signCurrentRequest('POST', '/identities');
 
       const response = await this.restClient.post(
-        '/identities/',
+        '/identities',
         JSON.parse(this.body || '{}'),
         { headers: this.headers },
       );
@@ -574,7 +574,7 @@ export default class Definitions {
     });
     await this.signCurrentRequest(
       'PATCH',
-      `/communities/membership-requests/${this.communityMembershipRequestId}`,
+      `/community-membership-requests/${this.communityMembershipRequestId}`,
       String(Date.now()),
       keyPair,
       identityId,
@@ -757,7 +757,7 @@ export default class Definitions {
       ],
       [
         'PATCH',
-        /^\/communities\/membership-requests\/[^/]+$/,
+        /^\/community-membership-requests\/[^/]+$/,
         () => {
           const request = this.communityMembershipRequest as Record<
             string,
@@ -1044,7 +1044,7 @@ export default class Definitions {
       ],
       [
         'POST',
-        /^\/communities\/[^/]+\/join-requests$/,
+        /^\/community-membership-requests$/,
         () => ({
           action: 'member_joined',
           args: { identityId: actorIdentityId, method: 'automatic' },
@@ -1052,7 +1052,7 @@ export default class Definitions {
       ],
       [
         'PATCH',
-        /^\/communities\/membership-requests\/[^/]+$/,
+        /^\/community-membership-requests\/[^/]+$/,
         () => {
           const request = this.communityMembershipRequest as Record<
             string,
@@ -1152,7 +1152,7 @@ export default class Definitions {
       return;
     }
 
-    if (method === 'POST' && pathname === '/communities/') {
+    if (method === 'POST' && pathname === '/communities') {
       this.body = JSON.stringify(
         this.signCommunityGenesis(body, keyPair, createdAt),
       );
@@ -1208,7 +1208,7 @@ export default class Definitions {
       id: actorIdentityId,
     };
 
-    if (body.operation || method !== 'POST' || pathname !== '/conversations/') {
+    if (body.operation || method !== 'POST' || pathname !== '/conversations') {
       return;
     }
 
@@ -1964,7 +1964,7 @@ export default class Definitions {
     };
 
     this.body = JSON.stringify(signedBody);
-    await this.signCurrentRequest('POST', '/keychains/');
+    await this.signCurrentRequest('POST', '/keychains');
   }
 
   @given('I sign the current private authorization challenge request')
@@ -2799,7 +2799,7 @@ export default class Definitions {
   public async iSignTheCurrentPresenceListRequest(): Promise<void> {
     this.body = undefined;
     await this.ensureIdentityKeyPair();
-    await this.signCurrentRequest('GET', '/presence/');
+    await this.signCurrentRequest('GET', '/presence');
   }
 
   @given('I sign the current identity presence request')
@@ -2834,7 +2834,7 @@ export default class Definitions {
     this.body = undefined;
     await this.signCurrentRequest(
       'GET',
-      '/presence/',
+      '/presence',
       String(Date.now()),
       signer,
       signerIdentityId,
@@ -2852,7 +2852,7 @@ export default class Definitions {
 
     await this.iSignTheCurrentKeychainPublicationRequest();
     this.response = await this.restClient.post(
-      '/keychains/',
+      '/keychains',
       JSON.parse(this.body),
       { headers: this.headers },
     );
@@ -3007,7 +3007,7 @@ export default class Definitions {
 
   @given('I sign the current community creation request')
   public async iSignTheCurrentCommunityCreationRequest(): Promise<void> {
-    await this.signCurrentRequest('POST', '/communities/');
+    await this.signCurrentRequest('POST', '/communities');
   }
 
   @given('I remember the current community')
@@ -3320,7 +3320,7 @@ export default class Definitions {
     this.body = undefined;
     await this.signCurrentRequest(
       'GET',
-      '/communities/',
+      '/communities',
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -3334,7 +3334,7 @@ export default class Definitions {
     this.body = undefined;
     await this.signCurrentRequest(
       'GET',
-      '/communities/membership-requests',
+      '/community-membership-requests',
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -3484,12 +3484,13 @@ export default class Definitions {
         keyPair,
         1,
       ),
+      communityId: this.communityId,
       createdAt,
       mutation: this.signCommunityRecord(payload, keyPair),
     });
     await this.signCurrentRequest(
       'POST',
-      `/communities/${this.communityId}/join-requests`,
+      '/community-membership-requests',
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -3506,7 +3507,7 @@ export default class Definitions {
   @given('I sign the current community membership requests request')
   public async iSignTheCurrentCommunityMembershipRequestsRequest(): Promise<void> {
     this.body = undefined;
-    await this.signCurrentRequest('GET', '/communities/membership-requests');
+    await this.signCurrentRequest('GET', '/community-membership-requests');
   }
 
   @given('I sign the current membership request update')
@@ -3903,7 +3904,7 @@ export default class Definitions {
     this.body = undefined;
     await this.signCurrentRequest(
       'GET',
-      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages/search`,
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages`,
     );
   }
 
@@ -3916,7 +3917,7 @@ export default class Definitions {
     this.body = undefined;
     await this.signCurrentRequest(
       'GET',
-      `/communities/${this.communityId}/messages/search`,
+      `/communities/${this.communityId}/messages`,
     );
   }
 
@@ -4051,7 +4052,7 @@ export default class Definitions {
 
   @given('I sign the current one-to-one conversation request')
   public async iSignTheCurrentOneToOneConversationRequest(): Promise<void> {
-    await this.signCurrentRequest('POST', '/conversations/');
+    await this.signCurrentRequest('POST', '/conversations');
   }
 
   /** Signs the group genesis an older client sent, a shape nodes now refuse. */
@@ -4083,7 +4084,7 @@ export default class Definitions {
       nonce,
       operation: { createdAt, mutation: proof.toPrimitives(), parents: [] },
     });
-    await this.signCurrentRequest('POST', '/conversations/');
+    await this.signCurrentRequest('POST', '/conversations');
   }
 
   @given('I have created a one-to-one conversation')
@@ -4093,7 +4094,7 @@ export default class Definitions {
     await this.iSignTheCurrentOneToOneConversationRequest();
 
     this.response = await this.restClient.post(
-      '/conversations/',
+      '/conversations',
       JSON.parse(this.body || '{}'),
       { headers: this.headers },
     );
@@ -4268,7 +4269,7 @@ export default class Definitions {
 
   @given('I sign the current call start request')
   public async iSignTheCurrentCallStartRequest(): Promise<void> {
-    await this.signCurrentRequest('POST', '/calls/');
+    await this.signCurrentRequest('POST', '/calls');
   }
 
   @given('the community member signs the current call start request')
@@ -4277,7 +4278,7 @@ export default class Definitions {
 
     await this.signCurrentRequest(
       'POST',
-      '/calls/',
+      '/calls',
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -4288,7 +4289,7 @@ export default class Definitions {
   public async bothCommunityMembersStartTheCurrentCallConcurrently(): Promise<void> {
     const base = this.body;
 
-    await this.signCurrentRequest('POST', '/calls/');
+    await this.signCurrentRequest('POST', '/calls');
     const ownerHeaders = { ...this.headers };
     const ownerBody = JSON.parse(this.body || '{}');
     const otherIdentityKeyPair = await this.ensureOtherIdentityKeyPair();
@@ -4296,7 +4297,7 @@ export default class Definitions {
     this.body = base;
     await this.signCurrentRequest(
       'POST',
-      '/calls/',
+      '/calls',
       String(Date.now()),
       otherIdentityKeyPair,
       this.otherIdentityId,
@@ -4305,8 +4306,8 @@ export default class Definitions {
     const otherBody = JSON.parse(this.body || '{}');
 
     this.concurrentCallResponses = await Promise.all([
-      this.restClient.post('/calls/', ownerBody, { headers: ownerHeaders }),
-      this.restClient.post('/calls/', otherBody, { headers: otherHeaders }),
+      this.restClient.post('/calls', ownerBody, { headers: ownerHeaders }),
+      this.restClient.post('/calls', otherBody, { headers: otherHeaders }),
     ]);
     this.response = this.concurrentCallResponses[0];
     this.callId = String(this.concurrentCallResponses[0].data.id);
@@ -4371,7 +4372,7 @@ export default class Definitions {
   @given('I sign the current calls request')
   public async iSignTheCurrentCallsRequest(): Promise<void> {
     this.body = undefined;
-    await this.signCurrentRequest('GET', '/calls/');
+    await this.signCurrentRequest('GET', '/calls');
   }
 
   @given('I sign the current call history request')
@@ -4967,12 +4968,12 @@ export default class Definitions {
     this.binaryBody = undefined;
     this.headers['content-type'] = 'application/json';
     this.replicationCid = cid;
-    await this.signCurrentRequest('PUT', `/ipfs/replication/${cid}`);
+    await this.signCurrentRequest('PUT', `/ipfs/replications/${cid}`);
   }
 
   @when('I PUT the signed content replication registration')
   public async iPUTTheSignedContentReplicationRegistration(): Promise<void> {
-    await this.iPUT(`/ipfs/replication/${this.replicationCid}`);
+    await this.iPUT(`/ipfs/replications/${this.replicationCid}`);
   }
 
   @given('I sign the current public IPFS content request')
@@ -4995,7 +4996,7 @@ export default class Definitions {
   public async iSignTheCurrentContentReplicationStatusRequest(): Promise<void> {
     this.binaryBody = undefined;
     this.body = undefined;
-    await this.signCurrentRequest('GET', '/ipfs/replication/status');
+    await this.signCurrentRequest('GET', '/ipfs/replication-status');
   }
 
   @given(
@@ -5009,7 +5010,7 @@ export default class Definitions {
     this.body = undefined;
     await this.signCurrentRequest(
       'GET',
-      '/ipfs/replication/status',
+      '/ipfs/replication-status',
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -5019,7 +5020,7 @@ export default class Definitions {
   @given('I sign the current conversations request')
   public async iSignTheCurrentConversationsRequest(): Promise<void> {
     this.body = undefined;
-    await this.signCurrentRequest('GET', '/conversations/');
+    await this.signCurrentRequest('GET', '/conversations');
   }
 
   @given('I sign the current conversations request with an expired timestamp')
@@ -5027,7 +5028,7 @@ export default class Definitions {
     this.body = undefined;
     await this.signCurrentRequest(
       'GET',
-      '/conversations/',
+      '/conversations',
       String(Date.now() - 31_000),
     );
   }
@@ -5035,15 +5036,15 @@ export default class Definitions {
   @given('I sign the current node owner request')
   public async iSignTheCurrentNodeOwnerRequest(): Promise<void> {
     this.body = this.body ?? '{}';
-    await this.signCurrentRequest('PUT', '/node/owner/');
+    await this.signCurrentRequest('PUT', '/node/owner');
   }
 
   @given('I hand the node over to the other identity')
   public async iHandTheNodeOverToTheOtherIdentity(): Promise<void> {
     await this.ensureOtherIdentityKeyPair();
     this.body = JSON.stringify({ identityId: this.otherIdentityId });
-    await this.signCurrentRequest('PUT', '/node/owner/');
-    await this.iPUT('/node/owner/');
+    await this.signCurrentRequest('PUT', '/node/owner');
+    await this.iPUT('/node/owner');
     expect(this.response.status).to.equal(200);
   }
 
@@ -5130,7 +5131,7 @@ export default class Definitions {
     const publication = { ...(record.data as Record<string, unknown>) };
 
     delete publication.identityExternalIdentifier;
-    const replay = await this.restClient.post('/identities/', publication, {
+    const replay = await this.restClient.post('/identities', publication, {
       headers: {},
     });
 
@@ -5152,7 +5153,7 @@ export default class Definitions {
     this.body = this.body ?? '{}';
     await this.signCurrentRequest(
       'PUT',
-      '/node/owner/',
+      '/node/owner',
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -5353,7 +5354,7 @@ export default class Definitions {
 
     await this.signCurrentRequest(
       'PUT',
-      '/node/blocks/',
+      '/node/blocks',
       String(Date.now() - 31_000),
       keyPair,
       this.otherIdentityId,
@@ -5364,7 +5365,7 @@ export default class Definitions {
   public async iSignTheNodeBlocksRequestWithAnExpiredTimestamp(): Promise<void> {
     await this.signCurrentRequest(
       'PUT',
-      '/node/blocks/',
+      '/node/blocks',
       String(Date.now() - 31_000),
     );
   }
@@ -5373,7 +5374,7 @@ export default class Definitions {
   public async anotherIdentitySignsTheNodeBlocksRequestClaimingToBeMe(): Promise<void> {
     await this.signCurrentRequest(
       'PUT',
-      '/node/blocks/',
+      '/node/blocks',
       String(Date.now()),
       await this.ensureOtherIdentityKeyPair(),
     );
@@ -5385,7 +5386,7 @@ export default class Definitions {
 
     await this.signCurrentRequest(
       'POST',
-      '/node/networks/',
+      '/node/networks',
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -5399,7 +5400,7 @@ export default class Definitions {
     this.body = undefined;
     await this.signCurrentRequest(
       'GET',
-      '/node/networks/',
+      '/node/networks',
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -5409,18 +5410,18 @@ export default class Definitions {
   @given('I sign the current node networks request')
   public async iSignTheCurrentNodeNetworksRequest(): Promise<void> {
     this.body = undefined;
-    await this.signCurrentRequest('GET', '/node/networks/');
+    await this.signCurrentRequest('GET', '/node/networks');
   }
 
   @given('I sign the current node relay configuration query')
   public async iSignTheCurrentNodeRelayConfigurationQuery(): Promise<void> {
     this.body = undefined;
-    await this.signCurrentRequest('GET', '/node/relay-configuration/');
+    await this.signCurrentRequest('GET', '/node/relay-configuration');
   }
 
   @given('I sign the current node relay configuration request')
   public async iSignTheCurrentNodeRelayConfigurationRequest(): Promise<void> {
-    await this.signCurrentRequest('PUT', '/node/relay-configuration/');
+    await this.signCurrentRequest('PUT', '/node/relay-configuration');
   }
 
   @given('another identity signs the current node relay configuration request')
@@ -5429,7 +5430,7 @@ export default class Definitions {
 
     await this.signCurrentRequest(
       'PUT',
-      '/node/relay-configuration/',
+      '/node/relay-configuration',
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -5444,7 +5445,7 @@ export default class Definitions {
       this.body = undefined;
     }
 
-    await this.signCurrentRequest(method, '/node/diagnostics/');
+    await this.signCurrentRequest(method, '/node/diagnostics');
   }
 
   @given('another identity signs the current node diagnostics {string} request')
@@ -5455,7 +5456,7 @@ export default class Definitions {
 
     await this.signCurrentRequest(
       method,
-      '/node/diagnostics/',
+      '/node/diagnostics',
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -5483,7 +5484,7 @@ export default class Definitions {
     await later;
 
     this.response = await this.restClient.put(
-      '/node/diagnostics/',
+      '/node/diagnostics',
       this.rememberedDiagnosticsRequest.body &&
         JSON.parse(this.rememberedDiagnosticsRequest.body),
       { headers: this.rememberedDiagnosticsRequest.headers },
@@ -5509,13 +5510,13 @@ export default class Definitions {
 
   @given('I sign the current node network request')
   public async iSignTheCurrentNodeNetworkRequest(): Promise<void> {
-    await this.signCurrentRequest('POST', '/node/networks/');
+    await this.signCurrentRequest('POST', '/node/networks');
   }
 
   @given('I sign the current node public network request')
   public async iSignTheCurrentNodePublicNetworkRequest(): Promise<void> {
     this.body = this.body ?? '{}';
-    await this.signCurrentRequest('POST', '/node/networks/public/');
+    await this.signCurrentRequest('POST', '/node/networks/public');
   }
 
   @given(
@@ -5525,7 +5526,7 @@ export default class Definitions {
     networkId: string,
   ): Promise<void> {
     this.body = undefined;
-    await this.signCurrentRequest('DELETE', `/node/networks/${networkId}/`);
+    await this.signCurrentRequest('DELETE', `/node/networks/${networkId}`);
   }
 
   @given(
@@ -5539,7 +5540,7 @@ export default class Definitions {
     this.body = undefined;
     await this.signCurrentRequest(
       'DELETE',
-      `/node/networks/${networkId}/`,
+      `/node/networks/${networkId}`,
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -5638,7 +5639,7 @@ export default class Definitions {
 
   @given('I sign the current notification creation request')
   public async iSignTheCurrentNotificationCreationRequest(): Promise<void> {
-    await this.signCurrentRequest('POST', '/notifications/');
+    await this.signCurrentRequest('POST', '/notifications');
   }
 
   @given('another identity signs the current notification creation request')
@@ -5647,7 +5648,7 @@ export default class Definitions {
 
     await this.signCurrentRequest(
       'POST',
-      '/notifications/',
+      '/notifications',
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -5661,7 +5662,7 @@ export default class Definitions {
     this.body = undefined;
     await this.signCurrentRequest(
       'GET',
-      '/notifications/',
+      '/notifications',
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -5671,13 +5672,13 @@ export default class Definitions {
   @given('I sign the current notifications request')
   public async iSignTheCurrentNotificationsRequest(): Promise<void> {
     this.body = undefined;
-    await this.signCurrentRequest('GET', '/notifications/');
+    await this.signCurrentRequest('GET', '/notifications');
   }
 
   @given('I sign the current notification settings request')
   public async iSignTheCurrentNotificationSettingsRequest(): Promise<void> {
     this.body = undefined;
-    await this.signCurrentRequest('GET', '/notification-settings/');
+    await this.signCurrentRequest('GET', '/notification-settings');
   }
 
   @given('I sign the current notification scope settings request')
@@ -5745,7 +5746,7 @@ export default class Definitions {
         },
       ),
     });
-    await this.signCurrentRequest('POST', '/stickers/packs/');
+    await this.signCurrentRequest('POST', '/stickers/packs');
   }
 
   @given('I sign the current unsigned sticker pack creation request')
@@ -5767,7 +5768,7 @@ export default class Definitions {
         })),
       },
     });
-    await this.signCurrentRequest('POST', '/stickers/packs/');
+    await this.signCurrentRequest('POST', '/stickers/packs');
   }
 
   @given('I remember the current sticker pack')
@@ -5916,7 +5917,7 @@ export default class Definitions {
   @given('I sign the current sticker library request')
   public async iSignTheCurrentStickerLibraryRequest(): Promise<void> {
     this.body = undefined;
-    await this.signCurrentRequest('GET', '/stickers/me');
+    await this.signCurrentRequest('GET', '/stickers/library');
   }
 
   @given('I sign the current saved sticker pack request')
@@ -6010,7 +6011,10 @@ export default class Definitions {
 
   @when('I GET my sticker library')
   public async iGETMyStickerLibrary(): Promise<void> {
-    this.response = await this.restClient.get('/stickers/me', this.headers);
+    this.response = await this.restClient.get(
+      '/stickers/library',
+      this.headers,
+    );
   }
 
   @when('I PUT the current sticker pack as saved')
@@ -6135,7 +6139,7 @@ export default class Definitions {
     await this.iSignTheCurrentNotificationCreationRequest();
 
     this.response = await this.restClient.post(
-      '/notifications/',
+      '/notifications',
       JSON.parse(this.body || '{}'),
       { headers: this.headers },
     );
@@ -6160,7 +6164,7 @@ export default class Definitions {
       await this.iSignTheCurrentNotificationCreationRequest();
 
       this.response = await this.restClient.post(
-        '/notifications/',
+        '/notifications',
         JSON.parse(this.body || '{}'),
         { headers: this.headers },
       );
@@ -6255,7 +6259,7 @@ export default class Definitions {
     await this.iSignTheCurrentCommunityCreationRequest();
 
     this.response = await this.restClient.post(
-      '/communities/',
+      '/communities',
       JSON.parse(this.body || '{}'),
       { headers: this.headers },
     );
@@ -6410,6 +6414,28 @@ export default class Definitions {
     );
 
     this.rememberCreatedIdentityFromResponse();
+  }
+
+  @when('I POST the current device authorization transition')
+  public async iPOSTTheCurrentDeviceAuthorizationTransition(): Promise<void> {
+    const { identityId } = JSON.parse(String(this.body)) as {
+      identityId: string;
+    };
+
+    await this.iPOSTTo(
+      `/identity-devices/${encodeURIComponent(identityId)}/transitions`,
+    );
+  }
+
+  @when(
+    'I POST the current device authorization transition to another identity',
+  )
+  public async iPOSTTheCurrentDeviceAuthorizationTransitionToAnotherIdentity(): Promise<void> {
+    const other = await this.ensureOtherIdentityKeyPair();
+
+    await this.iPOSTTo(
+      `/identity-devices/${encodeURIComponent(other.toPrimitives().publicKey)}/transitions`,
+    );
   }
 
   @when('I POST to {string} {int} times concurrently')
@@ -7014,7 +7040,7 @@ export default class Definitions {
     }
 
     this.response = await this.restClient.post(
-      `/communities/${this.communityId}/join-requests`,
+      '/community-membership-requests',
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
@@ -7059,7 +7085,7 @@ export default class Definitions {
 
   @when('I GET current communities')
   public async iGETCurrentCommunities(): Promise<void> {
-    this.response = await this.restClient.get('/communities/', this.headers);
+    this.response = await this.restClient.get('/communities', this.headers);
   }
 
   @when('I PATCH the current community')
@@ -7086,7 +7112,7 @@ export default class Definitions {
   @when('I GET community membership requests')
   public async iGETCommunityMembershipRequests(): Promise<void> {
     this.response = await this.restClient.get(
-      '/communities/membership-requests',
+      '/community-membership-requests',
       this.headers,
     );
   }
@@ -7098,7 +7124,7 @@ export default class Definitions {
     }
 
     this.response = await this.restClient.patch(
-      `/communities/membership-requests/${this.communityMembershipRequestId}`,
+      `/community-membership-requests/${this.communityMembershipRequestId}`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
@@ -7106,7 +7132,7 @@ export default class Definitions {
 
   @when('I GET current calls')
   public async iGETCurrentCalls(): Promise<void> {
-    this.response = await this.restClient.get('/calls/', this.headers);
+    this.response = await this.restClient.get('/calls', this.headers);
   }
 
   @when('I GET current call history')
@@ -7369,7 +7395,7 @@ export default class Definitions {
     }
 
     this.response = await this.restClient.get(
-      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages/search?query=searchable&limit=20`,
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages?query=searchable&limit=20`,
       this.headers,
     );
   }
@@ -7381,7 +7407,19 @@ export default class Definitions {
     }
 
     this.response = await this.restClient.get(
-      `/communities/${this.communityId}/messages/search?query=searchable&limit=20`,
+      `/communities/${this.communityId}/messages?query=searchable&limit=20`,
+      this.headers,
+    );
+  }
+
+  @when('I GET messages from the current community without a query')
+  public async iGETMessagesFromTheCurrentCommunityWithoutAQuery(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/messages`,
       this.headers,
     );
   }
@@ -7467,7 +7505,7 @@ export default class Definitions {
   @when('I GET the published IPFS content as binary')
   public async iGETThePublishedContentAsBinary(): Promise<void> {
     this.response = await this.restClient.getBinary(
-      `/ipfs/${this.response.data.cid}`,
+      `/ipfs/contents/${this.response.data.cid}`,
       this.headers,
     );
   }
@@ -7487,7 +7525,7 @@ export default class Definitions {
     await this.ensureIdentityKeyPair();
 
     this.response = await this.restClient.get(
-      `/presence/?identityIds=${encodeURIComponent(this.ownerIdentityId?.valueOf() || '')}`,
+      `/presence?identityIds=${encodeURIComponent(this.ownerIdentityId?.valueOf() || '')}`,
       this.headers,
     );
   }
@@ -7545,7 +7583,7 @@ export default class Definitions {
   @when('I GET current conversations')
   public async iGetCurrentConversations(): Promise<void> {
     this.response = await this.restClient.get(
-      '/conversations/?limit=20',
+      '/conversations?limit=20',
       this.headers,
     );
   }
@@ -7686,21 +7724,21 @@ export default class Definitions {
     }
 
     this.body = undefined;
-    await this.signCurrentRequest('GET', '/calls/');
+    await this.signCurrentRequest('GET', '/calls');
     const ownerHeaders = { ...this.headers };
     const otherIdentityKeyPair = await this.ensureOtherIdentityKeyPair();
 
     await this.signCurrentRequest(
       'GET',
-      '/calls/',
+      '/calls',
       String(Date.now()),
       otherIdentityKeyPair,
       this.otherIdentityId,
     );
     const otherHeaders = { ...this.headers };
     const responses = await Promise.all([
-      this.restClient.get('/calls/', { headers: ownerHeaders }),
-      this.restClient.get('/calls/', { headers: otherHeaders }),
+      this.restClient.get('/calls', { headers: ownerHeaders }),
+      this.restClient.get('/calls', { headers: otherHeaders }),
     ]);
 
     for (const response of responses) {

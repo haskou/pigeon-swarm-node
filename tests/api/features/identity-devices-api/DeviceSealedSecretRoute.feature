@@ -7,7 +7,7 @@ Feature: Device sealed secret route
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "sealed-secret-network"
     And I set a client-signed identity body with name "sealed owner" and handle "sealed-owner"
-    When I POST to "/identities/"
+    When I POST to "/identities"
     Then response code is equal to 200
     Given I set an unsigned sealed secret bundle body
     When I PUT the current sealed secret bundle
@@ -17,7 +17,7 @@ Feature: Device sealed secret route
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "sealed-secret-network"
     And I set a client-signed identity body with name "sealed duplicate" and handle "sealed-duplicate"
-    When I POST to "/identities/"
+    When I POST to "/identities"
     Then response code is equal to 200
     Given I set a duplicate recipient sealed secret bundle body
     And I sign the current sealed secret bundle request
@@ -28,7 +28,7 @@ Feature: Device sealed secret route
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "sealed-secret-network"
     And I set a client-signed identity body with name "sealed reader" and handle "sealed-reader"
-    When I POST to "/identities/"
+    When I POST to "/identities"
     Then response code is equal to 200
     When I GET the current sealed secret delivery
     Then response code is equal to 401
@@ -37,7 +37,7 @@ Feature: Device sealed secret route
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "sealed-secret-network"
     And I set a client-signed identity body with name "sealed empty" and handle "sealed-empty"
-    When I POST to "/identities/"
+    When I POST to "/identities"
     Then response code is equal to 200
     Given I sign the current sealed secret delivery request
     When I GET the current sealed secret delivery
@@ -47,7 +47,7 @@ Feature: Device sealed secret route
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "sealed-secret-network"
     And I set a client-signed identity body with name "sealed replay" and handle "sealed-replay"
-    When I POST to "/identities/"
+    When I POST to "/identities"
     Then response code is equal to 200
     Given I set a sealed secret bundle body for my device with generation 1
     And I sign the current sealed secret bundle request
@@ -67,7 +67,7 @@ Feature: Device sealed secret route
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "sealed-secret-network"
     And I set a client-signed identity body with name "sealed stale" and handle "sealed-stale"
-    When I POST to "/identities/"
+    When I POST to "/identities"
     Then response code is equal to 200
     Given requests are signed 61 seconds ago
     And I set a sealed secret bundle body for my device with generation 1
@@ -84,14 +84,14 @@ Feature: Device sealed secret route
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "sealed-secret-network"
     And I set a client-signed identity body with name "sealed handover" and handle "sealed-handover"
-    When I POST to "/identities/"
+    When I POST to "/identities"
     Then response code is equal to 200
     Given I set a signed device enrollment transition body
-    When I POST to "/identity-devices/transitions"
+    When I POST the current device authorization transition
     Then response code is equal to 200
     Given I set a signed self-retirement transition body for the enrolled device
     And I attach sealed secrets for the remaining devices with generation 2
-    When I POST to "/identity-devices/transitions"
+    When I POST the current device authorization transition
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | revision                            | 2 |
@@ -108,10 +108,10 @@ Feature: Device sealed secret route
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "sealed-secret-network"
     And I set a client-signed identity body with name "sealed enrollment" and handle "sealed-enrollment"
-    When I POST to "/identities/"
+    When I POST to "/identities"
     Then response code is equal to 200
     Given I set a signed device enrollment transition body
     And I attach sealed secrets for the remaining devices with generation 2
-    When I POST to "/identity-devices/transitions"
+    When I POST the current device authorization transition
     Then response code is equal to 400
     And the genesis device authorization checkpoint exists

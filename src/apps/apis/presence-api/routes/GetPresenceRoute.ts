@@ -52,7 +52,7 @@ export class GetPresenceRoute extends Route {
     );
   }
 
-  @Get('/')
+  @Get()
   public async getPresences(
     @Req() request: Request,
     @Res() response: Response,

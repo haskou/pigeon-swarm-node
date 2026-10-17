@@ -4,7 +4,7 @@ Feature: Get community moderation logs
     Given I register a test IPFS network "community-moderation-logs-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community text channel body
@@ -21,7 +21,7 @@ Feature: Get community moderation logs
     Given I register a test IPFS network "community-kick-moderation-logs-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community member body for another identity
@@ -47,7 +47,7 @@ Feature: Get community moderation logs
     Given I register a test IPFS network "community-invite-moderation-logs-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community member manager role body

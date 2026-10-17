@@ -10,7 +10,7 @@ import { CallRouteSupport } from './CallRouteSupport';
 export class GetCallsRoute extends CallRouteSupport {
   private readonly finder = this.get<ActiveCallsFinder>(ActiveCallsFinder);
 
-  @Get('/')
+  @Get()
   public async getCalls(
     @Req() request: Request,
     @Res() response: Response,

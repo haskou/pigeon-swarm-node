@@ -20,7 +20,6 @@ import { DeleteCommunityRoleRoute } from '@app/apps/apis/communities-api/routes/
 import { GetCommunitiesRoute } from '@app/apps/apis/communities-api/routes/GetCommunitiesRoute';
 import { GetCommunityChannelDraftsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelDraftsRoute';
 import { GetCommunityChannelMessagePinsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelMessagePinsRoute';
-import { GetCommunityChannelMessageSearchRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelMessageSearchRoute';
 import { GetCommunityChannelMessagesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelMessagesRoute';
 import { GetCommunityChannelsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelsRoute';
 import { GetCommunityDiscoveryRoute } from '@app/apps/apis/communities-api/routes/GetCommunityDiscoveryRoute';
@@ -28,7 +27,7 @@ import { GetCommunityFrontierRoute } from '@app/apps/apis/communities-api/routes
 import { GetCommunityInviteRoute } from '@app/apps/apis/communities-api/routes/GetCommunityInviteRoute';
 import { GetCommunityMembershipRequestsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMembershipRequestsRoute';
 import { GetCommunityMembersRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMembersRoute';
-import { GetCommunityMessageSearchRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMessageSearchRoute';
+import { GetCommunityMessagesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMessagesRoute';
 import { GetCommunityModerationLogsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityModerationLogsRoute';
 import { GetCommunityOperationsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityOperationsRoute';
 import { GetCommunityRolesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityRolesRoute';
@@ -285,8 +284,7 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PostCommunityInviteRoute,
   PostCommunityInviteAcceptRoute,
   GetCommunityChannelsRoute,
-  GetCommunityMessageSearchRoute,
-  GetCommunityChannelMessageSearchRoute,
+  GetCommunityMessagesRoute,
   PostCommunityTextChannelRoute,
   PostCommunityVoiceChannelRoute,
   PatchCommunityChannelRoute,

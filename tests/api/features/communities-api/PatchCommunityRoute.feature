@@ -8,7 +8,7 @@ Feature: Patch community API
     And I register a test IPFS network "communities-api-profile-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community text channel body
@@ -32,7 +32,7 @@ Feature: Patch community API
     And I register a test IPFS network "communities-api-profile-auto-join-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community profile body enabling auto join

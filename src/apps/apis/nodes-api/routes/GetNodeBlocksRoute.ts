@@ -11,7 +11,7 @@ export class GetNodeBlocksRoute extends NodeOwnerRouteSupport {
   private readonly finder: NodeBlockListFinder =
     this.get<NodeBlockListFinder>(NodeBlockListFinder);
 
-  @Get('/')
+  @Get()
   public async getBlocks(
     @Req() request: Request,
     @Res() response: Response,

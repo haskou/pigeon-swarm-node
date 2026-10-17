@@ -35,7 +35,7 @@ import {
 
 const NODE_PORT = 19240;
 const INVALID_SIGNED_REQUEST_CODE = 401020;
-const SETTINGS_PATH = '/notification-settings/';
+const SETTINGS_PATH = '/notification-settings';
 const RESERVE_PATH = '/private-blobs';
 const UPLOAD_PATH = '/ipfs/public';
 

@@ -3,6 +3,7 @@ import {
   IsInt,
   IsObject,
   IsOptional,
+  IsString,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -18,6 +19,9 @@ export class PostCommunityJoinRequestBody {
   @IsInt()
   @Min(0)
   public readonly acceptedAt?: number;
+
+  @IsString()
+  public readonly communityId: string;
 
   @IsInt()
   @Min(0)

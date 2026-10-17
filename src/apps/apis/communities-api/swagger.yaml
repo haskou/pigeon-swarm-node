@@ -6,7 +6,7 @@ info:
 tags:
   - name: communities
 paths:
-  /communities/:
+  /communities:
     get:
       tags:
         - communities
@@ -71,7 +71,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityDiscoveryResource'
-  /communities/membership-requests:
+  /community-membership-requests:
     get:
       tags:
         - communities
@@ -88,7 +88,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityMembershipRequestsResource'
-  /communities/membership-requests/{requestId}:
+    post:
+      tags:
+        - communities
+      summary: Request to join a private community
+      description: Requests to join the community named by `communityId` in the body. Creates a pending join request when autoJoinEnabled is false. If autoJoinEnabled is true, the request is immediately accepted and the requester is added to memberIds.
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostCommunityJoinRequestBody'
+      responses:
+        '200':
+          description: Pending or auto-accepted join request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommunityMembershipRequestResource'
+        '409':
+          description: Community not found, identity is banned, or an auto-join request lacks the requester-signed acceptedAt and acceptedMutation (CommunityNotFoundError, CommunityMemberBannedError, CommunityRequestAutoAcceptanceRequiredError).
+  /community-membership-requests/{requestId}:
     patch:
       tags:
         - communities
@@ -582,32 +606,6 @@ paths:
                 $ref: '#/components/schemas/CommunityInviteDetailsResource'
         '409':
           description: Invite token was not found, expired, or has no uses left.
-  /communities/{communityId}/join-requests:
-    post:
-      tags:
-        - communities
-      summary: Request to join a private community
-      description: Creates a pending join request when autoJoinEnabled is false. If autoJoinEnabled is true, the request is immediately accepted and the requester is added to memberIds.
-      parameters:
-        - $ref: '#/components/parameters/CommunityId'
-        - $ref: '#/components/parameters/XIdentityId'
-        - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XSignature'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PostCommunityJoinRequestBody'
-      responses:
-        '200':
-          description: Pending or auto-accepted join request.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommunityMembershipRequestResource'
-        '409':
-          description: Community not found, identity is banned, or an auto-join request lacks the requester-signed acceptedAt and acceptedMutation (CommunityNotFoundError, CommunityMemberBannedError, CommunityRequestAutoAcceptanceRequiredError).
   /communities/invites/{inviteToken}/accept:
     post:
       tags:
@@ -800,7 +798,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityResource'
-  /communities/me/drafts:
+  /community-drafts:
     get:
       tags:
         - communities
@@ -948,8 +946,8 @@ paths:
     get:
       tags:
         - communities
-      summary: List community text channel messages
-      description: Only community members can read text channel messages. Private community messages expose encryptedPayload. Public community messages expose plaintextPayload. Voice-channel call lifecycle is exposed through calls/channel presence, not this text timeline.
+      summary: List or search community text channel messages
+      description: Only community members can read text channel messages. Private community messages expose encryptedPayload. Public community messages expose plaintextPayload. Voice-channel call lifecycle is exposed through calls/channel presence, not this text timeline. With `query`, the page holds the public plaintext messages that match it instead of the timeline; only public community messages are searchable, `limit` defaults to 20 and is at most 50, `beforeMessageId` is ignored and `polls` is empty. Query string values are not part of the signed path.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path
@@ -967,18 +965,23 @@ paths:
           name: beforeMessageId
           schema:
             type: string
+        - in: query
+          name: query
+          description: Searches the channel's public plaintext messages instead of listing the timeline.
+          schema:
+            type: string
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
       responses:
         '200':
-          description: Channel timeline items ordered from oldest to newest in the page. Community channel poll ids are valid channel message ids and can be used as beforeMessageId.
+          description: Channel timeline items ordered from oldest to newest in the page, or the matching public messages when `query` is given. Community channel poll ids are valid channel message ids and can be used as beforeMessageId.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityChannelMessagesResource'
         '409':
-          description: Authenticated identity is not a member or the channel does not exist.
+          description: Authenticated identity is not a member or the channel does not exist, or `query` is given for a private community.
     post:
       tags:
         - communities
@@ -1009,16 +1012,17 @@ paths:
                 $ref: '#/components/schemas/CommunityChannelMessageResource'
         '409':
           description: Authenticated identity is not a member, the channel does not exist, or the public mutation is invalid.
-  /communities/{communityId}/messages/search:
+  /communities/{communityId}/messages:
     get:
       tags:
         - communities
       summary: Search public community messages across visible text channels
-      description: Only public community plaintext messages are searchable. Results are limited to text channels visible to the authenticated member. The request is signed as GET /communities/{communityId}/messages/search; query string values are not part of the signed path.
+      description: Only public community plaintext messages are searchable. Results are limited to text channels visible to the authenticated member. Messages are listed per channel, so `query` is required here. The request is signed as GET /communities/{communityId}/messages; query string values are not part of the signed path.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: query
           name: query
+          required: true
           schema:
             type: string
         - in: query
@@ -1038,44 +1042,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityMessageSearchResource'
+        '400':
+          description: '`query` is missing (code 400100).'
         '409':
           description: The community is private or the authenticated identity is not a member.
-  /communities/{communityId}/channels/{channelId}/messages/search:
-    get:
-      tags:
-        - communities
-      summary: Search public community text channel messages
-      description: Only public community plaintext messages are searchable. The request is signed as GET /communities/{communityId}/channels/{channelId}/messages/search; query string values are not part of the signed path.
-      parameters:
-        - $ref: '#/components/parameters/CommunityId'
-        - in: path
-          name: channelId
-          required: true
-          schema:
-            type: string
-        - in: query
-          name: query
-          schema:
-            type: string
-        - in: query
-          name: limit
-          schema:
-            type: integer
-            default: 20
-            minimum: 1
-            maximum: 50
-        - $ref: '#/components/parameters/XIdentityId'
-        - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/XSignature'
-      responses:
-        '200':
-          description: Matching public channel messages.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommunityChannelMessagesResource'
-        '409':
-          description: The community is private, the authenticated identity is not a member, or the channel does not exist.
   /communities/{communityId}/channels/{channelId}/messages/{messageId}:
     put:
       tags:
@@ -2191,9 +2161,13 @@ components:
       type: object
       description: The mutation signs a community_membership_request document of type request (creator = identity = requester, status pending, updatedAt = createdAt). For autoJoinEnabled communities acceptedAt, acceptedMutation and operation are required; acceptedMutation signs the same document with status accepted, updatedAt = acceptedAt and sequence + 1, signed by the requester, and operation signs member_joined with args identityId = requester, method = automatic and no reference.
       required:
+        - communityId
         - createdAt
         - mutation
       properties:
+        communityId:
+          type: string
+          description: The community to join.
         operation:
           $ref: '#/components/schemas/CommunityOperationBody'
         createdAt:

@@ -19,7 +19,7 @@ export class PutNodeBlockExceptionsRoute extends NodeOwnerRouteSupport {
     NodeBlockExceptionsUpdater,
   );
 
-  @Put('/')
+  @Put()
   public async putExceptions(
     @Body({ validate: { forbidNonWhitelisted: true, whitelist: true } })
     body: PutNodeBlockExceptionsBody,

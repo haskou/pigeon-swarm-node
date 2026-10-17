@@ -14,7 +14,7 @@ export class PutNodeBlockPublicationRoute extends NodeOwnerRouteSupport {
     NodeBlockListPublicationUpdater,
   );
 
-  @Put('/')
+  @Put()
   public async putPublication(
     @Body({ validate: { forbidNonWhitelisted: true, whitelist: true } })
     body: PutNodeBlockPublicationBody,

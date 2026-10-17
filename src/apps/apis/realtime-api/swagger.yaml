@@ -2,19 +2,124 @@ openapi: 3.0.3
 info:
   title: Pigeon-swarm Realtime API
   version: 1.0.0
-  description: Single-use tickets for the credentialless realtime WebSocket.
+  description: The credentialless realtime WebSocket and the single-use tickets that open it.
 tags:
   - name: realtime
 paths:
-  /realtime/v1/tickets:
+  /realtime:
+    get:
+      tags:
+        - realtime
+      summary: Open a ticket-authenticated realtime connection
+      description: |
+        WebSocket upgrade endpoint for realtime domain events and live network synchronization status.
+
+        Authenticate with a single-use ticket from `POST /realtime/tickets`,
+        offered in the `Sec-WebSocket-Protocol` header next to the protocol
+        version: `pigeon-realtime.v1, ticket.<ticket>`. Browser clients set
+        subprotocols in the native `WebSocket` constructor, so no custom headers
+        or query parameters are needed. The server selects `pigeon-realtime.v1`
+        and never echoes the ticket.
+
+        When `ROUTE_PREFIX` is configured, connect to the prefixed path, for
+        example `GET /api/realtime`.
+
+        The former signed-query endpoint `GET /ws` has been removed and answers
+        `404`. Signed query parameters and signed headers are ignored on this
+        path; without a valid ticket in `Sec-WebSocket-Protocol` the upgrade answers `401`.
+
+        On success the server sends:
+
+        `{ "type": "connection_ack", "identityId": "<normalizedIdentityId>" }`
+
+        The server then sends the current network synchronization snapshot and
+        publishes a new one whenever libp2p connectivity, OrbitDB store
+        membership or the compared community state changes:
+
+        `{ "type": "network_synchronization_status", "status": { "changedAt": 1770000000000, "networks": [] } }`
+
+        `converged` describes all stores against peers currently known to this
+        node, and requires every one of them to hold the same community state
+        (`communityState`); store participation alone is not content equality.
+        It is not a global percentage because future and disconnected peers
+        cannot be known in an eventually consistent network.
+
+        Clients may send `{ "type": "identity_heartbeat" }` over the open
+        socket. The reference client (`pigeon-swarm-ui`) sends one every 10 seconds.
+        Include `"active": true` when the user has
+        produced activity since the previous heartbeat. The server answers
+        `{ "type": "heartbeat_ack", "identityId": "<normalizedIdentityId>", "timestamp": 1770000000000 }`.
+        Presence is kept in memory, replicated through domain events, and is
+        not written to OrbitDB/IPFS.
+        Heartbeat messages are not signed because the WebSocket upgrade already
+        authenticated the connection.
+
+        Call presence notifications contain `attributes.callId`, a minimal
+        `attributes.liveCall` snapshot and `attributes.liveCallRevision`.
+        Apply snapshots directly; reset revision tracking on reconnect and load
+        the initial/recovery call list. Current scope permissions are checked
+        on every call delivery. Stable heartbeat renewals are not forwarded.
+        The heartbeat HTTP endpoint returns 204 without a roster.
+
+        After successfully applying a `calls.v1.signal.sent` domain event,
+        clients must send
+        `{ "type": "call_signal_ack", "signalId": "<signalId>" }`.
+        The authenticated socket identity must match the event
+        `recipientIdentityId`. Retries retain the same `signalId`, so clients
+        must acknowledge every duplicate while applying its SDP/ICE payload
+        only once.
+
+        Clients may subscribe to a mailbox with
+        `{ "type": "mailbox_subscribe", "mailboxId": "<mailboxId>", "readToken": "<readToken>" }`.
+        A wrong or missing capability is ignored, exactly like an unknown
+        mailbox. The server then pushes
+        `{ "type": "mailbox_envelope", "mailboxId": "<mailboxId>", "cursor": 42 }`
+        for each envelope appended on this node. The hint is a content-free
+        nudge: clients must GET the mailbox envelopes to read data, and that
+        GET response is the source of truth. There is no subscription ack and
+        no unsubscribe message; closing the socket ends its subscriptions.
+        Revoking the reader that authorised a subscription, or deleting the
+        mailbox (including by retention), ends it at once; the socket stays open.
+        A socket holds at most 256 mailbox subscriptions.
+
+        Clients may also send ephemeral typing indicators. Direct conversation typing:
+        `{ "type": "typing", "scope": "conversation", "conversationId": "<conversationId>", "active": true }`.
+        Community text channel typing:
+        `{ "type": "typing", "scope": "community_channel", "communityId": "<communityId>", "channelId": "<channelId>", "active": true }`.
+        The server uses the authenticated WebSocket identity, validates access
+        to the conversation or text channel, excludes the sender, and relays a
+        `{ "type": "typing", ... }` message to the remaining recipients. Typing
+        in a group conversation is never relayed: it travels as an MLS record
+        through the group mailboxes.
+
+        Subsequent messages use:
+
+        `{ "type": "domain_event", "event": { "type": "<eventType>", "aggregate_id": "<aggregateId>", "attributes": {} } }`
+      parameters:
+        - in: header
+          name: Sec-WebSocket-Protocol
+          required: true
+          schema:
+            type: string
+          description: Offers `pigeon-realtime.v1` and `ticket.<ticket>`. The ticket is single-use and is consumed as soon as it is presented.
+      responses:
+        '101':
+          description: WebSocket upgrade accepted. The server selects `pigeon-realtime.v1`.
+        '401':
+          description: Ticket missing, malformed, unknown, expired, or already used, or `pigeon-realtime.v1` not offered. Signed headers and query parameters do not authenticate the upgrade.
+        '403':
+          description: Browser Origin is not listed in `REALTIME_ALLOWED_ORIGINS`.
+        '429':
+          description: Too many upgrades or open sockets on this node.
+  /realtime/tickets:
     post:
       tags:
         - realtime
       summary: Issue a single-use realtime WebSocket ticket
       description: |
         Signed request that returns a random ticket for one credentialless
-        WebSocket upgrade at `GET /realtime/v1`. The signed canonical request is
-        `POST /realtime/v1/tickets` with an empty body `{}`. When `ROUTE_PREFIX`
+        WebSocket upgrade at `GET /realtime`. The signed canonical request is
+        `POST /realtime/tickets` with an empty body `{}`. When `ROUTE_PREFIX`
         is configured, sign the prefixed path.
 
         The ticket is valid for 30 seconds and for exactly one upgrade. It is
