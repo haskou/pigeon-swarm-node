@@ -13,9 +13,15 @@ export default class NonCanonicalIdentityIdsPurgeInitializer {
     const { ownerCleared, ownListNonCanonicalEntries, removedEntries } =
       await this.purger.purge();
 
-    if (ownerCleared || removedEntries > 0 || ownListNonCanonicalEntries > 0) {
+    if (ownerCleared || removedEntries > 0) {
       Kernel.logger.info(
-        `Purged non-canonical identity ids: ownerCleared=${ownerCleared} removedEntries=${removedEntries} ownListNonCanonicalEntries=${ownListNonCanonicalEntries}`,
+        `Purged non-canonical identity ids: ownerCleared=${ownerCleared} removedEntries=${removedEntries}`,
+      );
+    }
+
+    if (ownListNonCanonicalEntries > 0) {
+      Kernel.logger.warn(
+        `The node own block list holds ${ownListNonCanonicalEntries} non-canonical identity ids: it is kept and enforced locally, NOT published, and must be re-signed with a higher version.`,
       );
     }
 

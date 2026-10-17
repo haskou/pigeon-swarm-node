@@ -31,7 +31,7 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
 
     expect(logger.info).toHaveBeenCalledTimes(1);
     expect(logger.info.mock.calls[0][0]).toBe(
-      'Purged non-canonical identity ids: ownerCleared=true removedEntries=3 ownListNonCanonicalEntries=0',
+      'Purged non-canonical identity ids: ownerCleared=true removedEntries=3',
     );
   });
 
