@@ -1,3 +1,4 @@
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { assert } from '@haskou/value-objects';
 
 import { CommunityOperationLimitExceededError } from '../errors/CommunityOperationLimitExceededError';
@@ -20,6 +21,15 @@ export class CommunityOperationLimits {
   public static readonly MAX_ARGUMENT_BYTES = 4_096;
 
   /**
+   * Levels `args` may nest, `args` itself counting as depth 0. The operation
+   * digest refuses a value deeper than `PublicMutationProof.MAX_PAYLOAD_DEPTH`
+   * below the operation, and `args` sits one level below it, so deeper
+   * arguments are refused here, as a limit, before the digest is taken.
+   */
+  public static readonly MAX_ARGUMENT_DEPTH =
+    PublicMutationProof.MAX_PAYLOAD_DEPTH - 1;
+
+  /**
    * Operations one identity may sign in one community, for its whole life.
    * The founder (the author of the genesis) is exempt: it is the root of trust,
    * and the one that approves and moderates every member, so a quota would
@@ -31,6 +41,11 @@ export class CommunityOperationLimits {
     assert(
       Buffer.byteLength(JSON.stringify(args)) <=
         CommunityOperationLimits.MAX_ARGUMENT_BYTES,
+      new CommunityOperationLimitExceededError(),
+    );
+    assert(
+      PublicMutationProof.depthOf(args) <=
+        CommunityOperationLimits.MAX_ARGUMENT_DEPTH,
       new CommunityOperationLimitExceededError(),
     );
   }

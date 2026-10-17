@@ -131,8 +131,12 @@ export class CommunityOperation {
     return `community:${communityId}:op:${hash}`;
   }
 
-  /** The id the author's identity key signs, before the operation exists. */
+  /**
+   * The id the author's identity key signs, before the operation exists.
+   * Arguments beyond the limits are refused before the digest is taken.
+   */
   public static recordIdFor(attributes: CommunityOperationAttributes): string {
+    CommunityOperationLimits.assertArguments(attributes.args);
     const content = CommunityOperation.contentOf(attributes);
 
     return CommunityOperation.recordIdOf(

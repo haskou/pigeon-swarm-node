@@ -521,6 +521,7 @@ package "communities/domain" {
 
   class CommunityOperationLimits {
     + MAX_ARGUMENT_BYTES: number
+    + MAX_ARGUMENT_DEPTH: number
     + MAX_OPERATIONS_PER_AUTHOR: number
     + assertArguments(args): void
     + isAuthorQuotaReached(count): boolean

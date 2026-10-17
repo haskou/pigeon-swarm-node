@@ -9,6 +9,9 @@ package "public-mutations/domain" {
     +version: 2
     +author: identityId, deviceCredential, authorizationRevision
     +signingContent(): "pigeon:public-mutation:v2\n" + canonical body
+    +MAX_PAYLOAD_DEPTH: 64
+    +digestOf(payload): string
+    +depthOf(value): number
   }
   class PublicMutationVerifier <<DomainService>>
   interface PublicMutationAuthorAuthorization {

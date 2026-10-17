@@ -20,6 +20,13 @@ export class PublicMutationProof {
   private static readonly DIGEST = /^[A-Za-z0-9_-]{43}$/;
   private static readonly DOMAIN = 'pigeon:public-mutation:v2\n';
 
+  /**
+   * Deepest value a digested payload may hold. The payload root counts as
+   * depth 0 and each nested object or array adds one: a value 64 levels below
+   * the root is digested, one 65 levels below it is refused.
+   */
+  public static readonly MAX_PAYLOAD_DEPTH = 64;
+
   private static exact(
     value: unknown,
     fields: string[],
@@ -119,7 +126,8 @@ export class PublicMutationProof {
 
   /**
    * base64url(sha256(utf8(JCS(payload)))) of a plain JSON object; anything
-   * else (non-finite numbers, class instances, depth beyond 64) is refused.
+   * else (non-finite numbers, class instances, depth beyond
+   * `MAX_PAYLOAD_DEPTH`) is refused.
    */
   public static digestOf(payload: Record<string, unknown>): string {
     try {
@@ -127,6 +135,17 @@ export class PublicMutationProof {
     } catch {
       throw new InvalidPublicMutationError();
     }
+  }
+
+  /** Levels below `value` of its deepest value, counted as `digestOf` counts them. */
+  public static depthOf(value: unknown): number {
+    if (value === null || typeof value !== 'object') return 0;
+
+    return Object.values(value).reduce<number>(
+      (deepest, child) =>
+        Math.max(deepest, PublicMutationProof.depthOf(child) + 1),
+      0,
+    );
   }
 
   /** Strict decoder: unknown, missing or malformed fields are rejected. */

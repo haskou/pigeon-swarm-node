@@ -113,6 +113,7 @@ export class ConversationOperation {
     return `conversation:${conversationId}:op:${hash}`;
   }
 
+  /** Arguments beyond the limits are refused before the digest is taken. */
   public static create(attributes: {
     action: ConversationOperationAction;
     args: ConversationOperationArguments;
@@ -122,6 +123,7 @@ export class ConversationOperation {
     networkId: NetworkId;
     parents: string[];
   }): ConversationOperation {
+    ConversationOperationLimits.assertArguments(attributes.args);
     const content: Omit<ConversationOperationPrimitives, 'id'> = {
       action: attributes.action.valueOf(),
       args: attributes.args,

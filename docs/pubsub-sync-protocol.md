@@ -397,8 +397,10 @@ and every replica stores and folds all of them, so growth is bounded by two rule
 that depend only on the signed record and its causal past, never on the clock or the
 arrival order (`CommunityOperationLimits`):
 
-- `args` is at most 4096 bytes of JSON (`MAX_ARGUMENT_BYTES`). An operation above it
-  is not an operation: it is refused wherever a record is read (`write`, replicated
+- `args` is at most 4096 bytes of JSON (`MAX_ARGUMENT_BYTES`) and nests at most 63
+  levels below itself (`MAX_ARGUMENT_DEPTH`; `args` is depth 1 of the operation, whose
+  digest refuses any value deeper than 64, see `payloadDigest` in `docs/api.md`). An
+  operation above either is not an operation: it is refused wherever a record is read (`write`, replicated
   read, head hydration) and the client gets `CommunityOperationLimitExceededError`.
   The `parents` bound stays 64 digests.
 - An identity other than the founder (the genesis author, trusted by construction and the one that approves every member) signs at most 1000 operations per community (`MAX_OPERATIONS_PER_AUTHOR`).

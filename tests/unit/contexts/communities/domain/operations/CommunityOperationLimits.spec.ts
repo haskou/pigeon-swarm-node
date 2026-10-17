@@ -227,6 +227,46 @@ describe('Community operation limits', () => {
     });
   });
 
+  describe('argument depth', () => {
+    /** A value whose deepest leaf sits `levels` below it. */
+    const chain = (levels: number): unknown =>
+      levels === 0 ? 'leaf' : [chain(levels - 1)];
+    /**
+     * Signs `args` whose deepest value sits `depth` levels below `args`
+     * (depth 0). `args` is itself depth 1 of the digested operation.
+     */
+    const create = (depth: number) =>
+      operation(
+        CommunityOperationAction.COMMUNITY_UPDATED,
+        owner,
+        { description: 'd', name: 'n', padding: chain(depth - 1) },
+        [genesis()],
+      );
+
+    it('accepts arguments 63 levels deep, which puts the operation at the 64-level digest limit', () => {
+      const accepted = create(63);
+
+      expect(
+        CommunityOperation.fromPrimitives(accepted.toPrimitives()).getHash(),
+      ).toBe(accepted.getHash());
+    });
+
+    it('refuses arguments 64 levels deep, which would put the operation at 65, with the operation limit error', () => {
+      expect(() => create(64)).toThrow(CommunityOperationLimitExceededError);
+    });
+
+    it('refuses a replicated record whose arguments are 64 levels deep', () => {
+      const record = {
+        ...genesis().toPrimitives(),
+        args: { ...genesis().getArguments(), padding: chain(63) },
+      };
+
+      expect(() => CommunityOperation.fromPrimitives(record)).toThrow(
+        CommunityOperationLimitExceededError,
+      );
+    });
+  });
+
   describe('operations per author', () => {
     beforeEach(() => {
       jest.replaceProperty(
