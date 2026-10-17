@@ -282,6 +282,8 @@ services:
     class: /apps/initializers/public-mutations/CommunityGovernanceMutationPolicies
     arguments:
       - >-
+        @contexts/communities/infrastructure/orbitdb/policies/CommunityInvitationClaimMutationPolicy
+      - >-
         @contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy
       - >-
         @contexts/communities/infrastructure/orbitdb/policies/CommunityModerationLogMutationPolicy
@@ -964,6 +966,8 @@ services:
     @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessagePinRepository
   contexts/communities/domain/repositories/CommunityChannelMessageRepository: >-
     @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessageRepository
+  contexts/communities/domain/repositories/CommunityInvitationClaimRepository: >-
+    @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInvitationClaimRepository
   contexts/communities/domain/repositories/CommunityMembershipRequestRepository: >-
     @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityMembershipRequestRepository
   contexts/communities/domain/repositories/CommunityMessageReactionRepository: >-
@@ -1031,6 +1035,14 @@ services:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
       - >-
         @contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessageIndex
+  contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInvitationClaimRepository:
+    class: >-
+      /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInvitationClaimRepository
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard'
+    parent: >-
+      contexts/communities/domain/repositories/CommunityInvitationClaimRepository
   contexts/communities/infrastructure/orbitdb/OrbitDBCommunityMembershipRequestRepository:
     class: >-
       /contexts/communities/infrastructure/orbitdb/OrbitDBCommunityMembershipRequestRepository
@@ -1099,6 +1111,13 @@ services:
       /contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageReactionMutationPolicy
     arguments:
       - '@contexts/communities/domain/repositories/CommunityRepository'
+    parent: contexts/public-mutations/domain/services/PublicMutationPolicy
+  contexts/communities/infrastructure/orbitdb/policies/CommunityInvitationClaimMutationPolicy:
+    class: >-
+      /contexts/communities/infrastructure/orbitdb/policies/CommunityInvitationClaimMutationPolicy
+    arguments:
+      - '@contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository'
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
     parent: contexts/public-mutations/domain/services/PublicMutationPolicy
   contexts/communities/infrastructure/orbitdb/policies/CommunityMembershipRequestMutationPolicy:
     class: >-

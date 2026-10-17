@@ -25,6 +25,15 @@ describe('CommunityInvitations', () => {
     expect(issued.findByKey(invited.key.publicKey())?.getId()).toBe(id);
   });
 
+  it('finds an invitation by key in its latest status, and no other key', () => {
+    const revoked = issued.after(revoke([invited.operation], invited), true);
+
+    expect(revoked.findByKey(invited.key.publicKey())?.isRevoked()).toBe(true);
+    expect(
+      revoked.findByKey(invitation([created], bob).key.publicKey()),
+    ).toBeUndefined();
+  });
+
   it('counts every admission, applied or not, and leaves the earlier collection alone', () => {
     const used = issued
       .after(

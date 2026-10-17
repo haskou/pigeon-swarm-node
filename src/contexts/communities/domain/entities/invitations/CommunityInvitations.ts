@@ -3,20 +3,27 @@ import { CommunityOperationAction } from '../../value-objects/CommunityOperation
 import { CommunityInvitation } from './CommunityInvitation';
 
 /**
- * The invitations of one set of community operations, by id. Immutable: each
- * change returns a new collection and leaves the invitations it does not
- * touch shared.
+ * The invitations of one set of community operations, by id and by key.
+ * Immutable: each change returns a new collection and leaves the invitations
+ * it does not touch shared.
  */
 export class CommunityInvitations {
-  public static readonly EMPTY = new CommunityInvitations(new Map());
+  public static readonly EMPTY = new CommunityInvitations(new Map(), new Map());
 
   private constructor(
     private readonly invitations: ReadonlyMap<string, CommunityInvitation>,
+    /** The first invitation issued with each key, so a preview never scans. */
+    private readonly idsByKey: ReadonlyMap<string, string>,
   ) {}
 
   private with(invitation: CommunityInvitation): CommunityInvitations {
+    const key = invitation.getInvitationKey();
+
     return new CommunityInvitations(
       new Map(this.invitations).set(invitation.getId(), invitation),
+      this.idsByKey.has(key)
+        ? this.idsByKey
+        : new Map(this.idsByKey).set(key, invitation.getId()),
     );
   }
 
@@ -36,9 +43,9 @@ export class CommunityInvitations {
   }
 
   public findByKey(invitationKey: string): CommunityInvitation | undefined {
-    return this.list().find(
-      (invitation) => invitation.getInvitationKey() === invitationKey,
-    );
+    const id = this.idsByKey.get(invitationKey);
+
+    return id === undefined ? undefined : this.invitations.get(id);
   }
 
   public list(): CommunityInvitation[] {
@@ -94,6 +101,7 @@ export class CommunityInvitations {
           isCut(invitation) ? invitation.cut() : invitation,
         ]),
       ),
+      this.idsByKey,
     );
   }
 }
