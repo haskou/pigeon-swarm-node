@@ -684,6 +684,44 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     );
   });
 
+  it('should name the provider multiaddr when a provider dial is skipped', async () => {
+    const directory = createDirectory(localDatabase);
+    const privateConnection = mock<IPFSConnection>();
+    const network = privateNetwork(
+      privateKey(),
+      privateConnection,
+      '12D3KooWLeaf',
+    );
+    const publicConnection = mock<IPFSConnection>();
+    const selfProviderMultiaddr = '/ip4/127.0.0.1/tcp/4001/p2p/not-a-peer-id_0';
+    const selfDialError = new Error('Can not dial self');
+
+    selfDialError.name = 'InvalidPeerIdError';
+    privateConnection.getMultiaddrs.mockReturnValue([]);
+    privateConnection.getPeers.mockReturnValue([]);
+    privateConnection.listen.mockResolvedValue(undefined);
+    publicConnection.dial.mockRejectedValue(selfDialError);
+    publicConnection.findRecordProviderMultiaddrs.mockResolvedValue([
+      selfProviderMultiaddr,
+    ]);
+    publicConnection.getPeers.mockReturnValue(['12D3KooWPub1icPeer']);
+    publicConnection.publishPubSub.mockResolvedValue(undefined);
+    publicConnection.subscribePubSub.mockResolvedValue(undefined);
+    publicConnection.waitForPeers.mockResolvedValue(true);
+    Reflect.set(
+      directory,
+      'getPublicConnection',
+      jest.fn().mockResolvedValue(publicConnection),
+    );
+
+    await directory.discover(network, mock());
+
+    expect(logger.debug).toHaveBeenCalledWith(
+      'Private IPFS relay record provider dial skipped:' +
+        ` error=InvalidPeerIdError multiaddr=${selfProviderMultiaddr}`,
+    );
+  });
+
   it('should keep one active circuit relay while it remains connected', async () => {
     const directory = createDirectory(localDatabase);
     const privateConnection = mock<IPFSConnection>();
