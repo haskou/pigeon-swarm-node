@@ -1,6 +1,7 @@
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { Request } from 'express';
 
@@ -22,6 +23,22 @@ export default class SignedHttpRequestAuthenticator {
   ) {}
 
   /**
+   * Whether this node holds the identity. A node that has not opened its
+   * replicated state yet holds nobody, so every signer counts as a stranger.
+   */
+  private async holds(identityId: IdentityId): Promise<boolean> {
+    try {
+      return await this.identityRepository.holds(identityId);
+    } catch (error) {
+      if (error instanceof ReplicatedStateNotReadyError) {
+        return false;
+      }
+
+      throw error;
+    }
+  }
+
+  /**
    * Records a state-changing request once, after every other check passed. An
    * identity this node does not hold, such as one creating itself here, only
    * gets a slot in the share of the replay guard kept for strangers.
@@ -39,7 +56,7 @@ export default class SignedHttpRequestAuthenticator {
       return;
     }
 
-    const accepted = (await this.identityRepository.holds(identityId))
+    const accepted = (await this.holds(identityId))
       ? signedRequestReplayGuard.accept(identityId, signature)
       : signedRequestReplayGuard.acceptFromStranger(identityId, signature);
 

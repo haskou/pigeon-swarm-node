@@ -84,7 +84,8 @@ Implemented:
   leaves no record behind
 - the guard is bounded and fails closed: each signing key holds at most 1,000
   live entries, identities this node does not hold (such as one creating itself
-  here) share 10,000, and the whole guard holds 100,000. A full share refuses
+  here, or any identity while the node has not opened its replicated state)
+  share 10,000, and the whole guard holds 100,000. A full share refuses
   new signatures with `401` code `401020` instead of evicting live entries, so
   a key or a crowd of self-made keys cannot fill the guard for the identities
   and devices this node serves, nor flush an intercepted signature out of it

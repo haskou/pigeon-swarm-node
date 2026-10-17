@@ -3,6 +3,7 @@ import { signedRequestReplayGuard } from '@app/apps/apis/shared/SignedRequestRep
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import {
   KeyPair,
   SignedHttpRequestBody,
@@ -168,6 +169,39 @@ describe('SignedHttpRequestAuthenticator', () => {
         await buildSignedRequest('POST', { value: 1 }),
       ),
     ).resolves.toBeDefined();
+  });
+
+  it('records a state-changing request in the stranger share while replicated state is not open', async () => {
+    identityRepository.holds.mockRejectedValue(
+      new ReplicatedStateNotReadyError(),
+    );
+    const acceptFromStranger = jest.spyOn(
+      signedRequestReplayGuard,
+      'acceptFromStranger',
+    );
+
+    await authenticator.authenticate(
+      await buildSignedRequest('POST', { value: 1 }),
+    );
+
+    expect(acceptFromStranger).toHaveBeenCalledTimes(1);
+  });
+
+  it('records nothing when looking the identity up fails otherwise', async () => {
+    identityRepository.holds.mockRejectedValue(new Error('index failure'));
+    const accept = jest.spyOn(signedRequestReplayGuard, 'accept');
+    const acceptFromStranger = jest.spyOn(
+      signedRequestReplayGuard,
+      'acceptFromStranger',
+    );
+
+    await expect(
+      authenticator.authenticate(
+        await buildSignedRequest('POST', { value: 1 }),
+      ),
+    ).rejects.toThrow('index failure');
+    expect(accept).not.toHaveBeenCalled();
+    expect(acceptFromStranger).not.toHaveBeenCalled();
   });
 
   it('looks up no identity for a safe request', async () => {
