@@ -301,7 +301,11 @@ before blocks are enforced and before the server accepts a request (`index.ts`
 runs every initializer before `runServer`), `NonCanonicalIdentityIdsPurger`
 drops alias ids from the local exceptions and from what each adopted source
 applies, and clears an owner stored under an alias. Its read-filter-save
-therefore never races an owner route. It logs counts only
+therefore never races an owner route. Each initializer is bounded by
+`NODE_INITIALIZER_TIMEOUT_MS` (default 10 minutes): a purge that hangs fails
+startup with exit status 1 and a log naming only the initializer and the
+bound, instead of leaving the node up with its API never listening. The purge
+logs counts only
 (`Purged non-canonical identity ids: ownerCleared=<bool> removedEntries=<n>`),
 never an id, and writes nothing when the stored data is canonical. A node whose
 owner was cleared is unclaimed: the first signed caller of `PUT /node/owner`
