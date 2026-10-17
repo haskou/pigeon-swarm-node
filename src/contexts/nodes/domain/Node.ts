@@ -4,6 +4,7 @@ import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import { assert, PrimitiveOf } from '@haskou/value-objects';
 
+import { InvalidNodeOwnerIdentityIdError } from './errors/InvalidNodeOwnerIdentityIdError';
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from './errors/NodeCannotHaveMoreThanOnePublicNetworkError';
 import { NodeIsAlreadyOwnedByThisIdentityError } from './errors/NodeIsAlreadyOwnedByThisIdentityError';
 import { NodeNetworkNotFoundError } from './errors/NodeNetworkNotFoundError';
@@ -92,6 +93,8 @@ export class Node extends AggregateRoot {
       );
     }
 
+    assert(owner.isCanonicalKey(), new InvalidNodeOwnerIdentityIdError());
+
     this.owner = owner;
   }
 
@@ -102,6 +105,7 @@ export class Node extends AggregateRoot {
    * records no event.
    */
   public replaceLostOwner(newOwner: IdentityId): ClearedNodeOwnerSetting[] {
+    assert(newOwner.isCanonicalKey(), new InvalidNodeOwnerIdentityIdError());
     assert(
       !this.isOwnedBy(newOwner),
       new NodeIsAlreadyOwnedByThisIdentityError(),

@@ -1,3 +1,4 @@
+import { InvalidNodeOwnerIdentityIdError } from '@app/contexts/nodes/domain/errors/InvalidNodeOwnerIdentityIdError';
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from '@app/contexts/nodes/domain/errors/NodeCannotHaveMoreThanOnePublicNetworkError';
 import { NodeIsAlreadyOwnedByThisIdentityError } from '@app/contexts/nodes/domain/errors/NodeIsAlreadyOwnedByThisIdentityError';
 import { NodeNetworkNotFoundError } from '@app/contexts/nodes/domain/errors/NodeNetworkNotFoundError';
@@ -14,6 +15,7 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { PrimitiveOf } from '@haskou/value-objects';
 import { generateKeyPairSync } from 'crypto';
 
+import { IdentityIdMother } from '../../../mothers/IdentityIdMother';
 import { IdentityMother } from '../../../mothers/IdentityMother';
 import { NetworkMother } from '../../../mothers/NetworkMother';
 import { NodeMother } from '../../../mothers/NodeMother';
@@ -170,6 +172,32 @@ describe('Node', () => {
         NodeOwnerCanOnlyBeChangedByCurrentOwnerError,
       );
     });
+
+    it.each(IdentityIdMother.forged())(
+      'should refuse claiming the node for an id with %s',
+      (_case, forged: IdentityId) => {
+        const before = node.toPrimitives();
+
+        expect(() => node.assignOwner(forged, forged)).toThrow(
+          InvalidNodeOwnerIdentityIdError,
+        );
+        expect(node.toPrimitives()).toEqual(before);
+      },
+    );
+
+    it.each(IdentityIdMother.forged())(
+      'should keep the owner when the current owner names an id with %s',
+      (_case, forged: IdentityId) => {
+        const owner = new IdentityMother().id;
+
+        node.assignOwner(owner, owner);
+
+        expect(() => node.assignOwner(forged, owner)).toThrow(
+          InvalidNodeOwnerIdentityIdError,
+        );
+        expect(node.toPrimitives().owner).toBe(owner.valueOf());
+      },
+    );
   });
 
   describe('replaceLostOwner', () => {
@@ -241,6 +269,22 @@ describe('Node', () => {
         NodeOwnerCanOnlyBeChangedByCurrentOwnerError,
       );
     });
+
+    it.each(IdentityIdMother.forged())(
+      'should refuse a new owner id with %s and keep the node as it was',
+      (_case, forged: IdentityId) => {
+        const claimed = new NodeMother()
+          .withOwner(new IdentityMother().id)
+          .withRegistrationMode(NodeRegistrationMode.CLOSED)
+          .build();
+        const before = claimed.toPrimitives();
+
+        expect(() => claimed.replaceLostOwner(forged)).toThrow(
+          InvalidNodeOwnerIdentityIdError,
+        );
+        expect(claimed.toPrimitives()).toEqual(before);
+      },
+    );
   });
 
   describe('updateRelayConfiguration', () => {

@@ -1,6 +1,6 @@
 import { PostIdentityBody } from '@app/apps/apis/identities-api/bodies/PostIdentityBody';
 import IdentityAdmissionSourceRateLimiter from '@app/apps/apis/identities-api/IdentityAdmissionSourceRateLimiter';
-import IdentityCreationQueue from '@app/apps/apis/identities-api/IdentityCreationQueue';
+import IdentityCreationGate from '@app/apps/apis/identities-api/IdentityCreationGate';
 import IdentityNetworkAdmissionRateLimiter from '@app/apps/apis/identities-api/IdentityNetworkAdmissionRateLimiter';
 import IdentityPublishRateLimiter from '@app/apps/apis/identities-api/IdentityPublishRateLimiter';
 import { PostIdentityRoute } from '@app/apps/apis/identities-api/routes/PostIdentityRoute';
@@ -8,9 +8,11 @@ import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequ
 import IdentityCreationDetector from '@app/contexts/identities/application/detect-creation/IdentityCreationDetector';
 import IdentityPublisher from '@app/contexts/identities/application/publish/IdentityPublisher';
 import { IdentityPublishMessage } from '@app/contexts/identities/application/publish/messages/IdentityPublishMessage';
+import { Identity } from '@app/contexts/identities/domain/Identity';
 import NodeRegistrationAdmitter from '@app/contexts/nodes/application/admit-registration/NodeRegistrationAdmitter';
 import { NodeRegistrationReservation } from '@app/contexts/nodes/application/admit-registration/NodeRegistrationReservation';
 import { NodeRegistrationCodeId } from '@app/contexts/nodes/domain/value-objects/NodeRegistrationCodeId';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Kernel } from '@haskou/ddd-kernel';
 import { Request, Response } from 'express';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -21,12 +23,15 @@ const IDENTITY_ID =
 describe('PostIdentityRoute', () => {
   let creationDetector: MockProxy<IdentityCreationDetector>;
   let publisher: MockProxy<IdentityPublisher>;
+  let publishRateLimiter: MockProxy<IdentityPublishRateLimiter>;
   let registrationAdmitter: MockProxy<NodeRegistrationAdmitter>;
   let reservation: NodeRegistrationReservation;
 
   const publish = async (): Promise<unknown> => {
     const route = new PostIdentityRoute();
-    const message = { identity: {} } as unknown as IdentityPublishMessage;
+    const identity = mock<Identity>();
+    identity.getId.mockReturnValue(new IdentityId(IDENTITY_ID));
+    const message = { identity } as unknown as IdentityPublishMessage;
     const body = Object.assign(new PostIdentityBody(), {
       id: IDENTITY_ID,
       networks: [],
@@ -50,6 +55,7 @@ describe('PostIdentityRoute', () => {
   beforeEach(() => {
     creationDetector = mock<IdentityCreationDetector>();
     publisher = mock<IdentityPublisher>();
+    publishRateLimiter = mock<IdentityPublishRateLimiter>();
     registrationAdmitter = mock<NodeRegistrationAdmitter>();
     reservation = new NodeRegistrationReservation(
       NodeRegistrationCodeId.generate(),
@@ -59,11 +65,13 @@ describe('PostIdentityRoute', () => {
     const services = new Map<unknown, unknown>([
       [IdentityAdmissionSourceRateLimiter, mock()],
       [IdentityCreationDetector, creationDetector],
-      [IdentityCreationQueue, new IdentityCreationQueue()],
+      [
+        IdentityCreationGate,
+        new IdentityCreationGate(creationDetector, registrationAdmitter),
+      ],
       [IdentityNetworkAdmissionRateLimiter, mock()],
-      [IdentityPublishRateLimiter, mock()],
+      [IdentityPublishRateLimiter, publishRateLimiter],
       [IdentityPublisher, publisher],
-      [NodeRegistrationAdmitter, registrationAdmitter],
       [SignedHttpRequestAuthenticator, mock()],
     ]);
     new Kernel({
@@ -71,34 +79,13 @@ describe('PostIdentityRoute', () => {
     });
   });
 
-  it('should keep the code use spent when the identity was saved before the failure', async () => {
-    const failure = new Error('event publish failed after save');
-    creationDetector.isCreation
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
-    publisher.publish.mockRejectedValue(failure);
-
-    expect(await publish()).toBe(failure);
-    expect(registrationAdmitter.release).not.toHaveBeenCalled();
-  });
-
-  it('should give the code use back when the identity was not saved', async () => {
-    const failure = new Error('publish failed before save');
+  it('should give the code use back when the publish rate limit refuses the creation', async () => {
+    const failure = new Error('publish rate limit exceeded');
     creationDetector.isCreation.mockResolvedValue(true);
-    publisher.publish.mockRejectedValue(failure);
+    publishRateLimiter.consume.mockRejectedValue(failure);
 
     expect(await publish()).toBe(failure);
     expect(registrationAdmitter.release).toHaveBeenCalledWith(reservation);
-  });
-
-  it('should report the original failure and keep the use spent when the re-check fails', async () => {
-    const failure = new Error('event publish failed after save');
-    creationDetector.isCreation
-      .mockResolvedValueOnce(true)
-      .mockRejectedValueOnce(new Error('store unavailable'));
-    publisher.publish.mockRejectedValue(failure);
-
-    expect(await publish()).toBe(failure);
-    expect(registrationAdmitter.release).not.toHaveBeenCalled();
+    expect(publisher.publish).not.toHaveBeenCalled();
   });
 });

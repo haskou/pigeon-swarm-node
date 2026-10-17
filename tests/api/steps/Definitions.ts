@@ -237,6 +237,14 @@ export default class Definitions {
     return this.otherIdentityKeyPair;
   }
 
+  /** The path of the identity the current key pair signs for, whether or not the node holds it. */
+  private async currentIdentityPath(): Promise<string> {
+    await this.ensureIdentityKeyPair();
+    const identityId = this.ownerIdentityId as IdentityId;
+
+    return `/identities/${encodeURIComponent(identityId.valueOf())}`;
+  }
+
   private async ensureIdentityDeviceOwnerKeyPair(): Promise<KeyPair> {
     this.identityDeviceOwnerKeyPair ??= await KeyPair.generate();
 
@@ -2576,6 +2584,11 @@ export default class Definitions {
       'PUT',
       `/identities/${encodeURIComponent(this.createdIdentityId)}`,
     );
+  }
+
+  @given('I sign a PUT request for the current identity')
+  public async iSignAPUTRequestForTheCurrentIdentity(): Promise<void> {
+    await this.signCurrentRequest('PUT', await this.currentIdentityPath());
   }
 
   @given('I sign the current presence update request')
@@ -6576,6 +6589,15 @@ export default class Definitions {
 
     this.response = await this.restClient.put(
       `/identities/${encodeURIComponent(this.createdIdentityId)}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I PUT the current identity')
+  public async iPUTTheCurrentIdentity(): Promise<void> {
+    this.response = await this.restClient.put(
+      await this.currentIdentityPath(),
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
