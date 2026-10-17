@@ -291,10 +291,13 @@ on the id alone, so it reveals nothing about the list.
 `PUT /node/block-sources/{ownerIdentityId}` and
 `POST /node/block-sources/{ownerIdentityId}/approvals` refuse a body or path
 naming such an id with `400` code `400080` before anything is stored, so no
-owner write can add an alias. A source list is kept with the bytes its
-publisher signed, so an alias it names stays in `list`, but it is never
-pending, approved or enforced. Replicated identity records under an alias id
-are refused on every load and never held.
+owner write can add an alias. `DELETE /node/block-sources/{ownerIdentityId}`
+and `GET /node/block-sources/{ownerIdentityId}/pending` refuse such a path id
+the same way once the owner is authenticated, before any source is read or
+removed, so an alias is never answered as a missing source. A source list is
+kept with the bytes its publisher signed, so an alias it names stays in `list`,
+but it is never pending, approved or enforced. Replicated identity records
+under an alias id are refused on every load and never held.
 
 **Upgrading a node that ran before ids had to be canonical.** At every start,
 before blocks are enforced and before the server accepts a request (`index.ts`

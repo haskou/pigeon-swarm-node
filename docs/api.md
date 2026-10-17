@@ -1944,7 +1944,10 @@ a record or path id, answer `400` code `400080` for such an id instead.
 `PUT /node/blocks`, `PUT /node/block-exceptions`,
 `PUT /node/block-sources/{ownerIdentityId}` and
 `POST /node/block-sources/{ownerIdentityId}/approvals` answer `400` code
-`400080`, before anything is stored, for a body or path naming such an id.
+`400080`, before anything is stored, for a body or path naming such an id;
+`DELETE /node/block-sources/{ownerIdentityId}` and
+`GET /node/block-sources/{ownerIdentityId}/pending` answer it for such a path
+id once the owner is authenticated, before any source is read or removed.
 A fetched block source keeps its signed `list` verbatim, so it may still name
 one, but such an id is never pending, approved or enforced. At start, before
 it serves any request, the node drops such ids from its exceptions and from
@@ -2149,7 +2152,9 @@ DELETE /node/block-sources/{ownerIdentityId}
 
 Stops following the source, and its entries stop applying at once. Returns the
 remaining `{ "sources": [...] }`. Returns
-`409 NodeBlockSourceNotFoundError` when the source is not adopted.
+`409 NodeBlockSourceNotFoundError` when the source is not adopted. An
+`ownerIdentityId` that is not the canonical encoding of a usable key gets `400`
+code `400080` after the owner check, and nothing is removed.
 
 ```http
 GET /node/block-sources/{ownerIdentityId}/pending
@@ -2165,6 +2170,10 @@ Returns the entries of the source's latest version that wait for review:
   "blockedNodePeerIds": ["<libp2pPeerId>"]
 }
 ```
+
+Returns `409 NodeBlockSourceNotFoundError` when the source is not adopted. An
+`ownerIdentityId` that is not the canonical encoding of a usable key gets `400`
+code `400080` after the owner check, before any source is read.
 
 ```http
 POST /node/block-sources/{ownerIdentityId}/approvals
