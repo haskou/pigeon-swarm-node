@@ -291,9 +291,10 @@ spec against the route handlers and the OpenAPI documents:
   its own, such as `/community-drafts` or `/community-membership-requests`.
 - **Singletons.** A resource that exists once in its parent is singular and
   never keyed by a parameter: `/node` and its `owner`, `registration`,
-  `relay-configuration` and `diagnostics`, a community `frontier` and `mls`
-  group, a channel `draft`, a message `pin` and `thread`, a sticker pack
-  `saved` mark, a sticker `favorite` mark, the sticker `library`,
+  `relay-configuration` and `diagnostics`, a community `frontier`, `mls`
+  group and `invitation-preview`, an invitation `revocation`, a channel
+  `draft`, a message `pin` and `thread`, a sticker pack `saved` mark, a
+  sticker `favorite` mark, the sticker `library`,
   `/client-contract`, `/ipfs/replication-status` and
   `/push/vapid-public-key`. The namespaces `/ipfs`, `/push`, `/realtime` and
   `/private-authorization` are singletons too.
