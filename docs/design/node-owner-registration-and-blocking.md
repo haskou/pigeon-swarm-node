@@ -88,11 +88,16 @@ Both tools reuse the existing node owner unchanged:
   diagnostics, private authorization scopes) run through
   `NodeOwnerWriteHolder`, which holds the same section with
   `NodeRepository.holdLocalNode`, checks the owner of the latest node and runs
-  the write before any handover can land. `NodeBlockListStorer` stores a list
-  signed by the current owner under the same hold. Routes answer the in-section
-  refusal as `403010`, like the up-front check. A held write never updates the
-  node itself, and a hold is taken before a block policy change, never inside
-  one, since sections do not nest.
+  the write before any handover can land; routes answer that in-section
+  refusal as `403010`, like the up-front check. `NodeBlockListStorer` stores a
+  list signed by the current owner under the same hold, so a list signed by an
+  owner whose handover lands first is refused with
+  `NodeBlockListMustBeSignedByCurrentOwnerError` (`409`) and the stored list is
+  kept. A held write never updates or holds the node itself, and a hold is
+  taken before a block policy change, never inside one. Sections do not nest:
+  `EmbeddedLocalDatabase.exclusively` refuses a section entered from inside one
+  of the same scope at once with `LocalDatabaseSectionIsNestedError`, instead
+  of leaving the request waiting on itself.
 
 ### Owner loss and reset
 
