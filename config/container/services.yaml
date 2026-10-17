@@ -81,6 +81,7 @@ services:
     arguments:
       - '@contexts/nodes/domain/services/NodeBlockPolicy'
       - '@contexts/identities/domain/repositories/IdentityRepository'
+      - '@contexts/nodes/domain/repositories/NodeRepository'
   apps/commands/nodes/NodeOwnerResetCommand:
     class: /apps/commands/nodes/NodeOwnerResetCommand
     arguments:

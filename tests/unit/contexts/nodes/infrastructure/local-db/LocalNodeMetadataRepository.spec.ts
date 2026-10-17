@@ -1,6 +1,6 @@
-import { NetworkName } from '@app/contexts/nodes/domain/value-objects/NetworkName';
-import { NetworkKey } from '@app/contexts/nodes/domain/value-objects/NetworkKey';
 import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
+import { NetworkKey } from '@app/contexts/nodes/domain/value-objects/NetworkKey';
+import { NetworkName } from '@app/contexts/nodes/domain/value-objects/NetworkName';
 import LocalNodeMetadataRepository from '@app/contexts/nodes/infrastructure/local-db/LocalNodeMetadataRepository';
 import LocalNodeMetadataMapper from '@app/contexts/nodes/infrastructure/local-db/mappers/LocalNodeMetadataMapper';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -13,6 +13,7 @@ import { generateKeyPairSync } from 'crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { Node } from '../../../../../../src/contexts/nodes/domain/Node';
+import { IdentityIdMother } from '../../../../mothers/IdentityIdMother';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
 import { NetworkMother } from '../../../../mothers/NetworkMother';
 
@@ -198,6 +199,38 @@ describe('LocalNodeMetadataRepository', () => {
       const mode = await repository.loadLocalNodeRegistrationMode();
 
       expect(mode.isOpen()).toBe(true);
+    });
+  });
+
+  describe('isLocalNodeOwnedBy', () => {
+    it('should tell the stored owner apart from another identity without touching the runtime networks', async () => {
+      const owner = new IdentityMother().id;
+      database.findOne.mockResolvedValue({
+        _id: 'local',
+        networks: {},
+        nodeId: canonicalNodeId,
+        owner: owner.valueOf(),
+        relayConfiguration: defaultRelayConfiguration,
+      });
+
+      await expect(repository.isLocalNodeOwnedBy(owner)).resolves.toBe(true);
+      await expect(
+        repository.isLocalNodeOwnedBy(IdentityIdMother.canonical()),
+      ).resolves.toBe(false);
+      expect(networkRegistry.initialize).not.toHaveBeenCalled();
+    });
+
+    it('should tell that an unclaimed node is owned by nobody', async () => {
+      database.findOne.mockResolvedValue({
+        _id: 'local',
+        networks: {},
+        nodeId: canonicalNodeId,
+        relayConfiguration: defaultRelayConfiguration,
+      });
+
+      await expect(
+        repository.isLocalNodeOwnedBy(IdentityIdMother.canonical()),
+      ).resolves.toBe(false);
     });
   });
 
@@ -488,7 +521,9 @@ describe('LocalNodeMetadataRepository', () => {
       });
 
       networkRegistry.configureRelaySettings.mockReturnValue(true);
-      networkRegistry.getAll.mockReturnValue([createNetworkMock(networkMother)]);
+      networkRegistry.getAll.mockReturnValue([
+        createNetworkMock(networkMother),
+      ]);
 
       await resave(node);
       await flushPromises();

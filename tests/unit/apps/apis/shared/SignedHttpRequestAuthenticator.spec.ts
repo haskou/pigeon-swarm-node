@@ -1,11 +1,16 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
-import { signedRequestReplayGuard } from '@app/apps/apis/shared/SignedRequestReplayGuard';
+import {
+  SignedRequestReplayGuard,
+  signedRequestReplayGuard,
+} from '@app/apps/apis/shared/SignedRequestReplayGuard';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import {
   KeyPair,
+  Signature,
   SignedHttpRequestBody,
   SignedHttpRequestSignature,
 } from '@haskou/pigeon-swarm-crypto';
@@ -14,6 +19,18 @@ import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IdentityIdMother } from '../../../mothers/IdentityIdMother';
 import { SignatureMother } from '../../../mothers/SignatureMother';
+
+const CLIENT_ADDRESS = '203.0.113.7';
+const SIGNATURE_BYTES = 64;
+const SLOTS_PER_SIGNER = 1_000;
+const STRANGER_SIGNERS = 10;
+
+const signatureOf = (index: number): Signature => {
+  const bytes = Buffer.alloc(SIGNATURE_BYTES);
+  bytes.writeUInt32BE(index);
+
+  return Signature.fromBuffer(bytes);
+};
 
 async function buildSignedRequest(
   method: string,
@@ -37,6 +54,7 @@ async function buildSignedRequest(
   return {
     body,
     header: (name: string) => headers[name.toLowerCase()],
+    ip: CLIENT_ADDRESS,
     method,
     path: '/resource',
   } as unknown as Request;
@@ -53,6 +71,7 @@ function withHeader(request: Request, header: string, value: string): Request {
 describe('SignedHttpRequestAuthenticator', () => {
   let blockPolicy: MockProxy<NodeBlockPolicy>;
   let identityRepository: MockProxy<IdentityRepository>;
+  let nodes: MockProxy<NodeRepository>;
   let authenticator: SignedHttpRequestAuthenticator;
 
   beforeEach(() => {
@@ -60,9 +79,12 @@ describe('SignedHttpRequestAuthenticator', () => {
     blockPolicy.isIdentityBlocked.mockResolvedValue(false);
     identityRepository = mock<IdentityRepository>();
     identityRepository.holds.mockResolvedValue(true);
+    nodes = mock<NodeRepository>();
+    nodes.isLocalNodeOwnedBy.mockResolvedValue(false);
     authenticator = new SignedHttpRequestAuthenticator(
       blockPolicy,
       identityRepository,
+      nodes,
     );
   });
 
@@ -146,8 +168,97 @@ describe('SignedHttpRequestAuthenticator', () => {
       await buildSignedRequest('POST', { value: 1 }),
     );
 
-    expect(acceptFromStranger).toHaveBeenCalledTimes(1);
+    expect(acceptFromStranger).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      CLIENT_ADDRESS,
+    );
     expect(accept).not.toHaveBeenCalled();
+  });
+
+  it('records a state-changing request from the node owner it does not hold in the shared slots', async () => {
+    identityRepository.holds.mockResolvedValue(false);
+    nodes.isLocalNodeOwnedBy.mockResolvedValue(true);
+    const accept = jest.spyOn(signedRequestReplayGuard, 'accept');
+    const acceptFromStranger = jest.spyOn(
+      signedRequestReplayGuard,
+      'acceptFromStranger',
+    );
+
+    const identityId = await authenticator.authenticate(
+      await buildSignedRequest('POST', { value: 1 }),
+    );
+
+    expect(nodes.isLocalNodeOwnedBy).toHaveBeenCalledWith(identityId);
+    expect(accept).toHaveBeenCalledTimes(1);
+    expect(acceptFromStranger).not.toHaveBeenCalled();
+  });
+
+  it('admits the node owner it does not hold while strangers flood their share', async () => {
+    const guard = new SignedRequestReplayGuard();
+    jest
+      .spyOn(signedRequestReplayGuard, 'accept')
+      .mockImplementation((signer, signature) =>
+        guard.accept(signer, signature),
+      );
+    jest
+      .spyOn(signedRequestReplayGuard, 'acceptFromStranger')
+      .mockImplementation((signer, signature, clientAddress) =>
+        guard.acceptFromStranger(signer, signature, clientAddress),
+      );
+    const strangers = await Promise.all(
+      Array.from(
+        { length: STRANGER_SIGNERS },
+        async () =>
+          new IdentityId((await KeyPair.generate()).toPrimitives().publicKey),
+      ),
+    );
+    strangers.forEach((stranger, signer) =>
+      Array.from({ length: SLOTS_PER_SIGNER }).forEach((_, index) =>
+        guard.acceptFromStranger(
+          stranger,
+          signatureOf(index),
+          `198.51.100.${signer}`,
+        ),
+      ),
+    );
+    identityRepository.holds.mockResolvedValue(false);
+    const stranger = await buildSignedRequest('POST', { value: 1 });
+    const owner = await buildSignedRequest('POST', { value: 1 });
+    nodes.isLocalNodeOwnedBy.mockImplementation((identityId) =>
+      Promise.resolve(
+        identityId.isEqual(
+          new IdentityId(String(owner.header('x-identity-id'))),
+        ),
+      ),
+    );
+
+    await expect(authenticator.authenticate(stranger)).rejects.toThrow(
+      'Invalid signed request.',
+    );
+    await expect(authenticator.authenticate(owner)).resolves.toBeDefined();
+  });
+
+  it('records the node owner it does not hold in the shared slots while replicated state is not open', async () => {
+    identityRepository.holds.mockRejectedValue(
+      new ReplicatedStateNotReadyError(),
+    );
+    nodes.isLocalNodeOwnedBy.mockResolvedValue(true);
+    const accept = jest.spyOn(signedRequestReplayGuard, 'accept');
+
+    await authenticator.authenticate(
+      await buildSignedRequest('POST', { value: 1 }),
+    );
+
+    expect(accept).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not look the node owner up for an identity this node holds', async () => {
+    await authenticator.authenticate(
+      await buildSignedRequest('POST', { value: 1 }),
+    );
+
+    expect(nodes.isLocalNodeOwnedBy).not.toHaveBeenCalled();
   });
 
   it('refuses a stranger once strangers fill their share but still admits a held identity', async () => {
@@ -208,6 +319,7 @@ describe('SignedHttpRequestAuthenticator', () => {
     await authenticator.authenticate(await buildSignedRequest('GET', {}));
 
     expect(identityRepository.holds).not.toHaveBeenCalled();
+    expect(nodes.isLocalNodeOwnedBy).not.toHaveBeenCalled();
   });
 
   it('refuses an identity blocked on this node with 403012', async () => {
