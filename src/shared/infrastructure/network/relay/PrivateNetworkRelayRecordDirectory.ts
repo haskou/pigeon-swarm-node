@@ -1136,8 +1136,7 @@ export default class PrivateNetworkRelayRecordDirectory {
       Kernel.logger.debug('Private IPFS relay record provider connected');
     } catch (error: unknown) {
       Kernel.logger.debug(
-        'Private IPFS relay record provider dial skipped:' +
-          ` error=${errorClassName(error)} multiaddr=${multiaddr}`,
+        `Private IPFS relay record provider dial skipped: error=${errorClassName(error)}`,
       );
     } finally {
       clearTimeout(providerDial.timeout);
