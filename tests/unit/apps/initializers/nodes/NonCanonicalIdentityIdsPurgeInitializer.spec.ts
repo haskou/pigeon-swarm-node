@@ -23,8 +23,8 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
   it('should log what it purged as counts only', async () => {
     purger.purge.mockResolvedValue({
       ownerCleared: true,
-      removedEntries: 3,
       ownListNonCanonicalEntries: 0,
+      removedEntries: 3,
     });
 
     await initializer.ensure();
@@ -38,8 +38,8 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
   it('should warn that the node is unclaimed when it cleared the owner', async () => {
     purger.purge.mockResolvedValue({
       ownerCleared: true,
-      removedEntries: 0,
       ownListNonCanonicalEntries: 0,
+      removedEntries: 0,
     });
 
     await initializer.ensure();
@@ -53,8 +53,8 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
   it('should not warn when it kept the owner', async () => {
     purger.purge.mockResolvedValue({
       ownerCleared: false,
-      removedEntries: 2,
       ownListNonCanonicalEntries: 0,
+      removedEntries: 2,
     });
 
     await initializer.ensure();
@@ -65,8 +65,8 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
   it('should log nothing when nothing was purged', async () => {
     purger.purge.mockResolvedValue({
       ownerCleared: false,
-      removedEntries: 0,
       ownListNonCanonicalEntries: 0,
+      removedEntries: 0,
     });
 
     await initializer.ensure();
@@ -78,8 +78,8 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
   it('should log the count of its own list naming an alias, which it keeps', async () => {
     purger.purge.mockResolvedValue({
       ownerCleared: false,
-      removedEntries: 0,
       ownListNonCanonicalEntries: 2,
+      removedEntries: 0,
     });
 
     await initializer.ensure();

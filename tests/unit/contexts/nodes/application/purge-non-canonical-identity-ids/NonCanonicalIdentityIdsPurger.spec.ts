@@ -142,8 +142,9 @@ describe('NonCanonicalIdentityIdsPurger', () => {
   });
 
   it('should count, but keep, its own stored list when it names an alias', async () => {
-    const mother = new NodeBlockListMother(await KeyPair.generate())
-      .blockingIdentities([a, IdentityIdMother.aliasPrefix(a), b]);
+    const mother = new NodeBlockListMother(
+      await KeyPair.generate(),
+    ).blockingIdentities([a, IdentityIdMother.aliasPrefix(a), b]);
 
     blockLists.findLocal.mockResolvedValue(mother.build());
     nodes.loadLocalNode.mockResolvedValue(storedNode(a));

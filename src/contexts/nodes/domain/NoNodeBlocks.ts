@@ -27,6 +27,10 @@ export class NoNodeBlocks extends NodeBlocks {
     return false;
   }
 
+  public namesOnlyCanonicalIdentityIds(): boolean {
+    return true;
+  }
+
   public toPrimitives(): NodeBlockListPrimitives | undefined {
     return undefined;
   }

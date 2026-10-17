@@ -312,15 +312,15 @@ under an alias id are refused on every load and never held.
 before blocks are enforced and before the server accepts a request (`index.ts`
 runs every initializer before `runServer`), `NonCanonicalIdentityIdsPurger`
 drops alias ids from the local exceptions and from what each adopted source
-applies, drops its own stored block list when that list names an alias (the
-owner signed the list, so no entry can be cut from it), and clears an owner
-stored under an alias. Its read-filter-save
+applies, and clears an owner stored under an alias. It counts, and never edits,
+the alias ids in its own signed block list (the owner signed that list, so no
+entry can be cut from it). Its read-filter-save
 therefore never races an owner route. Each initializer is bounded by
 `NODE_INITIALIZER_TIMEOUT_MS` (default 10 minutes): a purge that hangs fails
 startup with exit status 1 and a log naming only the initializer and the
 bound, instead of leaving the node up with its API never listening. The purge
 logs counts only
-(`Purged non-canonical identity ids: ownerCleared=<bool> ownListDropped=<bool> removedEntries=<n>`),
+(`Purged non-canonical identity ids: ownerCleared=<bool> removedEntries=<n> ownListNonCanonicalEntries=<n>`),
 never an id, and writes nothing when the stored data is canonical. A node whose
 owner was cleared is unclaimed: the first signed caller of `PUT /node/owner`
 claims it, and the node logs a warning that it is unclaimed and must be claimed
@@ -428,7 +428,9 @@ signed by the owner identity:
   the RFC 8785 canonical JSON of the stored document without
   `identitySignature`, and the signature travels in the `X-Identity-Signature`
   response header. It is off by default, because a published list reveals
-  whom this owner blocked.
+  whom this owner blocked. A stored list that names an alias id is not served:
+  `GET /node/published-blocks` answers `404` until the owner stores a newer list
+  naming only canonical ids.
 - **Adopting.** Another node's owner adds a source with owner-signed
   `PUT /node/block-sources/{ownerIdentityId} { "origin": "https://..." }`. That
   node periodically fetches `GET {origin}/node/published-blocks`, reading at

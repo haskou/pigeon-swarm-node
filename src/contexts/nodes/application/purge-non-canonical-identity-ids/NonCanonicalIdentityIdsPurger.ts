@@ -1,3 +1,4 @@
+import { NodeBlockEntries } from '../../domain/NodeBlockEntries';
 import NodeBlockExceptionsRepository from '../../domain/repositories/NodeBlockExceptionsRepository';
 import NodeBlockListRepository from '../../domain/repositories/NodeBlockListRepository';
 import NodeBlockSourceRepository from '../../domain/repositories/NodeBlockSourceRepository';
@@ -6,12 +7,12 @@ import { NonCanonicalIdentityIdsPurge } from './NonCanonicalIdentityIdsPurge';
 
 /**
  * A node that ran before identity ids had to be canonical may hold aliases of
- * a key: as its owner, in its own stored block list, in its local block
- * exceptions or in what an adopted source applies. No request can be signed
- * under one, so the node clears such an owner, leaving the node to be claimed
- * again, and drops such entries. The owner's own list is dropped whole, since
- * its signature covers every entry. Signed source lists stay verbatim; their
- * aliases are never enforced. Canonical data is never written.
+ * a key: as its owner, in its local block exceptions or in what an adopted
+ * source applies. No request can be signed under one, so the node clears such
+ * an owner, leaving the node to be claimed again, and drops such entries.
+ * Signed lists stay verbatim; their aliases are never enforced. The node's own
+ * signed list is counted, never edited: its aliases are never enforced and it
+ * is not published while it names one. Canonical data is never written.
  */
 export default class NonCanonicalIdentityIdsPurger {
   constructor(
@@ -62,12 +63,20 @@ export default class NonCanonicalIdentityIdsPurger {
     return removed;
   }
 
+  private async countOwnListNonCanonical(): Promise<number> {
+    const entries = NodeBlockEntries.of(
+      await this.blockListRepository.findLocal(),
+    );
+
+    return entries.count() - entries.canonical().count();
+  }
+
   public async purge(): Promise<NonCanonicalIdentityIdsPurge> {
     const ownerCleared = await this.clearOwner();
-    const ownListDropped = await this.blockListRepository.purgeNonCanonical();
     const removedEntries =
       (await this.purgeExceptions()) + (await this.purgeApprovals());
+    const ownListNonCanonicalEntries = await this.countOwnListNonCanonical();
 
-    return { ownerCleared, ownListDropped, removedEntries };
+    return { ownerCleared, ownListNonCanonicalEntries, removedEntries };
   }
 }

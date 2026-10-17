@@ -14,6 +14,7 @@ export abstract class NodeBlocks {
   public abstract getBlockedIdentityIds(): IdentityId[];
   public abstract getBlockedNodePeerIds(): NodePeerId[];
   public abstract isVersion(version: NodeBlockListVersion): boolean;
+  public abstract namesOnlyCanonicalIdentityIds(): boolean;
   public abstract toPrimitives(): NodeBlockListPrimitives | undefined;
   public abstract toSigned(): SignedNodeBlockList | undefined;
 }
