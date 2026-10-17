@@ -201,6 +201,7 @@ export default class Definitions {
   private publishedGenesisExternalIdentifier: string | undefined;
   private readonly replayAnswers: { data: unknown; status: number }[] = [];
   private blockSourcePublisherKeyPair: KeyPair | undefined;
+  private blockSourcePublisherEncoding: string | undefined;
   private rememberedCallJoinRequest:
     { body: string | undefined; headers: Record<string, string> } | undefined;
 
@@ -1448,11 +1449,39 @@ export default class Definitions {
   }
 
   private async blockSourcePath(suffix: string): Promise<string> {
-    const publisher = await this.ensureBlockSourcePublisherKeyPair();
+    const publisher = new IdentityId(
+      (await this.ensureBlockSourcePublisherKeyPair()).toPrimitives().publicKey,
+    );
+    const named = this.blockSourcePublisherEncoding
+      ? this.aliasOf(publisher, this.blockSourcePublisherEncoding)
+      : publisher;
 
-    return `/node/block-sources/${encodeURIComponent(
-      publisher.toPrimitives().publicKey,
-    )}${suffix}`;
+    return `/node/block-sources/${encodeURIComponent(named.valueOf())}${suffix}`;
+  }
+
+  private async otherIdentityIdUnder(encoding?: string): Promise<string> {
+    await this.ensureOtherIdentityKeyPair();
+    const other = this.otherIdentityId as IdentityId;
+
+    return (encoding ? this.aliasOf(other, encoding) : other).valueOf();
+  }
+
+  private async setBlockApprovalBody(
+    version: number,
+    encoding?: string,
+  ): Promise<void> {
+    this.body = JSON.stringify({
+      all: false,
+      blockedIdentityIds: [await this.otherIdentityIdUnder(encoding)],
+      version,
+    });
+  }
+
+  private async setBlockExceptionsBody(encoding?: string): Promise<void> {
+    this.body = JSON.stringify({
+      identityIds: [await this.otherIdentityIdUnder(encoding)],
+      nodePeerIds: [],
+    });
   }
 
   private async followBlockSource(
@@ -1599,6 +1628,7 @@ export default class Definitions {
     this.messageId = undefined;
     this.notificationId = undefined;
     this.blockSourcePublisherKeyPair = undefined;
+    this.blockSourcePublisherEncoding = undefined;
     this.otherIdentityId = undefined;
     this.otherIdentityKeyPair = undefined;
     this.ownerIdentityId = undefined;
@@ -5180,21 +5210,37 @@ export default class Definitions {
   public async iSetABlockApprovalBodyChoosingTheOtherIdentity(
     version: number,
   ): Promise<void> {
-    await this.ensureOtherIdentityKeyPair();
-    this.body = JSON.stringify({
-      all: false,
-      blockedIdentityIds: [this.otherIdentityId?.valueOf()],
-      version,
-    });
+    await this.setBlockApprovalBody(version);
+  }
+
+  @given(
+    'I set a block approval body for version {int} choosing the other identity under {string} of its key',
+  )
+  public async iSetABlockApprovalBodyChoosingAnAlias(
+    version: number,
+    encoding: string,
+  ): Promise<void> {
+    await this.setBlockApprovalBody(version, encoding);
   }
 
   @given('I set a block exceptions body excepting the other identity')
   public async iSetABlockExceptionsBodyExceptingTheOtherIdentity(): Promise<void> {
-    await this.ensureOtherIdentityKeyPair();
-    this.body = JSON.stringify({
-      identityIds: [this.otherIdentityId?.valueOf()],
-      nodePeerIds: [],
-    });
+    await this.setBlockExceptionsBody();
+  }
+
+  @given(
+    'I set a block exceptions body excepting the other identity under {string} of its key',
+  )
+  public async iSetABlockExceptionsBodyExceptingAnAlias(
+    encoding: string,
+  ): Promise<void> {
+    await this.setBlockExceptionsBody(encoding);
+  }
+
+  /** Later block source paths name the publisher by that encoding of its key. */
+  @given('the block source publisher is named by {string} of its key')
+  public theBlockSourcePublisherIsNamedBy(encoding: string): void {
+    this.blockSourcePublisherEncoding = encoding;
   }
 
   /** `{publisher}` in the suffix-free path is the followed source's owner identity. */

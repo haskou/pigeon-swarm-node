@@ -40,7 +40,7 @@ function logError(message: string, error: unknown): void {
   Kernel.logger.error(details ? `${message}: ${details}` : message);
 }
 
-async function init(application: PigeonApplication) {
+export async function init(application: PigeonApplication): Promise<void> {
   startTimer('Environment variables');
   application.loadEnvironmentVariables();
   endTimer('Environment variables');

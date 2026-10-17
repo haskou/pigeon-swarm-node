@@ -180,3 +180,87 @@ Feature: Node block sharing
     When I send the PUT to the block source path ""
     Then response code is equal to 403
     And response body should contain "403010"
+
+  Scenario Outline: The owner cannot except an identity under <encoding> of its key
+    Given I set a block exceptions body excepting the other identity under "<encoding>" of its key
+    And I sign a PUT request to "/node/block-exceptions"
+    When I PUT "/node/block-exceptions"
+    Then response code is equal to 400
+    And response body should contain "400080"
+
+    Given I sign a GET request to "/node/block-exceptions"
+    When I GET "/node/block-exceptions"
+    Then response code is equal to 200
+    And response data should match exactly
+      """
+      {"identityIds": [], "nodePeerIds": []}
+      """
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |
+
+  Scenario Outline: The owner cannot approve an identity under <encoding> of its key
+    Given the node follows a block source whose version 1 blocks the other identity
+    And I set a block approval body for version 1 choosing the other identity under "<encoding>" of its key
+    And I sign a POST request to the block source path "/approvals"
+    When I send the POST to the block source path "/approvals"
+    Then response code is equal to 400
+    And response body should contain "400080"
+
+    Given I set json body
+      """
+      {}
+      """
+    And another identity signs a POST request to "/realtime/v1/tickets"
+    When I POST to "/realtime/v1/tickets"
+    Then response code is equal to 201
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |
+
+  Scenario Outline: The owner cannot approve entries of a source named by <encoding> of its key
+    Given the node follows a block source whose version 1 blocks the other identity
+    And I set a block approval body for version 1 choosing the other identity
+    And the block source publisher is named by "<encoding>" of its key
+    And I sign a POST request to the block source path "/approvals"
+    When I send the POST to the block source path "/approvals"
+    Then response code is equal to 400
+    And response body should contain "400080"
+
+    Given I set json body
+      """
+      {}
+      """
+    And another identity signs a POST request to "/realtime/v1/tickets"
+    When I POST to "/realtime/v1/tickets"
+    Then response code is equal to 201
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |
+
+  Scenario Outline: The owner cannot adopt a source named by <encoding> of its key
+    Given the block source publisher is named by "<encoding>" of its key
+    And I set json body
+      """
+      {"origin": "https://publisher.example", "autoApply": true}
+      """
+    And I sign a PUT request to the block source path ""
+    When I send the PUT to the block source path ""
+    Then response code is equal to 400
+    And response body should contain "400080"
+
+    Given I sign a GET request to "/node/block-sources"
+    When I GET "/node/block-sources"
+    Then response code is equal to 200
+    And response body should not contain "publisher.example"
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |
