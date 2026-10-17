@@ -33,11 +33,7 @@ export class CommunityDiscoveryViewModel {
       return 'member';
     }
 
-    if (!request) {
-      return 'none';
-    }
-
-    return request.isInvitation() ? 'invited' : 'requested';
+    return request ? 'requested' : 'none';
   }
 
   private communityToResource(

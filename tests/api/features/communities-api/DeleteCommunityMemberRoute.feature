@@ -11,13 +11,12 @@ Feature: Delete community member API
     When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
-    And I set a community member body for another identity
-    And I sign the current community member request
-    When I POST to the current community members
+    And the community member signs the current community join request
+    When I POST to request joining the current community
     Then response code is equal to 200
     And I remember the current community membership request
     And I set an accepted community membership request body
-    And the community member signs the current membership request update
+    And I sign the current membership request update
     When I PATCH the current community membership request
     Then response code is equal to 200
     And the community member signs the current community leave request
@@ -37,11 +36,6 @@ Feature: Delete community member API
     When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
-    And I set a community invite body
-    And I sign the current community invite request
-    When I POST to the current community invites
-    Then response code is equal to 200
-    And I remember the current community invite
     And the community member signs the current community join request
     When I POST to request joining the current community
     Then response code is equal to 200
@@ -58,8 +52,8 @@ Feature: Delete community member API
     When I GET the current community
     Then response code is equal to 409
     And response body should contain "Community not found"
-    Given the community member signs the current community invite accept request
-    When I POST to accept the current community invite
+    Given the community member signs the current community join request
+    When I POST to request joining the current community
     Then response code is equal to 409
     And response body should contain "Community not found"
     Given the community member signs the community membership requests request
@@ -74,13 +68,12 @@ Feature: Delete community member API
     When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
-    And I set a community member body for another identity
-    And I sign the current community member request
-    When I POST to the current community members
+    And the community member signs the current community join request
+    When I POST to request joining the current community
     Then response code is equal to 200
     And I remember the current community membership request
     And I set an accepted community membership request body
-    And the community member signs the current membership request update
+    And I sign the current membership request update
     When I PATCH the current community membership request
     Then response code is equal to 200
     And I sign the current community leave request

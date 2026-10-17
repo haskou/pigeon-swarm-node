@@ -1,17 +1,10 @@
 import 'reflect-metadata';
-import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
 import { CommunityOperation } from '@app/contexts/communities/domain/operations/CommunityOperation';
 import { CommunityStateFold } from '@app/contexts/communities/domain/operations/CommunityStateFold';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
-import { CommunityInviteNonce } from '@app/contexts/communities/domain/value-objects/CommunityInviteNonce';
 import { CommunityOperationAction } from '@app/contexts/communities/domain/value-objects/CommunityOperationAction';
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
-import OrbitDBCommunityInviteMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityInviteMapper';
-import OrbitDBCommunityInviteRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInviteRepository';
 import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
-import CommunityInviteMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy';
-import CommunityInviteUseMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteUseMutationPolicy';
 import CommunityOperationMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityOperationMutationPolicy';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
@@ -33,9 +26,8 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 import { orbitDBRuntimeAdapter } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBRuntimeAdapter';
 import Kernel from '@haskou/ddd-kernel';
 import { KeyPair, PrivateKey } from '@haskou/pigeon-swarm-crypto';
-import { Timestamp } from '@haskou/value-objects';
 import assert from 'node:assert/strict';
-import { generateKeyPairSync, randomBytes, randomUUID } from 'node:crypto';
+import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -60,7 +52,6 @@ type Replica = {
   };
   registry?: OrbitDBReplicatedStateRegistry;
   repository?: OrbitDBCommunityRepository;
-  invites?: OrbitDBCommunityInviteRepository;
 };
 
 const action = (name: keyof typeof CommunityOperationAction & string): string =>
@@ -152,22 +143,14 @@ async function open(replica: Replica): Promise<void> {
     new PrivateAuthorizationStorageCoordinator(),
   );
   const repository = new OrbitDBCommunityRepository(registry, guard);
-  const invites = new OrbitDBCommunityInviteRepository(
-    registry,
-    new OrbitDBCommunityInviteMapper(),
-    guard,
-  );
 
   registry.addMutationGate(
     new PublicMutationGate(new PublicMutationVerifier(authorization), [
       new CommunityOperationMutationPolicy(registry),
-      new CommunityInviteMutationPolicy(repository),
-      new CommunityInviteUseMutationPolicy(repository, invites),
     ]),
   );
   replica.registry = registry;
   replica.repository = repository;
-  replica.invites = invites;
   await registry.register(
     networkId,
     replica.stores as unknown as OrbitDBPrivateNetworkStores,
@@ -329,171 +312,6 @@ function record(signed: SignedCommunityOperation): Record<string, unknown> {
     { ...signed.operation.toPrimitives() },
     signed.proof,
   );
-}
-
-/** Signs a `requests` record the way a client does, against the community frontier. */
-function signRequest(
-  payload: { id: string } & Record<string, unknown>,
-  signer: CommunityOperationSigner,
-  frontier: string[],
-): PublicMutationProof {
-  const body = {
-    author: {
-      authorizationRevision: 0,
-      deviceCredential: signer.deviceCredential,
-      identityId: signer.id,
-    },
-    frontier,
-    kind: 'put',
-    operationId: randomBytes(16).toString('base64url'),
-    payloadDigest: PublicMutationProof.digestOf(payload),
-    predecessor: null as string | null,
-    recordId: payload.id,
-    sequence: 0,
-    store: 'requests',
-    version: 2,
-  } as const;
-
-  return PublicMutationProof.signed(
-    body,
-    signer.deviceKeyPair.sign(PublicMutationProof.signingContentOf(body)),
-  );
-}
-
-/**
- * Replication admission enforces the expiry an invite token commits to: a use
- * recorded at or after it and a join signed at or after it are refused by
- * every replica, whoever writes them raw.
- */
-async function inviteExpiryHolds(
-  communityId: CommunityId,
-  owner: CommunityOperationSigner,
-): Promise<void> {
-  const [honest, , malicious] = nodes;
-  const [dave, frank, grace] = await Promise.all(
-    Array.from({ length: 3 }, () => actor()),
-  );
-  const frontier = await honest.repository!.findFrontier(communityId);
-  const expiresAt = clock + 1000;
-  const expiring = CommunityInvite.create(
-    communityId,
-    new IdentityId(owner.id),
-    new CommunityInviteNonce(randomUUID().replace(/-/g, '')),
-    new Timestamp(clock++),
-    new Timestamp(expiresAt),
-    new CommunityInviteMaxUses(5),
-  );
-
-  await honest.invites!.save(
-    expiring,
-    signRequest(
-      { ...new OrbitDBCommunityInviteMapper().toPayload(expiring) },
-      owner,
-      frontier,
-    ),
-  );
-  const use = async (
-    member: CommunityOperationSigner,
-    usedAt: number,
-  ): Promise<Record<string, unknown>> => {
-    const token = expiring.getToken().valueOf();
-    const payload = {
-      communityId: communityId.valueOf(),
-      id: `invite-use:${token}:${member.id}`,
-      identityId: member.id,
-      scopeType: 'community_invite_use',
-      token,
-      usedAt,
-    };
-    const proof = signRequest(payload, member, frontier);
-
-    await honest
-      .invites!.recordUse(
-        expiring,
-        new IdentityId(member.id),
-        new Timestamp(usedAt),
-        proof,
-      )
-      .catch((): void => undefined);
-
-    return PublicMutationRecord.withProof(payload, proof);
-  };
-  const join = async (
-    member: CommunityOperationSigner,
-    createdAt: number,
-  ): Promise<SignedCommunityOperation> =>
-    signCommunityOperation({
-      action: action('MEMBER_JOINED'),
-      args: {
-        identityId: member.id,
-        method: 'invite_link',
-        reference: expiring.getToken().toReference(),
-      },
-      communityId: communityId.valueOf(),
-      createdAt,
-      networkId,
-      parents: await honest.repository!.findFrontier(communityId),
-      signer: member,
-    });
-
-  const expiredUse = await use(grace, expiresAt);
-  const recordedUses = [
-    await use(dave, expiresAt - 1),
-    await use(frank, clock++),
-  ];
-
-  await until('honest node recorded only the uses before expiry', async () => {
-    const ids = (
-      await honest.registry!.queryDocuments(
-        'requests',
-        (value) => value.scopeType === 'community_invite_use',
-      )
-    ).map((value) => value.id);
-
-    return (
-      !ids.includes(expiredUse.id) &&
-      recordedUses.every((recorded) => ids.includes(recorded.id))
-    );
-  });
-  const frankJoin = await join(frank, clock++);
-
-  await honest.repository!.save(frankJoin.operation, frankJoin.proof);
-  ledger.push(frankJoin);
-  const refused = [
-    await join(dave, expiresAt),
-    await join(grace, expiresAt - 1),
-  ];
-
-  for (const signed of refused)
-    await assert.rejects(
-      honest.repository!.save(signed.operation, signed.proof),
-      `honest node must refuse ${signed.operation.getId()}`,
-    );
-  await malicious.stores!.requests.put!(expiredUse);
-  for (const signed of refused)
-    await malicious.stores!.communityOperations.put!(record(signed));
-  await until(
-    'refused invite joins reached the honest raw stores',
-    async () => {
-      const stored = await honest.stores!.communityOperations.query!((value) =>
-        refused.some((signed) => signed.operation.getId() === value.id),
-      );
-
-      return stored.length === refused.length;
-    },
-  );
-  await pause(3000);
-  await converged('invite expiry held on every replica', communityId);
-  for (const replica of nodes) {
-    const community = await replica.repository!.requireById(communityId);
-
-    assert.ok(community?.isMember(new IdentityId(frank.id)));
-    for (const outsider of [dave, grace])
-      assert.ok(
-        !community?.isMember(new IdentityId(outsider.id)),
-        `${replica.name} must refuse a join the invite expiry forbids`,
-      );
-  }
 }
 
 async function assertHeadsIndexOnlySignedOperations(
@@ -945,9 +763,6 @@ async function main(): Promise<void> {
     );
   }
   console.log('PASS signed kick removed the member on every replica');
-  stage = 'invite expiry is enforced on replication';
-  await inviteExpiryHolds(communityId, owner);
-  console.log('PASS expired invite joins refused on every replica');
 }
 
 const watchdog = setTimeout(() => {

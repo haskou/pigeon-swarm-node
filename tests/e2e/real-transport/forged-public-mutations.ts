@@ -1,6 +1,5 @@
 import 'reflect-metadata';
 import { Community } from '@app/contexts/communities/domain/Community';
-import { CommunityInvite } from '@app/contexts/communities/domain/entities/invites/CommunityInvite';
 import { CommunityChannelMessage } from '@app/contexts/communities/domain/entities/messages/CommunityChannelMessage';
 import { CommunityModerationLogDetails } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationLogDetails';
 import { CommunityModerationLogEntry } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationLogEntry';
@@ -9,19 +8,14 @@ import CommunityRepository from '@app/contexts/communities/domain/repositories/C
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { CommunityInviteMaxUses } from '@app/contexts/communities/domain/value-objects/CommunityInviteMaxUses';
-import { CommunityInviteNonce } from '@app/contexts/communities/domain/value-objects/CommunityInviteNonce';
 import { CommunityModerationAction } from '@app/contexts/communities/domain/value-objects/CommunityModerationAction';
 import { CommunityModerationTargetType } from '@app/contexts/communities/domain/value-objects/CommunityModerationTargetType';
 import OrbitDBCommunityChannelMessageMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityChannelMessageMapper';
-import OrbitDBCommunityInviteMapper from '@app/contexts/communities/infrastructure/orbitdb/mappers/OrbitDBCommunityInviteMapper';
 import OrbitDBCommunityChannelMessagePinRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessagePinRepository';
 import OrbitDBCommunityChannelMessageRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityChannelMessageRepository';
-import OrbitDBCommunityInviteRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInviteRepository';
 import OrbitDBCommunityModerationLogRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityModerationLogRepository';
 import CommunityChannelMessageMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageMutationPolicy';
 import CommunityChannelMessagePinMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessagePinMutationPolicy';
-import CommunityInviteMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInviteMutationPolicy';
 import CommunityModerationLogMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityModerationLogMutationPolicy';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
@@ -96,7 +90,6 @@ type Replica = {
   };
   registry?: OrbitDBReplicatedStateRegistry;
   pins?: OrbitDBCommunityChannelMessagePinRepository;
-  invites?: OrbitDBCommunityInviteRepository;
   settings?: OrbitDBNotificationScopeSettingsRepository;
   stickerPacks?: OrbitDBStickerPackRepository;
   stickerLibraries?: OrbitDBStickerUserLibraryRepository;
@@ -208,16 +201,6 @@ async function open(replica: Replica, gate: PublicMutationGate): Promise<void> {
       new PrivateAuthorizationStorageCoordinator(),
     ),
   );
-  replica.invites = new OrbitDBCommunityInviteRepository(
-    replica.registry,
-    new OrbitDBCommunityInviteMapper(),
-    new PrivateCommunityPublicStorageGuard(
-      {
-        hasScope: (): Promise<boolean> => Promise.resolve(false),
-      } as never,
-      new PrivateAuthorizationStorageCoordinator(),
-    ),
-  );
   replica.settings = new OrbitDBNotificationScopeSettingsRepository(
     replica.registry,
   );
@@ -293,7 +276,6 @@ async function main(): Promise<void> {
   };
   const community = {
     acceptSentChannelMessage: (): void => undefined,
-    assertCanCreateInvite: (): void => undefined,
     assertCanRecordModerationAction: (): void => undefined,
     authorizeTextChannelPollCreation: (): void => undefined,
     authorizeTextChannelPollVote: (): void => undefined,
@@ -311,7 +293,6 @@ async function main(): Promise<void> {
       new CommunityChannelMessagePinMutationPolicy(communities),
       new CommunityChannelMessageMutationPolicy(communities),
       new NotificationScopeSettingsMutationPolicy(),
-      new CommunityInviteMutationPolicy(communities as never),
       new CommunityModerationLogMutationPolicy(communities as never),
       new PollMutationPolicy(pollAccess),
       new PollVoteMutationPolicy(pollAccess),
@@ -559,67 +540,6 @@ async function main(): Promise<void> {
     return (await settingsCount(honest)) === 0;
   });
   console.log('PASS settings signed reset applied');
-
-  stage = 'community invites are governed too';
-  const inviteCommunityId = new CommunityId(randomUUID());
-  const invite = CommunityInvite.create(
-    inviteCommunityId,
-    identity,
-    new CommunityInviteNonce(randomUUID().replace(/-/g, '')),
-    new Timestamp(1780000000000),
-    undefined,
-    new CommunityInviteMaxUses(1),
-  );
-  const inviteToken = invite.getToken();
-  const invitePayload = new OrbitDBCommunityInviteMapper().toPayload(invite);
-  const inviteProof = (
-    kind: 'put' | 'delete',
-    sequence: number,
-    payload: Record<string, unknown>,
-  ): PublicMutationProof => {
-    const body = {
-      author: {
-        authorizationRevision: 0,
-        deviceCredential: author,
-        identityId: author,
-      },
-      frontier: FRONTIER,
-      kind,
-      operationId: `forged-invite-${sequence}`.padEnd(22, '0'),
-      payloadDigest: PublicMutationProof.digestOf(payload),
-      predecessor:
-        sequence === 0 ? null : PublicMutationProof.digestOf({ previous: 0 }),
-      recordId: inviteToken.valueOf(),
-      sequence,
-      store: 'requests',
-      version: 2,
-    } as const;
-
-    return PublicMutationProof.signed(
-      body,
-      device.sign(PublicMutationProof.signingContentOf(body)),
-    );
-  };
-
-  await honest.invites!.save(invite, inviteProof('put', 0, invitePayload));
-  await until('invite reached the malicious store', async () => {
-    const stored = await malicious.stores!.requests.query!(
-      (record) => record.id === inviteToken.valueOf(),
-    );
-
-    return stored.length === 1;
-  });
-  await malicious.stores!.requests.put!({
-    ...invitePayload,
-    maxUses: 9999,
-  });
-  await pause(3000);
-  assert.equal(
-    (await honest.invites!.requireByToken(inviteToken)).toPrimitives().maxUses,
-    1,
-    'forged unsigned invite rewrite must be ignored',
-  );
-  console.log('PASS forged invite rewrite rejected by the honest node');
 
   stage = 'moderation logs are governed too';
   const logCommunityId = new CommunityId(randomUUID());

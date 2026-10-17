@@ -22,28 +22,6 @@ Feature: Get community operations
     Then response code is equal to 200
     And response lists 1 community operations by digest, each signed by its author identity
 
-  Scenario: A member reads an invite link join without the invite token
-    Given I register a test IPFS network "community-operations-invite-network"
-    And I set a private community body
-    And I sign the current community creation request
-    When I POST to "/communities"
-    Then response code is equal to 200
-    And I remember the current community
-    And I set a community invite body
-    And I sign the current community invite request
-    When I POST to the current community invites
-    Then response code is equal to 200
-    And I remember the current community invite
-    And the community member signs the current community invite accept request
-    When I POST to accept the current community invite
-    Then response code is equal to 200
-    And the community member signs the current community operations request
-    When I GET the current community operations with query ""
-    Then response code is equal to 200
-    And response lists 2 community operations by digest, each signed by its author identity
-    And response body should contain "invite_link"
-    And response body should not contain the current community invite token
-
   Scenario: An invalid page query is refused
     Given I register a test IPFS network "community-operations-query-network"
     And I set a private community body

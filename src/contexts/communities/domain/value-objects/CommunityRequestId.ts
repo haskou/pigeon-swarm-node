@@ -1,12 +1,9 @@
 import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
 import { ShortId } from '@haskou/value-objects';
 
-import { CommunityRequestType } from './CommunityRequestType';
-
 export class CommunityRequestId extends ShortId {
   public static derive(
     communityId: string,
-    type: CommunityRequestType,
     creatorIdentityId: string,
     identityId: string,
     createdAt: number,
@@ -14,7 +11,7 @@ export class CommunityRequestId extends ShortId {
     return new CommunityRequestId(
       CommitmentId.communityRequest(
         communityId,
-        type.isInvitation() ? 'invitation' : 'request',
+        'request',
         creatorIdentityId,
         identityId,
         createdAt,

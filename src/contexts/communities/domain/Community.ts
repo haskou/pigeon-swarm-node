@@ -11,7 +11,6 @@ import { CommunityChannelPermissions } from './entities/channels/CommunityChanne
 import { CommunityChannels } from './entities/channels/CommunityChannels';
 import { CommunityTextChannel } from './entities/channels/CommunityTextChannel';
 import { CommunityVoiceChannel } from './entities/channels/CommunityVoiceChannel';
-import { CommunityInvite } from './entities/invites/CommunityInvite';
 import { CommunityMembership } from './entities/membership/CommunityMembership';
 import { CommunityMembershipRequest } from './entities/membership/CommunityMembershipRequest';
 import { CommunityRole } from './entities/membership/CommunityRole';
@@ -34,8 +33,6 @@ import { CommunityChannelMessageWasSentEvent } from './events/CommunityChannelMe
 import { CommunityChannelWasCreatedEvent } from './events/CommunityChannelWasCreatedEvent';
 import { CommunityChannelWasDeletedEvent } from './events/CommunityChannelWasDeletedEvent';
 import { CommunityChannelWasRenamedEvent } from './events/CommunityChannelWasRenamedEvent';
-import { CommunityInviteWasAcceptedEvent } from './events/CommunityInviteWasAcceptedEvent';
-import { CommunityInviteWasCreatedEvent } from './events/CommunityInviteWasCreatedEvent';
 import { CommunityMemberWasAddedEvent } from './events/CommunityMemberWasAddedEvent';
 import { CommunityMemberWasLeftEvent } from './events/CommunityMemberWasLeftEvent';
 import { CommunityWasCreatedEvent } from './events/CommunityWasCreatedEvent';
@@ -49,8 +46,6 @@ import { CommunityChannelName } from './value-objects/CommunityChannelName';
 import { CommunityChannelType } from './value-objects/CommunityChannelType';
 import { CommunityDescription } from './value-objects/CommunityDescription';
 import { CommunityId } from './value-objects/CommunityId';
-import { CommunityInviteMaxUses } from './value-objects/CommunityInviteMaxUses';
-import { CommunityInviteNonce } from './value-objects/CommunityInviteNonce';
 import { CommunityJoinMethod } from './value-objects/CommunityJoinMethod';
 import { CommunityModerationAction } from './value-objects/CommunityModerationAction';
 import { CommunityName } from './value-objects/CommunityName';
@@ -183,19 +178,6 @@ export class Community extends AggregateRoot {
     );
   }
 
-  private assertInvitationResolvedByParty(
-    author: IdentityId,
-    request: CommunityMembershipRequest,
-  ): void {
-    const isInvitee = request.getIdentityId().isEqual(author);
-    const isCreatorWithdrawing =
-      request.isDeclined() && request.getCreatorIdentityId().isEqual(author);
-
-    if (!isInvitee && !isCreatorWithdrawing) {
-      throw new CommunityRequestActorMismatchError();
-    }
-  }
-
   private assertRequestResolvedByAuthorized(
     author: IdentityId,
     request: CommunityMembershipRequest,
@@ -250,79 +232,13 @@ export class Community extends AggregateRoot {
     this.join(member);
   }
 
-  public createInvite(
-    actor: IdentityId,
-    nonce: CommunityInviteNonce,
-    createdAt: Timestamp,
-    expiresAt?: Timestamp,
-    maxUses?: CommunityInviteMaxUses,
-  ): CommunityInvite {
-    this.createAccessValidator().assertCanCreateInvite(actor);
-
-    const invite = CommunityInvite.create(
-      this.id,
-      actor,
-      nonce,
-      createdAt,
-      expiresAt,
-      maxUses,
-    );
-    this.record(
-      new CommunityInviteWasCreatedEvent(invite.getToken().valueOf(), {
-        communityId: this.id.valueOf(),
-        invite: invite.toPrimitives(),
-        networkId: this.networkId.valueOf(),
-      }),
-    );
-
-    return invite;
-  }
-
-  public acceptInvite(
-    member: IdentityId,
-    acceptedInvite: CommunityInvite,
-  ): void {
-    this.record(
-      new CommunityInviteWasAcceptedEvent(acceptedInvite.getToken().valueOf(), {
-        communityId: this.id.valueOf(),
-        identityId: member.valueOf(),
-        invite: acceptedInvite.toPrimitives(),
-        networkId: this.networkId.valueOf(),
-      }),
-    );
-    this.join(member);
-  }
-
-  public inviteMember(
-    actor: IdentityId,
-    invitedIdentityId: IdentityId,
-    createdAt: Timestamp,
-  ): CommunityMembershipRequest {
-    this.createAccessValidator().assertCanCreateInvite(actor);
-
-    return CommunityMembershipRequest.invitation(
-      this.id,
-      actor,
-      invitedIdentityId,
-      createdAt,
-      this.ownerIdentityId,
-    );
-  }
-
   public acceptMembershipRequest(
     actor: IdentityId,
     membershipRequest: CommunityMembershipRequest,
     updatedAt: Timestamp,
   ): void {
-    if (membershipRequest.isRequest()) {
-      this.createAccessValidator().assertCanApproveMembers(actor);
-    }
-
-    membershipRequest.accept(
-      actor,
-      membershipRequest.isRequest() ? actor : this.ownerIdentityId,
-      updatedAt,
-    );
+    this.createAccessValidator().assertCanApproveMembers(actor);
+    membershipRequest.accept(actor, actor, updatedAt);
     this.join(membershipRequest.getIdentityId());
   }
 
@@ -339,15 +255,8 @@ export class Community extends AggregateRoot {
     membershipRequest: CommunityMembershipRequest,
     updatedAt: Timestamp,
   ): void {
-    if (membershipRequest.isRequest()) {
-      this.createAccessValidator().assertCanRejectMembers(actor);
-    }
-
-    membershipRequest.decline(
-      actor,
-      membershipRequest.isRequest() ? actor : this.ownerIdentityId,
-      updatedAt,
-    );
+    this.createAccessValidator().assertCanRejectMembers(actor);
+    membershipRequest.decline(actor, actor, updatedAt);
   }
 
   public sendChannelMessage(
@@ -888,14 +797,7 @@ export class Community extends AggregateRoot {
         throw new CommunityRequestActorMismatchError();
       }
 
-      if (request.isInvitation()) validator.assertCanCreateInvite(author);
-      else this.requestMembership(author);
-
-      return;
-    }
-
-    if (request.isInvitation()) {
-      this.assertInvitationResolvedByParty(author, request);
+      this.requestMembership(author);
 
       return;
     }

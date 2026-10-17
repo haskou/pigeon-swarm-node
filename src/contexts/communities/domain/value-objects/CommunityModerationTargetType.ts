@@ -3,7 +3,7 @@ import { Enum } from '@haskou/value-objects';
 const communityModerationTargetTypes = {
   CHANNEL: 'channel',
   COMMUNITY: 'community',
-  INVITE: 'invite',
+  INVITATION: 'invitation',
   MEMBER: 'member',
   MEMBERSHIP_REQUEST: 'membership_request',
   MESSAGE: 'message',
@@ -19,8 +19,8 @@ export class CommunityModerationTargetType extends Enum<string> {
     communityModerationTargetTypes.COMMUNITY,
   );
 
-  public static readonly INVITE = new CommunityModerationTargetType(
-    communityModerationTargetTypes.INVITE,
+  public static readonly INVITATION = new CommunityModerationTargetType(
+    communityModerationTargetTypes.INVITATION,
   );
 
   public static readonly MEMBER = new CommunityModerationTargetType(

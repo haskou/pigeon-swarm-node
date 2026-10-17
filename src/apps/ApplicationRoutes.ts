@@ -24,7 +24,6 @@ import { GetCommunityChannelMessagesRoute } from '@app/apps/apis/communities-api
 import { GetCommunityChannelsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityChannelsRoute';
 import { GetCommunityDiscoveryRoute } from '@app/apps/apis/communities-api/routes/GetCommunityDiscoveryRoute';
 import { GetCommunityFrontierRoute } from '@app/apps/apis/communities-api/routes/GetCommunityFrontierRoute';
-import { GetCommunityInviteRoute } from '@app/apps/apis/communities-api/routes/GetCommunityInviteRoute';
 import { GetCommunityMembershipRequestsRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMembershipRequestsRoute';
 import { GetCommunityMembersRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMembersRoute';
 import { GetCommunityMessagesRoute } from '@app/apps/apis/communities-api/routes/GetCommunityMessagesRoute';
@@ -42,10 +41,7 @@ import { PostCommunityBanRoute } from '@app/apps/apis/communities-api/routes/Pos
 import { PostCommunityChannelMessagePinRoute } from '@app/apps/apis/communities-api/routes/PostCommunityChannelMessagePinRoute';
 import { PostCommunityChannelMessageReactionRoute } from '@app/apps/apis/communities-api/routes/PostCommunityChannelMessageReactionRoute';
 import { PostCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/PostCommunityChannelMessageRoute';
-import { PostCommunityInviteAcceptRoute } from '@app/apps/apis/communities-api/routes/PostCommunityInviteAcceptRoute';
-import { PostCommunityInviteRoute } from '@app/apps/apis/communities-api/routes/PostCommunityInviteRoute';
 import { PostCommunityJoinRequestRoute } from '@app/apps/apis/communities-api/routes/PostCommunityJoinRequestRoute';
-import { PostCommunityMemberRoute } from '@app/apps/apis/communities-api/routes/PostCommunityMemberRoute';
 import { PostCommunityRoleRoute } from '@app/apps/apis/communities-api/routes/PostCommunityRoleRoute';
 import { PostCommunityRoute } from '@app/apps/apis/communities-api/routes/PostCommunityRoute';
 import { PostCommunityTextChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityTextChannelRoute';
@@ -260,7 +256,6 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PostUsedStickerRoute,
   GetCommunitiesRoute,
   GetCommunityDiscoveryRoute,
-  GetCommunityInviteRoute,
   GetCommunityMembershipRequestsRoute,
   PatchCommunityRequestRoute,
   PostCommunityRoute,
@@ -270,7 +265,6 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PatchCommunityRoute,
   GetCommunityMembersRoute,
   GetCommunityModerationLogsRoute,
-  PostCommunityMemberRoute,
   PostCommunityJoinRequestRoute,
   DeleteCommunityMemberRoute,
   DeleteCommunityMemberByIdRoute,
@@ -281,8 +275,6 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PatchCommunityRoleRoute,
   DeleteCommunityRoleRoute,
   PutCommunityMemberRolesRoute,
-  PostCommunityInviteRoute,
-  PostCommunityInviteAcceptRoute,
   GetCommunityChannelsRoute,
   GetCommunityMessagesRoute,
   PostCommunityTextChannelRoute,

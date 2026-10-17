@@ -9,7 +9,6 @@ import { PatchCommunityChannelBody } from '@app/apps/apis/communities-api/bodies
 import { PatchCommunityChannelPermissionsBody } from '@app/apps/apis/communities-api/bodies/PatchCommunityChannelPermissionsBody';
 import { PostCommunityBanBody } from '@app/apps/apis/communities-api/bodies/PostCommunityBanBody';
 import { PostCommunityBody } from '@app/apps/apis/communities-api/bodies/PostCommunityBody';
-import { PostCommunityInviteAcceptBody } from '@app/apps/apis/communities-api/bodies/PostCommunityInviteAcceptBody';
 import { PostCommunityTextChannelBody } from '@app/apps/apis/communities-api/bodies/PostCommunityTextChannelBody';
 import { PostCommunityVoiceChannelBody } from '@app/apps/apis/communities-api/bodies/PostCommunityVoiceChannelBody';
 import { PutCommunityMemberRolesBody } from '@app/apps/apis/communities-api/bodies/PutCommunityMemberRolesBody';
@@ -22,11 +21,6 @@ type BodyClass = new () => object;
 const operationCases: [string, BodyClass, string[]][] = [
   ['PostConversationBody', PostConversationBody, ['operation']],
   ['PostCommunityBody', PostCommunityBody, ['operation']],
-  [
-    'PostCommunityInviteAcceptBody',
-    PostCommunityInviteAcceptBody,
-    ['operation'],
-  ],
   ['DeleteCommunityMemberBody', DeleteCommunityMemberBody, ['operation']],
   [
     'DeleteCommunityMemberKickBody',

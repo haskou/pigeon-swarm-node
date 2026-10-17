@@ -345,27 +345,24 @@ describe('Community', () => {
   });
 
   describe('moderation log permissions', () => {
-    it('lets an invitee, but not a bystander, record an invitation acceptance', () => {
+    it('lets the owner, but not a member without approve_members, record a request acceptance', () => {
       const community = createCommunity();
-      const bystander = new IdentityId(
-        'MCowBQYDK2VwAyEA0b+eY0HcM3dWnxGMaJqCwUq4Yk3ZcqrQKz2Y4mQw1Jk=',
-      );
-      const details = { identityId: member.valueOf(), type: 'invitation' };
+      const details = { identityId: member.valueOf(), type: 'request' };
 
       expect(() =>
         community.assertCanRecordModerationAction(
-          member,
+          owner,
           CommunityModerationAction.MEMBERSHIP_REQUEST_ACCEPTED,
           details,
         ),
       ).not.toThrow();
       expect(() =>
         community.assertCanRecordModerationAction(
-          bystander,
+          member,
           CommunityModerationAction.MEMBERSHIP_REQUEST_ACCEPTED,
           details,
         ),
-      ).toThrow(CommunityRequestActorMismatchError);
+      ).toThrow();
     });
 
     it('rejects actions the actor has no permission for', () => {
