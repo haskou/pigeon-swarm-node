@@ -195,7 +195,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DeviceSealedSecretReceipt'
         '400':
-          description: Malformed body, a field outside its limits, or duplicate recipient credentials.
+          description: Malformed body, a field outside its limits, or duplicate recipient credentials. A path identity id that is not the one canonical encoding of a usable key (code 400080).
         '401':
           description: Timestamp outside the 30 second window, missing or invalid device proof, revoked or unknown credential, replayed request, or X-Recovery-Signature supplied.
         '409':
@@ -241,6 +241,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DeviceSealedSecretRecord'
+        '400':
+          description: A path identity id that is not the one canonical encoding of a usable key (code 400080).
         '401':
           description: Timestamp outside the 30 second window, missing or invalid device proof, revoked or unknown credential, or X-Recovery-Signature supplied.
         '404':
@@ -291,7 +293,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DeviceAuthorizationTransitionResult'
         '400':
-          description: Malformed transition, or sealedSecrets on a transition that does not retire its author (code 400030).
+          description: Malformed transition, or sealedSecrets on a transition that does not retire its author (code 400030). A transition signed by the identity whose identity id is not the one canonical encoding of a usable key (code 400080).
         '409':
           description: Expired, replayed, causally stale or unauthorized transition, or a hand-over that is not sealed to exactly the remaining devices, not signed by the retiring device, or not newer than the stored generation.
         '429':

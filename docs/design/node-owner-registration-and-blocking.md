@@ -255,6 +255,15 @@ While the identity is blocked, this node:
   (`ContentReplicationMaintainer.ts:57`), so this node neither fetches nor
   announces its content. Other owners share the budget it no longer uses.
 
+Block entries hold canonical ids compared as strings. An alias encoding of a
+blocked key (another DER prefix byte, or base64 padding bits that decode to the
+same bytes) still verifies that key's signatures, so the node refuses any id
+that is not the one canonical encoding of a usable key
+(`IdentityId.isCanonicalKey`) before it reads the list: an `X-Identity-Id`
+header with `401` code `401020`, and a record or path id (`POST /identities`,
+device transitions, sealed secrets) with `400` code `400080`. The answer depends
+on the id alone, so it reveals nothing about the list.
+
 ### What a node block does on this node
 
 While the node is blocked, this node:

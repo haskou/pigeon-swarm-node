@@ -69,6 +69,11 @@ Implemented:
 - replay rejection: a mutating (non-GET/HEAD/OPTIONS) signed request whose
   identity and signature were already accepted inside the freshness window is
   rejected with `401`; the guard is in-memory and per node
+- `X-Identity-Id` must be the one canonical encoding of a usable Ed25519 key
+  (PEM armour and whitespace are ignored). An alias encoding of the signing key,
+  such as another DER prefix byte or base64 padding bits that decode to the
+  same bytes, is refused with `401` code `401020`, so block lists, owner checks
+  and the replay guard always see one id per key
 - declared body hash (`PUT /node/blocks` only): the request also carries
   `X-Body-Hash`, the lowercase hex SHA-256 of the exact body bytes, and the
   canonical payload is built with that hex string as its `body` instead of the
@@ -1840,6 +1845,13 @@ open ones are closed. A blocked node peer id cannot connect to this node. The
 current owner is never blocked, even if the list names them. Bearer
 capability routes (mailboxes, private blob reads and writes) and public reads
 are not gated.
+
+Block entries are canonical identity ids compared as strings, so an id that is
+not the one canonical encoding of a usable key never reaches the list. A signed
+request naming one in `X-Identity-Id` gets `401` code `401020` (see
+_Authentication_). `POST /identities`, `POST /identity-devices/transitions` and
+`/identity-devices/{identityId}/sealed-secrets`, which check the block list for
+a record or path id, answer `400` code `400080` for such an id instead.
 
 ```http
 PUT /node/blocks
