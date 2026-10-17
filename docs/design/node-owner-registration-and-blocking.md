@@ -2,10 +2,16 @@
 
 Status: design for issue #384, decisions confirmed by the owner. Built:
 registration control (delivery step 1), local blocking (slice 2), sharing
-(slice 3) and the host owner reset `yarn node:reset-owner` (slice 4). The
-price-based
-admission model stays the default, and every node stays open unless its owner
-changes that. A node owner gets two optional, local tools:
+(slice 3) and the host owner reset `yarn node:reset-owner` (slice 4).
+Hardening: forged owner ids refused (#608), alias identity ids refused
+(#610) and purged from stored blocks, records and owner (#615), the purge run
+before serving and aliases refused on every block write (#617), the owner check
+in the same section as owner-only writes (#621) with nested use failing fast
+(#624), the payload-digest depth limit (#638), nested keyed sections refused
+(#639), a time bound on startup initializers (#640) and alias block source
+paths refused on removal and pending reads (#641). The price-based admission
+model stays the default, and every node stays open unless its owner changes
+that. A node owner gets two optional, local tools:
 
 1. **Registration control.** Decide whether new identities may be **created**
    through this node. It never gates existing identities or login.
