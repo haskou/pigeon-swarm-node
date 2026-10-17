@@ -1,6 +1,7 @@
 import { NodeBlockEntriesAreNotListedBySourceError } from '@app/contexts/nodes/domain/errors/NodeBlockEntriesAreNotListedBySourceError';
 import { NodeBlockSourceVersionHasChangedError } from '@app/contexts/nodes/domain/errors/NodeBlockSourceVersionHasChangedError';
 import { NodeBlockEntries } from '@app/contexts/nodes/domain/NodeBlockEntries';
+import { NodeBlockList } from '@app/contexts/nodes/domain/NodeBlockList';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
 import { SignedNodeBlockList } from '@app/contexts/nodes/domain/SignedNodeBlockList';
 import { NodeBlockListVersion } from '@app/contexts/nodes/domain/value-objects/NodeBlockListVersion';
@@ -156,39 +157,50 @@ describe('NodeBlockSource', () => {
   );
 
   describe('a signed list naming a non-canonical identity id', () => {
-    it.each([false, true])(
-      'should keep the signed list verbatim yet never pend or apply the alias (autoApply %p)',
-      (autoApply) => {
-        const alias = IdentityIdMother.aliasPrefix(a);
-        const adopted = source(autoApply);
+    it.each(IdentityIdMother.aliases())(
+      'should refuse a list naming an identity under %s of its key and keep the last valid list',
+      (_, aliasOf) => {
+        const adopted = source(true);
 
-        expect(adopted.receive(list(1, [alias, b]), at)).toEqual(
-          NodeBlockSourceFetchOutcome.ACCEPTED,
-        );
-        adopted.approveAll(new NodeBlockListVersion(1));
+        adopted.receive(list(1, [b]), at);
 
-        expect(adopted.toPrimitives().list?.blockedIdentityIds).toEqual(
-          expect.arrayContaining([alias.valueOf(), b.valueOf()]),
+        expect(adopted.receive(list(2, [aliasOf(a), b]), at)).toEqual(
+          NodeBlockSourceFetchOutcome.NON_CANONICAL_IDENTITY_ID,
         );
+        expect(adopted.toPrimitives().list?.version).toBe(1);
+        expect(adopted.getVersionFloor().valueOf()).toBe(1);
         expect(values(adopted.applied())).toEqual([b.valueOf()]);
-        expect(adopted.pending().count()).toBe(0);
+        expect(adopted.toPrimitives().lastFetch?.outcome).toBe(
+          'non-canonical-identity-id',
+        );
       },
     );
 
-    it('should refuse approving the alias', () => {
-      const alias = IdentityIdMother.reencoded(a);
-      const adopted = source();
+    it.each([false, true])(
+      'should never pend or apply an alias of a list stored before ids had to be canonical (autoApply %p)',
+      (autoApply) => {
+        const alias = IdentityIdMother.aliasPrefix(a);
+        const stored = NodeBlockSource.fromPrimitives({
+          ...source(autoApply).toPrimitives(),
+          list: NodeBlockList.fromSigned(list(1, [alias, b])).toPrimitives(),
+          versionFloor: 1,
+        });
 
-      adopted.receive(list(1, [alias]), at);
+        stored.approveAll(new NodeBlockListVersion(1));
 
-      expect(() =>
-        adopted.approve(
-          new NodeBlockListVersion(1),
-          new NodeBlockEntries([alias], []),
-        ),
-      ).toThrow(NodeBlockEntriesAreNotListedBySourceError);
-      expect(adopted.applied().count()).toBe(0);
-    });
+        expect(stored.toPrimitives().list?.blockedIdentityIds).toEqual(
+          expect.arrayContaining([alias.valueOf(), b.valueOf()]),
+        );
+        expect(values(stored.applied())).toEqual([b.valueOf()]);
+        expect(stored.pending().count()).toBe(0);
+        expect(() =>
+          stored.approve(
+            new NodeBlockListVersion(1),
+            new NodeBlockEntries([alias], []),
+          ),
+        ).toThrow(NodeBlockEntriesAreNotListedBySourceError);
+      },
+    );
   });
 
   describe('dropNonCanonicalApprovals', () => {

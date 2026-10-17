@@ -320,3 +320,43 @@ Feature: Node block sharing
       | method | suffix           |
       | DELETE |                  |
       | GET    | /pending-entries |
+
+  Scenario Outline: A source list naming an identity under <encoding> of its key is refused and the last valid list kept
+    Given the node follows an auto-applied block source whose version 1 blocks the other identity
+    And the auto-applied block source publishes version 2 blocking the other identity under "<encoding>" of its key
+    And I sign a GET request to "/node/block-sources"
+    When I GET "/node/block-sources"
+    Then response code is equal to 200
+    And response data should match partially
+      """
+      {"sources": [{"version": 1, "appliedCount": 1, "lastFetchOutcome": "non-canonical-identity-id"}]}
+      """
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |
+
+  Scenario Outline: A source list stored with an identity under <encoding> of its key never blocks after a restart
+    Given the node stored an auto-applied block source list version 1 blocking the other identity under "<encoding>" of its key
+    When the node restarts
+    And I set json body
+      """
+      {}
+      """
+    And another identity signs a POST request to "/realtime/tickets"
+    And I POST to "/realtime/tickets"
+    Then response code is equal to 201
+
+    Given I sign a GET request to "/node/block-sources"
+    When I GET "/node/block-sources"
+    Then response code is equal to 200
+    And response data should match partially
+      """
+      {"sources": [{"version": 1, "pendingCount": 0, "appliedCount": 0}]}
+      """
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |

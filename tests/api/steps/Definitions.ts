@@ -36,6 +36,7 @@ import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign
 import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
 import NodeOwnerSettingsResetter from '@app/contexts/nodes/application/reset-owner-settings/NodeOwnerSettingsResetter';
 import { NodeBlockEntries } from '@app/contexts/nodes/domain/NodeBlockEntries';
+import { NodeBlockList } from '@app/contexts/nodes/domain/NodeBlockList';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
 import NodeBlockExceptionsRepository from '@app/contexts/nodes/domain/repositories/NodeBlockExceptionsRepository';
 import NodeBlockListRepository from '@app/contexts/nodes/domain/repositories/NodeBlockListRepository';
@@ -1501,46 +1502,65 @@ export default class Definitions {
     });
   }
 
-  private async followBlockSource(
+  /** A list the block source publisher signed, blocking the other identity named by `encoding` of its key. */
+  private async signedBlockSourceList(
     version: number,
-    autoApply: boolean,
-  ): Promise<void> {
+    encoding?: string,
+  ): Promise<SignedNodeBlockList> {
     const publisher = await this.ensureBlockSourcePublisherKeyPair();
-    const other = await this.ensureOtherIdentityKeyPair();
-    const unsigned = {
-      blockedIdentityIds: [
-        new IdentityId(other.toPrimitives().publicKey).valueOf(),
-      ],
-      blockedNodePeerIds: [] as string[],
-      issuedAt: Date.now(),
-      ownerIdentityId: new IdentityId(
-        publisher.toPrimitives().publicKey,
-      ).valueOf(),
-      type: 'pigeon-node-block-list',
-      version,
-    };
-    const source = NodeBlockSource.adopt(
-      new IdentityId(unsigned.ownerIdentityId),
+    const content = Buffer.from(
+      canonicalize({
+        blockedIdentityIds: [await this.otherIdentityIdUnder(encoding)],
+        blockedNodePeerIds: [],
+        issuedAt: Date.now(),
+        ownerIdentityId: new IdentityId(
+          publisher.toPrimitives().publicKey,
+        ).valueOf(),
+        type: 'pigeon-node-block-list',
+        version,
+      })!,
+    );
+
+    return new SignedNodeBlockList(
+      content,
+      publisher.sign(
+        Buffer.concat([Buffer.from('pigeon:node-block-list:v1\n'), content]),
+      ),
+    );
+  }
+
+  private async adoptedBlockSource(
+    autoApply: boolean,
+  ): Promise<NodeBlockSource> {
+    const publisher = await this.ensureBlockSourcePublisherKeyPair();
+
+    return NodeBlockSource.adopt(
+      new IdentityId(publisher.toPrimitives().publicKey),
       new NodeBlockSourceOrigin('https://publisher.example'),
       autoApply,
       new NodeBlockSourceVersionFloor(0),
     );
+  }
 
-    const content = Buffer.from(canonicalize(unsigned)!);
-
-    source.receive(
-      new SignedNodeBlockList(
-        content,
-        publisher.sign(
-          Buffer.concat([Buffer.from('pigeon:node-block-list:v1\n'), content]),
-        ),
-      ),
-      Timestamp.now(),
-    );
+  private async saveBlockSource(source: NodeBlockSource): Promise<void> {
     await Kernel.di
       .getService<NodeBlockSourceRepository>(NodeBlockSourceRepository)
       .save(source);
     await Kernel.di.getService<NodeBlockPolicy>(NodeBlockPolicy).load();
+  }
+
+  /** Stands in for a refresher fetch: the source receives what its publisher signed. */
+  private async followBlockSource(
+    version: number,
+    autoApply: boolean,
+  ): Promise<void> {
+    const source = await this.adoptedBlockSource(autoApply);
+
+    source.receive(
+      await this.signedBlockSourceList(version),
+      Timestamp.now(),
+    );
+    await this.saveBlockSource(source);
   }
 
   private async setNodeBlockListBody(
@@ -5226,6 +5246,54 @@ export default class Definitions {
     version: number,
   ): Promise<void> {
     await this.followBlockSource(version, true);
+  }
+
+  /** Stands in for a refresher fetch of the source the node already follows. */
+  @given(
+    'the auto-applied block source publishes version {int} blocking the other identity under {string} of its key',
+  )
+  public async theBlockSourcePublishesAnAlias(
+    version: number,
+    encoding: string,
+  ): Promise<void> {
+    const publisher = await this.ensureBlockSourcePublisherKeyPair();
+    const source = await Kernel.di
+      .getService<NodeBlockSourceRepository>(NodeBlockSourceRepository)
+      .find(new IdentityId(publisher.toPrimitives().publicKey));
+
+    source.receive(
+      await this.signedBlockSourceList(version, encoding),
+      Timestamp.now(),
+    );
+    await this.saveBlockSource(source);
+  }
+
+  /** What a node kept from a source before ids had to be canonical: the signed list, bypassing admission. */
+  @given(
+    'the node stored an auto-applied block source list version {int} blocking the other identity under {string} of its key',
+  )
+  public async theNodeStoredAnAliasSourceList(
+    version: number,
+    encoding: string,
+  ): Promise<void> {
+    const source = await this.adoptedBlockSource(true);
+    const list = NodeBlockList.fromSigned(
+      await this.signedBlockSourceList(version, encoding),
+    );
+
+    await this.saveBlockSource(
+      NodeBlockSource.fromPrimitives({
+        ...source.toPrimitives(),
+        approved: {
+          identityIds: list
+            .getBlockedIdentityIds()
+            .map((identityId) => identityId.valueOf()),
+          nodePeerIds: [],
+        },
+        list: list.toPrimitives(),
+        versionFloor: version,
+      }),
+    );
   }
 
   @given(
