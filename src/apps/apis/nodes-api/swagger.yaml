@@ -882,6 +882,7 @@ components:
               accepted,
               not-newer,
               wrong-signer,
+              non-canonical-identity-id,
               invalid-signature,
               invalid-document,
               too-large,

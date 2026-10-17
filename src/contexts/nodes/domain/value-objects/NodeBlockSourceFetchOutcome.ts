@@ -4,6 +4,7 @@ const outcomes = {
   ACCEPTED: 'accepted',
   INVALID_DOCUMENT: 'invalid-document',
   INVALID_SIGNATURE: 'invalid-signature',
+  NON_CANONICAL_IDENTITY_ID: 'non-canonical-identity-id',
   NOT_NEWER: 'not-newer',
   REDIRECTED: 'redirected',
   REFUSED_ADDRESS: 'refused-address',
@@ -25,6 +26,9 @@ export class NodeBlockSourceFetchOutcome extends Enum<string> {
   public static readonly INVALID_SIGNATURE = new NodeBlockSourceFetchOutcome(
     outcomes.INVALID_SIGNATURE,
   );
+
+  public static readonly NON_CANONICAL_IDENTITY_ID =
+    new NodeBlockSourceFetchOutcome(outcomes.NON_CANONICAL_IDENTITY_ID);
 
   public static readonly NOT_NEWER = new NodeBlockSourceFetchOutcome(
     outcomes.NOT_NEWER,

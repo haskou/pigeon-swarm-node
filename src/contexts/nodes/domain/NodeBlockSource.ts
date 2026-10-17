@@ -74,7 +74,10 @@ export class NodeBlockSource {
     private lastFetch: NodeBlockSourceFetch,
   ) {}
 
-  /** The kept list's entries a node can enforce; its signed bytes stay verbatim. */
+  /**
+   * The kept list's entries a node can enforce. A list stored before ids had
+   * to be canonical keeps its signed bytes, but its aliases are never enforced.
+   */
   private listed(): NodeBlockEntries {
     return NodeBlockEntries.of(this.list).canonical();
   }
@@ -100,6 +103,10 @@ export class NodeBlockSource {
 
     if (!list.getOwnerIdentityId().isEqual(this.ownerIdentityId)) {
       return NodeBlockSourceFetchOutcome.WRONG_SIGNER;
+    }
+
+    if (!list.namesOnlyCanonicalIdentityIds()) {
+      return NodeBlockSourceFetchOutcome.NON_CANONICAL_IDENTITY_ID;
     }
 
     if (!this.floor.admits(list.getVersion())) {
@@ -133,7 +140,8 @@ export class NodeBlockSource {
 
   /**
    * Keeps `signed` only if the pinned identity signed its bytes, they hold a
-   * valid list naming that identity, and its version is above the floor.
+   * valid list naming that identity and only canonical identity ids, and its
+   * version is above the floor.
    */
   public receive(
     signed: SignedNodeBlockList,
