@@ -195,8 +195,6 @@ additions, device transitions, login and every other route are never gated.
 - **Uses are counted on this node only.** That is safe because the code only
   gates creation through this node. No other node checks it, and the identity
   record does not carry it, so no replica has to agree on the remaining uses.
-  Replicated community invites need that agreement (`api.md`, "Create community
-  invite link token"); registration codes do not.
 
 ### Registration link
 

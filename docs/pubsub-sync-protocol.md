@@ -506,7 +506,7 @@ of carried caps are in `docs/design/causal-device-authorization.md`.
 
 Residual: community **operations** are evaluated against the state folded from
 their causal past, but the permissions of channel messages, pins, reactions,
-invites, membership requests and polls are evaluated against the community
+membership requests and polls are evaluated against the community
 state folded at admission, not at a causal frontier. A later demotion can
 therefore still make a node refuse such a record that another node admitted
 earlier.
@@ -596,18 +596,12 @@ authorizationRevision }` and an
 - `notificationSettings` documents (public scopes only) are governed the same way
   with `scopeType: "notification_settings"`; the author must be the settings
   owner (`identityId`) and the record id is `<identityId>:<scopeKey>`.
-- `requests` documents are governed with three scope types.
-  `community_invite` (author = `creatorIdentityId`; id = token =
-  `base64url(sha256(JSON([communityId, creatorIdentityId, nonce, maxUses, expiresAt ?? null])))`,
-  so the token commits to the invite limits; immutable),
-  `community_invite_use` (author = the acceptor, id
-  `invite-use:<token>:<identityId>`; refused once the invite has expired at
-  `usedAt`; `maxUses` is checked only by the accepting node's API) and
-  `community_membership_request` (id derived from community, type, creator,
-  identity and `createdAt`; creator and identity are immutable, the status moves
-  from `pending` to `accepted`/`declined` by the authorised party: invitee,
-  creator, moderator/owner or the requester). Heads are index wrappers under
-  collection `requests`; community deletion writes no unsigned tombstones.
+- `requests` documents are governed with scope type
+  `community_membership_request` (id derived from community, creator, identity
+  and `createdAt` with type `request`; creator and identity are immutable, the
+  status moves from `pending` to `accepted`/`declined` by the authorised party:
+  moderator/owner or the requester). Heads are index wrappers under collection
+  `requests`; community deletion writes no unsigned tombstones.
 - `mlsRecords` documents are governed with scope type `community_mls`
   (record id `community:<community>:mls:<recordId>` where `recordId` is
   `base64url(sha256(canonicalize({epoch, groupId, kind, payload,
@@ -647,12 +641,8 @@ target.id, createdAt]))`, immutable (tombstones are always rejected; the
   unsigned per-community tombstones on community deletion are gone). Admission
   checks the derived id and that the actor holds the permission for the action
   in the current community (channels, roles, bans, kicks with manage members,
-  invites, request decisions, owner for profile updates, message author or
+  invitations, request decisions, owner for profile updates, message author or
   manage messages for message deletions). Heads are index wrappers under collection `moderationLogs`.
-  An `invite_link_created` `target.id` is the invite reference, never the token
-  (see `docs/api.md`); the node builds it on `POST .../invites`, while
-  admission cannot tell a reference from a token, so a creator replicating its
-  own token there only leaks an invite it could share anyway.
 - Every node verifies on write, on replicated read, on head hydration and on the
   persisted head cache: signature, scope binding, the device in the identity's
   device authorization chain at the claimed revision, and the community permission (pin needs
@@ -668,7 +658,7 @@ target.id, createdAt]))`, immutable (tombstones are always rejected; the
   the node cannot sign on behalf of users.
 - Limits: device authorization is evaluated at the revision the proof claims
   ([Causal device authorization](#causal-device-authorization)), but community
-  permissions of these records (pin, reaction, moderation log, invite, request,
+  permissions of these records (pin, reaction, moderation log, request,
   poll, channel message) are still evaluated against the community state folded
   at admission, not at a causal frontier, so records of a member who later lost
   the permission stop being admitted. A head rejected

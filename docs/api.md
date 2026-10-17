@@ -193,7 +193,7 @@ signature:
 ```
 
 `frontier` is present only on records scoped to a community (channel messages,
-reactions, pins, invites, membership requests, moderation log, MLS records,
+reactions, pins, membership requests, moderation log, MLS records,
 polls) and absent everywhere else; the node rejects a scoped record without it
 and any other record with it. It lists 1–64 digests of the community's
 operations, strictly ascending, that the author had observed
@@ -318,9 +318,7 @@ Documented exceptions, kept until issue #606 reshapes them:
 | `POST /stickers/packs/{packId}/stickers/{stickerId}/used`     | Verb                                     |
 | `POST /mailboxes/{mailboxId}/ack`                             | Verb                                     |
 | `POST /push/test`                                             | Verb                                     |
-| `POST /communities/invites/{inviteToken}/accept`              | Verb                                     |
 | `GET /communities/discover`                                   | Verb beside `{communityId}`              |
-| `GET /communities/invites/{inviteToken}`                      | Static segment beside `{communityId}`    |
 | `GET /calls/history`, `GET /calls/ice-servers`                | Static segment beside `{callId}`         |
 | `POST /communities/{communityId}/channels/text` and `/voice`  | Static segment beside `{channelId}`      |
 | `POST /node/networks/public`                                  | Static segment beside `{networkId}`      |
@@ -1664,7 +1662,7 @@ Implemented:
 - remove the network from local node metadata
 - stop the runtime IPFS network and delete the local IPFS storage folder for that network
 - delete local and replicated data scoped to that network:
-  conversations, communities and their channel messages/reactions/invites/requests/moderation logs, calls, polls, missed-call notifications, peer network references and content replication records
+  conversations, communities and their channel messages/reactions/requests/moderation logs, calls, polls, missed-call notifications, peer network references and content replication records
 - preserve identity metadata that still belongs to other networks by removing only the deleted `networkId`
 - delete identity metadata only when the deleted network was its only network
 
@@ -3566,7 +3564,7 @@ Implemented:
 - only return communities configured with `discoverable: true`
 - do not return channel metadata or encrypted content
 - include the authenticated identity membership state:
-  `none`, `member`, `requested` or `invited`
+  `none`, `member` or `requested`
 
 ### Create community
 
@@ -3646,7 +3644,7 @@ Implemented:
 
 - require signed request auth
 - allow any authenticated identity, members or not, because a non-member signs the
-  `member_joined` operation of a join, an invite link or an accepted invitation
+  `member_joined` operation of a join
 - fail with `CommunityNotFoundError` when the community is unknown to the node
 - return `{ "frontier": ["<digest>"], "networkId": "<id>" }`: the sorted operation
   digests no other operation names as parent (the `parents` for the next signed
@@ -3769,48 +3767,6 @@ Implemented:
 - require signed request auth
 - only allow community members to list members
 
-### Invite community member
-
-```http
-POST /communities/{communityId}/members
-```
-
-Request:
-
-```json
-{
-  "identityId": "<newMemberIdentityId>",
-  "createdAt": 1780000000000,
-  "mutation": { "...": "SignedPublicMutation" }
-}
-```
-
-Response:
-
-```json
-{
-  "id": "<requestId>",
-  "communityId": "<communityId>",
-  "creatorIdentityId": "<ownerIdentityId>",
-  "identityId": "<invitedIdentityId>",
-  "type": "invitation",
-  "status": "pending",
-  "createdAt": 1773848829055,
-  "updatedAt": 1773848829055
-}
-```
-
-The invitation is a signed `requests` record only and carries no `operation`:
-the invitee joins by signing `member_joined` (`method: "invitation"`,
-`reference: <requestId>`) when they accept.
-
-Implemented:
-
-- require signed request auth from the community owner
-- create a pending invitation
-- do not add the invited identity to `memberIds` until they accept
-- return an existing pending invitation for the same identity idempotently
-
 ### Request community membership
 
 ```http
@@ -3850,8 +3806,7 @@ Implemented:
 
 - require signed request auth
 - return requests created by the authenticated identity
-- return invitations targeting the authenticated identity
-- return requests/invitations for communities owned by the authenticated
+- return requests for communities owned by the authenticated
   identity
 
 ### Accept or decline community membership request
@@ -3882,18 +3837,15 @@ Request:
 
 `operation` is required when `status` is `accepted` and signs `member_joined`
 with `args` `{identityId: <request.identityId>, method, reference: <requestId>}`:
-`method` is `approval` for a `request` (signed by a member with
-`approve_members`) and `invitation` for an `invitation` (signed by the invited
-identity). It is not sent when `status` is `declined`.
+`method` is `approval` (signed by a member with `approve_members`). It is not
+sent when `status` is `declined`.
 
 Implemented:
 
 - accepted statuses add the request `identityId` to `memberIds`
-- invited identities can accept or decline `invitation` requests
 - community owners or members with `approve_members`/`reject_members` can
   accept or decline `request` join requests
 - requesters can decline their own pending join request
-- owners can decline invitations they created
 
 ### Leave community
 
@@ -3936,128 +3888,6 @@ Implemented:
 - reject attempts to kick the community owner
 - does not add the target to `bannedMemberIds`
 
-### Create community invite link token
-
-```http
-POST /communities/{communityId}/invites
-```
-
-Request:
-
-```json
-{
-  "expiresAt": 1770000000000,
-  "maxUses": 1,
-  "nonce": "<16-128 chars>",
-  "createdAt": 1780000000000,
-  "mutation": { "...": "SignedPublicMutation" }
-}
-```
-
-Response:
-
-```json
-{
-  "inviteToken": "<inviteToken>",
-  "communityId": "<communityId>",
-  "expiresAt": 1770000000000,
-  "maxUses": 1,
-  "uses": 0
-}
-```
-
-Implemented:
-
-- require signed request auth from the community owner or a member with
-  `create_invites`
-- create a bearer invite token for the community; the token commits to the
-  invite limits:
-  `base64url(sha256(JSON.stringify([communityId, creatorIdentityId, nonce, maxUses, expiresAt ?? null])))`,
-  so no replica can rewrite `maxUses` or `expiresAt` under the same token
-- default `maxUses` to `1`
-- invites cannot be revoked yet (deferred); a link stays redeemable until it
-  expires or reaches `maxUses`
-- `maxUses` is enforced only by the accepting node's API: an honest node refuses
-  an accept once the invite has `maxUses` recorded uses. Replicas never cap the
-  replicated uses or joins. Concurrent accepts on partitioned nodes, a malicious
-  node, or a signer that backdates `usedAt` and the operation `createdAt` can
-  exceed `maxUses` or join after `expiresAt`, and no replica can refute it:
-  every member can read the token from the replicated `community_invite`
-  record, so a token holder is indistinguishable from an invitee. That remains
-  until tokens are hidden and joins prove possession of the token instead of
-  revealing it (#550)
-- breaking: tokens derived without their limits no longer validate, so existing
-  invites and the `invite_link` joins they admitted are refused. Communities
-  with such joins must be recreated, or the network reset (pre-release)
-- carry no key material: group encryption keys are negotiated by members over
-  MLS (`/communities/{communityId}/mls/records`), never through the invite
-
-### Read community invite link token
-
-```http
-GET /communities/invites/{inviteToken}
-```
-
-This endpoint is unsigned so a user opening an invite link can preview the
-community and create an identity before accepting.
-
-Response:
-
-```json
-{
-  "inviteToken": "<inviteToken>",
-  "communityId": "<communityId>",
-  "communityName": "Pigeon Swarm",
-  "networkId": "<networkId>",
-  "communityAvatar": "bagaa...",
-  "communityBanner": "bagaa...",
-  "expiresAt": 1770000000000,
-  "maxUses": 1,
-  "uses": 0
-}
-```
-
-Implemented:
-
-- resolve invite metadata by bearer token
-- return minimal community metadata for invite preview
-- return the community `networkId`, which the invited identity, not yet a member
-  and so unable to read `GET /communities/{communityId}`, needs to build the
-  signed `member_joined` operation of the accept
-
-### Accept community invite link token
-
-```http
-POST /communities/invites/{inviteToken}/accept
-```
-
-Request body: `{ "usedAt", "mutation", "operation" }`. `mutation` signs a
-`community_invite_use` document with id `invite-use:<token>:<identityId>`,
-signed by the acceptor; a node only admits it while the invite has not expired
-at `usedAt`. The invite token is
-`base64url(sha256(JSON.stringify([communityId, creatorIdentityId, nonce, maxUses, expiresAt ?? null])))`.
-`operation` signs `member_joined` with `args`
-`{identityId: <acceptor>, method: "invite_link", reference: <invite reference>}`,
-where the invite reference is
-`base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken)))`:
-every member reads the operation, so it never carries the token. The operation
-is only admitted by a node that also holds the signed invite and the acceptor's
-`invite-use:<token>:<identityId>` record of a token with that reference, while
-the invite has not expired at the operation's `createdAt`. Expiry is judged at
-the signer-chosen `usedAt` and operation `createdAt`, so a backdated signature
-passes it. `maxUses` is checked only here, against the uses this node holds;
-replicas never cap it (see "Create community invite link token").
-
-Implemented:
-
-- require signed request auth from the identity accepting the invite
-- reject missing, expired or exhausted invite tokens
-- record one signed invite use
-- add the authenticated identity as a community member
-- reject banned identities
-- publish `communities.v1.member.was_added` with the updated community
-- never receive or decrypt the community key
-
 ### Ban community member
 
 ```http
@@ -4089,7 +3919,7 @@ Implemented:
 - require signed request auth from the owner or a member with `ban_members`
 - remove the banned identity from `memberIds` if they were a member
 - store banned identities in `bannedMemberIds`
-- prevent banned identities from requesting to join or accepting invite links
+- prevent banned identities from requesting to join
 - publish `communities.v1.community.was_updated`
 - when the banned identity was a member, also publish
   `communities.v1.member.was_left` with the updated community, the banned
@@ -4136,7 +3966,7 @@ Implemented:
   `community_updated`, `channel_created`, `channel_renamed`,
   `channel_deleted`, `channel_permissions_updated`, `role_created`,
   `role_updated`, `role_deleted`, `member_roles_updated`,
-  `invitation_created`, `invite_link_created`,
+  `invitation_created`, `invitation_revoked`,
   `membership_request_accepted`, `membership_request_declined`,
   `member_banned`, `member_unbanned`, `member_kicked` and `message_deleted`
 
@@ -4198,8 +4028,6 @@ checked by the `CommunityModerationLogVectors` unit spec.
 | `POST .../bans`                                        | `member_banned`                                                | member, banned `identityId`     | `{reason}`                                                                                                                                                                  |
 | `DELETE .../bans/{identityId}`                         | `member_unbanned`                                              | member, `identityId`            | `{}`                                                                                                                                                                        |
 | `DELETE .../members/{identityId}/kick`                 | `member_kicked`                                                | member, `identityId`            | `{}`                                                                                                                                                                        |
-| `POST .../invites`                                     | `invite_link_created`                                          | invite, invite reference        | `{expiresAt, maxUses}`                                                                                                                                                      |
-| `POST .../members`                                     | `invitation_created`                                           | membership_request, request id  | `{identityId}` (the invited identity)                                                                                                                                       |
 | `PATCH /community-membership-requests/{requestId}`     | `membership_request_accepted` or `membership_request_declined` | membership_request, `requestId` | `{identityId, type}` of the request                                                                                                                                         |
 | `DELETE .../channels/{channelId}/messages/{messageId}` | `message_deleted`                                              | message, `messageId`            | `{channelId, targetMessageAuthorId}`                                                                                                                                        |
 
@@ -4213,21 +4041,11 @@ of these routes also takes (see "Signed community operations"). The `DELETE`
 routes for channel, role, ban and member kick take
 `{ "moderationLog": { "createdAt", "mutation" }, "operation": { ... } }`.
 
-An `invite_link_created` target names the invite by its reference: `target.id`
-is `base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken)))`,
-the same value an `invite_link` `member_joined` signs as `reference`. Reading
-the log needs `manage_members`, not `create_invites`, so a token there would let
-a member manager hand out working invite links. The node rebuilds the entry
-with the reference, so a client that signs the token is refused. Entries are
-immutable and not migrated: `invite_link_created` entries recorded before this
-rule still carry the raw token as `target.id`, and those invites stay
-redeemable until they expire or run out of uses.
-
 Permissions checked against the signed actor: channel actions need
 `manage_channels`, role and member-role actions `manage_roles`, bans
-`ban_members`, kicks `manage_members`, invitations `create_invites`, request
-decisions `approve_members`/`reject_members` (invitations are decided by the
-invited identity), `community_updated` the owner, and `message_deleted` the
+`ban_members`, kicks `manage_members`, invitations `create_invites`,
+invitation revocations `manage_members` or `create_invites`, request
+decisions `approve_members`/`reject_members`, `community_updated` the owner, and `message_deleted` the
 message author or `manage_messages`.
 
 ### List community channels
@@ -4625,8 +4443,6 @@ Other metadata events:
   state changes to `accepted`
 - `communities.v1.membership_request.was_declined`: same request payload after
   state changes to `declined`
-- `communities.v1.invite.was_created`
-- `communities.v1.invite.was_accepted`
 - `communities.v1.channel.message.was_pinned`
 - `communities.v1.channel.message.was_unpinned`
 

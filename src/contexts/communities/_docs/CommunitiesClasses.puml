@@ -75,24 +75,12 @@ package "communities/application" {
     + leave(message): Community
   }
 
-  class CommunityInviteCreator {
-    + create(message): CommunityInvite
-  }
-
-  class CommunityInviteAccepter {
-    + accept(message): Community
-  }
-
   class CommunityMembershipRequester {
     + request(message): CommunityMembershipRequest
   }
 
   class CommunityMembershipRequestUpdater {
     + update(message): CommunityMembershipRequest
-  }
-
-  class CommunityMemberInviter {
-    + invite(message): CommunityMembershipRequest
   }
 
   class CommunityChannelMessagesFinder {
@@ -113,10 +101,6 @@ package "communities/application" {
 
   class CommunityChannelMessageReactionRemover {
     + remove(message): CommunityChannelMessageReaction
-  }
-
-  class CommunityInviteDetailsFinder {
-    + find(message): CommunityInviteDetails
   }
 
   class CommunityMembershipRequestsFinder {
@@ -165,16 +149,10 @@ package "communities/application" {
   CommunityMemberRolesAssigner ..> CommunityRepository
   CommunityMemberKicker ..> CommunityRepository
   CommunityLeaver ..> CommunityRepository
-  CommunityInviteCreator ..> CommunityRepository
-  CommunityInviteCreator ..> CommunityInviteRepository
-  CommunityInviteAccepter ..> CommunityRepository
-  CommunityInviteAccepter ..> CommunityInviteRepository
   CommunityMembershipRequester ..> CommunityRepository
   CommunityMembershipRequester ..> CommunityMembershipRequestRepository
   CommunityMembershipRequestUpdater ..> CommunityRepository
   CommunityMembershipRequestUpdater ..> CommunityMembershipRequestRepository
-  CommunityMemberInviter ..> CommunityRepository
-  CommunityMemberInviter ..> CommunityMembershipRequestRepository
   CommunityChannelMessagesFinder ..> CommunityRepository
   CommunityChannelMessagesFinder ..> CommunityChannelMessageRepository
   CommunityChannelMessagesFinder ..> CommunityChannelMessageReactionRepository
@@ -186,8 +164,6 @@ package "communities/application" {
   CommunityChannelMessageReactionAdder ..> CommunityChannelMessageReactionRepository
   CommunityChannelMessageReactionRemover ..> CommunityRepository
   CommunityChannelMessageReactionRemover ..> CommunityChannelMessageReactionRepository
-  CommunityInviteDetailsFinder ..> CommunityRepository
-  CommunityInviteDetailsFinder ..> CommunityInviteRepository
   CommunityMembershipRequestsFinder ..> CommunityMembershipRequestRepository
   CommunityModerationLogsFinder ..> CommunityModerationLogRepository
   CommunityOperationsFinder ..> CommunityRepository
@@ -220,9 +196,6 @@ package "communities/domain" {
     - channels: CommunityChannels
     - settings: CommunitySettings
     + create(ownerIdentityId, networkId, profile, settings): Community
-    + createInvite(actor, expiresAt?, maxUses?): CommunityInvite
-    + acceptInvite(member, acceptedInvite): void
-    + inviteMember(actor, invitedIdentityId): CommunityMembershipRequest
     + acceptMembershipRequest(actor, membershipRequest): void
     + acceptMembershipRequestAutomatically(membershipRequest): void
     + declineMembershipRequest(actor, membershipRequest): void
@@ -413,20 +386,6 @@ package "communities/domain" {
     + ensureMessageSearchAvailable(): void
   }
 
-  class CommunityInvite {
-    - token: CommunityInviteToken
-    - communityId: CommunityId
-    - creatorIdentityId: IdentityId
-    - createdAt: Timestamp
-    - expiresAt: Timestamp?
-    - maxUses: CommunityInviteMaxUses
-    - uses: CommunityInviteUses
-    + create(communityId, creatorIdentityId, nonce, createdAt, expiresAt?, maxUses?): CommunityInvite
-    + assertRedeemableAt(at): void
-    + checkAcceptanceAvailability(now?): void
-    + accept(now?): void
-  }
-
   class CommunityMembershipRequest {
     - id: CommunityRequestId
     - communityId: CommunityId
@@ -435,7 +394,6 @@ package "communities/domain" {
     - creatorIdentityId: IdentityId
     - identityId: IdentityId
     - timestamps: CommunityMembershipRequestTimestamps
-    + invitation(communityId, creatorIdentityId, identityId): CommunityMembershipRequest
     + request(communityId, requesterIdentityId): CommunityMembershipRequest
     + accept(actorIdentityId, ownerIdentityId): void
     + decline(actorIdentityId, ownerIdentityId): void
@@ -460,9 +418,6 @@ package "communities/domain" {
   class CommunityChannelMessagePlaintextPayload
   class CommunityVisibility
   class CommunityChannelMessageReactionEmoji
-  class CommunityInviteToken
-  class CommunityInviteMaxUses
-  class CommunityInviteUses
   class CommunityRequestId
   class CommunityRequestStatus {
     + isAccepted(): boolean
@@ -581,11 +536,6 @@ package "communities/domain" {
     + delete(reaction): void
   }
 
-  interface CommunityInviteRepository {
-    + requireByToken(token): CommunityInvite
-    + save(invite): void
-  }
-
   interface CommunityMembershipRequestRepository {
     + findByCommunityAndIdentity(communityId, identityId): CommunityMembershipRequest[]
     + requireById(id): CommunityMembershipRequest
@@ -648,11 +598,6 @@ CommunityChannelMessageReaction --> CommunityId
   CommunityModerationLogEntry --> CommunityModerationTarget
   CommunityModerationLogEntry --> CommunityModerationLogDetails
   CommunityModerationTarget --> CommunityModerationTargetType
-  CommunityInvite --> CommunityId
-  CommunityInvite --> IdentityId
-  CommunityInvite --> CommunityInviteToken
-  CommunityInvite --> CommunityInviteMaxUses
-  CommunityInvite --> CommunityInviteUses
   CommunityMembershipRequest --> CommunityId
   CommunityMembershipRequest --> IdentityId
   CommunityMembershipRequest --> CommunityRequestId
@@ -676,7 +621,6 @@ CommunityChannelMessageReaction --> CommunityId
   CommunityStateFold ..> CommunityState
   CommunityChannelMessageRepository ..> CommunityChannelMessage
   CommunityChannelMessageReactionRepository ..> CommunityChannelMessageReaction
-  CommunityInviteRepository ..> CommunityInvite
   CommunityMembershipRequestRepository ..> CommunityMembershipRequest
   CommunityModerationLogRepository ..> CommunityModerationLogEntry
 
@@ -710,8 +654,6 @@ package "communities/infrastructure" {
   class OrbitDBCommunityChannelMessageDocument
   class OrbitDBCommunityMessageReactionRepository
   class OrbitDBCommunityChannelMessageReactionDocument
-  class OrbitDBCommunityInviteRepository
-  class OrbitDBCommunityInviteDocument
   class OrbitDBCommunityMembershipRequestRepository
   class OrbitDBCommunityMembershipRequestDocument
   class OrbitDBCommunityModerationLogRepository
@@ -736,8 +678,6 @@ package "communities/infrastructure" {
   OrbitDBCommunityChannelMessageRepository --> OrbitDBCommunityChannelMessageDocument
   OrbitDBCommunityMessageReactionRepository ..|> CommunityChannelMessageReactionRepository
   OrbitDBCommunityMessageReactionRepository --> OrbitDBCommunityChannelMessageReactionDocument
-  OrbitDBCommunityInviteRepository ..|> CommunityInviteRepository
-  OrbitDBCommunityInviteRepository --> OrbitDBCommunityInviteDocument
   OrbitDBCommunityMembershipRequestRepository ..|> CommunityMembershipRequestRepository
   OrbitDBCommunityMembershipRequestRepository --> OrbitDBCommunityMembershipRequestDocument
   OrbitDBCommunityModerationLogRepository ..|> CommunityModerationLogRepository
@@ -761,12 +701,8 @@ package "communities-api" {
   class PatchCommunityRoute
   class PatchCommunityRequestRoute
   class GetCommunityMembersRoute
-  class PostCommunityMemberRoute
   class PostCommunityJoinRequestRoute
   class DeleteCommunityMemberRoute
-  class GetCommunityInviteRoute
-  class PostCommunityInviteRoute
-  class PostCommunityInviteAcceptRoute
   class GetCommunityChannelsRoute
   class PostCommunityTextChannelRoute
   class PostCommunityVoiceChannelRoute
@@ -791,13 +727,9 @@ package "communities-api" {
   PatchCommunityRoute ..> CommunityProfileUpdater
   GetCommunityMembersRoute ..> Community
   GetCommunityMembershipRequestsRoute ..> CommunityMembershipRequestsFinder
-  PostCommunityMemberRoute ..> CommunityMemberInviter
   PostCommunityJoinRequestRoute ..> CommunityMembershipRequester
   PatchCommunityRequestRoute ..> CommunityMembershipRequestUpdater
   DeleteCommunityMemberRoute ..> CommunityLeaver
-  PostCommunityInviteRoute ..> CommunityInviteCreator
-  GetCommunityInviteRoute ..> CommunityInviteDetailsFinder
-  PostCommunityInviteAcceptRoute ..> CommunityInviteAccepter
   GetCommunityChannelsRoute ..> CommunityChannelsFinder
   PostCommunityTextChannelRoute ..> CommunityTextChannelCreator
   PostCommunityVoiceChannelRoute ..> CommunityVoiceChannelCreator
@@ -829,9 +761,6 @@ note right of Community
   - channels can be visible to
     everyone or selected roles
   - non-owner members can leave
-  - owner can create bearer invite links
-  - owner can invite identities as
-    pending membership requests
   - non-members can request to join
   - pending requests become members
     only when accepted
