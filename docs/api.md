@@ -101,7 +101,8 @@ Implemented:
   the socket address unless `API_TRUST_PROXY` names a reverse proxy, so a proxy
   the node is not told about puts every stranger on one address). The address
   is kept in memory only, with its entry. An entry expires after 60 seconds and
-  is dropped when the guard next records a signed state-changing request
+  is dropped when the guard next records a signature: a signed state-changing
+  request, or a device or recovery proof on any method
 - the per-address cap of 250 is a trade-off. Filling the stranger share takes
   40 addresses instead of one. One address still has room for its identity
   creations (`IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE`, 30 by default)
