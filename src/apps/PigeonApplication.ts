@@ -80,6 +80,7 @@ import LocalPrivateBlobOwnerKeyDeriver from '../contexts/private-blobs/infrastru
 import LocalPrivateBlobRepository from '../contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository';
 import { IdentityId } from '../contexts/shared/domain/value-objects/IdentityId';
 import { pigeonEnvironmentSchema } from '../shared/infrastructure/environment/PigeonEnvironment';
+import InitializerTimedOutError from '../shared/infrastructure/errors/InitializerTimedOutError';
 import HttpRequestContext from '../shared/infrastructure/express/HttpRequestContext';
 import {
   handleCustomHttpError,
@@ -458,10 +459,33 @@ export default class PigeonApplication {
     await this.kernel.runSchedulers();
   }
 
+  // Runs the initializers one by one, each bounded by
+  // NODE_INITIALIZER_TIMEOUT_MS, so a hung one fails startup instead of
+  // leaving the node up with its API never listening.
   public async runInitializers(
     ...ClassDefinitions: ApplicationServiceClass<Initializer>[]
   ): Promise<void> {
-    await this.kernel.runInitializers(...ClassDefinitions);
+    const timeoutMs = this.kernel.environment.NODE_INITIALIZER_TIMEOUT_MS;
+
+    for (const ClassDefinition of ClassDefinitions) {
+      const timedOut = Promise.withResolvers<never>();
+      const deadline = setTimeout(
+        () =>
+          timedOut.reject(
+            new InitializerTimedOutError(ClassDefinition.name, timeoutMs),
+          ),
+        timeoutMs,
+      );
+
+      try {
+        await Promise.race([
+          this.kernel.di.getService<Initializer>(ClassDefinition).ensure(),
+          timedOut.promise,
+        ]);
+      } finally {
+        clearTimeout(deadline);
+      }
+    }
   }
 
   public async runRuntimes(

@@ -2652,6 +2652,9 @@ services:
   shared/infrastructure/errors/HandlerNotFoundError:
     class: /shared/infrastructure/errors/HandlerNotFoundError
     arguments: []
+  shared/infrastructure/errors/InitializerTimedOutError:
+    class: /shared/infrastructure/errors/InitializerTimedOutError
+    arguments: []
   shared/infrastructure/errors/InvalidMessageBusAdapterError:
     class: /shared/infrastructure/errors/InvalidMessageBusAdapterError
     arguments: []

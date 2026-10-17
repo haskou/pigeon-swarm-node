@@ -10,8 +10,10 @@ import path from 'node:path';
  * policies (Docker `on-failure`, Kubernetes) only react to the exit status.
  * Covers a failure before any listener opens, an API port already taken by
  * another process, a failure in an initializer, which must happen before the
- * API listens, and a failure after the API has started listening, which must
- * not keep the process alive. Run `yarn build` first.
+ * API listens, an initializer that does not finish within
+ * `NODE_INITIALIZER_TIMEOUT_MS`, which must not leave the port closed forever,
+ * and a failure after the API has started listening, which must not keep the
+ * process alive. Run `yarn build` first.
  */
 
 const REPOSITORY_ROOT = path.resolve(__dirname, '../../..');
@@ -21,6 +23,7 @@ const EXIT_TIMEOUT_MS = 30_000;
 type Scenario = {
   name: string;
   environment: (port: number) => Record<string, string>;
+  failureOutput?: RegExp;
   listensBeforeFailure: boolean;
   portInUse: boolean;
 };
@@ -51,6 +54,16 @@ const scenarios: Scenario[] = [
       API_PORT: String(port),
       IPFS_STORAGE_PATH: '/dev/null/ipfs',
     }),
+    listensBeforeFailure: false,
+    portInUse: false,
+  },
+  {
+    name: 'initializer past its time bound, before the API starts listening',
+    environment: (port) => ({
+      API_PORT: String(port),
+      NODE_INITIALIZER_TIMEOUT_MS: '1',
+    }),
+    failureOutput: /Initializer \w+ did not finish within 1 ms/,
     listensBeforeFailure: false,
     portInUse: false,
   },
@@ -151,6 +164,10 @@ async function runScenario(scenario: Scenario): Promise<void> {
   );
   assert.equal(result.code, 1, `expected exit status 1; ${context}`);
   assert.match(result.output, /Application error/, context);
+
+  if (scenario.failureOutput) {
+    assert.match(result.output, scenario.failureOutput, context);
+  }
 
   if (scenario.portInUse) {
     assert.match(

@@ -84,6 +84,7 @@ export const pigeonEnvironmentSchema = {
     type: 'number',
   },
   NODE_ENV: { defaultValue: 'local', type: 'string' },
+  NODE_INITIALIZER_TIMEOUT_MS: { defaultValue: 10 * 60 * 1000, type: 'number' },
   NODE_REGISTRATION_CODE_MAX_TTL_DAYS: { defaultValue: 30, type: 'number' },
   NODE_REGISTRATION_CODE_MAX_USES: { defaultValue: 100, type: 'number' },
   NOTIFICATIONS_MAX_INVITATIONS_PER_IDENTITY: {
