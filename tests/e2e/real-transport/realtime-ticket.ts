@@ -84,11 +84,7 @@ async function verify(node: NodeRuntime): Promise<void> {
   );
   attempt.ws.close();
 
-  const replay = await connect(
-    node,
-    REALTIME_WS_PATH,
-    ticketProtocols(ticket),
-  );
+  const replay = await connect(node, REALTIME_WS_PATH, ticketProtocols(ticket));
 
   assert.ok('status' in replay, 'replayed ticket was accepted');
   assert.equal(replay.status, 401, 'replayed ticket was not refused with 401');
@@ -100,7 +96,11 @@ async function verify(node: NodeRuntime): Promise<void> {
   );
 
   assert.ok('status' in retired, 'ticket authenticated the retired /ws path');
-  assert.equal(retired.status, 404, 'retired /ws path was not refused with 404');
+  assert.equal(
+    retired.status,
+    404,
+    'retired /ws path was not refused with 404',
+  );
 
   const keyPair = await KeyPair.generate();
   const legacyQuery = await connect(
@@ -124,12 +124,12 @@ async function verify(node: NodeRuntime): Promise<void> {
 
   assert.ok(
     'status' in realtimeQuery,
-    'signed query authenticated /realtime/v1 without a ticket',
+    'signed query authenticated /realtime without a ticket',
   );
   assert.equal(
     realtimeQuery.status,
     401,
-    'signed query on /realtime/v1 was not refused with 401',
+    'signed query on /realtime was not refused with 401',
   );
 
   const ambientCookie = await connect(
@@ -141,12 +141,12 @@ async function verify(node: NodeRuntime): Promise<void> {
 
   assert.ok(
     'status' in ambientCookie,
-    'ambient cookie authenticated /realtime/v1 without a ticket',
+    'ambient cookie authenticated /realtime without a ticket',
   );
   assert.equal(
     ambientCookie.status,
     401,
-    'ambient cookie on /realtime/v1 was not refused with 401',
+    'ambient cookie on /realtime was not refused with 401',
   );
 }
 

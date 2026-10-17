@@ -8,7 +8,7 @@ Feature: Community bans API
     And I register a test IPFS network "communities-api-bans-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community ban body for another identity
@@ -26,7 +26,7 @@ Feature: Community bans API
     And I register a test IPFS network "communities-api-unban-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community ban body for another identity

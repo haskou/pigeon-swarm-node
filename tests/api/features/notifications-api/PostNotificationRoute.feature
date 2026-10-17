@@ -10,7 +10,7 @@ Feature: Post notification route
     Given I am an anonymous user
     And I set a conversation invitation notification body
     And I sign the current notification creation request
-    When I POST to "/notifications/"
+    When I POST to "/notifications"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | type   | conversation_invitation |
@@ -22,7 +22,7 @@ Feature: Post notification route
     Given I am an anonymous user
     And I set a group conversation invitation notification body
     And I sign the current notification creation request
-    When I POST to "/notifications/"
+    When I POST to "/notifications"
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | type   | group_conversation_invitation |
@@ -35,7 +35,7 @@ Feature: Post notification route
     Given I am an anonymous user
     And I set a group conversation invitation notification body naming a conversation
     And I sign the current notification creation request
-    When I POST to "/notifications/"
+    When I POST to "/notifications"
     Then response code is equal to 400
     And response body should contain "400070"
     And response body should not contain "group:notification-api-conversation"
@@ -44,7 +44,7 @@ Feature: Post notification route
     Given I am an anonymous user
     And I set a conversation invitation notification body
     And another identity signs the current notification creation request
-    When I POST to "/notifications/"
+    When I POST to "/notifications"
     Then response code is equal to 403
 
   Scenario: Reject an invitation without the inviter mutation
@@ -52,5 +52,5 @@ Feature: Post notification route
     And I set a conversation invitation notification body
     And I remove the mutation from the current notification body
     And I sign the current notification creation request
-    When I POST to "/notifications/"
+    When I POST to "/notifications"
     Then response code is equal to 400

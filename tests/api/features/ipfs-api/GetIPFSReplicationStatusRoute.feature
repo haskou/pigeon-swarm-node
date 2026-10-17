@@ -6,7 +6,7 @@ Feature: Get IPFS replication status route
   Scenario: An upload alone does not register replication
     Given the local node has no owner and no networks
     And I sign the current node owner request
-    When I PUT "/node/owner/"
+    When I PUT "/node/owner"
     Then response code is equal to 200
     And I register a test IPFS network "api-replication-status-network"
     And I set raw IPFS content with content type "image/png" and text "hello"
@@ -15,7 +15,7 @@ Feature: Get IPFS replication status route
     Then response code is equal to 201
     And response body should contain "cid"
     Given I sign the current IPFS replication status request
-    When I GET "/ipfs/replication/status"
+    When I GET "/ipfs/replication-status"
     Then response code is equal to 200
     And response data should match partially
       """
@@ -31,17 +31,17 @@ Feature: Get IPFS replication status route
   Scenario: Reject replication status from a non-owner
     Given the local node has no owner and no networks
     And I sign the current node owner request
-    When I PUT "/node/owner/"
+    When I PUT "/node/owner"
     Then response code is equal to 200
 
     Given another identity signs the current IPFS replication status request
-    When I GET "/ipfs/replication/status"
+    When I GET "/ipfs/replication-status"
     Then response code is equal to 403
 
   Scenario: A signed registration makes the node responsible for the content
     Given the local node has no owner and no networks
     And I sign the current node owner request
-    When I PUT "/node/owner/"
+    When I PUT "/node/owner"
     Then response code is equal to 200
     And I register a test IPFS network "api-replication-register-network"
     And I set raw IPFS content with content type "application/octet-stream" and text "hello"
@@ -55,7 +55,7 @@ Feature: Get IPFS replication status route
   Scenario: Reject a replication registration with the private-upload context
     Given the local node has no owner and no networks
     And I sign the current node owner request
-    When I PUT "/node/owner/"
+    When I PUT "/node/owner"
     Then response code is equal to 200
     And I register a test IPFS network "api-replication-private-context-network"
     And I set raw IPFS content with content type "application/octet-stream" and text "hello"

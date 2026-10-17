@@ -22,7 +22,7 @@ type ConnectOptions = {
 };
 
 describe('realtime upgrade (real HTTP server and ws client)', () => {
-  const ticketPath = '/realtime/v1';
+  const ticketPath = '/realtime';
   const legacyPath = '/ws';
   let server: Server;
   let port: number;

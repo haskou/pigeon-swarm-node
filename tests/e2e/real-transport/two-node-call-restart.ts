@@ -74,7 +74,7 @@ async function createOneToOneConversation(
   return request<{ id: string }>(
     node,
     'POST',
-    '/conversations/',
+    '/conversations',
     {
       keychainExternalIdentifier,
       networkId: NETWORK_ID,
@@ -249,7 +249,7 @@ async function main(): Promise<void> {
     await request(
       nodeA,
       'POST',
-      '/calls/',
+      '/calls',
       {
         conversationId: conversation.id,
         mutation: mutationOf(start.proof),

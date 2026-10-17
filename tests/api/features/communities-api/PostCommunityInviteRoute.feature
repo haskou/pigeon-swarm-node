@@ -8,7 +8,7 @@ Feature: Post community invite API
     And I register a test IPFS network "communities-api-invite-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community invite body
@@ -35,7 +35,7 @@ Feature: Post community invite API
     And I register a test IPFS network "communities-api-encrypted-invite-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community invite body
@@ -55,7 +55,7 @@ Feature: Post community invite API
     And I register a test IPFS network "communities-api-invite-max-uses-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community invite body
@@ -76,7 +76,7 @@ Feature: Post community invite API
     And I register a test IPFS network "communities-api-expired-invite-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set an expired community invite body
@@ -94,7 +94,7 @@ Feature: Post community invite API
     And I register a test IPFS network "communities-api-expired-invite-read-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set an expired community invite body
@@ -111,7 +111,7 @@ Feature: Post community invite API
     And I register a test IPFS network "communities-api-exhausted-invite-read-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community invite body

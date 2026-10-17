@@ -95,11 +95,11 @@ async function describeNetworkSynchronization(
   const states = await Promise.all(
     nodes.map(async (node) => {
       try {
-        const peers = await request<Peers>(node, 'GET', '/peers/');
+        const peers = await request<Peers>(node, 'GET', '/peers');
 
         return `${node.name} ${JSON.stringify(peers.networkSynchronization.networks)}`;
       } catch (error) {
-        return `${node.name} /peers/ unavailable (${error instanceof Error ? error.message : String(error)})`;
+        return `${node.name} /peers unavailable (${error instanceof Error ? error.message : String(error)})`;
       }
     }),
   );
@@ -250,7 +250,7 @@ async function startChannelCall(
   return request<LiveCall>(
     node,
     'POST',
-    '/calls/',
+    '/calls',
     {
       ...scope,
       mutation: mutationOf(signed.proof),
@@ -314,7 +314,7 @@ async function startIsolatedNodes(
     await request(
       node,
       'PUT',
-      '/node/relay-configuration/',
+      '/node/relay-configuration',
       configurations[index],
     );
     await addPrivateNetwork(node, key);
@@ -351,7 +351,7 @@ async function startIsolatedNodes(
     await request(
       node,
       'PUT',
-      '/node/relay-configuration/',
+      '/node/relay-configuration',
       configurations[index],
     );
     await stopNode(node);
@@ -361,7 +361,7 @@ async function startIsolatedNodes(
     async () =>
       (
         await Promise.all(
-          nodes.map((node) => request<Peers>(node, 'GET', '/peers/')),
+          nodes.map((node) => request<Peers>(node, 'GET', '/peers')),
         )
       ).every((peers) =>
         peers.networkSynchronization.networks.some(
@@ -443,7 +443,7 @@ async function main(): Promise<void> {
     const community = await request<{ id: string }>(
       nodes[0],
       'POST',
-      '/communities/',
+      '/communities',
       {
         autoJoinEnabled: true,
         description: 'Disposable integration fixture',
@@ -601,7 +601,7 @@ async function main(): Promise<void> {
         await request(
           nodes[1],
           'POST',
-          `/communities/${community.id}/join-requests`,
+          '/community-membership-requests',
           {
             acceptedAt: joinAcceptedAt,
             acceptedMutation: signJoin(
@@ -609,6 +609,7 @@ async function main(): Promise<void> {
               1,
               replicated.frontier,
             ),
+            communityId: community.id,
             createdAt: joinCreatedAt,
             mutation: signJoin(joinRecord, 0, replicated.frontier),
             operation: joinOperation.body,

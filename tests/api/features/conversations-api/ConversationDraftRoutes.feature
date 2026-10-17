@@ -14,8 +14,8 @@ Feature: Conversation drafts live under opaque keys
         "updatedAt": 1700000000000
       }
       """
-    And I sign a PUT request to "/conversations/me/drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
-    When I PUT "/conversations/me/drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
+    And I sign a PUT request to "/conversation-drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
+    When I PUT "/conversation-drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
     Then response code is equal to 200
     And response data should match exactly
       """
@@ -25,8 +25,8 @@ Feature: Conversation drafts live under opaque keys
         "updatedAt": 1700000000000
       }
       """
-    Given I sign a GET request to "/conversations/me/drafts"
-    When I GET "/conversations/me/drafts"
+    Given I sign a GET request to "/conversation-drafts"
+    When I GET "/conversation-drafts"
     Then response code is equal to 200
     And response data should match exactly
       """
@@ -40,8 +40,8 @@ Feature: Conversation drafts live under opaque keys
         ]
       }
       """
-    Given I sign a DELETE request to "/conversations/me/drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
-    When I DELETE "/conversations/me/drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
+    Given I sign a DELETE request to "/conversation-drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
+    When I DELETE "/conversation-drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
     Then response code is equal to 200
     And response data should match exactly
       """
@@ -49,8 +49,8 @@ Feature: Conversation drafts live under opaque keys
         "draftKey": "eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
       }
       """
-    Given I sign a GET request to "/conversations/me/drafts"
-    When I GET "/conversations/me/drafts"
+    Given I sign a GET request to "/conversation-drafts"
+    When I GET "/conversation-drafts"
     Then response data should match exactly
       """
       {
@@ -66,12 +66,12 @@ Feature: Conversation drafts live under opaque keys
         "updatedAt": 1700000000000
       }
       """
-    And I sign a PUT request to "/conversations/me/drafts/L7OYmM9rXK294jd9FNvHMxyq8IJdWRBtCQ3ut4Wqo4k"
-    And I PUT "/conversations/me/drafts/L7OYmM9rXK294jd9FNvHMxyq8IJdWRBtCQ3ut4Wqo4k"
-    And another identity signs a DELETE request to "/conversations/me/drafts/L7OYmM9rXK294jd9FNvHMxyq8IJdWRBtCQ3ut4Wqo4k"
-    And I DELETE "/conversations/me/drafts/L7OYmM9rXK294jd9FNvHMxyq8IJdWRBtCQ3ut4Wqo4k"
-    And another identity signs a GET request to "/conversations/me/drafts"
-    When I GET "/conversations/me/drafts"
+    And I sign a PUT request to "/conversation-drafts/L7OYmM9rXK294jd9FNvHMxyq8IJdWRBtCQ3ut4Wqo4k"
+    And I PUT "/conversation-drafts/L7OYmM9rXK294jd9FNvHMxyq8IJdWRBtCQ3ut4Wqo4k"
+    And another identity signs a DELETE request to "/conversation-drafts/L7OYmM9rXK294jd9FNvHMxyq8IJdWRBtCQ3ut4Wqo4k"
+    And I DELETE "/conversation-drafts/L7OYmM9rXK294jd9FNvHMxyq8IJdWRBtCQ3ut4Wqo4k"
+    And another identity signs a GET request to "/conversation-drafts"
+    When I GET "/conversation-drafts"
     Then response code is equal to 200
     And response data should match exactly
       """
@@ -79,8 +79,8 @@ Feature: Conversation drafts live under opaque keys
         "drafts": []
       }
       """
-    Given I sign a GET request to "/conversations/me/drafts"
-    When I GET "/conversations/me/drafts"
+    Given I sign a GET request to "/conversation-drafts"
+    When I GET "/conversation-drafts"
     Then response data should match partially
       """
       {
@@ -99,8 +99,8 @@ Feature: Conversation drafts live under opaque keys
         "encryptedPayload": "sealed-draft-payload"
       }
       """
-    And I sign a PUT request to "/conversations/me/drafts/one-to-one-conversation"
-    When I PUT "/conversations/me/drafts/one-to-one-conversation"
+    And I sign a PUT request to "/conversation-drafts/one-to-one-conversation"
+    When I PUT "/conversation-drafts/one-to-one-conversation"
     Then response code is equal to 409
     And response data should match partially
       """
@@ -111,8 +111,8 @@ Feature: Conversation drafts live under opaque keys
 
   Scenario: A draft payload longer than the limit is rejected
     Given I set json body with "encryptedPayload" of 65537 characters
-    And I sign a PUT request to "/conversations/me/drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
-    When I PUT "/conversations/me/drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
+    And I sign a PUT request to "/conversation-drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
+    When I PUT "/conversation-drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
     Then response code is equal to 400
 
   Scenario Outline: The conversation id draft route does not exist

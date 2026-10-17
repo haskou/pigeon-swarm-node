@@ -31,7 +31,7 @@ Feature: DELETE /notification-settings/scopes
     When I DELETE "/notification-settings/scopes"
     Then response code is equal to 200
     And I sign the current notification settings request
-    When I GET "/notification-settings/"
+    When I GET "/notification-settings"
     Then response code is equal to 200
     And response data should match partially
       """

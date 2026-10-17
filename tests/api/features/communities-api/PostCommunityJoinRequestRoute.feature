@@ -8,7 +8,7 @@ Feature: Post community join request API
     And I register a test IPFS network "communities-api-join-request-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And the community member signs the current community request
@@ -44,7 +44,7 @@ Feature: Post community join request API
     And I register a test IPFS network "communities-api-auto-join-network"
     And I set an auto-join private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And response body should contain "autoJoinEnabled"
     And response body should contain "true"

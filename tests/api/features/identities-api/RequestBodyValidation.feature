@@ -6,11 +6,11 @@ Feature: Request body validation
   Scenario: Refuse a malformed JSON body
     Given I am an anonymous user
     And I set the raw JSON body "{\"name\": "
-    When I POST to "/identities/"
+    When I POST to "/identities"
     Then response code is equal to 400
 
   Scenario: Refuse an oversized JSON body
     Given I am an anonymous user
     And I set a JSON body of 20 megabytes
-    When I POST to "/identities/"
+    When I POST to "/identities"
     Then response code is equal to 413

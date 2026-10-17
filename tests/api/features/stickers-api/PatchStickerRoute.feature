@@ -10,7 +10,7 @@ Feature: Patch sticker route
     Given I am an anonymous user
     And I set a sticker pack body
     And I sign the current sticker pack creation request
-    When I POST to "/stickers/packs/"
+    When I POST to "/stickers/packs"
     Then response code is equal to 200
     Given I remember the current sticker pack
     And I set a static sticker body

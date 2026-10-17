@@ -25,7 +25,7 @@ import { setImmediate } from 'timers/promises';
 
 type UploadRequest = Request & PassThrough;
 
-const PATH = '/node/blocks/';
+const PATH = '/node/blocks';
 const MAX_BYTES = 1024;
 const UPLOADED = { type: 'pigeon-node-block-list' };
 

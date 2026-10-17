@@ -4,7 +4,7 @@ Feature: Get community operations
     Given I register a test IPFS network "community-operations-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community text channel body
@@ -26,7 +26,7 @@ Feature: Get community operations
     Given I register a test IPFS network "community-operations-invite-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I set a community invite body
@@ -48,7 +48,7 @@ Feature: Get community operations
     Given I register a test IPFS network "community-operations-query-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And I sign the current community operations request
@@ -64,7 +64,7 @@ Feature: Get community operations
     Given I register a test IPFS network "community-operations-member-network"
     And I set a private community body
     And I sign the current community creation request
-    When I POST to "/communities/"
+    When I POST to "/communities"
     Then response code is equal to 200
     And I remember the current community
     And the community member signs the current community operations request
