@@ -31,4 +31,22 @@ describe('public mutation state digest vectors', () => {
       InvalidPublicMutationError,
     );
   });
+
+  describe('depth', () => {
+    /** A record whose deepest value sits `depth` levels below it; the record is depth 0. */
+    const nested = (depth: number): Record<string, unknown> =>
+      depth === 1 ? { value: 'leaf' } : { value: nested(depth - 1) };
+
+    it.each([63, 64])('digests a payload %i levels deep', (depth) => {
+      expect(PublicMutationProof.digestOf(nested(depth))).toMatch(
+        /^[A-Za-z0-9_-]{43}$/,
+      );
+    });
+
+    it.each([65, 66])('refuses a payload %i levels deep', (depth) => {
+      expect(() => PublicMutationProof.digestOf(nested(depth))).toThrow(
+        InvalidPublicMutationError,
+      );
+    });
+  });
 });
