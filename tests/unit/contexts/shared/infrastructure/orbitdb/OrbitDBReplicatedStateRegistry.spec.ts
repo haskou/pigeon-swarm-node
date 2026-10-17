@@ -1739,6 +1739,76 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       registry.clear();
     });
 
+    it.each(IdentityIdMother.aliases())(
+      'never projects a replicated identity signed under %s of its key through the real gate',
+      async (_, aliasOf) => {
+        const ipfs = mock<IPFS>();
+        const mapper = new IpfsIdentityMapper();
+        const registry = new OrbitDBReplicatedStateRegistry();
+        const { identities, stores } = createStores();
+        const projected: Record<string, unknown>[] = [];
+        const signer = await SignedIdentityMother.create();
+        const aliasId = aliasOf(new IdentityId(signer.id)).valueOf();
+        const recordOf = async (
+          identity: Identity,
+        ): Promise<{ key: string; value: Record<string, unknown> }> => {
+          const primitives = identity.toPrimitives();
+          const cid = (
+            await ipfs.calculateJSONId(mapper.toDocument(identity))
+          ).valueOf();
+
+          return {
+            key: cid,
+            value: {
+              cid,
+              id: cid,
+              identity: primitives,
+              identityId: primitives.id,
+              networkIds: primitives.networks,
+              version: primitives.version,
+            },
+          };
+        };
+
+        ipfs.calculateJSONId.mockImplementation((data) =>
+          Promise.resolve(
+            new IPFSId(
+              `bafy${createHash('sha256').update(JSON.stringify(data)).digest('hex')}`,
+            ),
+          ),
+        );
+        registry.addMutationGate(new OrbitDBIdentityMutationGate(ipfs));
+        await registry.register('network-1', stores);
+        await registry.onDocumentUpdated('identities', (document) => {
+          projected.push(document);
+        });
+
+        identities.emitUpdate({
+          payload: await recordOf(signer.build()),
+        });
+        await jest.advanceTimersByTimeAsync(0);
+
+        expect(projected).toHaveLength(1);
+
+        const alias = await recordOf(signer.build({ id: aliasId }));
+
+        identities.emitUpdate({ payload: alias });
+        await jest.advanceTimersByTimeAsync(0);
+
+        expect(
+          registry.isDocumentPendingAdmission('identities', alias.key),
+        ).toBe(true);
+
+        await jest.advanceTimersByTimeAsync(2_000 + 10_000 + 60_000);
+
+        expect(
+          registry.isDocumentPendingAdmission('identities', alias.key),
+        ).toBe(false);
+        expect(projected).toHaveLength(1);
+        registry.clear();
+      },
+    );
+
     it('offers an updated document again once the authorization it rests on replicates', async () => {
       let memberReplicated = false;
       const registry = new OrbitDBReplicatedStateRegistry();
