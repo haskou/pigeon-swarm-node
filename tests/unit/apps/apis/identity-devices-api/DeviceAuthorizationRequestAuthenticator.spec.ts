@@ -1,7 +1,9 @@
 import { DeviceAuthorizationRequestAuthenticator } from '@app/apps/apis/identity-devices-api/DeviceAuthorizationRequestAuthenticator';
+import { signedRequestReplayGuard } from '@app/apps/apis/shared/SignedRequestReplayGuard';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
+import { DeviceAuthorizationTransitionLog } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionLog';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import {
@@ -21,6 +23,35 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
     'authenticateCurrentDevice',
   ] as const;
   const RECOVERY_ENTRY_POINTS = ['authenticate', 'authenticateReader'] as const;
+  const AUTHORIZED_ENTRY_POINTS = [
+    'authenticate',
+    'authenticateCurrentDevice',
+  ] as const;
+
+  const logOf = (
+    ...states: DeviceAuthorization[]
+  ): DeviceAuthorizationTransitionLog =>
+    new DeviceAuthorizationTransitionLog([], [], [], states);
+
+  function authenticateBy(
+    entryPoint: (typeof ENTRY_POINTS)[number],
+    request: Request,
+    authorization: DeviceAuthorization,
+  ): void {
+    const authenticator = new DeviceAuthorizationRequestAuthenticator();
+
+    if (entryPoint === 'authenticateReader') {
+      authenticator.authenticateReader(request, logOf(authorization));
+
+      return;
+    }
+
+    authenticator[entryPoint](request, authorization);
+  }
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   async function fixture(deviceInput?: KeyPair, signedAt = Date.now()) {
     const device = deviceInput ?? (await KeyPair.generate());
@@ -87,17 +118,11 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
     'refuses a replayed device proof to %s',
     async (entryPoint) => {
       const { authorization, request } = await fixture();
-      new DeviceAuthorizationRequestAuthenticator()[entryPoint](
-        request,
-        authorization,
-      );
+      authenticateBy(entryPoint, request, authorization);
 
-      expect(() =>
-        new DeviceAuthorizationRequestAuthenticator()[entryPoint](
-          request,
-          authorization,
-        ),
-      ).toThrow('Invalid signed request.');
+      expect(() => authenticateBy(entryPoint, request, authorization)).toThrow(
+        'Invalid signed request.',
+      );
     },
   );
 
@@ -109,12 +134,9 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
         Date.now() - STALE,
       );
 
-      expect(() =>
-        new DeviceAuthorizationRequestAuthenticator()[entryPoint](
-          request,
-          authorization,
-        ),
-      ).toThrow('Invalid signed request.');
+      expect(() => authenticateBy(entryPoint, request, authorization)).toThrow(
+        'Invalid signed request.',
+      );
     },
   );
 
@@ -122,17 +144,11 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
     'refuses a replayed recovery proof to %s',
     async (entryPoint) => {
       const { authorization, request } = await recoveryProof();
-      new DeviceAuthorizationRequestAuthenticator()[entryPoint](
-        request,
-        authorization,
-      );
+      authenticateBy(entryPoint, request, authorization);
 
-      expect(() =>
-        new DeviceAuthorizationRequestAuthenticator()[entryPoint](
-          request,
-          authorization,
-        ),
-      ).toThrow('Invalid signed request.');
+      expect(() => authenticateBy(entryPoint, request, authorization)).toThrow(
+        'Invalid signed request.',
+      );
     },
   );
 
@@ -143,8 +159,47 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
         Date.now() - STALE,
       );
 
+      expect(() => authenticateBy(entryPoint, request, authorization)).toThrow(
+        'Invalid signed request.',
+      );
+    },
+  );
+
+  it.each(IdentityIdMother.aliases())(
+    'reads a device proof that names its key by %s as a key the log does not record',
+    async (_encoding, aliasOf: (of: IdentityId) => IdentityId) => {
+      const { authorization, headers, request } = await fixture();
+      const log = logOf(authorization);
+      new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+        request,
+        log,
+      );
+      headers['x-device-credential'] = aliasOf(
+        new IdentityId(String(headers['x-device-credential'])),
+      ).valueOf();
+      const accept = jest.spyOn(signedRequestReplayGuard, 'accept');
+
+      const reader =
+        new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+          request,
+          log,
+        );
+
+      expect(log.records(reader)).toBe(false);
+      expect(accept).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(IdentityIdMother.aliases())(
+    'refuses a device proof that names an authorized key by %s',
+    async (_encoding, aliasOf: (of: IdentityId) => IdentityId) => {
+      const { authorization, headers, request } = await fixture();
+      headers['x-device-credential'] = aliasOf(
+        new IdentityId(String(headers['x-device-credential'])),
+      ).valueOf();
+
       expect(() =>
-        new DeviceAuthorizationRequestAuthenticator()[entryPoint](
+        new DeviceAuthorizationRequestAuthenticator().authenticate(
           request,
           authorization,
         ),
@@ -152,24 +207,35 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
     },
   );
 
-  it.each(IdentityIdMother.aliases())(
-    'refuses a replayed device proof that names its key by %s',
-    async (_encoding, aliasOf: (of: IdentityId) => IdentityId) => {
-      const { authorization, headers, request } = await fixture();
-      new DeviceAuthorizationRequestAuthenticator().authenticateReader(
-        request,
-        authorization,
-      );
-      headers['x-device-credential'] = aliasOf(
-        new IdentityId(String(headers['x-device-credential'])),
-      ).valueOf();
+  it.each(AUTHORIZED_ENTRY_POINTS)(
+    'takes no replay slot for a device proof %s refuses',
+    async (entryPoint) => {
+      const accept = jest.spyOn(signedRequestReplayGuard, 'accept');
+      const { authorization } = await fixture();
+      const stranger = await fixture();
 
       expect(() =>
-        new DeviceAuthorizationRequestAuthenticator().authenticateReader(
-          request,
-          authorization,
-        ),
+        authenticateBy(entryPoint, stranger.request, authorization),
       ).toThrow('Invalid signed request.');
+      expect(accept).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(AUTHORIZED_ENTRY_POINTS)(
+    'admits a proof to %s after a refusal against an authorization lacking its device',
+    async (entryPoint) => {
+      const device = await KeyPair.generate();
+      const authorized = await fixture(device);
+      const { request } = await fixture(device);
+      const other = await fixture();
+
+      expect(() =>
+        authenticateBy(entryPoint, request, other.authorization),
+      ).toThrow('Invalid signed request.');
+
+      expect(() =>
+        authenticateBy(entryPoint, request, authorized.authorization),
+      ).not.toThrow();
     },
   );
 
@@ -293,15 +359,33 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
   });
 
   describe('authenticateReader', () => {
-    it('identifies a signing device the head no longer authorizes', async () => {
+    async function removedReader() {
       const removed = await KeyPair.generate();
       const authorized = await fixture();
       const reader = await fixture(removed);
+      const removedCredential = DeviceCredential.fromString(
+        removed.toPrimitives().publicKey,
+      );
+      const enrolled = authorized.authorization.enroll(removedCredential);
+
+      return {
+        ...reader,
+        log: logOf(
+          authorized.authorization,
+          enrolled,
+          enrolled.revoke(removedCredential),
+        ),
+        removed,
+      };
+    }
+
+    it('identifies a signing device the head no longer authorizes', async () => {
+      const { log, removed, request } = await removedReader();
 
       const credential =
         new DeviceAuthorizationRequestAuthenticator().authenticateReader(
-          reader.request,
-          authorized.authorization,
+          request,
+          log,
         );
 
       expect(credential).toBeInstanceOf(DeviceCredential);
@@ -312,13 +396,63 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
       ).toBe(true);
     });
 
+    it('refuses a replayed proof of a device the head no longer authorizes', async () => {
+      const { log, request } = await removedReader();
+      new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+        request,
+        log,
+      );
+
+      expect(() =>
+        new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+          request,
+          log,
+        ),
+      ).toThrow('Invalid signed request.');
+    });
+
+    it('serves a device in no replayed state without taking a replay slot', async () => {
+      const accept = jest.spyOn(signedRequestReplayGuard, 'accept');
+      const { authorization } = await fixture();
+      const stranger = await KeyPair.generate();
+      const { request } = await fixture(stranger);
+
+      const readers = [1, 2].map(() =>
+        new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+          request,
+          logOf(authorization),
+        ),
+      );
+
+      readers.forEach((reader) =>
+        expect(
+          (reader as DeviceCredential).isEqual(
+            DeviceCredential.fromString(stranger.toPrimitives().publicKey),
+          ),
+        ).toBe(true),
+      );
+      expect(accept).not.toHaveBeenCalled();
+    });
+
+    it('refuses a stale proof of a device in no replayed state', async () => {
+      const { authorization } = await fixture();
+      const { request } = await fixture(undefined, Date.now() - STALE);
+
+      expect(() =>
+        new DeviceAuthorizationRequestAuthenticator().authenticateReader(
+          request,
+          logOf(authorization),
+        ),
+      ).toThrow('Invalid signed request.');
+    });
+
     it('identifies the recovery authority of the identity', async () => {
       const { authorization, request } = await recoveryProof();
 
       const reader =
         new DeviceAuthorizationRequestAuthenticator().authenticateReader(
           request,
-          authorization,
+          logOf(authorization),
         );
 
       expect(reader).toBeInstanceOf(RecoveryAuthority);
@@ -336,7 +470,7 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
       expect(() =>
         new DeviceAuthorizationRequestAuthenticator().authenticateReader(
           request,
-          other.authorization,
+          logOf(other.authorization),
         ),
       ).toThrow('Invalid signed request.');
     });
@@ -348,7 +482,7 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
       expect(() =>
         new DeviceAuthorizationRequestAuthenticator().authenticateReader(
           request,
-          authorization,
+          logOf(authorization),
         ),
       ).toThrow('Invalid signed request.');
     });
@@ -360,7 +494,7 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
       expect(() =>
         new DeviceAuthorizationRequestAuthenticator().authenticateReader(
           request,
-          authorization,
+          logOf(authorization),
         ),
       ).toThrow('Invalid signed request.');
     });
@@ -373,7 +507,7 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
       expect(() =>
         new DeviceAuthorizationRequestAuthenticator().authenticateReader(
           request,
-          authorization,
+          logOf(authorization),
         ),
       ).toThrow('Invalid signed request.');
     });
@@ -386,7 +520,7 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
       expect(() =>
         new DeviceAuthorizationRequestAuthenticator().authenticateReader(
           request,
-          authorization,
+          logOf(authorization),
         ),
       ).toThrow('Invalid signed request.');
     });

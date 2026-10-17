@@ -25,8 +25,11 @@ paths:
         Total recovery omits both device headers and sends X-Recovery-Signature.
         The device or recovery proof must carry an X-Timestamp within 30 seconds
         of the node clock and is accepted once: a replayed proof signature,
-        under any encoding of the same key, is refused. Clients sign every read
-        anew.
+        under any encoding of the same key, is refused. A proof takes its
+        replay slot only once the device is authorized or the key is the
+        recovery authority. The record is in memory and per node, so within
+        the 60 second window a proof can be accepted once more on another node
+        or after a restart. Clients sign every read anew.
       parameters:
         - in: path
           name: identityId
@@ -97,7 +100,10 @@ paths:
         before the query is parsed. Unlike the checkpoint read, the device
         credential does not have to be authorized at the head: a removed device
         reads the transitions up to its removal so it can verify that removal
-        itself.
+        itself. The recovery authority and a device some replayed state
+        authorized take a replay slot, so a replayed read is refused (401020);
+        any other key takes none and reads only recoveries and
+        concurrentRecoveries.
 
         Every entry is the stored signed transition, byte-for-byte the
         primitives POST /identity-devices/transitions accepted, never re-signed

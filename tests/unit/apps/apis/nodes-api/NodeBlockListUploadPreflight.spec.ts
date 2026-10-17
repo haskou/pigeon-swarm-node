@@ -5,6 +5,7 @@ import { InvalidSignedRequestError } from '@app/apps/apis/shared/errors/InvalidS
 import { SignedRequestBodyIsTooLargeError } from '@app/apps/apis/shared/errors/SignedRequestBodyIsTooLargeError';
 import { SignedRequestBodyReadTimeoutError } from '@app/apps/apis/shared/errors/SignedRequestBodyReadTimeoutError';
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
@@ -136,6 +137,8 @@ describe('NodeBlockListUploadPreflight', () => {
 
     const blockPolicy = mock<NodeBlockPolicy>();
     blockPolicy.isIdentityBlocked.mockResolvedValue(false);
+    const identityRepository = mock<IdentityRepository>();
+    identityRepository.holds.mockResolvedValue(true);
     const node = mock<Node>();
     node.isOwnedBy.mockImplementation((identityId) =>
       identityId.isEqual(identityOf(owner)),
@@ -147,7 +150,7 @@ describe('NodeBlockListUploadPreflight', () => {
       [NodeLoader, nodeLoader],
       [
         SignedHttpRequestAuthenticator,
-        new SignedHttpRequestAuthenticator(blockPolicy),
+        new SignedHttpRequestAuthenticator(blockPolicy, identityRepository),
       ],
     ]);
     new Kernel({

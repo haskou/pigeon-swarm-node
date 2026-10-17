@@ -80,6 +80,7 @@ services:
     class: /apps/apis/shared/SignedHttpRequestAuthenticator
     arguments:
       - '@contexts/nodes/domain/services/NodeBlockPolicy'
+      - '@contexts/identities/domain/repositories/IdentityRepository'
   apps/commands/nodes/NodeOwnerResetCommand:
     class: /apps/commands/nodes/NodeOwnerResetCommand
     arguments:

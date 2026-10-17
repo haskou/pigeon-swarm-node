@@ -36,11 +36,11 @@ export class GetDeviceAuthorizationRoute extends Route {
     DeviceAuthorizationFinder,
   );
 
-  /** The authorization of the identity that signed the request for itself. */
-  private async findForRequester(
+  /** The identity that signed the request for itself. */
+  private async authenticateRequester(
     identityId: string,
     request: Request,
-  ): Promise<DeviceAuthorization> {
+  ): Promise<IdentityId> {
     const requesterIdentityId = await this.authenticator.authenticate(request);
     const targetIdentityId = new IdentityId(decodeURIComponent(identityId));
 
@@ -49,16 +49,18 @@ export class GetDeviceAuthorizationRoute extends Route {
       new InvalidSignedRequestError(),
     );
 
-    return this.finder.find(
-      new DeviceAuthorizationFindMessage(targetIdentityId),
-    );
+    return targetIdentityId;
   }
 
   private async findForOwner(
     identityId: string,
     request: Request,
   ): Promise<DeviceAuthorization> {
-    const authorization = await this.findForRequester(identityId, request);
+    const authorization = await this.finder.find(
+      new DeviceAuthorizationFindMessage(
+        await this.authenticateRequester(identityId, request),
+      ),
+    );
     this.deviceAuthenticator.authenticate(request, authorization);
 
     return authorization;
@@ -110,18 +112,15 @@ export class GetDeviceAuthorizationRoute extends Route {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const authorization = await this.findForRequester(identityId, request);
-    const reader = this.deviceAuthenticator.authenticateReader(
-      request,
-      authorization,
+    const log = await this.finder.findTransitionLog(
+      new DeviceAuthorizationFindMessage(
+        await this.authenticateRequester(identityId, request),
+      ),
     );
-    const disclosure = await this.finder.findTransitionLog(
-      new GetDeviceAuthorizationTransitionLogRequest(
-        authorization.getIdentityId(),
-        reader,
-        after,
-      ).getMessage(),
-    );
+    const reader = this.deviceAuthenticator.authenticateReader(request, log);
+    const disclosure = log
+      .disclosedTo(reader)
+      .after(new GetDeviceAuthorizationTransitionLogRequest(after).getAfter());
 
     return response
       .status(HttpRouteStatusEnum.OK)

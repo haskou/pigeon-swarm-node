@@ -148,6 +148,7 @@ const GROUP_CALL_CAPABILITY = 'Zm9yLXRoZS1ncm91cC1jYWxsLW9ubHktMzItYnl0ZXM';
 export default class Definitions {
   private admissionProofBits: number | undefined;
   private identitySignedOffsetMs = 0;
+  private signedRequestOffsetMs = 0;
   private binaryBody: Buffer | undefined;
   private readonly notificationSettingsSequences = new Map<string, number>();
   private readonly communityRecordSequences = new Map<string, number>();
@@ -1389,7 +1390,7 @@ export default class Definitions {
   private async signCurrentRequest(
     method: string,
     path: string,
-    timestamp: string = String(Date.now()),
+    timestamp: string = String(Date.now() + this.signedRequestOffsetMs),
     keyPair: KeyPair | undefined = undefined,
     identityId: IdentityId | undefined = undefined,
   ): Promise<void> {
@@ -1605,6 +1606,7 @@ export default class Definitions {
     this.callJoined.clear();
     this.admissionProofBits = undefined;
     this.identitySignedOffsetMs = 0;
+    this.signedRequestOffsetMs = 0;
     this.communityChannelId = undefined;
     this.communityChannelMessageId = undefined;
     this.communityThreadRootMessageId = undefined;
@@ -2192,6 +2194,11 @@ export default class Definitions {
         [network],
       );
     }
+  }
+
+  @given('requests are signed {int} seconds ago')
+  public requestsAreSignedSecondsAgo(seconds: number): void {
+    this.signedRequestOffsetMs = -seconds * 1_000;
   }
 
   @given('identity bodies are signed {int} minutes ago')

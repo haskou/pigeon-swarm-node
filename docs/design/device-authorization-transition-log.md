@@ -87,6 +87,12 @@ authorized at the head. A device that was just removed must be able to read
 its removal. The device signature still proves possession of the key, so the
 node discloses to that key and nothing else.
 
+Every proof must be fresh, but only the recovery authority and a device some
+replayed state authorized (`log.records(reader)`) take a slot in the replay
+guard, so a replayed proof of theirs is refused. A key in no replayed state
+takes no slot and reads only the public recovery lineage, so a key that was
+never authorized cannot fill the guard.
+
 ### Disclosure
 
 The node builds a `DeviceAuthorizationTransitionLog` (the lists above plus
