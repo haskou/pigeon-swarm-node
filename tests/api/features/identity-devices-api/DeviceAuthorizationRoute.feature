@@ -91,6 +91,32 @@ Feature: Device authorization route
     Then response code is equal to 200
     And response is the current device authorization checkpoint
 
+  Scenario: Refuse a replayed device proof reading the authorization checkpoint
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "checkpoint replay" and handle "checkpoint-replay"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I sign the current device authorization checkpoint request
+    When I GET the current device authorization checkpoint
+    Then response code is equal to 200
+    When I GET the current device authorization checkpoint
+    Then response code is equal to 401
+    And response body should contain "401020"
+
+  Scenario: Refuse a replayed recovery proof reading the transition log
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-recovery-network"
+    And I set a client-signed identity body with name "recovery log replay" and handle "recovery-log-replay"
+    When I POST to "/identities/"
+    Then response code is equal to 200
+    Given I sign the current device transition log recovery request
+    When I GET the current device transition log
+    Then response code is equal to 200
+    When I GET the current device transition log
+    Then response code is equal to 401
+    And response body should contain "401020"
+
   Scenario: Require authentication to read a device authorization checkpoint
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
