@@ -278,8 +278,11 @@ operator therefore learns who asked to join which community (see
 can preview before signing in or creating an identity.
 
 - The client sends the derived key as `Authorization: Bearer <invitationKey>`,
-  never in the URL, so the key stays out of access logs, as mailbox
-  capabilities do (`MailboxRouteSupport`).
+  never in the URL, as mailbox and call capabilities do
+  (`MailboxRouteSupport.bearerToken`, `CallRouteSupport.capability`). The key
+  is not secret: members and node operators read it in `invitation_created`.
+  The header keeps it, and with it the invitation, out of URLs and access
+  logs. The node never logs the `Authorization` header.
 - The node finds the invitation through an index of invitation keys. An
   unknown key, or an invitation that is not live at the node's frontier or
   has expired by the node's clock, gets the same `404` as an unknown
@@ -391,6 +394,10 @@ Invitation `I` is **live** in a set of operations `S` when all of these hold:
    joiners that have an admission under `I` in `S` that is valid by these
    rules at its own causal past. Admissions that the fold later skips or
    voids still count, which errs on the side of fewer uses.
+5. The issuer of `I` holds `create_invites` in the community folded from
+   `S`. A ban that cuts nothing in the cut graph still applies to the folded
+   state (see [Retroactive reach](#retroactive-reach)), so this rule stops a
+   banned issuer's invitations once the ban is in an admission's causal past.
 
 An admission `A` (`member_joined`, method `invitation`) is **valid** when all
 of these hold:
@@ -453,7 +460,12 @@ exceptions: the rule never removes them (see
   [Admission algorithm](#admission-algorithm)): a kick, a ban, a leave or a
   role change.
 - An operation `O` by `X` that needs permission `P` is **void** in a set `S`
-  when a cut that stands in `S` is concurrent with `O` and cuts `P` of `X`.
+  when a cut that stands in `S` reaches `O` and cuts `P` of `X`.
+- A standing cut `C` **reaches** `O` when they are concurrent. If `C` lies in
+  a cycle of the cut graph (see [Standing cuts](#standing-cuts)), `C` also
+  never reaches an operation in the closure of an operation that `C`'s author
+  signed without `C` in its closure. A cycle cut never voids what its author
+  built on.
 - A void operation changes nothing in the folded state, and **it cuts
   nothing**. Operations that depended on it are re-authorized linearly as
   usual. For example, a joiner whose admission is void is not a member, so
@@ -475,59 +487,97 @@ way:
    author.
 2. Group the cuts into strongly connected components, and visit the
    components in topological order.
-3. A cut is void when an edge reaches it from a standing cut in an earlier
-   component. Every other cut stands. Cuts in the same cycle never void each
-   other.
+3. A cut is void when a standing cut in an earlier component reaches it and
+   cuts the permission it needs. Every other cut stands. Cuts in the same
+   component never void each other.
+
+A cycle is a component of more than one cut. Edges ignore the bound on
+reach, so the components never depend on it.
 
 So:
 
 - **A removed member cannot undo its removal.** Its backdated cuts are
   concurrent with its removal, which reaches them, so they are void and cut
   nothing. The one exception is a cut of its remover, which forms a cycle
-  with the removal.
+  with the removal and whose reach is bounded (see
+  [Retroactive reach](#retroactive-reach)).
 - **Mutual cuts all stand.** When manager `A` kicks `X` and `X` kicks `A`
-  concurrently, both lose `manage_members`, and the acts of each that are
-  concurrent with the other's kick are void. No replica can tell which kick
-  came first. Letting both fall would keep `X`, together with every other cut
-  it made. A third manager or the founder restores whoever should stay.
+  concurrently, both lose `manage_members`, and each kick voids the acts of
+  the other that it reaches. No replica can tell which kick came first.
+  Letting both fall would keep `X`, together with every other cut it made. A
+  third manager or the founder restores whoever should stay.
 - **The founder's cuts can never be answered.** The founder holds every
   permission by ownership, and can be neither kicked, banned nor made to
   leave while others remain (`Community.ts`). No cut reaches the founder's
   cuts.
 
+The fold indexes cuts by the member they cut. Step 1 compares each cut only
+with the cuts that cut its author, and the void rule tests each operation
+only against the standing cuts that cut its author, so no step compares all
+pairs. The graph, its components and the standing cuts are cached per
+frontier, as `pasts` is. The graph changes only when a cut arrives. The reach
+of a cycle cut also changes when its author signs, so the fold re-checks that
+author's cycles then.
+
 ### Retroactive reach
 
 A cut sits where its author places it. A cutter that chooses old parents
 makes its cut concurrent with every act of the cut member since those
-parents, and voids all of them. This reach is retroactive by design:
+parents. Outside a cycle, the cut voids all of them. This reach is
+retroactive by design:
 
 - Every member who can cut someone has it, that is every holder of
-  `manage_members` or `manage_roles`. A removed manager gains it over its
-  remover through a mutual cut, so it can void its remover's acts since the
-  parents it chooses.
+  `manage_members` or `manage_roles`.
 - A member also cuts itself by leaving. A `create_invites` holder that leaves
   with old parents voids its own invitations since then, and the admissions
   under them, although it could not kick those joiners.
-- Bans fail closed. The cut rule never removes a ban from the folded state,
-  so cutting a moderator never readmits a member it banned. The linear fold
-  alone decides bans, as today. A ban that a standing cut reaches still cuts
-  nothing in the graph, so a removed moderator's backdated bans void nobody's
-  acts.
 - Without the cut, a backdated operation already takes effect where the
   fold's linear order places it among the operations it is concurrent with.
   The cut replaces that order with one rule.
 
+**A removed manager's answer is bounded.** A removed manager can cut its
+remover with old parents. That cut forms a cycle with its removal, so both
+stand. Its cut never reaches what it built on, so it voids only the remover's
+acts since the removed manager's own latest operations. A manager active
+until its removal voids little. One that had signed nothing for a long time
+reaches far back (see [Residuals](#residuals)).
+
+The bound applies to both cuts of the cycle. The removal spares a backdated
+act of the removed manager only when one of the remover's own devices built
+on that act before receiving the removal.
+
+The bound still voids. If cycle cuts voided nothing, a removed manager could
+keep its backdated invitations and admissions by answering its removal with a
+cut of its remover, because nothing would void them.
+
+**Bans fail closed.** The cut rule never removes a ban from the folded state,
+so cutting a moderator never readmits a member it banned. The linear fold
+alone decides bans, as today. A ban that a standing cut reaches still cuts
+nothing in the graph, so a removed moderator's backdated bans void nobody's
+acts. A backdated ban of the remover forms a cycle with the removal, so it
+stands like any cycle cut, with the same bounded reach.
+
+The price is that a removed moderator can still ban by backdating, as it can
+today. A ban with parents from before its removal becomes ready early in the
+linear order, and its author can choose `createdAt` until the ban's digest
+sorts it before the removal (`CommunityStateFold.orderOf`), so the ban
+applies. This works against any identity, the remover included. A manager's
+unban is the remedy. Without a total order, an honest ban made during a
+partition looks exactly like a backdated one, so voiding backdated bans would
+also void honest bans and readmit those members.
+
 ### For invitations
 
-- An invitation whose issuer's `create_invites` is cut by a concurrent
-  standing cut is void, and so is every admission under it.
-- An admission whose admitter's `manage_members` is cut by a concurrent
-  standing cut is void.
+- An invitation whose issuer's `create_invites` is cut by a standing cut that
+  reaches it is void, and so is every admission under it.
+- An admission whose admitter's `manage_members` is cut by a standing cut
+  that reaches it is void.
 - A removed or demoted member's backdated invitation or admission is
   concurrent with the removal, so it is void on every replica once the
-  removal arrives. When the removal is already in the operation's causal
-  past, the ledger refuses the operation outright (admission rule 1 and
-  liveness rule 3).
+  removal arrives, unless the removal lies in a cycle and one of the
+  remover's devices built on it (see [Retroactive reach](#retroactive-reach)).
+  When the removal is already in the operation's causal past, the ledger
+  refuses the operation outright (admission rule 1 and liveness rule 3).
 - **Revocations are never void.** A revocation only closes an invitation.
   Voiding it would reopen a link that an authorized member closed. A revoker
   needs its authority only at the revocation's parents. A removed issuer or
@@ -539,10 +589,11 @@ parents, and voids all of them. This reach is retroactive by design:
 
 A void admission removes a member, also when the admission was honest and was
 made during a partition in which the admitter or the issuer was demoted. Only
-a member who can cut, that is a `manage_members` or `manage_roles` holder,
-triggers this, and such a member could remove the joiner directly anyway. A
-member who leaves the fold loses their MLS leaves, as on any removal (UI
-`docs/mls-group-encryption.md`, "Who commits", Remove).
+a member who can cut triggers this: a `manage_members` or `manage_roles`
+holder, who could remove the joiner directly anyway, or a removed manager
+answering its removal, whose cut reaches only the remover's acts it had not
+built on. A member who leaves the fold loses their MLS leaves, as on any
+removal (UI `docs/mls-group-encryption.md`, "Who commits", Remove).
 
 Slice 2 builds the cut graph and voids invitations and admissions with it.
 #543's own change voids every other operation that needs a permission
@@ -594,10 +645,14 @@ These statements hold for honest admitters:
    The most they can do is submit one claim per identity and invitation, and
    join while the invitation is live.
 
-6. **A removed or demoted issuer or admitter cannot act by backdating.** Its
-   invitations and admissions are void everywhere once the removal is known.
-   Only its revocations stay valid (see
-   [Authority cuts](#authority-cuts-543)).
+6. **A removed or demoted issuer or admitter cannot invite or admit by
+   backdating.** Its invitations and admissions are void everywhere once the
+   removal is known. Three kinds of backdated act still take effect (see
+   [Authority cuts](#authority-cuts-543)):
+   - revocations, which close links and evict nobody;
+   - bans, where the linear order places them, until a manager unbans;
+   - a cut of its remover, which voids only the remover's acts that the
+     removed member had not built on.
 7. **A malicious manager can ignore any of these limits** while it is a
    manager. It can already add anyone with `added`, so this is no new power.
 
@@ -641,36 +696,38 @@ to every member:
 
 ## Threats
 
-| Threat                                                             | Actor                                   | Outcome                                                                                          | Mechanism                                                                                         |
-| ------------------------------------------------------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| Read the link secret from replicated records, an API or logs       | node operator, member, network observer | prevented                                                                                        | only the public key and joiner-bound proofs leave the joiner's client                             |
-| Read the secret from the UI host or `Referer`                      | UI host operator                        | prevented                                                                                        | browsers do not send fragments; the UI removes the fragment from the address bar                  |
-| Read an invitation key from access logs                            | proxy or node operator                  | prevented                                                                                        | the preview sends the key in a header                                                             |
-| Use a token from records stored before the cutover                 | node operator                           | grants nothing                                                                                   | the cutover refuses every old scope and join method                                               |
-| Join without the link                                              | outsider                                | prevented                                                                                        | possession proof                                                                                  |
-| Replay a possession proof for another identity                     | anyone who reads operations or claims   | prevented                                                                                        | the proof binds identity, invitation, community and network                                       |
-| Join under an alias id while banned, or use an invitation twice    | banned identity, member, malicious node | prevented                                                                                        | canonical ids in every operation and claim; strict key decoding                                   |
-| Join through a link bound to another identity                      | link holder                             | prevented                                                                                        | `invitee`, checked by the claim policy, the ledger and every fold                                 |
-| Enroll an identity without its consent                             | link holder                             | prevented                                                                                        | consent proof                                                                                     |
-| Join after revocation or expiry, or exceed `maxUses`               | link holder                             | prevented                                                                                        | the admitter chooses position and `createdAt`; the checks run at the admission's past             |
-| Spend a manager's operation quota through claims                   | link holder with many identities        | prevented                                                                                        | admissions count toward their joiner                                                              |
-| Extend an invitation's life                                        | issuer                                  | at most 30 days from its `createdAt`; ends when the issuer loses `create_invites`                | expiry bound, admission rule 6, liveness rule 3                                                   |
-| Overshoot `maxUses` through concurrent admissions                  | honest admitters across a partition     | possible, at most `k * maxUses` with `maxUses <= 100`                                            | stated limit; no eviction by use count                                                            |
-| Evict a member with a backdated join                               | link holder                             | prevented                                                                                        | link holders sign no operations; use count and revocation never evict                             |
-| Forge an invitation                                                | member without `create_invites`         | prevented                                                                                        | permission checked at `past(I)` and in the fold                                                   |
-| Revoke another issuer's invitation                                 | `create_invites` holder                 | prevented                                                                                        | only the issuer and `manage_members` holders revoke                                               |
-| Backdate an invitation, admission or cut after removal or demotion | former issuer or manager                | void once the removal is known                                                                   | authority cut; void operations cut nothing; ledger refusal when the removal is in the causal past |
-| Answer a removal with a backdated cut of the remover               | removed manager                         | both lose the permission; the remover's concurrent acts are void; impossible against the founder | mutual cuts stand ([residual](#residuals))                                                        |
-| Revoke with parents from before a removal                          | former issuer or manager                | closes invitations it could revoke before the removal; evicts nobody                             | revocations are never void ([residual](#residuals))                                               |
-| Readmit a banned member by cutting its moderator                   | member who can cut                      | prevented                                                                                        | bans fail closed; the cut rule never removes a ban                                                |
-| Present another encoding of a proof                                | anyone                                  | refused                                                                                          | strict signature decoding; no rule keys on signature bytes                                        |
-| Issue, admit or revoke with a stolen device                        | device thief                            | bounded by `compromisedSince`; replicas can diverge until #541                                   | causal device authorization; #541                                                                 |
-| Serve forged, aliased or over-limit admissions to a client         | malicious node                          | prevented                                                                                        | the client fold checks canonical ids, the proofs and the admission rules                          |
-| Ignore limits or revocation                                        | malicious manager                       | not prevented, no new power                                                                      | `added` already exists                                                                            |
-| Flood claims                                                       | link holder with many identities        | bounded by the cost of creating identities; one claim per identity and invitation                | [residual](#residuals)                                                                            |
-| Learn which identity asks to join which community                  | node operator                           | possible                                                                                         | claims replicate through the `requests` store ([residual](#residuals))                            |
-| Publish a weak (small-order) invitation key                        | malicious issuer                        | refused                                                                                          | strict key decoding; an issuer could publish the secret anyway                                    |
-| Link leaked by its holder (chat, screenshot)                       | whoever sees the link                   | can join while the invitation is live, unless it names an `invitee`                              | revocation, expiry of at most 30 days, `maxUses`, `invitee`; inherent to bearer links             |
+| Threat                                                                               | Actor                                   | Outcome                                                                                                                               | Mechanism                                                                                         |
+| ------------------------------------------------------------------------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Read the link secret from replicated records, an API or logs                         | node operator, member, network observer | prevented                                                                                                                             | only the public key and joiner-bound proofs leave the joiner's client                             |
+| Read the secret from the UI host or `Referer`                                        | UI host operator                        | prevented                                                                                                                             | browsers do not send fragments; the UI removes the fragment from the address bar                  |
+| Link preview requests to invitations in access logs                                  | proxy or node operator                  | prevented; the key itself is public to members and node operators                                                                     | the key travels in a header, never in a URL; the node never logs `Authorization`                  |
+| Use a token from records stored before the cutover                                   | node operator                           | grants nothing                                                                                                                        | the cutover refuses every old scope and join method                                               |
+| Join without the link                                                                | outsider                                | prevented                                                                                                                             | possession proof                                                                                  |
+| Replay a possession proof for another identity                                       | anyone who reads operations or claims   | prevented                                                                                                                             | the proof binds identity, invitation, community and network                                       |
+| Join under an alias id while banned, or use an invitation twice                      | banned identity, member, malicious node | prevented                                                                                                                             | canonical ids in every operation and claim; strict key decoding                                   |
+| Join through a link bound to another identity                                        | link holder                             | prevented                                                                                                                             | `invitee`, checked by the claim policy, the ledger and every fold                                 |
+| Enroll an identity without its consent                                               | link holder                             | prevented                                                                                                                             | consent proof                                                                                     |
+| Join after revocation or expiry, or exceed `maxUses`                                 | link holder                             | prevented                                                                                                                             | the admitter chooses position and `createdAt`; the checks run at the admission's past             |
+| Spend a manager's operation quota through claims                                     | link holder with many identities        | prevented                                                                                                                             | admissions count toward their joiner                                                              |
+| Extend an invitation's life                                                          | issuer                                  | at most 30 days from its `createdAt`; ends when the issuer loses `create_invites`                                                     | expiry bound, admission rule 6, liveness rules 3 and 5                                            |
+| Overshoot `maxUses` through concurrent admissions                                    | honest admitters across a partition     | possible, at most `k * maxUses` with `maxUses <= 100`                                                                                 | stated limit; no eviction by use count                                                            |
+| Evict a member with a backdated join                                                 | link holder                             | prevented                                                                                                                             | link holders sign no operations; use count and revocation never evict                             |
+| Forge an invitation                                                                  | member without `create_invites`         | prevented                                                                                                                             | permission checked at `past(I)` and in the fold                                                   |
+| Revoke another issuer's invitation                                                   | `create_invites` holder                 | prevented                                                                                                                             | only the issuer and `manage_members` holders revoke                                               |
+| Backdate an invitation, admission or cut of a third member after removal or demotion | former issuer or manager                | void once the removal is known                                                                                                        | authority cut; void operations cut nothing; ledger refusal when the removal is in the causal past |
+| Answer a removal with a backdated cut of the remover                                 | removed manager                         | both lose the permission; voids only the remover's acts since the removed manager's latest operations; impossible against the founder | cycle cuts stand with bounded reach ([residual](#residuals))                                      |
+| Revoke with parents from before a removal                                            | former issuer or manager                | closes invitations it could revoke before the removal; evicts nobody                                                                  | revocations are never void ([residual](#residuals))                                               |
+| Ban by backdating after removal                                                      | former moderator                        | possible against any identity, the remover included, until a manager unbans                                                           | bans fail closed; the linear order decides them ([residual](#residuals))                          |
+| Readmit a banned member by cutting its moderator                                     | member who can cut                      | prevented                                                                                                                             | bans fail closed; the cut rule never removes a ban                                                |
+| Admit under a banned issuer's invitation                                             | manager                                 | refused once the ban is in the admission's causal past                                                                                | liveness rule 5                                                                                   |
+| Present another encoding of a proof                                                  | anyone                                  | refused                                                                                                                               | strict signature decoding; no rule keys on signature bytes                                        |
+| Issue, admit or revoke with a stolen device                                          | device thief                            | bounded by `compromisedSince`; replicas can diverge until #541                                                                        | causal device authorization; #541                                                                 |
+| Serve forged, aliased or over-limit admissions to a client                           | malicious node                          | prevented                                                                                                                             | the client fold checks canonical ids, the proofs and the admission rules                          |
+| Ignore limits or revocation                                                          | malicious manager                       | not prevented, no new power                                                                                                           | `added` already exists                                                                            |
+| Flood claims                                                                         | link holder with many identities        | bounded by the cost of creating identities; one claim per identity and invitation                                                     | [residual](#residuals)                                                                            |
+| Learn which identity asks to join which community                                    | node operator                           | possible                                                                                                                              | claims replicate through the `requests` store ([residual](#residuals))                            |
+| Publish a weak (small-order) invitation key                                          | malicious issuer                        | refused                                                                                                                               | strict key decoding; an issuer could publish the secret anyway                                    |
+| Link leaked by its holder (chat, screenshot)                                         | whoever sees the link                   | can join while the invitation is live, unless it names an `invitee`                                                                   | revocation, expiry of at most 30 days, `maxUses`, `invitee`; inherent to bearer links             |
 
 ## Changes at implementation
 
@@ -692,8 +749,8 @@ order because each one depends on the one before it:
      - refuse non-canonical identity ids in every community operation, in the
        ledger and the fold;
      - count each invitation admission toward its joiner's quota;
-     - add the cut graph to the fold and void invitations and admissions
-       with it;
+     - add the cut graph to the fold, cached per frontier, and void
+       invitations and admissions with it;
      - add the write-once `community_invitation_claim` policy.
    - Removals:
      - the `invite_link` method and the old self-signed `invitation` method;
@@ -731,8 +788,9 @@ order because each one depends on the one before it:
      - unit specs for every rule and negative case, including alias ids for
        a joiner, a banned member and a repeated use, a `maxUses` above 100,
        an `invitee` mismatch, and the quota of a joiner and of an admitter;
-     - the cut graph: mutual cuts, a removed member's backdated cuts and
-       bans, the founder's cuts, and a revocation after removal;
+     - the cut graph: mutual cuts and their bounded reach, a removed
+       member's backdated cuts and bans, the founder's cuts, a banned
+       issuer's invitations, and a revocation after removal;
      - the crypto vectors;
      - a forged-operations integration test;
      - real-transport end-to-end tests for backdating, partition and heal,
@@ -740,7 +798,7 @@ order because each one depends on the one before it:
 3. **UI** (#433), described below.
 
 No log line contains a secret, a key, an invitation id, an identity id, a
-community id or an address.
+community id or an address. The node never logs the `Authorization` header.
 
 ## UI changes (#433)
 
@@ -799,12 +857,20 @@ community id or an address.
   which invitation.
 - Concurrent admissions overshoot `maxUses` by at most a factor of the number
   of concurrent branches, and the overshoot is never repaired.
-- Cuts reach back as far as their author chooses. A cut voids every
-  concurrent act of the cut member, including honest admissions made during
-  a partition. A removed manager can answer its remover with a mutual cut,
-  and both lose the permission. A member that leaves with old parents voids
-  its own invitations and the admissions under them. Only the founder's cuts
-  cannot be answered.
+- Cuts outside a cycle reach back as far as their author chooses, and void
+  every act of the cut member they reach, including honest admissions made
+  during a partition. A member that leaves with old parents voids its own
+  invitations and the admissions under them.
+- A removed manager can answer its remover with a cut, and both lose the
+  permission. Its cut voids the remover's acts since the removed manager's
+  own latest operations, so a manager that had signed nothing for a long time
+  reaches far back. Only the founder's cuts cannot be answered.
+- When a removed manager answers its removal, the removal spares a backdated
+  act of the removed manager that one of the remover's devices built on
+  before receiving the removal. A malicious node serving that device can
+  arrange that order.
+- A removed moderator can ban any identity, its remover included, by
+  backdating, as today. A manager's unban is the remedy.
 - The `invitee` of a bound link tells every member which identity the issuer
   invited, before that identity joins and even if it never does.
 - A removed issuer or manager can still revoke, with parents from before its
