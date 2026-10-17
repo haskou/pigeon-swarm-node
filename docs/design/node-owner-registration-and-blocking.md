@@ -264,20 +264,31 @@ header with `401` code `401020`, and a record or path id (`POST /identities`,
 device transitions, sealed secrets) with `400` code `400080`. The answer depends
 on the id alone, so it reveals nothing about the list.
 
-`PUT /node/blocks` refuses a list blocking such an id with `400` code `400080`.
-A source list is kept with the bytes its publisher signed, so an alias it names
-stays in `list`, but it is never pending, approved or enforced. Replicated
-identity records under an alias id are refused on every load and never held.
+`PUT /node/blocks`, `PUT /node/block-exceptions`,
+`PUT /node/block-sources/{ownerIdentityId}` and
+`POST /node/block-sources/{ownerIdentityId}/approvals` refuse a body or path
+naming such an id with `400` code `400080` before anything is stored, so no
+owner write can add an alias. A source list is kept with the bytes its
+publisher signed, so an alias it names stays in `list`, but it is never
+pending, approved or enforced. Replicated identity records under an alias id
+are refused on every load and never held.
 
 **Upgrading a node that ran before ids had to be canonical.** At every start,
-before blocks are enforced, `NonCanonicalIdentityIdsPurger` drops alias ids
-from the local exceptions and from what each adopted source applies, and
-clears an owner stored under an alias. It logs counts only
+before blocks are enforced and before the server accepts a request (`index.ts`
+runs every initializer before `runServer`), `NonCanonicalIdentityIdsPurger`
+drops alias ids from the local exceptions and from what each adopted source
+applies, and clears an owner stored under an alias. Its read-filter-save
+therefore never races an owner route. It logs counts only
 (`Purged non-canonical identity ids: ownerCleared=<bool> removedEntries=<n>`),
 never an id, and writes nothing when the stored data is canonical. A node whose
 owner was cleared is unclaimed: the first signed caller of `PUT /node/owner`
-claims it, so the operator claims it again with the canonical id at once, or,
-with the node stopped, names the owner with `yarn node:reset-owner`.
+claims it, and the node logs a warning that it is unclaimed and must be claimed
+again, naming `yarn node:reset-owner` and no id. Operators whose owner may have
+been claimed under an alias run `yarn node:reset-owner <canonical owner
+identity id>` on the stopped node before starting the upgraded node: the
+command refuses and changes nothing when that id already owns the node, and
+otherwise installs it in the same write that drops the alias owner (clearing
+the owner settings like any owner reset), so the node never starts unclaimed.
 
 ### What a node block does on this node
 

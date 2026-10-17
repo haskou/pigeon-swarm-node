@@ -252,6 +252,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NodeBlockSourceResource'
+        '400':
+          description: The body is invalid, or ownerIdentityId is not the canonical encoding of a usable key (code 400080); nothing is stored.
         '403':
           description: The authenticated identity is not the node owner (code 403010).
         '409':
@@ -354,6 +356,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NodeBlockSourceResource'
+        '400':
+          description: The body is invalid, or ownerIdentityId or a named blockedIdentityIds entry is not the canonical encoding of a usable key (code 400080); nothing is stored.
         '403':
           description: The authenticated identity is not the node owner (code 403010).
         '409':
@@ -399,6 +403,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NodeBlockExceptionsResource'
+        '400':
+          description: The body is invalid, or an identityIds entry is not the canonical encoding of a usable key (code 400080); nothing is stored.
         '403':
           description: The authenticated identity is not the node owner (code 403010).
   /node/diagnostics/:
