@@ -2,10 +2,21 @@ import EmbeddedLocalDatabase, {
   EmbeddedLocalDatabaseOperation,
 } from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import LocalDatabaseIsLockedError from '@app/shared/infrastructure/local-db/LocalDatabaseIsLockedError';
+import LocalDatabaseSectionIsNestedError from '@app/shared/infrastructure/local-db/LocalDatabaseSectionIsNestedError';
 import * as fs from 'fs/promises';
 import { Level } from 'level';
 import os from 'os';
 import path from 'path';
+import { setTimeout } from 'timers/promises';
+
+/** Settles like `pending`, or rejects once it waited a second, never hangs. */
+const withinASecond = async <T>(pending: Promise<T>): Promise<T> =>
+  Promise.race([
+    pending,
+    setTimeout(1000, undefined, { ref: false }).then((): never => {
+      throw new Error('Still waiting after a second');
+    }),
+  ]);
 
 describe('EmbeddedLocalDatabase', () => {
   let databasePath: string;
@@ -129,6 +140,62 @@ describe('EmbeddedLocalDatabase', () => {
     await expect(
       secondDatabase.findOne('records', 'invalid'),
     ).resolves.toBeUndefined();
+  });
+
+  it('should refuse at once a section entered from inside a section of the same scope, on any handle', async () => {
+    const nested = jest.fn();
+
+    await firstDatabase.exclusively('scope', async () => {
+      await expect(
+        withinASecond(secondDatabase.exclusively('scope', nested)),
+      ).rejects.toThrow(LocalDatabaseSectionIsNestedError);
+    });
+
+    expect(nested).not.toHaveBeenCalled();
+    await expect(
+      withinASecond(
+        secondDatabase.exclusively('scope', () => Promise.resolve('free')),
+      ),
+    ).resolves.toBe('free');
+  });
+
+  it('should name no scope or id in the refusal', async () => {
+    const refusal = firstDatabase.exclusively('identity-123', () =>
+      firstDatabase.exclusively('identity-123', () =>
+        Promise.resolve('nested'),
+      ),
+    );
+
+    await expect(withinASecond(refusal)).rejects.toMatchObject({
+      message:
+        'A local database section cannot be entered again from inside itself.',
+    });
+  });
+
+  it('should let a section of another scope run inside a section', async () => {
+    await expect(
+      withinASecond(
+        firstDatabase.exclusively('outer', () =>
+          secondDatabase.exclusively('inner', () => Promise.resolve('inner')),
+        ),
+      ),
+    ).resolves.toBe('inner');
+  });
+
+  it('should queue, not refuse, work a section started that enters it after the section ended', async () => {
+    const { promise: ended, resolve: end } = Promise.withResolvers<void>();
+    const enter = (): Promise<string> =>
+      firstDatabase.exclusively('scope', () => Promise.resolve('queued'));
+    let later!: Promise<string>;
+
+    await firstDatabase.exclusively('scope', () => {
+      later = ended.then(enter);
+
+      return Promise.resolve();
+    });
+    end();
+
+    await expect(withinASecond(later)).resolves.toBe('queued');
   });
 
   describe('when another process holds the database', () => {

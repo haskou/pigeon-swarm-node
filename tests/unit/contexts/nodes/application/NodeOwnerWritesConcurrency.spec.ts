@@ -20,6 +20,7 @@ import LocalNodeMetadataMapper from '@app/contexts/nodes/infrastructure/local-db
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import LocalDatabaseSectionIsNestedError from '@app/shared/infrastructure/local-db/LocalDatabaseSectionIsNestedError';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { LocalDomainEventPublisher } from '@app/shared/infrastructure/messageBus/LocalDomainEventPublisher';
 import { promises as fs } from 'fs';
@@ -104,6 +105,15 @@ describe('Concurrent node owner writes', () => {
       },
     };
   };
+
+  /** Settles like `pending`, or rejects once it waited a second, never hangs. */
+  const withinASecond = async <T>(pending: Promise<T>): Promise<T> =>
+    Promise.race([
+      pending,
+      setTimeout(1000, undefined, { ref: false }).then((): never => {
+        throw new Error('Still waiting after a second');
+      }),
+    ]);
 
   afterEach(async () => {
     await setImmediate();
@@ -264,6 +274,40 @@ describe('Concurrent node owner writes', () => {
     await expect(write).resolves.toBe('written');
     await handover;
     expect(landed).toEqual(['write', 'handover']);
+  });
+
+  it('should refuse a node update or hold nested in a hold at once and stay usable', async () => {
+    const change = jest.fn();
+    const nestedAction = jest.fn();
+    const owner = IdentityIdMother.canonical().valueOf();
+
+    await repository.holdLocalNode(async () => {
+      await expect(
+        withinASecond(freshRepository().updateLocalNode(change)),
+      ).rejects.toThrow(LocalDatabaseSectionIsNestedError);
+      await expect(
+        withinASecond(repository.updateStoppedLocalNode(change)),
+      ).rejects.toThrow(LocalDatabaseSectionIsNestedError);
+      await expect(
+        withinASecond(repository.holdLocalNode(nestedAction)),
+      ).rejects.toThrow(LocalDatabaseSectionIsNestedError);
+    });
+    await withinASecond(
+      new NodeOwnerAssigner(
+        freshRepository(),
+        mock<NodeBlockPolicy>(),
+      ).assignOwner(new NodeOwnerAssignerMessage(owner, owner)),
+    );
+
+    expect(change).not.toHaveBeenCalled();
+    expect(nestedAction).not.toHaveBeenCalled();
+    await expect(
+      withinASecond(
+        freshRepository().holdLocalNode((node) =>
+          Promise.resolve(node.toPrimitives().owner),
+        ),
+      ),
+    ).resolves.toBe(owner);
   });
 
   it('should give an unowned node one owner when two identities claim it together', async () => {
