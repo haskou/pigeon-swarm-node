@@ -1395,6 +1395,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         `identity:${signer.id}`,
         await recordOf(signer.build()),
       );
+      await headCache.markWarm('network-1');
       registry.addMutationGate(new OrbitDBIdentityMutationGate(ipfs));
       await registry.register('network-1', stores);
 
