@@ -35,6 +35,7 @@ import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNe
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
 import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
 import NodeOwnerSettingsResetter from '@app/contexts/nodes/application/reset-owner-settings/NodeOwnerSettingsResetter';
+import { NoNodeBlocks } from '@app/contexts/nodes/domain/NoNodeBlocks';
 import { NodeBlockEntries } from '@app/contexts/nodes/domain/NodeBlockEntries';
 import { NodeBlockList } from '@app/contexts/nodes/domain/NodeBlockList';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
@@ -1790,6 +1791,38 @@ export default class Definitions {
         encoding,
       ).valueOf(),
     });
+  }
+
+  /** Stores the owner-signed list as an upgraded node holds it: the alias is kept verbatim. */
+  @given(
+    'the node stored its own block list version {int} blocking the other identity under {string} of its key',
+  )
+  public async theNodeStoredAnAliasAsOwnBlockList(
+    version: number,
+    encoding: string,
+  ): Promise<void> {
+    await this.setNodeBlockListBody(
+      version,
+      'other',
+      'owner',
+      'owner',
+      encoding,
+    );
+    await Kernel.di
+      .getService<EmbeddedLocalDatabase>(EmbeddedLocalDatabase)
+      .save('node_block_list', 'local', {
+        _id: 'local',
+        blockList: JSON.parse(String(this.body)),
+      });
+  }
+
+  @then('the node has no stored own block list')
+  public async theNodeHasNoStoredOwnBlockList(): Promise<void> {
+    expect(
+      await Kernel.di
+        .getService<NodeBlockListRepository>(NodeBlockListRepository)
+        .findLocal(),
+    ).to.be.instanceOf(NoNodeBlocks);
   }
 
   /** Runs the startup purge, then reloads blocks, as a restart does. */

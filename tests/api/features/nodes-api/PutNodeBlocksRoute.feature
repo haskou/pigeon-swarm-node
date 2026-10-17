@@ -294,3 +294,16 @@ Feature: Put node blocks
       | encoding                        |
       | an alias DER prefix             |
       | a non-canonical base64 encoding |
+
+  Scenario Outline: A restart drops an own block list that names an alias of a key by <encoding>
+    Given the node stored its own block list version 1 blocking the other identity under "<encoding>" of its key
+    When the node restarts
+    Then the node has no stored own block list
+    When I GET "/node"
+    Then response code is equal to 200
+    And response body should contain "owner"
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |
