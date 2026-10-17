@@ -51,6 +51,13 @@ export class SignedHttpRequestVerifier {
     const identityId = new IdentityId(
       this.getRequiredHeader(request, 'x-identity-id'),
     );
+
+    // An alias encoding of the signer's key verifies its signature too, yet
+    // names another identity to block lists, owner checks and replay keys.
+    if (!identityId.isCanonicalKey()) {
+      throw new InvalidSignedRequestError();
+    }
+
     const timestamp = this.getRequiredHeader(request, 'x-timestamp');
     const signature = this.verifyOver(
       request,
