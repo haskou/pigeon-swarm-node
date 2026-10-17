@@ -20,7 +20,7 @@ import LocalNodeMetadataMapper from '@app/contexts/nodes/infrastructure/local-db
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
-import LocalDatabaseSectionIsNestedError from '@app/shared/infrastructure/local-db/LocalDatabaseSectionIsNestedError';
+import KeyedSerialSectionIsNestedError from '@app/shared/infrastructure/concurrency/KeyedSerialSectionIsNestedError';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { LocalDomainEventPublisher } from '@app/shared/infrastructure/messageBus/LocalDomainEventPublisher';
 import { promises as fs } from 'fs';
@@ -284,13 +284,13 @@ describe('Concurrent node owner writes', () => {
     await repository.holdLocalNode(async () => {
       await expect(
         withinASecond(freshRepository().updateLocalNode(change)),
-      ).rejects.toThrow(LocalDatabaseSectionIsNestedError);
+      ).rejects.toThrow(KeyedSerialSectionIsNestedError);
       await expect(
         withinASecond(repository.updateStoppedLocalNode(change)),
-      ).rejects.toThrow(LocalDatabaseSectionIsNestedError);
+      ).rejects.toThrow(KeyedSerialSectionIsNestedError);
       await expect(
         withinASecond(repository.holdLocalNode(nestedAction)),
-      ).rejects.toThrow(LocalDatabaseSectionIsNestedError);
+      ).rejects.toThrow(KeyedSerialSectionIsNestedError);
     });
     await withinASecond(
       new NodeOwnerAssigner(

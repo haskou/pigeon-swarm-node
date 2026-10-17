@@ -2,11 +2,9 @@ import { KeyedSerialQueue } from '@app/shared/infrastructure/concurrency/KeyedSe
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import Kernel from '@haskou/ddd-kernel';
 import { Level } from 'level';
-import { AsyncLocalStorage } from 'node:async_hooks';
 import path from 'path';
 
 import LocalDatabaseIsLockedError from './LocalDatabaseIsLockedError';
-import LocalDatabaseSectionIsNestedError from './LocalDatabaseSectionIsNestedError';
 
 export type EmbeddedLocalDatabaseOperation =
   | {
@@ -29,12 +27,6 @@ export default class EmbeddedLocalDatabase {
 
   // Keyed by path, like `databases`: every handle on one database shares them.
   private static readonly exclusiveSections = new KeyedSerialQueue();
-
-  // The sections the running code was started in, outermost first. A section
-  // closes when its action settles, so work it left running may queue on it.
-  private static readonly enteredSections = new AsyncLocalStorage<
-    ReadonlyArray<{ readonly key: string; open: boolean }>
-  >();
 
   private readonly database: Level<string, Record<string, unknown>>;
   private readonly databasePath: string;
@@ -190,31 +182,16 @@ export default class EmbeddedLocalDatabase {
    * Runs `action` with no other section of the same `scope` on this database
    * in between, whichever handle opened it, so a read-modify-write is atomic.
    * Sections on one scope do not nest: entering one from inside itself throws
-   * `LocalDatabaseSectionIsNestedError` instead of waiting on itself forever.
+   * `KeyedSerialSectionIsNestedError` instead of waiting on itself forever.
    */
   public async exclusively<T>(
     scope: string,
     action: () => Promise<T>,
   ): Promise<T> {
-    const key = `${this.databasePath}\n${scope}`;
-    const entered = EmbeddedLocalDatabase.enteredSections.getStore() ?? [];
-
-    if (entered.some((section) => section.open && section.key === key)) {
-      throw new LocalDatabaseSectionIsNestedError();
-    }
-
-    return EmbeddedLocalDatabase.exclusiveSections.run(key, async () => {
-      const section = { key, open: true };
-
-      try {
-        return await EmbeddedLocalDatabase.enteredSections.run(
-          [...entered, section],
-          action,
-        );
-      } finally {
-        section.open = false;
-      }
-    });
+    return EmbeddedLocalDatabase.exclusiveSections.run(
+      `${this.databasePath}\n${scope}`,
+      action,
+    );
   }
 
   public async find(

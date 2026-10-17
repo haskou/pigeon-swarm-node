@@ -95,9 +95,11 @@ Both tools reuse the existing node owner unchanged:
   `NodeBlockListMustBeSignedByCurrentOwnerError` (`409`) and the stored list is
   kept. A held write never updates or holds the node itself, and a hold is
   taken before a block policy change, never inside one. Sections do not nest:
-  `EmbeddedLocalDatabase.exclusively` refuses a section entered from inside one
-  of the same scope at once with `LocalDatabaseSectionIsNestedError`, instead
-  of leaving the request waiting on itself.
+  `EmbeddedLocalDatabase.exclusively` runs on `KeyedSerialQueue`, which refuses
+  an action entered from inside an open one on the same key at once with
+  `KeyedSerialSectionIsNestedError`, instead of leaving the request waiting on
+  itself. `IdentityCreationGate` shares the queue, so a publication nested in a
+  publication of the same identity is refused the same way.
 
 ### Owner loss and reset
 

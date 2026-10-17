@@ -69,7 +69,8 @@ export default class IdentityCreationGate {
    * Admits the publication of `identity` and runs `publish`. A creation the
    * node refuses throws `IdentityCreationIsRefusedOnThisNodeError` before
    * `publish` runs; a creation that fails before the save gives its code use
-   * back.
+   * back. `publish` must not publish the same identity again: the nested
+   * call throws `KeyedSerialSectionIsNestedError` at once.
    */
   public async publish<T>(
     identity: Identity,

@@ -2,7 +2,7 @@ import EmbeddedLocalDatabase, {
   EmbeddedLocalDatabaseOperation,
 } from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import LocalDatabaseIsLockedError from '@app/shared/infrastructure/local-db/LocalDatabaseIsLockedError';
-import LocalDatabaseSectionIsNestedError from '@app/shared/infrastructure/local-db/LocalDatabaseSectionIsNestedError';
+import KeyedSerialSectionIsNestedError from '@app/shared/infrastructure/concurrency/KeyedSerialSectionIsNestedError';
 import * as fs from 'fs/promises';
 import { Level } from 'level';
 import os from 'os';
@@ -148,7 +148,7 @@ describe('EmbeddedLocalDatabase', () => {
     await firstDatabase.exclusively('scope', async () => {
       await expect(
         withinASecond(secondDatabase.exclusively('scope', nested)),
-      ).rejects.toThrow(LocalDatabaseSectionIsNestedError);
+      ).rejects.toThrow(KeyedSerialSectionIsNestedError);
     });
 
     expect(nested).not.toHaveBeenCalled();
@@ -167,8 +167,7 @@ describe('EmbeddedLocalDatabase', () => {
     );
 
     await expect(withinASecond(refusal)).rejects.toMatchObject({
-      message:
-        'A local database section cannot be entered again from inside itself.',
+      message: 'A serial section cannot be entered again from inside itself.',
     });
   });
 

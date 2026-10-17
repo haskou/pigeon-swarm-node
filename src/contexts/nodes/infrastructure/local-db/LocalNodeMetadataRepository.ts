@@ -95,7 +95,7 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
   // Every write of the node metadata, generation included, runs in this
   // section, so a read-modify-write never reverts another and two first loads
   // never generate two node ids. A section entered from inside another throws
-  // `LocalDatabaseSectionIsNestedError` instead of waiting on itself.
+  // `KeyedSerialSectionIsNestedError` instead of waiting on itself.
   private async exclusively<T>(action: () => Promise<T>): Promise<T> {
     return this.database.exclusively(
       LocalNodeMetadataRepository.NAMESPACE,
