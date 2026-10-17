@@ -56,7 +56,7 @@ Both tools reuse the existing node owner unchanged:
   `node_metadata` document with the node id, networks and relay configuration
   (`LocalNodeMetadataRepository.ts:15-16,59-83`). It is never replicated.
 - **Authentication.** Owner-only routes extend `NodeOwnerRouteSupport`
-  (`src/apps/apis/nodes-api/routes/NodeOwnerRouteSupport.ts:17-53`). The request
+  (`src/apps/apis/nodes-api/routes/NodeOwnerRouteSupport.ts:14-107`). The request
   is verified by `SignedHttpRequestAuthenticator` (signature, freshness, replay;
   `SignedHttpRequestAuthenticator.ts:29-36`), and the caller must be the owner,
   else `403010`. `X-Identity-Id` is the identity's public key, so the owner is
@@ -77,6 +77,22 @@ Both tools reuse the existing node owner unchanged:
   one section per local database (`EmbeddedLocalDatabase.exclusively`), so two
   concurrent writes never revert each other. Generating the metadata of a new
   node runs in the same section, so concurrent first loads keep one node id.
+- **Owner check as the write lands.** The route checks the signer owns the node
+  up front (`403010`), and the write checks it again in the section where it
+  lands, so a `PUT /node/owner` handover between the two cannot let the former
+  owner's write through. Node settings check it inside the
+  `updateLocalNode` change (`Node.changeRegistrationMode`, `removeNetwork`,
+  and, once claimed, `updateRelayConfiguration` and `addNetwork`, through
+  `NodeCanOnlyBeManagedByItsOwnerError`). Owner-only writes stored outside the
+  node (registration codes, block sources, exceptions and publication,
+  diagnostics, private authorization scopes) run through
+  `NodeOwnerWriteHolder`, which holds the same section with
+  `NodeRepository.holdLocalNode`, checks the owner of the latest node and runs
+  the write before any handover can land. `NodeBlockListStorer` stores a list
+  signed by the current owner under the same hold. Routes answer the in-section
+  refusal as `403010`, like the up-front check. A held write never updates the
+  node itself, and a hold is taken before a block policy change, never inside
+  one, since sections do not nest.
 
 ### Owner loss and reset
 

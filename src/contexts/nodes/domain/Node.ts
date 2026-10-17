@@ -6,6 +6,7 @@ import { assert, PrimitiveOf } from '@haskou/value-objects';
 
 import { InvalidNodeOwnerIdentityIdError } from './errors/InvalidNodeOwnerIdentityIdError';
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from './errors/NodeCannotHaveMoreThanOnePublicNetworkError';
+import { NodeCanOnlyBeManagedByItsOwnerError } from './errors/NodeCanOnlyBeManagedByItsOwnerError';
 import { NodeIsAlreadyOwnedByThisIdentityError } from './errors/NodeIsAlreadyOwnedByThisIdentityError';
 import { NodeNetworkNotFoundError } from './errors/NodeNetworkNotFoundError';
 import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from './errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
@@ -58,7 +59,24 @@ export class Node extends AggregateRoot {
     );
   }
 
-  public addNetwork(network: Network): void {
+  // Whoever runs an unclaimed node sets it up; once claimed, only its owner.
+  private assertSetUpBy(authenticatedIdentityId: IdentityId | undefined): void {
+    if (!this.owner) {
+      return;
+    }
+
+    assert(
+      authenticatedIdentityId !== undefined &&
+        this.isOwnedBy(authenticatedIdentityId),
+      new NodeCanOnlyBeManagedByItsOwnerError(),
+    );
+  }
+
+  public addNetwork(
+    network: Network,
+    authenticatedIdentityId: IdentityId | undefined,
+  ): void {
+    this.assertSetUpBy(authenticatedIdentityId);
     this.networks.set(network.getId(), network);
 
     assert(
@@ -69,7 +87,11 @@ export class Node extends AggregateRoot {
     this.record(new NodeNetworkWasAdded(this.id.valueOf()));
   }
 
-  public removeNetwork(networkId: NetworkId): void {
+  public removeNetwork(
+    networkId: NetworkId,
+    authenticatedIdentityId: IdentityId,
+  ): void {
+    this.assertManagedBy(authenticatedIdentityId);
     const persistedNetworkId = this.findNetworkKey(networkId);
 
     assert(persistedNetworkId, new NodeNetworkNotFoundError(networkId));
@@ -145,7 +167,10 @@ export class Node extends AggregateRoot {
 
   public updateRelayConfiguration(
     relayConfiguration: NodeRelayConfiguration,
+    authenticatedIdentityId: IdentityId | undefined,
   ): void {
+    this.assertSetUpBy(authenticatedIdentityId);
+
     if (this.relayConfiguration.isEqual(relayConfiguration)) {
       return;
     }
@@ -158,7 +183,12 @@ export class Node extends AggregateRoot {
     );
   }
 
-  public changeRegistrationMode(registrationMode: NodeRegistrationMode): void {
+  public changeRegistrationMode(
+    registrationMode: NodeRegistrationMode,
+    authenticatedIdentityId: IdentityId,
+  ): void {
+    this.assertManagedBy(authenticatedIdentityId);
+
     if (this.registrationMode.isEqual(registrationMode)) {
       return;
     }
@@ -185,6 +215,14 @@ export class Node extends AggregateRoot {
 
   public isOwnedBy(identityId: IdentityId): boolean {
     return this.owner?.isEqual(identityId) ?? false;
+  }
+
+  /** Refuses an owner-only change by anyone but the current owner. */
+  public assertManagedBy(authenticatedIdentityId: IdentityId): void {
+    assert(
+      this.isOwnedBy(authenticatedIdentityId),
+      new NodeCanOnlyBeManagedByItsOwnerError(),
+    );
   }
 
   public isIdentifiedBy(id: NodeId): boolean {

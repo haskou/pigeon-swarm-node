@@ -1,13 +1,20 @@
 import { NodeNetworkAdderMessage } from '@app/contexts/nodes/application/add-network/messages/NodeNetworkAdderMessage';
+import { NodePublicNetworkAdderMessage } from '@app/contexts/nodes/application/add-network/messages/NodePublicNetworkAdderMessage';
 import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNetworkAdder';
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
 import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
 import { NodeRegistrationModeChangerMessage } from '@app/contexts/nodes/application/change-registration-mode/messages/NodeRegistrationModeChangerMessage';
 import NodeRegistrationModeChanger from '@app/contexts/nodes/application/change-registration-mode/NodeRegistrationModeChanger';
+import { NodeOwnerWriteHolderMessage } from '@app/contexts/nodes/application/hold-owner-write/messages/NodeOwnerWriteHolderMessage';
+import NodeOwnerWriteHolder from '@app/contexts/nodes/application/hold-owner-write/NodeOwnerWriteHolder';
+import { NodeNetworkRemoverMessage } from '@app/contexts/nodes/application/remove-network/messages/NodeNetworkRemoverMessage';
+import NodeNetworkRemover from '@app/contexts/nodes/application/remove-network/NodeNetworkRemover';
 import { NodeRelayConfigurationUpdaterMessage } from '@app/contexts/nodes/application/update-relay-configuration/messages/NodeRelayConfigurationUpdaterMessage';
 import NodeRelayConfigurationUpdater from '@app/contexts/nodes/application/update-relay-configuration/NodeRelayConfigurationUpdater';
+import { NodeCanOnlyBeManagedByItsOwnerError } from '@app/contexts/nodes/domain/errors/NodeCanOnlyBeManagedByItsOwnerError';
 import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from '@app/contexts/nodes/domain/errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
+import NodeNetworkDataCleaner from '@app/contexts/nodes/domain/services/NodeNetworkDataCleaner';
 import LocalNodeMetadataRepository from '@app/contexts/nodes/infrastructure/local-db/LocalNodeMetadataRepository';
 import LocalNodeMetadataMapper from '@app/contexts/nodes/infrastructure/local-db/mappers/LocalNodeMetadataMapper';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -19,14 +26,14 @@ import { promises as fs } from 'fs';
 import { mock, MockProxy } from 'jest-mock-extended';
 import os from 'os';
 import path from 'path';
-import { setImmediate } from 'timers/promises';
+import { setImmediate, setTimeout } from 'timers/promises';
 
 import { IdentityIdMother } from '../../../mothers/IdentityIdMother';
-import { IdentityMother } from '../../../mothers/IdentityMother';
 
 /**
  * Every owner write loads the node, changes one setting and saves it. Run
- * together against the real local database, none may revert another.
+ * together against the real local database, none may revert another, and none
+ * of a former owner may land once the node was handed over.
  */
 describe('Concurrent node owner writes', () => {
   const previousPath = process.env.PIGEON_LOCAL_DB_PATH;
@@ -58,6 +65,46 @@ describe('Concurrent node owner writes', () => {
     await repository.loadLocalNode();
   });
 
+  /** Hands the node from its first owner to the second; returns both. */
+  const handOver = async (): Promise<[string, string]> => {
+    const former = IdentityIdMother.canonical().valueOf();
+    const current = IdentityIdMother.canonical().valueOf();
+    const assigner = new NodeOwnerAssigner(
+      freshRepository(),
+      mock<NodeBlockPolicy>(),
+    );
+
+    await assigner.assignOwner(new NodeOwnerAssignerMessage(former, former));
+    await assigner.assignOwner(new NodeOwnerAssignerMessage(current, former));
+
+    return [former, current];
+  };
+
+  /** `entered` settles once the gated step waits; `release` lets it go on. */
+  const gate = (): {
+    entered: Promise<void>;
+    release: () => void;
+    wait: () => Promise<void>;
+  } => {
+    let enter!: () => void;
+    let release!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      enter = resolve;
+    });
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    return {
+      entered,
+      release,
+      wait: async () => {
+        enter();
+        await released;
+      },
+    };
+  };
+
   afterEach(async () => {
     await setImmediate();
     await database.close();
@@ -71,36 +118,34 @@ describe('Concurrent node owner writes', () => {
     await fs.rm(databasePath, { force: true, recursive: true });
   });
 
-  it('should persist concurrent registration mode, relay, owner and network writes', async () => {
-    const owner = new IdentityMother().id.valueOf();
+  it('should persist concurrent registration mode, relay and network writes', async () => {
+    const [, owner] = await handOver();
     const networkId = NetworkId.generate();
-    const modeRepository = freshRepository();
-    const relayRepository = freshRepository();
-    const ownerRepository = freshRepository();
-    const networkRepository = freshRepository();
 
     await Promise.all([
       new NodeRegistrationModeChanger(
-        modeRepository,
+        freshRepository(),
         mock<LocalDomainEventPublisher>(),
-      ).change(new NodeRegistrationModeChangerMessage('codes')),
+      ).change(new NodeRegistrationModeChangerMessage('codes', owner)),
       new NodeRelayConfigurationUpdater(
-        relayRepository,
+        freshRepository(),
         mock<DomainEventPublisher>(),
       ).update(
-        new NodeRelayConfigurationUpdaterMessage({
-          callsRelay: { port: 4199 },
-        }),
+        new NodeRelayConfigurationUpdaterMessage(
+          { callsRelay: { port: 4199 } },
+          owner,
+        ),
       ),
-      new NodeOwnerAssigner(
-        ownerRepository,
-        mock<NodeBlockPolicy>(),
-      ).assignOwner(new NodeOwnerAssignerMessage(owner, owner)),
       new NodeNetworkAdder(
-        networkRepository,
+        freshRepository(),
         mock<DomainEventPublisher>(),
       ).addNetwork(
-        new NodeNetworkAdderMessage(networkId.valueOf(), 'concurrent'),
+        new NodeNetworkAdderMessage(
+          networkId.valueOf(),
+          'concurrent',
+          undefined,
+          owner,
+        ),
       ),
     ]);
 
@@ -110,6 +155,115 @@ describe('Concurrent node owner writes', () => {
     expect(node.relayConfiguration.callsRelay?.port).toBe(4199);
     expect(node.owner).toBe(owner);
     expect(Object.keys(node.networks)).toEqual([networkId.valueOf()]);
+  });
+
+  it('should refuse every node setting write of a former owner', async () => {
+    const networkId = NetworkId.generate();
+    const adder = new NodeNetworkAdder(
+      freshRepository(),
+      mock<DomainEventPublisher>(),
+    );
+    const cleaner = mock<NodeNetworkDataCleaner>();
+    const [former] = await handOver();
+    const before = (await freshRepository().loadLocalNode()).toPrimitives();
+
+    await expect(
+      new NodeRegistrationModeChanger(
+        freshRepository(),
+        mock<LocalDomainEventPublisher>(),
+      ).change(new NodeRegistrationModeChangerMessage('closed', former)),
+    ).rejects.toThrow(NodeCanOnlyBeManagedByItsOwnerError);
+    await expect(
+      new NodeRelayConfigurationUpdater(
+        freshRepository(),
+        mock<DomainEventPublisher>(),
+      ).update(
+        new NodeRelayConfigurationUpdaterMessage(
+          { callsRelay: { port: 4199 } },
+          former,
+        ),
+      ),
+    ).rejects.toThrow(NodeCanOnlyBeManagedByItsOwnerError);
+    await expect(
+      adder.addNetwork(
+        new NodeNetworkAdderMessage(
+          networkId.valueOf(),
+          'former',
+          undefined,
+          former,
+        ),
+      ),
+    ).rejects.toThrow(NodeCanOnlyBeManagedByItsOwnerError);
+    await expect(
+      adder.addPublicNetwork(new NodePublicNetworkAdderMessage(former)),
+    ).rejects.toThrow(NodeCanOnlyBeManagedByItsOwnerError);
+    await expect(
+      new NodeNetworkRemover(
+        freshRepository(),
+        cleaner,
+        mock<DomainEventPublisher>(),
+      ).remove(new NodeNetworkRemoverMessage(networkId.valueOf(), former)),
+    ).rejects.toThrow(NodeCanOnlyBeManagedByItsOwnerError);
+
+    expect((await freshRepository().loadLocalNode()).toPrimitives()).toEqual(
+      before,
+    );
+    expect(cleaner.clean).not.toHaveBeenCalled();
+  });
+
+  it('should refuse a held write of a former owner without running it', async () => {
+    const [former] = await handOver();
+    const write = jest.fn();
+
+    await expect(
+      new NodeOwnerWriteHolder(freshRepository()).hold(
+        new NodeOwnerWriteHolderMessage(former),
+        write,
+      ),
+    ).rejects.toThrow(NodeCanOnlyBeManagedByItsOwnerError);
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('should refuse a held write on a node nobody claimed', async () => {
+    const write = jest.fn();
+
+    await expect(
+      new NodeOwnerWriteHolder(freshRepository()).hold(
+        new NodeOwnerWriteHolderMessage(IdentityIdMother.canonical().valueOf()),
+        write,
+      ),
+    ).rejects.toThrow(NodeCanOnlyBeManagedByItsOwnerError);
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('should land a handover only after the owner write it raced', async () => {
+    const [, owner] = await handOver();
+    const next = IdentityIdMother.canonical().valueOf();
+    const writing = gate();
+    const landed: string[] = [];
+
+    const write = new NodeOwnerWriteHolder(freshRepository()).hold(
+      new NodeOwnerWriteHolderMessage(owner),
+      async () => {
+        await writing.wait();
+        landed.push('write');
+
+        return 'written';
+      },
+    );
+    await writing.entered;
+    const handover = new NodeOwnerAssigner(
+      freshRepository(),
+      mock<NodeBlockPolicy>(),
+    )
+      .assignOwner(new NodeOwnerAssignerMessage(next, owner))
+      .then(() => landed.push('handover'));
+    await setTimeout(100);
+    writing.release();
+
+    await expect(write).resolves.toBe('written');
+    await handover;
+    expect(landed).toEqual(['write', 'handover']);
   });
 
   it('should give an unowned node one owner when two identities claim it together', async () => {

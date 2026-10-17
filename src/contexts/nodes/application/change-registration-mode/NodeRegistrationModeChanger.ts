@@ -14,7 +14,10 @@ export default class NodeRegistrationModeChanger {
     message: NodeRegistrationModeChangerMessage,
   ): Promise<Node> {
     const node = await this.nodes.updateLocalNode((latest) =>
-      latest.changeRegistrationMode(message.registrationMode),
+      latest.changeRegistrationMode(
+        message.registrationMode,
+        message.authenticatedIdentityId,
+      ),
     );
 
     // The mode is local node configuration: never gossiped nor pushed to clients.

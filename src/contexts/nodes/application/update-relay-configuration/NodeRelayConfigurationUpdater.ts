@@ -13,7 +13,10 @@ export default class NodeRelayConfigurationUpdater {
     message: NodeRelayConfigurationUpdaterMessage,
   ): Promise<void> {
     const node = await this.nodes.updateLocalNode((latest) =>
-      latest.updateRelayConfiguration(message.relayConfiguration),
+      latest.updateRelayConfiguration(
+        message.relayConfiguration,
+        message.authenticatedIdentityId,
+      ),
     );
 
     await this.eventPublisher.publish(node.pullDomainEvents());

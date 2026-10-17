@@ -34,8 +34,6 @@ export class PostNodeBlockSourceApprovalRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.assertOwnerCanManageNode(request);
-
     const message = new NodeBlockSourceEntriesApproverMessage({
       all: body.all,
       blockedIdentityIds: body.blockedIdentityIds ?? [],
@@ -53,7 +51,9 @@ export class PostNodeBlockSourceApprovalRoute extends NodeOwnerRouteSupport {
       throw new NonCanonicalIdentityIdError();
     }
 
-    const source = await this.approver.approve(message);
+    const source = await this.writeAsNodeOwner(request, () =>
+      this.approver.approve(message),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

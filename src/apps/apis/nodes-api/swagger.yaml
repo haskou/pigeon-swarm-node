@@ -79,7 +79,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeRelayConfigurationResource'
         '403':
-          description: The authenticated identity is not the node owner.
+          description: The authenticated identity is not the node owner. A write still in flight when the node changes hands is refused the same way.
         '409':
           description: The relay configuration is invalid.
   /node/blocks/:
@@ -133,7 +133,7 @@ paths:
         '408':
           description: The body was not received within NODE_BLOCK_LIST_BODY_TIMEOUT_MS (code 408010).
         '409':
-          description: The list is not signed by the current owner, its signature does not verify, or its version is not higher than the stored one.
+          description: The list is not signed by the owner of the node as it is stored (a handover landing first refuses it), its signature does not verify, or its version is not higher than the stored one.
         '413':
           description: The body exceeds NODE_BLOCK_LIST_MAX_BYTES (code 413010).
         '429':
@@ -180,7 +180,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeBlockPublicationResource'
         '403':
-          description: The authenticated identity is not the node owner (code 403010).
+          description: The authenticated identity is not the node owner (code 403010). A write still in flight when the node changes hands is refused the same way.
   /node/blocks/published/:
     get:
       tags:
@@ -255,7 +255,7 @@ paths:
         '400':
           description: The body is invalid, or ownerIdentityId is not the canonical encoding of a usable key (code 400080); nothing is stored.
         '403':
-          description: The authenticated identity is not the node owner (code 403010).
+          description: The authenticated identity is not the node owner (code 403010). A write still in flight when the node changes hands is refused the same way.
         '409':
           description: The origin is not a bare https origin (code InvalidNodeBlockSourceOriginError).
     delete:
@@ -276,7 +276,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeBlockSourcesResource'
         '403':
-          description: The authenticated identity is not the node owner (code 403010).
+          description: The authenticated identity is not the node owner (code 403010). A write still in flight when the node changes hands is refused the same way.
         '409':
           description: The source is not adopted (code NodeBlockSourceNotFoundError).
   /node/block-sources/{ownerIdentityId}/pending:
@@ -359,7 +359,7 @@ paths:
         '400':
           description: The body is invalid, or ownerIdentityId or a named blockedIdentityIds entry is not the canonical encoding of a usable key (code 400080); nothing is stored.
         '403':
-          description: The authenticated identity is not the node owner (code 403010).
+          description: The authenticated identity is not the node owner (code 403010). A write still in flight when the node changes hands is refused the same way.
         '409':
           description: A newer version was fetched (NodeBlockSourceVersionHasChangedError), a named entry is not in that version (NodeBlockEntriesAreNotListedBySourceError), all and the named entries disagree (InvalidNodeBlockSourceApprovalError), or the source is not adopted (NodeBlockSourceNotFoundError).
   /node/block-exceptions/:
@@ -406,7 +406,7 @@ paths:
         '400':
           description: The body is invalid, or an identityIds entry is not the canonical encoding of a usable key (code 400080); nothing is stored.
         '403':
-          description: The authenticated identity is not the node owner (code 403010).
+          description: The authenticated identity is not the node owner (code 403010). A write still in flight when the node changes hands is refused the same way.
   /node/diagnostics/:
     put:
       tags:
@@ -431,7 +431,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeDiagnosticsResource'
         '403':
-          description: The authenticated identity is not the node owner, or the node has no owner.
+          description: The authenticated identity is not the node owner, or the node has no owner. A write still in flight when the node changes hands is refused the same way.
         '409':
           description: Consent is missing or the duration is outside 1 to 60 minutes.
     get:
@@ -467,7 +467,7 @@ paths:
         '204':
           description: Diagnostics session discarded.
         '403':
-          description: The authenticated identity is not the node owner, or the node has no owner.
+          description: The authenticated identity is not the node owner, or the node has no owner. A write still in flight when the node changes hands is refused the same way.
   /node/networks/:
     get:
       tags:
@@ -508,7 +508,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NetworksResource'
         '403':
-          description: The authenticated identity is not the node owner.
+          description: The authenticated identity is not the node owner. A write still in flight when the node changes hands is refused the same way.
   /node/networks/{networkId}/:
     delete:
       tags:
@@ -532,7 +532,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NetworksResource'
         '403':
-          description: The authenticated identity is not the node owner.
+          description: The authenticated identity is not the node owner. A write still in flight when the node changes hands is refused the same way.
         '409':
           description: The network does not exist in the local node.
   /node/networks/public/:
@@ -553,7 +553,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NetworksResource'
         '403':
-          description: The authenticated identity is not the node owner.
+          description: The authenticated identity is not the node owner. A write still in flight when the node changes hands is refused the same way.
         '409':
           description: The node already has a public network.
   /node/owner/:
@@ -607,7 +607,7 @@ paths:
         '400':
           description: The mode is not `open`, `codes` or `closed`.
         '403':
-          description: The request is not signed by the node owner or the node has no owner (code `403010`).
+          description: The request is not signed by the node owner or the node has no owner (code `403010`). A write still in flight when the node changes hands is refused the same way.
   /node/registration-codes/:
     post:
       tags:
@@ -634,7 +634,7 @@ paths:
         '400':
           description: '`maxUses` or `expiresAt` is out of range (code `400070`) or the body is invalid.'
         '403':
-          description: The request is not signed by the node owner or the node has no owner (code `403010`).
+          description: The request is not signed by the node owner or the node has no owner (code `403010`). A write still in flight when the node changes hands is refused the same way.
     get:
       tags:
         - nodes
@@ -673,7 +673,7 @@ paths:
         '204':
           description: Registration code revoked.
         '403':
-          description: The request is not signed by the node owner or the node has no owner (code `403010`).
+          description: The request is not signed by the node owner or the node has no owner (code `403010`). A write still in flight when the node changes hands is refused the same way.
         '409':
           description: The code id is not a valid id.
   /peers/:

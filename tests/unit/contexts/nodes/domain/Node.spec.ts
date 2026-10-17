@@ -1,5 +1,6 @@
 import { InvalidNodeOwnerIdentityIdError } from '@app/contexts/nodes/domain/errors/InvalidNodeOwnerIdentityIdError';
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from '@app/contexts/nodes/domain/errors/NodeCannotHaveMoreThanOnePublicNetworkError';
+import { NodeCanOnlyBeManagedByItsOwnerError } from '@app/contexts/nodes/domain/errors/NodeCanOnlyBeManagedByItsOwnerError';
 import { NodeIsAlreadyOwnedByThisIdentityError } from '@app/contexts/nodes/domain/errors/NodeIsAlreadyOwnedByThisIdentityError';
 import { NodeNetworkNotFoundError } from '@app/contexts/nodes/domain/errors/NodeNetworkNotFoundError';
 import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from '@app/contexts/nodes/domain/errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
@@ -73,7 +74,7 @@ describe('Node', () => {
       const networkId = new NetworkId('550e8400-e29b-41d4-a716-446655440000');
       const network = networkMother.withId(networkId).withoutKey().build();
 
-      node.addNetwork(network);
+      node.addNetwork(network, undefined);
 
       const result = node.toPrimitives();
       expect(result.networks[networkId.valueOf()]).toEqual(
@@ -94,22 +95,49 @@ describe('Node', () => {
         .withoutKey()
         .build();
 
-      node.addNetwork(firstPublic);
+      node.addNetwork(firstPublic, undefined);
 
-      expect(() => node.addNetwork(secondPublic)).toThrow(
+      expect(() => node.addNetwork(secondPublic, undefined)).toThrow(
         NodeCannotHaveMoreThanOnePublicNetworkError,
       );
+    });
+
+    it('should let only the owner add a network once the node is claimed', () => {
+      const owner = IdentityIdMother.canonical();
+      const claimed = mother.withOwner(owner).build();
+      const network = networkMother.withId(NetworkId.generate()).build();
+
+      expect(() =>
+        claimed.addNetwork(network, IdentityIdMother.canonical()),
+      ).toThrow(NodeCanOnlyBeManagedByItsOwnerError);
+      expect(() => claimed.addNetwork(network, undefined)).toThrow(
+        NodeCanOnlyBeManagedByItsOwnerError,
+      );
+      expect(claimed.toPrimitives().networks).toEqual({});
+
+      claimed.addNetwork(network, owner);
+
+      expect(Object.keys(claimed.toPrimitives().networks)).toEqual([
+        network.getId().valueOf(),
+      ]);
     });
   });
 
   describe('removeNetwork', () => {
+    let owner: IdentityId;
+
+    beforeEach(() => {
+      owner = IdentityIdMother.canonical();
+      node = mother.withOwner(owner).build();
+    });
+
     it('should remove a network and record a NodeNetworkWasRemoved event', () => {
       const networkId = NetworkId.generate();
       const network = networkMother.withId(networkId).withoutKey().build();
 
-      node.addNetwork(network);
+      node.addNetwork(network, owner);
       node.pullDomainEvents();
-      node.removeNetwork(networkId);
+      node.removeNetwork(networkId, owner);
 
       expect(node.toPrimitives().networks[networkId.valueOf()]).toBeUndefined();
       expect(node.pullDomainEvents()).toEqual([
@@ -125,20 +153,42 @@ describe('Node', () => {
         networks: {
           [networkId.valueOf()]: network.toPrimitives(),
         },
-        owner: undefined,
+        owner: owner.valueOf(),
         registrationMode: 'open',
         relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
       });
 
-      restored.removeNetwork(new NetworkId(networkId.valueOf()));
+      restored.removeNetwork(new NetworkId(networkId.valueOf()), owner);
 
       expect(restored.toPrimitives().networks).toEqual({});
     });
 
     it('should throw when removing an unknown network', () => {
-      expect(() => node.removeNetwork(NetworkId.generate())).toThrow(
+      expect(() => node.removeNetwork(NetworkId.generate(), owner)).toThrow(
         NodeNetworkNotFoundError,
       );
+    });
+
+    it('should let only the owner remove a network', () => {
+      const networkId = NetworkId.generate();
+      const unclaimed = new NodeMother()
+        .withNetwork(networkId, networkMother.withId(networkId).build())
+        .build();
+
+      node.addNetwork(networkMother.withId(networkId).build(), owner);
+
+      expect(() =>
+        node.removeNetwork(networkId, IdentityIdMother.canonical()),
+      ).toThrow(NodeCanOnlyBeManagedByItsOwnerError);
+      expect(() => unclaimed.removeNetwork(networkId, owner)).toThrow(
+        NodeCanOnlyBeManagedByItsOwnerError,
+      );
+      expect(Object.keys(node.toPrimitives().networks)).toEqual([
+        networkId.valueOf(),
+      ]);
+      expect(Object.keys(unclaimed.toPrimitives().networks)).toEqual([
+        networkId.valueOf(),
+      ]);
     });
   });
 
@@ -242,9 +292,9 @@ describe('Node', () => {
         .build();
       const before = claimed.toPrimitives();
 
-      expect(() => claimed.replaceLostOwner(new IdentityId(owner.valueOf()))).toThrow(
-        NodeIsAlreadyOwnedByThisIdentityError,
-      );
+      expect(() =>
+        claimed.replaceLostOwner(new IdentityId(owner.valueOf())),
+      ).toThrow(NodeIsAlreadyOwnedByThisIdentityError);
       expect(claimed.toPrimitives()).toEqual(before);
     });
 
@@ -352,7 +402,7 @@ describe('Node', () => {
         },
       });
 
-      node.updateRelayConfiguration(relayConfiguration);
+      node.updateRelayConfiguration(relayConfiguration, undefined);
 
       expect(node.toPrimitives().relayConfiguration).toEqual(
         relayConfiguration.toPrimitives(),
@@ -361,9 +411,43 @@ describe('Node', () => {
         expect.any(NodeRelayConfigurationWasUpdated),
       ]);
     });
+
+    it('should let only the owner update the relay configuration once the node is claimed', () => {
+      const owner = IdentityIdMother.canonical();
+      const claimed = mother.withOwner(owner).build();
+      const relayConfiguration = NodeRelayConfiguration.fromPrimitives({
+        callsRelay: { port: 4199 },
+      });
+
+      expect(() =>
+        claimed.updateRelayConfiguration(
+          relayConfiguration,
+          IdentityIdMother.canonical(),
+        ),
+      ).toThrow(NodeCanOnlyBeManagedByItsOwnerError);
+      expect(() =>
+        claimed.updateRelayConfiguration(relayConfiguration, undefined),
+      ).toThrow(NodeCanOnlyBeManagedByItsOwnerError);
+      expect(claimed.toPrimitives().relayConfiguration).toEqual(
+        NodeRelayConfiguration.default().toPrimitives(),
+      );
+
+      claimed.updateRelayConfiguration(relayConfiguration, owner);
+
+      expect(claimed.toPrimitives().relayConfiguration).toEqual(
+        relayConfiguration.toPrimitives(),
+      );
+    });
   });
 
   describe('changeRegistrationMode', () => {
+    let owner: IdentityId;
+
+    beforeEach(() => {
+      owner = IdentityIdMother.canonical();
+      node = mother.withOwner(owner).build();
+    });
+
     it('should be open for registration by default', () => {
       expect(node.isOpenForRegistration()).toBe(true);
       expect(node.isClosedForRegistration()).toBe(false);
@@ -371,7 +455,7 @@ describe('Node', () => {
     });
 
     it('should change the registration mode and record a domain event', () => {
-      node.changeRegistrationMode(NodeRegistrationMode.CLOSED);
+      node.changeRegistrationMode(NodeRegistrationMode.CLOSED, owner);
 
       expect(node.isClosedForRegistration()).toBe(true);
       expect(node.isOpenForRegistration()).toBe(false);
@@ -382,15 +466,32 @@ describe('Node', () => {
     });
 
     it('should neither be open nor closed in codes mode', () => {
-      node.changeRegistrationMode(NodeRegistrationMode.CODES);
+      node.changeRegistrationMode(NodeRegistrationMode.CODES, owner);
 
       expect(node.isOpenForRegistration()).toBe(false);
       expect(node.isClosedForRegistration()).toBe(false);
     });
 
     it('should not record an event when the mode does not change', () => {
-      node.changeRegistrationMode(NodeRegistrationMode.OPEN);
+      node.changeRegistrationMode(NodeRegistrationMode.OPEN, owner);
 
+      expect(node.pullDomainEvents()).toEqual([]);
+    });
+
+    it('should let only the owner change the registration mode', () => {
+      const unclaimed = new NodeMother().build();
+
+      expect(() =>
+        node.changeRegistrationMode(
+          NodeRegistrationMode.CLOSED,
+          IdentityIdMother.canonical(),
+        ),
+      ).toThrow(NodeCanOnlyBeManagedByItsOwnerError);
+      expect(() =>
+        unclaimed.changeRegistrationMode(NodeRegistrationMode.CLOSED, owner),
+      ).toThrow(NodeCanOnlyBeManagedByItsOwnerError);
+      expect(node.isOpenForRegistration()).toBe(true);
+      expect(unclaimed.isOpenForRegistration()).toBe(true);
       expect(node.pullDomainEvents()).toEqual([]);
     });
   });

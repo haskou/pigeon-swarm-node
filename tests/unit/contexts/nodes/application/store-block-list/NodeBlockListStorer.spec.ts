@@ -6,8 +6,8 @@ import { NodeBlockListVersionIsNotNewerError } from '@app/contexts/nodes/domain/
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NoNodeBlocks } from '@app/contexts/nodes/domain/NoNodeBlocks';
 import NodeBlockListRepository from '@app/contexts/nodes/domain/repositories/NodeBlockListRepository';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
-import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -16,7 +16,8 @@ import { NodeBlockListMother } from '../../../../mothers/NodeBlockListMother';
 import { NodeMother } from '../../../../mothers/NodeMother';
 
 describe('NodeBlockListStorer', () => {
-  let loader: MockProxy<NodeLoaderService>;
+  let nodes: MockProxy<NodeRepository>;
+  let held: boolean;
   let repository: MockProxy<NodeBlockListRepository>;
   let policy: MockProxy<NodeBlockPolicy>;
   let storer: NodeBlockListStorer;
@@ -31,15 +32,24 @@ describe('NodeBlockListStorer', () => {
   });
 
   beforeEach(() => {
-    loader = mock<NodeLoaderService>();
+    nodes = mock<NodeRepository>();
+    held = false;
     repository = mock<NodeBlockListRepository>();
     policy = mock<NodeBlockPolicy>();
     policy.change.mockImplementation((mutation) => mutation());
-    storer = new NodeBlockListStorer(loader, repository, policy);
+    storer = new NodeBlockListStorer(nodes, repository, policy);
     node = new NodeMother()
       .withOwner(new IdentityId(owner.toPrimitives().publicKey))
       .build();
-    loader.loadNode.mockResolvedValue(node);
+    nodes.holdLocalNode.mockImplementation(async (action) => {
+      held = true;
+
+      try {
+        return await action(node);
+      } finally {
+        held = false;
+      }
+    });
     repository.findLocal.mockResolvedValue(new NoNodeBlocks());
   });
 
@@ -79,6 +89,21 @@ describe('NodeBlockListStorer', () => {
       storer.store(message(new NodeBlockListMother(owner).withVersion(5))),
     ).rejects.toThrow(NodeBlockListVersionIsNotNewerError);
     expect(repository.saveLocal).not.toHaveBeenCalled();
+  });
+
+  it('should check the signer is the owner and store while no handover can land', async () => {
+    let storedWhileHeld = false;
+
+    repository.saveLocal.mockImplementation(() => {
+      storedWhileHeld = held;
+
+      return Promise.resolve();
+    });
+
+    await storer.store(message(new NodeBlockListMother(owner).withVersion(2)));
+
+    expect(nodes.holdLocalNode).toHaveBeenCalledTimes(1);
+    expect(storedWhileHeld).toBe(true);
   });
 
   it('should store through the policy, so stores and source updates run one at a time', async () => {

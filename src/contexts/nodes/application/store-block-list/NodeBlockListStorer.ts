@@ -3,22 +3,21 @@ import { assert } from '@haskou/value-objects';
 import { NodeBlockListMustBeSignedByCurrentOwnerError } from '../../domain/errors/NodeBlockListMustBeSignedByCurrentOwnerError';
 import { NodeBlockListSignatureIsNotValidError } from '../../domain/errors/NodeBlockListSignatureIsNotValidError';
 import { NodeBlockListVersionIsNotNewerError } from '../../domain/errors/NodeBlockListVersionIsNotNewerError';
+import { Node } from '../../domain/Node';
 import { NodeBlockList } from '../../domain/NodeBlockList';
 import NodeBlockListRepository from '../../domain/repositories/NodeBlockListRepository';
+import NodeRepository from '../../domain/repositories/NodeRepository';
 import NodeBlockPolicy from '../../domain/services/NodeBlockPolicy';
-import NodeLoaderService from '../../domain/services/NodeLoaderService';
 import { NodeBlockListStorerMessage } from './messages/NodeBlockListStorerMessage';
 
 export default class NodeBlockListStorer {
   constructor(
-    private readonly loader: NodeLoaderService,
+    private readonly nodes: NodeRepository,
     private readonly repository: NodeBlockListRepository,
     private readonly policy: NodeBlockPolicy,
   ) {}
 
-  private async storeChecked(list: NodeBlockList): Promise<void> {
-    const node = await this.loader.loadNode();
-
+  private async storeChecked(node: Node, list: NodeBlockList): Promise<void> {
     assert(
       node.isOwnedBy(list.getOwnerIdentityId()),
       new NodeBlockListMustBeSignedByCurrentOwnerError(),
@@ -38,11 +37,16 @@ export default class NodeBlockListStorer {
     await this.repository.saveLocal(list);
   }
 
-  /** Stores a newer list signed by the current owner; one store at a time, so versions never go back. */
+  /**
+   * Stores a newer list signed by the current owner; one store at a time, so
+   * versions never go back, and no handover lands until the list is stored.
+   */
   public async store(
     message: NodeBlockListStorerMessage,
   ): Promise<NodeBlockList> {
-    await this.policy.change(() => this.storeChecked(message.blockList));
+    await this.nodes.holdLocalNode((node) =>
+      this.policy.change(() => this.storeChecked(node, message.blockList)),
+    );
 
     return message.blockList;
   }

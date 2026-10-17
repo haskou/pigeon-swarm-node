@@ -26,8 +26,6 @@ export class PutNodeBlockExceptionsRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.assertOwnerCanManageNode(request);
-
     const message = new NodeBlockExceptionsUpdaterMessage(
       body.identityIds,
       body.nodePeerIds,
@@ -41,7 +39,9 @@ export class PutNodeBlockExceptionsRoute extends NodeOwnerRouteSupport {
       throw new NonCanonicalIdentityIdError();
     }
 
-    const exceptions = await this.updater.update(message);
+    const exceptions = await this.writeAsNodeOwner(request, () =>
+      this.updater.update(message),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

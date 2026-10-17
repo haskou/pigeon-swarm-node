@@ -21,10 +21,10 @@ export class PutNodeRegistrationRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.assertOwnerCanManageNode(request);
-
-    const node = await this.changer.change(
-      new NodeRegistrationModeChangerMessage(body.mode),
+    const node = await this.changeNodeAsOwner(request, (identityId) =>
+      this.changer.change(
+        new NodeRegistrationModeChangerMessage(body.mode, identityId.valueOf()),
+      ),
     );
 
     return response

@@ -21,10 +21,10 @@ export class PutNodeBlockPublicationRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.assertOwnerCanManageNode(request);
-
-    const publication = await this.updater.update(
-      new NodeBlockListPublicationUpdaterMessage(body.published),
+    const publication = await this.writeAsNodeOwner(request, () =>
+      this.updater.update(
+        new NodeBlockListPublicationUpdaterMessage(body.published),
+      ),
     );
 
     return response

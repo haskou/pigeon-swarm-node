@@ -19,8 +19,11 @@ export class PutNodeRelayConfigurationRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.assertOwnerCanManageNodeWhenClaimed(request);
-    await this.updater.update(new NodeRelayConfigurationUpdaterMessage(body));
+    await this.setUpNodeAsOwnerWhenClaimed(request, (identityId) =>
+      this.updater.update(
+        new NodeRelayConfigurationUpdaterMessage(body, identityId?.valueOf()),
+      ),
+    );
 
     const node = await this.nodeLoader.loadNode();
 

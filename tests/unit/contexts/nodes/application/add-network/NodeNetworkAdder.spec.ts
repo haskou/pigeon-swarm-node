@@ -8,6 +8,7 @@ import { NodePublicNetworkAdderMessage } from '../../../../../../src/contexts/no
 import NodeNetworkAdder from '../../../../../../src/contexts/nodes/application/add-network/NodeNetworkAdder';
 import { Node } from '../../../../../../src/contexts/nodes/domain/Node';
 import NodeRepository from '../../../../../../src/contexts/nodes/domain/repositories/NodeRepository';
+import { IdentityIdMother } from '../../../../mothers/IdentityIdMother';
 
 describe('NodeNetworkAdder', () => {
   let nodes: MockProxy<NodeRepository>;
@@ -32,6 +33,8 @@ describe('NodeNetworkAdder', () => {
       const message = new NodeNetworkAdderMessage(
         UUID.generate().toString(),
         'private_0',
+        undefined,
+        IdentityIdMother.canonical().valueOf(),
       );
       const events = [mock<DomainEvent>()];
 
@@ -41,14 +44,32 @@ describe('NodeNetworkAdder', () => {
 
       expect(result).toBe(node);
       expect(nodes.updateLocalNode).toHaveBeenCalledTimes(1);
-      expect(node.addNetwork).toHaveBeenCalledWith(message.network);
+      expect(node.addNetwork).toHaveBeenCalledWith(
+        message.network,
+        message.authenticatedIdentityId,
+      );
       expect(eventPublisher.publish).toHaveBeenCalledWith(events);
+    });
+
+    it('should let anyone set up a network on a node nobody claimed', async () => {
+      const message = new NodeNetworkAdderMessage(
+        UUID.generate().toString(),
+        'private_0',
+        undefined,
+        undefined,
+      );
+
+      await adder.addNetwork(message);
+
+      expect(node.addNetwork).toHaveBeenCalledWith(message.network, undefined);
     });
 
     it('should not publish when adding the network fails', async () => {
       const message = new NodeNetworkAdderMessage(
         UUID.generate().toString(),
         'public',
+        undefined,
+        undefined,
       );
       const expectedError = new Error('network constraint failed');
 
@@ -63,7 +84,9 @@ describe('NodeNetworkAdder', () => {
 
   describe('addPublicNetwork', () => {
     it('should add a generated public network to the latest node and publish its events', async () => {
-      const message = new NodePublicNetworkAdderMessage();
+      const message = new NodePublicNetworkAdderMessage(
+        IdentityIdMother.canonical().valueOf(),
+      );
       const events = [mock<DomainEvent>()];
 
       node.pullDomainEvents.mockReturnValue(events);
@@ -71,7 +94,10 @@ describe('NodeNetworkAdder', () => {
       const result = await adder.addPublicNetwork(message);
 
       expect(result).toBe(node);
-      expect(node.addNetwork).toHaveBeenCalledWith(message.network);
+      expect(node.addNetwork).toHaveBeenCalledWith(
+        message.network,
+        message.authenticatedIdentityId,
+      );
       expect(eventPublisher.publish).toHaveBeenCalledWith(events);
     });
   });
