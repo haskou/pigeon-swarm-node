@@ -89,6 +89,18 @@ paths:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1operations'
   /communities/{communityId}/moderation-logs:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1moderation-logs'
+  /communities/{communityId}/invitations:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1invitations'
+  /communities/{communityId}/invitation-preview:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1invitation-preview'
+  /communities/{communityId}/invitation-claims:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1invitation-claims'
+  /communities/{communityId}/invitations/{invitationId}/claims:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1invitations~1{invitationId}~1claims'
+  /communities/{communityId}/invitations/{invitationId}/admissions:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1invitations~1{invitationId}~1admissions'
+  /communities/{communityId}/invitations/{invitationId}/revocation:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1invitations~1{invitationId}~1revocation'
   /communities/{communityId}/members:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1members'
   /communities/{communityId}/members/me:

@@ -3423,27 +3423,24 @@ error.
 | `DELETE .../bans/{identityId}`                                                                                                             | `member_unbanned`             | `{identityId}`                                                                            |
 | `DELETE .../members/{identityId}/kick`                                                                                                     | `member_kicked`               | `{identityId}`                                                                            |
 | `DELETE .../members/me`                                                                                                                    | `member_left`                 | `{identityId}`                                                                            |
-| `POST /community-membership-requests` (auto-join), `PATCH /community-membership-requests/{id}` (accept), `POST .../invites/{token}/accept` | `member_joined`               | `{identityId, method, reference?}`                                                        |
+| `POST /community-membership-requests` (auto-join), `PATCH /community-membership-requests/{id}` (accept)                                    | `member_joined`               | `{identityId, method, reference?}`                                                        |
+| `POST .../invitations/{invitationId}/admissions`                                                                                           | `member_joined`               | `{consent, identityId, invitationId, method: "invitation", possession}`                   |
+| `POST .../invitations`                                                                                                                     | `invitation_created`          | `{expiresAt, invitationKey, maxUses, invitee?}`                                           |
+| `POST .../invitations/{invitationId}/revocation`                                                                                           | `invitation_revoked`          | `{invitationId}`                                                                          |
 
-`member_joined` carries `method` `added`, `approval`, `invitation`, `invite_link` or
-`automatic`, and `reference` exactly for `approval`, `invitation` and
-`invite_link`: the id of the accepted `community_membership_request` (type
-`request` for `approval`, `invitation` for `invitation`), or for `invite_link`
-the invite reference
-`base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken)))`
-(`CommunityInviteReference.of` from `@haskou/pigeon-swarm-crypto`, pinned by its
-`community-operation.json` vector; a token that is not 32 canonical base64url
-bytes has no reference and matches no invite), never the token itself, so the
-operation log does not hand out a usable invite.
-A node admits it only when it holds the signed invite and the member's
-`community_invite_use` record of a token with that reference, and, for
-`invite_link`, the invite has not expired at the operation's signer-chosen
-`createdAt`. Replicas do not cap `maxUses`: the joins have no single order, so a
-cap in the fold would let a join backdated by any token holder evict an honest
-member. `approval` needs `approve_members`,
-`added` needs `manage_members`, `automatic` needs `autoJoinEnabled`, and the
-other methods are signed by the joining identity. A node that has not
-replicated the referenced records yet admits the operation later.
+`member_joined` carries `method` `added`, `approval`, `invitation` or `automatic`.
+`approval` carries `reference`, the id of the accepted
+`community_membership_request`; the other methods carry none. `invitation` takes
+`{identityId, invitationId, possession, consent}` instead (see [Community
+invitations](#community-invitations)). `approval` needs `approve_members`, `added`
+needs `manage_members`, `automatic` needs `autoJoinEnabled`, `invitation` needs
+`manage_members` of its author (the admitter, not the joiner), and the remaining
+methods are signed by the joining identity. A node that has not replicated the
+referenced records yet admits the operation later.
+
+Every identity id in an operation, its author and each argument, must be
+canonical (`IdentityId.isCanonicalKey()`); an operation that names another
+encoding of a key is refused.
 
 Channel and role ids are not chosen: `channelId` and `roleId` are the first 24 hex
 characters of `sha256(JSON.stringify(["channel" | "role", communityId,
@@ -3458,8 +3455,8 @@ Per case they give the inputs (`networkId`, community nonce, owner, `createdAt`,
 content, the signature and the request `operation`.
 A unit spec recomputes all of them with the domain code and with plain
 `canonicalize` and `sha256`, so a client can use the file as its conformance test.
-A client that is not a member yet reads the `networkId` it needs for the
-`member_joined` of an invite from `GET /communities/invites/{inviteToken}`.
+A client that is not a member yet reads the `networkId` it needs for its
+invitation proofs from `GET /communities/{communityId}/invitation-preview`.
 
 ### List communities
 
@@ -3847,6 +3844,189 @@ Implemented:
   accept or decline `request` join requests
 - requesters can decline their own pending join request
 
+### Community invitations
+
+An invitation is a signed community operation, not a bearer token. The issuer's
+client generates a 32-byte secret, derives an Ed25519 invitation key from it
+(`CommunityInvitationKey` from `@haskou/pigeon-swarm-crypto`) and signs an
+`invitation_created` operation that carries only the public key. The link is
+`https://<ui-origin>/invite/community#c=<communityId>&k=<secret>`; both values
+sit in the URL fragment, so browsers never send them, and the secret never
+reaches the node, a record, a response or a log. The invitation id is the
+digest of the `invitation_created` operation.
+
+A joiner signs two proofs over
+`canonicalize({communityId, identityId, invitationId, networkId})`:
+`possession` with the invitation key (domain
+`pigeon:community-invitation-possession:v1\n`) and `consent` with its own
+identity key (domain `pigeon:community-invitation-consent:v1\n`). It stores
+them in a claim, which carries no authority. A member holding `manage_members`
+admits the claim with a `member_joined` operation (method `invitation`) that
+embeds both proofs, so the join is judged against the community folded from
+its own causal past and no admission depends on a `requests` record. See
+`docs/design/signed-community-invitations.md`.
+
+#### Create an invitation
+
+```http
+POST /communities/{communityId}/invitations
+```
+
+Request body: `{ "expiresAt", "invitationKey", "invitee"?, "maxUses", "moderationLog", "operation" }`.
+`operation` signs `invitation_created` with `args` `{expiresAt, invitationKey,
+maxUses, invitee?}`. `moderationLog` signs an `invitation_created` entry whose
+target is `{ "type": "invitation", "id": <invitation id> }` and whose details are
+`{expiresAt, maxUses}`.
+
+Response:
+
+```json
+{
+  "createdAt": 1773848829055,
+  "expiresAt": 1774453629055,
+  "id": "<invitationId>",
+  "invitationKey": "<base64url public key>",
+  "invitee": "<identityId>",
+  "issuerIdentityId": "<identityId>",
+  "live": true,
+  "maxUses": 1,
+  "revoked": false,
+  "uses": 0
+}
+```
+
+Implemented:
+
+- require signed request auth from a member with `create_invites`
+- `invitationKey` is a canonical Ed25519 public key that is not of small order
+  and differs from the key of every invitation in the operation's causal past
+- `maxUses` is 1 to 100, and exactly 1 when `invitee` names a canonical identity
+  id that alone may join
+- `expiresAt` is after the operation's `createdAt` and at most 30 days
+  (2 592 000 000 ms) later
+
+#### List invitations
+
+```http
+GET /communities/{communityId}/invitations
+```
+
+Response: `{ "invitations": [ <invitation as above> ] }`. `uses`, `revoked` and
+`live` come from the folded operations. Requires signed request auth from a
+member.
+
+#### Preview an invitation
+
+```http
+GET /communities/{communityId}/invitation-preview
+Authorization: Bearer <invitationKey>
+```
+
+Unsigned, so a link holder previews before it has an identity. The client sends
+the public key derived from the link secret (base64url, 20 to 128 characters)
+in the `Authorization` header, never in the URL, and the node never logs that
+header. A missing or malformed key, an unknown key and an invitation that is
+revoked, expired, used up or no longer live all answer `404` with
+`Community not found.`, exactly like an unknown community.
+
+Response:
+
+```json
+{
+  "communityAvatar": "<ref>",
+  "communityBanner": "<ref>",
+  "communityId": "<communityId>",
+  "communityName": "Pigeon",
+  "expiresAt": 1774453629055,
+  "invitationId": "<invitationId>",
+  "networkId": "<networkId>"
+}
+```
+
+The response holds no issuer, invitee, use count, member, peer id or address.
+The joiner needs `networkId` and `invitationId` to sign its proofs.
+
+#### Claim an invitation
+
+```http
+POST /communities/{communityId}/invitations/{invitationId}/claims
+```
+
+Request body: `{ "consent", "possession", "mutation" }`. `mutation` is the joiner's
+public-mutation proof (store `requests`, `kind: "put"`) with a signed community
+`frontier`. It signs the record `{communityId, consent, id, identityId,
+invitationId, possession, scopeType: "community_invitation_claim"}` with record
+id `invitation-claim:<invitationId>:<identityId>`; the author is the joiner.
+
+Response: the stored claim `{communityId, consent, id, identityId, invitationId, possession}`.
+
+Implemented:
+
+- require signed request auth from the joiner
+- store the claim only when `identityId` is canonical (and is the `invitee` when
+  the invitation names one), the invitation is in the community folded at the
+  claim's frontier and live there, both proofs verify, and the joiner is neither
+  banned nor a member
+- a claim is written once: a second claim of the same invitation by the same
+  identity answers `409` with code `CommunityInvitationAlreadyClaimedError`
+- an unknown or unusable invitation answers `409` with
+  `CommunityInvitationNotFoundError` or `CommunityInvitationUnusableError`
+
+#### List pending invitation claims
+
+```http
+GET /communities/{communityId}/invitation-claims
+```
+
+Response: `{ "claims": [ <claim as above> ] }`. Requires signed request auth from a
+member with `manage_members`, because a claim names who asks to join. Only
+pending claims are returned: the invitation is live and unexpired, and its
+joiner is neither a member nor banned nor already admitted under it.
+
+#### Admit a claim
+
+```http
+POST /communities/{communityId}/invitations/{invitationId}/admissions
+```
+
+Request body: `{ "consent", "identityId", "possession", "operation" }`, the proofs
+copied from the claim. `operation` signs `member_joined` with `args`
+`{consent, identityId, invitationId, method: "invitation", possession}`. Response: the
+community, as for [Get community](#get-community).
+
+Implemented:
+
+- require signed request auth from a member with `manage_members`; that member is
+  the operation author and the joiner signs nothing
+- the join counts toward the joiner's operation quota, not the admitter's
+- the ledger refuses the admission unless the invitation is live in its causal
+  past, `possession` and `consent` verify, the joiner is canonical, not banned,
+  not a member and has not used the invitation, `createdAt` lies between the
+  invitation's `createdAt` and `expiresAt`, and the joiner is the `invitee` when
+  one is named
+- usage limits, revocation and expiry never evict an admitted member; admissions
+  made concurrently can exceed `maxUses` by at most one `maxUses` per concurrent
+  branch
+
+#### Revoke an invitation
+
+```http
+POST /communities/{communityId}/invitations/{invitationId}/revocation
+```
+
+Request body: `{ "moderationLog", "operation" }`. `operation` signs
+`invitation_revoked` with `args` `{invitationId}`; `moderationLog` signs an
+`invitation_revoked` entry whose target is the invitation. Response: the
+invitation, as for create.
+
+Implemented:
+
+- require signed request auth from the invitation's issuer or a member with
+  `manage_members`; other `create_invites` holders cannot revoke it
+- revocation is permanent and a second revocation is refused
+- every admission with the revocation in its causal past is refused; admissions
+  made before or concurrently with it stand
+
 ### Leave community
 
 ```http
@@ -4028,6 +4208,8 @@ checked by the `CommunityModerationLogVectors` unit spec.
 | `POST .../bans`                                        | `member_banned`                                                | member, banned `identityId`     | `{reason}`                                                                                                                                                                  |
 | `DELETE .../bans/{identityId}`                         | `member_unbanned`                                              | member, `identityId`            | `{}`                                                                                                                                                                        |
 | `DELETE .../members/{identityId}/kick`                 | `member_kicked`                                                | member, `identityId`            | `{}`                                                                                                                                                                        |
+| `POST .../invitations`                                 | `invitation_created`                                           | invitation, invitation id       | `{expiresAt, maxUses}`                                                                                                                                                      |
+| `POST .../invitations/{invitationId}/revocation`       | `invitation_revoked`                                           | invitation, `invitationId`      | `{}`                                                                                                                                                                        |
 | `PATCH /community-membership-requests/{requestId}`     | `membership_request_accepted` or `membership_request_declined` | membership_request, `requestId` | `{identityId, type}` of the request                                                                                                                                         |
 | `DELETE .../channels/{channelId}/messages/{messageId}` | `message_deleted`                                              | message, `messageId`            | `{channelId, targetMessageAuthorId}`                                                                                                                                        |
 
@@ -4044,7 +4226,7 @@ routes for channel, role, ban and member kick take
 Permissions checked against the signed actor: channel actions need
 `manage_channels`, role and member-role actions `manage_roles`, bans
 `ban_members`, kicks `manage_members`, invitations `create_invites`,
-invitation revocations `manage_members` or `create_invites`, request
+invitation revocations the invitation's issuer or `manage_members`, request
 decisions `approve_members`/`reject_members`, `community_updated` the owner, and `message_deleted` the
 message author or `manage_messages`.
 

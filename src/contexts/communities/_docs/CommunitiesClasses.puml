@@ -83,6 +83,34 @@ package "communities/application" {
     + update(message): CommunityMembershipRequest
   }
 
+  class CommunityInvitationCreator {
+    + create(message): { community, invitation }
+  }
+
+  class CommunityInvitationsFinder {
+    + find(message): { community, invitations }
+  }
+
+  class CommunityInvitationPreviewer {
+    + preview(message): { community, invitation }
+  }
+
+  class CommunityInvitationClaimer {
+    + claim(message): CommunityInvitationClaim
+  }
+
+  class CommunityInvitationClaimsFinder {
+    + find(message): CommunityInvitationClaim[]
+  }
+
+  class CommunityInvitationAdmitter {
+    + admit(message): Community
+  }
+
+  class CommunityInvitationRevoker {
+    + revoke(message): { community, invitation }
+  }
+
   class CommunityChannelMessagesFinder {
     + find(message): CommunityChannelMessagesPage
   }
@@ -153,6 +181,24 @@ package "communities/application" {
   CommunityMembershipRequester ..> CommunityMembershipRequestRepository
   CommunityMembershipRequestUpdater ..> CommunityRepository
   CommunityMembershipRequestUpdater ..> CommunityMembershipRequestRepository
+  CommunityInvitationCreator ..> CommunityRepository
+  CommunityInvitationCreator ..> CommunityFinder
+  CommunityInvitationCreator ..> CommunityModerationLogRecorder
+  CommunityInvitationsFinder ..> CommunityRepository
+  CommunityInvitationsFinder ..> CommunityFinder
+  CommunityInvitationPreviewer ..> CommunityRepository
+  CommunityInvitationPreviewer ..> CommunityFinder
+  CommunityInvitationClaimer ..> CommunityRepository
+  CommunityInvitationClaimer ..> CommunityFinder
+  CommunityInvitationClaimer ..> CommunityInvitationClaimRepository
+  CommunityInvitationClaimsFinder ..> CommunityRepository
+  CommunityInvitationClaimsFinder ..> CommunityFinder
+  CommunityInvitationClaimsFinder ..> CommunityInvitationClaimRepository
+  CommunityInvitationAdmitter ..> CommunityRepository
+  CommunityInvitationAdmitter ..> CommunityFinder
+  CommunityInvitationRevoker ..> CommunityRepository
+  CommunityInvitationRevoker ..> CommunityFinder
+  CommunityInvitationRevoker ..> CommunityModerationLogRecorder
   CommunityChannelMessagesFinder ..> CommunityRepository
   CommunityChannelMessagesFinder ..> CommunityChannelMessageRepository
   CommunityChannelMessagesFinder ..> CommunityChannelMessageReactionRepository
@@ -217,6 +263,7 @@ package "communities/domain" {
     + manageChannelMessages(identityId, channelId): void
     + searchTextChannelMessages(identityId, channelId): void
     + viewModerationLog(identityId): void
+    + viewInvitationClaims(identityId): void
     + addTextChannel(actor, name): CommunityTextChannel
     + addRole(actor, name, permissions): CommunityRole
     + assignRoles(actor, member, roleIds): void
@@ -405,6 +452,30 @@ package "communities/domain" {
   class CommunityDescription
   class CommunityAvatar
   class CommunityBanner
+
+  class CommunityInvitation {
+    + MAX_USES: number
+    + MAX_LIFETIME: number
+    + fromOperation(operation): CommunityInvitation
+    + isRevoked(): boolean
+    + hasJoined(joiner): boolean
+    + isOpenAt(at): boolean
+    + isLiveIn(community): boolean
+    + assertAdmits(community, joiner, possession, consent): void
+  }
+
+  class CommunityInvitations {
+    + find(id): CommunityInvitation?
+    + findByKey(invitationKey): CommunityInvitation?
+    + list(): CommunityInvitation[]
+  }
+
+  class CommunityInvitationClaim {
+    + idOf(invitationId, identityId): string
+    + create(communityId, invitationId, identityId, possession, consent): CommunityInvitationClaim
+  }
+
+  CommunityInvitations o-- CommunityInvitation
   class CommunityChannelId
   class CommunityChannelName
   class CommunityChannelType
@@ -492,6 +563,7 @@ package "communities/domain" {
     + deleted: boolean
     + frontier: string[]
     + skipped: string[]
+    + invitations: CommunityInvitations
   }
 
   note right of CommunityStateFold
@@ -519,8 +591,14 @@ package "communities/domain" {
     + requireAtFrontier(id, frontier): Community
     + findByMember(identityId): Community[]
     + findFrontier(id): string[]
+    + findInvitations(id): CommunityInvitations
     + save(operation, proof): void
   }
+  interface CommunityInvitationClaimRepository {
+    + findByCommunity(communityId): CommunityInvitationClaim[]
+    + save(claim, proof): void
+  }
+  CommunityInvitationClaimRepository ..> CommunityInvitationClaim
   interface CommunityChannelMessageRepository {
     + requireById(communityId, channelId, messageId): CommunityChannelMessage
     + hasById(communityId, channelId, messageId): boolean
@@ -649,6 +727,8 @@ package "communities/infrastructure" {
   class LocalPrivateCommunityRepository
   class PrivateCommunityPublicStorageGuard
   class OrbitDBCommunityRepository
+  class OrbitDBCommunityInvitationClaimRepository
+  class CommunityInvitationClaimMutationPolicy
   class CommunityOperationMutationPolicy
   class OrbitDBCommunityChannelMessageRepository
   class OrbitDBCommunityChannelMessageDocument
@@ -672,6 +752,8 @@ package "communities/infrastructure" {
   PrivateCommunityPublicStorageGuard --> PrivateAuthorizationRepository
   PrivateCommunityPublicStorageGuard --> PrivateAuthorizationStorageCoordinator
   OrbitDBCommunityRepository --> CommunityStateFold : read model
+  OrbitDBCommunityInvitationClaimRepository ..|> CommunityInvitationClaimRepository
+  CommunityInvitationClaimMutationPolicy ..> OrbitDBCommunityRepository : state at the claim frontier
   CommunityOperationMutationPolicy --> CommunityOperationLedger : causal past
   CommunityOperationMutationPolicy --> CommunityOperationApplier : re-authorize
   OrbitDBCommunityChannelMessageRepository ..|> CommunityChannelMessageRepository
@@ -700,6 +782,13 @@ package "communities-api" {
   class GetCommunityMembershipRequestsRoute
   class PatchCommunityRoute
   class PatchCommunityRequestRoute
+  class PostCommunityInvitationRoute
+  class GetCommunityInvitationsRoute
+  class GetCommunityInvitationPreviewRoute
+  class PostCommunityInvitationClaimRoute
+  class GetCommunityInvitationClaimsRoute
+  class PostCommunityInvitationAdmissionRoute
+  class PostCommunityInvitationRevocationRoute
   class GetCommunityMembersRoute
   class PostCommunityJoinRequestRoute
   class DeleteCommunityMemberRoute
@@ -729,6 +818,13 @@ package "communities-api" {
   GetCommunityMembershipRequestsRoute ..> CommunityMembershipRequestsFinder
   PostCommunityJoinRequestRoute ..> CommunityMembershipRequester
   PatchCommunityRequestRoute ..> CommunityMembershipRequestUpdater
+  PostCommunityInvitationRoute ..> CommunityInvitationCreator
+  GetCommunityInvitationsRoute ..> CommunityInvitationsFinder
+  GetCommunityInvitationPreviewRoute ..> CommunityInvitationPreviewer
+  PostCommunityInvitationClaimRoute ..> CommunityInvitationClaimer
+  GetCommunityInvitationClaimsRoute ..> CommunityInvitationClaimsFinder
+  PostCommunityInvitationAdmissionRoute ..> CommunityInvitationAdmitter
+  PostCommunityInvitationRevocationRoute ..> CommunityInvitationRevoker
   DeleteCommunityMemberRoute ..> CommunityLeaver
   GetCommunityChannelsRoute ..> CommunityChannelsFinder
   PostCommunityTextChannelRoute ..> CommunityTextChannelCreator
@@ -756,7 +852,7 @@ note right of Community
   - custom roles assign permissions
     to community members
   - roles can manage channels,
-    invites, member approvals,
+    invitations, member approvals,
     messages and role assignment
   - channels can be visible to
     everyone or selected roles

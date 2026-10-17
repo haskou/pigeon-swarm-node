@@ -1,6 +1,6 @@
 # Signed community invitations
 
-Status: proposed, not implemented. Design for #545 and #550, tied to #543 and
+Status: implemented. Design for #545 and #550, tied to #543 and
 #541, and for the client fold in haskou/pigeon-swarm-ui#433. It replaces
 invite-link tokens and direct invitation requests with one signed invitation
 link in a single cutover. Invitations issued before the cutover are invalid.
