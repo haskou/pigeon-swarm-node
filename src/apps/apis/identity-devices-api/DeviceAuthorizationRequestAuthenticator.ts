@@ -2,15 +2,43 @@ import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationTransitionReader } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionReader';
+import { PublicKey } from '@haskou/pigeon-swarm-crypto';
 import { assert } from '@haskou/value-objects';
 import { Request } from 'express';
 
 import { InvalidSignedRequestError } from '../shared/errors/InvalidSignedRequestError';
 import { SignedHttpRequestVerifier } from '../shared/SignedHttpRequestVerifier';
 import { assertSignedRequestTimestampIsFresh } from '../shared/SignedRequestFreshness';
+import { signedRequestReplayGuard } from '../shared/SignedRequestReplayGuard';
 
+/**
+ * Authenticates the device proof (`X-Device-Credential` and
+ * `X-Device-Signature`) or recovery proof (`X-Recovery-Signature`) of a
+ * request. Every accepted proof is fresh and used once: a signature seen
+ * before inside its window is refused, keyed by the raw signing key.
+ */
 export class DeviceAuthorizationRequestAuthenticator {
   private readonly verifier = new SignedHttpRequestVerifier();
+
+  /** Verifies the signature, then admits it only fresh and only once. */
+  private verifyProof(
+    request: Request,
+    timestamp: string,
+    signatureValue: string,
+    signer: PublicKey,
+  ): void {
+    const signature = this.verifier.verifyWith(
+      request,
+      timestamp,
+      signatureValue,
+      signer,
+    );
+    assertSignedRequestTimestampIsFresh(timestamp);
+    assert(
+      signedRequestReplayGuard.accept(signer, signature),
+      new InvalidSignedRequestError(),
+    );
+  }
 
   private verifyDevice(
     request: Request,
@@ -26,7 +54,7 @@ export class DeviceAuthorizationRequestAuthenticator {
       new InvalidSignedRequestError(),
     );
     const credential = DeviceCredential.fromWire(credentialValue);
-    this.verifier.verifyWith(request, timestamp, signatureValue, credential);
+    this.verifyProof(request, timestamp, signatureValue, credential);
 
     return credential;
   }
@@ -59,7 +87,7 @@ export class DeviceAuthorizationRequestAuthenticator {
         recoverySignatureValue.length > 0,
         new InvalidSignedRequestError(),
       );
-      this.verifier.verifyWith(
+      this.verifyProof(
         request,
         timestamp,
         recoverySignatureValue,
@@ -120,7 +148,6 @@ export class DeviceAuthorizationRequestAuthenticator {
         new InvalidSignedRequestError(),
       );
       const timestamp = this.verifier.getRequiredHeader(request, 'x-timestamp');
-      assertSignedRequestTimestampIsFresh(timestamp);
       const credential = this.verifyDevice(
         request,
         timestamp,

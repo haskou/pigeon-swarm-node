@@ -2393,7 +2393,9 @@ export default class Definitions {
     });
   }
 
-  @given('I set a sealed secret bundle body for my device with generation {int}')
+  @given(
+    'I set a sealed secret bundle body for my device with generation {int}',
+  )
   public async iSetASealedSecretBundleBodyForMyDeviceWithGeneration(
     generation: number,
   ): Promise<void> {
