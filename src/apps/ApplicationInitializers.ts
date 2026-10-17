@@ -6,9 +6,11 @@ import DiagnosticsTraceInitializer from './initializers/diagnostics/DiagnosticsT
 import IdentityMutationGateInitializer from './initializers/identities/IdentityMutationGateInitializer';
 import KeychainMutationGateInitializer from './initializers/keychains/KeychainMutationGateInitializer';
 import NodeBlockPolicyInitializer from './initializers/nodes/NodeBlockPolicyInitializer';
+import NonCanonicalIdentityIdsPurgeInitializer from './initializers/nodes/NonCanonicalIdentityIdsPurgeInitializer';
 import PublicMutationGateInitializer from './initializers/public-mutations/PublicMutationGateInitializer';
 
 export const applicationInitializers: ApplicationServiceClass<Initializer>[] = [
+  NonCanonicalIdentityIdsPurgeInitializer,
   NodeBlockPolicyInitializer,
   PublicMutationGateInitializer,
   KeychainMutationGateInitializer,

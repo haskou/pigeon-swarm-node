@@ -4,8 +4,11 @@ import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrim
 /**
  * Decides whether a replicated identity record is admissible. A record is
  * admitted only when it embeds a self-signed identity whose canonical content
- * id is the record id. Every redundant field must repeat the signed value, and
- * the sender cannot supply freshness or tombstone fields.
+ * id is the record id, and whose id is the canonical encoding of its key.
+ * Every redundant field must repeat the signed value, and the sender cannot
+ * supply freshness or tombstone fields. Records are checked on every load, so
+ * one stored before ids had to be canonical is never held, even if it was
+ * persisted then.
  */
 export default class IdentityRecordAdmissionDomainService {
   private static readonly ALLOWED_KEYS: readonly string[] = [
@@ -77,6 +80,7 @@ export default class IdentityRecordAdmissionDomainService {
     return (
       signed.networks.length <=
         IdentityRecordAdmissionDomainService.MAX_NETWORKS &&
+      identity.getId().isCanonicalKey() &&
       identity.hasValidAdmissionProof() &&
       this.repeatsSignedFields(record, signed)
     );

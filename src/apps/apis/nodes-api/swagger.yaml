@@ -125,7 +125,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeBlocksResource'
         '400':
-          description: The body is not JSON or not a block list document.
+          description: The body is not JSON or not a block list document, or it blocks an identity id that is not the canonical encoding of a usable key (code 400080).
         '401':
           description: The signed request is invalid, stale or replayed, X-Body-Hash is malformed, or the body does not hash to X-Body-Hash (code 401020); a signed header is missing (code 401021).
         '403':

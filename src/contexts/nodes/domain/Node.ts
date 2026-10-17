@@ -128,6 +128,21 @@ export class Node extends AggregateRoot {
     return cleared;
   }
 
+  /**
+   * Leaves the node unowned if its owner was stored before owner ids had to
+   * be canonical: no request can be signed under such an id, so it can never
+   * act as owner. The owner claims the node again; it records no event.
+   */
+  public clearNonCanonicalOwner(): boolean {
+    if (!this.owner || this.owner.isCanonicalKey()) {
+      return false;
+    }
+
+    this.owner = undefined;
+
+    return true;
+  }
+
   public updateRelayConfiguration(
     relayConfiguration: NodeRelayConfiguration,
   ): void {

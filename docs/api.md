@@ -1852,6 +1852,11 @@ request naming one in `X-Identity-Id` gets `401` code `401020` (see
 _Authentication_). `POST /identities`, `POST /identity-devices/transitions` and
 `/identity-devices/{identityId}/sealed-secrets`, which check the block list for
 a record or path id, answer `400` code `400080` for such an id instead.
+`PUT /node/blocks` answers `400` code `400080` for a list blocking such an id.
+A fetched block source keeps its signed `list` verbatim, so it may still name
+one, but such an id is never pending, approved or enforced. At start the node
+drops such ids from its exceptions and from what its sources apply, and
+leaves the node unclaimed if its owner was stored under one.
 
 ```http
 PUT /node/blocks

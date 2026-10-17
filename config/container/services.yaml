@@ -253,6 +253,11 @@ services:
     class: /apps/initializers/nodes/NodeBlockPolicyInitializer
     arguments:
       - '@contexts/nodes/domain/services/NodeBlockPolicy'
+  apps/initializers/nodes/NonCanonicalIdentityIdsPurgeInitializer:
+    class: /apps/initializers/nodes/NonCanonicalIdentityIdsPurgeInitializer
+    arguments:
+      - >-
+        @contexts/nodes/application/purge-non-canonical-identity-ids/NonCanonicalIdentityIdsPurger
   apps/initializers/public-mutations/CallMutationPolicies:
     class: /apps/initializers/public-mutations/CallMutationPolicies
     arguments:
@@ -1882,6 +1887,13 @@ services:
     class: /contexts/nodes/application/load/NodeLoader
     arguments:
       - '@contexts/nodes/domain/services/NodeLoaderService'
+  contexts/nodes/application/purge-non-canonical-identity-ids/NonCanonicalIdentityIdsPurger:
+    class: >-
+      /contexts/nodes/application/purge-non-canonical-identity-ids/NonCanonicalIdentityIdsPurger
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeRepository'
+      - '@contexts/nodes/domain/repositories/NodeBlockExceptionsRepository'
+      - '@contexts/nodes/domain/repositories/NodeBlockSourceRepository'
   contexts/nodes/application/record-peer-community-state/NodePeerCommunityStateRecorder:
     class: >-
       /contexts/nodes/application/record-peer-community-state/NodePeerCommunityStateRecorder

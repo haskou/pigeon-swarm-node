@@ -12,6 +12,7 @@ package "nodes" {
       +addNetwork(network: Network): void
       +assignOwner(owner: IdentityId, authenticatedIdentityId: IdentityId): void
       +hasOwner(): boolean
+      +clearNonCanonicalOwner(): boolean
       +isOwnedBy(identityId: IdentityId): boolean
       +changeRegistrationMode(mode: NodeRegistrationMode): void
       +isOpenForRegistration(): boolean
@@ -191,6 +192,7 @@ package "nodes" {
     class NodeBlockEntries {
       -identityIds: IdentityId[]
       -nodePeerIds: NodePeerId[]
+      +canonical(): NodeBlockEntries
     }
 
     class NodeBlockSource {
@@ -206,6 +208,7 @@ package "nodes" {
       +approve(version: NodeBlockListVersion, entries: NodeBlockEntries): void
       +pending(): NodeBlockEntries
       +applied(): NodeBlockEntries
+      +dropNonCanonicalApprovals(): number
     }
 
     note right of NodeBlockSource
@@ -267,6 +270,7 @@ package "nodes" {
       own list plus each source's applied entries
       minus local exceptions. An unclaimed node
       blocks nobody; the current owner is never blocked.
+      Only canonical identity ids are enforced.
     end note
 
     NodeBlockList --|> NodeBlocks
@@ -464,6 +468,10 @@ package "nodes" {
       +find(): Promise<NodeBlockEntries>
     }
 
+    class NonCanonicalIdentityIdsPurger {
+      +purge(): Promise<NonCanonicalIdentityIdsPurge>
+    }
+
     class NodeBlockListPublicationUpdater {
       +update(message: NodeBlockListPublicationUpdaterMessage): Promise<NodeBlockPublication>
     }
@@ -490,6 +498,9 @@ package "nodes" {
     NodeBlockSourceFinder --> NodeBlockSourceRepository
     NodeBlockExceptionsUpdater --> NodeBlockExceptionsRepository
     NodeBlockExceptionsUpdater --> NodeBlockPolicy
+    NonCanonicalIdentityIdsPurger --> NodeRepository
+    NonCanonicalIdentityIdsPurger --> NodeBlockExceptionsRepository
+    NonCanonicalIdentityIdsPurger --> NodeBlockSourceRepository
     NodeBlockExceptionsFinder --> NodeBlockExceptionsRepository
     NodeBlockListPublicationUpdater --> NodeBlockPublicationRepository
     NodeBlockListPublicationFinder --> NodeBlockPublicationRepository
