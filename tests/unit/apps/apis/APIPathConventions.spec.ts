@@ -131,6 +131,45 @@ function handlerOperations(): string[] {
     });
 }
 
+type RegisteredHandler = { method: string; order: number; path: string };
+
+function registeredHandlers(): RegisteredHandler[] {
+  const storage = getMetadataArgsStorage();
+
+  return storage.actions.flatMap((action) => {
+    const order = applicationRoutes.indexOf(action.target as never);
+
+    if (order < 0) return [];
+
+    const controller = storage.controllers.find(
+      (candidate) => candidate.target === action.target,
+    );
+
+    return [
+      {
+        method: action.type,
+        order,
+        path: `${controller?.route ?? ''}${(action.route as string) ?? ''}`,
+      },
+    ];
+  });
+}
+
+// True when `literal` names one concrete path that `pattern` also matches.
+function shadows(pattern: string, literal: string): boolean {
+  const patternSegments = pattern.split('/');
+  const literalSegments = literal.split('/');
+
+  return (
+    pattern !== literal &&
+    patternSegments.length === literalSegments.length &&
+    patternSegments.every(
+      (segment, index) =>
+        segment.startsWith(':') || segment === literalSegments[index],
+    )
+  );
+}
+
 function apiSwaggerFiles(): string[] {
   return readdirSync(apisRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && entry.name.endsWith('-api'))
@@ -253,6 +292,25 @@ describe('API path conventions', () => {
     expect(
       removedOperations.filter((operation) => served.has(operation)),
     ).toEqual([]);
+  });
+
+  it('should register a literal path before the parameter path that also matches it', () => {
+    const handlers = registeredHandlers();
+    const misordered = handlers.flatMap((pattern) =>
+      handlers
+        .filter(
+          (literal) =>
+            literal.method === pattern.method &&
+            shadows(pattern.path, literal.path) &&
+            literal.order > pattern.order,
+        )
+        .map(
+          (literal) =>
+            `${literal.method.toUpperCase()} ${literal.path} is registered after ${pattern.path}`,
+        ),
+    );
+
+    expect(misordered).toEqual([]);
   });
 
   it('should only list exceptions that exist', () => {

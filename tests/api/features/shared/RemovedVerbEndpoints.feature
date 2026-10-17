@@ -1,6 +1,6 @@
 Feature: Removed verb-style endpoints
 
-  Scenario Outline: A removed verb-style GET path is only an unknown resource id
+  Scenario Outline: A removed verb-style GET path is refused as a malformed resource id
     Given I register a test IPFS network "removed-verb-network"
     And I sign a GET request to "<path>"
     When I GET "<path>"
@@ -8,9 +8,19 @@ Feature: Removed verb-style endpoints
 
     Examples:
       | path                  | status |
-      | /communities/discover | 409    |
-      | /calls/history        | 409    |
-      | /calls/ice-servers    | 409    |
+      | /communities/discover | 404    |
+      | /calls/history        | 404    |
+      | /calls/ice-servers    | 404    |
+
+  Scenario Outline: A removed verb-style GET path is refused before authentication succeeds
+    When I GET "<path>"
+    Then response code is equal to 401
+
+    Examples:
+      | path                  |
+      | /communities/discover |
+      | /calls/history        |
+      | /calls/ice-servers    |
 
   Scenario Outline: A removed verb-style POST endpoint is no longer served
     When I POST to "<path>"
