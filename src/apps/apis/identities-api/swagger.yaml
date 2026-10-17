@@ -165,9 +165,8 @@ components:
           type: string
         admissionNonce:
           type: string
-          minLength: 1
-          maxLength: 64
-          description: Proof-of-work nonce bound to the identity id and its sorted network ids. SHA-256 of `pigeon-identity-admission:v1:<id>:<networks>:<nonce>` must have 16 leading zero bits (a fixed protocol constant). Through this API, a node may ask up to 20 bits for networks that already took 60 or more admissions on it in the current minute (one more bit per doubling); see the 400 response. Covered by the identity signature.
+          pattern: '^(0|[1-9][0-9]{0,15})$'
+          description: Canonical decimal proof-of-work nonce of 1 to 16 digits, without leading zeros, bound to the identity id and its sorted network ids. The crypto library's v2 identity-admission proof (`ProofOfWork.identityAdmission`) must have 16 leading zero bits (a fixed protocol constant). Through this API, a node may ask up to 20 bits for networks that already took 60 or more admissions on it in the current minute (one more bit per doubling); see the 400 response. Covered by the identity signature.
         authorizationRevision:
           type: integer
           minimum: 0

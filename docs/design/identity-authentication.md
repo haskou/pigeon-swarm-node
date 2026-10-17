@@ -102,8 +102,10 @@ which merges the persisted history of that key once the genesis is known.
 
 ### (f) Admission proof (cost of minting identities)
 
-Every identity carries a signed `admissionNonce`. SHA-256 of
-`pigeon-identity-admission:v1:<identityId>:<sorted networkIds>:<nonce>` must
+Every identity carries a signed `admissionNonce`: the crypto library's v2
+identity-admission proof of work (`ProofOfWork.identityAdmission`, domain
+`pigeon-identity-admission:v2`, length-prefixed preimage over the identity id and
+the sorted network ids, canonical decimal nonce). Its SHA-256 must
 start with 16 zero bits (`IdentityAdmissionProof.DIFFICULTY_BITS`, a protocol
 constant so every node verifies the same proof; not configurable). The proof is stateless,
 so every node checks it from the record alone: the gate rejects records without

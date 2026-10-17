@@ -2473,7 +2473,7 @@ Node-local queues of opaque ciphertext envelopes. Mailboxes are never written to
 | `DELETE /mailboxes/{mailboxId}`                         | `Bearer <readToken>`                                          | Deletes the mailbox and its envelopes. `204`. Closes every realtime subscription to it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 - `mailboxId` is 32 bytes base64url; capabilities are sent only in `Authorization`, never the URL.
-- Creation proof preimage: `pigeon-mailbox-creation:v1:<mailboxId>:<postTokenHash>:<readTokenHash>:<creationNonce>` (1 to 64 character nonce). Byte-exact vectors (preimage, digest, leading zero bits, mined nonce) are in [`tests/fixtures/mailbox-creation-proof-vectors.json`](../tests/fixtures/mailbox-creation-proof-vectors.json), checked by the `MailboxCreationProofVectors` unit spec.
+- Creation proof: the `@haskou/pigeon-swarm-crypto` v2 mailbox-creation proof of work (`ProofOfWork.mailboxCreation(mailboxId, postTokenHash, readTokenHash)`): SHA-256 over a length-prefixed preimage (domain `pigeon-mailbox-creation:v2`). `creationNonce` is a canonical decimal string of 1 to 16 digits without leading zeros (`^(0|[1-9][0-9]{0,15})$`). A proof in any other encoding, including the retired v1 `domain:field:...:nonce` form, is refused with `400`. Byte-exact vectors are the library's `vectors/proof-of-work.json`, checked by the `MailboxCreationProofVectors` unit spec.
 - A wrong, swapped or missing capability, a malformed id and an unknown mailbox all return the same `404`.
 - Limits: `MAILBOX_MAX_ENVELOPES`, `MAILBOX_MAX_BYTES`, `MAILBOX_MAX_COUNT`, `MAILBOX_CREATE_RATE_LIMIT_PER_MINUTE` (in memory, per client address, `0` disables; IPv6 counts per /64, IPv4-mapped addresses as IPv4; the address is the socket address unless `API_TRUST_PROXY` is set; the window resets on restart and `MAILBOX_MAX_COUNT` still bounds creation; exceeding the rate returns `429` with code `429041`), `MAILBOX_APPEND_RATE_PER_MINUTE` (persisted per mailbox, default `120`, `0` disables).
 - Readers: `MAILBOX_MAX_READERS` (default `129`, at least `1`) bounds how many read capabilities one mailbox holds: the root reader plus one per device, so the default admits all 128 devices an identity may hold. Each reader keeps its own acknowledged cursor.
@@ -2800,17 +2800,20 @@ The signature covers this canonical property order:
 }
 ```
 
-`admissionNonce` is a hashcash-style proof of work. SHA-256 of
-`pigeon-identity-admission:v1:<identityId>:<sorted networkIds joined by ','>:<admissionNonce>`
-must start with 16 zero bits (a protocol constant, not configurable; about
-65 thousand hashes on average). The nonce is covered by the identity signature, is
-at most 64 characters, and must be mined again whenever the network set changes.
+`admissionNonce` is a proof of work: the `@haskou/pigeon-swarm-crypto` v2
+identity-admission proof (`ProofOfWork.identityAdmission(identityId, networkIds)`,
+domain `pigeon-identity-admission:v2`, length-prefixed preimage over the identity
+id and the sorted network ids). Its SHA-256 must start with 16 zero bits (a
+protocol constant, not configurable; about 65 thousand hashes on average). The
+nonce is covered by the identity signature, is a canonical decimal string of 1 to
+16 digits without leading zeros, and must be mined again whenever the network set
+changes. A proof in any other encoding, including the retired v1 form, never
+verifies; v1 records are discarded rather than migrated.
 Every node verifies it; identities without a valid proof are rejected and never
 admitted to the replicated store. The request `admissionNonce` is required in
 practice: without it the identity is refused.
-Byte-exact vectors (preimage, digest, leading zero bits, mined nonce) are in
-[`tests/fixtures/identity-admission-proof-vectors.json`](../tests/fixtures/identity-admission-proof-vectors.json),
-checked by the `IdentityAdmissionProofVectors` unit spec.
+Byte-exact vectors are the library's `vectors/proof-of-work.json`, checked by
+the `IdentityAdmissionProofVectors` unit spec.
 
 Through `POST /identities` and `PUT /identities/{identityId}`, a node may ask
 more than 16 bits for the networks an identity enters (all of them for a new

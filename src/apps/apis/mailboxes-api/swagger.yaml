@@ -34,7 +34,8 @@ paths:
                   description: Becomes the mailbox's first reader. Further readers join through POST /mailboxes/{mailboxId}/readers.
                 creationNonce:
                   type: string
-                  pattern: '^[A-Za-z0-9_-]{1,64}$'
+                  pattern: '^(0|[1-9][0-9]{0,15})$'
+                  description: Canonical decimal proof-of-work nonce of 1 to 16 digits, without leading zeros. The crypto library's v2 mailbox-creation proof (`ProofOfWork.mailboxCreation`) bound to the mailbox id and both token hashes must have the required leading zero bits.
       responses:
         '200':
           description: Already exists with the same hashes.
