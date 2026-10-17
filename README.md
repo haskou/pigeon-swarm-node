@@ -137,12 +137,12 @@ yarn typecheck
 yarn test:scheduler
 ```
 
-The jest scripts start node with `--no-sparkplug`. On Node 24, V8's Sparkplug
-baseline compiler can make a garbage collection crash a jest worker with SIGSEGV
-in an unrelated suite
-([nodejs/node#62393](https://github.com/nodejs/node/issues/62393)). Node
-rejects the flag in `NODE_OPTIONS`, so run jest through these scripts rather
-than `npx jest`; `tests/unit/config/JestRuntime.spec.ts` fails without it.
+Jest needs Node 24.22.0 or later; CI pins it in `.github/actions/setup-workspace`.
+Earlier Node 24 releases ship a V8 whose Sparkplug baseline compiler can make a
+garbage collection crash a jest worker with SIGSEGV in an unrelated suite
+([nodejs/node#62393](https://github.com/nodejs/node/issues/62393)); 24.22.0
+carries the fix. `tests/unit/config/JestRuntime.spec.ts` fails on an older
+runtime.
 
 Docker helpers are available through the `Makefile`:
 
