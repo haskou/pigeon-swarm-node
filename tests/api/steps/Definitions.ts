@@ -1,6 +1,7 @@
 import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
 import IdentityAdmissionSourceRateLimiter from '@app/apps/apis/identities-api/IdentityAdmissionSourceRateLimiter';
 import { PrivateAuthorizationRequestBodyLimit } from '@app/apps/apis/private-authorization-api/routes/PrivateAuthorizationRequestBodyLimit';
+import NonCanonicalIdentityIdsPurgeInitializer from '@app/apps/initializers/nodes/NonCanonicalIdentityIdsPurgeInitializer';
 import PigeonApplication from '@app/apps/PigeonApplication';
 import OrbitDBCallProjectionRuntime from '@app/apps/runtimes/orbitdb-call-projection-runtime/OrbitDBCallProjectionRuntime';
 import OrbitDBReplicatedStateRuntime from '@app/apps/runtimes/orbitdb-runtime/OrbitDBReplicatedStateRuntime';
@@ -34,8 +35,10 @@ import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNe
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
 import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
 import NodeOwnerSettingsResetter from '@app/contexts/nodes/application/reset-owner-settings/NodeOwnerSettingsResetter';
+import { NodeBlockEntries } from '@app/contexts/nodes/domain/NodeBlockEntries';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
 import { SignedNodeBlockList } from '@app/contexts/nodes/domain/SignedNodeBlockList';
+import NodeBlockExceptionsRepository from '@app/contexts/nodes/domain/repositories/NodeBlockExceptionsRepository';
 import NodeBlockListRepository from '@app/contexts/nodes/domain/repositories/NodeBlockListRepository';
 import NodeBlockSourceRepository from '@app/contexts/nodes/domain/repositories/NodeBlockSourceRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
@@ -1499,6 +1502,7 @@ export default class Definitions {
     blocked: string,
     owner: string,
     signer: string,
+    encoding?: string,
   ): Promise<void> {
     const identities: Record<string, () => Promise<KeyPair>> = {
       other: () => this.ensureOtherIdentityKeyPair(),
@@ -1510,7 +1514,15 @@ export default class Definitions {
       ).valueOf();
     const blockedNames = blocked === 'nobody' ? [] : blocked.split(',');
     const blockedIdentityIds = (
-      await Promise.all(blockedNames.map((name) => publicKeyOf(name.trim())))
+      await Promise.all(
+        blockedNames.map(async (name) => {
+          const identityId = new IdentityId(await publicKeyOf(name.trim()));
+
+          return (
+            encoding ? this.aliasOf(identityId, encoding) : identityId
+          ).valueOf();
+        }),
+      )
     ).sort();
     const unsigned = {
       blockedIdentityIds,
@@ -1662,6 +1674,88 @@ export default class Definitions {
       .getService<NodeOwnerSettingsResetter>(NodeOwnerSettingsResetter)
       .reset(new IdentityId(otherKeyPair.toPrimitives().publicKey));
     await Kernel.di.getService<NodeBlockPolicy>(NodeBlockPolicy).load();
+  }
+
+  /** Stores what a node could hold from before ids had to be canonical, the way an upgraded node finds it. */
+  @given(
+    'the node stored the other identity under {string} of its key as a block exception and a source approval',
+  )
+  public async theNodeStoredAnAliasAsExceptionAndApproval(
+    encoding: string,
+  ): Promise<void> {
+    const other = new IdentityId(
+      (await this.ensureOtherIdentityKeyPair()).toPrimitives().publicKey,
+    );
+    const alias = this.aliasOf(other, encoding);
+    const publisher = new IdentityId(
+      (await this.ensureBlockSourcePublisherKeyPair()).toPrimitives().publicKey,
+    );
+    const sources = Kernel.di.getService<NodeBlockSourceRepository>(
+      NodeBlockSourceRepository,
+    );
+    const source = await sources.find(publisher);
+
+    await Kernel.di
+      .getService<NodeBlockExceptionsRepository>(NodeBlockExceptionsRepository)
+      .save(new NodeBlockEntries([alias], []));
+    await sources.save(
+      NodeBlockSource.fromPrimitives({
+        ...source.toPrimitives(),
+        approved: {
+          identityIds: [alias.valueOf(), other.valueOf()],
+          nodePeerIds: [],
+        },
+      }),
+    );
+  }
+
+  @given('the local node owner was stored under {string} of my key')
+  public async theLocalNodeOwnerWasStoredUnderAnAlias(
+    encoding: string,
+  ): Promise<void> {
+    const database = Kernel.di.getService<EmbeddedLocalDatabase>(
+      EmbeddedLocalDatabase,
+    );
+    const metadata = await database.findOne('node_metadata', 'local');
+
+    await database.save('node_metadata', 'local', {
+      ...(metadata as Record<string, unknown>),
+      owner: this.aliasOf(
+        this.ownerIdentityId as IdentityId,
+        encoding,
+      ).valueOf(),
+    });
+  }
+
+  /** Runs the startup purge, then reloads blocks, as a restart does. */
+  @when('the node restarts')
+  public async theNodeRestarts(): Promise<void> {
+    await Kernel.di
+      .getService<NonCanonicalIdentityIdsPurgeInitializer>(
+        NonCanonicalIdentityIdsPurgeInitializer,
+      )
+      .ensure();
+    await Kernel.di.getService<NodeBlockPolicy>(NodeBlockPolicy).load();
+  }
+
+  @then(
+    'the stored block exception and source approval name only the canonical other identity id',
+  )
+  public async theStoredBlocksNameOnlyCanonicalIds(): Promise<void> {
+    const publisher = new IdentityId(
+      (await this.ensureBlockSourcePublisherKeyPair()).toPrimitives().publicKey,
+    );
+    const exceptions = await Kernel.di
+      .getService<NodeBlockExceptionsRepository>(NodeBlockExceptionsRepository)
+      .find();
+    const source = await Kernel.di
+      .getService<NodeBlockSourceRepository>(NodeBlockSourceRepository)
+      .find(publisher);
+
+    expect(exceptions.getIdentityIds()).to.deep.equal([]);
+    expect(source.applied().toPrimitives().identityIds).to.deep.equal([
+      this.otherIdentityId?.valueOf(),
+    ]);
   }
 
   @then('the local node is owned by the other identity')
@@ -4996,6 +5090,22 @@ export default class Definitions {
     signer: string,
   ): Promise<void> {
     await this.setNodeBlockListBody(version, blocked, owner, signer);
+  }
+
+  @given(
+    'I set a node block list body version {int} blocking the other identity under {string} of its key',
+  )
+  public async iSetANodeBlockListBodyBlockingAnAlias(
+    version: number,
+    encoding: string,
+  ): Promise<void> {
+    await this.setNodeBlockListBody(
+      version,
+      'other',
+      'owner',
+      'owner',
+      encoding,
+    );
   }
 
   @given('I set a node block list body of {int} bytes')

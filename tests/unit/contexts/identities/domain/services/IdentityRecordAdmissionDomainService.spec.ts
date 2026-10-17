@@ -1,6 +1,8 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import IdentityRecordAdmissionDomainService from '@app/contexts/identities/domain/services/IdentityRecordAdmissionDomainService';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
+import { IdentityIdMother } from '../../../../mothers/IdentityIdMother';
 import { SignedIdentityMother } from '../../../../mothers/SignedIdentityMother';
 
 describe('IdentityRecordAdmissionDomainService', () => {
@@ -94,6 +96,20 @@ describe('IdentityRecordAdmissionDomainService', () => {
         ),
       ).toBe(false);
     });
+
+    it.each(IdentityIdMother.aliases())(
+      'should reject an identity signed under %s of its key',
+      async (_, aliasOf) => {
+        const signer = await SignedIdentityMother.create();
+        const identity = signer.build({
+          id: aliasOf(new IdentityId(signer.id)).valueOf(),
+        });
+
+        expect(admission.admitsIdentity(identity, recordFor(identity))).toBe(
+          false,
+        );
+      },
+    );
 
     it('should reject an identity above the network cap while admitting exactly the cap', async () => {
       const signer = await SignedIdentityMother.create();

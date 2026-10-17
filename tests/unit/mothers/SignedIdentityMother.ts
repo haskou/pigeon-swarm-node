@@ -1,17 +1,19 @@
-import { IdentityAdmissionProof } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionProof';
 import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
-import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
-import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { IdentityAdmissionProof } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionProof';
 import { ProfileHandle } from '@app/contexts/identities/domain/value-objects/ProfileHandle';
 import { ProfileName } from '@app/contexts/identities/domain/value-objects/ProfileName';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 
 export interface SignedIdentityOptions {
   admissionNonce?: string;
   handle?: string;
+  /** Another id for the same key, such as an alias encoding of it. */
+  id?: string;
   mailboxHome?: string;
   networks?: string[];
   previousIdentityExternalIdentifier?: string;
@@ -55,18 +57,20 @@ export class SignedIdentityMother {
   }
 
   public build(options: SignedIdentityOptions = {}): Identity {
+    const id = options.id ?? this.id;
     const networks = options.networks ?? [
       '550e8400-e29b-41d4-a716-446655440000',
     ];
     const payload = {
       admissionNonce:
-        options.admissionNonce ?? this.mineAdmissionNonce(networks),
+        options.admissionNonce ??
+        new IdentityAdmissionProof(id, networks).mine(),
       authorizationRevision: 0,
       deviceCredential: this.deviceCredential.valueOf(),
       deviceCredentialCommitment: this.deviceCredential
         .getCommitment()
         .valueOf(),
-      id: this.id,
+      id,
       mailboxHome: options.mailboxHome,
       networks,
       previousIdentityExternalIdentifier:

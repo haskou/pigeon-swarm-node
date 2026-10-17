@@ -12,6 +12,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 
+import { IdentityIdMother } from '../../../mothers/IdentityIdMother';
 import {
   NODE_PEER_ID_A,
   NODE_PEER_ID_B,
@@ -153,6 +154,76 @@ describe('NodeBlockSource', () => {
       expect(values(adopted.applied())).toEqual([b.valueOf()]);
     },
   );
+
+  describe('a signed list naming a non-canonical identity id', () => {
+    it.each([false, true])(
+      'should keep the signed list verbatim yet never pend or apply the alias (autoApply %p)',
+      (autoApply) => {
+        const alias = IdentityIdMother.aliasPrefix(a);
+        const adopted = source(autoApply);
+
+        expect(adopted.receive(list(1, [alias, b]), at)).toEqual(
+          NodeBlockSourceFetchOutcome.ACCEPTED,
+        );
+        adopted.approveAll(new NodeBlockListVersion(1));
+
+        expect(adopted.toPrimitives().list?.blockedIdentityIds).toEqual(
+          expect.arrayContaining([alias.valueOf(), b.valueOf()]),
+        );
+        expect(values(adopted.applied())).toEqual([b.valueOf()]);
+        expect(adopted.pending().count()).toBe(0);
+      },
+    );
+
+    it('should refuse approving the alias', () => {
+      const alias = IdentityIdMother.reencoded(a);
+      const adopted = source();
+
+      adopted.receive(list(1, [alias]), at);
+
+      expect(() =>
+        adopted.approve(
+          new NodeBlockListVersion(1),
+          new NodeBlockEntries([alias], []),
+        ),
+      ).toThrow(NodeBlockEntriesAreNotListedBySourceError);
+      expect(adopted.applied().count()).toBe(0);
+    });
+  });
+
+  describe('dropNonCanonicalApprovals', () => {
+    it('should drop stored approvals of non-canonical identity ids and count them', () => {
+      const alias = IdentityIdMother.aliasPrefix(a);
+      const adopted = source();
+
+      adopted.receive(list(1, [alias, a, b]), at);
+      const stored = NodeBlockSource.fromPrimitives({
+        ...adopted.toPrimitives(),
+        approved: {
+          identityIds: [alias.valueOf(), a.valueOf()],
+          nodePeerIds: [NODE_PEER_ID_A],
+        },
+      });
+
+      expect(stored.dropNonCanonicalApprovals()).toBe(1);
+      expect(stored.applied().toPrimitives()).toEqual({
+        identityIds: [a.valueOf()],
+        nodePeerIds: [NODE_PEER_ID_A],
+      });
+      expect(values(stored.pending())).toEqual([b.valueOf()]);
+    });
+
+    it('should leave canonical approvals unchanged', () => {
+      const adopted = source();
+
+      adopted.receive(list(1, [a, b]), at);
+      adopted.approveAll(new NodeBlockListVersion(1));
+      const before = adopted.toPrimitives();
+
+      expect(adopted.dropNonCanonicalApprovals()).toBe(0);
+      expect(adopted.toPrimitives()).toEqual(before);
+    });
+  });
 
   it('should ask again for an entry that was removed and added back', () => {
     const adopted = source();

@@ -2,6 +2,7 @@ import { NodeBlockEntries } from '@app/contexts/nodes/domain/NodeBlockEntries';
 import { NodePeerId } from '@app/contexts/nodes/domain/value-objects/NodePeerId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
+import { IdentityIdMother } from '../../../mothers/IdentityIdMother';
 import {
   NODE_PEER_ID_A,
   NODE_PEER_ID_B,
@@ -55,5 +56,22 @@ describe('NodeBlockEntries', () => {
     expect(NodeBlockEntries.fromPrimitives(primitives).toPrimitives()).toEqual(
       primitives,
     );
+  });
+
+  it('should keep only identity ids that are the canonical encoding of a key', () => {
+    const entries = new NodeBlockEntries(
+      [a, ...IdentityIdMother.forged().map(([, forged]) => forged), b],
+      [peerA, peerB],
+    );
+
+    expect(entries.canonical().toPrimitives()).toEqual(
+      new NodeBlockEntries([a, b], [peerA, peerB]).toPrimitives(),
+    );
+  });
+
+  it('should keep a canonical set unchanged', () => {
+    const entries = new NodeBlockEntries([a, b], [peerA]);
+
+    expect(entries.canonical().toPrimitives()).toEqual(entries.toPrimitives());
   });
 });

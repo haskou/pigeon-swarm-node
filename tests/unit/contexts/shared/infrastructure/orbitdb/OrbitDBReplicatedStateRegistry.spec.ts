@@ -1,3 +1,9 @@
+import { Identity } from '@app/contexts/identities/domain/Identity';
+import IpfsIdentityMapper from '@app/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
+import { OrbitDBIdentityMutationGate } from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMutationGate';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { OrbitDBEntry } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBEntry';
 import { OrbitDBMutationGate } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
@@ -6,6 +12,10 @@ import OrbitDBReplicatedHeadCache, {
 } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCache';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { mock, MockProxy } from 'jest-mock-extended';
+import { createHash } from 'node:crypto';
+
+import { IdentityIdMother } from '../../../../mothers/IdentityIdMother';
+import { SignedIdentityMother } from '../../../../mothers/SignedIdentityMother';
 
 type Entry = {
   key?: string;
@@ -1339,6 +1349,64 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       expect.objectContaining({ cid: 'signed' }),
     );
   });
+
+  it.each(IdentityIdMother.aliases())(
+    'never restores at startup a persisted identity signed under %s of its key',
+    async (_, aliasOf) => {
+      const ipfs = mock<IPFS>();
+      const mapper = new IpfsIdentityMapper();
+      const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+      const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+      const { stores } = createStores();
+      const signer = await SignedIdentityMother.create();
+      const aliasId = aliasOf(new IdentityId(signer.id)).valueOf();
+      const recordOf = async (
+        identity: Identity,
+      ): Promise<Record<string, unknown>> => {
+        const primitives = identity.toPrimitives();
+        const cid = (
+          await ipfs.calculateJSONId(mapper.toDocument(identity))
+        ).valueOf();
+
+        return {
+          cid,
+          id: cid,
+          identity: primitives,
+          identityId: primitives.id,
+          networkIds: primitives.networks,
+          version: primitives.version,
+        };
+      };
+
+      ipfs.calculateJSONId.mockImplementation((data) =>
+        Promise.resolve(
+          new IPFSId(
+            `bafy${createHash('sha256').update(JSON.stringify(data)).digest('hex')}`,
+          ),
+        ),
+      );
+      await headCache.save(
+        'network-1',
+        `identity:${aliasId}`,
+        await recordOf(signer.build({ id: aliasId })),
+      );
+      await headCache.save(
+        'network-1',
+        `identity:${signer.id}`,
+        await recordOf(signer.build()),
+      );
+      registry.addMutationGate(new OrbitDBIdentityMutationGate(ipfs));
+      await registry.register('network-1', stores);
+
+      await expect(
+        registry.findHead(`identity:${aliasId}`),
+      ).resolves.toBeUndefined();
+      await expect(registry.findHead(`identity:${signer.id}`)).resolves.toEqual(
+        expect.objectContaining({ identityId: signer.id }),
+      );
+      registry.clear();
+    },
+  );
 
   it('re-admits a head whose record claims an authorization revision the node has not replicated yet', async () => {
     jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
