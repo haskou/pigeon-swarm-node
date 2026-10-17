@@ -332,3 +332,30 @@ Feature: Put node blocks
       | encoding                        |
       | an alias DER prefix             |
       | a non-canonical base64 encoding |
+
+  Scenario Outline: A clean own block list re-signed above the unpublished version lifts the hold on publication by <encoding>
+    Given the node stored its own block list version 1 blocking the other identity under "<encoding>" of its key
+    And I set json body
+      """
+      {"published": true}
+      """
+    And I sign a PUT request to "/node/blocks/publication"
+    When I PUT "/node/blocks/publication"
+    Then response code is equal to 200
+    When the node restarts
+    And I GET "/node/published-blocks"
+    Then response code is equal to 404
+
+    Given I set a node block list body version 2 blocking "other"
+    And I sign a PUT request to "/node/blocks"
+    When I PUT "/node/blocks"
+    Then response code is equal to 200
+
+    When I GET "/node/published-blocks" as binary
+    Then response code is equal to 200
+    And the response is the stored node block list as signed canonical bytes
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |

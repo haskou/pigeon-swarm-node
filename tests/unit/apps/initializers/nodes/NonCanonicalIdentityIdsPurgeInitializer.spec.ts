@@ -31,7 +31,7 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
 
     expect(logger.info).toHaveBeenCalledTimes(1);
     expect(logger.info.mock.calls[0][0]).toBe(
-      'Purged non-canonical identity ids: ownerCleared=true removedEntries=3 ownListNonCanonicalEntries=0',
+      'Purged non-canonical identity ids: ownerCleared=true removedEntries=3',
     );
   });
 
@@ -75,7 +75,7 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
-  it('should log the count of its own list naming an alias, which it keeps', async () => {
+  it('should warn, with a count only, that its own list naming an alias is kept but not published', async () => {
     purger.purge.mockResolvedValue({
       ownerCleared: false,
       ownListNonCanonicalEntries: 2,
@@ -84,10 +84,12 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
 
     await initializer.ensure();
 
-    expect(logger.info).toHaveBeenCalledTimes(1);
-    expect(logger.info.mock.calls[0][0]).toBe(
-      'Purged non-canonical identity ids: ownerCleared=false removedEntries=0 ownListNonCanonicalEntries=2',
+    expect(logger.info).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    const message = logger.warn.mock.calls[0][0];
+    expect(message).toBe(
+      'The node own block list holds 2 non-canonical identity ids: it is kept and enforced locally, NOT published, and must be re-signed with a higher version.',
     );
-    expect(logger.warn).not.toHaveBeenCalled();
+    expect(message).not.toMatch(/did:|[0-9a-f]{16,}|networkId|\/ip[46]\//i);
   });
 });
