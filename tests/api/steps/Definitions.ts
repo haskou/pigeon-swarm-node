@@ -1792,6 +1792,38 @@ export default class Definitions {
     });
   }
 
+  /** Stores the owner-signed list as an upgraded node holds it: the alias is kept verbatim. */
+  @given(
+    'the node stored its own block list version {int} blocking the other identity under {string} of its key',
+  )
+  public async theNodeStoredAnAliasAsOwnBlockList(
+    version: number,
+    encoding: string,
+  ): Promise<void> {
+    await this.setNodeBlockListBody(
+      version,
+      'other',
+      'owner',
+      'owner',
+      encoding,
+    );
+    await Kernel.di
+      .getService<EmbeddedLocalDatabase>(EmbeddedLocalDatabase)
+      .save('node_block_list', 'local', {
+        _id: 'local',
+        blockList: JSON.parse(String(this.body)),
+      });
+  }
+
+  @then('the node keeps its own block list')
+  public async theNodeKeepsItsOwnBlockList(): Promise<void> {
+    expect(
+      await Kernel.di
+        .getService<NodeBlockListRepository>(NodeBlockListRepository)
+        .findLocal(),
+    ).to.be.instanceOf(NodeBlockList);
+  }
+
   /** Runs the startup purge, then reloads blocks, as a restart does. */
   @when('the node restarts')
   public async theNodeRestarts(): Promise<void> {

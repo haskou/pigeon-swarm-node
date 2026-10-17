@@ -294,3 +294,25 @@ Feature: Put node blocks
       | encoding                        |
       | an alias DER prefix             |
       | a non-canonical base64 encoding |
+
+  Scenario Outline: A restart keeps an own block list that names an alias of a key by <encoding> and publishes none of it
+    Given the node stored its own block list version 1 blocking the other identity under "<encoding>" of its key
+    And I set json body
+      """
+      {"published": true}
+      """
+    And I sign a PUT request to "/node/blocks/publication"
+    When I PUT "/node/blocks/publication"
+    Then response code is equal to 200
+    When the node restarts
+    Then the node keeps its own block list
+    When I GET "/node/published-blocks"
+    Then response code is equal to 404
+    When I GET "/node"
+    Then response code is equal to 200
+    And response body should contain "owner"
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |

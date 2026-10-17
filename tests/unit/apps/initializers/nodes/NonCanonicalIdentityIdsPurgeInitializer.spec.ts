@@ -21,18 +21,26 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
   });
 
   it('should log what it purged as counts only', async () => {
-    purger.purge.mockResolvedValue({ ownerCleared: true, removedEntries: 3 });
+    purger.purge.mockResolvedValue({
+      ownerCleared: true,
+      ownListNonCanonicalEntries: 0,
+      removedEntries: 3,
+    });
 
     await initializer.ensure();
 
     expect(logger.info).toHaveBeenCalledTimes(1);
     expect(logger.info.mock.calls[0][0]).toBe(
-      'Purged non-canonical identity ids: ownerCleared=true removedEntries=3',
+      'Purged non-canonical identity ids: ownerCleared=true removedEntries=3 ownListNonCanonicalEntries=0',
     );
   });
 
   it('should warn that the node is unclaimed when it cleared the owner', async () => {
-    purger.purge.mockResolvedValue({ ownerCleared: true, removedEntries: 0 });
+    purger.purge.mockResolvedValue({
+      ownerCleared: true,
+      ownListNonCanonicalEntries: 0,
+      removedEntries: 0,
+    });
 
     await initializer.ensure();
 
@@ -43,7 +51,11 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
   });
 
   it('should not warn when it kept the owner', async () => {
-    purger.purge.mockResolvedValue({ ownerCleared: false, removedEntries: 2 });
+    purger.purge.mockResolvedValue({
+      ownerCleared: false,
+      ownListNonCanonicalEntries: 0,
+      removedEntries: 2,
+    });
 
     await initializer.ensure();
 
@@ -51,11 +63,31 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
   });
 
   it('should log nothing when nothing was purged', async () => {
-    purger.purge.mockResolvedValue({ ownerCleared: false, removedEntries: 0 });
+    purger.purge.mockResolvedValue({
+      ownerCleared: false,
+      ownListNonCanonicalEntries: 0,
+      removedEntries: 0,
+    });
 
     await initializer.ensure();
 
     expect(logger.info).not.toHaveBeenCalled();
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it('should log the count of its own list naming an alias, which it keeps', async () => {
+    purger.purge.mockResolvedValue({
+      ownerCleared: false,
+      ownListNonCanonicalEntries: 2,
+      removedEntries: 0,
+    });
+
+    await initializer.ensure();
+
+    expect(logger.info).toHaveBeenCalledTimes(1);
+    expect(logger.info.mock.calls[0][0]).toBe(
+      'Purged non-canonical identity ids: ownerCleared=false removedEntries=0 ownListNonCanonicalEntries=2',
+    );
     expect(logger.warn).not.toHaveBeenCalled();
   });
 });

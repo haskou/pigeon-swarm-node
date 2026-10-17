@@ -1,10 +1,12 @@
 import PublishedNodeBlockListFinder from '@app/contexts/nodes/application/find-published-block-list/PublishedNodeBlockListFinder';
 import { NodeBlockPublication } from '@app/contexts/nodes/domain/NodeBlockPublication';
+import { NoNodeBlocks } from '@app/contexts/nodes/domain/NoNodeBlocks';
 import NodeBlockListRepository from '@app/contexts/nodes/domain/repositories/NodeBlockListRepository';
 import NodeBlockPublicationRepository from '@app/contexts/nodes/domain/repositories/NodeBlockPublicationRepository';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
+import { IdentityIdMother } from '../../../../mothers/IdentityIdMother';
 import { NodeBlockListMother } from '../../../../mothers/NodeBlockListMother';
 
 describe('PublishedNodeBlockListFinder', () => {
@@ -34,5 +36,17 @@ describe('PublishedNodeBlockListFinder', () => {
     expect((await finder.find()).toSigned()?.isEqual(mother.signed())).toBe(
       true,
     );
+  });
+
+  it('should publish nothing while the stored list names an alias', async () => {
+    const a = await NodeBlockListMother.identityId();
+    const aliased = new NodeBlockListMother(await KeyPair.generate())
+      .blockingIdentities([a, IdentityIdMother.aliasPrefix(a)])
+      .build();
+
+    publications.find.mockResolvedValue(new NodeBlockPublication(true));
+    lists.findLocal.mockResolvedValue(aliased);
+
+    expect(await finder.find()).toBeInstanceOf(NoNodeBlocks);
   });
 });

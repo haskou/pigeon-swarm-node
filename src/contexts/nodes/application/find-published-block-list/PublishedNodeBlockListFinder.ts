@@ -3,7 +3,10 @@ import { NoNodeBlocks } from '../../domain/NoNodeBlocks';
 import NodeBlockListRepository from '../../domain/repositories/NodeBlockListRepository';
 import NodeBlockPublicationRepository from '../../domain/repositories/NodeBlockPublicationRepository';
 
-/** The owner's stored list when the owner chose to publish it; `NoNodeBlocks` otherwise. */
+/**
+ * The owner's stored list when the owner chose to publish it and the list
+ * names only canonical identity ids; `NoNodeBlocks` otherwise.
+ */
 export default class PublishedNodeBlockListFinder {
   constructor(
     private readonly publicationRepository: NodeBlockPublicationRepository,
@@ -17,6 +20,8 @@ export default class PublishedNodeBlockListFinder {
       return new NoNodeBlocks();
     }
 
-    return this.listRepository.findLocal();
+    const list = await this.listRepository.findLocal();
+
+    return list.namesOnlyCanonicalIdentityIds() ? list : new NoNodeBlocks();
   }
 }

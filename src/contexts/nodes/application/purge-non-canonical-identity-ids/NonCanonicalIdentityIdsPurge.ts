@@ -2,4 +2,5 @@
 export interface NonCanonicalIdentityIdsPurge {
   ownerCleared: boolean;
   removedEntries: number;
+  ownListNonCanonicalEntries: number;
 }

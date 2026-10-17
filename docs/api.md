@@ -2000,11 +2000,14 @@ id once the owner is authenticated, before any source is read or removed.
 A fetched block source list that names such an id is refused with the fetch
 outcome `non-canonical-identity-id`, and the last valid list is kept. A list
 kept before ids had to be canonical keeps its signed `list` verbatim, so it may
-still name one, but such an id is never pending, approved or enforced. At start, before
-it serves any request, the node drops such ids from its exceptions and from
-what its sources apply, and leaves the node unclaimed if its owner was stored
-under one. It then logs a warning that the node is unclaimed and must be
-claimed again, naming `yarn node:reset-owner` and no id.
+still name one, but such an id is never pending, approved or enforced. At start,
+before it serves any request, the node drops such ids from its exceptions and
+from what its sources apply, and leaves the node unclaimed if its owner was stored
+under one. It then logs a warning that the node is unclaimed and must be claimed
+again, naming `yarn node:reset-owner` and no id. A stored own block list that
+names such an id is kept, signed verbatim: its alias entries are never enforced,
+and `GET /node/published-blocks` answers `404` while it names one, until the owner
+stores a newer list that names only canonical ids.
 
 Before starting an upgraded node whose owner may have been claimed under such
 an id, stop it and run `yarn node:reset-owner <canonical owner identity id>`
