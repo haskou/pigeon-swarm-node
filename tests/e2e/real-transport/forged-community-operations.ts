@@ -4,7 +4,9 @@ import { CommunityStateFold } from '@app/contexts/communities/domain/operations/
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { CommunityOperationAction } from '@app/contexts/communities/domain/value-objects/CommunityOperationAction';
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
+import OrbitDBCommunityInvitationClaimRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityInvitationClaimRepository';
 import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
+import CommunityInvitationClaimMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInvitationClaimMutationPolicy';
 import CommunityOperationMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityOperationMutationPolicy';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
@@ -25,7 +27,11 @@ import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { orbitDBRuntimeAdapter } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBRuntimeAdapter';
 import Kernel from '@haskou/ddd-kernel';
-import { KeyPair, PrivateKey } from '@haskou/pigeon-swarm-crypto';
+import {
+  CommunityInvitationKey,
+  KeyPair,
+  PrivateKey,
+} from '@haskou/pigeon-swarm-crypto';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomUUID } from 'node:crypto';
 import { mkdtemp } from 'node:fs/promises';
@@ -33,6 +39,11 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 
+import {
+  invitationFieldsOf,
+  signInvitationClaim,
+  signInvitationProofs,
+} from '../../support/signCommunityInvitation';
 import {
   CommunityOperationSigner,
   signCommunityOperation,
@@ -52,6 +63,7 @@ type Replica = {
   };
   registry?: OrbitDBReplicatedStateRegistry;
   repository?: OrbitDBCommunityRepository;
+  claims?: OrbitDBCommunityInvitationClaimRepository;
 };
 
 const action = (name: keyof typeof CommunityOperationAction & string): string =>
@@ -147,10 +159,15 @@ async function open(replica: Replica): Promise<void> {
   registry.addMutationGate(
     new PublicMutationGate(new PublicMutationVerifier(authorization), [
       new CommunityOperationMutationPolicy(),
+      new CommunityInvitationClaimMutationPolicy(repository, registry),
     ]),
   );
   replica.registry = registry;
   replica.repository = repository;
+  replica.claims = new OrbitDBCommunityInvitationClaimRepository(
+    registry,
+    guard,
+  );
   await registry.register(
     networkId,
     replica.stores as unknown as OrbitDBPrivateNetworkStores,
@@ -371,6 +388,371 @@ async function startNodes(): Promise<void> {
   }
 }
 
+const HOUR = 3_600_000;
+
+function aliasOf(identityId: string): string {
+  const alphabet =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  const index = identityId.length - 2;
+  const value = alphabet.indexOf(identityId[index]);
+  const padding = value % 4;
+
+  return `${identityId.slice(0, index)}${alphabet[value - padding + ((padding + 1) % 4)]}${identityId.slice(index + 1)}`;
+}
+
+/** What every replica serves about the invitations of a community. */
+async function invitationsOf(
+  replica: Replica,
+  id: CommunityId,
+): Promise<unknown> {
+  const community = await replica.repository!.requireById(id);
+
+  return JSON.parse(
+    JSON.stringify(
+      (await replica.repository!.findInvitations(id))
+        .list()
+        .map((invitation) => invitation.toPrimitives(community))
+        .sort((left, right) => left.id.localeCompare(right.id)),
+    ),
+  );
+}
+
+async function invitationsConverged(
+  label: string,
+  id: CommunityId,
+): Promise<void> {
+  const expected = expectedOf(ledger, id);
+  const wanted = JSON.parse(
+    JSON.stringify(
+      expected.invitations
+        .list()
+        .map((invitation) => invitation.toPrimitives(expected.community!))
+        .sort((left, right) => left.id.localeCompare(right.id)),
+    ),
+  );
+
+  await converged(label, id);
+  await until(`${label}: invitations`, async () => {
+    for (const replica of nodes)
+      if (!isDeepStrictEqual(await invitationsOf(replica, id), wanted))
+        return false;
+
+    return true;
+  });
+}
+
+/** Writes one operation and waits until every replica folds it, so no step is judged before its parents arrive. */
+async function send(
+  ...[replica, id, signer, name, args]: Parameters<typeof submit>
+): Promise<SignedCommunityOperation> {
+  const signed = await submit(replica, id, signer, name, args);
+
+  await converged('invitation step reached every replica', id);
+
+  return signed;
+}
+
+async function forgedInvitations(owner: CommunityOperationSigner) {
+  const [honest, second, malicious] = nodes;
+  const [manager, issuer, plain, joiner] = await Promise.all(
+    Array.from({ length: 4 }, () => actor()),
+  );
+  const nonce = randomUUID();
+  const id = CommunityId.derive(networkId, owner.id, nonce);
+  const genesis = signCommunityOperation({
+    action: action('COMMUNITY_CREATED'),
+    args: {
+      autoJoinEnabled: false,
+      description: 'Invitation target',
+      discoverable: true,
+      name: 'Invitations',
+      nonce,
+      visibility: 'public',
+    },
+    communityId: id.valueOf(),
+    createdAt: clock++,
+    networkId,
+    parents: [],
+    signer: owner,
+  });
+
+  await honest.repository!.save(genesis.operation, genesis.proof);
+  ledger.push(genesis);
+  await converged('invitation genesis reached every replica', id);
+  for (const member of [manager, issuer, plain]) {
+    await submit(second, id, owner, 'MEMBER_JOINED', {
+      identityId: member.id,
+      method: 'added',
+    });
+    await converged('invitation member reached every replica', id);
+  }
+  const managers = CommunityRoleId.derive(
+    id.valueOf(),
+    owner.id,
+    clock,
+  ).valueOf();
+
+  await send(honest, id, owner, 'ROLE_CREATED', {
+    name: 'managers',
+    permissions: ['create_invites', 'manage_members'],
+    roleId: managers,
+  });
+  const issuers = CommunityRoleId.derive(
+    id.valueOf(),
+    owner.id,
+    clock,
+  ).valueOf();
+
+  await send(honest, id, owner, 'ROLE_CREATED', {
+    name: 'issuers',
+    permissions: ['create_invites'],
+    roleId: issuers,
+  });
+  await send(honest, id, owner, 'MEMBER_ROLES_UPDATED', {
+    identityId: manager.id,
+    roleIds: [managers],
+  });
+  await send(honest, id, owner, 'MEMBER_ROLES_UPDATED', {
+    identityId: issuer.id,
+    roleIds: [issuers],
+  });
+  await converged('invitation roles reached every replica', id);
+
+  stage = 'genuine invitation replicates';
+  const link = CommunityInvitationKey.generate();
+  const invitation = await send(honest, id, issuer, 'INVITATION_CREATED', {
+    expiresAt: clock + HOUR,
+    invitationKey: link.key.publicKey(),
+    maxUses: 2,
+  });
+  const invitationId = invitation.operation.getHash();
+  const brief = await send(honest, id, issuer, 'INVITATION_CREATED', {
+    expiresAt: clock + 1000,
+    invitationKey: CommunityInvitationKey.generate().key.publicKey(),
+    maxUses: 1,
+  });
+
+  await invitationsConverged('invitations reached every replica', id);
+  assert.equal(
+    (await second.repository!.findInvitations(id)).list().length,
+    2,
+    'The second replica must read both invitations',
+  );
+  console.log('PASS signed invitations replicated between real nodes');
+
+  stage = 'forged invitations are refused';
+  const parents = await honest.repository!.findFrontier(id);
+  const fieldsOf = (joinerId: string, invited = invitationId) =>
+    invitationFieldsOf(id.valueOf(), invited, joinerId, networkId);
+  const admission = (
+    signer: CommunityOperationSigner,
+    proofs: { consent: string; possession: string },
+    overrides: {
+      createdAt?: number;
+      identityId?: string;
+      invitationId?: string;
+    } = {},
+  ): SignedCommunityOperation =>
+    signCommunityOperation({
+      action: action('MEMBER_JOINED'),
+      args: {
+        ...proofs,
+        identityId: overrides.identityId ?? joiner.id,
+        invitationId: overrides.invitationId ?? invitationId,
+        method: 'invitation',
+      },
+      communityId: id.valueOf(),
+      createdAt: overrides.createdAt ?? clock++,
+      networkId,
+      parents,
+      signer,
+    });
+  const genuine = signInvitationProofs(link.key, joiner, fieldsOf(joiner.id));
+  const wrongKey = signInvitationProofs(
+    CommunityInvitationKey.generate().key,
+    joiner,
+    fieldsOf(joiner.id),
+  );
+  const briefProofs = signInvitationProofs(
+    link.key,
+    joiner,
+    fieldsOf(joiner.id, brief.operation.getHash()),
+  );
+  const wrongConsent = {
+    consent: briefProofs.consent,
+    possession: genuine.possession,
+  };
+  const invitationOf = (
+    signer: CommunityOperationSigner,
+    args: Record<string, unknown>,
+  ): SignedCommunityOperation =>
+    signCommunityOperation({
+      action: action('INVITATION_CREATED'),
+      args: {
+        invitationKey: CommunityInvitationKey.generate().key.publicKey(),
+        ...args,
+      },
+      communityId: id.valueOf(),
+      createdAt: clock++,
+      networkId,
+      parents,
+      signer,
+    });
+  const aliased = aliasOf(joiner.id);
+  const aliasedProofs = genuine;
+  const refused: [string, SignedCommunityOperation][] = [
+    [
+      'an invitation by a member without create_invites',
+      invitationOf(plain, { expiresAt: clock + HOUR, maxUses: 1 }),
+    ],
+    [
+      'an invitation above the use limit',
+      invitationOf(issuer, { expiresAt: clock + HOUR, maxUses: 101 }),
+    ],
+    [
+      'an admission by an author without manage_members',
+      admission(issuer, genuine),
+    ],
+    [
+      'an admission with a bad possession',
+      admission(manager, { ...genuine, possession: wrongKey.possession }),
+    ],
+    [
+      'an admission with a bad consent',
+      admission(manager, { ...genuine, consent: wrongConsent.consent }),
+    ],
+    [
+      'an admission after the invitation expired',
+      admission(manager, briefProofs, {
+        createdAt: brief.operation.getCreatedAt() + 1001,
+        invitationId: brief.operation.getHash(),
+      }),
+    ],
+    [
+      'an admission backdated before the invitation',
+      admission(manager, genuine, {
+        createdAt: invitation.operation.getCreatedAt() - 1,
+      }),
+    ],
+    [
+      'an admission of a non-canonical joiner id',
+      admission(manager, aliasedProofs, { identityId: aliased }),
+    ],
+  ];
+
+  for (const [label, forged] of refused) {
+    await assert.rejects(
+      honest.repository!.save(forged.operation, forged.proof),
+      `${label} must be refused by the node that receives it`,
+    );
+    await malicious.stores!.communityOperations.put!(record(forged));
+  }
+  await until('forged invitations reached the raw stores', async () => {
+    for (const replica of [honest, second])
+      for (const [, forged] of refused)
+        if (
+          (
+            await replica.stores!.communityOperations.query!(
+              (value) => value.id === forged.operation.getId(),
+            )
+          ).length === 0
+        )
+          return false;
+
+    return true;
+  });
+  await pause(3000);
+  await invitationsConverged('forged invitations changed nothing', id);
+  for (const replica of nodes)
+    assert.ok(
+      !(await replica.repository!.requireById(id)).isMember(
+        new IdentityId(joiner.id),
+      ),
+      `${replica.name} must not admit the joiner through a forgery`,
+    );
+  console.log(
+    `PASS ${refused.length} forged invitations and admissions refused on every replica`,
+  );
+
+  stage = 'invitation claims are written once';
+  const claimed = signInvitationClaim({
+    communityId: id.valueOf(),
+    frontier: await honest.repository!.findFrontier(id),
+    invitationId,
+    joiner,
+    key: link.key,
+    networkId,
+  });
+
+  await honest.claims!.save(claimed.claim, claimed.proof);
+  await until('the claim reached every replica', async () => {
+    for (const replica of nodes)
+      if ((await replica.claims!.findByCommunity(id)).length !== 1)
+        return false;
+
+    return true;
+  });
+  const rival = signInvitationClaim({
+    communityId: id.valueOf(),
+    frontier: await honest.repository!.findFrontier(id),
+    invitationId,
+    joiner,
+    key: link.key,
+    networkId,
+  });
+  const claimPayload = {
+    ...rival.claim.toPrimitives(),
+    scopeType: 'community_invitation_claim',
+  };
+
+  assert.notEqual(rival.proof.digest(), claimed.proof.digest());
+  await malicious.stores!.requests.put!(
+    PublicMutationRecord.withProof(claimPayload, rival.proof),
+  );
+  await pause(3000);
+  for (const replica of nodes) {
+    const stored = await replica.registry!.queryDocuments(
+      'requests',
+      (document) => document.id === claimPayload.id,
+    );
+
+    assert.deepEqual(
+      stored.map((document) =>
+        PublicMutationRecord.proofOf(document)?.digest(),
+      ),
+      [claimed.proof.digest()],
+      `${replica.name} must keep the first claim of the joiner only`,
+    );
+  }
+  console.log('PASS a second claim with another proof is refused');
+
+  stage = 'genuine admission replicates';
+  await submit(second, id, manager, 'MEMBER_JOINED', {
+    ...genuine,
+    identityId: joiner.id,
+    invitationId,
+    method: 'invitation',
+  });
+  await invitationsConverged('genuine admission reached every replica', id);
+  for (const replica of nodes) {
+    assert.ok(
+      (await replica.repository!.requireById(id)).isMember(
+        new IdentityId(joiner.id),
+      ),
+      `${replica.name} must admit the claimed joiner`,
+    );
+    assert.equal(
+      (await replica.repository!.findInvitations(id)).find(invitationId)
+        ? (
+            (await invitationsOf(replica, id)) as { id: string; uses: number }[]
+          ).find((value) => value.id === invitationId)?.uses
+        : -1,
+      1,
+    );
+  }
+  console.log('PASS a genuine invitation, claim and admission replicated');
+}
+
 async function main(): Promise<void> {
   root = await mkdtemp(path.join(tmpdir(), 'pigeon-forged-communities-'));
   process.env.NODE_ENV = 'test';
@@ -434,6 +816,9 @@ async function main(): Promise<void> {
     });
   await converged('roles reached every replica', communityId);
   console.log('PASS signed memberships and roles converged on every replica');
+
+  stage = 'invitations';
+  await forgedInvitations(owner);
 
   stage = 'forged community records are ignored';
   const legitimate = expectedOf(ledger, communityId);
