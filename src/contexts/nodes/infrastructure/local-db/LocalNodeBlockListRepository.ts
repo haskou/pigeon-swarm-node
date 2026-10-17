@@ -4,6 +4,7 @@ import { NodeBlocks } from '@app/contexts/nodes/domain/NodeBlocks';
 import { NoNodeBlocks } from '@app/contexts/nodes/domain/NoNodeBlocks';
 import NodeBlockListRepository from '@app/contexts/nodes/domain/repositories/NodeBlockListRepository';
 import { ClearedNodeOwnerSetting } from '@app/contexts/nodes/domain/value-objects/ClearedNodeOwnerSetting';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 
 import { LocalNodeBlockListDocument } from './documents/LocalNodeBlockListDocument';
@@ -11,6 +12,14 @@ import { LocalNodeBlockListDocument } from './documents/LocalNodeBlockListDocume
 export default class LocalNodeBlockListRepository extends NodeBlockListRepository {
   private static readonly NAMESPACE = 'node_block_list';
   private static readonly LOCAL_ID = 'local';
+
+  private static isCanonicalId(value: string): boolean {
+    try {
+      return new IdentityId(value).isCanonicalKey();
+    } catch {
+      return false;
+    }
+  }
 
   constructor(private readonly database: EmbeddedLocalDatabase) {
     super();
@@ -42,6 +51,33 @@ export default class LocalNodeBlockListRepository extends NodeBlockListRepositor
       LocalNodeBlockListRepository.LOCAL_ID,
       document,
     );
+  }
+
+  public async purgeNonCanonical(): Promise<boolean> {
+    const document = (await this.database.findOne(
+      LocalNodeBlockListRepository.NAMESPACE,
+      LocalNodeBlockListRepository.LOCAL_ID,
+    )) as LocalNodeBlockListDocument | undefined;
+
+    if (!document) {
+      return false;
+    }
+
+    const { blockedIdentityIds, ownerIdentityId } = document.blockList;
+    const canonical =
+      LocalNodeBlockListRepository.isCanonicalId(ownerIdentityId) &&
+      blockedIdentityIds.every(LocalNodeBlockListRepository.isCanonicalId);
+
+    if (canonical) {
+      return false;
+    }
+
+    await this.database.delete(
+      LocalNodeBlockListRepository.NAMESPACE,
+      LocalNodeBlockListRepository.LOCAL_ID,
+    );
+
+    return true;
   }
 
   public async resetOwnerSettings(): Promise<ClearedNodeOwnerSetting[]> {

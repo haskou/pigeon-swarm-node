@@ -3,6 +3,7 @@ import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodeBlockEntries } from '@app/contexts/nodes/domain/NodeBlockEntries';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
 import NodeBlockExceptionsRepository from '@app/contexts/nodes/domain/repositories/NodeBlockExceptionsRepository';
+import NodeBlockListRepository from '@app/contexts/nodes/domain/repositories/NodeBlockListRepository';
 import NodeBlockSourceRepository from '@app/contexts/nodes/domain/repositories/NodeBlockSourceRepository';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { NodeBlockSourceOrigin } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceOrigin';
@@ -23,6 +24,7 @@ describe('NonCanonicalIdentityIdsPurger', () => {
   let nodes: MockProxy<NodeRepository>;
   let exceptions: MockProxy<NodeBlockExceptionsRepository>;
   let sources: MockProxy<NodeBlockSourceRepository>;
+  let blockLists: MockProxy<NodeBlockListRepository>;
   let purger: NonCanonicalIdentityIdsPurger;
   let a: IdentityId;
   let b: IdentityId;
@@ -66,7 +68,14 @@ describe('NonCanonicalIdentityIdsPurger', () => {
     nodes = mock<NodeRepository>();
     exceptions = mock<NodeBlockExceptionsRepository>();
     sources = mock<NodeBlockSourceRepository>();
-    purger = new NonCanonicalIdentityIdsPurger(nodes, exceptions, sources);
+    blockLists = mock<NodeBlockListRepository>();
+    blockLists.purgeNonCanonical.mockResolvedValue(false);
+    purger = new NonCanonicalIdentityIdsPurger(
+      nodes,
+      exceptions,
+      sources,
+      blockLists,
+    );
   });
 
   it('should clear a non-canonical owner and drop non-canonical exceptions and approvals', async () => {
@@ -111,6 +120,7 @@ describe('NonCanonicalIdentityIdsPurger', () => {
 
     expect(purge.ownerCleared).toBe(false);
     expect(purge.removedEntries).toBe(0);
+    expect(purge.ownListDropped).toBe(false);
     expect(nodes.updateLocalNode).not.toHaveBeenCalled();
     expect(exceptions.save).not.toHaveBeenCalled();
     expect(sources.save).not.toHaveBeenCalled();
@@ -126,5 +136,18 @@ describe('NonCanonicalIdentityIdsPurger', () => {
 
     expect(purge.ownerCleared).toBe(false);
     expect(nodes.updateLocalNode).not.toHaveBeenCalled();
+  });
+
+  it('should drop its own stored list when it names an alias', async () => {
+    nodes.loadLocalNode.mockResolvedValue(storedNode(a));
+    blockLists.purgeNonCanonical.mockResolvedValue(true);
+    exceptions.find.mockResolvedValue(NodeBlockEntries.none());
+    sources.findAll.mockResolvedValue([]);
+
+    const purge = await purger.purge();
+
+    expect(blockLists.purgeNonCanonical).toHaveBeenCalledTimes(1);
+    expect(purge.ownListDropped).toBe(true);
+    expect(purge.ownerCleared).toBe(false);
   });
 });

@@ -1,21 +1,24 @@
 import NodeBlockExceptionsRepository from '../../domain/repositories/NodeBlockExceptionsRepository';
+import NodeBlockListRepository from '../../domain/repositories/NodeBlockListRepository';
 import NodeBlockSourceRepository from '../../domain/repositories/NodeBlockSourceRepository';
 import NodeRepository from '../../domain/repositories/NodeRepository';
 import { NonCanonicalIdentityIdsPurge } from './NonCanonicalIdentityIdsPurge';
 
 /**
  * A node that ran before identity ids had to be canonical may hold aliases of
- * a key: as its owner, in its local block exceptions or in what an adopted
- * source applies. No request can be signed under one, so the node clears
- * such an owner, leaving the node to be claimed again, and drops such
- * entries. Signed source lists stay verbatim; their aliases are never
- * enforced. Canonical data is never written.
+ * a key: as its owner, in its own stored block list, in its local block
+ * exceptions or in what an adopted source applies. No request can be signed
+ * under one, so the node clears such an owner, leaving the node to be claimed
+ * again, and drops such entries. The owner's own list is dropped whole, since
+ * its signature covers every entry. Signed source lists stay verbatim; their
+ * aliases are never enforced. Canonical data is never written.
  */
 export default class NonCanonicalIdentityIdsPurger {
   constructor(
     private readonly nodeRepository: NodeRepository,
     private readonly exceptionsRepository: NodeBlockExceptionsRepository,
     private readonly sourceRepository: NodeBlockSourceRepository,
+    private readonly blockListRepository: NodeBlockListRepository,
   ) {}
 
   private async clearOwner(): Promise<boolean> {
@@ -61,9 +64,10 @@ export default class NonCanonicalIdentityIdsPurger {
 
   public async purge(): Promise<NonCanonicalIdentityIdsPurge> {
     const ownerCleared = await this.clearOwner();
+    const ownListDropped = await this.blockListRepository.purgeNonCanonical();
     const removedEntries =
       (await this.purgeExceptions()) + (await this.purgeApprovals());
 
-    return { ownerCleared, removedEntries };
+    return { ownerCleared, ownListDropped, removedEntries };
   }
 }

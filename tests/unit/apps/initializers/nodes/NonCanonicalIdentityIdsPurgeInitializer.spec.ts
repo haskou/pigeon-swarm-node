@@ -21,18 +21,26 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
   });
 
   it('should log what it purged as counts only', async () => {
-    purger.purge.mockResolvedValue({ ownerCleared: true, removedEntries: 3 });
+    purger.purge.mockResolvedValue({
+      ownerCleared: true,
+      ownListDropped: false,
+      removedEntries: 3,
+    });
 
     await initializer.ensure();
 
     expect(logger.info).toHaveBeenCalledTimes(1);
     expect(logger.info.mock.calls[0][0]).toBe(
-      'Purged non-canonical identity ids: ownerCleared=true removedEntries=3',
+      'Purged non-canonical identity ids: ownerCleared=true ownListDropped=false removedEntries=3',
     );
   });
 
   it('should warn that the node is unclaimed when it cleared the owner', async () => {
-    purger.purge.mockResolvedValue({ ownerCleared: true, removedEntries: 0 });
+    purger.purge.mockResolvedValue({
+      ownerCleared: true,
+      ownListDropped: false,
+      removedEntries: 0,
+    });
 
     await initializer.ensure();
 
@@ -43,7 +51,11 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
   });
 
   it('should not warn when it kept the owner', async () => {
-    purger.purge.mockResolvedValue({ ownerCleared: false, removedEntries: 2 });
+    purger.purge.mockResolvedValue({
+      ownerCleared: false,
+      ownListDropped: false,
+      removedEntries: 2,
+    });
 
     await initializer.ensure();
 
@@ -51,11 +63,30 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
   });
 
   it('should log nothing when nothing was purged', async () => {
-    purger.purge.mockResolvedValue({ ownerCleared: false, removedEntries: 0 });
+    purger.purge.mockResolvedValue({
+      ownerCleared: false,
+      ownListDropped: false,
+      removedEntries: 0,
+    });
 
     await initializer.ensure();
 
     expect(logger.info).not.toHaveBeenCalled();
     expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it('should log that it dropped its own list naming an alias', async () => {
+    purger.purge.mockResolvedValue({
+      ownerCleared: false,
+      ownListDropped: true,
+      removedEntries: 0,
+    });
+
+    await initializer.ensure();
+
+    expect(logger.info).toHaveBeenCalledTimes(1);
+    expect(logger.info.mock.calls[0][0]).toBe(
+      'Purged non-canonical identity ids: ownerCleared=false ownListDropped=true removedEntries=0',
+    );
   });
 });

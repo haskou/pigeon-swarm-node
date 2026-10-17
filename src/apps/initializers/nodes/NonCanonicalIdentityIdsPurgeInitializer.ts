@@ -10,11 +10,12 @@ export default class NonCanonicalIdentityIdsPurgeInitializer {
   constructor(private readonly purger: NonCanonicalIdentityIdsPurger) {}
 
   public async ensure(): Promise<void> {
-    const { ownerCleared, removedEntries } = await this.purger.purge();
+    const { ownerCleared, ownListDropped, removedEntries } =
+      await this.purger.purge();
 
-    if (ownerCleared || removedEntries > 0) {
+    if (ownerCleared || ownListDropped || removedEntries > 0) {
       Kernel.logger.info(
-        `Purged non-canonical identity ids: ownerCleared=${ownerCleared} removedEntries=${removedEntries}`,
+        `Purged non-canonical identity ids: ownerCleared=${ownerCleared} ownListDropped=${ownListDropped} removedEntries=${removedEntries}`,
       );
     }
 
