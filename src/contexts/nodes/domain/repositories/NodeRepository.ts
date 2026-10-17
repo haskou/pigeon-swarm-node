@@ -35,8 +35,9 @@ export default abstract class NodeRepository {
    * Runs `action` with the latest local node while no update of the local node,
    * owner changes included, can happen, so a write `action` stores elsewhere
    * after checking the node still holds when it lands. `action` must not
-   * update the local node, and a hold is taken before a block policy change,
-   * never inside one, so the two always queue in the same order.
+   * update or hold the local node again: such a nested call is refused at once
+   * rather than left waiting on the hold. A hold is taken before a block policy
+   * change, never inside one, so the two always queue in the same order.
    */
   public abstract holdLocalNode<T>(
     action: (node: Node) => Promise<T>,

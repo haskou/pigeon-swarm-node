@@ -2725,6 +2725,9 @@ services:
   shared/infrastructure/local-db/LocalDatabaseIsLockedError:
     class: /shared/infrastructure/local-db/LocalDatabaseIsLockedError
     arguments: []
+  shared/infrastructure/local-db/LocalDatabaseSectionIsNestedError:
+    class: /shared/infrastructure/local-db/LocalDatabaseSectionIsNestedError
+    arguments: []
   shared/infrastructure/logs/WinstonLogger:
     class: /shared/infrastructure/logs/WinstonLogger
     arguments: []
