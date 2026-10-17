@@ -68,7 +68,15 @@ Implemented:
 - timestamp freshness validation with a 30 second maximum clock skew
 - replay rejection: a mutating (non-GET/HEAD/OPTIONS) signed request whose
   identity and signature were already accepted inside the freshness window is
-  rejected with `401`; the guard is in-memory and per node
+  rejected with `401`; the guard is in-memory and per node. A device proof
+  (`X-Device-Signature`) or recovery proof (`X-Recovery-Signature`) is fresh
+  and one-use on every method, `GET` included: a client signs each such
+  request anew (see _Identity device authorization_)
+- `X-Identity-Id` must be the one canonical encoding of a usable Ed25519 key
+  (PEM armour and whitespace are ignored). An alias encoding of the signing key,
+  such as another DER prefix byte or base64 padding bits that decode to the
+  same bytes, is refused with `401` code `401020`, so block lists, owner checks
+  and the replay guard always see one id per key
 - declared body hash (`PUT /node/blocks` only): the request also carries
   `X-Body-Hash`, the lowercase hex SHA-256 of the exact body bytes, and the
   canonical payload is built with that hex string as its `body` instead of the
@@ -1558,6 +1566,10 @@ Implemented:
   on the stopped node (see
   [Resetting the Node Owner](INSTALLATION.md#resetting-the-node-owner)), the
   named identity owns the node and a claim by any other identity is refused
+- refuse an `identityId` that is not the one canonical encoding of a usable
+  Ed25519 key (an alias DER prefix, a re-encoded base64, a small-order or an
+  off-curve point) with `409`, code `InvalidNodeOwnerIdentityIdError`, so the
+  node is never handed to an id no identity can sign for
 
 ### Put local node registration mode
 
@@ -1595,9 +1607,9 @@ Implemented:
 - `closed`: nobody can create an identity through this node, the owner
   included; switch to `codes` to invite someone
 - the mode only gates **creation** through this node: a `POST /identities`
-  for an identity this node does not hold yet, whatever its version. Updates
-  and republishing of an identity this node already holds, login and every
-  other route are never gated
+  or `PUT /identities/{identityId}` for an identity this node does not hold
+  yet, whatever its version. Updates and republishing of an identity this node
+  already holds, login and every other route are never gated
 - changing the mode is local: it is neither gossiped nor pushed to WebSocket
   clients; `GET /node` reads it
 - the proof of work and its pricing apply unchanged in every mode
@@ -1836,6 +1848,13 @@ open ones are closed. A blocked node peer id cannot connect to this node. The
 current owner is never blocked, even if the list names them. Bearer
 capability routes (mailboxes, private blob reads and writes) and public reads
 are not gated.
+
+Block entries are canonical identity ids compared as strings, so an id that is
+not the one canonical encoding of a usable key never reaches the list. A signed
+request naming one in `X-Identity-Id` gets `401` code `401020` (see
+_Authentication_). `POST /identities`, `POST /identity-devices/transitions` and
+`/identity-devices/{identityId}/sealed-secrets`, which check the block list for
+a record or path id, answer `400` code `400080` for such an id instead.
 
 ```http
 PUT /node/blocks
@@ -2668,7 +2687,8 @@ with `429`, code `429042`. The count is in memory and local to the node, and it
 resets on restart. Clients behind one NAT share the count.
 
 When this node's registration mode is `codes`, creating an identity through it
-needs the registration code in a header:
+needs the registration code in a header, on `POST /identities` and on a
+`PUT /identities/{identityId}` that creates an identity alike:
 
 ```http
 POST /identities
@@ -2676,15 +2696,18 @@ X-Registration-Code: <code>
 ```
 
 Registration control applies only when the body is an identity this node does
-not hold yet, whatever its version: a later version whose genesis lives
-elsewhere still brings a new identity here. An identity that already
-replicated here is a republish or an update and is never gated, nor is login.
+not hold yet, whatever its version and whichever of the two routes carries it:
+a later version whose genesis lives elsewhere still brings a new identity here.
+An identity that already replicated here is a republish or an update and is
+never gated, nor is login.
 The check runs after the per-address limiter and before the per-identity and
 per-network counters, so refused attempts never spend those limits. One use of
 the code is reserved before publishing and released if publishing fails before
 the identity is saved, so a refused proof never burns a use, a failure after
 the save never makes a creation free, and two concurrent requests cannot both
-spend the last one. Creation is refused with `403`, code `403011`, when the mode is
+spend the last one. Publications of one identity run one at a time, so
+concurrent creations of it spend a single use. Creation is refused with `403`,
+code `403011`, when the mode is
 `closed` ("Identity creation on this node is closed.") and in `codes` mode
 when the code is missing, unknown, expired or used up ("Identity creation on
 this node needs a valid registration code." for all four), so a caller learns
@@ -2701,7 +2724,9 @@ Updates use the same signed public shape and add
 add networks, but cannot remove a previously joined network or replace the
 pinned genesis credential commitment or recovery authority. The node validates
 the complete previous-publication chain before publishing the new CID. The same
-`429` / `429040` publication cap applies.
+`429` / `429040` publication cap applies. A `PUT` for an identity this node
+does not hold yet creates it here, so it takes the `X-Registration-Code` header
+and is refused with `403` / `403011` exactly like a `POST` (see above).
 
 ## Keychain HTTP API
 
@@ -6073,6 +6098,16 @@ signature against its recovery authority before returning the checkpoint. A
 missing, mixed, malformed, invalid, revoked or unrelated proof returns the same
 generic `401` without revealing which check failed.
 
+Every device or recovery proof, on these reads as on the sealed-secret routes,
+must carry an `X-Timestamp` within 30 seconds of the node clock and is accepted
+once: the node remembers each accepted proof signature for its 60 second
+validity window, keyed by the raw bytes of the signing key, and refuses a second
+request with the same signature, including one that names the same key in
+another encoding, with `401` code `401020`. A device credential that is not the
+one canonical encoding of an Ed25519 key is refused the same way. A client never
+resends a captured or earlier request: it signs each read and write with a new
+timestamp. Like the identity replay guard, the record is in-memory and per node.
+
 List the currently authorized device credentials with:
 
 ```http
@@ -6264,7 +6299,9 @@ generation published after its revocation. Both routes use device proof only,
 checked against the current authorization head: `X-Timestamp`,
 `X-Device-Credential` and `X-Device-Signature`. The identity signature
 (`X-Identity-Id`, `X-Signature`) and `X-Recovery-Signature` are not accepted.
-`X-Timestamp` must be within 30 seconds of the node clock.
+`X-Timestamp` must be within 30 seconds of the node clock, and each device
+signature is accepted once (see _Identity device authorization_): a replayed request
+returns `401` code `401020`.
 
 Publish a generation with:
 
@@ -6333,8 +6370,9 @@ X-Device-Credential: <device credential>
 X-Device-Signature: <signature>
 ```
 
-Freshness and device proof are checked as for `PUT`, and a revoked or unknown
-credential returns `401`. The route is not replay-guarded. No stored bundle, or
+Freshness, device proof and the one-use rule are checked as for `PUT`, so a
+replayed read returns `401` code `401020`, and a revoked or unknown credential
+returns `401`. No stored bundle, or
 no entry for the caller, returns `404`. A device added after the last publish
 has no entry until the owner republishes.
 

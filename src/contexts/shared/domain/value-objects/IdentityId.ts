@@ -19,6 +19,21 @@ export class IdentityId extends PublicKey {
     super(IdentityId.addPEMHeaders(value?.valueOf()));
   }
 
+  /**
+   * Whether this id is the one canonical encoding of a usable Ed25519 key. A
+   * re-encoded alias of another key's bytes, a small-order point or an
+   * off-curve point is not: nobody can sign for it as itself.
+   */
+  public isCanonicalKey(): boolean {
+    try {
+      this.toRaw();
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public isEqual(other: unknown): boolean {
     return other instanceof IdentityId && this.valueOf() === other.valueOf();
   }

@@ -23,10 +23,16 @@ export default class NodeOwnerResetCommand {
     }
 
     try {
-      return new IdentityId(newOwner);
+      const identityId = new IdentityId(newOwner);
+
+      if (identityId.isCanonicalKey()) {
+        return identityId;
+      }
     } catch {
-      throw NodeOwnerResetUsageError.invalidNewOwner();
+      // Not shaped like an identity id at all: refused below, never echoed.
     }
+
+    throw NodeOwnerResetUsageError.invalidNewOwner();
   }
 
   constructor(

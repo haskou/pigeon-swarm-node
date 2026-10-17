@@ -17,6 +17,7 @@ import {
 
 import { PutIdentityBody } from '../bodies/PutIdentityBody';
 import IdentityAdmissionSourceRateLimiter from '../IdentityAdmissionSourceRateLimiter';
+import IdentityCreationGate from '../IdentityCreationGate';
 import IdentityNetworkAdmissionRateLimiter from '../IdentityNetworkAdmissionRateLimiter';
 import IdentityPublishRateLimiter from '../IdentityPublishRateLimiter';
 import { PutIdentityRequest } from '../requests/PutIdentityRequest';
@@ -45,6 +46,9 @@ export class PutIdentityRoute extends Route {
       IdentityNetworkAdmissionRateLimiter,
     );
 
+  private readonly creationGate =
+    this.get<IdentityCreationGate>(IdentityCreationGate);
+
   @Put('/:identityId')
   public async updateIdentity(
     @Param('identityId') identityId: string,
@@ -70,12 +74,19 @@ export class PutIdentityRoute extends Route {
       throw new IdentityUpdateRequesterMismatchError();
     }
 
-    await this.rateLimiter.consume(authenticatedIdentityId);
-    await this.networkAdmissionRateLimiter.consume(body.networks);
-
     try {
-      const candidate = await this.identityPublisher.publish(
-        new PutIdentityRequest(body).getIdentityPublishMessage(),
+      const message = new PutIdentityRequest(body).getIdentityPublishMessage();
+      // A PUT for an identity this node does not hold yet creates it, so it
+      // passes the same registration control as a POST.
+      const candidate = await this.creationGate.publish(
+        message.identity,
+        request.header('X-Registration-Code'),
+        async () => {
+          await this.rateLimiter.consume(authenticatedIdentityId);
+          await this.networkAdmissionRateLimiter.consume(body.networks);
+
+          return this.identityPublisher.publish(message);
+        },
       );
 
       return response

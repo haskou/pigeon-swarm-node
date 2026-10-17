@@ -5,6 +5,7 @@ import { Request } from 'express';
 
 import { IdentityIsBlockedOnThisNodeError } from './errors/IdentityIsBlockedOnThisNodeError';
 import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';
+import { NonCanonicalIdentityIdError } from './errors/NonCanonicalIdentityIdError';
 import { SignedHttpRequestVerifier } from './SignedHttpRequestVerifier';
 import { SignedRequestBodyHash } from './SignedRequestBodyHash';
 import { assertSignedRequestTimestampIsFresh } from './SignedRequestFreshness';
@@ -71,7 +72,17 @@ export default class SignedHttpRequestAuthenticator {
     return { bodyHash, identityId };
   }
 
+  /**
+   * Refuses an identity blocked on this node (403012). Block entries hold
+   * canonical ids compared as strings, so an alias encoding of a blocked key
+   * would never match its entry: an id that is not the canonical encoding of a
+   * usable key is refused first (400080), before the block list is read.
+   */
   public async assertIsNotBlocked(identityId: IdentityId): Promise<void> {
+    if (!identityId.isCanonicalKey()) {
+      throw new NonCanonicalIdentityIdError();
+    }
+
     if (await this.blockPolicy.isIdentityBlocked(identityId)) {
       throw new IdentityIsBlockedOnThisNodeError();
     }

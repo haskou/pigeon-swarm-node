@@ -40,9 +40,12 @@ services:
   apps/apis/identities-api/IdentityAdmissionSourceRateLimiter:
     class: /apps/apis/identities-api/IdentityAdmissionSourceRateLimiter
     arguments: []
-  apps/apis/identities-api/IdentityCreationQueue:
-    class: /apps/apis/identities-api/IdentityCreationQueue
-    arguments: []
+  apps/apis/identities-api/IdentityCreationGate:
+    class: /apps/apis/identities-api/IdentityCreationGate
+    arguments:
+      - >-
+        @contexts/identities/application/detect-creation/IdentityCreationDetector
+      - '@contexts/nodes/application/admit-registration/NodeRegistrationAdmitter'
   apps/apis/identities-api/IdentityNetworkAdmissionRateLimiter:
     class: /apps/apis/identities-api/IdentityNetworkAdmissionRateLimiter
     arguments:

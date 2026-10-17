@@ -23,6 +23,10 @@ paths:
         together. The device signature covers the same canonical request as
         X-Signature, and the credential must belong to the current checkpoint.
         Total recovery omits both device headers and sends X-Recovery-Signature.
+        The device or recovery proof must carry an X-Timestamp within 30 seconds
+        of the node clock and is accepted once: a replayed proof signature,
+        under any encoding of the same key, is refused. Clients sign every read
+        anew.
       parameters:
         - in: path
           name: identityId
@@ -44,7 +48,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DeviceAuthorization'
         '401':
-          description: The signature is missing or invalid, the signer does not own the requested identity, or the supplied device credential is not currently authorized.
+          description: The signature is missing, invalid or stale, the signer does not own the requested identity, the supplied device credential is not currently authorized, or the device or recovery proof was already used (code 401020).
         '409':
           description: The authorization checkpoint is unavailable on this node.
   /identity-devices/{identityId}/devices:
@@ -79,7 +83,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DeviceCatalog'
         '401':
-          description: The signature is missing or invalid, the signer does not own the requested identity, or the supplied proof is not valid.
+          description: The signature is missing, invalid or stale, the signer does not own the requested identity, the supplied proof is not valid, or the proof was already used (code 401020).
         '409':
           description: The authorization checkpoint is unavailable on this node.
   /identity-devices/{identityId}/transitions:
@@ -139,7 +143,7 @@ paths:
         '400':
           description: after is not a non-negative decimal safe integer without leading zeros (code 400050).
         '401':
-          description: The signature is missing or invalid, the signer does not own the requested identity, or the supplied proof is not exactly one valid device or recovery proof (code 401020).
+          description: The signature is missing, invalid or stale, the signer does not own the requested identity, the supplied proof is not exactly one valid device or recovery proof, or the proof was already used (code 401020).
         '409':
           description: The authorization checkpoint is unavailable on this node.
   /identity-devices/{identityId}/sealed-secrets:
@@ -152,8 +156,8 @@ paths:
         The publisher is the device named by X-Device-Credential. Authentication
         is device proof only, checked against the current head. The identity
         signature and X-Recovery-Signature are not accepted. X-Timestamp must be
-        within 30 seconds of the node clock. The request signature is consumed by
-        the replay guard.
+        within 30 seconds of the node clock. The device signature is accepted
+        once, keyed by the raw signing key: a replay is refused with 401020.
 
         Each entry signature covers this preimage, serialized with JSON.stringify
         in exactly this key order:
@@ -195,9 +199,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/DeviceSealedSecretReceipt'
         '400':
-          description: Malformed body, a field outside its limits, or duplicate recipient credentials.
+          description: Malformed body, a field outside its limits, or duplicate recipient credentials. A path identity id that is not the one canonical encoding of a usable key (code 400080).
         '401':
-          description: Timestamp outside the 30 second window, missing or invalid device proof, revoked or unknown credential, replayed request, or X-Recovery-Signature supplied.
+          description: Timestamp outside the 30 second window, missing or invalid device proof, revoked or unknown credential, replayed request, or X-Recovery-Signature supplied (code 401020).
         '409':
           description: Authorization revision mismatch, recipients mismatch (missing, revoked or unknown credential), invalid entry signature, or generation not greater than the stored generation.
     get:
@@ -207,8 +211,9 @@ paths:
       description: |
         Returns the caller's own entry of the stored generation. Authentication is
         device proof only, checked against the current head, with the same
-        X-Timestamp window as PUT. A revoked or unknown credential is refused.
-        The request is not replay-guarded.
+        X-Timestamp window and the same one-use device signature as PUT, so a
+        replayed read is refused with 401020. A revoked or unknown credential is
+        refused.
 
         The response never includes other devices' entries, the authorized-device
         list, head commitments or decrypted material. A device added after the last
@@ -241,8 +246,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DeviceSealedSecretRecord'
+        '400':
+          description: A path identity id that is not the one canonical encoding of a usable key (code 400080).
         '401':
-          description: Timestamp outside the 30 second window, missing or invalid device proof, revoked or unknown credential, or X-Recovery-Signature supplied.
+          description: Timestamp outside the 30 second window, missing or invalid device proof, revoked or unknown credential, replayed request, or X-Recovery-Signature supplied (code 401020).
         '404':
           description: No stored bundle for the identity, or no entry for the caller.
   /identity-devices/transitions:
@@ -291,7 +298,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DeviceAuthorizationTransitionResult'
         '400':
-          description: Malformed transition, or sealedSecrets on a transition that does not retire its author (code 400030).
+          description: Malformed transition, or sealedSecrets on a transition that does not retire its author (code 400030). A transition signed by the identity whose identity id is not the one canonical encoding of a usable key (code 400080).
         '409':
           description: Expired, replayed, causally stale or unauthorized transition, or a hand-over that is not sealed to exactly the remaining devices, not signed by the retiring device, or not newer than the stored generation.
         '429':
@@ -329,14 +336,14 @@ components:
       required: false
       schema:
         type: string
-      description: Device signature over the same canonical request payload as X-Signature. It must be supplied together with X-Device-Credential.
+      description: Device signature over the same canonical request payload as X-Signature. It must be supplied together with X-Device-Credential. Each signature is accepted once.
     XRecoverySignature:
       in: header
       name: X-Recovery-Signature
       required: false
       schema:
         type: string
-      description: Recovery-authority signature over the same canonical request payload as X-Signature. It is accepted only when both device-proof headers are absent.
+      description: Recovery-authority signature over the same canonical request payload as X-Signature. It is accepted only when both device-proof headers are absent. Each signature is accepted once.
   schemas:
     DeviceAuthorizationTransition:
       type: object

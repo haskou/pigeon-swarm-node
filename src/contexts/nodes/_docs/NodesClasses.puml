@@ -104,6 +104,7 @@ package "nodes" {
     }
 
     class NodeOwnerCanOnlyBeChangedByCurrentOwnerError <DomainError>
+    class InvalidNodeOwnerIdentityIdError <DomainError>
 
     class NetworkId
     class NetworkName
@@ -123,6 +124,7 @@ package "nodes" {
     NodePeer --> NodeId
     NodePeerNetwork *--> NodePeerNetworkType
     Node ..> NodeOwnerCanOnlyBeChangedByCurrentOwnerError
+    Node ..> InvalidNodeOwnerIdentityIdError
     Network *--> NetworkId
     Network *--> NetworkName
     Network --> NetworkKey

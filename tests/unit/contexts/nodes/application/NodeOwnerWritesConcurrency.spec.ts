@@ -6,6 +6,7 @@ import { NodeRegistrationModeChangerMessage } from '@app/contexts/nodes/applicat
 import NodeRegistrationModeChanger from '@app/contexts/nodes/application/change-registration-mode/NodeRegistrationModeChanger';
 import { NodeRelayConfigurationUpdaterMessage } from '@app/contexts/nodes/application/update-relay-configuration/messages/NodeRelayConfigurationUpdaterMessage';
 import NodeRelayConfigurationUpdater from '@app/contexts/nodes/application/update-relay-configuration/NodeRelayConfigurationUpdater';
+import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from '@app/contexts/nodes/domain/errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import LocalNodeMetadataRepository from '@app/contexts/nodes/infrastructure/local-db/LocalNodeMetadataRepository';
 import LocalNodeMetadataMapper from '@app/contexts/nodes/infrastructure/local-db/mappers/LocalNodeMetadataMapper';
@@ -20,6 +21,7 @@ import os from 'os';
 import path from 'path';
 import { setImmediate } from 'timers/promises';
 
+import { IdentityIdMother } from '../../../mothers/IdentityIdMother';
 import { IdentityMother } from '../../../mothers/IdentityMother';
 
 /**
@@ -108,6 +110,34 @@ describe('Concurrent node owner writes', () => {
     expect(node.relayConfiguration.callsRelay?.port).toBe(4199);
     expect(node.owner).toBe(owner);
     expect(Object.keys(node.networks)).toEqual([networkId.valueOf()]);
+  });
+
+  it('should give an unowned node one owner when two identities claim it together', async () => {
+    const claimants = [
+      IdentityIdMother.canonical().valueOf(),
+      IdentityIdMother.canonical().valueOf(),
+    ];
+
+    const results = await Promise.allSettled(
+      claimants.map((claimant) =>
+        new NodeOwnerAssigner(
+          freshRepository(),
+          mock<NodeBlockPolicy>(),
+        ).assignOwner(new NodeOwnerAssignerMessage(claimant, claimant)),
+      ),
+    );
+    const owner = (await freshRepository().loadLocalNode()).toPrimitives()
+      .owner as string;
+    const refusals = results.flatMap((result): unknown[] =>
+      result.status === 'rejected' ? [result.reason as unknown] : [],
+    );
+
+    expect(claimants).toContain(owner);
+    expect(results[claimants.indexOf(owner)].status).toBe('fulfilled');
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]).toBeInstanceOf(
+      NodeOwnerCanOnlyBeChangedByCurrentOwnerError,
+    );
   });
 
   it('should keep one generated node when first loads race', async () => {

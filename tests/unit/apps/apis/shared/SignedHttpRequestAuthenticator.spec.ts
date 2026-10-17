@@ -9,6 +9,7 @@ import {
 import { Request } from 'express';
 import { mock, MockProxy } from 'jest-mock-extended';
 
+import { IdentityIdMother } from '../../../mothers/IdentityIdMother';
 import { SignatureMother } from '../../../mothers/SignatureMother';
 
 async function buildSignedRequest(
@@ -35,6 +36,14 @@ async function buildSignedRequest(
     header: (name: string) => headers[name.toLowerCase()],
     method,
     path: '/resource',
+  } as unknown as Request;
+}
+
+function withHeader(request: Request, header: string, value: string): Request {
+  return {
+    ...request,
+    header: (name: string) =>
+      name.toLowerCase() === header ? value : request.header(name),
   } as unknown as Request;
 }
 
@@ -67,15 +76,27 @@ describe('SignedHttpRequestAuthenticator', () => {
     await authenticator.authenticate(request);
 
     await expect(
-      authenticator.authenticate({
-        ...request,
-        header: (name: string) =>
-          name.toLowerCase() === 'x-signature'
-            ? reencoded
-            : request.header(name),
-      } as unknown as Request),
+      authenticator.authenticate(withHeader(request, 'x-signature', reencoded)),
     ).rejects.toThrow('Invalid signed request.');
   });
+
+  it.each(IdentityIdMother.aliases())(
+    'rejects a replay that names the signer by %s',
+    async (_encoding, aliasOf: (of: IdentityId) => IdentityId) => {
+      const request = await buildSignedRequest('POST', { value: 1 });
+      const alias = aliasOf(
+        new IdentityId(String(request.header('x-identity-id'))),
+      );
+
+      await authenticator.authenticate(request);
+
+      await expect(
+        authenticator.authenticate(
+          withHeader(request, 'x-identity-id', alias.valueOf()),
+        ),
+      ).rejects.toThrow('Invalid signed request.');
+    },
+  );
 
   it('allows identical safe requests inside the same millisecond', async () => {
     const request = await buildSignedRequest('GET', {});
@@ -96,4 +117,33 @@ describe('SignedHttpRequestAuthenticator', () => {
       message: 'Identity is blocked on this node.',
     });
   });
+
+  it.each(IdentityIdMother.aliases())(
+    'refuses a blocked identity that names its key by %s with 401020',
+    async (_encoding, aliasOf: (of: IdentityId) => IdentityId) => {
+      const request = await buildSignedRequest('GET', {});
+      const blocked = new IdentityId(String(request.header('x-identity-id')));
+
+      blockPolicy.isIdentityBlocked.mockImplementation(
+        (identityId: IdentityId) =>
+          Promise.resolve(identityId.isEqual(blocked)),
+      );
+
+      await expect(
+        authenticator.authenticate(
+          withHeader(request, 'x-identity-id', aliasOf(blocked).valueOf()),
+        ),
+      ).rejects.toMatchObject({ code: 401020, httpCode: 401 });
+    },
+  );
+
+  it.each(IdentityIdMother.forged())(
+    'refuses to check the block list for an id with %s with 400080',
+    async (_case, forged: IdentityId) => {
+      await expect(
+        authenticator.assertIsNotBlocked(forged),
+      ).rejects.toMatchObject({ code: 400080, httpCode: 400 });
+      expect(blockPolicy.isIdentityBlocked).not.toHaveBeenCalled();
+    },
+  );
 });

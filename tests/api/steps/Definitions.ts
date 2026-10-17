@@ -101,6 +101,7 @@ import {
   signNotificationInvitation,
   signNotificationState,
 } from '../../support/signNotification';
+import { IdentityIdMother } from '../../unit/mothers/IdentityIdMother';
 import IPFSDefinition from './IPFSDefinition';
 import RestClient from './RestClient';
 import { RestResponse } from './RestResponse';
@@ -237,6 +238,14 @@ export default class Definitions {
     return this.otherIdentityKeyPair;
   }
 
+  /** The path of the identity the current key pair signs for, whether or not the node holds it. */
+  private async currentIdentityPath(): Promise<string> {
+    await this.ensureIdentityKeyPair();
+    const identityId = this.ownerIdentityId as IdentityId;
+
+    return `/identities/${encodeURIComponent(identityId.valueOf())}`;
+  }
+
   private async ensureIdentityDeviceOwnerKeyPair(): Promise<KeyPair> {
     this.identityDeviceOwnerKeyPair ??= await KeyPair.generate();
 
@@ -282,10 +291,11 @@ export default class Definitions {
     handle: string,
     version: number = 1,
     previousIdentityExternalIdentifier: string | undefined = undefined,
+    identityId: IdentityId | undefined = undefined,
   ): Promise<void> {
     const keyPair = await this.ensureIdentityKeyPair();
     const recoveryKeyPair = await this.ensureIdentityRecoveryKeyPair();
-    const ownerIdentityId = this.ownerIdentityId as IdentityId;
+    const ownerIdentityId = identityId ?? (this.ownerIdentityId as IdentityId);
     const deviceCredential = DeviceCredential.fromString(
       (await this.ensureIdentityDeviceOwnerKeyPair()).toPrimitives().publicKey,
     );
@@ -404,6 +414,16 @@ export default class Definitions {
     identityId: IdentityId | undefined,
   ): IdentityId | undefined {
     return identityId ?? this.ownerIdentityId;
+  }
+
+  private aliasOf(identityId: IdentityId, encoding: string): IdentityId {
+    const aliasOf = new Map(IdentityIdMother.aliases()).get(encoding);
+
+    if (!aliasOf) {
+      throw new Error(`Unknown identity id encoding: ${encoding}`);
+    }
+
+    return aliasOf(identityId);
   }
 
   private getCurrentRequestBody(): SignedHttpRequestBody {
@@ -2373,6 +2393,41 @@ export default class Definitions {
     });
   }
 
+  @given(
+    'I set a sealed secret bundle body for my device with generation {int}',
+  )
+  public async iSetASealedSecretBundleBodyForMyDeviceWithGeneration(
+    generation: number,
+  ): Promise<void> {
+    const device = await this.ensureIdentityDeviceOwnerKeyPair();
+    const credential = DeviceCredential.fromString(
+      device.toPrimitives().publicKey,
+    ).toWire();
+    const sealedSecret = 'c2VhbGVk';
+    const signature = device.sign(
+      DeviceSealedSecretBundle.signingPayload({
+        authorizationRevision: 0,
+        generation,
+        identityId: (this.ownerIdentityId as IdentityId).valueOf(),
+        publisherCredential: credential,
+        recipientCredential: credential,
+        sealedSecret,
+      }),
+    );
+
+    this.body = JSON.stringify({
+      authorizationRevision: 0,
+      entries: [
+        {
+          recipientCredential: credential,
+          sealedSecret,
+          signature: signature.valueOf(),
+        },
+      ],
+      generation,
+    });
+  }
+
   @given('I sign the current sealed secret delivery request')
   public async iSignTheCurrentSealedSecretDeliveryRequest(): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;
@@ -2576,6 +2631,11 @@ export default class Definitions {
       'PUT',
       `/identities/${encodeURIComponent(this.createdIdentityId)}`,
     );
+  }
+
+  @given('I sign a PUT request for the current identity')
+  public async iSignAPUTRequestForTheCurrentIdentity(): Promise<void> {
+    await this.signCurrentRequest('PUT', await this.currentIdentityPath());
   }
 
   @given('I sign the current presence update request')
@@ -4894,6 +4954,29 @@ export default class Definitions {
     );
   }
 
+  @given('I set my identity record under {string} of my key')
+  public async iSetMyIdentityRecordUnderAnAliasOfMyKey(
+    encoding: string,
+  ): Promise<void> {
+    await this.ensureIdentityKeyPair();
+    await this.buildClientSignedIdentityBody(
+      'Alias Identity',
+      'alias-identity',
+      1,
+      undefined,
+      this.aliasOf(this.ownerIdentityId as IdentityId, encoding),
+    );
+  }
+
+  /** Rewrites only the header: the signature does not cover `X-Identity-Id`. */
+  @given('the request names its signer by {string} of its key')
+  public theRequestNamesItsSignerByAnAliasOfItsKey(encoding: string): void {
+    this.headers['x-identity-id'] = this.aliasOf(
+      new IdentityId(this.headers['x-identity-id']),
+      encoding,
+    ).valueOf();
+  }
+
   @when('a stranger replays my public identity record')
   public async aStrangerReplaysMyPublicIdentityRecord(): Promise<void> {
     const record = await this.restClient.get('/identities/test-identity', {});
@@ -6576,6 +6659,15 @@ export default class Definitions {
 
     this.response = await this.restClient.put(
       `/identities/${encodeURIComponent(this.createdIdentityId)}`,
+      this.body && JSON.parse(this.body),
+      { headers: this.headers },
+    );
+  }
+
+  @when('I PUT the current identity')
+  public async iPUTTheCurrentIdentity(): Promise<void> {
+    this.response = await this.restClient.put(
+      await this.currentIdentityPath(),
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
