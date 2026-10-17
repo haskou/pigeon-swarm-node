@@ -6,13 +6,13 @@ import { Get, JsonController, Req, Res } from 'routing-controllers';
 
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
-@JsonController('/communities')
+@JsonController('/community-drafts')
 export class GetCommunityChannelDraftsRoute extends CommunityRouteSupport {
   private readonly finder = this.get<CommunityChannelDraftsFinder>(
     CommunityChannelDraftsFinder,
   );
 
-  @Get('/me/drafts')
+  @Get()
   public async listDrafts(
     @Req() request: Request,
     @Res() response: Response,

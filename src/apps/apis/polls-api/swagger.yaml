@@ -5,7 +5,7 @@ info:
 tags:
   - name: polls
 paths:
-  /polls/:
+  /polls:
     post:
       tags: [polls]
       summary: Create a poll in a community text channel

@@ -81,8 +81,8 @@ Feature: Node block sharing
     When I POST to "/realtime/tickets"
     Then response code is equal to 201
 
-    Given I sign a GET request to the block source path "/pending"
-    When I send the GET to the block source path "/pending"
+    Given I sign a GET request to the block source path "/pending-entries"
+    When I send the GET to the block source path "/pending-entries"
     Then response code is equal to 200
     And response body should contain the other identity id
 
@@ -286,8 +286,8 @@ Feature: Node block sharing
   Scenario Outline: The owner cannot read the pending entries of a source named by <encoding> of its key
     Given the node follows a block source whose version 1 blocks the other identity
     And the block source publisher is named by "<encoding>" of its key
-    And I sign a GET request to the block source path "/pending"
-    When I send the GET to the block source path "/pending"
+    And I sign a GET request to the block source path "/pending-entries"
+    When I send the GET to the block source path "/pending-entries"
     Then response code is equal to 400
     And response body should contain "400080"
     And response body should not contain the other identity id
@@ -306,9 +306,9 @@ Feature: Node block sharing
     And response body should contain "403010"
 
     Examples:
-      | method | suffix   |
-      | DELETE |          |
-      | GET    | /pending |
+      | method | suffix           |
+      | DELETE |                  |
+      | GET    | /pending-entries |
 
   Scenario Outline: A canonical id of a source the node does not follow is not found on <method> <suffix>
     Given I sign a <method> request to the block source path "<suffix>"
@@ -317,6 +317,6 @@ Feature: Node block sharing
     And response body should contain "NodeBlockSourceNotFoundError"
 
     Examples:
-      | method | suffix   |
-      | DELETE |          |
-      | GET    | /pending |
+      | method | suffix           |
+      | DELETE |                  |
+      | GET    | /pending-entries |

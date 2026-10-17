@@ -20,7 +20,7 @@ export class PutNodeOwnerRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  @Put('/')
+  @Put()
   public async putOwner(
     @Body() body: PutNodeOwnerBody,
     @Req() request: Request,

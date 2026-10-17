@@ -17,7 +17,7 @@ export class PostPrivateBlobRoute extends PrivateBlobRouteSupport {
   private readonly reserver =
     this.get<PrivateBlobReserver>(PrivateBlobReserver);
 
-  @Post('/')
+  @Post()
   public async request(
     @Body({ validate: { forbidNonWhitelisted: true, whitelist: true } })
     body: PostPrivateBlobBody,

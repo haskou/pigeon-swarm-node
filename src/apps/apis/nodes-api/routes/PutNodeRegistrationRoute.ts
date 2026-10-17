@@ -14,7 +14,7 @@ export class PutNodeRegistrationRoute extends NodeOwnerRouteSupport {
     NodeRegistrationModeChanger,
   );
 
-  @Put('/')
+  @Put()
   public async putRegistration(
     @Body({ validate: { forbidNonWhitelisted: true, whitelist: true } })
     body: PutNodeRegistrationBody,

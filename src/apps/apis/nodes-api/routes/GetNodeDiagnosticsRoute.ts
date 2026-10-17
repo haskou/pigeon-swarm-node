@@ -12,7 +12,7 @@ export class GetNodeDiagnosticsRoute extends NodeOwnerRouteSupport {
     DiagnosticsSessionExporter,
   );
 
-  @Get('/')
+  @Get()
   public async getDiagnostics(
     @Req() request: Request,
     @Res() response: Response,

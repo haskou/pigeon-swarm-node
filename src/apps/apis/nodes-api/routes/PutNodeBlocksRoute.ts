@@ -57,7 +57,7 @@ export class PutNodeBlocksRoute extends Route {
     return document;
   }
 
-  @Put('/')
+  @Put()
   public async putBlocks(
     @Req() request: Request,
     @Res() response: Response,

@@ -106,7 +106,7 @@ paths:
         concurrentRecoveries.
 
         Every entry is the stored signed transition, byte-for-byte the
-        primitives POST /identity-devices/transitions accepted, never re-signed
+        primitives POST /identity-devices/{identityId}/transitions accepted, never re-signed
         or rewritten and never carrying sealedSecrets. Records the replay
         rejected are never served. The recovery authority reads every list. A
         device authorized in some replayed state reads recoveries,
@@ -152,6 +152,66 @@ paths:
           description: The signature is missing, invalid or stale, the signer does not own the requested identity, the supplied proof is not exactly one valid device or recovery proof, or the proof was already used (code 401020).
         '409':
           description: The authorization checkpoint is unavailable on this node.
+    post:
+      tags:
+        - identity-devices
+      summary: Apply a signed device authorization transition
+      description: |
+        Applies an enrollment, revocation or recovery transition after checking
+        its causal revision, author authority, target proof of possession and
+        replay identifiers. The request never contains passwords, protected
+        device roots, password KDF metadata or recovery secrets.
+
+        Signatures cover UTF-8 compact JSON with no whitespace. Keys use the
+        order shown by the request schema and undefined properties are omitted.
+        The target proof envelope is
+        {"domain":"pigeon:device-authorization:proof-of-possession:v2",
+        "transition":<unsigned transition>}. The author envelope is
+        {"domain":"pigeon:device-authorization:transition:v3",
+        "proofOfPossession":"<target signature>",
+        "transition":<unsigned transition>}. The unsigned transition key order
+        is authorCredential, authorizedAt, compromisedCredentials,
+        compromisedSince, epoch, identityId, operation, operationId,
+        pairingExpiration, pairingId, previousRevision, revision,
+        targetCredential, targetCredentialCommitment. Each compromisedCredentials
+        entry writes compromisedSince before credential.
+
+        A device retiring itself (revocation with authorCredential equal to
+        targetCredential, without compromisedSince or compromisedCredentials)
+        may add sealedSecrets to hand over the next sealed secret generation to
+        the remaining devices. The node takes the transition revision as
+        authorizationRevision and authorCredential as publisherCredential for
+        the entry signature preimage, and validates the hand-over before the
+        transition is applied. The body limit is 1 MB.
+
+        The path identity must equal the transition's identityId; a mismatch
+        is refused (400090) before the transition is read further.
+      parameters:
+        - in: path
+          name: identityId
+          required: true
+          schema:
+            type: string
+          description: Percent-encoded identity id of the transition. It must equal the body identityId.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceAuthorizationTransition'
+      responses:
+        '200':
+          description: Current deterministic authorization checkpoint.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceAuthorizationTransitionResult'
+        '400':
+          description: Malformed transition, or sealedSecrets on a transition that does not retire its author (code 400030). A transition signed by the identity whose identity id is not the one canonical encoding of a usable key (code 400080). A path identity id that differs from the body identityId (code 400090).
+        '409':
+          description: Expired, replayed, causally stale or unauthorized transition, or a hand-over that is not sealed to exactly the remaining devices, not signed by the retiring device, or not newer than the stored generation.
+        '429':
+          description: Per-identity (20 per minute) or per-node (300 per minute) transition rate limit exceeded (code 429030).
   /identity-devices/{identityId}/sealed-secrets:
     put:
       tags:
@@ -258,57 +318,6 @@ paths:
           description: Timestamp outside the 30 second window, missing or invalid device proof, revoked or unknown credential, replayed request, or X-Recovery-Signature supplied (code 401020).
         '404':
           description: No stored bundle for the identity, or no entry for the caller.
-  /identity-devices/transitions:
-    post:
-      tags:
-        - identity-devices
-      summary: Apply a signed device authorization transition
-      description: |
-        Applies an enrollment, revocation or recovery transition after checking
-        its causal revision, author authority, target proof of possession and
-        replay identifiers. The request never contains passwords, protected
-        device roots, password KDF metadata or recovery secrets.
-
-        Signatures cover UTF-8 compact JSON with no whitespace. Keys use the
-        order shown by the request schema and undefined properties are omitted.
-        The target proof envelope is
-        {"domain":"pigeon:device-authorization:proof-of-possession:v2",
-        "transition":<unsigned transition>}. The author envelope is
-        {"domain":"pigeon:device-authorization:transition:v3",
-        "proofOfPossession":"<target signature>",
-        "transition":<unsigned transition>}. The unsigned transition key order
-        is authorCredential, authorizedAt, compromisedCredentials,
-        compromisedSince, epoch, identityId, operation, operationId,
-        pairingExpiration, pairingId, previousRevision, revision,
-        targetCredential, targetCredentialCommitment. Each compromisedCredentials
-        entry writes compromisedSince before credential.
-
-        A device retiring itself (revocation with authorCredential equal to
-        targetCredential, without compromisedSince or compromisedCredentials)
-        may add sealedSecrets to hand over the next sealed secret generation to
-        the remaining devices. The node takes the transition revision as
-        authorizationRevision and authorCredential as publisherCredential for
-        the entry signature preimage, and validates the hand-over before the
-        transition is applied. The body limit is 1 MB.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DeviceAuthorizationTransition'
-      responses:
-        '200':
-          description: Current deterministic authorization checkpoint.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DeviceAuthorizationTransitionResult'
-        '400':
-          description: Malformed transition, or sealedSecrets on a transition that does not retire its author (code 400030). A transition signed by the identity whose identity id is not the one canonical encoding of a usable key (code 400080).
-        '409':
-          description: Expired, replayed, causally stale or unauthorized transition, or a hand-over that is not sealed to exactly the remaining devices, not signed by the retiring device, or not newer than the stored generation.
-        '429':
-          description: Per-identity (20 per minute) or per-node (300 per minute) transition rate limit exceeded (code 429030).
 components:
   parameters:
     XIdentityId:

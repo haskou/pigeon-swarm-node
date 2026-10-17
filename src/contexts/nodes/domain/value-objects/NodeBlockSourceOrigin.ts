@@ -40,6 +40,6 @@ export class NodeBlockSourceOrigin extends StringValueObject {
 
   /** The URL a source serves its published list at. */
   public publishedListUrl(): URL {
-    return new URL('/node/blocks/published', this.valueOf());
+    return new URL('/node/published-blocks', this.valueOf());
   }
 }

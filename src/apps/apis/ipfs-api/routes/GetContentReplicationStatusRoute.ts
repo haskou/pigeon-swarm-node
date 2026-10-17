@@ -32,7 +32,7 @@ export class GetContentReplicationStatusRoute extends Route {
     }
   }
 
-  @Get('/replication/status')
+  @Get('/replication-status')
   public async request(
     @Req() request: Request,
     @Res() response: Response,

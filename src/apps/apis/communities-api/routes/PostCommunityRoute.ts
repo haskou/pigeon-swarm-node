@@ -12,7 +12,7 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 export class PostCommunityRoute extends CommunityRouteSupport {
   private readonly creator = this.get<CommunityCreator>(CommunityCreator);
 
-  @Post('/')
+  @Post()
   public async createCommunity(
     @Body() body: PostCommunityBody,
     @Req() request: Request,

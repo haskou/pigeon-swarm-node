@@ -17,7 +17,7 @@ export class PostKeychainRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  @Post('/')
+  @Post()
   public async publishKeychain(
     @Body() body: PostKeychainBody,
     @Req() request: Request,

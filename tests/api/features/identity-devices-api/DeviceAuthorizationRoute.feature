@@ -272,7 +272,7 @@ Feature: Device authorization route
   Scenario: Refuse a transition posted to another identity
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
-    And I set a client-signed identity body with name "misrouted transition owner" and handle "misrouted-owner"
+    And I set a client-signed identity body with name "misrouted owner" and handle "misrouted-owner"
     When I POST to "/identities"
     Then response code is equal to 200
     Given I set a signed device enrollment transition body

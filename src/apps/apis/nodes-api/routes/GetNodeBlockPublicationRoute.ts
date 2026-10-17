@@ -12,7 +12,7 @@ export class GetNodeBlockPublicationRoute extends NodeOwnerRouteSupport {
     NodeBlockListPublicationFinder,
   );
 
-  @Get('/')
+  @Get()
   public async getPublication(
     @Req() request: Request,
     @Res() response: Response,

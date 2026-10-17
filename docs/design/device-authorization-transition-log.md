@@ -39,7 +39,7 @@ GET /identity-devices/{percent-encoded identityId}/transitions?after=<revision>
 ```
 
 Every entry is a transition in exactly the primitives
-`POST /identity-devices/transitions` accepts and the node stores, including
+`POST /identity-devices/{identityId}/transitions` accepts and the node stores, including
 the `proofOfPossession` and `signature` strings. The node never re-signs,
 summarizes or rewrites an entry. A stored record only enters the replay when
 its canonical serialization equals that of the parsed transition

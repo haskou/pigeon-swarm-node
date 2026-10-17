@@ -52,7 +52,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConversationsResource'
-  /conversations/me/drafts:
+  /conversation-drafts:
     get:
       tags:
         - conversations
@@ -69,7 +69,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConversationDraftsResource'
-  /conversations/me/drafts/{draftKey}:
+  /conversation-drafts/{draftKey}:
     put:
       tags:
         - conversations

@@ -11,7 +11,7 @@ import { CommunityRouteSupport } from './CommunityRouteSupport';
 export class GetCommunitiesRoute extends CommunityRouteSupport {
   private readonly finder = this.get<CommunitiesFinder>(CommunitiesFinder);
 
-  @Get('/')
+  @Get()
   public async getCommunities(
     @Req() request: Request,
     @Res() response: Response,

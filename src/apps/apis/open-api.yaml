@@ -31,8 +31,6 @@ paths:
     $ref: './identity-devices-api/swagger.yaml#/paths/~1identity-devices~1{identityId}~1transitions'
   /identity-devices/{identityId}/sealed-secrets:
     $ref: './identity-devices-api/swagger.yaml#/paths/~1identity-devices~1{identityId}~1sealed-secrets'
-  /identity-devices/transitions:
-    $ref: './identity-devices-api/swagger.yaml#/paths/~1identity-devices~1transitions'
   /private-authorization/scopes:
     $ref: './private-authorization-api/swagger.yaml#/paths/~1private-authorization~1scopes'
   /private-authorization/challenges:
@@ -55,115 +53,12 @@ paths:
     $ref: './private-blobs-api/swagger.yaml#/paths/~1private-blobs~1{blobId}'
   /client-contract:
     $ref: './nodes-api/swagger.yaml#/paths/~1client-contract'
-  /realtime/v1/tickets:
-    $ref: './realtime-api/swagger.yaml#/paths/~1realtime~1v1~1tickets'
-  /realtime/v1:
-    get:
-      tags:
-        - realtime
-      summary: Open a ticket-authenticated realtime connection
-      description: |
-        WebSocket upgrade endpoint for realtime domain events and live network synchronization status.
-
-        Authenticate with a single-use ticket from `POST /realtime/v1/tickets`,
-        offered in the `Sec-WebSocket-Protocol` header next to the protocol
-        version: `pigeon-realtime.v1, ticket.<ticket>`. Browser clients set
-        subprotocols in the native `WebSocket` constructor, so no custom headers
-        or query parameters are needed. The server selects `pigeon-realtime.v1`
-        and never echoes the ticket.
-
-        When `ROUTE_PREFIX` is configured, connect to the prefixed path, for
-        example `GET /api/realtime/v1`.
-
-        The former signed-query endpoint `GET /ws` has been removed and answers
-        `404`. Signed query parameters and signed headers are ignored on this
-        path; without a valid ticket in `Sec-WebSocket-Protocol` the upgrade answers `401`.
-
-        On success the server sends:
-
-        `{ "type": "connection_ack", "identityId": "<normalizedIdentityId>" }`
-
-        The server then sends the current network synchronization snapshot and
-        publishes a new one whenever libp2p connectivity, OrbitDB store
-        membership or the compared community state changes:
-
-        `{ "type": "network_synchronization_status", "status": { "changedAt": 1770000000000, "networks": [] } }`
-
-        `converged` describes all stores against peers currently known to this
-        node, and requires every one of them to hold the same community state
-        (`communityState`); store participation alone is not content equality.
-        It is not a global percentage because future and disconnected peers
-        cannot be known in an eventually consistent network.
-
-        Clients may send `{ "type": "identity_heartbeat" }` over the open
-        socket. The reference client (`pigeon-swarm-ui`) sends one every 10 seconds.
-        Include `"active": true` when the user has
-        produced activity since the previous heartbeat. The server answers
-        `{ "type": "heartbeat_ack", "identityId": "<normalizedIdentityId>", "timestamp": 1770000000000 }`.
-        Presence is kept in memory, replicated through domain events, and is
-        not written to OrbitDB/IPFS.
-        Heartbeat messages are not signed because the WebSocket upgrade already
-        authenticated the connection.
-
-        Call presence notifications contain `attributes.callId`, a minimal
-        `attributes.liveCall` snapshot and `attributes.liveCallRevision`.
-        Apply snapshots directly; reset revision tracking on reconnect and load
-        the initial/recovery call list. Current scope permissions are checked
-        on every call delivery. Stable heartbeat renewals are not forwarded.
-        The heartbeat HTTP endpoint returns 204 without a roster.
-
-        After successfully applying a `calls.v1.signal.sent` domain event,
-        clients must send
-        `{ "type": "call_signal_ack", "signalId": "<signalId>" }`.
-        The authenticated socket identity must match the event
-        `recipientIdentityId`. Retries retain the same `signalId`, so clients
-        must acknowledge every duplicate while applying its SDP/ICE payload
-        only once.
-
-        Clients may subscribe to a mailbox with
-        `{ "type": "mailbox_subscribe", "mailboxId": "<mailboxId>", "readToken": "<readToken>" }`.
-        A wrong or missing capability is ignored, exactly like an unknown
-        mailbox. The server then pushes
-        `{ "type": "mailbox_envelope", "mailboxId": "<mailboxId>", "cursor": 42 }`
-        for each envelope appended on this node. The hint is a content-free
-        nudge: clients must GET the mailbox envelopes to read data, and that
-        GET response is the source of truth. There is no subscription ack and
-        no unsubscribe message; closing the socket ends its subscriptions.
-        Revoking the reader that authorised a subscription, or deleting the
-        mailbox (including by retention), ends it at once; the socket stays open.
-        A socket holds at most 256 mailbox subscriptions.
-
-        Clients may also send ephemeral typing indicators. Direct conversation typing:
-        `{ "type": "typing", "scope": "conversation", "conversationId": "<conversationId>", "active": true }`.
-        Community text channel typing:
-        `{ "type": "typing", "scope": "community_channel", "communityId": "<communityId>", "channelId": "<channelId>", "active": true }`.
-        The server uses the authenticated WebSocket identity, validates access
-        to the conversation or text channel, excludes the sender, and relays a
-        `{ "type": "typing", ... }` message to the remaining recipients. Typing
-        in a group conversation is never relayed: it travels as an MLS record
-        through the group mailboxes.
-
-        Subsequent messages use:
-
-        `{ "type": "domain_event", "event": { "type": "<eventType>", "aggregate_id": "<aggregateId>", "attributes": {} } }`
-      parameters:
-        - in: header
-          name: Sec-WebSocket-Protocol
-          required: true
-          schema:
-            type: string
-          description: Offers `pigeon-realtime.v1` and `ticket.<ticket>`. The ticket is single-use and is consumed as soon as it is presented.
-      responses:
-        '101':
-          description: WebSocket upgrade accepted. The server selects `pigeon-realtime.v1`.
-        '401':
-          description: Ticket missing, malformed, unknown, expired, or already used, or `pigeon-realtime.v1` not offered. Signed headers and query parameters do not authenticate the upgrade.
-        '403':
-          description: Browser Origin is not listed in `REALTIME_ALLOWED_ORIGINS`.
-        '429':
-          description: Too many upgrades or open sockets on this node.
-  /calls/:
-    $ref: './calls-api/swagger.yaml#/paths/~1calls~1'
+  /realtime/tickets:
+    $ref: './realtime-api/swagger.yaml#/paths/~1realtime~1tickets'
+  /realtime:
+    $ref: './realtime-api/swagger.yaml#/paths/~1realtime'
+  /calls:
+    $ref: './calls-api/swagger.yaml#/paths/~1calls'
   /calls/{callId}:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}'
   /calls/ice-servers:
@@ -178,14 +73,14 @@ paths:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1participants~1me~1heartbeat'
   /calls/{callId}/signals:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1signals'
-  /communities/:
-    $ref: './communities-api/swagger.yaml#/paths/~1communities~1'
+  /communities:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities'
   /communities/discover:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1discover'
-  /communities/membership-requests:
-    $ref: './communities-api/swagger.yaml#/paths/~1communities~1membership-requests'
-  /communities/membership-requests/{requestId}:
-    $ref: './communities-api/swagger.yaml#/paths/~1communities~1membership-requests~1{requestId}'
+  /community-membership-requests:
+    $ref: './communities-api/swagger.yaml#/paths/~1community-membership-requests'
+  /community-membership-requests/{requestId}:
+    $ref: './communities-api/swagger.yaml#/paths/~1community-membership-requests~1{requestId}'
   /communities/{communityId}:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}'
   /communities/{communityId}/frontier:
@@ -200,118 +95,130 @@ paths:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1members~1me'
   /communities/{communityId}/members/{identityId}/kick:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1members~1{identityId}~1kick'
+  /communities/{communityId}/members/{identityId}/roles:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1members~1{identityId}~1roles'
+  /communities/{communityId}/bans:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1bans'
+  /communities/{communityId}/bans/{identityId}:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1bans~1{identityId}'
+  /communities/{communityId}/roles:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1roles'
+  /communities/{communityId}/roles/{roleId}:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1roles~1{roleId}'
   /communities/{communityId}/invites:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1invites'
   /communities/invites/{inviteToken}:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1invites~1{inviteToken}'
-  /communities/{communityId}/join-requests:
-    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1join-requests'
   /communities/invites/{inviteToken}/accept:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1invites~1{inviteToken}~1accept'
   /communities/{communityId}/channels:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels'
-  /communities/{communityId}/messages/search:
-    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1messages~1search'
+  /communities/{communityId}/messages:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1messages'
   /communities/{communityId}/channels/text:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1text'
   /communities/{communityId}/channels/voice:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1voice'
   /communities/{communityId}/channels/{channelId}:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}'
+  /communities/{communityId}/channels/{channelId}/permissions:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1permissions'
   /communities/{communityId}/channels/{channelId}/messages:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1messages'
-  /communities/me/drafts:
-    $ref: './communities-api/swagger.yaml#/paths/~1communities~1me~1drafts'
+  /community-drafts:
+    $ref: './communities-api/swagger.yaml#/paths/~1community-drafts'
   /communities/{communityId}/channels/{channelId}/draft:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1draft'
   /communities/{communityId}/mls/records:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1mls~1records'
   /communities/{communityId}/channels/{channelId}/pins:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1pins'
-  /communities/{communityId}/channels/{channelId}/messages/search:
-    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1messages~1search'
   /communities/{communityId}/channels/{channelId}/messages/{messageId}:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1messages~1{messageId}'
   /communities/{communityId}/channels/{channelId}/messages/{messageId}/pin:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1messages~1{messageId}~1pin'
   /communities/{communityId}/channels/{channelId}/messages/{messageId}/thread:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1messages~1{messageId}~1thread'
+  /communities/{communityId}/channels/{channelId}/messages/{messageId}/reactions:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}~1messages~1{messageId}~1reactions'
   /conversations:
     $ref: './conversations-api/swagger.yaml#/paths/~1conversations'
-  /conversations/me/drafts:
-    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1me~1drafts'
-  /conversations/me/drafts/{draftKey}:
-    $ref: './conversations-api/swagger.yaml#/paths/~1conversations~1me~1drafts~1{draftKey}'
-  /identities/:
-    $ref: './identities-api/swagger.yaml#/paths/~1identities~1'
-  /identities/{reference}:
-    $ref: './identities-api/swagger.yaml#/paths/~1identities~1{reference}'
-  /ipfs/{resourceId}:
-    $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1{resourceId}'
+  /conversation-drafts:
+    $ref: './conversations-api/swagger.yaml#/paths/~1conversation-drafts'
+  /conversation-drafts/{draftKey}:
+    $ref: './conversations-api/swagger.yaml#/paths/~1conversation-drafts~1{draftKey}'
+  /identities:
+    $ref: './identities-api/swagger.yaml#/paths/~1identities'
+  /identities/{identityId}:
+    $ref: './identities-api/swagger.yaml#/paths/~1identities~1{identityId}'
+  /ipfs/contents/{cid}:
+    $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1contents~1{cid}'
   /ipfs/public:
     $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1public'
-  /ipfs/replication/status:
-    $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1replication~1status'
-  /keychains/:
-    $ref: './keychains-api/swagger.yaml#/paths/~1keychains~1'
+  /ipfs/replication-status:
+    $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1replication-status'
+  /ipfs/replications/{cid}:
+    $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1replications~1{cid}'
+  /keychains:
+    $ref: './keychains-api/swagger.yaml#/paths/~1keychains'
   /keychains/{identityId}:
     $ref: './keychains-api/swagger.yaml#/paths/~1keychains~1{identityId}'
   /link-previews:
     $ref: './link-previews-api/swagger.yaml#/paths/~1link-previews'
-  /node/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1'
-  /node/relay-configuration/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1relay-configuration~1'
-  /node/blocks/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1blocks~1'
-  /node/blocks/publication/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1blocks~1publication~1'
-  /node/blocks/published/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1blocks~1published~1'
-  /node/block-sources/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1block-sources~1'
+  /node:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node'
+  /node/relay-configuration:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1relay-configuration'
+  /node/blocks:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1blocks'
+  /node/blocks/publication:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1blocks~1publication'
+  /node/published-blocks:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1published-blocks'
+  /node/block-sources:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1block-sources'
   /node/block-sources/{ownerIdentityId}:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1block-sources~1{ownerIdentityId}'
-  /node/block-sources/{ownerIdentityId}/pending:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1block-sources~1{ownerIdentityId}~1pending'
+  /node/block-sources/{ownerIdentityId}/pending-entries:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1block-sources~1{ownerIdentityId}~1pending-entries'
   /node/block-sources/{ownerIdentityId}/approvals:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1block-sources~1{ownerIdentityId}~1approvals'
-  /node/block-exceptions/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1block-exceptions~1'
-  /node/diagnostics/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1diagnostics~1'
-  /node/networks/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1networks~1'
-  /node/networks/{networkId}/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1networks~1{networkId}~1'
-  /node/networks/public/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1networks~1public~1'
-  /node/owner/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1owner~1'
-  /node/registration/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1registration~1'
-  /node/registration-codes/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1registration-codes~1'
-  /node/registration-codes/{codeId}/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1registration-codes~1{codeId}~1'
-  /peers/:
-    $ref: './nodes-api/swagger.yaml#/paths/~1peers~1'
-  /notifications/:
-    $ref: './notifications-api/swagger.yaml#/paths/~1notifications~1'
+  /node/block-exceptions:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1block-exceptions'
+  /node/diagnostics:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1diagnostics'
+  /node/networks:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1networks'
+  /node/networks/{networkId}:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1networks~1{networkId}'
+  /node/networks/public:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1networks~1public'
+  /node/owner:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1owner'
+  /node/registration:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1registration'
+  /node/registration-codes:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1registration-codes'
+  /node/registration-codes/{codeId}:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1registration-codes~1{codeId}'
+  /peers:
+    $ref: './nodes-api/swagger.yaml#/paths/~1peers'
+  /notifications:
+    $ref: './notifications-api/swagger.yaml#/paths/~1notifications'
   /notifications/{notificationId}:
     $ref: './notifications-api/swagger.yaml#/paths/~1notifications~1{notificationId}'
-  /notification-settings/:
-    $ref: './notification-settings-api/swagger.yaml#/paths/~1notification-settings~1'
+  /notification-settings:
+    $ref: './notification-settings-api/swagger.yaml#/paths/~1notification-settings'
   /notification-settings/scopes:
     $ref: './notification-settings-api/swagger.yaml#/paths/~1notification-settings~1scopes'
-  /presence/:
-    $ref: './presence-api/swagger.yaml#/paths/~1presence~1'
+  /presence:
+    $ref: './presence-api/swagger.yaml#/paths/~1presence'
   /presence/{identityId}:
     $ref: './presence-api/swagger.yaml#/paths/~1presence~1{identityId}'
   /presence/me:
     $ref: './presence-api/swagger.yaml#/paths/~1presence~1me'
-  /polls/:
-    $ref: './polls-api/swagger.yaml#/paths/~1polls~1'
+  /polls:
+    $ref: './polls-api/swagger.yaml#/paths/~1polls'
   /polls/{pollId}:
     $ref: './polls-api/swagger.yaml#/paths/~1polls~1{pollId}'
   /polls/{pollId}/votes:
@@ -328,8 +235,8 @@ paths:
     $ref: './push-api/swagger.yaml#/paths/~1push~1test'
   /stickers/packs:
     $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs'
-  /stickers/me:
-    $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1me'
+  /stickers/library:
+    $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1library'
   /stickers/packs/{packId}:
     $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}'
   /stickers/packs/{packId}/saved:

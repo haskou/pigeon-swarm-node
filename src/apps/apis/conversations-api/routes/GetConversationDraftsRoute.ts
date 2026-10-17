@@ -8,7 +8,7 @@ import { Get, JsonController, Req, Res } from 'routing-controllers';
 
 import { ConversationDraftsResource } from '../resources/ConversationDraftsResource';
 
-@JsonController('/conversations')
+@JsonController('/conversation-drafts')
 export class GetConversationDraftsRoute extends Route {
   private readonly authenticator = this.get<SignedHttpRequestAuthenticator>(
     SignedHttpRequestAuthenticator,
@@ -18,7 +18,7 @@ export class GetConversationDraftsRoute extends Route {
     ConversationDraftsFinder,
   );
 
-  @Get('/me/drafts')
+  @Get()
   public async listDrafts(
     @Req() request: Request,
     @Res() response: Response,

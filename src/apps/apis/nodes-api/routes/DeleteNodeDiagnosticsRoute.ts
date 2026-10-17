@@ -11,7 +11,7 @@ export class DeleteNodeDiagnosticsRoute extends NodeOwnerRouteSupport {
     DiagnosticsSessionCloser,
   );
 
-  @Delete('/')
+  @Delete()
   public async deleteDiagnostics(
     @Req() request: Request,
     @Res() response: Response,

@@ -24,7 +24,7 @@ export class PutContentReplicationRoute extends Route {
     ContentReplicationRegistrar,
   );
 
-  @Put('/replication/:cid')
+  @Put('/replications/:cid')
   public async request(
     @Param('cid') cid: string,
     @Body() body: PutContentReplicationBody,

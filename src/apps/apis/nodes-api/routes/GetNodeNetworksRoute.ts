@@ -29,7 +29,7 @@ export class GetNodeNetworksRoute extends Route {
     }
   }
 
-  @Get('/')
+  @Get()
   public async getNetworks(
     @Req() request: Request,
     @Res() response: Response,

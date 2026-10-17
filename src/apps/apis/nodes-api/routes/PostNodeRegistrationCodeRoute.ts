@@ -17,7 +17,7 @@ export class PostNodeRegistrationCodeRoute extends NodeOwnerRouteSupport {
     NodeRegistrationCodeIssuer,
   );
 
-  @Post('/')
+  @Post()
   public async postRegistrationCode(
     @Body({ validate: { forbidNonWhitelisted: true, whitelist: true } })
     body: PostNodeRegistrationCodeBody,

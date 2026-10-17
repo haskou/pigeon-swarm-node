@@ -11,16 +11,17 @@ import {
   Res,
 } from 'routing-controllers';
 
+import { MissingCommunityMessageQueryError } from '../errors/MissingCommunityMessageQueryError';
 import { CommunityMessageSearchViewModel } from '../view-model/CommunityMessageSearchViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
 @JsonController('/communities')
-export class GetCommunityMessageSearchRoute extends CommunityRouteSupport {
+export class GetCommunityMessagesRoute extends CommunityRouteSupport {
   private readonly finder = this.get<CommunityMessagesSearchFinder>(
     CommunityMessagesSearchFinder,
   );
 
-  @Get('/:communityId/messages/search')
+  @Get('/:communityId/messages')
   public async searchCommunityMessages(
     @Param('communityId') communityId: string,
     @QueryParam('query') query: string | undefined,
@@ -29,6 +30,11 @@ export class GetCommunityMessageSearchRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
+
+    if (query === undefined) {
+      throw new MissingCommunityMessageQueryError();
+    }
+
     const result = await this.finder.find(
       new CommunityMessagesSearchMessage(
         communityId,

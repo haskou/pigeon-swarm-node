@@ -10,7 +10,7 @@ import { NodeViewModel } from '../view-model/NodeViewModel';
 export class GetNodeRoute extends Route {
   private readonly loader: NodeLoader = this.get<NodeLoader>(NodeLoader);
 
-  @Get('/')
+  @Get()
   public async getNode(@Res() response: Response): Promise<Response> {
     const node = await this.loader.loadNode();
 

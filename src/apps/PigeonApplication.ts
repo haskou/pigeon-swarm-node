@@ -188,22 +188,24 @@ export default class PigeonApplication {
             phase: 'beforeErrors',
           },
           {
+            // Strict routing makes `/calls/` a different path from `/calls`,
+            // so a trailing slash names no route. Express builds its router
+            // on the first `use`, so the setting precedes every middleware.
             handle: (app) => {
+              app.set('strict routing', true);
               app.set(
                 'trust proxy',
                 parseTrustProxySetting(this.kernel.environment.API_TRUST_PROXY),
               );
+              app.use((request, _response, next) => {
+                HttpRequestContext.run(request, next);
+              });
             },
             phase: 'beforeControllers',
           },
         ],
         kernel: this.kernel,
         port: this.kernel.environment.API_PORT,
-        preControllerMiddlewares: [
-          (request, _response, next) => {
-            HttpRequestContext.run(request, next);
-          },
-        ],
         routePrefix: routePrefixValue,
         routingControllersOptions: {
           cors: true,
@@ -435,7 +437,7 @@ export default class PigeonApplication {
 
     this.webSocketRealtimeServer.attach(
       server.server,
-      `${routePrefix}/realtime/v1`,
+      `${routePrefix}/realtime`,
     );
   }
 

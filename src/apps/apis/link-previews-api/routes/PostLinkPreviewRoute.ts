@@ -23,7 +23,7 @@ export class PostLinkPreviewRoute extends Route {
     return request.ip || request.socket.remoteAddress || 'unknown';
   }
 
-  @Post('/')
+  @Post()
   public async createPreview(
     @Body() body: PostLinkPreviewBody,
     @Req() request: Request,

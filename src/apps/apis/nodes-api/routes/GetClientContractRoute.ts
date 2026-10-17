@@ -7,7 +7,7 @@ import { ClientContractViewModel } from '../view-model/ClientContractViewModel';
 
 @JsonController('/client-contract')
 export class GetClientContractRoute extends Route {
-  @Get('/')
+  @Get()
   public getClientContract(@Res() response: Response): Response {
     return response
       .status(HttpRouteStatusEnum.OK)

@@ -12,7 +12,7 @@ export class GetStickerUserLibraryRoute extends StickerRouteSupport {
     StickerUserLibraryFinder,
   );
 
-  @Get('/me')
+  @Get('/library')
   public async getLibrary(
     @Req() request: Request,
     @Res() response: Response,

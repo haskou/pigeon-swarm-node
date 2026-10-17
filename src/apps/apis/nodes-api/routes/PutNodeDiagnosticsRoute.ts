@@ -14,7 +14,7 @@ export class PutNodeDiagnosticsRoute extends NodeOwnerRouteSupport {
     DiagnosticsSessionOpener,
   );
 
-  @Put('/')
+  @Put()
   public async putDiagnostics(
     @Body() body: PutNodeDiagnosticsBody,
     @Req() request: Request,

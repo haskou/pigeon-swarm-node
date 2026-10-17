@@ -32,22 +32,22 @@ describe('ApiSwaggerFactory', () => {
         'realtime-api',
         'stickers-api',
       ]);
-      expect(specs['calls-api']).toContain('/calls/:');
-      expect(specs['communities-api']).toContain('/communities/:');
+      expect(specs['calls-api']).toContain('/calls:');
+      expect(specs['communities-api']).toContain('/communities:');
       expect(specs['conversations-api']).toContain('/conversations:');
-      expect(specs['identities-api']).toContain('/identities/:');
+      expect(specs['identities-api']).toContain('/identities:');
       expect(specs['identity-devices-api']).toContain(
         '/identity-devices/{identityId}:',
       );
-      expect(specs['ipfs-api']).toContain('/ipfs/{resourceId}:');
-      expect(specs['keychains-api']).toContain('/keychains/:');
+      expect(specs['ipfs-api']).toContain('/ipfs/contents/{cid}:');
+      expect(specs['keychains-api']).toContain('/keychains:');
       expect(specs['link-previews-api']).toContain('/link-previews:');
-      expect(specs['nodes-api']).toContain('/node/:');
+      expect(specs['nodes-api']).toContain('/node:');
       expect(specs['notification-settings-api']).toContain(
-        '/notification-settings/:',
+        '/notification-settings:',
       );
-      expect(specs['notifications-api']).toContain('/notifications/:');
-      expect(specs['presence-api']).toContain('/presence/:');
+      expect(specs['notifications-api']).toContain('/notifications:');
+      expect(specs['presence-api']).toContain('/presence:');
       expect(specs['private-authorization-api']).toContain(
         '/private-authorization/challenges:',
       );
@@ -61,38 +61,34 @@ describe('ApiSwaggerFactory', () => {
       const spec = factory.createAggregatedSpec();
 
       expect(spec).toContain('title: Pigeon-swarm APIs');
-      expect(spec).toContain(
-        "$ref: './calls-api/swagger.yaml#/paths/~1calls~1'",
-      );
+      expect(spec).toContain("$ref: './calls-api/swagger.yaml#/paths/~1calls'");
       expect(spec).toContain(
         "$ref: './conversations-api/swagger.yaml#/paths/~1conversations'",
       );
       expect(spec).toContain(
-        "$ref: './identities-api/swagger.yaml#/paths/~1identities~1'",
+        "$ref: './identities-api/swagger.yaml#/paths/~1identities'",
       );
       expect(spec).toContain(
         "$ref: './identity-devices-api/swagger.yaml#/paths/~1identity-devices~1{identityId}'",
       );
       expect(spec).toContain(
-        "$ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1{resourceId}'",
+        "$ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1contents~1{cid}'",
       );
       expect(spec).toContain(
-        "$ref: './keychains-api/swagger.yaml#/paths/~1keychains~1'",
+        "$ref: './keychains-api/swagger.yaml#/paths/~1keychains'",
       );
       expect(spec).toContain(
         "$ref: './link-previews-api/swagger.yaml#/paths/~1link-previews'",
       );
+      expect(spec).toContain("$ref: './nodes-api/swagger.yaml#/paths/~1node'");
       expect(spec).toContain(
-        "$ref: './nodes-api/swagger.yaml#/paths/~1node~1'",
+        "$ref: './notification-settings-api/swagger.yaml#/paths/~1notification-settings'",
       );
       expect(spec).toContain(
-        "$ref: './notification-settings-api/swagger.yaml#/paths/~1notification-settings~1'",
+        "$ref: './notifications-api/swagger.yaml#/paths/~1notifications'",
       );
       expect(spec).toContain(
-        "$ref: './notifications-api/swagger.yaml#/paths/~1notifications~1'",
-      );
-      expect(spec).toContain(
-        "$ref: './presence-api/swagger.yaml#/paths/~1presence~1'",
+        "$ref: './presence-api/swagger.yaml#/paths/~1presence'",
       );
       expect(spec).toContain(
         "$ref: './private-authorization-api/swagger.yaml#/paths/~1private-authorization~1challenges'",

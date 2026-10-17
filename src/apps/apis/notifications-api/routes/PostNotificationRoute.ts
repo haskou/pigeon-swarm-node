@@ -35,7 +35,7 @@ export class PostNotificationRoute extends Route {
     }
   }
 
-  @Post('/')
+  @Post()
   public async createNotification(
     @Body() body: PostNotificationBody,
     @Req() request: Request,

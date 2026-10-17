@@ -17,7 +17,7 @@ export class GetPeersRoute extends Route {
       NodeNetworkSynchronizationFinder,
     );
 
-  @Get('/')
+  @Get()
   public async getPeers(@Res() response: Response): Promise<Response> {
     const peers = await this.peersFinder.find();
     const synchronization = this.synchronizationFinder.find();

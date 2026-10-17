@@ -7,7 +7,7 @@ import { JsonController, Post, Req, Res } from 'routing-controllers';
 
 import { RealtimeTicketCapacityExceededError } from '../errors/RealtimeTicketCapacityExceededError';
 
-@JsonController('/realtime/v1')
+@JsonController('/realtime')
 export class PostRealtimeTicketRoute extends Route {
   private readonly authenticator = this.get<SignedHttpRequestAuthenticator>(
     SignedHttpRequestAuthenticator,
