@@ -984,11 +984,11 @@ components:
     NetworkResource:
       type: object
       required:
+        - id
         - name
       properties:
         id:
           type: string
-          description: Optional network id. The node generates one when omitted.
         name:
           type: string
         key:
@@ -1155,11 +1155,11 @@ components:
     PeerNetworkResource:
       type: object
       required:
+        - id
         - name
       properties:
         id:
           type: string
-          description: Optional network id. The node generates one when omitted.
         name:
           type: string
     ConnectedIpfsPeerNetworkResource:
