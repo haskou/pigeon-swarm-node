@@ -81,6 +81,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CallResource'
+        '404':
+          description: The path segment is not a canonical call id (lowercase UUID), so no call can have it. Refused after authentication and before any lookup.
         '409':
           description: Call not found or not visible to the authenticated identity.
         '503':

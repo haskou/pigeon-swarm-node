@@ -326,6 +326,13 @@ signed one of the old paths must sign the new one):
 | `POST /node/networks/public`                                  | `POST /node/networks` with `{ "name": "public" }`                 |
 | `POST /ipfs/public`                                           | `POST /ipfs/contents`                                             |
 
+The three removed `GET` paths still match `GET /communities/{communityId}` and
+`GET /calls/{callId}`. Those two routes authenticate the request first and then
+refuse a segment that is not a canonical id (a 43-character base64url community
+id, a lowercase UUID call id) with `404`, before any lookup. A signed request
+for `/communities/discover`, `/calls/history` or `/calls/ice-servers` therefore
+answers `404`, and an unsigned one `401`.
+
 Documented exceptions, RPC-style operations with no resource to write:
 
 | Route                                | Why it stays                                                                                |
@@ -3635,6 +3642,7 @@ GET /communities/{communityId}
 Implemented:
 
 - require signed request auth
+- refuse a `communityId` that is not a canonical id (43-character base64url) with `404`, before any lookup
 - only allow community members to read the community
 
 ### Get community frontier

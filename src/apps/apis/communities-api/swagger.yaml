@@ -158,6 +158,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityResource'
+        '404':
+          description: The path segment is not a canonical community id (43-character base64url), so no community can have it. Refused after authentication and before any lookup.
         '409':
           description: Authenticated identity is not a community member.
     patch:
