@@ -321,9 +321,11 @@ therefore never races an owner route. Each initializer is bounded by
 `NODE_INITIALIZER_TIMEOUT_MS` (default 10 minutes): a purge that hangs fails
 startup with exit status 1 and a log naming only the initializer and the
 bound, instead of leaving the node up with its API never listening. The purge
-logs counts only
-(`Purged non-canonical identity ids: ownerCleared=<bool> removedEntries=<n> ownListNonCanonicalEntries=<n>`),
-never an id, and writes nothing when the stored data is canonical. A node whose
+logs counts only (`Purged non-canonical identity ids: ownerCleared=<bool> removedEntries=<n>`
+when it dropped something), never an id. When the own signed list names aliases, it logs
+a warning with the count only: the own list is kept and enforced locally, it is NOT
+published, and it must be re-signed with a higher version. Canonical stored data writes
+nothing. A node whose
 owner was cleared is unclaimed: the first signed caller of `PUT /node/owner`
 claims it, and the node logs a warning that it is unclaimed and must be claimed
 again, naming `yarn node:reset-owner` and no id. Operators whose owner may have
@@ -431,8 +433,11 @@ signed by the owner identity:
   `identitySignature`, and the signature travels in the `X-Identity-Signature`
   response header. It is off by default, because a published list reveals
   whom this owner blocked. A stored list that names an alias id is not served:
-  `GET /node/published-blocks` answers `404` until the owner stores a newer list
-  naming only canonical ids.
+  `GET /node/published-blocks` answers `404` until the owner re-signs a clean list (only
+  canonical ids) at a version above the last published one. The stored list keeps its
+  version, so the owner must sign a higher one: an equal or lower version is refused
+  with `409` and the held list stays. Publication stays on, so the clean list is then
+  served at once.
 - **Adopting.** Another node's owner adds a source with owner-signed
   `PUT /node/block-sources/{ownerIdentityId} { "origin": "https://..." }`. That
   node periodically fetches `GET {origin}/node/published-blocks`, reading at

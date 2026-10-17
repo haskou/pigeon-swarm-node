@@ -532,6 +532,7 @@ package "nodes" {
     NodeBlockListPublicationFinder --> NodeBlockPublicationRepository
     PublishedNodeBlockListFinder --> NodeBlockPublicationRepository
     PublishedNodeBlockListFinder --> NodeBlockListRepository
+    PublishedNodeBlockListFinder ..> NodeBlocks
   }
 
   package "infrastructure" {

@@ -200,7 +200,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PublishedNodeBlockList'
         '404':
-          description: Publication is off, no list is stored, or the stored list names an alias of a key (code 404040).
+          description: Publication is off, no list is stored, or the stored list names an alias of a key (code 404040). The owner lifts the alias hold by signing a clean list (only canonical ids) at a version above the stored one and storing it with PUT /node/blocks; an equal or lower version is refused with 409. Publication stays on.
   /node/block-sources:
     get:
       tags:

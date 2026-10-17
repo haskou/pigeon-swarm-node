@@ -2006,8 +2006,10 @@ from what its sources apply, and leaves the node unclaimed if its owner was stor
 under one. It then logs a warning that the node is unclaimed and must be claimed
 again, naming `yarn node:reset-owner` and no id. A stored own block list that
 names such an id is kept, signed verbatim: its alias entries are never enforced,
-and `GET /node/published-blocks` answers `404` while it names one, until the owner
-stores a newer list that names only canonical ids.
+and `GET /node/published-blocks` answers `404` while it names one. To lift the hold, the
+owner re-signs a clean list (only canonical ids) at a version above the kept one and
+sends it with `PUT /node/blocks`; an equal or lower version is refused with `409`. Publication
+stays on, so the clean list is served again at once.
 
 Before starting an upgraded node whose owner may have been claimed under such
 an id, stop it and run `yarn node:reset-owner <canonical owner identity id>`
